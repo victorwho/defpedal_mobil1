@@ -1,0 +1,46 @@
+remote: error: GH013: Repository rule violations found for refs/heads/main.        
+remote: 
+remote: - GITHUB PUSH PROTECTION        
+remote:   ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇö        
+remote:     Resolve the following violations before pushing again        
+remote: 
+remote:     - Push cannot contain secrets        
+remote: 
+remote:             
+remote:      (?) Learn how to resolve a blocked push        
+remote:      https://docs.github.com/code-security/secret-scanning/working-with-secret-scanning-and-push-protection/working-with-push-protection-from-the-command-line#resolving-a-blocked-push        
+remote:             
+remote:             
+remote:       ÔÇöÔÇö Mapbox Secret Access Token ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇö        
+remote:        locations:        
+remote:          - commit: 620ffe807d3658aa70546e82eb42a9ed9132b64a        
+remote:            path: .env:3        
+remote:             
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.        
+remote:        https://github.com/victorwho/defpedal_mobil1/security/secret-scanning/unblock-secret/3At9tTBFePzSpoOn5JNL39PGOAv        
+remote:             
+remote:             
+remote:       ÔÇöÔÇö Mapbox Secret Access Token ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇö        
+remote:        locations:        
+remote:          - commit: fd4b9f448a6bf05b6af35dbc182711ebbf5fe058        
+remote:            path: components/Search.tsx:5        
+remote:          - commit: fd4b9f448a6bf05b6af35dbc182711ebbf5fe058        
+remote:            path: services/nominatim.ts:3        
+remote:             
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.        
+remote:        https://github.com/victorwho/defpedal_mobil1/security/secret-scanning/unblock-secret/3At9tPpfVA6078Xlr4m73TGfDUo        
+remote:             
+remote:             
+remote:       ÔÇöÔÇö Mapbox Secret Access Token ÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇöÔÇö        
+remote:        locations:        
+remote:          - commit: fd4b9f448a6bf05b6af35dbc182711ebbf5fe058        
+remote:            path: services/osrm.ts:6        
+remote:             
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.        
+remote:        https://github.com/victorwho/defpedal_mobil1/security/secret-scanning/unblock-secret/3At9tSIqHLvDG9eDRQqxefWcMaw        
+remote:             
+remote: 
+remote: 
+To https://github.com/victorwho/defpedal_mobil1.git
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/victorwho/defpedal_mobil1.git'

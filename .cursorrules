@@ -1,0 +1,3 @@
+# AI Assistant Instructions
+
+ALWAYS record any architectural changes, bug fixes, or new features in the Changelog section of `ARCHITECTURE.md` before completing a task. This is a strict requirement to maintain project history.
