@@ -13,6 +13,7 @@ Update it at the end of each implementation slice.
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
 - Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
 - Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
+- Stable baseline Phase 2 note: the default repo workflow now points at `dev:mobile`, `.gitignore` covers the main runtime/staging noise, and repo docs now describe the web app as an opt-in reference surface
 
 ## Phase Status
 
@@ -188,12 +189,13 @@ We will call the repo "stable baseline" when all of the following are true:
 
 ### Phase 2: Repo shape and developer workflow
 
-- Status: Pending
+- Status: In progress
 - Checklist:
-  - make root scripts clearly favor `dev:mobile`, `dev:api`, and native validation
-  - tighten `.gitignore` to avoid noisy artifacts and staging leftovers
-  - refresh `README.md`, `CONTEXT.md`, and related docs around the mobile-first happy path
-  - define whether the legacy web app remains buildable by default or becomes opt-in reference only
+  - completed: make root scripts clearly favor `dev:mobile`, `dev:api`, and native validation
+  - completed: tighten `.gitignore` to avoid noisy runtime artifacts and staging leftovers
+  - completed: refresh `README.md`, `CONTEXT.md`, and related docs around the mobile-first happy path
+  - completed: define the legacy web app as an opt-in reference surface instead of the default workflow
+  - remaining: sanity-check the updated workflow docs against one clean onboarding pass
 - Exit criteria:
   - a new contributor can follow one documented happy path from install to native validation
 

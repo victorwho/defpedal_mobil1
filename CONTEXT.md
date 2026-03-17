@@ -15,6 +15,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 - the isolated stabilization worktree now runs on top of that committed mobile baseline
 - the snapshot intentionally excluded local-only env files, generated output, and temp validation artifacts
 - the active hardening plan for turning this into a stable development baseline lives in `mobile_stable_baseline_plan.md`
+- the default developer path now targets `mobile app + mobile API + mobile-first validate`, while the root web app is an explicit opt-in reference surface
 
 ## Tech Stack
 

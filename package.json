@@ -10,7 +10,7 @@
     "services/*"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run dev:mobile",
     "dev:web": "vite",
     "dev:mobile": "npm run start --workspace @defensivepedal/mobile",
     "dev:api": "npm run dev --workspace @defensivepedal/mobile-api",

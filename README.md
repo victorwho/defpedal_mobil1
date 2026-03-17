@@ -1,12 +1,11 @@
 # Defensive Pedal
 
-This repository now contains the original web app plus the first implementation slice of the
-mobile-first migration:
+This repo is now organized around a mobile-first product baseline:
 
-- `packages/core`: shared route, navigation, and API contract logic
-- `services/mobile-api`: Fastify backend-for-frontend for mobile routing/search
-- `apps/mobile`: Expo/React Native app scaffold
-- root web app: the current React/Vite reference implementation
+- `apps/mobile`: Expo/React Native app
+- `services/mobile-api`: Fastify backend-for-frontend for the mobile app
+- `packages/core`: shared contracts, navigation logic, and route helpers
+- root web app: legacy reference surface, kept for comparison during migration
 
 ## Workspace layout
 
@@ -20,6 +19,16 @@ defpedal_mobil1/
   services
   utils
 ```
+
+## Default workflow
+
+The default developer path in this repo is:
+
+1. run the mobile API
+2. run the Expo mobile app
+3. validate with the mobile-first baseline command
+
+Use the legacy web app only when you explicitly need reference behavior.
 
 ## What is implemented
 
@@ -40,6 +49,7 @@ defpedal_mobil1/
   - offline/auth/settings placeholders
   - Mapbox-backed route preview component
 - Existing web app now reads shared logic from `packages/core` through re-exported local modules
+- Root validation now defaults to the mobile-first baseline, while legacy web validation remains opt-in
 
 ## Run locally
 
@@ -54,10 +64,16 @@ Install workspace dependencies from the repo root:
 npm install
 ```
 
-Run the existing web app:
+Run the mobile app:
 
 ```bash
-npm run dev:web
+npm run dev
+```
+
+Or explicitly:
+
+```bash
+npm run dev:mobile
 ```
 
 Run the mobile API:
@@ -66,22 +82,28 @@ Run the mobile API:
 npm run dev:api
 ```
 
-Run the Expo app:
-
-```bash
-npm run dev:mobile
-```
-
 Run the repeatable native Android validation workflow on Windows:
 
 ```powershell
 npm run android:validate:native
 ```
 
-Run the repo validation suite locally:
+Run the stable mobile-first validation suite:
 
 ```bash
 npm run validate
+```
+
+Run the legacy reference web app only when needed:
+
+```bash
+npm run dev:web
+```
+
+Validate the legacy web reference surface explicitly:
+
+```bash
+npm run validate:web
 ```
 
 ## Environment
@@ -89,6 +111,9 @@ npm run validate
 - Web app: existing `.env` / `.env.example`
 - Mobile app: `apps/mobile/.env.example`
 - Mobile API: `services/mobile-api/.env.example`
+
+Local-only env files such as `.env`, `apps/mobile/.env`, `apps/mobile/.env.preview`, and
+`services/mobile-api/.env` should stay uncommitted.
 
 ### Mobile app variants
 
@@ -231,3 +256,4 @@ The end-to-end migration plan lives in [mobile_implementation_plan.md](./mobile_
 The current Android validation status and workflow live in [native_android_validation.md](./native_android_validation.md).
 The current release automation and rollout guidance live in [mobile_release_runbook.md](./mobile_release_runbook.md).
 The current mobile API deployment and load-test guidance live in [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md).
+The stable-baseline hardening plan lives in [mobile_stable_baseline_plan.md](./mobile_stable_baseline_plan.md).
