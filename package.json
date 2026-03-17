@@ -3,14 +3,38 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "index.cjs",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
   "scripts": {
     "dev": "vite",
+    "dev:web": "vite",
+    "dev:mobile": "npm run start --workspace @defensivepedal/mobile",
+    "dev:api": "npm run dev --workspace @defensivepedal/mobile-api",
+    "android:validate:native": "powershell -ExecutionPolicy Bypass -File ./scripts/validate-android-native.ps1",
+    "android:validate:native:release": "powershell -ExecutionPolicy Bypass -File ./scripts/validate-android-native.ps1 -AndroidVariant release",
+    "loadtest:api": "node ./scripts/load-test-mobile-api.mjs --profile smoke",
+    "loadtest:api:smoke": "node ./scripts/load-test-mobile-api.mjs --profile smoke",
+    "loadtest:api:steady": "node ./scripts/load-test-mobile-api.mjs --profile steady",
+    "loadtest:api:burst": "node ./scripts/load-test-mobile-api.mjs --profile burst",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:web": "vite build",
+    "build:api": "npm run build --workspace @defensivepedal/mobile-api",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck:web": "tsc --noEmit",
+    "typecheck:mobile": "npm run typecheck --workspace @defensivepedal/mobile",
+    "typecheck:api": "npm run typecheck --workspace @defensivepedal/mobile-api",
+    "typecheck": "npm run typecheck:web && npm run typecheck:api && npm run typecheck:mobile",
+    "validate": "npm run test && npm run typecheck && npm run build:web && npm run build:api"
   },
   "dependencies": {
     "@mapbox/search-js-react": "1.0.0-beta.24",
     "@supabase/supabase-js": "2",
+    "expo-router": "~55.0.5",
     "leaflet": "^1.9.4",
     "react": "19.2.1",
     "react-dom": "19.2.1"
@@ -19,8 +43,8 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "jsdom": "^28.1.0",
+    "@vitejs/plugin-react": "5.0.0",
+    "jsdom": "26.1.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.0.18"

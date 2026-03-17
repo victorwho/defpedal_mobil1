@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2022",
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
@@ -11,7 +12,8 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vite/client"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -19,6 +21,12 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
+      "@defensivepedal/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@defensivepedal/core/*": [
+        "./packages/core/src/*"
+      ],
       "@/*": [
         "./*"
       ]

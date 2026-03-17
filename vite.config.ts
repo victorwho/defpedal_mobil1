@@ -16,14 +16,26 @@ export default defineConfig(({ mode }) => {
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
       },
       resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
+        alias: [
+          {
+            find: '@defensivepedal/core',
+            replacement: path.resolve(__dirname, 'packages/core/src/index.ts'),
+          },
+          {
+            find: /^@defensivepedal\/core\/(.*)$/,
+            replacement: path.resolve(__dirname, 'packages/core/src/$1'),
+          },
+          {
+            find: '@',
+            replacement: path.resolve(__dirname, '.'),
+          },
+        ]
       },
       test: {
         globals: true,
         environment: 'jsdom',
         setupFiles: './setupTests.ts',
+        exclude: ['**/node_modules/**', '**/dist/**'],
       }
     };
 });

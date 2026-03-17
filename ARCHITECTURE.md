@@ -6,17 +6,21 @@ This document serves as the source of truth for the application's architecture, 
 ## 1. High-Level Architecture
 
 ### Core Technologies
-- **Framework**: React 19 (Vite)
+- **Web Framework**: React 19 (Vite)
+- **Mobile Framework**: Expo + React Native scaffold
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Map**: Leaflet (via `leaflet` package; direct DOM manipulation in `MapWrapper` for performance)
-- **Backend**: Supabase (Auth, Database)
+- **Styling**: Tailwind CSS on web; React Native StyleSheet scaffold on mobile
+- **Map**: Leaflet on web; `@rnmapbox/maps` scaffold on mobile
+- **Backend**: Supabase (Auth, Database) + Fastify mobile API scaffold
 
 ### Key Directories
 - **`/components`**: Pure UI components. `MapWrapper.tsx` is the heaviest component, managing the Leaflet instance directly via refs.
 - **`/services`**: Stateless modules for external APIs (OSRM, Supabase, Nominatim, Elevation, Offline Maps).
 - **`/hooks`**: React hooks for browser APIs (Geolocation, Speech, WakeLock).
 - **`/utils`**: Pure functions for math (Haversine), formatting, and route analysis.
+- **`/packages/core`**: Shared types, route contracts, polyline helpers, navigation helpers, and route analysis for web/mobile/backend.
+- **`/services/mobile-api`**: Fastify backend-for-frontend for mobile routing, coverage, search, risk, and elevation orchestration.
+- **`/apps/mobile`**: Expo React Native app scaffold with typed routes, shared-store wiring, and Mapbox preview shell.
 
 ## 2. Critical Workflows
 
@@ -62,6 +66,16 @@ The app operates as a global state machine managed in `App.tsx`:
 ## 4. Changelog
 
 ### [Current Session]
+- **Architecture (Monorepo Migration)**: Added npm workspaces and introduced `apps/mobile`, `packages/core`, and `services/mobile-api` as the first mobile-first migration slice.
+  - Added shared core exports for route contracts, polyline encoding, navigation helpers, and route-analysis logic.
+  - Rewired the existing web app's `types.ts` and `utils/*` modules to use the shared core package.
+- **Feature (Mobile API Scaffold)**: Added a Fastify backend-for-frontend for native clients.
+  - Implemented coverage, route preview, reroute, autocomplete, and reverse-geocode endpoints.
+  - Kept the custom OSRM service as the safe-routing source and Mapbox Directions as the fast-routing source.
+  - Added backend elevation enrichment and Supabase-backed risk-segment enrichment scaffolding.
+- **Feature (React Native Scaffold)**: Added an Expo React Native app shell for the native migration.
+  - Implemented typed routes for onboarding, auth, route planning, route preview, navigation, feedback, offline maps, and settings.
+  - Added a shared Zustand app store and a Mapbox-backed route preview component that consumes the normalized backend contract.
 - **Architecture**: Created `ARCHITECTURE.md` to track system state.
 - **Feature (Auth)**: Added Google OAuth support.
   - Modified `services/supabase.ts` to include `signInWithGoogle`.

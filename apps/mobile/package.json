@@ -1,0 +1,42 @@
+{
+  "name": "@defensivepedal/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.tsx",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@defensivepedal/core": "file:../../packages/core",
+    "@rnmapbox/maps": "^10.1.41",
+    "@sentry/react-native": "^8.4.0",
+    "@supabase/supabase-js": "^2.56.1",
+    "@tanstack/react-query": "^5.83.1",
+    "expo": "~55.0.6",
+    "expo-application": "~55.0.9",
+    "expo-constants": "~55.0.7",
+    "expo-device": "~55.0.9",
+    "expo-file-system": "~55.0.10",
+    "expo-keep-awake": "~55.0.4",
+    "expo-location": "~55.1.2",
+    "expo-router": "~55.0.5",
+    "expo-secure-store": "~55.0.8",
+    "expo-speech": "~55.0.8",
+    "expo-sqlite": "~55.0.10",
+    "expo-status-bar": "~55.0.4",
+    "expo-task-manager": "~55.0.9",
+    "posthog-react-native": "^4.37.3",
+    "react": "19.2.1",
+    "react-native": "0.83.2",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "typescript": "~5.8.2"
+  }
+}

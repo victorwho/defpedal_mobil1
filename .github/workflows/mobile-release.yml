@@ -1,0 +1,83 @@
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Mobile platform to build
+        required: true
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+      profile:
+        description: EAS build profile
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
+      auto_submit:
+        description: Submit automatically after the build is created
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: mobile-release-${{ github.event.inputs.platform }}-${{ github.event.inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Expo token is configured
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "::error::Missing EXPO_TOKEN secret."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate repository
+        run: npm run validate
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+
+      - name: Trigger EAS build
+        working-directory: apps/mobile
+        run: |
+          AUTO_SUBMIT_FLAG=""
+          if [ "${{ github.event.inputs.auto_submit }}" = "true" ]; then
+            AUTO_SUBMIT_FLAG="--auto-submit"
+          fi
+
+          eas build \
+            --platform "${{ github.event.inputs.platform }}" \
+            --profile "${{ github.event.inputs.profile }}" \
+            --non-interactive \
+            --no-wait \
+            ${AUTO_SUBMIT_FLAG}
+
+      - name: Release summary
+        run: |
+          echo "Triggered EAS build for platform=${{ github.event.inputs.platform }} profile=${{ github.event.inputs.profile }} auto_submit=${{ github.event.inputs.auto_submit }}."
+          echo "Check the EAS dashboard for build and submit progress."

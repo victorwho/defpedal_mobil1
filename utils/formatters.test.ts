@@ -54,6 +54,7 @@ describe('formatters', () => {
             distance: 100,
             duration: 60,
             geometry: { coordinates: [], type: 'LineString' },
+            intersections: [],
             maneuver: {
                 bearing_after: 0,
                 bearing_before: 0,
@@ -63,6 +64,7 @@ describe('formatters', () => {
             },
             mode: 'driving',
             name: 'Main St',
+            driving_side: 'right',
             weight: 1
         };
 

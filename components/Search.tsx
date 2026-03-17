@@ -1,8 +1,10 @@
 import React from 'react';
 import { SearchBox } from '@mapbox/search-js-react';
+import type { SearchBoxProps } from '@mapbox/search-js-react/dist/components/SearchBox';
 import type { GeolocationCoordinates } from '../types';
 
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+const SearchBoxComponent = SearchBox as unknown as React.ComponentType<SearchBoxProps>;
 
 interface SearchProps {
   onSelect: (coords: [number, number], name: string) => void;
@@ -47,7 +49,7 @@ const Search: React.FC<SearchProps> = ({
 
   return (
     <div className={`w-full ${className}`}>
-        <SearchBox 
+        <SearchBoxComponent 
             accessToken={MAPBOX_ACCESS_TOKEN}
             options={{
                 language: 'ro',

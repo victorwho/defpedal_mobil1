@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 *.local
+.expo
+.expo-shared
+android
+ios
+*.tsbuildinfo
 
 # Editor directories and files
 .vscode/*
