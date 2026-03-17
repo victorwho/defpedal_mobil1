@@ -35,7 +35,21 @@ export default defineConfig(({ mode }) => {
         globals: true,
         environment: 'jsdom',
         setupFiles: './setupTests.ts',
-        exclude: ['**/node_modules/**', '**/dist/**'],
+        include: [
+          'apps/**/*.{test,spec}.{ts,tsx}',
+          'hooks/**/*.{test,spec}.{ts,tsx}',
+          'packages/**/*.{test,spec}.{ts,tsx}',
+          'services/**/*.{test,spec}.{ts,tsx}',
+          'utils/**/*.{test,spec}.{ts,tsx}',
+        ],
+        exclude: [
+          '**/node_modules/**',
+          '**/dist/**',
+          '**/.claude/**',
+          '**/.expo/**',
+          '**/output/**',
+          '**/tmp/**',
+        ],
       }
     };
 });

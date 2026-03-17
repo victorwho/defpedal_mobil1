@@ -12,6 +12,7 @@ Update it at the end of each implementation slice.
 - Primary risk: Android validation is now strong, but iPhone validation, production-scale load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
 - Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
+- Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
 
 ## Phase Status
 
@@ -173,13 +174,14 @@ We will call the repo "stable baseline" when all of the following are true:
 
 ### Phase 1: Build and CI determinism
 
-- Status: Next
+- Status: In progress
 - Checklist:
-  - separate the default mobile validation path from legacy web build conflicts
-  - resolve the root entrypoint collision between the Vite web build and Expo Router mobile entry
-  - introduce explicit validation scripts such as `validate:mobile` and `validate:web` if needed
-  - update CI to run the stable baseline validation path
-  - exclude `.claude`, worktrees, temp folders, output folders, and generated artifacts from test discovery
+  - completed: separate the default mobile validation path from legacy web build conflicts
+  - completed: resolve the root entrypoint collision between the Vite web build and Expo Router mobile entry
+  - completed: introduce explicit validation scripts such as `validate:mobile` and `validate:web`
+  - completed in branch behavior: CI and release workflows now inherit the stable validation path through `npm run validate`
+  - completed: exclude worktree/helper folders from test discovery by constraining Vitest to source roots and excluding `.claude`, `.expo`, `output`, and `tmp`
+  - remaining: confirm one green CI run on the stabilization branch
 - Exit criteria:
   - one local green validation run
   - one green CI run on the stabilization branch

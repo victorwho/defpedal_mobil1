@@ -29,7 +29,9 @@
     "typecheck:mobile": "npm run typecheck --workspace @defensivepedal/mobile",
     "typecheck:api": "npm run typecheck --workspace @defensivepedal/mobile-api",
     "typecheck": "npm run typecheck:web && npm run typecheck:api && npm run typecheck:mobile",
-    "validate": "npm run test && npm run typecheck && npm run build:web && npm run build:api"
+    "validate:web": "npm run test && npm run typecheck:web && npm run build:web",
+    "validate:mobile": "npm run test && npm run typecheck && npm run build:api",
+    "validate": "npm run validate:mobile"
   },
   "dependencies": {
     "@mapbox/search-js-react": "1.0.0-beta.24",
