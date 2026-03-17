@@ -9,13 +9,15 @@ Update it at the end of each implementation slice.
 
 - Overall migration progress: roughly 87-92 percent of product migration, 80-85 percent of production hardening
 - Current milestone: physical Android validation now confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded web-style redesign
-- Primary risk: Android validation is now strong, but iPhone validation, production-scale load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
+- Primary risk: Android validation is now strong, but iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
+- Stable feature-baseline declaration: the repo is now stable enough for normal frontend and feature development on top of the mobile-first architecture; remaining iPhone and staging concerns are release-hardening backlog rather than day-to-day repo-foundation blockers
 - Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
 - Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
 - Stable baseline Phase 2 note: the default repo workflow now points at `dev:mobile`, `.gitignore` covers the main runtime/staging noise, and repo docs now describe the web app as an opt-in reference surface
 - Stable baseline Phase 3 note: active schema SQL now has an ordered home under `supabase/migrations/`, and the backend operations docs now point staging/production rollout at that migration path
 - Stable baseline Phase 4 note: the mobile release workflow now enforces dispatch guardrails and repo-backed release preflight checks, Android release validation is the explicit default native QA path, and `iphone_validation.md` is now the pending record for the first in-repo iPhone smoke pass
+- Stable baseline Phase 5 note: the repo now has a documented local route-core load baseline in `mobile_api_load_test_baseline.md`, and the branch is stable enough for ongoing frontend and feature work even though iPhone validation and Redis-backed staging evidence are still deferred
 
 ## Phase Status
 
@@ -109,10 +111,11 @@ Update it at the end of each implementation slice.
   - the repo now includes a runnable `mobile-api` load-test harness with smoke, steady, and burst profiles plus JSON report output
   - the repo now includes a mobile API operations runbook covering Docker/Cloud Run rollout, Redis cutover, smoke/steady load tests, and rollback guidance
   - the local smoke load test now passes against `http://127.0.0.1:8080` and writes reports into `output/load-tests/`
+  - an isolated local route-core baseline now passes smoke, steady, and burst load tests and is documented in `mobile_api_load_test_baseline.md`
 - Missing:
-  - production-scale load testing at target concurrency and burst levels
+  - production-scale Redis-backed staging load testing at target concurrency and burst levels
   - iPhone validation
-  - deeper release automation and store-secret verification gates
+  - final store-side release rehearsal on real credentials plus iPhone evidence
   - a fully working debug-mode Android dev-client launch on the emulator after the bundle downloader `ProtocolException` is resolved
 
 ## Current Focus
@@ -165,6 +168,15 @@ We will call the repo "stable baseline" when all of the following are true:
 - the backend has a staging validation path plus production-like load-test evidence
 - schema changes are stored as real migrations, including the current `hazard_type` addition
 - CI and release workflows are aligned with the mobile-first product path
+
+For normal day-to-day feature work, we also recognize a softer milestone:
+
+- "stable feature-development baseline"
+  - the repo is green locally
+  - the mobile-first workflow is documented
+  - Android validation is dependable
+  - the backend has a repeatable local load baseline
+  - remaining work can be treated as release-hardening backlog instead of repo-foundation instability
 
 ### Phase 0: Capture the real repo state
 
@@ -229,12 +241,12 @@ We will call the repo "stable baseline" when all of the following are true:
 
 ### Phase 5: Staging and handoff
 
-- Status: Pending
+- Status: In progress
 - Checklist:
-  - run staging smoke, steady, and burst load tests with Redis enabled
-  - capture baseline performance and error results
-  - declare the stable-baseline milestone in this tracker
-  - list any remaining backlog items that should not block normal feature work
+  - completed locally: capture repeatable route-core smoke, steady, and burst evidence in `mobile_api_load_test_baseline.md`
+  - completed: declare the stable feature-development baseline milestone in this tracker
+  - completed: list the remaining backlog items that should not block normal feature work
+  - remaining: run staging smoke, steady, and burst load tests with Redis enabled
 - Exit criteria:
-  - stable mobile baseline milestone is explicitly declared
-  - remaining work is backlog, not foundation risk
+  - completed for feature work: stable feature-development baseline is explicitly declared
+  - remaining for release hardening: Redis-backed staging evidence and iPhone validation

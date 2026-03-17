@@ -1,6 +1,6 @@
 # Mobile API Operations Runbook
 
-Last updated: 2026-03-16
+Last updated: 2026-03-17
 
 This runbook covers deployment, rollout, caching, Redis cutover, health checks, and load testing
 for `services/mobile-api`.
@@ -126,6 +126,12 @@ Example production smoke run:
 node ./scripts/load-test-mobile-api.mjs --profile smoke --base-url https://api.example.com
 ```
 
+Example route-core local baseline when autocomplete/search is not part of the target slice:
+
+```bash
+node ./scripts/load-test-mobile-api.mjs --profile steady --base-url http://127.0.0.1:8080 --operations health,coverage,preview,reroute
+```
+
 Reports are written to:
 
 - `output/load-tests/`
@@ -138,6 +144,12 @@ The script measures:
 - per-endpoint latency
 - route cache hit / miss counts for preview and reroute
 - HTTP status distribution
+
+Optional filter:
+
+- `--operations health,coverage,preview,reroute`
+  - limits the run to a chosen subset of operations
+  - useful for route-core baselines when autocomplete/search depends on separate upstream credentials or quotas
 
 The script exits non-zero if thresholds are exceeded.
 
@@ -210,5 +222,6 @@ Operational checks:
 - no full synthetic load test for authenticated write endpoints yet
 - no iPhone validation yet
 - no automatic post-deploy canary gate yet
+- no committed Redis-backed staging report yet; the current local route-core baseline lives in `mobile_api_load_test_baseline.md`
 
 This runbook is the current operational baseline until deeper rollout automation is added.

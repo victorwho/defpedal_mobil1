@@ -18,6 +18,8 @@ The current direction is mobile-first, with the React Native app preserving the 
 - the default developer path now targets `mobile app + mobile API + mobile-first validate`, while the root web app is an explicit opt-in reference surface
 - release preflight guardrails now live in `.github/workflows/mobile-release.yml` plus `scripts/check-mobile-release.mjs`
 - Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `iphone_validation.md`
+- the repo now has a stable feature-development baseline for ongoing frontend and feature work, with remaining iPhone and staging/Redis items tracked as release-hardening backlog
+- the current local route-core backend load baseline is recorded in `mobile_api_load_test_baseline.md`
 
 ## Tech Stack
 
@@ -122,6 +124,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 - iPhone validation is still pending
 - production-scale staging load tests are still pending
 - release automation guardrails are stronger now, but first iPhone smoke evidence is still missing
+- the current local Mapbox geocoding credential returned HTTP `401` on 2026-03-17 during isolated autocomplete validation, so route-core load evidence was captured separately from search/autocomplete
 - final UI polish parity is still incomplete across all screens
 - Android bridgeless debug-client workflow is still unreliable; release-style validation is the dependable path
 - some navigation edge-case polish remains around spoken guidance and recovery behavior
@@ -170,6 +173,7 @@ defpedal_mobil1/
   physical_android_validation.md
   iphone_validation.md
   mobile_release_runbook.md
+  mobile_api_load_test_baseline.md
   mobile_api_operations_runbook.md
   supabase_add_hazard_type.sql
 ```

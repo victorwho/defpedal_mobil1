@@ -197,6 +197,7 @@ By default, the harness targets `http://127.0.0.1:8080` and writes JSON reports 
 - `output/load-tests/`
 
 Use `--base-url` to point it at staging or production-like environments.
+Use `--operations health,coverage,preview,reroute` when you want a route-core-only baseline.
 
 ### Mobile API protection
 
@@ -232,6 +233,7 @@ Without it, local development and tests continue to use the in-memory backend.
 - The release runbook lives in [mobile_release_runbook.md](./mobile_release_runbook.md)
 - The iPhone smoke-validation record lives in [iphone_validation.md](./iphone_validation.md)
 - The mobile API rollout runbook lives in [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md)
+- The current local route-core load baseline lives in [mobile_api_load_test_baseline.md](./mobile_api_load_test_baseline.md)
 
 Example preview build from the mobile app directory:
 
@@ -274,5 +276,6 @@ The end-to-end migration plan lives in [mobile_implementation_plan.md](./mobile_
 The current Android validation status and workflow live in [native_android_validation.md](./native_android_validation.md).
 The current release automation and rollout guidance live in [mobile_release_runbook.md](./mobile_release_runbook.md).
 The current mobile API deployment and load-test guidance live in [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md).
+The current local route-core backend baseline lives in [mobile_api_load_test_baseline.md](./mobile_api_load_test_baseline.md).
 The stable-baseline hardening plan lives in [mobile_stable_baseline_plan.md](./mobile_stable_baseline_plan.md).
 The database migration workflow lives in [supabase/README.md](./supabase/README.md).

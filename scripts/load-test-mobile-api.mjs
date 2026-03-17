@@ -29,6 +29,8 @@ const OPERATION_LABELS = {
   search: 'POST /v1/search/autocomplete',
 };
 
+const SUPPORTED_OPERATIONS = Object.keys(OPERATION_LABELS);
+
 const PROFILE_CONFIG = {
   smoke: {
     mode: 'iterations',
@@ -226,6 +228,35 @@ const createHeaders = (authToken) => {
   return headers;
 };
 
+const parseOperationsArg = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const operations = value
+    .split(',')
+    .map((operation) => operation.trim())
+    .filter(Boolean);
+
+  if (operations.length === 0) {
+    return null;
+  }
+
+  const uniqueOperations = [...new Set(operations)];
+  const unsupportedOperations = uniqueOperations.filter(
+    (operation) => !SUPPORTED_OPERATIONS.includes(operation),
+  );
+
+  if (unsupportedOperations.length > 0) {
+    console.error(
+      `Unsupported operations: ${unsupportedOperations.join(', ')}. Supported operations: ${SUPPORTED_OPERATIONS.join(', ')}`,
+    );
+    process.exit(1);
+  }
+
+  return uniqueOperations;
+};
+
 const executeOperation = async ({
   baseUrl,
   authToken,
@@ -365,8 +396,21 @@ const main = async () => {
   const durationMs = parseIntegerArg(args['duration-ms'], profileConfig.durationMs ?? 0);
   const iterations = parseIntegerArg(args.iterations, profileConfig.iterations ?? 0);
   const allowRateLimit = args['allow-rate-limit'] === 'true';
-  const weightedOperations = buildWeightedOperations(profileConfig.mix);
+  const selectedOperations = parseOperationsArg(args.operations);
+  const operationMix = selectedOperations
+    ? Object.fromEntries(
+        Object.entries(profileConfig.mix).filter(([operation]) =>
+          selectedOperations.includes(operation),
+        ),
+      )
+    : profileConfig.mix;
+  const weightedOperations = buildWeightedOperations(operationMix);
   const requestBodies = buildRequestBodies();
+
+  if (weightedOperations.length === 0) {
+    console.error('No operations selected for this load test.');
+    process.exit(1);
+  }
 
   const outputDirectory = path.join(process.cwd(), 'output', 'load-tests');
   await mkdir(outputDirectory, { recursive: true });
@@ -466,6 +510,7 @@ const main = async () => {
       elapsedMs,
       configuredDurationMs: profileConfig.mode === 'duration' ? durationMs : null,
       configuredIterations: profileConfig.mode === 'iterations' ? iterations : null,
+      selectedOperations: selectedOperations ?? SUPPORTED_OPERATIONS,
       requestsPerSecond:
         elapsedMs > 0 ? Number((results.length / (elapsedMs / 1000)).toFixed(2)) : 0,
     },
