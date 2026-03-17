@@ -74,6 +74,19 @@ Traffic controls:
 - `RATE_LIMIT_WRITE_MAX`
 - `RATE_LIMIT_WRITE_WINDOW_MS`
 
+## Database rollout prerequisite
+
+Before staging or production rollout for schema-dependent changes, apply the ordered SQL migrations in:
+
+- `supabase/migrations/`
+
+Current active example:
+
+- `supabase/migrations/202603170002_add_hazard_type.sql`
+
+If the app/backend contract depends on a new column or function, do not rely on a root-level SQL file
+alone; make sure the corresponding ordered migration has been applied first.
+
 ## Release Checklist
 
 1. Run `npm run validate`

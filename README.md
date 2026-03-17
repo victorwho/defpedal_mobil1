@@ -115,6 +115,15 @@ npm run validate:web
 Local-only env files such as `.env`, `apps/mobile/.env`, `apps/mobile/.env.preview`, and
 `services/mobile-api/.env` should stay uncommitted.
 
+## Database migrations
+
+Active schema changes now live in:
+
+- `supabase/migrations/`
+
+Apply them in filename order. The root-level SQL files are legacy artifacts; use the migration
+folder as the active source of truth for ongoing schema work.
+
 ### Mobile app variants
 
 The Expo config now supports three app variants:
@@ -257,3 +266,4 @@ The current Android validation status and workflow live in [native_android_valid
 The current release automation and rollout guidance live in [mobile_release_runbook.md](./mobile_release_runbook.md).
 The current mobile API deployment and load-test guidance live in [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md).
 The stable-baseline hardening plan lives in [mobile_stable_baseline_plan.md](./mobile_stable_baseline_plan.md).
+The database migration workflow lives in [supabase/README.md](./supabase/README.md).

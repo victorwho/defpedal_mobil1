@@ -14,6 +14,7 @@ Update it at the end of each implementation slice.
 - Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
 - Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
 - Stable baseline Phase 2 note: the default repo workflow now points at `dev:mobile`, `.gitignore` covers the main runtime/staging noise, and repo docs now describe the web app as an opt-in reference surface
+- Stable baseline Phase 3 note: active schema SQL now has an ordered home under `supabase/migrations/`, and the backend operations docs now point staging/production rollout at that migration path
 
 ## Phase Status
 
@@ -201,12 +202,13 @@ We will call the repo "stable baseline" when all of the following are true:
 
 ### Phase 3: Schema and backend readiness
 
-- Status: Pending
+- Status: In progress
 - Checklist:
-  - move loose SQL changes into a real migration folder and naming convention
-  - add the `hazard_type` change as an applied migration path
-  - document staging deployment inputs, Redis-backed testing expectations, and rollback notes
-  - verify backend contracts match live schema assumptions
+  - completed: move active loose SQL changes into a real migration folder and naming convention
+  - completed: add the `hazard_type` change as an ordered migration path
+  - completed: document staging deployment inputs and migration prerequisites in the backend operations docs
+  - completed: align repo docs so the backend contract now points to the ordered migration path for `hazard_type`
+  - remaining: recover or replace the corrupted legacy root SQL blobs if they still matter operationally
 - Exit criteria:
   - schema updates are tracked and re-runnable
   - backend staging path is documented and testable

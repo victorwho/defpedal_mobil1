@@ -126,7 +126,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 
 ### Recently active / needs attention
 
-- `hazard_type` support is now implemented in app/backend contracts, but the live Supabase database needs the migration in `supabase_add_hazard_type.sql` applied
+- `hazard_type` support is now implemented in app/backend contracts, but the live Supabase database still needs the ordered migration in `supabase/migrations/202603170002_add_hazard_type.sql` applied
 - the current phone-friendly preview flow depends on:
   - local `mobile-api` running on the laptop
   - active ngrok tunnel
@@ -135,7 +135,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 ### Known boundaries
 
 - The repo still includes the legacy web app and shared migration code side by side
-- Some SQL files in repo root are not organized as a standard migration system
+- Some historical SQL files still remain in repo root, but `supabase/migrations/` is now the active migration path
 - Visual mobile UI is mid-parity, not fully finalized
 
 ## Directory Map
@@ -161,6 +161,8 @@ defpedal_mobil1/
   utils/                    legacy web utility logic
   App.tsx                   legacy web app shell
   progress.md               migration progress tracker
+  supabase/
+    migrations/             ordered database migrations
   mobile_implementation_plan.md
   native_android_validation.md
   physical_android_validation.md
