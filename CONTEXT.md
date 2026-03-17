@@ -1,6 +1,6 @@
 # Repository Context
 
-Last updated: 2026-03-16
+Last updated: 2026-03-17
 
 This repository contains two parallel products:
 
@@ -8,6 +8,13 @@ This repository contains two parallel products:
 - the in-progress Expo/React Native mobile app plus its mobile backend
 
 The current direction is mobile-first, with the React Native app preserving the custom safe-routing backend as the core product differentiator.
+
+## Current Stabilization Note
+
+- the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`
+- the isolated stabilization worktree now runs on top of that committed mobile baseline
+- the snapshot intentionally excluded local-only env files, generated output, and temp validation artifacts
+- the active hardening plan for turning this into a stable development baseline lives in `mobile_stable_baseline_plan.md`
 
 ## Tech Stack
 
@@ -167,3 +174,4 @@ defpedal_mobil1/
 - the mobile app is the primary product direction
 - the web app should be treated as reference behavior, not the default place for new product work
 - for any new session, this file should be read first before making architecture or implementation decisions
+- the current branch-level hardening work should also follow `mobile_stable_baseline_plan.md`

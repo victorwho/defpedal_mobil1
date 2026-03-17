@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-03-16
+Last updated: 2026-03-17
 
 This file tracks the React Native migration against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -11,6 +11,7 @@ Update it at the end of each implementation slice.
 - Current milestone: physical Android validation now confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded web-style redesign
 - Primary risk: Android validation is now strong, but iPhone validation, production-scale load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
+- Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
 
 ## Phase Status
 
@@ -142,3 +143,90 @@ Update it at the end of each implementation slice.
 4. Run production-scale steady/burst load tests against a staging environment with Redis enabled.
 5. Capture fresh device screenshots for the redesigned screens, review them on a physical device, and fine-tune spacing, density, and motion based on actual Android/iPhone visual QA.
 6. Add a database migration for `hazard_type` if we want every selected hazard category stored explicitly in Supabase instead of using the current compatibility fallback when that column is absent.
+
+## Stable Baseline Program
+
+This section tracks the repo-hardening work needed to turn the current migration state into a stable
+mobile-first baseline for normal frontend and feature development.
+
+### Baseline milestone definition
+
+We will call the repo "stable baseline" when all of the following are true:
+
+- the committed source tree contains the real mobile app, shared core package, and mobile API
+- the default validation command is green and does not depend on unrelated legacy-web breakage
+- test discovery is deterministic and excludes worktrees, temp folders, and generated output
+- Android release-style validation is the documented default native QA path
+- iPhone has at least one documented smoke-tested validation pass
+- the backend has a staging validation path plus production-like load-test evidence
+- schema changes are stored as real migrations, including the current `hazard_type` addition
+- CI and release workflows are aligned with the mobile-first product path
+
+### Phase 0: Capture the real repo state
+
+- Status: Done
+- Evidence:
+  - `codex/mobile-current-snapshot` now contains the committed mobile-first repo snapshot
+  - the stabilization worktree now runs on top of that committed snapshot instead of the earlier pre-migration commit
+- Notes:
+  - the snapshot intentionally excluded local-only files such as `.env`, `apps/mobile/.env.preview`, `services/mobile-api/.env`, generated `output/`, `tmp/`, and ignored native build artifacts
+
+### Phase 1: Build and CI determinism
+
+- Status: Next
+- Checklist:
+  - separate the default mobile validation path from legacy web build conflicts
+  - resolve the root entrypoint collision between the Vite web build and Expo Router mobile entry
+  - introduce explicit validation scripts such as `validate:mobile` and `validate:web` if needed
+  - update CI to run the stable baseline validation path
+  - exclude `.claude`, worktrees, temp folders, output folders, and generated artifacts from test discovery
+- Exit criteria:
+  - one local green validation run
+  - one green CI run on the stabilization branch
+
+### Phase 2: Repo shape and developer workflow
+
+- Status: Pending
+- Checklist:
+  - make root scripts clearly favor `dev:mobile`, `dev:api`, and native validation
+  - tighten `.gitignore` to avoid noisy artifacts and staging leftovers
+  - refresh `README.md`, `CONTEXT.md`, and related docs around the mobile-first happy path
+  - define whether the legacy web app remains buildable by default or becomes opt-in reference only
+- Exit criteria:
+  - a new contributor can follow one documented happy path from install to native validation
+
+### Phase 3: Schema and backend readiness
+
+- Status: Pending
+- Checklist:
+  - move loose SQL changes into a real migration folder and naming convention
+  - add the `hazard_type` change as an applied migration path
+  - document staging deployment inputs, Redis-backed testing expectations, and rollback notes
+  - verify backend contracts match live schema assumptions
+- Exit criteria:
+  - schema updates are tracked and re-runnable
+  - backend staging path is documented and testable
+
+### Phase 4: Native validation and release readiness
+
+- Status: Pending
+- Checklist:
+  - keep Android release-style validation as the supported default path for now
+  - treat bridgeless debug-client recovery as backlog unless it is proven to block developer velocity
+  - run and document one iPhone smoke-validation pass on macOS hardware
+  - deepen release workflow guardrails for secrets, environment checks, and rollout sanity
+- Exit criteria:
+  - Android and iPhone each have one documented smoke-tested path
+  - preview release workflow has a documented preflight and rollback path
+
+### Phase 5: Staging and handoff
+
+- Status: Pending
+- Checklist:
+  - run staging smoke, steady, and burst load tests with Redis enabled
+  - capture baseline performance and error results
+  - declare the stable-baseline milestone in this tracker
+  - list any remaining backlog items that should not block normal feature work
+- Exit criteria:
+  - stable mobile baseline milestone is explicitly declared
+  - remaining work is backlog, not foundation risk
