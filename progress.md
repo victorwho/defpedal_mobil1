@@ -15,6 +15,7 @@ Update it at the end of each implementation slice.
 - Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
 - Stable baseline Phase 2 note: the default repo workflow now points at `dev:mobile`, `.gitignore` covers the main runtime/staging noise, and repo docs now describe the web app as an opt-in reference surface
 - Stable baseline Phase 3 note: active schema SQL now has an ordered home under `supabase/migrations/`, and the backend operations docs now point staging/production rollout at that migration path
+- Stable baseline Phase 4 note: the mobile release workflow now enforces dispatch guardrails and repo-backed release preflight checks, Android release validation is the explicit default native QA path, and `iphone_validation.md` is now the pending record for the first in-repo iPhone smoke pass
 
 ## Phase Status
 
@@ -215,15 +216,16 @@ We will call the repo "stable baseline" when all of the following are true:
 
 ### Phase 4: Native validation and release readiness
 
-- Status: Pending
+- Status: In progress
 - Checklist:
-  - keep Android release-style validation as the supported default path for now
-  - treat bridgeless debug-client recovery as backlog unless it is proven to block developer velocity
-  - run and document one iPhone smoke-validation pass on macOS hardware
-  - deepen release workflow guardrails for secrets, environment checks, and rollout sanity
+  - completed: keep Android release-style validation as the supported default path for now
+  - completed: treat bridgeless debug-client recovery as backlog unless it is proven to block developer velocity
+  - completed: deepen release workflow guardrails for secrets, environment checks, and rollout sanity
+  - completed: add `iphone_validation.md` as the canonical record for the first in-repo iPhone smoke pass
+  - remaining: run and document one iPhone smoke-validation pass on macOS hardware
 - Exit criteria:
-  - Android and iPhone each have one documented smoke-tested path
-  - preview release workflow has a documented preflight and rollback path
+  - remaining: Android and iPhone each have one documented smoke-tested path
+  - completed: preview release workflow has a documented preflight and rollback path
 
 ### Phase 5: Staging and handoff
 

@@ -24,6 +24,21 @@ on:
         required: true
         default: false
         type: boolean
+      native_validation_ref:
+        description: Latest native validation evidence (doc path, ticket, or dated note)
+        required: false
+        default: ""
+        type: string
+      release_notes_ref:
+        description: Release notes or change summary reference for preview or production rollout
+        required: false
+        default: ""
+        type: string
+      confirm_store_readiness:
+        description: Confirm Expo/EAS store credentials and rollout owner are ready
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: mobile-release-${{ github.event.inputs.platform }}-${{ github.event.inputs.profile }}
@@ -47,6 +62,35 @@ jobs:
             exit 1
           fi
 
+      - name: Release dispatch guardrails
+        run: |
+          PLATFORM="${{ github.event.inputs.platform }}"
+          PROFILE="${{ github.event.inputs.profile }}"
+          AUTO_SUBMIT="${{ github.event.inputs.auto_submit }}"
+          NATIVE_VALIDATION_REF="${{ github.event.inputs.native_validation_ref }}"
+          RELEASE_NOTES_REF="${{ github.event.inputs.release_notes_ref }}"
+          STORE_READY="${{ github.event.inputs.confirm_store_readiness }}"
+
+          if [ "${AUTO_SUBMIT}" = "true" ] && [ "${STORE_READY}" != "true" ]; then
+            echo "::error::Auto-submit requires confirm_store_readiness=true."
+            exit 1
+          fi
+
+          if [ "${PROFILE}" = "production" ] && [ -z "${RELEASE_NOTES_REF}" ]; then
+            echo "::error::Production releases require release_notes_ref."
+            exit 1
+          fi
+
+          if [ "${PROFILE}" = "production" ] && [ -z "${NATIVE_VALIDATION_REF}" ]; then
+            echo "::error::Production releases require native_validation_ref."
+            exit 1
+          fi
+
+          if [ "${PLATFORM}" = "ios" ] && [ -z "${NATIVE_VALIDATION_REF}" ]; then
+            echo "::error::iOS releases require native_validation_ref until an iPhone smoke pass is documented."
+            exit 1
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -58,6 +102,16 @@ jobs:
 
       - name: Validate repository
         run: npm run validate
+
+      - name: Validate mobile release configuration
+        run: >
+          node ./scripts/check-mobile-release.mjs
+          --platform "${{ github.event.inputs.platform }}"
+          --profile "${{ github.event.inputs.profile }}"
+          --auto-submit "${{ github.event.inputs.auto_submit }}"
+          --native-validation-ref "${{ github.event.inputs.native_validation_ref }}"
+          --release-notes-ref "${{ github.event.inputs.release_notes_ref }}"
+          --confirm-store-readiness "${{ github.event.inputs.confirm_store_readiness }}"
 
       - name: Install EAS CLI
         run: npm install --global eas-cli
@@ -80,4 +134,6 @@ jobs:
       - name: Release summary
         run: |
           echo "Triggered EAS build for platform=${{ github.event.inputs.platform }} profile=${{ github.event.inputs.profile }} auto_submit=${{ github.event.inputs.auto_submit }}."
+          echo "native_validation_ref=${{ github.event.inputs.native_validation_ref }}"
+          echo "release_notes_ref=${{ github.event.inputs.release_notes_ref }}"
           echo "Check the EAS dashboard for build and submit progress."

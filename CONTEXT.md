@@ -16,6 +16,8 @@ The current direction is mobile-first, with the React Native app preserving the 
 - the snapshot intentionally excluded local-only env files, generated output, and temp validation artifacts
 - the active hardening plan for turning this into a stable development baseline lives in `mobile_stable_baseline_plan.md`
 - the default developer path now targets `mobile app + mobile API + mobile-first validate`, while the root web app is an explicit opt-in reference surface
+- release preflight guardrails now live in `.github/workflows/mobile-release.yml` plus `scripts/check-mobile-release.mjs`
+- Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `iphone_validation.md`
 
 ## Tech Stack
 
@@ -119,7 +121,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 
 - iPhone validation is still pending
 - production-scale staging load tests are still pending
-- release automation still needs deeper rollout/secret guardrails
+- release automation guardrails are stronger now, but first iPhone smoke evidence is still missing
 - final UI polish parity is still incomplete across all screens
 - Android bridgeless debug-client workflow is still unreliable; release-style validation is the dependable path
 - some navigation edge-case polish remains around spoken guidance and recovery behavior
@@ -166,6 +168,7 @@ defpedal_mobil1/
   mobile_implementation_plan.md
   native_android_validation.md
   physical_android_validation.md
+  iphone_validation.md
   mobile_release_runbook.md
   mobile_api_operations_runbook.md
   supabase_add_hazard_type.sql

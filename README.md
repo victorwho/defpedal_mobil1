@@ -230,6 +230,7 @@ Without it, local development and tests continue to use the in-memory backend.
 - GitHub Actions mobile release automation now runs from [mobile-release.yml](./.github/workflows/mobile-release.yml)
 - EAS build profiles live in [eas.json](./apps/mobile/eas.json)
 - The release runbook lives in [mobile_release_runbook.md](./mobile_release_runbook.md)
+- The iPhone smoke-validation record lives in [iphone_validation.md](./iphone_validation.md)
 - The mobile API rollout runbook lives in [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md)
 
 Example preview build from the mobile app directory:
@@ -249,9 +250,17 @@ npx eas-cli build --profile production --platform android
 Manual dispatch is now available in GitHub Actions through `Mobile Release`, which:
 
 - runs `npm run validate`
+- runs release preflight checks against repo config
 - triggers an EAS build for `android` or `ios`
 - optionally enables `--auto-submit`
 - uses the `preview` and `production` submit targets configured in `apps/mobile/eas.json`
+
+For native QA on this Windows machine, the supported default path remains:
+
+- `npm run android:validate:native:release`
+
+The first in-repo iPhone smoke pass is still pending and should be recorded in
+[iphone_validation.md](./iphone_validation.md).
 
 The current submit defaults are:
 
