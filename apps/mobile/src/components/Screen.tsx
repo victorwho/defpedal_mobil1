@@ -1,7 +1,15 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
+import { space } from '../design-system/tokens/spacing';
+import {
+  fontFamily,
+  text3xl,
+  textBase,
+  textXs,
+} from '../design-system/tokens/typography';
 import { BrandLogo } from './BrandLogo';
 
 type ScreenProps = PropsWithChildren<{
@@ -39,66 +47,68 @@ export const Screen = ({ title, eyebrow, subtitle, aside, children }: ScreenProp
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
+    backgroundColor: brandColors.bgDeep,
   },
   canvas: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
+    backgroundColor: brandColors.bgDeep,
   },
   content: {
-    paddingTop: 14,
-    padding: 20,
-    paddingBottom: 44,
-    gap: 18,
+    paddingTop: space[3] + space[0.5],
+    padding: space[5],
+    paddingBottom: space[10] + space[1],
+    gap: space[4] + space[0.5],
   },
   headerShell: {
-    borderRadius: mobileTheme.radii.lg,
+    borderRadius: radii['2xl'] + space[1],
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
+    borderColor: brandColors.borderDefault,
     backgroundColor: 'rgba(17, 24, 39, 0.86)',
-    padding: 18,
+    padding: space[4] + space[0.5],
     overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 16,
+    gap: space[4],
   },
   brandRow: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 14,
+    gap: space[3] + space[0.5],
   },
   asideWrap: {
     alignItems: 'flex-end',
   },
   eyebrow: {
-    fontSize: 12,
-    fontWeight: '800',
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.4,
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
   },
   title: {
+    ...text3xl,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 32,
-    fontWeight: '900',
-    color: mobileTheme.colors.textOnDark,
+    color: brandColors.textPrimary,
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    ...textBase,
+    color: brandColors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
   titleWrap: {
     flex: 1,
-    gap: 5,
+    gap: space[1] + space[0.5],
   },
   glow: {
     position: 'absolute',
-    borderRadius: 999,
+    borderRadius: radii.full,
     opacity: 0.55,
   },
   glowTop: {

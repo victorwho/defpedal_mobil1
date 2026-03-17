@@ -2,6 +2,7 @@ import type { PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ThemeProvider } from '../design-system';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { NavigationLifecycleManager } from './NavigationLifecycleManager';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
@@ -11,14 +12,16 @@ const queryClient = new QueryClient();
 
 export const AppProviders = ({ children }: PropsWithChildren) => (
   <SafeAreaProvider>
-    <AuthSessionProvider>
-      <TelemetryProvider>
-        <QueryClientProvider client={queryClient}>
-          <NavigationLifecycleManager />
-          <OfflineMutationSyncManager />
-          {children}
-        </QueryClientProvider>
-      </TelemetryProvider>
-    </AuthSessionProvider>
+    <ThemeProvider>
+      <AuthSessionProvider>
+        <TelemetryProvider>
+          <QueryClientProvider client={queryClient}>
+            <NavigationLifecycleManager />
+            <OfflineMutationSyncManager />
+            {children}
+          </QueryClientProvider>
+        </TelemetryProvider>
+      </AuthSessionProvider>
+    </ThemeProvider>
   </SafeAreaProvider>
 );

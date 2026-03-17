@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
-import { StatusCard } from '../src/components/StatusCard';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { mobileEnv } from '../src/lib/env';
-import { mobileTheme } from '../src/lib/theme';
 import {
   buildOfflineRegionFromRoute,
   deleteOfflineRegion,
@@ -15,19 +13,92 @@ import {
 import { summarizeSelectedRouteOfflineReadiness } from '../src/lib/validationSummary';
 import { useAppStore } from '../src/store/appStore';
 
+import { useTheme } from '../src/design-system/ThemeContext';
+import { Button, Badge } from '../src/design-system/atoms';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import {
+  fontFamily,
+  textBase,
+  textSm,
+  textXs,
+  textLg,
+  textXl,
+} from '../src/design-system/tokens/typography';
+
 function MetricBlock({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={[styles.metricBlock, emphasis ? styles.metricBlockAccent : null]}>
-      <Text style={[styles.metricLabel, emphasis ? styles.metricLabelAccent : null]}>{label}</Text>
-      <Text style={[styles.metricValue, emphasis ? styles.metricValueAccent : null]}>{value}</Text>
+    <View
+      style={[
+        styles.metricBlock,
+        { backgroundColor: emphasis ? 'rgba(250, 204, 21, 0.14)' : 'rgba(15, 23, 42, 0.08)' },
+      ]}
+    >
+      <Text
+        style={[
+          styles.metricLabel,
+          { color: emphasis ? '#fef3c7' : colors.textMuted },
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.metricValue,
+          { color: emphasis ? colors.textPrimary : colors.textPrimary },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
 
 function ProgressBar({ progress }: { progress: number }) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.progressTrack}>
-      <View style={[styles.progressFill, { width: `${Math.max(0, Math.min(progress, 100))}%` }]} />
+      <View
+        style={[
+          styles.progressFill,
+          { width: `${Math.max(0, Math.min(progress, 100))}%`, backgroundColor: colors.accent },
+        ]}
+      />
+    </View>
+  );
+}
+
+function Card({
+  title,
+  tone = 'default',
+  children,
+}: {
+  title: string;
+  tone?: 'default' | 'accent' | 'warning';
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+
+  const bgMap = {
+    default: colors.bgSecondary,
+    accent: colors.accent,
+    warning: colors.cautionTint,
+  };
+
+  const titleColorMap = {
+    default: colors.textPrimary,
+    accent: colors.textInverse,
+    warning: colors.cautionText,
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: bgMap[tone] }, shadows.md]}>
+      <Text style={[styles.cardTitle, { color: titleColorMap[tone] }]}>{title}</Text>
+      {children}
     </View>
   );
 }
@@ -35,6 +106,8 @@ function ProgressBar({ progress }: { progress: number }) {
 export default function OfflineMapsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
+
+  const { colors } = useTheme();
 
   const routePreview = useAppStore((state) => state.routePreview);
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
@@ -80,8 +153,8 @@ export default function OfflineMapsScreen() {
       eyebrow="Keep riding"
       subtitle="This surface now mirrors the web app more closely: one clear readiness signal, a primary download action, and visible pack progress."
     >
-      <StatusCard title="Selected route readiness" tone={selectedRouteOfflineSummary.isSelectedRouteReady ? 'accent' : 'default'}>
-        <Text style={selectedRouteOfflineSummary.isSelectedRouteReady ? styles.darkText : styles.bodyText}>
+      <Card title="Selected route readiness" tone={selectedRouteOfflineSummary.isSelectedRouteReady ? 'accent' : 'default'}>
+        <Text style={[styles.bodyText, selectedRouteOfflineSummary.isSelectedRouteReady ? { color: colors.textInverse } : { color: colors.textSecondary }]}>
           {selectedRouteOfflineSummary.isSelectedRouteReady
             ? 'Your selected route is ready for an offline ride.'
             : 'Download a pack for the selected route before going offline.'}
@@ -109,29 +182,28 @@ export default function OfflineMapsScreen() {
             }
           />
         </View>
-      </StatusCard>
+      </Card>
 
-      <StatusCard title="Ride continuity" tone="accent">
-        <Text style={styles.darkText}>
+      <Card title="Ride continuity" tone="accent">
+        <Text style={[styles.bodyText, { color: colors.textInverse }]}>
           Active route: {selectedRoute?.id ?? 'No route selected'}
         </Text>
-        <Text style={styles.darkText}>Session state: {navigationSession?.state ?? 'idle'}</Text>
-        <Text style={styles.darkText}>Background status: {backgroundSnapshot.status.status}</Text>
-        <Text style={styles.darkText}>Queued writes: {queuedMutations.length}</Text>
-      </StatusCard>
+        <Text style={[styles.bodyText, { color: colors.textInverse }]}>Session state: {navigationSession?.state ?? 'idle'}</Text>
+        <Text style={[styles.bodyText, { color: colors.textInverse }]}>Background status: {backgroundSnapshot.status.status}</Text>
+        <Text style={[styles.bodyText, { color: colors.textInverse }]}>Queued writes: {queuedMutations.length}</Text>
+      </Card>
 
-      <StatusCard title="Download route pack">
-        <Text style={styles.bodyText}>
+      <Card title="Download route pack">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
           {selectedRoute
             ? 'Create a compact map pack around the selected route so preview and active navigation stay readable through signal loss.'
             : 'Choose a route preview first, then come back here to cache it for offline use.'}
         </Text>
         <View style={styles.actionStack}>
-          <Pressable
-            style={[
-              styles.primaryButton,
-              !selectedRoute || !mobileEnv.mapboxPublicToken ? styles.buttonDisabled : null,
-            ]}
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
             disabled={!selectedRoute || !mobileEnv.mapboxPublicToken}
             onPress={() => {
               if (!selectedRoute) {
@@ -149,36 +221,37 @@ export default function OfflineMapsScreen() {
               });
             }}
           >
-            <Text style={styles.primaryLabel}>
-              {selectedRoute ? 'Download selected route pack' : 'Need a selected route'}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => void refreshOfflineRegions()}>
-            <Text style={styles.secondaryLabel}>
-              {isRefreshing ? 'Refreshing...' : 'Refresh cached packs'}
-            </Text>
-          </Pressable>
+            {selectedRoute ? 'Download selected route pack' : 'Need a selected route'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="lg"
+            fullWidth
+            onPress={() => void refreshOfflineRegions()}
+          >
+            {isRefreshing ? 'Refreshing...' : 'Refresh cached packs'}
+          </Button>
         </View>
         {!mobileEnv.mapboxPublicToken ? (
-          <Text style={styles.helperText}>
+          <Text style={[styles.helperText, { color: colors.textMuted }]}>
             Set `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` to enable native offline pack downloads.
           </Text>
         ) : null}
-      </StatusCard>
+      </Card>
 
       {screenError ? (
-        <StatusCard title="Offline pack issue" tone="warning">
-          <Text style={styles.bodyText}>{screenError}</Text>
-        </StatusCard>
+        <Card title="Offline pack issue" tone="warning">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{screenError}</Text>
+        </Card>
       ) : null}
 
       {offlineRegions.length === 0 ? (
-        <StatusCard title="No cached packs yet">
-          <Text style={styles.bodyText}>
+        <Card title="No cached packs yet">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             No offline packs are cached yet. Download a selected route pack to seed local coverage
             before a ride.
           </Text>
-        </StatusCard>
+        </Card>
       ) : null}
 
       {offlineRegions.map((region) => {
@@ -186,32 +259,44 @@ export default function OfflineMapsScreen() {
           region.progressPercentage !== undefined ? Math.round(region.progressPercentage) : 0;
 
         return (
-          <StatusCard
+          <Card
             key={region.id}
             title={region.name}
             tone={region.status === 'ready' ? 'accent' : region.status === 'failed' ? 'warning' : 'default'}
           >
-            <Text style={region.status === 'ready' ? styles.darkText : styles.bodyText}>
-              Status: {region.status}
-            </Text>
+            <View style={styles.statusRow}>
+              <Badge
+                variant={
+                  region.status === 'ready'
+                    ? 'risk-safe'
+                    : region.status === 'failed'
+                      ? 'risk-danger'
+                      : 'neutral'
+                }
+                size="sm"
+              >
+                {region.status}
+              </Badge>
+            </View>
             <ProgressBar progress={progress} />
             <View style={styles.regionMeta}>
-              <Text style={region.status === 'ready' ? styles.darkText : styles.bodyText}>
+              <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
                 Progress: {region.progressPercentage !== undefined ? `${progress}%` : 'Waiting'}
               </Text>
-              <Text style={region.status === 'ready' ? styles.darkText : styles.bodyText}>
+              <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
                 Zoom: {region.minZoom} - {region.maxZoom}
               </Text>
-              <Text style={region.status === 'ready' ? styles.darkText : styles.bodyText}>
+              <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
                 Resources:{' '}
                 {region.completedResourceCount !== undefined && region.requiredResourceCount !== undefined
                   ? `${region.completedResourceCount}/${region.requiredResourceCount}`
                   : 'Unknown'}
               </Text>
             </View>
-            {region.error ? <Text style={styles.bodyText}>{region.error}</Text> : null}
-            <Pressable
-              style={styles.inlineButton}
+            {region.error ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{region.error}</Text> : null}
+            <Button
+              variant="ghost"
+              size="sm"
               onPress={() => {
                 setScreenError(null);
                 void deleteOfflineRegion(region.id)
@@ -225,9 +310,9 @@ export default function OfflineMapsScreen() {
                   });
               }}
             >
-              <Text style={styles.inlineButtonLabel}>Delete pack</Text>
-            </Pressable>
-          </StatusCard>
+              Delete pack
+            </Button>
+          </Card>
         );
       })}
     </Screen>
@@ -235,112 +320,71 @@ export default function OfflineMapsScreen() {
 }
 
 const styles = StyleSheet.create({
-  darkText: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    lineHeight: 21,
-  },
   bodyText: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 15,
+    ...textSm,
     lineHeight: 21,
   },
   helperText: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 13,
+    ...textXs,
     lineHeight: 18,
+  },
+  metaText: {
+    ...textSm,
+    lineHeight: 21,
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: space[2] + 2, // 10
   },
   metricBlock: {
     minWidth: 132,
     flexGrow: 1,
-    borderRadius: mobileTheme.radii.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  metricBlockAccent: {
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
+    borderRadius: radii.md,
+    paddingHorizontal: space[3] + 2, // 14
+    paddingVertical: space[3],
+    gap: space[1],
   },
   metricLabel: {
-    color: mobileTheme.colors.textMuted,
+    fontFamily: fontFamily.body.semiBold,
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  metricLabelAccent: {
-    color: '#fef3c7',
-  },
   metricValue: {
-    color: mobileTheme.colors.textPrimary,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 17,
     fontWeight: '900',
   },
-  metricValueAccent: {
-    color: mobileTheme.colors.textOnDark,
-  },
   actionStack: {
-    gap: 10,
-  },
-  primaryButton: {
-    borderRadius: 22,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  buttonDisabled: {
-    backgroundColor: '#8f9bad',
+    gap: space[2] + 2, // 10
   },
   progressTrack: {
-    height: 10,
-    borderRadius: 999,
+    height: space[2] + 2, // 10
+    borderRadius: radii.full,
     backgroundColor: 'rgba(15, 23, 42, 0.12)',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
-    backgroundColor: mobileTheme.colors.brand,
+    borderRadius: radii.full,
   },
   regionMeta: {
-    gap: 4,
+    gap: space[1],
   },
-  inlineButton: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    borderRadius: mobileTheme.radii.pill,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
   },
-  inlineButtonLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontWeight: '800',
+  card: {
+    borderRadius: radii.xl,
+    padding: space[4],
+    gap: space[3],
+  },
+  cardTitle: {
+    ...textXl,
+    fontWeight: '900',
   },
 });

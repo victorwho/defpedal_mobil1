@@ -2,7 +2,7 @@ import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 import { BrandLogo } from '../src/components/BrandLogo';
@@ -13,9 +13,24 @@ import { createClientTripId } from '../src/lib/offlineQueue';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
 import { telemetry } from '../src/lib/telemetry';
-import { mobileTheme } from '../src/lib/theme';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+
+import { Button } from '../src/design-system/atoms/Button';
+import { Badge } from '../src/design-system/atoms/Badge';
+import { Spinner } from '../src/design-system/atoms/Spinner';
+import { RouteComparisonPanel } from '../src/design-system/organisms/RouteComparisonPanel';
+import { darkTheme, safetyColors } from '../src/design-system/tokens/colors';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import {
+  fontFamily,
+  text2xl,
+  textXs,
+  textSm,
+  textDataSm,
+} from '../src/design-system/tokens/typography';
 
 const formatMinutes = (seconds: number) => `${Math.round(seconds / 60)} min`;
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
@@ -170,9 +185,9 @@ export default function RoutePreviewScreen() {
   const topOverlay = (
     <>
       <View style={styles.topBar}>
-        <Pressable style={styles.backPill} onPress={returnToPlanning}>
-          <Text style={styles.backPillLabel}>Back</Text>
-        </Pressable>
+        <Button variant="secondary" size="sm" onPress={returnToPlanning}>
+          Back
+        </Button>
         <View style={styles.brandCluster}>
           <BrandLogo size={40} />
           <View style={styles.brandCopy}>
@@ -190,26 +205,20 @@ export default function RoutePreviewScreen() {
       </View>
 
       <View style={styles.metaRow}>
-        <View style={styles.metaBadge}>
-          <Text style={styles.metaBadgeLabel}>
-            {routePreview?.coverage.status
-              ? `Coverage: ${routePreview.coverage.status}`
-              : 'Coverage pending'}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.metaBadge,
-            routePreview?.selectedMode === 'safe' ? styles.metaBadgeSafe : styles.metaBadgeFast,
-          ]}
+        <Badge variant="neutral" size="md">
+          {routePreview?.coverage.status
+            ? `Coverage: ${routePreview.coverage.status}`
+            : 'Coverage pending'}
+        </Badge>
+        <Badge
+          variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
+          size="md"
         >
-          <Text style={styles.metaBadgeLabel}>
-            {routePreview?.selectedMode === 'safe' ? 'Safe routing' : 'Fast routing'}
-          </Text>
-        </View>
-        <View style={styles.metaBadge}>
-          <Text style={styles.metaBadgeLabel}>{user ? 'Sync on' : 'Anonymous'}</Text>
-        </View>
+          {routePreview?.selectedMode === 'safe' ? 'Safe routing' : 'Fast routing'}
+        </Badge>
+        <Badge variant={user ? 'accent' : 'neutral'} size="md">
+          {user ? 'Sync on' : 'Anonymous'}
+        </Badge>
       </View>
     </>
   );
@@ -232,18 +241,18 @@ export default function RoutePreviewScreen() {
       topOverlay={topOverlay}
       footer={
         <>
-          <Pressable
-            style={[styles.primaryButton, !selectedRoute ? styles.primaryButtonDisabled : null]}
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
             disabled={!selectedRoute}
             onPress={beginNavigation}
           >
-            <Text style={styles.primaryButtonLabel}>
-              {selectedRoute ? 'Start navigation' : 'No route selected'}
-            </Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={returnToPlanning}>
-            <Text style={styles.secondaryButtonLabel}>Back to planning</Text>
-          </Pressable>
+            {selectedRoute ? 'Start navigation' : 'No route selected'}
+          </Button>
+          <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
+            Back to planning
+          </Button>
         </>
       }
     >
@@ -258,6 +267,7 @@ export default function RoutePreviewScreen() {
 
       {previewQuery.isPending ? (
         <View style={styles.sheetHero}>
+          <Spinner size={32} />
           <Text style={styles.sheetEyebrow}>Preview loading</Text>
           <Text style={styles.sheetTitle}>Building safer alternatives</Text>
           <Text style={styles.sheetSubtitle}>
@@ -270,14 +280,15 @@ export default function RoutePreviewScreen() {
         <View style={styles.warningPanel}>
           <Text style={styles.warningTitle}>Preview failed</Text>
           <Text style={styles.warningBody}>{previewQuery.error.message}</Text>
-          <Pressable
-            style={styles.retryPill}
+          <Button
+            variant="ghost"
+            size="sm"
             onPress={() => {
               void previewQuery.refetch();
             }}
           >
-            <Text style={styles.retryPillLabel}>Retry preview</Text>
-          </Pressable>
+            Retry preview
+          </Button>
         </View>
       ) : null}
 
@@ -320,47 +331,12 @@ export default function RoutePreviewScreen() {
             </View>
           </View>
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Alternatives</Text>
-            <Text style={styles.sectionHint}>
-              {routePreview?.routes.length ?? 0} available
-            </Text>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.alternativeTrack}
-          >
-            {routePreview?.routes.map((route) => (
-              <Pressable
-                key={route.id}
-                style={[
-                  styles.alternativeCard,
-                  selectedRoute?.id === route.id ? styles.alternativeCardActive : null,
-                ]}
-                onPress={() => setSelectedRouteId(route.id)}
-              >
-                <Text
-                  style={[
-                    styles.alternativeDuration,
-                    selectedRoute?.id === route.id ? styles.alternativeDurationActive : null,
-                  ]}
-                >
-                  {formatMinutes(route.adjustedDurationSeconds)}
-                </Text>
-                <Text style={styles.alternativeDistance}>
-                  {(route.distanceMeters / 1000).toFixed(1)} km
-                </Text>
-                <Text style={styles.alternativeMeta}>
-                  {route.source === 'custom_osrm' ? 'Custom safe routing' : 'Mapbox fast routing'}
-                </Text>
-                <Text style={styles.alternativeMeta}>
-                  {route.riskSegments.length} risk overlay{route.riskSegments.length === 1 ? '' : 's'}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <RouteComparisonPanel
+            routes={routePreview?.routes ?? []}
+            selectedRouteId={selectedRouteId}
+            onSelectRoute={setSelectedRouteId}
+            loading={previewQuery.isPending}
+          />
 
           <View style={styles.syncPanel}>
             <Text style={styles.syncPanelTitle}>Sync mode</Text>
@@ -397,246 +373,126 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  backPill: {
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(11, 16, 32, 0.84)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  backPillLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 12,
-    fontWeight: '800',
+    gap: space[3],
   },
   brandCluster: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: space[3],
   },
   brandCopy: {
     flex: 1,
-    gap: 2,
+    gap: space[0.5],
   },
   topEyebrow: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    color: darkTheme.accent,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
   topTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.4,
+    ...text2xl,
+    color: darkTheme.textPrimary,
   },
   topSubtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 13,
+    ...textSm,
+    color: darkTheme.textSecondary,
   },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-  },
-  metaBadge: {
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(11, 16, 32, 0.82)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  metaBadgeSafe: {
-    backgroundColor: 'rgba(15, 118, 110, 0.22)',
-  },
-  metaBadgeFast: {
-    backgroundColor: 'rgba(59, 130, 246, 0.18)',
-  },
-  metaBadgeLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 12,
-    fontWeight: '800',
+    gap: space[2],
   },
   sheetHero: {
-    gap: 4,
+    gap: space[1],
   },
   sheetEyebrow: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    color: darkTheme.accent,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
   sheetTitle: {
-    color: mobileTheme.colors.textOnDark,
+    ...text2xl,
     fontSize: 26,
-    fontWeight: '900',
+    color: darkTheme.textPrimary,
     letterSpacing: -0.7,
   },
   sheetSubtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 14,
+    ...textSm,
+    color: darkTheme.textSecondary,
     lineHeight: 20,
   },
   warningPanel: {
-    borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.16)',
-    padding: 14,
+    borderRadius: radii['2xl'],
+    backgroundColor: safetyColors.cautionTint + '28', // ~16% opacity tint
+    padding: space[3],
     gap: 6,
   },
   warningTitle: {
-    color: '#fbbf24',
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    color: safetyColors.caution,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.1,
   },
   warningBody: {
-    color: mobileTheme.colors.textOnDark,
+    ...textSm,
     fontSize: 13,
+    color: darkTheme.textPrimary,
     lineHeight: 18,
-  },
-  retryPill: {
-    alignSelf: 'flex-start',
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(250, 204, 21, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  retryPillLabel: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '800',
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: space[2] + 2,
   },
   metricCard: {
     minWidth: '47%',
-    borderRadius: 22,
+    borderRadius: radii['2xl'],
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 5,
+    borderColor: darkTheme.borderDefault,
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
+    gap: space[1],
+    ...shadows.sm,
   },
   metricLabel: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
+    ...textXs,
+    color: darkTheme.textMuted,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   metricValue: {
-    color: mobileTheme.colors.textOnDark,
+    ...textDataSm,
     fontSize: 17,
-    fontWeight: '900',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: 12,
-  },
-  sectionTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  sectionHint: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 12,
-  },
-  alternativeTrack: {
-    gap: 10,
-    paddingRight: 4,
-  },
-  alternativeCard: {
-    width: 150,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 4,
-  },
-  alternativeCardActive: {
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
-    borderColor: mobileTheme.colors.borderStrong,
-  },
-  alternativeDuration: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  alternativeDurationActive: {
-    color: mobileTheme.colors.brand,
-  },
-  alternativeDistance: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  alternativeMeta: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    color: darkTheme.textPrimary,
+    fontFamily: fontFamily.mono.bold,
   },
   syncPanel: {
-    borderRadius: 22,
+    borderRadius: radii['2xl'],
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
+    borderColor: darkTheme.borderDefault,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    padding: 14,
-    gap: 4,
+    padding: space[3],
+    gap: space[1],
   },
   syncPanelTitle: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    color: darkTheme.accent,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   syncPanelBody: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    ...textSm,
     fontSize: 13,
+    color: darkTheme.textSecondary,
     lineHeight: 18,
-  },
-  primaryButton: {
-    borderRadius: 24,
-    backgroundColor: mobileTheme.colors.brand,
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  primaryButtonDisabled: {
-    backgroundColor: '#8f9bad',
-  },
-  primaryButtonLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    alignItems: 'center',
-    paddingVertical: 15,
-  },
-  secondaryButtonLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    fontWeight: '800',
   },
 });

@@ -1,35 +1,46 @@
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { telemetry } from '../src/lib/telemetry';
-import { mobileTheme } from '../src/lib/theme';
+import { Button, TextInput } from '../src/design-system/atoms';
+import { darkTheme, gray } from '../src/design-system/tokens/colors';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import {
+  fontFamily,
+  text2xl,
+  textLg,
+  textSm,
+  textXs,
+} from '../src/design-system/tokens/typography';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
 export default function AuthScreen() {
-  const {
-    session,
-    user,
-    isLoading,
-    isConfigured,
-    isSupabaseConfigured,
-    isDeveloperBypassAvailable,
-    signInWithEmail,
-    signUpWithEmail,
-    signInWithDeveloperBypass,
-    signOut,
-  } = useAuthSession();
+  // --- Auth state (wrapped in try-catch for resilience) ---
+  let authCtx: ReturnType<typeof useAuthSession> | null = null;
+  try {
+    authCtx = useAuthSession();
+  } catch {
+    // AuthSessionProvider missing — show fallback
+  }
+
+  const session = authCtx?.session ?? null;
+  const user = authCtx?.user ?? null;
+  const isSupabaseConfigured = authCtx?.isSupabaseConfigured ?? false;
+  const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
+
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,6 +49,7 @@ export default function AuthScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submit = async () => {
+    if (!authCtx) return;
     if (!email.trim() || !password) {
       setErrorMessage('Enter both email and password.');
       return;
@@ -50,38 +62,20 @@ export default function AuthScreen() {
     try {
       const result =
         mode === 'sign-in'
-          ? await signInWithEmail(email.trim(), password)
-          : await signUpWithEmail(email.trim(), password);
+          ? await authCtx.signInWithEmail(email.trim(), password)
+          : await authCtx.signUpWithEmail(email.trim(), password);
 
       if (result.error) {
-        telemetry.capture('auth_failed', {
-          mode,
-          reason: result.error.message,
-        });
-        telemetry.captureError(result.error, {
-          feature: 'auth',
-          mode,
-        });
         setErrorMessage(result.error.message);
         return;
       }
 
-      telemetry.capture(mode === 'sign-in' ? 'auth_signed_in' : 'auth_signed_up', {
-        mode,
-      });
       setStatusMessage(
         mode === 'sign-in'
           ? 'Signed in successfully.'
           : 'Account created. Check your email if confirmation is required.',
       );
     } catch (error) {
-      telemetry.capture('auth_failed', {
-        mode,
-      });
-      telemetry.captureError(error, {
-        feature: 'auth',
-        mode,
-      });
       setErrorMessage(error instanceof Error ? error.message : 'Authentication failed.');
     } finally {
       setIsSubmitting(false);
@@ -89,522 +83,554 @@ export default function AuthScreen() {
   };
 
   const signInAsDeveloper = async () => {
+    if (!authCtx) return;
     setIsSubmitting(true);
     setErrorMessage(null);
     setStatusMessage(null);
 
     try {
-      const result = await signInWithDeveloperBypass();
-      telemetry.capture('auth_signed_in', {
-        mode: 'dev-bypass',
-      });
+      const result = await authCtx.signInWithDeveloperBypass();
       setStatusMessage(
-        `Developer session enabled for ${result.user.email ?? result.user.id}. Local validation only.`,
+        `Developer session enabled for ${result.user.email ?? result.user.id}.`,
       );
     } catch (error) {
-      telemetry.capture('auth_failed', {
-        mode: 'dev-bypass',
-      });
-      telemetry.captureError(error, {
-        feature: 'auth',
-        mode: 'dev-bypass',
-      });
       setErrorMessage(error instanceof Error ? error.message : 'Developer sign-in failed.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const accountState = isLoading ? 'Loading' : session ? 'Signed in' : 'Anonymous';
-  const providerLabel = session?.provider ?? 'none';
+  const handleGoogleSignIn = async () => {
+    if (!authCtx) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const { error } = await authCtx.signInWithGoogle();
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+      setStatusMessage('Signed in with Google.');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Google sign-in failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!authCtx) return;
+    try {
+      await authCtx.signOut();
+      setStatusMessage('Signed out.');
+      setErrorMessage(null);
+    } catch {
+      setErrorMessage('Sign out failed.');
+    }
+  };
+
+  // --- Render ---
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.canvas}>
-        <View style={[styles.glow, styles.glowTop]} />
-        <View style={[styles.glow, styles.glowBottom]} />
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.headerRow}>
-            <View style={styles.heroRow}>
-              <BrandLogo size={62} />
-              <View style={styles.heroCopy}>
-                <Text style={styles.eyebrow}>Account</Text>
-                <Text style={styles.title}>Welcome Back</Text>
-                <Text style={styles.subtitle}>
-                  Sign in to sync trips, hazard reports, and feedback while route preview stays
-                  anonymous-first.
+    <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
+        >
+          <Ionicons name="close" size={24} color={darkTheme.textPrimary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Account</Text>
+        <View style={styles.backButton} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Avatar + branding */}
+        <View style={styles.avatarSection}>
+          <View style={styles.avatarCircle}>
+            <BrandLogo size={64} />
+          </View>
+          <Text style={styles.brandName}>Defensive Pedal</Text>
+        </View>
+
+        {/* ── Signed-in state ── */}
+        {user ? (
+          <View style={styles.card}>
+            <View style={styles.signedInHeader}>
+              <Ionicons name="checkmark-circle" size={20} color="#22C55E" />
+              <Text style={styles.signedInLabel}>Logged in as</Text>
+            </View>
+            <Text style={styles.userEmail}>{user.email ?? user.id}</Text>
+            <Text style={styles.providerText}>
+              Provider: {session?.provider ?? 'unknown'}
+            </Text>
+
+            <View style={styles.signedInActions}>
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onPress={() => void handleSignOut()}
+              >
+                Sign out
+              </Button>
+            </View>
+
+            {statusMessage ? (
+              <Text style={styles.successText}>{statusMessage}</Text>
+            ) : null}
+          </View>
+        ) : (
+          /* ── Sign-in / Sign-up form ── */
+          <View style={styles.card}>
+            {/* Mode toggle */}
+            <View style={styles.segmentedRow}>
+              <Pressable
+                style={[
+                  styles.segmentButton,
+                  mode === 'sign-in' && styles.segmentButtonActive,
+                ]}
+                onPress={() => {
+                  setMode('sign-in');
+                  setErrorMessage(null);
+                  setStatusMessage(null);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'sign-in' }}
+              >
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    mode === 'sign-in' && styles.segmentLabelActive,
+                  ]}
+                >
+                  Log in
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.segmentButton,
+                  mode === 'sign-up' && styles.segmentButtonActive,
+                ]}
+                onPress={() => {
+                  setMode('sign-up');
+                  setErrorMessage(null);
+                  setStatusMessage(null);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: mode === 'sign-up' }}
+              >
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    mode === 'sign-up' && styles.segmentLabelActive,
+                  ]}
+                >
+                  Sign up
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Supabase not configured notice */}
+            {!isSupabaseConfigured ? (
+              <View style={styles.warningBanner}>
+                <Ionicons name="alert-circle-outline" size={16} color="#EAB308" />
+                <Text style={styles.warningText}>
+                  Supabase is not configured for this build. Auth is unavailable.
                 </Text>
               </View>
+            ) : null}
+
+            {/* Google Sign-in */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.googleButton,
+                pressed && { opacity: 0.8 },
+                (!isSupabaseConfigured || isSubmitting) && { opacity: 0.4 },
+              ]}
+              onPress={() => void handleGoogleSignIn()}
+              disabled={!isSupabaseConfigured || isSubmitting}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in with Google"
+            >
+              <View style={styles.googleIconWrap}>
+                <Text style={styles.googleG}>G</Text>
+              </View>
+              <Text style={styles.googleLabel}>Continue with Google</Text>
+            </Pressable>
+
+            {/* Divider */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with email</Text>
+              <View style={styles.dividerLine} />
             </View>
-            <Link href="/route-planning" asChild>
-              <Pressable style={styles.exitChip}>
-                <Text style={styles.exitLabel}>Back to map</Text>
+
+            {/* Email field */}
+            <View style={styles.fieldStack}>
+              <TextInput
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                disabled={!isSupabaseConfigured}
+                leftIcon={
+                  <Ionicons name="mail-outline" size={18} color={gray[400]} />
+                }
+              />
+              <TextInput
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                placeholder="Minimum 6 characters"
+                disabled={!isSupabaseConfigured}
+                leftIcon={
+                  <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
+                }
+              />
+            </View>
+
+            {/* Status / error messages */}
+            {statusMessage ? (
+              <Text style={styles.successText}>{statusMessage}</Text>
+            ) : null}
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : null}
+
+            {/* Submit button */}
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={isSubmitting || !isSupabaseConfigured}
+              loading={isSubmitting}
+              onPress={() => void submit()}
+            >
+              {mode === 'sign-in' ? 'Sign in with email' : 'Create account'}
+            </Button>
+
+            {/* Mode toggle text */}
+            <View style={styles.toggleRow}>
+              <Text style={styles.toggleQuestion}>
+                {mode === 'sign-in' ? "Don't have an account?" : 'Already have an account?'}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+                  setErrorMessage(null);
+                  setStatusMessage(null);
+                }}
+              >
+                <Text style={styles.toggleLink}>
+                  {mode === 'sign-in' ? 'Sign up' : 'Log in'}
+                </Text>
               </Pressable>
-            </Link>
-          </View>
-
-          <View style={styles.statusStrip}>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>Session</Text>
-              <Text style={styles.statusValue}>{accountState}</Text>
-            </View>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>Provider</Text>
-              <Text style={styles.statusValue}>{providerLabel}</Text>
-            </View>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusLabel}>Sync</Text>
-              <Text style={styles.statusValue}>{isConfigured ? 'Ready' : 'Limited'}</Text>
             </View>
           </View>
+        )}
 
-          <View style={styles.modalShell}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{user ? 'Signed-in account' : 'Log in / Sign up'}</Text>
-              <Text style={styles.modalSubtitle}>
-                {user
-                  ? 'This account unlocks synced ride data across devices.'
-                  : 'Use email auth or the developer bypass for local validation.'}
-              </Text>
+        {/* Developer bypass (only in dev) */}
+        {isDeveloperBypassAvailable && !user ? (
+          <View style={styles.devCard}>
+            <View style={styles.devHeader}>
+              <Ionicons name="code-slash-outline" size={16} color={gray[400]} />
+              <Text style={styles.devTitle}>Developer bypass</Text>
             </View>
-
-            {user ? (
-              <View style={styles.accountPanel}>
-                <View style={styles.accountBadge}>
-                  <Text style={styles.accountBadgeLabel}>Live account</Text>
-                </View>
-                <Text style={styles.accountEmail}>{user.email ?? 'Unknown account'}</Text>
-                <Text style={styles.accountMeta}>Provider: {providerLabel}</Text>
-                <Pressable
-                  style={styles.secondaryButton}
-                  onPress={() => {
-                    void signOut();
-                    telemetry.capture('auth_signed_out');
-                    setStatusMessage('Signed out.');
-                  }}
-                >
-                  <Text style={styles.secondaryLabel}>Sign out</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.formPanel}>
-                {!isSupabaseConfigured ? (
-                  <View style={styles.inlineNotice}>
-                    <Text style={styles.inlineNoticeText}>
-                      Supabase credentials are not configured for this build, so email auth is
-                      unavailable.
-                    </Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.segmentedRow}>
-                  <Pressable
-                    style={[styles.segmentButton, mode === 'sign-in' ? styles.segmentButtonActive : null]}
-                    onPress={() => setMode('sign-in')}
-                    disabled={!isSupabaseConfigured}
-                  >
-                    <Text
-                      style={[styles.segmentLabel, mode === 'sign-in' ? styles.segmentLabelActive : null]}
-                    >
-                      Sign in
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.segmentButton, mode === 'sign-up' ? styles.segmentButtonActive : null]}
-                    onPress={() => setMode('sign-up')}
-                    disabled={!isSupabaseConfigured}
-                  >
-                    <Text
-                      style={[styles.segmentLabel, mode === 'sign-up' ? styles.segmentLabelActive : null]}
-                    >
-                      Create account
-                    </Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.fieldStack}>
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Email</Text>
-                    <TextInput
-                      value={email}
-                      onChangeText={setEmail}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="email-address"
-                      placeholder="you@example.com"
-                      placeholderTextColor="#94a3b8"
-                      style={styles.input}
-                      editable={isSupabaseConfigured}
-                    />
-                  </View>
-                  <View style={styles.fieldGroup}>
-                    <Text style={styles.fieldLabel}>Password</Text>
-                    <TextInput
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                      placeholder="Minimum 6 characters"
-                      placeholderTextColor="#94a3b8"
-                      style={styles.input}
-                      editable={isSupabaseConfigured}
-                    />
-                  </View>
-                </View>
-
-                {statusMessage ? <Text style={styles.successText}>{statusMessage}</Text> : null}
-                {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-
-                <Pressable
-                  style={[styles.primaryButton, isSubmitting ? styles.buttonDisabled : null]}
-                  disabled={isSubmitting || !isSupabaseConfigured}
-                  onPress={() => {
-                    void submit();
-                  }}
-                >
-                  <Text style={styles.primaryLabel}>
-                    {isSubmitting
-                      ? 'Working...'
-                      : mode === 'sign-in'
-                        ? 'Sign in with email'
-                        : 'Create account'}
-                  </Text>
-                </Pressable>
-
-                {isDeveloperBypassAvailable ? (
-                  <View style={styles.devPanel}>
-                    <Text style={styles.devTitle}>Local validation bypass</Text>
-                    <Text style={styles.devCopy}>
-                      This shortcut is for local QA only and should never ship in production.
-                    </Text>
-                    <Pressable
-                      style={[styles.secondaryButton, isSubmitting ? styles.buttonDisabled : null]}
-                      disabled={isSubmitting}
-                      onPress={() => {
-                        void signInAsDeveloper();
-                      }}
-                    >
-                      <Text style={styles.secondaryLabel}>Use developer auth</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-            )}
+            <Text style={styles.devDescription}>
+              Local QA only. Should never ship in production.
+            </Text>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              disabled={isSubmitting}
+              loading={isSubmitting}
+              onPress={() => void signInAsDeveloper()}
+            >
+              Use developer auth
+            </Button>
           </View>
+        ) : null}
 
-          <View style={styles.infoGrid}>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoCardTitle}>Anonymous-first</Text>
-              <Text style={styles.infoCardBody}>
-                Riders can still search, preview routes, and navigate before signing in.
-              </Text>
-            </View>
-            <View style={styles.infoCard}>
-              <Text style={styles.infoCardTitle}>What syncs</Text>
-              <Text style={styles.infoCardBody}>
-                Signed-in sessions unlock synced trips, hazard submissions, and feedback writes.
-              </Text>
-            </View>
+        {/* Info footer */}
+        <View style={styles.infoSection}>
+          <View style={styles.infoRow}>
+            <Ionicons name="shield-checkmark-outline" size={16} color={gray[500]} />
+            <Text style={styles.infoText}>
+              Anonymous-first — browse and navigate without signing in.
+            </Text>
           </View>
-        </ScrollView>
-      </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="sync-outline" size={16} color={gray[500]} />
+            <Text style={styles.infoText}>
+              Sign in to sync trips, hazard reports, and feedback.
+            </Text>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
+    backgroundColor: darkTheme.bgDeep,
   },
-  canvas: {
-    flex: 1,
-    backgroundColor: mobileTheme.colors.background,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 40,
-    gap: 18,
-  },
-  glow: {
-    position: 'absolute',
-    borderRadius: 999,
-    opacity: 0.58,
-  },
-  glowTop: {
-    top: -80,
-    right: -20,
-    width: 220,
-    height: 220,
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
-  },
-  glowBottom: {
-    left: -70,
-    bottom: -20,
-    width: 220,
-    height: 220,
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-  },
-  headerRow: {
-    gap: 16,
-  },
-  heroRow: {
+  header: {
     flexDirection: 'row',
-    gap: 16,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
   },
-  heroCopy: {
-    flex: 1,
-    gap: 6,
+  backButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  eyebrow: {
-    color: mobileTheme.colors.brand,
-    textTransform: 'uppercase',
-    letterSpacing: 1.6,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  title: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -0.9,
-  },
-  subtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  exitChip: {
-    alignSelf: 'flex-start',
-    borderRadius: mobileTheme.radii.pill,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  exitLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  statusStrip: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  statusPill: {
-    minWidth: 92,
-    borderRadius: mobileTheme.radii.md,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(17, 24, 39, 0.8)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  statusLabel: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  statusValue: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  modalShell: {
-    borderRadius: 34,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(17, 24, 39, 0.92)',
-    padding: 22,
-    gap: 18,
-    shadowColor: '#000000',
-    shadowOpacity: 0.32,
-    shadowRadius: 24,
-    shadowOffset: {
-      width: 0,
-      height: 18,
-    },
-    elevation: 10,
-  },
-  modalHeader: {
-    gap: 6,
-  },
-  modalTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 24,
-    fontWeight: '900',
+  headerTitle: {
+    ...text2xl,
+    color: darkTheme.textPrimary,
     letterSpacing: -0.5,
   },
-  modalSubtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 14,
-    lineHeight: 20,
+  content: {
+    paddingHorizontal: space[5],
+    paddingBottom: space[10],
+    gap: space[5],
   },
-  accountPanel: {
-    gap: 12,
+  // Avatar
+  avatarSection: {
+    alignItems: 'center',
+    gap: space[3],
+    paddingTop: space[2],
   },
-  accountBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(250, 204, 21, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  avatarCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: gray[700],
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  accountBadgeLabel: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  brandName: {
+    fontFamily: fontFamily.heading.extraBold,
+    fontSize: 18,
+    color: darkTheme.textPrimary,
+    letterSpacing: -0.3,
   },
-  accountEmail: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 20,
-    fontWeight: '800',
-  },
-  accountMeta: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 14,
-  },
-  formPanel: {
-    gap: 14,
-  },
-  inlineNotice: {
-    borderRadius: mobileTheme.radii.md,
+  // Card
+  card: {
+    borderRadius: radii['2xl'],
     borderWidth: 1,
-    borderColor: 'rgba(234, 179, 8, 0.35)',
-    backgroundColor: 'rgba(234, 179, 8, 0.14)',
-    padding: 14,
+    borderColor: darkTheme.borderDefault,
+    backgroundColor: darkTheme.bgPrimary,
+    padding: space[5],
+    gap: space[4],
+    ...shadows.lg,
   },
-  inlineNoticeText: {
-    color: '#fef3c7',
-    fontSize: 13,
-    lineHeight: 19,
+  // Signed-in state
+  signedInHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
   },
+  signedInLabel: {
+    ...textSm,
+    color: darkTheme.textSecondary,
+  },
+  userEmail: {
+    ...textLg,
+    color: darkTheme.textPrimary,
+    fontFamily: fontFamily.body.bold,
+  },
+  providerText: {
+    ...textSm,
+    color: darkTheme.textSecondary,
+  },
+  signedInActions: {
+    marginTop: space[1],
+  },
+  // Segmented control
   segmentedRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: space[2],
+    backgroundColor: darkTheme.bgDeep,
+    borderRadius: radii.xl,
+    padding: 4,
   },
   segmentButton: {
     flex: 1,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingVertical: 13,
+    borderRadius: radii.lg,
+    paddingVertical: space[2] + 2,
     alignItems: 'center',
   },
   segmentButtonActive: {
-    backgroundColor: mobileTheme.colors.surface,
+    backgroundColor: darkTheme.bgSecondary,
   },
   segmentLabel: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontWeight: '800',
+    ...textSm,
+    fontFamily: fontFamily.body.bold,
+    color: darkTheme.textSecondary,
   },
   segmentLabelActive: {
-    color: mobileTheme.colors.textPrimary,
+    color: darkTheme.textPrimary,
   },
-  fieldStack: {
-    gap: 12,
-  },
-  fieldGroup: {
-    gap: 7,
-  },
-  fieldLabel: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.1,
-  },
-  input: {
-    borderRadius: 18,
+  // Warning
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space[2],
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(248, 250, 252, 0.96)',
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 15,
+    borderColor: 'rgba(234, 179, 8, 0.35)',
+    backgroundColor: 'rgba(234, 179, 8, 0.10)',
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
   },
-  successText: {
-    color: '#99f6e4',
+  warningText: {
+    ...textXs,
+    flex: 1,
+    color: '#fef3c7',
+    lineHeight: 18,
+  },
+  // Google button
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 52,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+    backgroundColor: darkTheme.bgSecondary,
+    gap: space[3],
+  },
+  googleIconWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleG: {
+    fontFamily: fontFamily.body.bold,
     fontSize: 14,
+    color: '#4285F4',
+    marginTop: -1,
+  },
+  googleLabel: {
+    ...textSm,
+    fontFamily: fontFamily.body.bold,
+    color: darkTheme.textPrimary,
+  },
+  // Divider
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: darkTheme.borderDefault,
+  },
+  dividerText: {
+    ...textXs,
+    color: gray[500],
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  },
+  // Fields
+  fieldStack: {
+    gap: space[3],
+  },
+  // Messages
+  successText: {
+    ...textSm,
+    color: '#4ADE80',
     lineHeight: 20,
   },
   errorText: {
-    color: '#fca5a5',
-    fontSize: 14,
+    ...textSm,
+    color: '#F87171',
     lineHeight: 20,
   },
-  primaryButton: {
-    borderRadius: 22,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 16,
+  // Toggle
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: space[1],
   },
-  buttonDisabled: {
-    opacity: 0.58,
+  toggleQuestion: {
+    ...textSm,
+    color: darkTheme.textSecondary,
   },
-  primaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
+  toggleLink: {
+    ...textSm,
+    color: '#FACC15',
+    fontFamily: fontFamily.body.bold,
   },
-  secondaryButton: {
-    borderRadius: 22,
+  // Dev card
+  devCard: {
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  secondaryLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  devPanel: {
-    borderRadius: mobileTheme.radii.md,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
+    borderColor: darkTheme.borderDefault,
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 16,
-    gap: 10,
+    padding: space[4],
+    gap: space[2],
+  },
+  devHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
   },
   devTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontWeight: '800',
-    fontSize: 15,
+    ...textSm,
+    color: darkTheme.textPrimary,
+    fontFamily: fontFamily.body.bold,
   },
-  devCopy: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 13,
-    lineHeight: 19,
+  devDescription: {
+    ...textXs,
+    color: darkTheme.textSecondary,
+    lineHeight: 18,
   },
-  infoGrid: {
-    gap: 12,
+  // Info section
+  infoSection: {
+    gap: space[3],
+    paddingHorizontal: space[1],
   },
-  infoCard: {
-    borderRadius: mobileTheme.radii.lg,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    padding: 18,
-    gap: 8,
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space[2],
   },
-  infoCardTitle: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '900',
-  },
-  infoCardBody: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 14,
+  infoText: {
+    ...textSm,
+    flex: 1,
+    color: gray[500],
     lineHeight: 20,
   },
 });

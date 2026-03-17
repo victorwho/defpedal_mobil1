@@ -8,6 +8,7 @@ import {
   isDeveloperAuthBypassAvailable,
   isSupabaseConfigured,
   signInWithEmail,
+  signInWithGoogle,
   signOut,
   signUpWithEmail,
   subscribeToAuthSessionChanges,
@@ -23,6 +24,7 @@ type AuthSessionContextValue = {
   isDeveloperBypassAvailable: boolean;
   signInWithEmail: typeof signInWithEmail;
   signUpWithEmail: typeof signUpWithEmail;
+  signInWithGoogle: typeof signInWithGoogle;
   signInWithDeveloperBypass: typeof activateDeveloperBypassSession;
   signOut: typeof signOut;
 };
@@ -70,6 +72,7 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       isDeveloperBypassAvailable: isDeveloperAuthBypassAvailable(),
       signInWithEmail,
       signUpWithEmail,
+      signInWithGoogle,
       signInWithDeveloperBypass: activateDeveloperBypassSession,
       signOut,
     }),

@@ -1,29 +1,42 @@
+/**
+ * @deprecated Use design-system tokens instead:
+ *   import { useTheme } from '../design-system';
+ *   import { space, radii, shadows } from '../design-system/tokens';
+ *
+ * This file is a backward-compatibility bridge. Existing components that import
+ * mobileTheme will continue to work until they are migrated to the design system.
+ */
+import { darkTheme } from '../design-system/tokens/colors';
+
 export const mobileTheme = {
   colors: {
-    background: '#0b1020',
-    backgroundElevated: '#111827',
-    backgroundPanel: '#161f33',
-    backgroundPanelSoft: '#1b2640',
+    // Map old keys -> new design system tokens
+    background: darkTheme.bgDeep,
+    backgroundElevated: darkTheme.bgPrimary,
+    backgroundPanel: darkTheme.bgSecondary,
+    backgroundPanelSoft: darkTheme.bgTertiary,
     surface: '#ffffff',
     surfaceMuted: '#f8fafc',
-    surfaceAccent: '#0f172a',
-    surfaceWarning: '#fef3c7',
-    border: 'rgba(148, 163, 184, 0.24)',
-    borderStrong: 'rgba(250, 204, 21, 0.28)',
-    textPrimary: '#0f172a',
-    textSecondary: '#475569',
-    textMuted: '#64748b',
-    textOnDark: '#f8fafc',
+    surfaceAccent: darkTheme.textInverse,
+    surfaceWarning: darkTheme.cautionTint,
+    border: `rgba(148, 163, 184, 0.24)`,
+    borderStrong: `rgba(250, 204, 21, 0.28)`,
+    textPrimary: darkTheme.textInverse,
+    textSecondary: darkTheme.textSecondary,
+    textMuted: darkTheme.textMuted,
+    textOnDark: darkTheme.textPrimary,
     textOnDarkMuted: '#cbd5e1',
-    textWarning: '#854d0e',
-    brand: '#facc15',
-    brandStrong: '#eab308',
-    accent: '#2563eb',
-    accentSoft: '#dbeafe',
-    success: '#0f766e',
-    successSoft: '#ccfbf1',
-    danger: '#dc2626',
+    textWarning: darkTheme.cautionText,
+    brand: darkTheme.accent,
+    brandStrong: darkTheme.accentHover,
+    accent: darkTheme.info,
+    accentSoft: darkTheme.infoTint,
+    success: darkTheme.safe,
+    successSoft: darkTheme.safeTint,
+    danger: darkTheme.danger,
   },
+  // LEGACY radii — kept at original values so existing screens don't visually break.
+  // New components should import { radii } from '../design-system/tokens/radii' instead.
   radii: {
     sm: 14,
     md: 20,
@@ -31,4 +44,3 @@ export const mobileTheme = {
     pill: 999,
   },
 } as const;
-

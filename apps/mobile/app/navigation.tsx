@@ -13,22 +13,32 @@ import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { NavigationFooterPanel, NavigationManeuverCard } from '../src/components/NavigationChrome';
 import { RouteMap } from '../src/components/RouteMap';
 import { Screen } from '../src/components/Screen';
-import { StatusCard } from '../src/components/StatusCard';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
 import { telemetry } from '../src/lib/telemetry';
-import { mobileTheme } from '../src/lib/theme';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+
+// Design system imports
+import { NavigationHUD } from '../src/design-system/organisms/NavigationHUD';
+import { Toast } from '../src/design-system/molecules/Toast';
+import { Modal } from '../src/design-system/organisms/Modal';
+import { Button } from '../src/design-system/atoms/Button';
+import { Badge } from '../src/design-system/atoms/Badge';
+import { IconButton } from '../src/design-system/atoms/IconButton';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import { darkTheme, safetyColors, gray } from '../src/design-system/tokens/colors';
+import { fontFamily, text2xl, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
 
 export default function NavigationScreen() {
   useKeepAwake();
@@ -355,19 +365,33 @@ export default function NavigationScreen() {
         eyebrow="Active ride"
         subtitle="Start from route preview to enter the live turn-by-turn shell."
       >
-        <StatusCard title="No active navigation" tone="warning">
-          <Text style={styles.fallbackBodyText}>
+        <View
+          style={{
+            borderRadius: radii.xl,
+            borderWidth: 1,
+            borderColor: `${safetyColors.caution}59`,
+            backgroundColor: `${safetyColors.cautionTint}18`,
+            padding: space[4],
+            gap: space[2],
+          }}
+        >
+          <Text style={[textXs, { color: safetyColors.cautionText, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fontFamily.body.bold }]}>
+            No active navigation
+          </Text>
+          <Text style={[textBase, { color: darkTheme.textSecondary }]}>
             Start a route preview first so the navigation session has a selected route and steps.
           </Text>
-        </StatusCard>
-        <Pressable
-          style={styles.fallbackPrimaryButton}
+        </View>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onPress={() => {
             router.replace('/route-preview');
           }}
         >
-          <Text style={styles.fallbackPrimaryLabel}>Return to preview</Text>
-        </Pressable>
+          Return to preview
+        </Button>
       </Screen>
     );
   }
@@ -376,7 +400,7 @@ export default function NavigationScreen() {
     locationState.permissionStatus === 'granted'
       ? 'GPS live'
       : `GPS ${locationState.permissionStatus}`;
-  const syncChipLabel = user ? `Sync on · ${pendingQueueCount}` : 'Anonymous ride';
+  const syncChipLabel = user ? `Sync on \u00b7 ${pendingQueueCount}` : 'Anonymous ride';
   const progressChipLabel = `Step ${navigationSession.currentStepIndex + 1}/${Math.max(totalSteps, 1)}`;
   const bgChipLabel = `BG ${backgroundSnapshot.status.status}`;
 
@@ -386,11 +410,20 @@ export default function NavigationScreen() {
       ? rerouteMutation.error.message
       : navigationSession.rerouteEligible
         ? rerouteMutation.isPending
-          ? 'Requesting a new route from the rider’s live GPS position.'
+          ? 'Requesting a new route from the rider\u2019s live GPS position.'
           : offRouteCountdownSeconds !== null && offRouteCountdownSeconds > 0
             ? `Off route. Automatic reroute will fire in ${offRouteCountdownSeconds}s.`
             : 'Off route. Manual reroute is ready.'
         : null;
+
+  const warningAction = locationState.error
+    ? { label: 'Retry GPS', handler: () => void locationState.refreshLocation() }
+    : navigationSession.rerouteEligible &&
+        !rerouteMutation.isPending &&
+        mobileEnv.mobileApiUrl &&
+        locationState.sample
+      ? { label: 'Reroute now', handler: () => rerouteMutation.mutate(locationState.sample!.coordinate) }
+      : null;
 
   return (
     <View style={styles.screen}>
@@ -413,113 +446,22 @@ export default function NavigationScreen() {
               <BrandLogo size={42} />
               <View style={styles.brandCopy}>
                 <Text style={styles.topEyebrow}>Defensive Pedal</Text>
-                <Text style={styles.topTitle}>Live ride</Text>
+                <Text style={[text2xl, { color: darkTheme.textPrimary }]}>Live ride</Text>
               </View>
             </View>
             <View style={styles.chipRow}>
-              <View style={styles.statusChip}>
-                <Text style={styles.statusChipLabel}>{gpsChipLabel}</Text>
-              </View>
-              <View style={styles.statusChip}>
-                <Text style={styles.statusChipLabel}>{bgChipLabel}</Text>
-              </View>
-              <View style={styles.statusChip}>
-                <Text style={styles.statusChipLabel}>{progressChipLabel}</Text>
-              </View>
-              <View style={styles.statusChip}>
-                <Text style={styles.statusChipLabel}>{syncChipLabel}</Text>
-              </View>
+              <Badge variant="neutral" size="sm">{gpsChipLabel}</Badge>
+              <Badge variant="neutral" size="sm">{bgChipLabel}</Badge>
+              <Badge variant="info" size="sm" mono>{progressChipLabel}</Badge>
+              <Badge variant="neutral" size="sm">{syncChipLabel}</Badge>
             </View>
           </View>
 
-          <NavigationManeuverCard
+          <NavigationHUD
             currentStep={currentStep}
             nextStep={nextStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
             gpsLabel={currentStep?.streetName || 'Live guidance from rider GPS'}
-          />
-
-          {warningMessage ? (
-            <View style={styles.warningBanner}>
-              <Text style={styles.warningBannerText}>{warningMessage}</Text>
-              {locationState.error ? (
-                <Pressable
-                  style={styles.warningAction}
-                  onPress={() => void locationState.refreshLocation()}
-                >
-                  <Text style={styles.warningActionLabel}>Retry GPS</Text>
-                </Pressable>
-              ) : navigationSession.rerouteEligible &&
-                !rerouteMutation.isPending &&
-                mobileEnv.mobileApiUrl &&
-                locationState.sample ? (
-                <Pressable
-                  style={styles.warningAction}
-                  onPress={() => rerouteMutation.mutate(locationState.sample!.coordinate)}
-                >
-                  <Text style={styles.warningActionLabel}>Reroute now</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {hazardBanner ? (
-            <View
-              style={[
-                styles.hazardBanner,
-                hazardBanner.tone === 'success'
-                  ? styles.hazardBannerSuccess
-                  : hazardBanner.tone === 'warning'
-                    ? styles.hazardBannerWarning
-                    : styles.hazardBannerError,
-              ]}
-            >
-              <Text style={styles.hazardBannerText}>{hazardBanner.message}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.floatingControlRail}>
-          <Pressable
-            style={styles.railButton}
-            onPress={() => {
-              setFollowing(!(navigationSession.isFollowing ?? true));
-            }}
-          >
-            <Text style={styles.railButtonLabel}>
-              {navigationSession.isFollowing ? 'Free map' : 'Recenter'}
-            </Text>
-          </Pressable>
-
-          <VoiceGuidanceButton
-            enabled={voiceGuidanceEnabled}
-            onPress={toggleVoiceGuidance}
-            compact
-          />
-
-          <Pressable style={styles.railButton} onPress={openHazardPicker}>
-            <Ionicons name="warning" size={22} color={mobileTheme.colors.textOnDark} />
-            <Text style={styles.railButtonLabel}>Hazard</Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.railButton, styles.railButtonDanger]}
-            onPress={() => {
-              queueTripEnd('stopped');
-              telemetry.capture('navigation_stopped', {
-                route_id: selectedRoute.id,
-                session_id: navigationSession.sessionId,
-              });
-              finishNavigation();
-              router.push('/feedback');
-            }}
-          >
-            <Text style={styles.railButtonLabel}>End ride</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.bottomCluster}>
-          <NavigationFooterPanel
             remainingDurationSeconds={Math.round(
               navigationSession.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
             )}
@@ -531,58 +473,131 @@ export default function NavigationScreen() {
             offRouteCountdownSeconds={offRouteCountdownSeconds}
             reroutePending={rerouteMutation.isPending}
           />
+
+          {warningMessage ? (
+            <View style={[styles.warningBanner, shadows.md]}>
+              <Text style={[textSm, styles.warningBannerText]}>{warningMessage}</Text>
+              {warningAction ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={warningAction.handler}
+                >
+                  {warningAction.label}
+                </Button>
+              ) : null}
+            </View>
+          ) : null}
         </View>
+
+        <View style={styles.floatingControlRail}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onPress={() => {
+              setFollowing(!(navigationSession.isFollowing ?? true));
+            }}
+          >
+            {navigationSession.isFollowing ? 'Free map' : 'Recenter'}
+          </Button>
+
+          <VoiceGuidanceButton
+            enabled={voiceGuidanceEnabled}
+            onPress={toggleVoiceGuidance}
+            compact
+          />
+
+          <IconButton
+            icon={<Ionicons name="warning" size={22} color={darkTheme.accent} />}
+            onPress={openHazardPicker}
+            accessibilityLabel="Report hazard"
+            variant="accent"
+          />
+
+          <Button
+            variant="danger"
+            size="sm"
+            onPress={() => {
+              queueTripEnd('stopped');
+              telemetry.capture('navigation_stopped', {
+                route_id: selectedRoute.id,
+                session_id: navigationSession.sessionId,
+              });
+              finishNavigation();
+              router.push('/feedback');
+            }}
+          >
+            End ride
+          </Button>
+        </View>
+
+        {/* Bottom area intentionally left empty -- footer metrics are inside NavigationHUD */}
       </SafeAreaView>
 
-      {hazardPickerOpen ? (
-        <View style={styles.modalBackdrop}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
+      {/* Hazard toast notification */}
+      {hazardBanner ? (
+        <View style={styles.toastContainer}>
+          <Toast
+            message={hazardBanner.message}
+            variant={hazardBanner.tone}
+            durationMs={3000}
+            onDismiss={() => {
+              setHazardBanner(null);
+              if (hazardBannerTimeoutRef.current) {
+                clearTimeout(hazardBannerTimeoutRef.current);
+                hazardBannerTimeoutRef.current = null;
+              }
+            }}
+          />
+        </View>
+      ) : null}
+
+      {/* Hazard picker modal */}
+      <Modal
+        visible={hazardPickerOpen}
+        onClose={() => {
+          setHazardPickerOpen(false);
+        }}
+        title="What should we mark here?"
+        description="This saves the hazard at your current rider location for later sync."
+        footer={
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
             onPress={() => {
               setHazardPickerOpen(false);
             }}
-          />
-          <View style={styles.hazardPickerCard}>
-            <View style={styles.hazardPickerHeader}>
-              <Text style={styles.hazardPickerEyebrow}>Hazard report</Text>
-              <Text style={styles.hazardPickerTitle}>What should we mark here?</Text>
-              <Text style={styles.hazardPickerSubtitle}>
-                This saves the hazard at your current rider location for later sync.
-              </Text>
-            </View>
-
-            <View style={styles.hazardOptionList}>
-              {HAZARD_TYPE_OPTIONS.map((option) => (
-                <Pressable
-                  key={option.value}
-                  style={styles.hazardOptionButton}
-                  onPress={() => {
-                    queueHazardReport(option.value);
-                  }}
-                >
-                  <View style={styles.hazardOptionIconWrap}>
-                    <Ionicons
-                      name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
-                      size={18}
-                      color={mobileTheme.colors.brand}
-                    />
-                  </View>
-                  <Text style={styles.hazardOptionLabel}>{option.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable
-              style={styles.hazardPickerDismissButton}
+          >
+            Cancel
+          </Button>
+        }
+      >
+        <View style={styles.hazardOptionList}>
+          {HAZARD_TYPE_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              variant="secondary"
+              size="md"
+              fullWidth
+              leftIcon={
+                <View style={styles.hazardOptionIconWrap}>
+                  <Ionicons
+                    name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
+                    size={18}
+                    color={darkTheme.accent}
+                  />
+                </View>
+              }
               onPress={() => {
-                setHazardPickerOpen(false);
+                queueHazardReport(option.value);
               }}
             >
-              <Text style={styles.hazardPickerDismissLabel}>Cancel</Text>
-            </Pressable>
-          </View>
+              {option.label}
+            </Button>
+          ))}
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 }
@@ -590,234 +605,77 @@ export default function NavigationScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
+    backgroundColor: darkTheme.bgDeep,
   },
   overlayRoot: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 14,
+    paddingHorizontal: space[4],
+    paddingTop: space[2],
+    paddingBottom: space[4],
   },
   topCluster: {
-    gap: 10,
+    gap: space[3],
   },
   topRow: {
-    gap: 10,
+    gap: space[3],
   },
   brandBlock: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: space[3],
   },
   brandCopy: {
     gap: 2,
   },
   topEyebrow: {
-    color: mobileTheme.colors.brand,
+    color: darkTheme.accent,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 12,
-    fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-  },
-  topTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.5,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-  },
-  statusChip: {
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(11, 16, 32, 0.84)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  statusChipLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 12,
-    fontWeight: '800',
+    gap: space[2],
   },
   warningBanner: {
-    borderRadius: 20,
+    borderRadius: radii.xl,
     backgroundColor: 'rgba(245, 158, 11, 0.18)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    gap: space[3],
   },
   warningBannerText: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
+    color: darkTheme.textPrimary,
+    fontFamily: fontFamily.body.bold,
   },
-  hazardBanner: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+  floatingControlRail: {
+    position: 'absolute',
+    right: space[4],
+    top: '48%',
+    transform: [{ translateY: -140 }],
+    width: 92,
+    gap: space[3],
+    alignItems: 'center',
   },
-  hazardBannerSuccess: {
-    backgroundColor: 'rgba(15, 118, 110, 0.22)',
-  },
-  hazardBannerWarning: {
-    backgroundColor: 'rgba(250, 204, 21, 0.18)',
-  },
-  hazardBannerError: {
-    backgroundColor: 'rgba(153, 27, 27, 0.28)',
-  },
-  hazardBannerText: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(3, 7, 18, 0.48)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 14,
-    paddingBottom: 18,
-  },
-  hazardPickerCard: {
-    borderRadius: 28,
-    backgroundColor: 'rgba(11, 16, 32, 0.96)',
-    borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.18)',
-    padding: 18,
-    gap: 16,
-  },
-  hazardPickerHeader: {
-    gap: 6,
-  },
-  hazardPickerEyebrow: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '900',
-    textTransform: 'uppercase',
-    letterSpacing: 1.1,
-  },
-  hazardPickerTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: -0.4,
-  },
-  hazardPickerSubtitle: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+  toastContainer: {
+    position: 'absolute',
+    bottom: space[8],
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   hazardOptionList: {
-    gap: 10,
-  },
-  hazardOptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    gap: space[3],
   },
   hazardOptionIconWrap: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(250, 204, 21, 0.14)',
-  },
-  hazardOptionLabel: {
-    flex: 1,
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  hazardPickerDismissButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  hazardPickerDismissLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  warningAction: {
-    alignSelf: 'flex-start',
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  warningActionLabel: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  bottomCluster: {
-    gap: 12,
-  },
-  floatingControlRail: {
-    position: 'absolute',
-    right: 14,
-    top: '48%',
-    transform: [{ translateY: -140 }],
-    width: 92,
-    gap: 10,
-  },
-  railButton: {
-    borderRadius: 20,
-    backgroundColor: 'rgba(11, 16, 32, 0.84)',
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    minHeight: 58,
-  },
-  railButtonDanger: {
-    backgroundColor: 'rgba(153, 27, 27, 0.82)',
-    borderColor: 'rgba(252, 165, 165, 0.18)',
-  },
-  railButtonDisabled: {
-    opacity: 0.55,
-  },
-  railButtonLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  fallbackBodyText: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  fallbackPrimaryButton: {
-    borderRadius: 22,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  fallbackPrimaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
   },
 });

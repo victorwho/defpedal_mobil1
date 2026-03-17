@@ -1,13 +1,24 @@
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
-import { StatusCard } from '../src/components/StatusCard';
+import { Badge } from '../src/design-system/atoms';
+import { Button } from '../src/design-system/atoms';
+import { useTheme } from '../src/design-system/ThemeContext';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import { space } from '../src/design-system/tokens/spacing';
+import {
+  fontFamily,
+  textDataSm,
+  textSm,
+  textXl,
+  textXs,
+} from '../src/design-system/tokens/typography';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { mobileEnv } from '../src/lib/env';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
-import { mobileTheme } from '../src/lib/theme';
 import {
   summarizeBackgroundMovement,
   summarizeSelectedRouteOfflineReadiness,
@@ -142,15 +153,103 @@ function MetricBlock({
   value: string;
   emphasis?: boolean;
 }) {
+  const { colors } = useTheme();
+
   return (
-    <View style={[styles.metricTile, emphasis ? styles.metricTileAccent : null]}>
-      <Text style={[styles.metricLabel, emphasis ? styles.metricLabelAccent : null]}>{label}</Text>
-      <Text style={[styles.metricValue, emphasis ? styles.metricValueAccent : null]}>{value}</Text>
+    <View
+      style={[
+        styles.metricTile,
+        { backgroundColor: colors.bgSecondary },
+        emphasis && { backgroundColor: 'rgba(250, 204, 21, 0.14)' },
+      ]}
+    >
+      <Text
+        style={[
+          styles.metricLabel,
+          { color: colors.textMuted },
+          emphasis && { color: colors.accent },
+        ]}
+      >
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.metricValue,
+          { color: colors.textPrimary },
+          emphasis && { color: colors.accent },
+        ]}
+      >
+        {value}
+      </Text>
     </View>
   );
 }
 
+function DiagnosticCard({
+  title,
+  tone = 'default',
+  children,
+}: {
+  title: string;
+  tone?: 'default' | 'accent' | 'warning';
+  children: React.ReactNode;
+}) {
+  const { colors } = useTheme();
+
+  const cardBg =
+    tone === 'accent'
+      ? colors.bgSecondary
+      : tone === 'warning'
+        ? 'rgba(245, 158, 11, 0.08)'
+        : colors.bgPrimary;
+
+  const borderColor =
+    tone === 'accent'
+      ? colors.borderAccent
+      : tone === 'warning'
+        ? colors.caution
+        : colors.borderDefault;
+
+  const titleColor =
+    tone === 'accent'
+      ? colors.accent
+      : tone === 'warning'
+        ? colors.cautionText
+        : colors.textMuted;
+
+  return (
+    <View
+      style={[
+        styles.card,
+        shadows.md,
+        {
+          borderColor,
+          backgroundColor: cardBg,
+        },
+      ]}
+    >
+      <Text style={[styles.cardTitle, { color: titleColor }]}>{title}</Text>
+      <View style={styles.cardBody}>{children}</View>
+    </View>
+  );
+}
+
+function StatusBadge({
+  label,
+  ok,
+}: {
+  label: string;
+  ok: boolean;
+}) {
+  return (
+    <Badge variant={ok ? 'risk-safe' : 'neutral'} size="sm">
+      {label}
+    </Badge>
+  );
+}
+
 export default function DiagnosticsScreen() {
+  const { colors } = useTheme();
   const { user, session } = useAuthSession();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
   const queuedMutations = useAppStore((state) => state.queuedMutations);
@@ -289,49 +388,85 @@ export default function DiagnosticsScreen() {
       eyebrow="Validation"
       subtitle="This remains the QA control room, but it now uses the same visual hierarchy as the rider-facing app instead of dropping into a plain utility page."
     >
-      <StatusCard title="Health at a glance" tone={apiHealth?.ok ? 'accent' : 'default'}>
+      <DiagnosticCard title="Health at a glance" tone={apiHealth?.ok ? 'accent' : 'default'}>
+        <View style={styles.badgeRow}>
+          <StatusBadge label="API reachable" ok={Boolean(apiHealth?.ok)} />
+          <Badge
+            variant={foregroundPermission === 'granted' ? 'risk-safe' : 'risk-caution'}
+            size="sm"
+          >
+            Foreground: {foregroundPermission}
+          </Badge>
+          <Badge
+            variant={backgroundPermission === 'granted' ? 'risk-safe' : 'risk-caution'}
+            size="sm"
+          >
+            Background: {backgroundPermission}
+          </Badge>
+          <Badge
+            variant={queuedMutations.length === 0 ? 'neutral' : 'info'}
+            size="sm"
+            mono
+          >
+            Queue: {queuedMutations.length}
+          </Badge>
+        </View>
         <View style={styles.metricGrid}>
           <MetricBlock label="API" value={apiHealth?.ok ? 'Reachable' : 'Unavailable'} emphasis={Boolean(apiHealth?.ok)} />
           <MetricBlock label="Foreground" value={foregroundPermission} />
           <MetricBlock label="Background" value={backgroundPermission} />
           <MetricBlock label="Queue" value={`${queuedMutations.length} pending`} />
         </View>
-        <Text style={apiHealth?.ok ? styles.darkText : styles.bodyText}>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Shared store backend: {apiHealth?.sharedStoreBackend ?? 'Unknown'}
         </Text>
-        <Text style={apiHealth?.ok ? styles.darkText : styles.bodyText}>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Generated:{' '}
           {apiHealth?.generatedAt ? new Date(apiHealth.generatedAt).toLocaleTimeString() : 'Not available'}
         </Text>
-      </StatusCard>
+      </DiagnosticCard>
 
-      <StatusCard title="Environment">
-        <Text style={styles.bodyText}>App variant: {mobileEnv.appVariant}</Text>
-        <Text style={styles.bodyText}>App environment: {mobileEnv.appEnv}</Text>
-        <Text style={styles.bodyText}>Mobile API URL: {mobileEnv.mobileApiUrl || 'Not set'}</Text>
-        <Text style={styles.bodyText}>
-          Mapbox token configured: {mobileEnv.mapboxPublicToken ? 'Yes' : 'No'}
+      <DiagnosticCard title="Environment">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>App variant: <Text style={styles.monoValue}>{mobileEnv.appVariant}</Text></Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>App environment: <Text style={styles.monoValue}>{mobileEnv.appEnv}</Text></Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>Mobile API URL: <Text style={styles.monoValue}>{mobileEnv.mobileApiUrl || 'Not set'}</Text></Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Mapbox token configured: <Text style={styles.monoValue}>{mobileEnv.mapboxPublicToken ? 'Yes' : 'No'}</Text>
         </Text>
-        <Text style={styles.bodyText}>
-          Validation bundle: {mobileEnv.validationBundleId || 'Not set'}
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Validation bundle: <Text style={styles.monoValue}>{mobileEnv.validationBundleId || 'Not set'}</Text>
         </Text>
-        <Text style={styles.bodyText}>
-          Validation mode: {mobileEnv.validationMode || 'Not set'}
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Validation mode: <Text style={styles.monoValue}>{mobileEnv.validationMode || 'Not set'}</Text>
         </Text>
-        <Text style={styles.bodyText}>
-          Validation Metro port: {mobileEnv.validationMetroPort || 'Default'}
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Validation Metro port: <Text style={styles.monoValue}>{mobileEnv.validationMetroPort || 'Default'}</Text>
         </Text>
-        <Text style={styles.bodyText}>
-          Validation source: {mobileEnv.validationSourceRoot || 'Not set'}
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Validation source: <Text style={styles.monoValue}>{mobileEnv.validationSourceRoot || 'Not set'}</Text>
         </Text>
-        <Text style={styles.bodyText}>Signed in: {user ? user.email ?? user.id : 'No'}</Text>
-        <Text style={styles.bodyText}>Auth provider: {session?.provider ?? 'none'}</Text>
-      </StatusCard>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>Signed in: <Text style={styles.monoValue}>{user ? user.email ?? user.id : 'No'}</Text></Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>Auth provider: <Text style={styles.monoValue}>{session?.provider ?? 'none'}</Text></Text>
+      </DiagnosticCard>
 
-      <StatusCard
+      <DiagnosticCard
         title="Background navigation"
         tone={backgroundSnapshot.status.status === 'active' ? 'accent' : 'default'}
       >
+        <View style={styles.badgeRow}>
+          <Badge
+            variant={backgroundSnapshot.status.status === 'active' ? 'accent' : 'neutral'}
+            size="sm"
+          >
+            {backgroundSnapshot.status.status}
+          </Badge>
+          <Badge
+            variant={movementSummary.movementDetected ? 'risk-safe' : 'neutral'}
+            size="sm"
+          >
+            Movement: {movementSummary.movementDetected ? 'Detected' : 'None'}
+          </Badge>
+        </View>
         <View style={styles.metricGrid}>
           <MetricBlock
             label="Status"
@@ -346,39 +481,42 @@ export default function DiagnosticsScreen() {
           <MetricBlock label="Samples" value={`${movementSummary.sampleCount}`} />
           <MetricBlock label="Distance" value={`${movementSummary.totalDistanceMeters} m`} />
         </View>
-        <Text
-          style={backgroundSnapshot.status.status === 'active' ? styles.darkText : styles.bodyText}
-        >
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Updated: {new Date(backgroundSnapshot.status.updatedAt).toLocaleTimeString()}
         </Text>
-        <Text
-          style={backgroundSnapshot.status.status === 'active' ? styles.darkText : styles.bodyText}
-        >
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Latest fix:{' '}
           {backgroundSnapshot.latestLocation
             ? new Date(backgroundSnapshot.latestLocation.timestamp).toLocaleTimeString()
             : 'None'}
         </Text>
-        <Text
-          style={backgroundSnapshot.status.status === 'active' ? styles.darkText : styles.bodyText}
-        >
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Straight-line movement: {movementSummary.straightLineDistanceMeters} m
         </Text>
-        <Text
-          style={backgroundSnapshot.status.status === 'active' ? styles.darkText : styles.bodyText}
-        >
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Movement window: {movementSummary.durationSeconds}s
         </Text>
         {backgroundSnapshot.status.error ? (
-          <Text style={styles.bodyText}>{backgroundSnapshot.status.error}</Text>
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{backgroundSnapshot.status.error}</Text>
         ) : null}
-        <Text style={styles.helperText}>
+        <Text style={[styles.helperText, { color: colors.textMuted }]}>
           For the locked-screen ride check, start navigation, lock the phone, move for at least a
           minute, then refresh here and confirm movement is detected.
         </Text>
-      </StatusCard>
+      </DiagnosticCard>
 
-      <StatusCard title="Offline and queue state">
+      <DiagnosticCard title="Offline and queue state">
+        <View style={styles.badgeRow}>
+          <Badge
+            variant={selectedRouteOfflineSummary.isSelectedRouteReady ? 'risk-safe' : 'neutral'}
+            size="sm"
+          >
+            Offline: {selectedRouteOfflineSummary.isSelectedRouteReady ? 'Ready' : 'Not ready'}
+          </Badge>
+          <Badge variant={selectedRouteId ? 'info' : 'neutral'} size="sm">
+            Route: {selectedRouteId ? 'Selected' : 'None'}
+          </Badge>
+        </View>
         <View style={styles.metricGrid}>
           <MetricBlock label="Route previews" value={`${routePreview?.routes.length ?? 0}`} />
           <MetricBlock label="Selected route" value={selectedRouteId ? 'Present' : 'None'} />
@@ -389,163 +527,177 @@ export default function DiagnosticsScreen() {
           />
           <MetricBlock label="Native packs" value={nativeOfflinePackCount !== null ? `${nativeOfflinePackCount}` : 'Unavailable'} />
         </View>
-        <Text style={styles.bodyText}>
-          Selected route matching packs: {selectedRouteOfflineSummary.matchingRegionCount}
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+          Selected route matching packs: <Text style={styles.monoValue}>{selectedRouteOfflineSummary.matchingRegionCount}</Text>
         </Text>
-        <Text style={styles.bodyText}>
-          Selected route ready packs: {selectedRouteOfflineSummary.readyRegionCount}
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+          Selected route ready packs: <Text style={styles.monoValue}>{selectedRouteOfflineSummary.readyRegionCount}</Text>
         </Text>
-        <Text style={styles.bodyText}>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>
           Selected route pack updated:{' '}
-          {selectedRouteOfflineSummary.latestReadyAt
-            ? new Date(selectedRouteOfflineSummary.latestReadyAt).toLocaleTimeString()
-            : 'None'}
+          <Text style={styles.monoValue}>
+            {selectedRouteOfflineSummary.latestReadyAt
+              ? new Date(selectedRouteOfflineSummary.latestReadyAt).toLocaleTimeString()
+              : 'None'}
+          </Text>
         </Text>
-        <Text style={styles.bodyText}>In-app offline regions: {offlineRegions.length}</Text>
-        <Text style={styles.bodyText}>Active session: {navigationSession?.state ?? 'idle'}</Text>
-        <Text style={styles.bodyText}>Queue detail: {queueDetail}</Text>
-      </StatusCard>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>In-app offline regions: <Text style={styles.monoValue}>{offlineRegions.length}</Text></Text>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>Active session: <Text style={styles.monoValue}>{navigationSession?.state ?? 'idle'}</Text></Text>
+        <Text style={[styles.dataText, { color: colors.textSecondary }]}>Queue detail: <Text style={styles.monoValue}>{queueDetail}</Text></Text>
+      </DiagnosticCard>
 
       {screenError ? (
-        <StatusCard title="Diagnostics issue" tone="warning">
-          <Text style={styles.bodyText}>{screenError}</Text>
-        </StatusCard>
+        <DiagnosticCard title="Diagnostics issue" tone="warning">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{screenError}</Text>
+        </DiagnosticCard>
       ) : null}
 
       {mobileEnv.appEnv !== 'production' ? (
-        <StatusCard title="Developer validation">
-          <Text style={styles.bodyText}>
+        <DiagnosticCard title="Developer validation">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Use this in development to queue authenticated sample writes, then toggle network off
             and back on to confirm the offline sync manager drains the queue.
           </Text>
+          <View style={styles.badgeRow}>
+            <StatusBadge label={`Signed in: ${user ? 'Yes' : 'No'}`} ok={Boolean(user)} />
+            <Badge
+              variant={
+                queueActionSnapshot.lastResult === 'queued'
+                  ? 'risk-safe'
+                  : queueActionSnapshot.lastResult === 'failed'
+                    ? 'risk-danger'
+                    : queueActionSnapshot.lastResult === 'blocked'
+                      ? 'risk-caution'
+                      : 'neutral'
+              }
+              size="sm"
+            >
+              {queueActionSnapshot.lastResult}
+            </Badge>
+          </View>
           <View style={styles.metricGrid}>
             <MetricBlock label="Signed in for writes" value={user ? 'Yes' : 'No'} />
             <MetricBlock label="Last result" value={queueActionSnapshot.lastResult} />
             <MetricBlock label="Press count" value={`${queueActionSnapshot.pressInCount}`} />
             <MetricBlock label="Mutation count" value={`${queueActionSnapshot.lastMutationCount}`} />
           </View>
-          <Text style={styles.bodyText}>
+          <Text style={[styles.dataText, { color: colors.textSecondary }]}>
             Last press:{' '}
-            {queueActionSnapshot.lastPressInAt
-              ? new Date(queueActionSnapshot.lastPressInAt).toLocaleTimeString()
-              : 'Never'}
+            <Text style={styles.monoValue}>
+              {queueActionSnapshot.lastPressInAt
+                ? new Date(queueActionSnapshot.lastPressInAt).toLocaleTimeString()
+                : 'Never'}
+            </Text>
           </Text>
-          <Text style={styles.bodyText}>
+          <Text style={[styles.dataText, { color: colors.textSecondary }]}>
             Last attempt:{' '}
-            {queueActionSnapshot.lastAttemptAt
-              ? new Date(queueActionSnapshot.lastAttemptAt).toLocaleTimeString()
-              : 'Never'}
+            <Text style={styles.monoValue}>
+              {queueActionSnapshot.lastAttemptAt
+                ? new Date(queueActionSnapshot.lastAttemptAt).toLocaleTimeString()
+                : 'Never'}
+            </Text>
           </Text>
-          <Text style={styles.bodyText}>
-            Last client trip: {queueActionSnapshot.lastClientTripId ?? 'None'}
+          <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+            Last client trip: <Text style={styles.monoValue}>{queueActionSnapshot.lastClientTripId ?? 'None'}</Text>
           </Text>
-          <Text style={styles.bodyText}>
-            Last error: {queueActionSnapshot.lastError ?? 'None'}
+          <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+            Last error: <Text style={styles.monoValue}>{queueActionSnapshot.lastError ?? 'None'}</Text>
           </Text>
-          {devStatusMessage ? <Text style={styles.helperText}>{devStatusMessage}</Text> : null}
+          {devStatusMessage ? <Text style={[styles.helperText, { color: colors.textMuted }]}>{devStatusMessage}</Text> : null}
           <View style={styles.buttonRow}>
-            <Pressable
-              style={styles.secondaryButton}
-              accessibilityRole="button"
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
               accessibilityLabel="Queue sample writes"
-              testID="queue-sample-writes-button"
-              hitSlop={10}
-              onPressIn={handleQueuePressIn}
-              onPress={queueSampleWrites}
+              onPress={() => {
+                handleQueuePressIn();
+                queueSampleWrites();
+              }}
             >
-              <Text style={styles.secondaryLabel}>Queue sample writes</Text>
-            </Pressable>
+              Queue sample writes
+            </Button>
           </View>
-        </StatusCard>
+        </DiagnosticCard>
       ) : null}
 
       <View style={styles.buttonRow}>
-        <Pressable style={styles.primaryButton} onPress={() => void refreshDiagnostics()}>
-          <Text style={styles.primaryLabel}>
-            {isRefreshing ? 'Refreshing...' : 'Refresh diagnostics'}
-          </Text>
-        </Pressable>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={isRefreshing}
+          onPress={() => void refreshDiagnostics()}
+        >
+          {isRefreshing ? 'Refreshing...' : 'Refresh diagnostics'}
+        </Button>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  darkText: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    lineHeight: 21,
-  },
   bodyText: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 21,
+    ...textSm,
+  },
+  dataText: {
+    ...textDataSm,
+  },
+  monoValue: {
+    fontFamily: fontFamily.mono.medium,
+    fontSize: 14,
+    lineHeight: 14 * 1.3,
   },
   helperText: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
+    ...textXs,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space[2],
   },
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: space[2],
   },
   metricTile: {
     minWidth: 132,
     flexGrow: 1,
-    borderRadius: mobileTheme.radii.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  metricTileAccent: {
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
+    borderRadius: radii.md,
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
+    gap: space[1],
   },
   metricLabel: {
-    color: mobileTheme.colors.textMuted,
+    fontFamily: fontFamily.body.semiBold,
     fontSize: 11,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  metricLabelAccent: {
-    color: '#fef3c7',
-  },
   metricValue: {
-    color: mobileTheme.colors.textPrimary,
+    fontFamily: fontFamily.mono.bold,
     fontSize: 17,
     fontWeight: '900',
   },
-  metricValueAccent: {
-    color: mobileTheme.colors.textOnDark,
+  card: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    padding: space[4],
+    gap: space[3],
+  },
+  cardTitle: {
+    fontFamily: fontFamily.heading.semiBold,
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  cardBody: {
+    gap: space[2],
   },
   buttonRow: {
-    gap: 10,
-  },
-  primaryButton: {
-    borderRadius: 22,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 16,
-    fontWeight: '800',
+    gap: space[3],
   },
 });

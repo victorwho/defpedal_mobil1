@@ -1,26 +1,41 @@
 import { getPreviewOrigin } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
-import { StatusCard } from '../src/components/StatusCard';
-import { mobileTheme } from '../src/lib/theme';
+import { useTheme } from '../src/design-system';
+import { Button } from '../src/design-system/atoms';
+import { TextInput } from '../src/design-system/atoms';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import {
+  fontFamily,
+  textBase,
+  textSm,
+  textXs,
+  textXl,
+  textDataSm,
+  text2xs,
+} from '../src/design-system/tokens/typography';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function SummaryMetric({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.metricTile}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
+    <View style={[styles.metricTile, { backgroundColor: `${colors.bgTertiary}20` }]}>
+      <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{value}</Text>
     </View>
   );
 }
 
 export default function FeedbackScreen() {
+  const { colors } = useTheme();
   const { user } = useAuthSession();
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
@@ -88,15 +103,19 @@ export default function FeedbackScreen() {
       eyebrow="Post-ride"
       subtitle="Close the ride with the same product tone as the web app: quick rating, short notes, and a clear sync outcome."
     >
-      <StatusCard title="Feedback status" tone="accent">
-        <Text style={styles.darkText}>
+      {/* ---- Feedback status card ---- */}
+      <View style={[styles.card, { backgroundColor: colors.accent, borderColor: colors.borderAccent }, shadows.md]}>
+        <Text style={[styles.cardTitle, { color: colors.textInverse }]}>Feedback status</Text>
+        <Text style={[styles.cardBody, { color: colors.textInverse }]}>
           {user
             ? 'Your ride feedback can queue offline and sync automatically when connectivity returns.'
             : 'You can still finish anonymously, but synced ride feedback requires sign-in.'}
         </Text>
-      </StatusCard>
+      </View>
 
-      <StatusCard title="Ride summary">
+      {/* ---- Ride summary card ---- */}
+      <View style={[styles.card, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }, shadows.md]}>
+        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Ride summary</Text>
         <View style={styles.metricGrid}>
           <SummaryMetric
             label="Session"
@@ -116,27 +135,45 @@ export default function FeedbackScreen() {
           />
         </View>
         <View style={styles.detailStack}>
-          <Text style={styles.bodyText}>
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Start: {formatCoordinateLabel(getPreviewOrigin(routeRequest).lat, getPreviewOrigin(routeRequest).lon)}
           </Text>
-          <Text style={styles.bodyText}>
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Destination: {formatCoordinateLabel(routeRequest.destination.lat, routeRequest.destination.lon)}
           </Text>
-          <Text style={styles.bodyText}>
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Route id: {selectedRoute?.id ?? 'No selected route'}
           </Text>
         </View>
-      </StatusCard>
+      </View>
 
-      <StatusCard title="How safe did it feel?">
+      {/* ---- Rating card ---- */}
+      <View style={[styles.card, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }, shadows.md]}>
+        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>How safe did it feel?</Text>
         <View style={styles.ratingRow}>
           {[1, 2, 3, 4, 5].map((value) => (
             <Pressable
               key={value}
-              style={[styles.ratingButton, rating >= value ? styles.ratingButtonActive : null]}
+              style={[
+                styles.ratingButton,
+                {
+                  borderColor: colors.borderDefault,
+                  backgroundColor: colors.bgSecondary,
+                },
+                rating >= value && {
+                  borderColor: colors.accentHover,
+                  backgroundColor: colors.accent,
+                },
+              ]}
               onPress={() => setRating(value)}
             >
-              <Text style={[styles.ratingLabel, rating >= value ? styles.ratingLabelActive : null]}>
+              <Text
+                style={[
+                  styles.ratingLabel,
+                  { color: colors.textSecondary },
+                  rating >= value && { color: colors.textInverse },
+                ]}
+              >
                 {value}
               </Text>
             </Pressable>
@@ -144,180 +181,142 @@ export default function FeedbackScreen() {
         </View>
 
         <View style={styles.ratingLegend}>
-          <Text style={styles.helperText}>1 = unsafe</Text>
-          <Text style={styles.helperText}>5 = very safe</Text>
+          <Text style={[styles.helperText, { color: colors.textMuted }]}>1 = unsafe</Text>
+          <Text style={[styles.helperText, { color: colors.textMuted }]}>5 = very safe</Text>
         </View>
 
         <TextInput
           multiline
           numberOfLines={5}
-          style={styles.commentInput}
           placeholder="Add any route notes, hazard context, or why this route felt better or worse than expected."
-          placeholderTextColor="#94a3b8"
           value={comments}
           onChangeText={setComments}
         />
 
         {feedbackQueued ? (
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeText}>
+          <View style={[styles.noticeCard, { borderColor: colors.borderDefault, backgroundColor: `${colors.bgTertiary}18` }]}>
+            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
               Feedback for this ride is already queued and will sync automatically.
             </Text>
           </View>
         ) : null}
         {!user ? (
-          <View style={styles.noticeCard}>
-            <Text style={styles.noticeText}>
+          <View style={[styles.noticeCard, { borderColor: colors.borderDefault, backgroundColor: `${colors.bgTertiary}18` }]}>
+            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
               Sign in from the account screen if you want this ride feedback stored on the backend.
             </Text>
           </View>
         ) : null}
-      </StatusCard>
+      </View>
 
-      <Pressable
-        style={[styles.primaryButton, feedbackLocked ? styles.primaryButtonDisabled : null]}
+      {/* ---- Actions ---- */}
+      <Button
+        variant="primary"
+        size="lg"
+        fullWidth
         disabled={feedbackLocked}
         onPress={finishRide}
       >
-        <Text style={styles.primaryLabel}>{queueLabel}</Text>
-      </Pressable>
+        {queueLabel}
+      </Button>
 
-      <Pressable
-        style={styles.secondaryButton}
+      <Button
+        variant="secondary"
+        size="lg"
+        fullWidth
         onPress={() => {
           resetFlow();
           router.replace('/route-planning');
         }}
       >
-        <Text style={styles.secondaryLabel}>Skip and start a new route</Text>
-      </Pressable>
+        Skip and start a new route
+      </Button>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  darkText: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 15,
-    lineHeight: 21,
+  /* Card container — replaces StatusCard */
+  card: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    padding: space[4],
+    gap: space[3],
   },
+  cardTitle: {
+    ...textXl,
+  },
+  cardBody: {
+    ...textBase,
+  },
+
+  /* Body / helper text */
   bodyText: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 21,
+    ...textSm,
   },
   helperText: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
+    ...textXs,
   },
+
+  /* Metric grid */
   metricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: space[2],
   },
   metricTile: {
     minWidth: 132,
     flexGrow: 1,
-    borderRadius: mobileTheme.radii.md,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
+    borderRadius: radii.md,
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
+    gap: space[1],
   },
   metricLabel: {
-    color: mobileTheme.colors.textMuted,
-    fontSize: 11,
+    ...text2xs,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   metricValue: {
-    color: mobileTheme.colors.textPrimary,
+    ...textDataSm,
+    fontFamily: fontFamily.mono.bold,
     fontSize: 17,
-    fontWeight: '900',
   },
+
+  /* Detail stack */
   detailStack: {
-    gap: 6,
+    gap: space[1],
   },
+
+  /* Rating */
   ratingRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: space[2],
   },
   ratingButton: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: radii.full,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.surface,
-    paddingVertical: 15,
+    paddingVertical: space[4],
     alignItems: 'center',
   },
-  ratingButtonActive: {
-    borderColor: mobileTheme.colors.borderStrong,
-    backgroundColor: '#fff8d6',
-  },
   ratingLabel: {
-    color: mobileTheme.colors.textSecondary,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 20,
-    fontWeight: '900',
-  },
-  ratingLabelActive: {
-    color: mobileTheme.colors.textPrimary,
   },
   ratingLegend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  commentInput: {
-    minHeight: 124,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.surfaceMuted,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    textAlignVertical: 'top',
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 15,
-  },
+
+  /* Notice */
   noticeCard: {
-    borderRadius: mobileTheme.radii.md,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
-    padding: 14,
+    padding: space[3],
   },
   noticeText: {
-    color: mobileTheme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  primaryButton: {
-    borderRadius: 22,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryButtonDisabled: {
-    backgroundColor: '#8f9bad',
-  },
-  primaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-  secondaryButton: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  secondaryLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 16,
-    fontWeight: '800',
+    ...textSm,
   },
 });

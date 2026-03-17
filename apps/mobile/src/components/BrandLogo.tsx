@@ -1,6 +1,8 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors, gray } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
+import { fontFamily, textXs } from '../design-system/tokens/typography';
 
 type BrandLogoProps = {
   size?: number;
@@ -38,21 +40,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    backgroundColor: mobileTheme.colors.surface,
+    backgroundColor: gray[50],
     borderWidth: 1,
-    borderColor: mobileTheme.colors.borderStrong,
+    borderColor: brandColors.borderStrong,
   },
   ring: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 999,
+    borderRadius: radii.full,
     borderWidth: 3,
     borderColor: 'rgba(250, 204, 21, 0.26)',
   },
   fallback: {
     position: 'absolute',
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '900',
+    color: brandColors.textInverse,
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
     letterSpacing: 0.8,
     opacity: 0,
   },

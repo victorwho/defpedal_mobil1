@@ -1,9 +1,21 @@
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { mobileTheme } from '../src/lib/theme';
+import { useTheme } from '../src/design-system/ThemeContext';
+import { Button } from '../src/design-system/atoms';
+import { space } from '../src/design-system/tokens/spacing';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import {
+  fontFamily,
+  text3xl,
+  textBase,
+  textSm,
+  textXs,
+} from '../src/design-system/tokens/typography';
+import { gray, safetyColors } from '../src/design-system/tokens/colors';
 
 const ONBOARDING_STEPS = [
   {
@@ -44,6 +56,7 @@ export default function OnboardingScreen() {
   const [stepIndex, setStepIndex] = useState(0);
   const step = ONBOARDING_STEPS[stepIndex];
   const isLastStep = stepIndex === ONBOARDING_STEPS.length - 1;
+  const { colors } = useTheme();
 
   const progressLabel = useMemo(
     () => `${stepIndex + 1} / ${ONBOARDING_STEPS.length}`,
@@ -51,8 +64,8 @@ export default function OnboardingScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.canvas}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.bgDeep }]}>
+      <View style={[styles.canvas, { backgroundColor: colors.bgDeep }]}>
         <View style={[styles.glow, styles.glowTop]} />
         <View style={[styles.glow, styles.glowBottom]} />
 
@@ -60,43 +73,43 @@ export default function OnboardingScreen() {
           <View style={styles.brandRow}>
             <BrandLogo size={58} />
             <View style={styles.headerCopy}>
-              <Text style={styles.progress}>{progressLabel}</Text>
-              <Text style={styles.headerTitle}>Welcome aboard</Text>
+              <Text style={[styles.progress, { color: colors.accent }]}>{progressLabel}</Text>
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Welcome aboard</Text>
             </View>
           </View>
           {!isLastStep ? (
             <Link href="/route-planning" asChild>
-              <Pressable style={styles.skipChip}>
-                <Text style={styles.skipLabel}>Skip</Text>
-              </Pressable>
+              <Button variant="secondary" size="sm">
+                Skip
+              </Button>
             </Link>
           ) : null}
         </View>
 
-        <View style={styles.stageCard}>
-          <Text style={styles.eyebrow}>{step.eyebrow}</Text>
-          <Text style={styles.title}>{step.title}</Text>
-          <Text style={styles.subtitle}>{step.subtitle}</Text>
+        <View style={[styles.stageCard, { borderColor: colors.borderDefault, ...shadows.xl }]}>
+          <Text style={[styles.eyebrow, { color: colors.accent }]}>{step.eyebrow}</Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{step.title}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{step.subtitle}</Text>
 
           <View style={styles.showcaseShell}>
-            <View style={styles.mockPhone}>
+            <View style={[styles.mockPhone, { borderColor: `rgba(250, 204, 21, 0.18)` }]}>
               <View style={styles.mockTopBar}>
                 <View style={styles.mockPillWide} />
                 <View style={styles.mockPillShort} />
               </View>
               <View style={styles.mockMap}>
-                <View style={styles.mockRouteSafe} />
+                <View style={[styles.mockRouteSafe, { borderColor: colors.accent }]} />
                 <View style={styles.mockRouteFast} />
-                <View style={styles.mockPuck} />
+                <View style={[styles.mockPuck, { backgroundColor: safetyColors.safe, borderColor: gray[50] }]} />
               </View>
               <View style={styles.mockBottomSheet}>
-                <Text style={styles.mockBadge}>{step.accentLabel}</Text>
+                <Text style={[styles.mockBadge, { color: colors.accentHover }]}>{step.accentLabel}</Text>
                 <View style={styles.mockMetricsRow}>
                   <View style={styles.mockMetricTile} />
                   <View style={styles.mockMetricTile} />
                   <View style={styles.mockMetricTile} />
                 </View>
-                <View style={styles.mockButton} />
+                <View style={[styles.mockButton, { backgroundColor: colors.accent }]} />
               </View>
             </View>
           </View>
@@ -104,8 +117,8 @@ export default function OnboardingScreen() {
           <View style={styles.bulletStack}>
             {step.bullets.map((bullet) => (
               <View key={bullet} style={styles.bulletRow}>
-                <View style={styles.bulletDot} />
-                <Text style={styles.bulletText}>{bullet}</Text>
+                <View style={[styles.bulletDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.bulletText, { color: colors.textPrimary }]}>{bullet}</Text>
               </View>
             ))}
           </View>
@@ -116,24 +129,29 @@ export default function OnboardingScreen() {
             {ONBOARDING_STEPS.map((_, index) => (
               <View
                 key={index}
-                style={[styles.dot, index === stepIndex ? styles.dotActive : null]}
+                style={[
+                  styles.dot,
+                  index === stepIndex && [styles.dotActive, { backgroundColor: colors.accent }],
+                ]}
               />
             ))}
           </View>
 
           {isLastStep ? (
             <Link href="/route-planning" asChild>
-              <Pressable style={styles.primaryButton}>
-                <Text style={styles.primaryLabel}>Start planning</Text>
-              </Pressable>
+              <Button variant="primary" size="lg" fullWidth>
+                Start planning
+              </Button>
             </Link>
           ) : (
-            <Pressable
-              style={styles.primaryButton}
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
               onPress={() => setStepIndex((current) => Math.min(current + 1, ONBOARDING_STEPS.length - 1))}
             >
-              <Text style={styles.primaryLabel}>Next</Text>
-            </Pressable>
+              Next
+            </Button>
           )}
         </View>
       </View>
@@ -144,19 +162,17 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
   },
   canvas: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 28,
-    gap: 18,
-    backgroundColor: mobileTheme.colors.background,
+    paddingHorizontal: space[5],
+    paddingTop: space[4],
+    paddingBottom: space[6] + space[1],
+    gap: space[4] + space[0.5],
   },
   glow: {
     position: 'absolute',
-    borderRadius: 999,
+    borderRadius: radii.full,
     opacity: 0.56,
   },
   glowTop: {
@@ -177,111 +193,86 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 12,
+    gap: space[3],
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: space[3] + space[0.5],
   },
   headerCopy: {
-    gap: 2,
+    gap: space[0.5],
   },
   progress: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '800',
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
   },
   headerTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  skipChip: {
-    borderRadius: mobileTheme.radii.pill,
-    borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  skipLabel: {
-    color: mobileTheme.colors.textOnDark,
-    fontWeight: '800',
+    ...text3xl,
+    fontFamily: fontFamily.heading.extraBold,
   },
   stageCard: {
     flex: 1,
-    borderRadius: 32,
+    borderRadius: radii['2xl'] + space[2],
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
     backgroundColor: 'rgba(17, 24, 39, 0.9)',
-    padding: 22,
-    gap: 18,
-    shadowColor: '#000000',
-    shadowOpacity: 0.34,
-    shadowRadius: 26,
-    shadowOffset: {
-      width: 0,
-      height: 16,
-    },
-    elevation: 10,
+    padding: space[5] + space[0.5],
+    gap: space[4] + space[0.5],
   },
   eyebrow: {
-    color: mobileTheme.colors.brand,
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.4,
   },
   title: {
-    color: mobileTheme.colors.textOnDark,
+    ...text3xl,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 31,
-    fontWeight: '900',
     letterSpacing: -0.9,
     lineHeight: 36,
   },
   subtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    ...textBase,
     fontSize: 15,
     lineHeight: 22,
   },
   showcaseShell: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: space[1] + space[0.5],
   },
   mockPhone: {
     width: '100%',
     maxWidth: 320,
-    borderRadius: 28,
+    borderRadius: radii['2xl'] + space[1],
     backgroundColor: '#060b16',
-    padding: 12,
-    gap: 10,
+    padding: space[3],
+    gap: space[2] + space[0.5],
     borderWidth: 1,
-    borderColor: 'rgba(250, 204, 21, 0.18)',
   },
   mockTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: space[2],
   },
   mockPillWide: {
     height: 14,
     width: '58%',
-    borderRadius: 999,
+    borderRadius: radii.full,
     backgroundColor: 'rgba(255, 255, 255, 0.14)',
   },
   mockPillShort: {
     height: 14,
     width: '22%',
-    borderRadius: 999,
+    borderRadius: radii.full,
     backgroundColor: 'rgba(250, 204, 21, 0.24)',
   },
   mockMap: {
     height: 220,
-    borderRadius: 22,
+    borderRadius: radii['2xl'] - space[0.5],
     backgroundColor: '#122033',
     overflow: 'hidden',
     justifyContent: 'center',
@@ -292,8 +283,7 @@ const styles = StyleSheet.create({
     width: '72%',
     height: 120,
     borderRadius: 80,
-    borderWidth: 8,
-    borderColor: '#facc15',
+    borderWidth: space[2],
     transform: [{ rotate: '-18deg' }],
   },
   mockRouteFast: {
@@ -306,89 +296,72 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '12deg' }],
   },
   mockPuck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#22c55e',
-    borderWidth: 4,
-    borderColor: '#f8fafc',
+    width: space[5],
+    height: space[5],
+    borderRadius: space[2] + space[0.5],
+    borderWidth: space[1],
   },
   mockBottomSheet: {
-    borderRadius: 22,
+    borderRadius: radii['2xl'] - space[0.5],
     backgroundColor: 'rgba(248, 250, 252, 0.96)',
-    padding: 14,
-    gap: 12,
+    padding: space[3] + space[0.5],
+    gap: space[3],
   },
   mockBadge: {
     alignSelf: 'flex-start',
-    color: mobileTheme.colors.brandStrong,
-    fontSize: 12,
-    fontWeight: '900',
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   mockMetricsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: space[2],
   },
   mockMetricTile: {
     flex: 1,
     height: 42,
-    borderRadius: 14,
+    borderRadius: space[3] + space[0.5],
     backgroundColor: 'rgba(15, 23, 42, 0.08)',
   },
   mockButton: {
     height: 46,
-    borderRadius: 18,
-    backgroundColor: mobileTheme.colors.brand,
+    borderRadius: radii['2xl'] - space[1] - space[0.5],
   },
   bulletStack: {
-    gap: 10,
+    gap: space[2] + space[0.5],
   },
   bulletRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: space[2] + space[0.5],
     alignItems: 'center',
   },
   bulletDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: mobileTheme.colors.brand,
+    width: space[2] + space[0.5],
+    height: space[2] + space[0.5],
+    borderRadius: radii.full,
   },
   bulletText: {
     flex: 1,
-    color: mobileTheme.colors.textOnDark,
+    ...textSm,
     fontSize: 15,
     lineHeight: 21,
   },
   footer: {
-    gap: 16,
+    gap: space[4],
   },
   dotRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: space[2],
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
+    width: space[2] + space[0.5],
+    height: space[2] + space[0.5],
+    borderRadius: radii.full,
     backgroundColor: 'rgba(255, 255, 255, 0.16)',
   },
   dotActive: {
-    width: 26,
-    backgroundColor: mobileTheme.colors.brand,
-  },
-  primaryButton: {
-    borderRadius: 24,
-    backgroundColor: mobileTheme.colors.brand,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  primaryLabel: {
-    color: mobileTheme.colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '900',
+    width: space[6] + space[0.5],
   },
 });

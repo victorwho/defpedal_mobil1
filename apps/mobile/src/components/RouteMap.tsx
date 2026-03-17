@@ -5,8 +5,15 @@ import { useMemo } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { brandColors, gray, safetyColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
+import { space } from '../design-system/tokens/spacing';
+import {
+  fontFamily,
+  textSm,
+  textXs,
+} from '../design-system/tokens/typography';
 import { mobileEnv } from '../lib/env';
-import { mobileTheme } from '../lib/theme';
 
 if (mobileEnv.mapboxPublicToken) {
   Mapbox.setAccessToken(mobileEnv.mapboxPublicToken);
@@ -222,8 +229,8 @@ export const RouteMap = ({
               id="route-alternatives-unselected"
               filter={['!=', ['get', 'selected'], true]}
               style={{
-                lineColor: '#94a3b8',
-                lineOpacity: 0.75,
+                lineColor: gray[400],
+                lineOpacity: 0.6,
                 lineWidth: 4,
                 lineJoin: 'round',
                 lineCap: 'round',
@@ -233,8 +240,8 @@ export const RouteMap = ({
               id="route-alternatives-selected"
               filter={['==', ['get', 'selected'], true]}
               style={{
-                lineColor: '#facc15',
-                lineWidth: 7,
+                lineColor: brandColors.accent,
+                lineWidth: 6,
                 lineJoin: 'round',
                 lineCap: 'round',
               }}
@@ -263,9 +270,9 @@ export const RouteMap = ({
               id="route-marker-origin"
               filter={['==', ['get', 'kind'], 'origin']}
               style={{
-                circleColor: '#0f766e',
+                circleColor: safetyColors.safe,
                 circleRadius: 6,
-                circleStrokeColor: '#f8fafc',
+                circleStrokeColor: gray[50],
                 circleStrokeWidth: 2,
               }}
             />
@@ -273,9 +280,9 @@ export const RouteMap = ({
               id="route-marker-destination"
               filter={['==', ['get', 'kind'], 'destination']}
               style={{
-                circleColor: '#2563eb',
+                circleColor: safetyColors.info,
                 circleRadius: 6,
-                circleStrokeColor: '#f8fafc',
+                circleStrokeColor: gray[50],
                 circleStrokeWidth: 2,
               }}
             />
@@ -283,9 +290,9 @@ export const RouteMap = ({
               id="route-marker-user"
               filter={['==', ['get', 'kind'], 'user']}
               style={{
-                circleColor: '#f97316',
+                circleColor: safetyColors.info,
                 circleRadius: 7,
-                circleStrokeColor: '#ffffff',
+                circleStrokeColor: brandColors.textPrimary,
                 circleStrokeWidth: 3,
               }}
             />
@@ -297,7 +304,7 @@ export const RouteMap = ({
             <Mapbox.LineLayer
               id="off-route-connector-layer"
               style={{
-                lineColor: '#f97316',
+                lineColor: safetyColors.caution,
                 lineWidth: 3,
                 lineDasharray: [1.2, 1.2],
                 lineOpacity: 0.95,
@@ -331,10 +338,10 @@ const styles = StyleSheet.create({
   container: {
     height: 340,
     overflow: 'hidden',
-    borderRadius: mobileTheme.radii.lg,
+    borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.borderStrong,
-    backgroundColor: mobileTheme.colors.backgroundPanel,
+    borderColor: brandColors.borderStrong,
+    backgroundColor: brandColors.bgSecondary,
   },
   containerFullBleed: {
     flex: 1,
@@ -344,38 +351,40 @@ const styles = StyleSheet.create({
   },
   overlay: {
     position: 'absolute',
-    right: 14,
-    bottom: 14,
-    left: 14,
-    borderRadius: 20,
+    right: space[3],
+    bottom: space[3],
+    left: space[3],
+    borderRadius: radii['2xl'],
     backgroundColor: 'rgba(11, 16, 32, 0.92)',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
+    paddingHorizontal: space[3],
+    paddingVertical: space[3],
+    gap: space[1],
   },
   overlayTitle: {
-    color: mobileTheme.colors.brand,
-    fontSize: 15,
-    fontWeight: '800',
+    color: brandColors.accent,
+    ...textSm,
+    fontFamily: fontFamily.heading.extraBold,
   },
   overlaySubtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 13,
+    color: brandColors.textSecondary,
+    ...textXs,
     lineHeight: 18,
   },
   fallback: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    gap: 8,
+    paddingHorizontal: space[6],
+    gap: space[2],
   },
   fallbackTitle: {
+    ...textSm,
+    fontFamily: fontFamily.heading.extraBold,
     fontSize: 18,
-    fontWeight: '800',
-    color: mobileTheme.colors.textOnDark,
+    color: brandColors.textPrimary,
   },
   fallbackText: {
     textAlign: 'center',
-    color: mobileTheme.colors.textOnDarkMuted,
+    ...textSm,
+    color: brandColors.textSecondary,
   },
 });

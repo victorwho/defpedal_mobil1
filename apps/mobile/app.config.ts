@@ -135,6 +135,7 @@ export default () => ({
     },
     plugins: [
       'expo-router',
+      'expo-font',
       '@rnmapbox/maps',
       ['./plugins/withAndroidCleartextTraffic', { enabled: usesCleartextTraffic }],
       [
@@ -161,6 +162,7 @@ export default () => ({
           useSQLCipher: false,
         },
       ],
+      'expo-web-browser',
     ],
     ios: {
       supportsTablet: false,

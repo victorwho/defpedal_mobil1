@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 
 import {
   buildDeveloperBypassSession,
@@ -8,6 +10,10 @@ import {
   type MobileAuthSession,
 } from './devAuth';
 import { mobileEnv } from './env';
+
+// Resolve the app's deep link scheme for OAuth redirects
+const appScheme =
+  (Constants.expoConfig?.scheme as string | undefined) ?? 'defensivepedal-dev';
 
 const secureStorage = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
@@ -114,6 +120,65 @@ export const signUpWithEmail = async (email: string, password: string) => {
     email,
     password,
   });
+};
+
+/**
+ * Sign in with Google via Supabase OAuth.
+ * Opens a web browser for Google consent, then handles the redirect back.
+ */
+export const signInWithGoogle = async (): Promise<{
+  error: Error | null;
+}> => {
+  const client = requireSupabaseClient();
+  await clearDeveloperBypassSession();
+
+  const redirectUrl = `${appScheme}://auth/callback`;
+
+  // 1. Get the OAuth URL from Supabase
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: redirectUrl,
+      skipBrowserRedirect: true, // We'll handle the browser ourselves
+    },
+  });
+
+  if (error || !data.url) {
+    return { error: error ?? new Error('Failed to get OAuth URL from Supabase.') };
+  }
+
+  // 2. Open the browser for Google sign-in
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+
+  if (result.type !== 'success' || !result.url) {
+    return { error: new Error('Google sign-in was cancelled.') };
+  }
+
+  // 3. Extract tokens from the redirect URL
+  // Supabase appends tokens as URL fragment: #access_token=...&refresh_token=...
+  const url = result.url;
+  const fragmentString = url.includes('#') ? url.split('#')[1] : '';
+  const params = new URLSearchParams(fragmentString);
+
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+
+  if (!accessToken || !refreshToken) {
+    return { error: new Error('Missing tokens in OAuth callback.') };
+  }
+
+  // 4. Set the session in Supabase client
+  const { error: sessionError } = await client.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  if (sessionError) {
+    return { error: sessionError };
+  }
+
+  emitAuthSessionChange();
+  return { error: null };
 };
 
 export const signOut = async () => {

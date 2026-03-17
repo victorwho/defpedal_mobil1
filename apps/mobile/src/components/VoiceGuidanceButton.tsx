@@ -1,7 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
+import { space } from '../design-system/tokens/spacing';
+import { shadows } from '../design-system/tokens/shadows';
+import { fontFamily, textXs } from '../design-system/tokens/typography';
 
 type VoiceGuidanceButtonProps = {
   enabled: boolean;
@@ -24,7 +28,7 @@ export const VoiceGuidanceButton = ({
       <Ionicons
         name={enabled ? 'volume-high' : 'volume-mute'}
         size={compact ? 22 : 24}
-        color={enabled ? mobileTheme.colors.textPrimary : mobileTheme.colors.textOnDark}
+        color={enabled ? brandColors.textInverse : brandColors.textPrimary}
       />
     </View>
     {!compact ? <Text style={styles.label}>{enabled ? 'Voice on' : 'Voice off'}</Text> : null}
@@ -33,55 +37,45 @@ export const VoiceGuidanceButton = ({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 22,
+    borderRadius: radii.xl + space[1] + space[0.5],
     backgroundColor: 'rgba(11, 16, 32, 0.88)',
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    borderColor: brandColors.borderDefault,
+    paddingHorizontal: space[2] + space[0.5],
+    paddingVertical: space[2] + space[0.5],
     alignItems: 'center',
-    gap: 8,
+    gap: space[2],
     minWidth: 74,
-    shadowColor: '#000000',
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    elevation: 8,
+    ...shadows.lg,
   },
   buttonCompact: {
     minWidth: 0,
     paddingHorizontal: 0,
     paddingVertical: 0,
-    borderRadius: 20,
+    borderRadius: radii.xl + space[1],
     backgroundColor: 'transparent',
     borderWidth: 0,
     shadowOpacity: 0,
     shadowRadius: 0,
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
+    shadowOffset: { width: 0, height: 0 },
     elevation: 0,
   },
   iconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: space[12],
+    height: space[12],
+    borderRadius: space[6],
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapEnabled: {
-    backgroundColor: mobileTheme.colors.brand,
+    backgroundColor: brandColors.accent,
   },
   iconWrapDisabled: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   label: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 12,
-    fontWeight: '800',
+    color: brandColors.textPrimary,
+    ...textXs,
+    fontFamily: fontFamily.heading.extraBold,
   },
 });
