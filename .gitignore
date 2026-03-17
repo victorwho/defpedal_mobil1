@@ -15,6 +15,16 @@ tmp
 .codex-logs
 ~$*
 *.local
+.env
+.env.*
+!.env.example
+.envrc
+apps/mobile/.env
+apps/mobile/.env.*
+!apps/mobile/.env.example
+services/mobile-api/.env
+services/mobile-api/.env.*
+!services/mobile-api/.env.example
 .expo
 .expo-shared
 android

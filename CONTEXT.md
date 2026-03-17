@@ -20,6 +20,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 - Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `iphone_validation.md`
 - the repo now has a stable feature-development baseline for ongoing frontend and feature work, with remaining iPhone and staging/Redis items tracked as release-hardening backlog
 - the current local route-core backend load baseline is recorded in `mobile_api_load_test_baseline.md`
+- preview mobile development can now auto-sync the active ngrok tunnel into `apps/mobile/.env.preview` through `scripts/sync-mobile-preview-url.mjs` and `npm run dev:mobile:preview`
 
 ## Tech Stack
 
@@ -135,7 +136,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 - the current phone-friendly preview flow depends on:
   - local `mobile-api` running on the laptop
   - active ngrok tunnel
-  - rebuilding the preview app when the tunnel URL changes
+  - keeping the preview env file in sync through the ngrok helper script when the tunnel URL changes
 
 ### Known boundaries
 

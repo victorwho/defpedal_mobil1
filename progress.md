@@ -18,6 +18,7 @@ Update it at the end of each implementation slice.
 - Stable baseline Phase 3 note: active schema SQL now has an ordered home under `supabase/migrations/`, and the backend operations docs now point staging/production rollout at that migration path
 - Stable baseline Phase 4 note: the mobile release workflow now enforces dispatch guardrails and repo-backed release preflight checks, Android release validation is the explicit default native QA path, and `iphone_validation.md` is now the pending record for the first in-repo iPhone smoke pass
 - Stable baseline Phase 5 note: the repo now has a documented local route-core load baseline in `mobile_api_load_test_baseline.md`, and the branch is stable enough for ongoing frontend and feature work even though iPhone validation and Redis-backed staging evidence are still deferred
+- Preview tunnel note: preview mobile development can now auto-sync the active ngrok URL into `apps/mobile/.env.preview` through `npm run sync:mobile:preview-url` and `npm run dev:mobile:preview`
 
 ## Phase Status
 

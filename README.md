@@ -76,6 +76,18 @@ Or explicitly:
 npm run dev:mobile
 ```
 
+Start the preview variant and auto-sync the active ngrok tunnel into `apps/mobile/.env.preview`:
+
+```bash
+npm run dev:mobile:preview
+```
+
+If you only want to refresh the preview env file without starting Expo:
+
+```bash
+npm run sync:mobile:preview-url
+```
+
 Run the mobile API:
 
 ```bash
@@ -144,6 +156,10 @@ Variant-specific env files are also supported:
 - `apps/mobile/.env.development`
 - `apps/mobile/.env.preview`
 - `apps/mobile/.env.production`
+
+For the preview variant, `npm run sync:mobile:preview-url` reads the active tunnel from the local
+ngrok API at `http://127.0.0.1:4040/api/tunnels` and updates `apps/mobile/.env.preview`
+automatically.
 
 The mobile app bundle/package identifiers change by variant:
 
