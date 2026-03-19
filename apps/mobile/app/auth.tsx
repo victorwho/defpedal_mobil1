@@ -40,6 +40,7 @@ export default function AuthScreen() {
   const user = authCtx?.user ?? null;
   const isSupabaseConfigured = authCtx?.isSupabaseConfigured ?? false;
   const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
+  const contextAuthError = authCtx?.authError ?? null;
 
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
@@ -47,6 +48,10 @@ export default function AuthScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Merge context-level auth errors (e.g. from cold-start deep link failures)
+  // into the local error state.
+  const displayError = errorMessage ?? contextAuthError;
 
   const submit = async () => {
     if (!authCtx) return;
@@ -58,6 +63,7 @@ export default function AuthScreen() {
     setIsSubmitting(true);
     setErrorMessage(null);
     setStatusMessage(null);
+    authCtx.clearAuthError();
 
     try {
       const result =
@@ -105,6 +111,7 @@ export default function AuthScreen() {
     setIsSubmitting(true);
     setErrorMessage(null);
     setStatusMessage(null);
+    authCtx.clearAuthError();
 
     try {
       const { error } = await authCtx.signInWithGoogle();
@@ -307,8 +314,8 @@ export default function AuthScreen() {
             {statusMessage ? (
               <Text style={styles.successText}>{statusMessage}</Text>
             ) : null}
-            {errorMessage ? (
-              <Text style={styles.errorText}>{errorMessage}</Text>
+            {displayError ? (
+              <Text style={styles.errorText}>{displayError}</Text>
             ) : null}
 
             {/* Submit button */}
