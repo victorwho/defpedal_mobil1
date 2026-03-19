@@ -14,7 +14,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 
-vi.mock('../src/lib/env', () => ({
+vi.mock('../../../src/lib/env', () => ({
   mobileEnv: {
     validationMode: null,
     appEnv: 'development',
@@ -24,7 +24,7 @@ vi.mock('../src/lib/env', () => ({
 
 // Control the auth loading state from tests
 let mockAuthLoading = false;
-vi.mock('../src/providers/AuthSessionProvider', () => ({
+vi.mock('../../../src/providers/AuthSessionProvider', () => ({
   useAuthSessionOptional: () => ({
     isLoading: mockAuthLoading,
     session: null,
@@ -32,7 +32,7 @@ vi.mock('../src/providers/AuthSessionProvider', () => ({
   }),
 }));
 
-vi.mock('../src/lib/storage', () => ({
+vi.mock('../../../src/lib/storage', () => ({
   zustandStorage: {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -40,8 +40,8 @@ vi.mock('../src/lib/storage', () => ({
   },
 }));
 
-import { useAppStore } from '../src/store/appStore';
-import Index from './index';
+import { useAppStore } from '../../../src/store/appStore';
+import Index from '../../../app/index';
 
 afterEach(() => {
   lastRedirectHref = null;
