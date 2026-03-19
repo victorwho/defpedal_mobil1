@@ -51,13 +51,12 @@ export const submitHazardReport = async (
     const baseInsert = {
       user_id: userId,
       location: {
-        type: 'Point',
-        coordinates: [request.coordinate.lon, request.coordinate.lat],
+        latitude: request.coordinate.lat,
+        longitude: request.coordinate.lon,
       },
       reported_at: request.reportedAt,
       day: now.toISOString().substring(0, 10),
       time_of_day: now.toTimeString().substring(0, 8),
-      source: request.source ?? 'manual',
     };
 
     let error: { message: string } | null = null;

@@ -139,7 +139,10 @@ export const signInWithGoogle = async (): Promise<{
     provider: 'google',
     options: {
       redirectTo: redirectUrl,
-      skipBrowserRedirect: true, // We'll handle the browser ourselves
+      skipBrowserRedirect: true,
+      queryParams: {
+        prompt: 'select_account',
+      },
     },
   });
 
@@ -148,33 +151,48 @@ export const signInWithGoogle = async (): Promise<{
   }
 
   // 2. Open the browser for Google sign-in
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+  // Pass the FULL redirect URL so Chrome Custom Tab matches it exactly
+  const result = await WebBrowser.openAuthSessionAsync(
+    data.url,
+    redirectUrl,
+  );
 
   if (result.type !== 'success' || !result.url) {
+    // The deep link handler in AuthSessionProvider may have caught the redirect.
+    // Give it a moment to process, then check for a session.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const currentSession = await client.auth.getSession();
+    if (currentSession.data.session) {
+      emitAuthSessionChange();
+      return { error: null };
+    }
     return { error: new Error('Google sign-in was cancelled.') };
   }
 
-  // 3. Extract tokens from the redirect URL
-  // Supabase appends tokens as URL fragment: #access_token=...&refresh_token=...
+  // 3. Extract tokens from the redirect URL fragment
   const url = result.url;
   const fragmentString = url.includes('#') ? url.split('#')[1] : '';
   const params = new URLSearchParams(fragmentString);
-
   const accessToken = params.get('access_token');
   const refreshToken = params.get('refresh_token');
 
-  if (!accessToken || !refreshToken) {
-    return { error: new Error('Missing tokens in OAuth callback.') };
-  }
-
-  // 4. Set the session in Supabase client
-  const { error: sessionError } = await client.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-
-  if (sessionError) {
-    return { error: sessionError };
+  if (accessToken && refreshToken) {
+    const { error: sessionError } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (sessionError) return { error: sessionError };
+  } else {
+    // Try PKCE code exchange
+    const queryString = url.includes('?') ? url.split('?')[1]?.split('#')[0] : '';
+    const queryParams = new URLSearchParams(queryString ?? '');
+    const code = queryParams.get('code');
+    if (code) {
+      const { error: codeError } = await client.auth.exchangeCodeForSession(code);
+      if (codeError) return { error: codeError };
+    } else {
+      return { error: new Error('Missing tokens in OAuth callback.') };
+    }
   }
 
   emitAuthSessionChange();
