@@ -99,6 +99,44 @@ The app operates as a global state machine managed in `App.tsx`:
 - **Feature (Risk Legend)**: Added `RiskLegend.tsx` component to display the color coding legend during route preview.
 - **Feature (Elevation Fallback)**: Implemented Mapbox Terrain-RGB raster tile decoding as a highly reliable fallback for elevation data when Open-Elevation and Open-Meteo APIs fail. Added `VITE_MAPBOX_ACCESS_TOKEN` to `.env.example`.
 
+### [Session 2 — 2026-03-18] Mobile Design System, Auth & UI Overhaul
+
+#### Design System (Phases 1–7)
+- **Feature (Design Tokens)**: Created atomic design system under `apps/mobile/src/design-system/` with tokens for colors, typography, spacing, radii, and shadows — all matching the webapp's dark theme with yellow accent (`#FBBF24`).
+- **Feature (Atoms)**: Built foundational atoms: `DSText`, `DSButton`, `DSTextInput`, `DSIcon`, `DSDivider`, `DSBadge`, `DSCard`.
+- **Feature (Molecules)**: Built molecule components: `DSSearchBar`, `DSListItem`, `DSToggle`, `DSSegmentedControl`.
+- **Feature (Organisms)**: Built organism components: `DSBottomSheet`, `DSHeader`, `DSEmptyState`.
+- **Feature (Templates)**: Built template layouts: `DSScreenTemplate`, `DSScrollScreenTemplate`.
+
+#### Auth & Account Screens
+- **Feature (Auth Screen Redesign)**: Completely rewrote `apps/mobile/app/auth.tsx` to replicate the webapp's clean auth UI: close button header, avatar section, Google OAuth button, divider, email/password form with icons, and segmented login/signup toggle.
+- **Feature (Settings Crash Fix)**: Added try-catch around `useAuthSession()` in both `auth.tsx` and `settings.tsx` to prevent app crashes when the auth context is unavailable.
+- **Feature (Google OAuth)**: Added Google sign-in via Supabase OAuth with `expo-web-browser`.
+  - Added `signInWithGoogle()` to `apps/mobile/src/lib/supabase.ts` using `signInWithOAuth` + `WebBrowser.openAuthSessionAsync`.
+  - Exposed `signInWithGoogle` through `AuthSessionProvider` context.
+  - Added `expo-web-browser` and `expo-crypto` dependencies (required native rebuild).
+  - Configured deep link scheme `defensivepedal-dev://` in `app.config.ts`.
+  - **⚠️ KNOWN ISSUE**: Google sign-in OAuth redirect back to the mobile app does not work reliably on Android. After Google authentication succeeds (session IS created in Supabase), Supabase's HTTP 302 redirect to the custom scheme `defensivepedal-dev://auth/callback` fails in Chrome Custom Tabs — the browser cannot follow 302 redirects to non-HTTPS schemes. The redirect falls back to the Supabase Site URL (the webapp) instead of returning to the mobile app. Multiple approaches were attempted:
+    1. Using `defensivepedal-dev://auth/callback` as redirect — Supabase redirects to webapp instead.
+    2. Using `defensivepedal-dev://auth` as redirect — same issue.
+    3. Direct Google OAuth via `expo-auth-session` + `signInWithIdToken` — blocked by Google ("access blocked: authorization error") because the OAuth client ID is a "Web" type, which only allows `https://` redirect URIs.
+    4. Adding Linking event listeners and `+not-found.tsx` catch-all route as fallbacks — did not resolve the core redirect issue.
+  - **Recommended fix**: Either (a) use `@react-native-google-signin/google-signin` for native Google Sign-In + `supabase.auth.signInWithIdToken()` (requires Android client ID with SHA-1 fingerprint, native rebuild), or (b) create a web intermediary page that receives the Supabase redirect and does a JavaScript `window.location.href` redirect to the custom scheme (JS redirects to custom schemes work in browsers, unlike HTTP 302).
+
+#### UI Screens
+- **Feature (Route Planning Redesign)**: Redesigned `route-planning.tsx` with the new design system components.
+- **Feature (FAQ Screen)**: Created new `faq.tsx` screen with expandable accordion-style FAQ items.
+
+#### Backend & Supabase
+- **Feature (Supabase Service Key)**: Updated `services/mobile-api/.env` with `SUPABASE_SERVICE_ROLE_KEY` for server-side Supabase access.
+- **Bugfix (Hazard Reports)**: Verified hazard reports from the mobile app are correctly stored in Supabase via the mobile API backend.
+
+#### Infrastructure
+- **Bugfix (Windows Path Limit)**: Added CMake `buildStagingDirectory` redirect in `android/build.gradle` to work around Windows 260-char path limit.
+- **Config (Android)**: Set `reactNativeArchitectures=arm64-v8a` in `gradle.properties` for faster builds.
+- **Config (Android)**: Added `RECEIVE_BOOT_COMPLETED` permission in `AndroidManifest.xml`.
+- **Dependencies**: Added `expo-web-browser`, `expo-crypto`, `expo-auth-session`, `react-native-svg`, `react-refresh` to the project.
+
 ## 5. Future Development Rules
 0.  **Changelog Maintenance (AI INSTRUCTION)**: You MUST ALWAYS record any architectural changes, bug fixes, or new features in the Changelog section (Section 4) of this document (`ARCHITECTURE.md`) before completing a task.
 1.  **MapWrapper Access**: Always check `useImperativeHandle` definition in `MapWrapper` when adding new map controls that `App.tsx` needs to trigger (like accessing bounds or markers).

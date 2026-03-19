@@ -38,6 +38,7 @@ export const supabaseClient =
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: false,
+          flowType: 'pkce',
         },
       })
     : null;
@@ -122,9 +123,51 @@ export const signUpWithEmail = async (email: string, password: string) => {
   });
 };
 
+// ── OAuth callback coordination ──
+// signInWithGoogle() opens the browser and waits for the deep link handler
+// (in AuthSessionProvider) to resolve the PKCE code exchange. This eliminates
+// the previous race condition where three code paths could set the session.
+const OAUTH_TIMEOUT_MS = 20_000;
+
+let oauthCallbackResolver: ((url: string) => void) | null = null;
+
 /**
- * Sign in with Google via Supabase OAuth.
- * Opens a web browser for Google consent, then handles the redirect back.
+ * Called by AuthSessionProvider's deep link handler when an OAuth callback
+ * URL arrives. Resolves the Promise that signInWithGoogle() is awaiting.
+ */
+export const resolveOAuthCallback = (url: string) => {
+  if (oauthCallbackResolver) {
+    oauthCallbackResolver(url);
+    oauthCallbackResolver = null;
+  }
+};
+
+/**
+ * Returns true when signInWithGoogle() is actively waiting for a callback.
+ * The deep link handler in AuthSessionProvider uses this to decide whether
+ * to forward the URL via resolveOAuthCallback (preferred) or handle it
+ * independently (cold-start fallback).
+ */
+export const isOAuthInProgress = () => oauthCallbackResolver !== null;
+
+/**
+ * Extract a PKCE authorization code from an OAuth callback URL.
+ */
+const extractCodeFromUrl = (url: string): string | null => {
+  const queryString = url.includes('?') ? url.split('?')[1]?.split('#')[0] : '';
+  const params = new URLSearchParams(queryString ?? '');
+  return params.get('code');
+};
+
+/**
+ * Sign in with Google via Supabase OAuth (PKCE flow).
+ *
+ * 1. Gets an OAuth URL from Supabase.
+ * 2. Opens a browser that redirects through a web intermediary (edge function)
+ *    which performs a JS redirect to the app's custom scheme — avoiding the
+ *    Android Chrome Custom Tab 302-to-custom-scheme failure.
+ * 3. Waits for AuthSessionProvider's deep link handler to forward the callback
+ *    URL, then exchanges the PKCE code for a session.
  */
 export const signInWithGoogle = async (): Promise<{
   error: Error | null;
@@ -132,14 +175,23 @@ export const signInWithGoogle = async (): Promise<{
   const client = requireSupabaseClient();
   await clearDeveloperBypassSession();
 
-  const redirectUrl = `${appScheme}://auth/callback`;
+  // The deep link URL the app will ultimately receive
+  const appCallbackUrl = `${appScheme}://auth/callback`;
 
-  // 1. Get the OAuth URL from Supabase
+  // The HTTPS intermediary that Supabase will 302 to. It serves a tiny HTML
+  // page whose JS redirects to the custom scheme (works on Android).
+  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
+  const intermediaryUrl = `${supabaseUrl}/functions/v1/oauth-redirect?scheme=${encodeURIComponent(appScheme)}`;
+
+  // 1. Get the OAuth URL from Supabase, redirecting to the intermediary
   const { data, error } = await client.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: redirectUrl,
-      skipBrowserRedirect: true, // We'll handle the browser ourselves
+      redirectTo: intermediaryUrl,
+      skipBrowserRedirect: true,
+      queryParams: {
+        prompt: 'select_account',
+      },
     },
   });
 
@@ -147,35 +199,50 @@ export const signInWithGoogle = async (): Promise<{
     return { error: error ?? new Error('Failed to get OAuth URL from Supabase.') };
   }
 
-  // 2. Open the browser for Google sign-in
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+  // 2. Set up a Promise that resolves when the deep link handler forwards
+  //    the OAuth callback URL to us (or rejects on timeout).
+  const callbackUrlPromise = new Promise<string>((resolve, reject) => {
+    oauthCallbackResolver = resolve;
 
-  if (result.type !== 'success' || !result.url) {
-    return { error: new Error('Google sign-in was cancelled.') };
-  }
-
-  // 3. Extract tokens from the redirect URL
-  // Supabase appends tokens as URL fragment: #access_token=...&refresh_token=...
-  const url = result.url;
-  const fragmentString = url.includes('#') ? url.split('#')[1] : '';
-  const params = new URLSearchParams(fragmentString);
-
-  const accessToken = params.get('access_token');
-  const refreshToken = params.get('refresh_token');
-
-  if (!accessToken || !refreshToken) {
-    return { error: new Error('Missing tokens in OAuth callback.') };
-  }
-
-  // 4. Set the session in Supabase client
-  const { error: sessionError } = await client.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
+    setTimeout(() => {
+      if (oauthCallbackResolver === resolve) {
+        oauthCallbackResolver = null;
+        reject(new Error('Google sign-in timed out. Please try again.'));
+      }
+    }, OAUTH_TIMEOUT_MS);
   });
 
-  if (sessionError) {
-    return { error: sessionError };
+  // 3. Open the browser. On iOS, WebBrowser may intercept the redirect and
+  //    return the URL directly. On Android, the deep link handler catches it.
+  const result = await WebBrowser.openAuthSessionAsync(
+    data.url,
+    appCallbackUrl,
+  );
+
+  // 4. Determine the callback URL from whichever path delivered it
+  let callbackUrl: string | null = null;
+
+  if (result.type === 'success' && result.url) {
+    // iOS path: WebBrowser intercepted the redirect
+    callbackUrl = result.url;
+    oauthCallbackResolver = null; // No longer needed
+  } else {
+    // Android path (or iOS fallback): wait for the deep link handler
+    try {
+      callbackUrl = await callbackUrlPromise;
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('Google sign-in failed.') };
+    }
   }
+
+  // 5. Exchange the PKCE code for a session
+  const code = extractCodeFromUrl(callbackUrl);
+  if (!code) {
+    return { error: new Error('Missing authorization code in OAuth callback.') };
+  }
+
+  const { error: codeError } = await client.auth.exchangeCodeForSession(code);
+  if (codeError) return { error: codeError };
 
   emitAuthSessionChange();
   return { error: null };
