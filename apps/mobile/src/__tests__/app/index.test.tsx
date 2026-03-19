@@ -14,7 +14,7 @@ vi.mock('expo-router', () => ({
   },
 }));
 
-vi.mock('../src/lib/env', () => ({
+vi.mock('../../../src/lib/env', () => ({
   mobileEnv: {
     validationMode: null,
     appEnv: 'development',
@@ -22,17 +22,7 @@ vi.mock('../src/lib/env', () => ({
   },
 }));
 
-// Control the auth loading state from tests
-let mockAuthLoading = false;
-vi.mock('../src/providers/AuthSessionProvider', () => ({
-  useAuthSessionOptional: () => ({
-    isLoading: mockAuthLoading,
-    session: null,
-    user: null,
-  }),
-}));
-
-vi.mock('../src/lib/storage', () => ({
+vi.mock('../../../src/lib/storage', () => ({
   zustandStorage: {
     getItem: vi.fn(() => null),
     setItem: vi.fn(),
@@ -40,29 +30,17 @@ vi.mock('../src/lib/storage', () => ({
   },
 }));
 
-import { useAppStore } from '../src/store/appStore';
-import Index from './index';
+import { useAppStore } from '../../../src/store/appStore';
+import Index from '../../../app/index';
 
 afterEach(() => {
   lastRedirectHref = null;
-  mockAuthLoading = false;
   useAppStore.getState().resetFlow();
   useAppStore.persist.clearStorage();
 });
 
 describe('Index route', () => {
-  it('returns null (no redirect) while auth is loading', () => {
-    mockAuthLoading = true;
-
-    const { container } = render(<Index />);
-
-    // Should render nothing — no redirect triggered
-    expect(container.innerHTML).toBe('');
-    expect(lastRedirectHref).toBeNull();
-  });
-
-  it('redirects to /route-planning when auth is done and app state is IDLE', () => {
-    mockAuthLoading = false;
+  it('redirects to /route-planning when app state is IDLE', () => {
     useAppStore.setState({ appState: 'IDLE' });
 
     render(<Index />);
@@ -71,7 +49,6 @@ describe('Index route', () => {
   });
 
   it('redirects to /navigation when app state is NAVIGATING with session and routes', () => {
-    mockAuthLoading = false;
     useAppStore.setState({
       appState: 'NAVIGATING',
       navigationSession: {
@@ -119,11 +96,16 @@ describe('Index route', () => {
   });
 
   it('redirects to /feedback when app state is AWAITING_FEEDBACK', () => {
-    mockAuthLoading = false;
     useAppStore.setState({ appState: 'AWAITING_FEEDBACK' });
 
     render(<Index />);
 
     expect(lastRedirectHref).toBe('/feedback');
+  });
+
+  it('redirects to /route-planning as default fallback', () => {
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/route-planning');
   });
 });
