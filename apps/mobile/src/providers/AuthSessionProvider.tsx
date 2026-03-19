@@ -154,3 +154,7 @@ export const useAuthSession = () => {
 
   return context;
 };
+
+export const useAuthSessionOptional = (): AuthSessionContextValue | null => {
+  return useContext(AuthSessionContext);
+};

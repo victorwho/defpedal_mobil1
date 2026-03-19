@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
+import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/RouteMap';
@@ -37,6 +38,10 @@ const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, 
 
 export default function RoutePreviewScreen() {
   const { user } = useAuthSession();
+  const guardPassed = useRouteGuard({
+    requiredStates: ['ROUTE_PREVIEW'],
+    condition: () => Boolean(useAppStore.getState().routePreview?.routes.length),
+  });
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const routePreview = useAppStore((state) => state.routePreview);
@@ -222,6 +227,8 @@ export default function RoutePreviewScreen() {
       </View>
     </>
   );
+
+  if (!guardPassed) return null;
 
   return (
     <MapStageScreen

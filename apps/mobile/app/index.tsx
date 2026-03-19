@@ -1,9 +1,11 @@
 import { Redirect } from 'expo-router';
 
 import { mobileEnv } from '../src/lib/env';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 export default function Index() {
+  const authCtx = useAuthSessionOptional();
   const appState = useAppStore((state) => state.appState);
   const navigationSession = useAppStore((state) => state.navigationSession);
   const routePreview = useAppStore((state) => state.routePreview);
@@ -14,6 +16,12 @@ export default function Index() {
       hasNavigationSession: Boolean(navigationSession),
       routeCount: routePreview?.routes.length ?? 0,
     });
+  }
+
+  // Wait for the auth session to finish loading before deciding which screen
+  // to redirect to. The splash screen remains visible during this time.
+  if (authCtx?.isLoading) {
+    return null;
   }
 
   if (appState === 'NAVIGATING' && navigationSession && routePreview?.routes.length) {

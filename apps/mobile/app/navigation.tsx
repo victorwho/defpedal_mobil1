@@ -15,6 +15,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
+import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { RouteMap } from '../src/components/RouteMap';
 import { Screen } from '../src/components/Screen';
@@ -43,6 +44,10 @@ import { fontFamily, text2xl, textXs, textSm, textBase } from '../src/design-sys
 export default function NavigationScreen() {
   useKeepAwake();
   const { user } = useAuthSession();
+  const guardPassed = useRouteGuard({
+    requiredStates: ['NAVIGATING'],
+    condition: () => Boolean(useAppStore.getState().navigationSession),
+  });
 
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
@@ -424,6 +429,8 @@ export default function NavigationScreen() {
         locationState.sample
       ? { label: 'Reroute now', handler: () => rerouteMutation.mutate(locationState.sample!.coordinate) }
       : null;
+
+  if (!guardPassed) return null;
 
   return (
     <View style={styles.screen}>

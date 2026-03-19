@@ -23,18 +23,12 @@ import {
   textSm,
   textXs,
 } from '../src/design-system/tokens/typography';
-import { useAuthSession } from '../src/providers/AuthSessionProvider';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
 export default function AuthScreen() {
-  // --- Auth state (wrapped in try-catch for resilience) ---
-  let authCtx: ReturnType<typeof useAuthSession> | null = null;
-  try {
-    authCtx = useAuthSession();
-  } catch {
-    // AuthSessionProvider missing — show fallback
-  }
+  const authCtx = useAuthSessionOptional();
 
   const session = authCtx?.session ?? null;
   const user = authCtx?.user ?? null;

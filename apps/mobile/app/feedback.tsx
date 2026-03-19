@@ -19,6 +19,7 @@ import {
   textDataSm,
   text2xs,
 } from '../src/design-system/tokens/typography';
+import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
@@ -37,6 +38,9 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
 export default function FeedbackScreen() {
   const { colors } = useTheme();
   const { user } = useAuthSession();
+  const guardPassed = useRouteGuard({
+    requiredStates: ['AWAITING_FEEDBACK'],
+  });
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
 
@@ -96,6 +100,8 @@ export default function FeedbackScreen() {
     resetFlow();
     router.replace('/route-planning');
   };
+
+  if (!guardPassed) return null;
 
   return (
     <Screen

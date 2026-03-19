@@ -10,15 +10,10 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { textLg, textSm, textBase, fontFamily } from '../src/design-system/tokens/typography';
 import { mobileEnv } from '../src/lib/env';
-import { useAuthSession } from '../src/providers/AuthSessionProvider';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 
 export default function SettingsScreen() {
-  let authCtx: ReturnType<typeof useAuthSession> | null = null;
-  try {
-    authCtx = useAuthSession();
-  } catch {
-    // AuthSessionProvider missing — degrade gracefully
-  }
+  const authCtx = useAuthSessionOptional();
   const user = authCtx?.user ?? null;
   const isConfigured = authCtx?.isConfigured ?? false;
   const session = authCtx?.session ?? null;
