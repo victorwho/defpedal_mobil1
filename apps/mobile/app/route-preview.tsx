@@ -38,9 +38,10 @@ const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, 
 
 export default function RoutePreviewScreen() {
   const { user } = useAuthSession();
+  // Allow both IDLE (initial load, waiting for API) and ROUTE_PREVIEW (routes loaded).
+  // The guard only blocks deep-link access from unrelated states like NAVIGATING.
   const guardPassed = useRouteGuard({
-    requiredStates: ['ROUTE_PREVIEW'],
-    condition: () => Boolean(useAppStore.getState().routePreview?.routes.length),
+    requiredStates: ['IDLE', 'ROUTE_PREVIEW'],
   });
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
@@ -58,7 +59,7 @@ export default function RoutePreviewScreen() {
   const previewQuery = useQuery({
     queryKey: ['route-preview', routeRequest],
     queryFn: () => mobileApi.previewRoute(routeRequest),
-    enabled: Boolean(mobileEnv.mobileApiUrl),
+    enabled: true,
   });
 
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function RoutePreviewScreen() {
     [routePreview, selectedRouteId],
   );
 
-  const isMissingApi = !mobileEnv.mobileApiUrl;
+  const isMissingApi = false; // Routing now calls OSRM/Mapbox directly
   const isEmpty =
     !previewQuery.isPending &&
     !previewQuery.isError &&

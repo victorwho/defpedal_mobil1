@@ -8,7 +8,7 @@
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { AutocompleteSuggestion } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
 import { TextInput } from '../atoms/TextInput';
@@ -37,6 +37,84 @@ export interface SearchBarProps {
   onClear: () => void;
   onSelectSuggestion: (suggestion: AutocompleteSuggestion) => void;
 }
+
+// ---------------------------------------------------------------------------
+// POI icon mapping
+// ---------------------------------------------------------------------------
+
+type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
+
+/** Map Mapbox POI categories to Ionicons names. */
+const CATEGORY_ICON_MAP: Readonly<Record<string, IoniconsName>> = {
+  restaurant: 'restaurant-outline',
+  cafe: 'cafe-outline',
+  coffee: 'cafe-outline',
+  bar: 'beer-outline',
+  pub: 'beer-outline',
+  hotel: 'bed-outline',
+  lodging: 'bed-outline',
+  hospital: 'medkit-outline',
+  pharmacy: 'medical-outline',
+  school: 'school-outline',
+  university: 'school-outline',
+  park: 'leaf-outline',
+  garden: 'leaf-outline',
+  museum: 'easel-outline',
+  library: 'library-outline',
+  cinema: 'film-outline',
+  theater: 'film-outline',
+  stadium: 'football-outline',
+  gym: 'fitness-outline',
+  fitness: 'fitness-outline',
+  bank: 'card-outline',
+  atm: 'card-outline',
+  gas_station: 'car-outline',
+  fuel: 'car-outline',
+  parking: 'car-outline',
+  bus_station: 'bus-outline',
+  train_station: 'train-outline',
+  airport: 'airplane-outline',
+  shopping: 'cart-outline',
+  supermarket: 'cart-outline',
+  grocery: 'cart-outline',
+  store: 'storefront-outline',
+  shop: 'storefront-outline',
+  mall: 'storefront-outline',
+  church: 'home-outline',
+  temple: 'home-outline',
+  mosque: 'home-outline',
+  bicycle: 'bicycle-outline',
+  bike: 'bicycle-outline',
+};
+
+/** Default icons per feature type when no category match. */
+const FEATURE_TYPE_ICON_MAP: Readonly<Record<string, IoniconsName>> = {
+  poi: 'pin-outline',
+  address: 'home-outline',
+  place: 'business-outline',
+  locality: 'map-outline',
+  neighborhood: 'map-outline',
+};
+
+const getSuggestionIcon = (
+  featureType?: SuggestionFeatureType,
+  category?: string,
+): IoniconsName => {
+  if (category) {
+    const normalized = category.toLowerCase().replace(/[\s-]/g, '_');
+    const match = CATEGORY_ICON_MAP[normalized];
+
+    if (match) return match;
+  }
+
+  if (featureType) {
+    const match = FEATURE_TYPE_ICON_MAP[featureType];
+
+    if (match) return match;
+  }
+
+  return 'location-outline';
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -151,45 +229,58 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {!isLoading &&
             !errorMessage &&
-            suggestions.map((suggestion) => (
-              <Pressable
-                key={suggestion.id}
-                style={({ pressed }) => [
-                  styles.suggestionButton,
-                  { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
-                ]}
-                onPress={() => onSelectSuggestion(suggestion)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${suggestion.primaryText}`}
-              >
-                <Ionicons
-                  name="location-outline"
-                  size={18}
-                  color={colors.textSecondary}
-                  style={styles.suggestionIcon}
-                />
-                <View style={styles.suggestionText}>
-                  <Text
-                    style={[
-                      textBase,
-                      {
-                        color: colors.textPrimary,
-                        fontFamily: fontFamily.body.semiBold,
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {suggestion.primaryText}
-                  </Text>
-                  <Text
-                    style={[textSm, { color: colors.textSecondary }]}
-                    numberOfLines={1}
-                  >
-                    {suggestion.label}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
+            suggestions.map((suggestion) => {
+              const iconName = getSuggestionIcon(
+                suggestion.featureType,
+                suggestion.category,
+              );
+
+              return (
+                <Pressable
+                  key={suggestion.id}
+                  style={({ pressed }) => [
+                    styles.suggestionButton,
+                    { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+                  ]}
+                  onPress={() => onSelectSuggestion(suggestion)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${suggestion.primaryText}`}
+                >
+                  <Ionicons
+                    name={iconName}
+                    size={18}
+                    color={
+                      suggestion.featureType === 'poi'
+                        ? colors.accent
+                        : colors.textSecondary
+                    }
+                    style={styles.suggestionIcon}
+                  />
+                  <View style={styles.suggestionText}>
+                    <Text
+                      style={[
+                        textBase,
+                        {
+                          color: colors.textPrimary,
+                          fontFamily: fontFamily.body.semiBold,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {suggestion.primaryText}
+                    </Text>
+                    <Text
+                      style={[textSm, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {suggestion.category
+                        ? `${suggestion.category} · ${suggestion.label}`
+                        : suggestion.label}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
         </View>
       ) : null}
     </View>

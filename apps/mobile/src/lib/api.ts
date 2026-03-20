@@ -20,6 +20,15 @@ import type {
 
 import { mobileEnv } from './env';
 import { getAccessToken } from './supabase';
+import {
+  mapboxAutocomplete,
+  mapboxReverseGeocode,
+  mapboxGetCoverage,
+} from './mapbox-search';
+import {
+  directPreviewRoute,
+  directReroute,
+} from './mapbox-routing';
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -243,31 +252,15 @@ const requestJson = async <TResponse>(
 
 export const mobileApi = {
   getCoverage: (lat: number, lon: number, countryHint?: string) =>
-    requestJson<CoverageResponse>(
-      `/v1/coverage?lat=${lat}&lon=${lon}${
-        countryHint ? `&countryHint=${encodeURIComponent(countryHint)}` : ''
-      }`,
-    ),
+    mapboxGetCoverage(lat, lon, countryHint),
   previewRoute: (payload: RoutePreviewRequest) =>
-    requestJson<RoutePreviewResponse>('/v1/routes/preview', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    directPreviewRoute(payload),
   reroute: (payload: RerouteRequest) =>
-    requestJson<RoutePreviewResponse>('/v1/routes/reroute', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    directReroute(payload),
   autocomplete: (payload: AutocompleteRequest) =>
-    requestJson<AutocompleteResponse>('/v1/search/autocomplete', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    mapboxAutocomplete(payload),
   reverseGeocode: (payload: ReverseGeocodeRequest) =>
-    requestJson<ReverseGeocodeResponse>('/v1/search/reverse-geocode', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
+    mapboxReverseGeocode(payload),
   reportHazard: (payload: HazardReportRequest) =>
     requestJson<HazardReportResponse>('/v1/hazards', {
       method: 'POST',

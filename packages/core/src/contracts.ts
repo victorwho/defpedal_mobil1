@@ -112,12 +112,22 @@ export interface AutocompleteRequest {
   limit?: number;
 }
 
+export type SuggestionFeatureType =
+  | 'poi'
+  | 'address'
+  | 'place'
+  | 'locality'
+  | 'neighborhood'
+  | 'unknown';
+
 export interface AutocompleteSuggestion {
   id: string;
   label: string;
   primaryText: string;
   coordinates: Coordinate;
   distanceMeters?: number;
+  featureType?: SuggestionFeatureType;
+  category?: string;
 }
 
 export interface AutocompleteResponse {

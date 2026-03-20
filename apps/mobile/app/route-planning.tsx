@@ -86,7 +86,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
       }),
-    enabled: Boolean(mobileEnv.mobileApiUrl) && Boolean(mapUserLocation),
+    enabled: Boolean(mobileEnv.mapboxPublicToken) && Boolean(mapUserLocation),
     retry: false,
   });
 
@@ -99,7 +99,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
       }),
-    enabled: Boolean(mobileEnv.mobileApiUrl) && !destinationHydrated,
+    enabled: Boolean(mobileEnv.mapboxPublicToken) && !destinationHydrated,
     retry: false,
   });
 
@@ -118,7 +118,7 @@ export default function RoutePlanningScreen() {
         limit: 5,
       }),
     enabled:
-      Boolean(mobileEnv.mobileApiUrl) &&
+      Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'startOverride' &&
       deferredStartOverrideQuery.length >= 2,
   });
@@ -137,7 +137,7 @@ export default function RoutePlanningScreen() {
         limit: 5,
       }),
     enabled:
-      Boolean(mobileEnv.mobileApiUrl) &&
+      Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'destination' &&
       deferredDestinationQuery.length >= 2,
   });
@@ -151,7 +151,7 @@ export default function RoutePlanningScreen() {
         routeRequest.destination.lon,
         routeRequest.countryHint,
       ),
-    enabled: Boolean(mobileEnv.mobileApiUrl),
+    enabled: Boolean(mobileEnv.mapboxPublicToken),
   });
 
   useEffect(() => {
@@ -199,7 +199,8 @@ export default function RoutePlanningScreen() {
   // --- Derived ---
 
   const canPreview =
-    Boolean(mobileEnv.mobileApiUrl) && (Boolean(currentLocation) || customStartEnabled);
+    Boolean(mobileEnv.mobileApiUrl || mobileEnv.mapboxPublicToken) &&
+    (Boolean(currentLocation) || customStartEnabled);
 
   const currentLocationLabel = useMemo(() => {
     if (!currentLocation) {
