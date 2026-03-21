@@ -17,6 +17,7 @@ import type {
 import { encodePolyline } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
+import { getElevationGain } from './elevation';
 import { mobileEnv } from './env';
 
 // ---------------------------------------------------------------------------
@@ -182,6 +183,62 @@ const fetchMapboxRoutes = async (
 };
 
 // ---------------------------------------------------------------------------
+// Elevation enrichment
+// ---------------------------------------------------------------------------
+
+const HILL_START_PENALTY_SEC = 10;
+const ELEVATION_TIME_FACTOR = 0.75;
+const CLIMB_THRESHOLD_M = 2;
+
+/**
+ * Count distinct climbs from an elevation gain total isn't possible without
+ * the raw profile, but we can estimate from the gain/distance ratio.
+ * For adjusted duration we use the same formula as routeAnalysis.ts.
+ */
+const computeAdjustedDuration = (
+  flatDuration: number,
+  elevationGain: number,
+  distanceMeters: number,
+): number => {
+  // Estimate number of climbs: roughly one climb per 500m of gain in typical cycling terrain
+  const estimatedClimbs =
+    elevationGain > CLIMB_THRESHOLD_M ? Math.max(1, Math.round(elevationGain / 30)) : 0;
+
+  return (
+    flatDuration +
+    elevationGain * ELEVATION_TIME_FACTOR +
+    estimatedClimbs * HILL_START_PENALTY_SEC
+  );
+};
+
+/**
+ * Enrich a route with elevation data. Fetches the elevation profile
+ * from the route geometry coordinates and computes totalClimbMeters
+ * and adjustedDurationSeconds. Fails gracefully — returns unchanged
+ * route if elevation fetch fails.
+ */
+const enrichRouteWithElevation = async (
+  route: RouteOption,
+  coordinates: [number, number][],
+): Promise<RouteOption> => {
+  const result = await getElevationGain(coordinates);
+
+  if (result === null) return route;
+
+  const adjustedDurationSeconds = computeAdjustedDuration(
+    route.durationSeconds,
+    result.elevationGain,
+    route.distanceMeters,
+  );
+
+  return {
+    ...route,
+    totalClimbMeters: Math.round(result.elevationGain),
+    adjustedDurationSeconds: Math.round(adjustedDurationSeconds),
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -204,6 +261,13 @@ export const directPreviewRoute = async (
     mapRoute(route, source, index),
   );
 
+  // Enrich all routes with elevation data in parallel (non-blocking)
+  const enrichedRoutes = await Promise.all(
+    rawRoutes.map((rawRoute, index) =>
+      enrichRouteWithElevation(routes[index], rawRoute.geometry.coordinates),
+    ),
+  );
+
   const coverage: CoverageRegion = {
     countryCode: request.countryHint?.toUpperCase() ?? 'UNKNOWN',
     status: 'supported',
@@ -212,7 +276,7 @@ export const directPreviewRoute = async (
   };
 
   return {
-    routes,
+    routes: enrichedRoutes,
     selectedMode: mode,
     coverage,
     generatedAt: new Date().toISOString(),

@@ -16,7 +16,6 @@ import { useEffect, useRef, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
-import { BrandLogo } from '../src/components/BrandLogo';
 import { RouteMap } from '../src/components/RouteMap';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
@@ -29,7 +28,7 @@ import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 // Design system imports
-import { NavigationHUD } from '../src/design-system/organisms/NavigationHUD';
+import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
@@ -39,7 +38,7 @@ import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { darkTheme, safetyColors, gray } from '../src/design-system/tokens/colors';
-import { fontFamily, text2xl, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
+import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
 
 export default function NavigationScreen() {
   useKeepAwake();
@@ -446,39 +445,12 @@ export default function NavigationScreen() {
         showRouteOverlay={false}
       />
 
-      <SafeAreaView style={styles.overlayRoot}>
-        <View style={styles.topCluster}>
-          <View style={styles.topRow}>
-            <View style={styles.brandBlock}>
-              <BrandLogo size={42} />
-              <View style={styles.brandCopy}>
-                <Text style={styles.topEyebrow}>Defensive Pedal</Text>
-                <Text style={[text2xl, { color: darkTheme.textPrimary }]}>Live ride</Text>
-              </View>
-            </View>
-            <View style={styles.chipRow}>
-              <Badge variant="neutral" size="sm">{gpsChipLabel}</Badge>
-              <Badge variant="neutral" size="sm">{bgChipLabel}</Badge>
-              <Badge variant="info" size="sm" mono>{progressChipLabel}</Badge>
-              <Badge variant="neutral" size="sm">{syncChipLabel}</Badge>
-            </View>
-          </View>
-
-          <NavigationHUD
+      <SafeAreaView style={styles.overlayRoot} pointerEvents="box-none">
+        {/* ── Top: maneuver card only ── */}
+        <View style={styles.topCluster} pointerEvents="box-none">
+          <ManeuverCard
             currentStep={currentStep}
-            nextStep={nextStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
-            gpsLabel={currentStep?.streetName || 'Live guidance from rider GPS'}
-            remainingDurationSeconds={Math.round(
-              navigationSession.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
-            )}
-            remainingDistanceMeters={
-              navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
-            }
-            currentSpeedMetersPerSecond={locationState.sample?.speedMetersPerSecond ?? null}
-            routeGapMeters={Math.round(navigationSession.distanceToRouteMeters ?? 0)}
-            offRouteCountdownSeconds={offRouteCountdownSeconds}
-            reroutePending={rerouteMutation.isPending}
           />
 
           {warningMessage ? (
@@ -497,16 +469,30 @@ export default function NavigationScreen() {
           ) : null}
         </View>
 
+        {/* ── Floating control rail (right side) ── */}
         <View style={styles.floatingControlRail}>
-          <Button
-            variant="secondary"
-            size="sm"
-            onPress={() => {
-              setFollowing(!(navigationSession.isFollowing ?? true));
-            }}
+          {/* Recenter / Free map — round gray button with GPS icon */}
+          <View
+            style={styles.roundButton}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel={navigationSession.isFollowing ? 'Free map' : 'Recenter'}
           >
-            {navigationSession.isFollowing ? 'Free map' : 'Recenter'}
-          </Button>
+            <IconButton
+              icon={
+                <Ionicons
+                  name={navigationSession.isFollowing ? 'navigate' : 'navigate-outline'}
+                  size={22}
+                  color={navigationSession.isFollowing ? darkTheme.accent : gray[300]}
+                />
+              }
+              onPress={() => {
+                setFollowing(!(navigationSession.isFollowing ?? true));
+              }}
+              accessibilityLabel={navigationSession.isFollowing ? 'Free map' : 'Recenter'}
+              variant="secondary"
+            />
+          </View>
 
           <VoiceGuidanceButton
             enabled={voiceGuidanceEnabled}
@@ -521,24 +507,38 @@ export default function NavigationScreen() {
             variant="accent"
           />
 
-          <Button
-            variant="danger"
-            size="sm"
-            onPress={() => {
-              queueTripEnd('stopped');
-              telemetry.capture('navigation_stopped', {
-                route_id: selectedRoute.id,
-                session_id: navigationSession.sessionId,
-              });
-              finishNavigation();
-              router.push('/feedback');
-            }}
-          >
-            End ride
-          </Button>
+          {/* End ride — round gray button with X icon */}
+          <View style={styles.roundButton}>
+            <IconButton
+              icon={<Ionicons name="close" size={22} color={gray[300]} />}
+              onPress={() => {
+                queueTripEnd('stopped');
+                telemetry.capture('navigation_stopped', {
+                  route_id: selectedRoute.id,
+                  session_id: navigationSession.sessionId,
+                });
+                finishNavigation();
+                router.push('/feedback');
+              }}
+              accessibilityLabel="End ride"
+              variant="secondary"
+            />
+          </View>
         </View>
 
-        {/* Bottom area intentionally left empty -- footer metrics are inside NavigationHUD */}
+        {/* ── Bottom: "then" strip + metrics ── */}
+        <View style={styles.bottomCluster} pointerEvents="box-none">
+          <FooterCard
+            nextStep={nextStep}
+            remainingDurationSeconds={Math.round(
+              navigationSession.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
+            )}
+            remainingDistanceMeters={
+              navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
+            }
+            totalClimbMeters={selectedRoute.totalClimbMeters}
+          />
+        </View>
       </SafeAreaView>
 
       {/* Hazard toast notification */}
@@ -624,28 +624,8 @@ const styles = StyleSheet.create({
   topCluster: {
     gap: space[3],
   },
-  topRow: {
+  bottomCluster: {
     gap: space[3],
-  },
-  brandBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  brandCopy: {
-    gap: 2,
-  },
-  topEyebrow: {
-    color: darkTheme.accent,
-    fontFamily: fontFamily.heading.extraBold,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
   },
   warningBanner: {
     borderRadius: radii.xl,
@@ -684,5 +664,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(250, 204, 21, 0.14)',
+  },
+  roundButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: gray[800],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

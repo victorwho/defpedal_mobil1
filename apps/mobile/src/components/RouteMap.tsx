@@ -217,7 +217,7 @@ export const RouteMap = ({
     <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
       <Mapbox.MapView style={StyleSheet.absoluteFill} styleURL={Mapbox.StyleURL.Outdoors}>
         <Mapbox.Camera
-          zoomLevel={followUser && userLocation ? 15.5 : 12.5}
+          zoomLevel={followUser && userLocation ? 14 : 12.5}
           centerCoordinate={cameraCoordinate}
           animationMode="easeTo"
           animationDuration={600}
