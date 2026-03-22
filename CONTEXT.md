@@ -1,6 +1,6 @@
 # Repository Context
 
-Last updated: 2026-03-17
+Last updated: 2026-03-22
 
 This repository contains two parallel products:
 
@@ -66,10 +66,12 @@ The current direction is mobile-first, with the React Native app preserving the 
 
 ### Routing stack
 
-- Safe routing: custom OSRM backend
-- Fast routing: Mapbox Directions
+- Safe routing: custom OSRM backend (called directly from mobile client)
+- Fast routing: Mapbox Directions API (called directly from mobile client)
+- Elevation data: Mapbox Tilequery API for client-side elevation sampling and total climb calculation
 - Client map rendering: native Mapbox maps
-- Mobile client talks only to `services/mobile-api`, not directly to OSRM/Mapbox/Supabase RPC routing paths
+- Route fetching is now client-side in `apps/mobile/src/lib/mapbox-routing.ts`, bypassing `services/mobile-api` for route requests
+- Mobile client still uses `services/mobile-api` for persisted writes (trips, hazards, feedback)
 
 ### Web app
 
@@ -132,6 +134,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 
 ### Recently active / needs attention
 
+- navigation screen layout polish (2026-03-22): RouteMap fullBleed now uses absoluteFillObject so the map covers the entire screen; ManeuverCard overlays at the top; all four floating control rail buttons (recenter, voice, hazard, end ride) now share a consistent gray[800] dark circle at 44×44px
 - `hazard_type` support is now implemented in app/backend contracts, but the live Supabase database still needs the ordered migration in `supabase/migrations/202603170002_add_hazard_type.sql` applied
 - the current phone-friendly preview flow depends on:
   - local `mobile-api` running on the laptop

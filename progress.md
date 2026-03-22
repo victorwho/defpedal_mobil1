@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-03-17
+Last updated: 2026-03-22
 
 This file tracks the React Native migration against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -40,14 +40,23 @@ Update it at the end of each implementation slice.
   - `apps/mobile/src/components/Screen.tsx`
   - `apps/mobile/src/components/StatusCard.tsx`
   - `apps/mobile/src/lib/theme.ts`
+  - `apps/mobile/src/lib/elevation.ts` — client-side elevation sampling via Mapbox Tilequery
+  - route preview now shows a compact single-row summary with routing mode, ETA, distance, and total climb
+  - client-side routing via direct Mapbox Directions (fast) and custom OSRM (safe) replaces backend dependency for route fetching
 
 ### Phase 3: Native turn-by-turn navigation
 
-- Status: Partially done
+- Status: Largely done
 - Evidence:
   - `apps/mobile/app/navigation.tsx`
   - `apps/mobile/src/hooks/useForegroundNavigationLocation.ts`
   - `packages/core/src/navigation.ts`
+  - `apps/mobile/src/design-system/organisms/NavigationHUD.tsx` — ManeuverCard, FooterCard with "Then" strip, round control buttons
+  - navigation HUD now shows current maneuver at top (standalone), "then" strip + metrics at bottom, and compact round control buttons on right rail
+  - route guard transition fix allows NAVIGATING state during screen switch
+  - RouteMap now uses `absoluteFillObject` for fullBleed mode so the map covers the entire screen and ManeuverCard overlays at the very top
+  - all four floating control rail buttons (recenter, voice guidance, hazard report, end ride) now use a consistent `gray[800]` dark circle background at 44×44px
+  - VoiceGuidanceButton compact icon wrapper resized from 48px to 44px and background changed from `rgba(255,255,255,0.12)` to `gray[800]` to match the other control buttons
 - Remaining:
   - deeper physical-device validation of background/location behavior
   - final polish for spoken guidance and recovery edge cases
@@ -134,6 +143,10 @@ Update it at the end of each implementation slice.
 - Completed in UI parity: route planning and route preview now use a map-first native layout with floating top controls and a bottom-sheet panel instead of the earlier stacked-card layout
 - Completed in UI parity: navigation now uses a stronger web-style overlay hierarchy, and auth/onboarding/settings/offline maps have been rebuilt away from plain scaffold cards toward modal/menu/full-screen branded surfaces
 - Completed in UI parity: feedback and diagnostics now use the same branded layout language, metric tiles, and stronger CTA hierarchy instead of falling back to plain QA-style screens
+- Completed in routing: client-side route fetching now calls Mapbox Directions (fast) and custom OSRM (safe) directly from the mobile app, with elevation sampling via Mapbox Tilequery for total climb calculation
+- Completed in UI parity: route preview now displays a compact single-row summary (mode, ETA, distance, total climb) instead of multiple stacked cards
+- Completed in UI parity: navigation HUD redesigned with standalone ManeuverCard at top, FooterCard with inline "Then" strip and metrics at bottom, and round gray control buttons (GPS recenter, end ride X) on right rail
+- Completed in navigation: route guard transition fix resolves the catch-22 where starting navigation redirected back to route planning
 - Completed in ride reporting: navigation now keeps the web-style right-rail hazard button, but opens a native hazard-type picker for bike-safety categories such as blocked bike lane, pothole, narrow street, dangerous intersection, aggressive traffic, and other context before queueing the same Supabase-backed `hazards` write
 - Completed in schema prep: `supabase_add_hazard_type.sql` now adds a nullable `hazard_type` column plus a value check constraint for the supported mobile hazard categories
 - Goal:

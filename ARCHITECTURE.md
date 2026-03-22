@@ -99,6 +99,27 @@ The app operates as a global state machine managed in `App.tsx`:
 - **Feature (Risk Legend)**: Added `RiskLegend.tsx` component to display the color coding legend during route preview.
 - **Feature (Elevation Fallback)**: Implemented Mapbox Terrain-RGB raster tile decoding as a highly reliable fallback for elevation data when Open-Elevation and Open-Meteo APIs fail. Added `VITE_MAPBOX_ACCESS_TOKEN` to `.env.example`.
 
+### [Session 3 — 2026-03-21] Elevation Gain, Navigation HUD Redesign & Client-Side Routing
+
+- **Feature (Elevation Profile)**: Added client-side elevation fetching via Mapbox Tilequery API in a new `apps/mobile/src/lib/elevation.ts` module.
+  - Samples elevation points along the route polyline using the Mapbox `contour` tilequery layer.
+  - Calculates total climb (elevation gain) by summing positive deltas between consecutive sample points, adapted from the webapp's `getAdjustedDuration` algorithm.
+  - Integrated into `mapbox-routing.ts` so both Safe and Fast route responses include `totalClimbMeters` and `adjustedDurationSeconds`.
+- **Feature (Route Preview Redesign)**: Redesigned route preview to show a single compact row with routing mode (Safe/Fast), ETA, distance, and total climb instead of multiple separate cards.
+  - Removed the stacked `SafestRoute`, `FastestRoute`, `ShortestRoute` cards and the duplicate route info card.
+  - Route info row is visible by default (no toggle needed).
+- **Feature (Navigation HUD Redesign)**: Completely redesigned the turn-by-turn navigation overlay:
+  - **ManeuverCard** (top, standalone): Shows the next maneuver with directional arrow, description, and distance (e.g., "→ Turn right in 100 m").
+  - **FooterCard** (bottom): Contains a "Then" strip showing the maneuver after next (e.g., "Then ← Turn left 200 m"), plus a metrics row with ETA, remaining distance, and remaining climb.
+  - **Control rail** (right side): Round gray buttons for recenter/free-map (GPS icon) and end-ride (X icon), plus voice guidance toggle and hazard report button.
+  - Removed previous cluttered multi-card navigation layout.
+- **Feature (Client-Side Routing)**: Moved from backend-dependent routing to direct Mapbox Directions API calls from the mobile client in `mapbox-routing.ts`.
+  - Safe mode uses the custom OSRM backend with cycling profile.
+  - Fast mode uses Mapbox Directions API directly with cycling profile.
+  - Both profiles now return normalized `RouteData` with geometry, steps, duration, distance, elevation, and climb data.
+- **Bugfix (Route Guard Transition)**: Fixed navigation start failing by allowing `'NAVIGATING'` as a transitional state in the route-preview guard, preventing a catch-22 where updating state triggered a redirect before the navigation screen could mount.
+- **New File**: `apps/mobile/src/lib/elevation.ts` — Mapbox Tilequery-based elevation sampling and total climb calculation.
+
 ### [Session 2 — 2026-03-18] Mobile Design System, Auth & UI Overhaul
 
 #### Design System (Phases 1–7)

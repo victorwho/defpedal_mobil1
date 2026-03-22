@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     backgroundColor: brandColors.bgSecondary,
   },
   containerFullBleed: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     height: undefined,
     borderRadius: 0,
     borderWidth: 0,

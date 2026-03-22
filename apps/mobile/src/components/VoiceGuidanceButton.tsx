@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { brandColors } from '../design-system/tokens/colors';
+import { brandColors, gray } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 import { shadows } from '../design-system/tokens/shadows';
@@ -61,9 +61,9 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   iconWrap: {
-    width: space[12],
-    height: space[12],
-    borderRadius: space[6],
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     backgroundColor: brandColors.accent,
   },
   iconWrapDisabled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: gray[800],
   },
   label: {
     color: brandColors.textPrimary,

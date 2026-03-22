@@ -494,18 +494,22 @@ export default function NavigationScreen() {
             />
           </View>
 
-          <VoiceGuidanceButton
-            enabled={voiceGuidanceEnabled}
-            onPress={toggleVoiceGuidance}
-            compact
-          />
+          <View style={styles.roundButton}>
+            <VoiceGuidanceButton
+              enabled={voiceGuidanceEnabled}
+              onPress={toggleVoiceGuidance}
+              compact
+            />
+          </View>
 
-          <IconButton
-            icon={<Ionicons name="warning" size={22} color={darkTheme.accent} />}
-            onPress={openHazardPicker}
-            accessibilityLabel="Report hazard"
-            variant="accent"
-          />
+          <View style={styles.roundButton}>
+            <IconButton
+              icon={<Ionicons name="warning" size={22} color={darkTheme.accent} />}
+              onPress={openHazardPicker}
+              accessibilityLabel="Report hazard"
+              variant="accent"
+            />
+          </View>
 
           {/* End ride — round gray button with X icon */}
           <View style={styles.roundButton}>
