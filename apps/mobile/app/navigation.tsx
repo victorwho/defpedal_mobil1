@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
     backgroundColor: darkTheme.bgDeep,
   },
   overlayRoot: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
     paddingHorizontal: space[4],
     paddingTop: space[2],

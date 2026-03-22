@@ -4,7 +4,7 @@ import path from 'node:path';
 const appRoot = __dirname;
 const workspaceRoot = path.resolve(appRoot, '..', '..');
 
-type AppVariant = 'development' | 'preview' | 'production';
+type AppVariant = 'development' | 'preview' | 'production' | 'test';
 
 const parseEnvFile = (filePath: string): Record<string, string> => {
   if (!existsSync(filePath)) {
@@ -43,6 +43,8 @@ const normalizeVariant = (value: string | undefined): AppVariant => {
     case 'preview':
     case 'staging':
       return 'preview';
+    case 'test':
+      return 'test';
     default:
       return 'development';
   }
@@ -107,18 +109,21 @@ const appNameByVariant: Record<AppVariant, string> = {
   development: 'Defensive Pedal Dev',
   preview: 'Defensive Pedal Preview',
   production: 'Defensive Pedal',
+  test: 'Test DefPedal',
 };
 
 const appSchemeByVariant: Record<AppVariant, string> = {
   development: 'defensivepedal-dev',
   preview: 'defensivepedal-preview',
   production: 'defensivepedal',
+  test: 'defensivepedal-test',
 };
 
 const appIdentifierByVariant: Record<AppVariant, string> = {
   development: 'com.defensivepedal.mobile.dev',
   preview: 'com.defensivepedal.mobile.preview',
   production: 'com.defensivepedal.mobile',
+  test: 'com.defensivepedal.mobile.test',
 };
 
 export default () => ({

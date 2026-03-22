@@ -2,22 +2,16 @@
 
 Last updated: 2026-03-22
 
-This file tracks the React Native migration against `mobile_implementation_plan.md`.
+This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
 
-- Overall migration progress: roughly 87-92 percent of product migration, 80-85 percent of production hardening
-- Current milestone: physical Android validation now confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded web-style redesign
-- Primary risk: Android validation is now strong, but iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
+- Overall progress: roughly 87-92 percent of product migration, 80-85 percent of production hardening
+- Current milestone: physical Android validation confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded design system
+- Primary risk: iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
-- Stable feature-baseline declaration: the repo is now stable enough for normal frontend and feature development on top of the mobile-first architecture; remaining iPhone and staging concerns are release-hardening backlog rather than day-to-day repo-foundation blockers
-- Stable baseline note: the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`, and the stabilization branch is operating on that real baseline instead of the earlier pre-migration commit
-- Stable baseline Phase 1 note: the stabilization worktree now has a green local `npm run validate` path, explicit `validate:web` support for the legacy reference app, and tighter test discovery that no longer scans worktree/helper folders
-- Stable baseline Phase 2 note: the default repo workflow now points at `dev:mobile`, `.gitignore` covers the main runtime/staging noise, and repo docs now describe the web app as an opt-in reference surface
-- Stable baseline Phase 3 note: active schema SQL now has an ordered home under `supabase/migrations/`, and the backend operations docs now point staging/production rollout at that migration path
-- Stable baseline Phase 4 note: the mobile release workflow now enforces dispatch guardrails and repo-backed release preflight checks, Android release validation is the explicit default native QA path, and `iphone_validation.md` is now the pending record for the first in-repo iPhone smoke pass
-- Stable baseline Phase 5 note: the repo now has a documented local route-core load baseline in `mobile_api_load_test_baseline.md`, and the branch is stable enough for ongoing frontend and feature work even though iPhone validation and Redis-backed staging evidence are still deferred
+- Webapp cleanup (2026-03-22): all legacy React/Vite/Leaflet webapp code has been removed from the repo root — components/, hooks/, utils/, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json, and webapp dependencies (leaflet, react-dom, vite, vitest, jsdom, testing-library). Root SQL files moved to supabase/migrations/legacy/. Root tsconfig.json cleaned of DOM libs. The repo is now mobile-only.
 - Preview tunnel note: preview mobile development can now auto-sync the active ngrok URL into `apps/mobile/.env.preview` through `npm run sync:mobile:preview-url` and `npm run dev:mobile:preview`
 
 ## Phase Status

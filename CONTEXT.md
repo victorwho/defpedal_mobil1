@@ -2,21 +2,15 @@
 
 Last updated: 2026-03-22
 
-This repository contains two parallel products:
+This repository contains the Defensive Pedal mobile app and its supporting backend.
 
-- the original React/Vite web app used as the reference implementation
-- the in-progress Expo/React Native mobile app plus its mobile backend
-
-The current direction is mobile-first, with the React Native app preserving the custom safe-routing backend as the core product differentiator.
+The product direction is mobile-only, built on Expo/React Native with a custom safe-routing backend as the core differentiator. The legacy React/Vite webapp has been removed.
 
 ## Current Stabilization Note
 
 - the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`
-- the isolated stabilization worktree now runs on top of that committed mobile baseline
-- the snapshot intentionally excluded local-only env files, generated output, and temp validation artifacts
-- the active hardening plan for turning this into a stable development baseline lives in `mobile_stable_baseline_plan.md`
-- the default developer path now targets `mobile app + mobile API + mobile-first validate`, while the root web app is an explicit opt-in reference surface
-- release preflight guardrails now live in `.github/workflows/mobile-release.yml` plus `scripts/check-mobile-release.mjs`
+- the default developer path targets `mobile app + mobile API + mobile-first validate`
+- release preflight guardrails live in `.github/workflows/mobile-release.yml` plus `scripts/check-mobile-release.mjs`
 - Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `iphone_validation.md`
 - the repo now has a stable feature-development baseline for ongoing frontend and feature work, with remaining iPhone and staging/Redis items tracked as release-hardening backlog
 - the current local route-core backend load baseline is recorded in `mobile_api_load_test_baseline.md`
@@ -73,13 +67,6 @@ The current direction is mobile-first, with the React Native app preserving the 
 - Route fetching is now client-side in `apps/mobile/src/lib/mapbox-routing.ts`, bypassing `services/mobile-api` for route requests
 - Mobile client still uses `services/mobile-api` for persisted writes (trips, hazards, feedback)
 
-### Web app
-
-- Framework: React + Vite
-- Mapping: Leaflet
-- Styling paradigm: utility-class / Tailwind-like class strings in JSX
-- Status: still present as reference and comparison surface during migration
-
 ## Current State
 
 ### Stable and working
@@ -97,7 +84,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 - Voice guidance exists and can be toggled in planning and navigation
 - Hazard reporting exists during navigation
 - Hazard type picker exists during navigation with bike-safety categories
-- Hazard reports use the same Supabase `hazards` table path as the web app
+- Hazard reports use the Supabase `hazards` table
 - Offline support exists:
   - offline packs
   - queued offline writes
@@ -127,7 +114,6 @@ The current direction is mobile-first, with the React Native app preserving the 
 - iPhone validation is still pending
 - production-scale staging load tests are still pending
 - release automation guardrails are stronger now, but first iPhone smoke evidence is still missing
-- the current local Mapbox geocoding credential returned HTTP `401` on 2026-03-17 during isolated autocomplete validation, so route-core load evidence was captured separately from search/autocomplete
 - final UI polish parity is still incomplete across all screens
 - Android bridgeless debug-client workflow is still unreliable; release-style validation is the dependable path
 - some navigation edge-case polish remains around spoken guidance and recovery behavior
@@ -135,6 +121,7 @@ The current direction is mobile-first, with the React Native app preserving the 
 ### Recently active / needs attention
 
 - navigation screen layout polish (2026-03-22): RouteMap fullBleed now uses absoluteFillObject so the map covers the entire screen; ManeuverCard overlays at the top; all four floating control rail buttons (recenter, voice, hazard, end ride) now share a consistent gray[800] dark circle at 44×44px
+- legacy webapp removal (2026-03-22): deleted root-level components/, hooks/, utils/, webapp service files, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json; moved root SQL files to supabase/migrations/legacy/; removed web deps from package.json and DOM libs from tsconfig.json
 - `hazard_type` support is now implemented in app/backend contracts, but the live Supabase database still needs the ordered migration in `supabase/migrations/202603170002_add_hazard_type.sql` applied
 - the current phone-friendly preview flow depends on:
   - local `mobile-api` running on the laptop
@@ -143,8 +130,8 @@ The current direction is mobile-first, with the React Native app preserving the 
 
 ### Known boundaries
 
-- The repo still includes the legacy web app and shared migration code side by side
-- Some historical SQL files still remain in repo root, but `supabase/migrations/` is now the active migration path
+- historical SQL files are preserved in `supabase/migrations/legacy/` for reference
+- `supabase/migrations/` is the active ordered migration path
 - Visual mobile UI is mid-parity, not fully finalized
 
 ## Directory Map
@@ -165,13 +152,10 @@ defpedal_mobil1/
     core/                   shared routing, navigation, contracts, types
   services/
     mobile-api/             Fastify backend-for-frontend for mobile
-  components/               legacy web UI components
-  hooks/                    legacy web hooks
-  utils/                    legacy web utility logic
-  App.tsx                   legacy web app shell
-  progress.md               migration progress tracker
   supabase/
     migrations/             ordered database migrations
+    migrations/legacy/      historical SQL files from webapp era
+  progress.md               implementation progress tracker
   mobile_implementation_plan.md
   native_android_validation.md
   physical_android_validation.md
@@ -179,13 +163,11 @@ defpedal_mobil1/
   mobile_release_runbook.md
   mobile_api_load_test_baseline.md
   mobile_api_operations_runbook.md
-  supabase_add_hazard_type.sql
 ```
 
 ## Working Agreement Notes
 
 - `progress.md` is the current implementation tracker
-- the mobile app is the primary product direction
-- the web app should be treated as reference behavior, not the default place for new product work
+- the mobile app is the sole product direction
 - for any new session, this file should be read first before making architecture or implementation decisions
 - the current branch-level hardening work should also follow `mobile_stable_baseline_plan.md`
