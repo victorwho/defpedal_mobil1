@@ -1,7 +1,0 @@
-{
-  "name": "Copy of pedala deploy",
-  "description": "A web application that provides turn-by-turn navigation using an OSRM server. It finds your location, allows you to search for a destination, and guides you along the calculated route with visual and textual instructions.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

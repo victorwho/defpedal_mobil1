@@ -6,14 +6,11 @@
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
+      "ES2022"
     ],
     "skipLibCheck": true,
     "types": [
-      "node",
-      "vite/client"
+      "node"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
@@ -26,9 +23,6 @@
       ],
       "@defensivepedal/core/*": [
         "./packages/core/src/*"
-      ],
-      "@/*": [
-        "./*"
       ]
     },
     "allowImportingTsExtensions": true,
