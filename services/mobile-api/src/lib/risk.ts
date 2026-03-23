@@ -32,7 +32,13 @@ export const fetchRiskSegments = async (
     route_geojson: routeGeometry,
   });
 
-  if (error || !data) {
+  if (error) {
+    console.error('[risk] Supabase RPC error:', error.message, error.code);
+    return [];
+  }
+
+  if (!data) {
+    console.warn('[risk] Supabase RPC returned null/undefined data');
     return [];
   }
 

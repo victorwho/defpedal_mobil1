@@ -8,8 +8,10 @@
 import type {
   Coordinate,
   CoverageRegion,
+  GeoJsonLineString,
   NavigationStep,
   RerouteRequest,
+  RiskSegment,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
@@ -19,6 +21,7 @@ import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { getElevationGain } from './elevation';
 import { mobileEnv } from './env';
+import { getAccessToken } from './supabase';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -239,6 +242,55 @@ const enrichRouteWithElevation = async (
 };
 
 // ---------------------------------------------------------------------------
+// Risk segment enrichment (calls server API for Supabase RPC)
+// ---------------------------------------------------------------------------
+
+const fetchRouteRiskSegments = async (
+  geometry: GeoJsonLineString,
+): Promise<RiskSegment[]> => {
+  if (!mobileEnv.mobileApiUrl) return [];
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    const token = await getAccessToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/risk-segments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ geometry }),
+    });
+
+    if (!response.ok) return [];
+
+    const data = (await response.json()) as { riskSegments: RiskSegment[] };
+    return data.riskSegments ?? [];
+  } catch {
+    return [];
+  }
+};
+
+const enrichRouteWithRisk = async (
+  route: RouteOption,
+  coordinates: [number, number][],
+): Promise<RouteOption> => {
+  const geometry: GeoJsonLineString = {
+    type: 'LineString',
+    coordinates,
+  };
+
+  const riskSegments = await fetchRouteRiskSegments(geometry);
+  if (riskSegments.length === 0) return route;
+
+  return { ...route, riskSegments };
+};
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -262,9 +314,16 @@ export const directPreviewRoute = async (
   );
 
   // Enrich all routes with elevation data in parallel (non-blocking)
-  const enrichedRoutes = await Promise.all(
+  const elevationEnriched = await Promise.all(
     rawRoutes.map((rawRoute, index) =>
       enrichRouteWithElevation(routes[index], rawRoute.geometry.coordinates),
+    ),
+  );
+
+  // Enrich all routes with risk segments in parallel (non-blocking)
+  const enrichedRoutes = await Promise.all(
+    rawRoutes.map((rawRoute, index) =>
+      enrichRouteWithRisk(elevationEnriched[index], rawRoute.geometry.coordinates),
     ),
   );
 

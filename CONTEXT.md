@@ -1,6 +1,6 @@
 # Repository Context
 
-Last updated: 2026-03-22
+Last updated: 2026-03-23
 
 This repository contains the Defensive Pedal mobile app and its supporting backend.
 
@@ -122,6 +122,13 @@ The product direction is mobile-only, built on Expo/React Native with a custom s
 
 - navigation screen layout polish (2026-03-22): RouteMap fullBleed now uses absoluteFillObject so the map covers the entire screen; ManeuverCard overlays at the top; all four floating control rail buttons (recenter, voice, hazard, end ride) now share a consistent gray[800] dark circle at 44×44px
 - legacy webapp removal (2026-03-22): deleted root-level components/, hooks/, utils/, webapp service files, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json; moved root SQL files to supabase/migrations/legacy/; removed web deps from package.json and DOM libs from tsconfig.json
+- route guard hydration fix (2026-03-23): useRouteGuard now locks once it passes, preventing Zustand persist hydration from revoking the guard and bouncing the user back to route planning after 1-3 seconds
+- feedback submission fix (2026-03-23): mobile-api `.env` was missing `SUPABASE_ANON_KEY`, causing `supabaseAuthClient` to be null and all authenticated requests from the dev build to return 401; added the key so feedback and trip mutations now reach Supabase
+- feedback thank you card (2026-03-23): after submitting feedback, the card swaps to a thank-you screen with 🙏 emoji, gratitude message, and a yellow (#FDD700) "Done" button before returning to route planning
+- entry point cleanup (2026-03-23): deleted unused root `index.js`; simplified `metro.config.js` by removing the legacy webapp blocklist since those files no longer exist
+- risk distribution card (2026-03-23): route preview and navigation screens now show a per-category risk breakdown (Very safe / Safe / Average / Elevated / Risky / Very risky / Extreme) as a colored stacked bar with percentage legend. Risk segments are fetched from the new `/v1/risk-segments` server endpoint which calls the Supabase `get_segmented_risk_route` RPC. The card appears in the bottom sheet scrollable area above the fixed Start navigation button.
+- Supabase permissions fix (2026-03-23): `road_risk_data` table was missing `SELECT` grant for `service_role`; applied `GRANT SELECT ON road_risk_data TO service_role` so the risk segment RPC now works
+- mobile-api service role key fix (2026-03-23): replaced placeholder `SUPABASE_SERVICE_ROLE_KEY` with the real JWT service role key so Supabase admin operations (risk segments, feedback inserts) work correctly
 - `hazard_type` support is now implemented in app/backend contracts, but the live Supabase database still needs the ordered migration in `supabase/migrations/202603170002_add_hazard_type.sql` applied
 - the current phone-friendly preview flow depends on:
   - local `mobile-api` running on the laptop

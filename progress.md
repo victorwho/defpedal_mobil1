@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-03-22
+Last updated: 2026-03-23
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -137,12 +137,21 @@ Update it at the end of each implementation slice.
 - Completed in UI parity: route planning and route preview now use a map-first native layout with floating top controls and a bottom-sheet panel instead of the earlier stacked-card layout
 - Completed in UI parity: navigation now uses a stronger web-style overlay hierarchy, and auth/onboarding/settings/offline maps have been rebuilt away from plain scaffold cards toward modal/menu/full-screen branded surfaces
 - Completed in UI parity: feedback and diagnostics now use the same branded layout language, metric tiles, and stronger CTA hierarchy instead of falling back to plain QA-style screens
+- Completed in navigation stability (2026-03-23): useRouteGuard now locks once it initially passes, preventing Zustand persist hydration race from bouncing users back to route planning 1-3 seconds after starting navigation
+- Completed in feedback flow (2026-03-23): fixed mobile-api missing `SUPABASE_ANON_KEY` which caused all authenticated dev-build requests to return 401; feedback submissions now reach the `navigation_feedback` table in Supabase
+- Completed in feedback UX (2026-03-23): feedback screen now shows a thank-you card (🙏 emoji + gratitude message + yellow #FDD700 "Done" button) after successful submission before returning to route planning
+- Completed in repo cleanup (2026-03-23): deleted unused root `index.js`; simplified `metro.config.js` by removing the legacy webapp blocklist since those source files were already deleted
 - Completed in routing: client-side route fetching now calls Mapbox Directions (fast) and custom OSRM (safe) directly from the mobile app, with elevation sampling via Mapbox Tilequery for total climb calculation
 - Completed in UI parity: route preview now displays a compact single-row summary (mode, ETA, distance, total climb) instead of multiple stacked cards
 - Completed in UI parity: navigation HUD redesigned with standalone ManeuverCard at top, FooterCard with inline "Then" strip and metrics at bottom, and round gray control buttons (GPS recenter, end ride X) on right rail
 - Completed in navigation: route guard transition fix resolves the catch-22 where starting navigation redirected back to route planning
 - Completed in ride reporting: navigation now keeps the web-style right-rail hazard button, but opens a native hazard-type picker for bike-safety categories such as blocked bike lane, pothole, narrow street, dangerous intersection, aggressive traffic, and other context before queueing the same Supabase-backed `hazards` write
 - Completed in schema prep: `supabase_add_hazard_type.sql` now adds a nullable `hazard_type` column plus a value check constraint for the supported mobile hazard categories
+- Completed in dev workflow (2026-03-23): local development now requires `adb reverse tcp:8080 tcp:8080` for the mobile-api and `adb reverse tcp:8081 tcp:8081` for Metro when testing on a physical Android device via USB
+- Completed in risk visualization (2026-03-23): new `RiskDistributionCard` component shows a distance-weighted percentage breakdown across 7 risk categories (Very safe → Extreme) with a colored stacked bar and legend. Uses `computeRiskDistribution()` from `packages/core/src/riskDistribution.ts` which calculates Haversine distances per segment and classifies by risk score thresholds
+- Completed in risk visualization (2026-03-23): new `/v1/risk-segments` server endpoint accepts a GeoJSON LineString and returns risk segments via the Supabase `get_segmented_risk_route` RPC. Client-side `directPreviewRoute` now calls this endpoint after fetching routes to enrich them with risk data
+- Completed in risk visualization (2026-03-23): risk distribution card appears in route preview (inside the scrollable bottom sheet above fixed buttons) and in navigation (below the FooterCard)
+- Completed in infrastructure (2026-03-23): fixed Supabase `road_risk_data` table missing `SELECT` grant for `service_role`; replaced placeholder `SUPABASE_SERVICE_ROLE_KEY` with real JWT in mobile-api `.env`
 - Goal:
   - keep route preview anonymous-first
   - require auth for persisted writes like trips, hazards, and feedback

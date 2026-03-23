@@ -2,8 +2,10 @@ import type {
   AutocompleteResponse,
   CoverageResponse,
   ErrorResponse,
+  GeoJsonLineString,
   HazardReportResponse,
   RerouteRequest,
+  RiskSegment,
   RoutePreviewRequest,
   TripEndResponse,
   TripStartResponse,
@@ -523,6 +525,48 @@ export const buildV1Routes = (
             statusCode: 502,
             code: 'UPSTREAM_ERROR',
             details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+      },
+    );
+
+    app.post<{
+      Body: { geometry: { type: string; coordinates: number[][] } };
+      Reply: { riskSegments: RiskSegment[] } | ErrorResponse;
+    }>(
+      '/risk-segments',
+      {
+        schema: {
+          response: {
+            200: { type: 'object' as const, properties: { riskSegments: { type: 'array' as const } } },
+            400: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        await applyRateLimit(request, reply, dependencies, 'routePreview');
+
+        const geometry = request.body?.geometry;
+        if (!geometry || geometry.type !== 'LineString' || !Array.isArray(geometry.coordinates)) {
+          throw new HttpError('Invalid geometry.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['Body must contain a GeoJSON LineString geometry.'],
+          });
+        }
+
+        try {
+          const riskSegments = await dependencies.fetchRiskSegments(
+            geometry as GeoJsonLineString,
+          );
+          return { riskSegments };
+        } catch (error) {
+          throw new HttpError('Risk segment fetch failed.', {
+            statusCode: 500,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown error.'],
           });
         }
       },

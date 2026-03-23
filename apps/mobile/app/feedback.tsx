@@ -1,82 +1,99 @@
 import { getPreviewOrigin } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Screen } from '../src/components/Screen';
-import { useTheme } from '../src/design-system';
-import { Button } from '../src/design-system/atoms';
-import { TextInput } from '../src/design-system/atoms';
+import { brandColors } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { shadows } from '../src/design-system/tokens/shadows';
-import {
-  fontFamily,
-  textBase,
-  textSm,
-  textXs,
-  textXl,
-  textDataSm,
-  text2xs,
-} from '../src/design-system/tokens/typography';
+import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
-const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+const STAR_SIZE = 40;
+const STAR_COLOR_ACTIVE = '#FACC15';
+const STAR_COLOR_INACTIVE = '#D1D5DB';
 
-function SummaryMetric({ label, value }: { label: string; value: string }) {
-  const { colors } = useTheme();
+const formatCoordinateLabel = (lat: number, lon: number) =>
+  `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+
+function StarRow({
+  rating,
+  onSelect,
+}: {
+  rating: number;
+  onSelect: (value: number) => void;
+}) {
   return (
-    <View style={[styles.metricTile, { backgroundColor: `${colors.bgTertiary}20` }]}>
-      <Text style={[styles.metricLabel, { color: colors.textMuted }]}>{label}</Text>
-      <Text style={[styles.metricValue, { color: colors.textPrimary }]}>{value}</Text>
+    <View style={styles.starRow}>
+      {[1, 2, 3, 4, 5].map((value) => (
+        <Pressable
+          key={value}
+          onPress={() => onSelect(value)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`${value} star${value > 1 ? 's' : ''}`}
+        >
+          <Text
+            style={[
+              styles.starIcon,
+              { color: rating >= value ? STAR_COLOR_ACTIVE : STAR_COLOR_INACTIVE },
+            ]}
+          >
+            ★
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
 
 export default function FeedbackScreen() {
-  const { colors } = useTheme();
   const { user } = useAuthSession();
   const guardPassed = useRouteGuard({
     requiredStates: ['AWAITING_FEEDBACK'],
   });
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
+  const [submitted, setSubmitted] = useState(false);
 
-  const routeRequest = useAppStore((state) => state.routeRequest);
-  const routePreview = useAppStore((state) => state.routePreview);
-  const selectedRouteId = useAppStore((state) => state.selectedRouteId);
-  const navigationSession = useAppStore((state) => state.navigationSession);
-  const activeTripClientId = useAppStore((state) => state.activeTripClientId);
-  const tripServerIds = useAppStore((state) => state.tripServerIds);
-  const queuedMutations = useAppStore((state) => state.queuedMutations);
-  const enqueueMutation = useAppStore((state) => state.enqueueMutation);
-  const resetFlow = useAppStore((state) => state.resetFlow);
+  const routeRequest = useAppStore((s) => s.routeRequest);
+  const routePreview = useAppStore((s) => s.routePreview);
+  const selectedRouteId = useAppStore((s) => s.selectedRouteId);
+  const navigationSession = useAppStore((s) => s.navigationSession);
+  const activeTripClientId = useAppStore((s) => s.activeTripClientId);
+  const tripServerIds = useAppStore((s) => s.tripServerIds);
+  const queuedMutations = useAppStore((s) => s.queuedMutations);
+  const enqueueMutation = useAppStore((s) => s.enqueueMutation);
+  const resetFlow = useAppStore((s) => s.resetFlow);
 
   const selectedRoute =
-    routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0] ?? null;
+    routePreview?.routes.find((r) => r.id === selectedRouteId) ??
+    routePreview?.routes[0] ??
+    null;
+
   const feedbackQueued = queuedMutations.some(
-    (mutation) =>
-      mutation.type === 'feedback' &&
-      (mutation.payload as { clientTripId?: string }).clientTripId === activeTripClientId,
+    (m) =>
+      m.type === 'feedback' &&
+      (m.payload as { clientTripId?: string }).clientTripId === activeTripClientId,
   );
-  const feedbackLocked = user ? rating === 0 || feedbackQueued : false;
 
-  const queueLabel = useMemo(() => {
-    if (feedbackQueued) {
-      return 'Feedback already queued';
-    }
+  const submitDisabled = rating === 0 || feedbackQueued;
 
-    return user ? 'Queue feedback and finish' : 'Finish without syncing';
-  }, [feedbackQueued, user]);
+  const handleSubmit = () => {
+    if (!navigationSession) return;
 
-  const finishRide = () => {
-    if (!navigationSession) {
-      return;
-    }
-
-    if (user) {
+    if (user && !feedbackQueued) {
       enqueueMutation('feedback', {
         clientTripId: activeTripClientId ?? undefined,
         tripId: activeTripClientId ? tripServerIds[activeTripClientId] : undefined,
@@ -97,6 +114,15 @@ export default function FeedbackScreen() {
       });
     }
 
+    setSubmitted(true);
+  };
+
+  const handleDone = () => {
+    resetFlow();
+    router.replace('/route-planning');
+  };
+
+  const handleCancel = () => {
     resetFlow();
     router.replace('/route-planning');
   };
@@ -104,225 +130,203 @@ export default function FeedbackScreen() {
   if (!guardPassed) return null;
 
   return (
-    <Screen
-      title="Trip Feedback"
-      eyebrow="Post-ride"
-      subtitle="Close the ride with the same product tone as the web app: quick rating, short notes, and a clear sync outcome."
-    >
-      {/* ---- Feedback status card ---- */}
-      <View style={[styles.card, { backgroundColor: colors.accent, borderColor: colors.borderAccent }, shadows.md]}>
-        <Text style={[styles.cardTitle, { color: colors.textInverse }]}>Feedback status</Text>
-        <Text style={[styles.cardBody, { color: colors.textInverse }]}>
-          {user
-            ? 'Your ride feedback can queue offline and sync automatically when connectivity returns.'
-            : 'You can still finish anonymously, but synced ride feedback requires sign-in.'}
-        </Text>
-      </View>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.cardContainer}>
+            <View style={styles.card}>
+              {submitted ? (
+                <>
+                  <Text style={styles.thankYouEmoji}>🙏</Text>
+                  <Text style={styles.title}>Thank you!</Text>
+                  <Text style={styles.subtitle}>
+                    Thank you for submitting feedback, you are making the street safer for everyone 🤗
+                  </Text>
+                  <Pressable
+                    style={[styles.button, styles.doneButton]}
+                    onPress={handleDone}
+                  >
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  {/* Title */}
+                  <Text style={styles.title}>How safe was your trip?</Text>
+                  <Text style={styles.subtitle}>
+                    Your feedback helps improve future routes.
+                  </Text>
 
-      {/* ---- Ride summary card ---- */}
-      <View style={[styles.card, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }, shadows.md]}>
-        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Ride summary</Text>
-        <View style={styles.metricGrid}>
-          <SummaryMetric
-            label="Session"
-            value={navigationSession?.sessionId ? 'Tracked' : 'Missing'}
-          />
-          <SummaryMetric
-            label="Route"
-            value={selectedRoute?.id ? 'Selected' : 'Not found'}
-          />
-          <SummaryMetric
-            label="Queue"
-            value={`${queuedMutations.length} pending`}
-          />
-          <SummaryMetric
-            label="Sync"
-            value={user ? 'Signed in' : 'Anonymous'}
-          />
-        </View>
-        <View style={styles.detailStack}>
-          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            Start: {formatCoordinateLabel(getPreviewOrigin(routeRequest).lat, getPreviewOrigin(routeRequest).lon)}
-          </Text>
-          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            Destination: {formatCoordinateLabel(routeRequest.destination.lat, routeRequest.destination.lon)}
-          </Text>
-          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            Route id: {selectedRoute?.id ?? 'No selected route'}
-          </Text>
-        </View>
-      </View>
+                  {/* Star rating */}
+                  <Text style={styles.sectionLabel}>Perceived safety</Text>
+                  <StarRow rating={rating} onSelect={setRating} />
 
-      {/* ---- Rating card ---- */}
-      <View style={[styles.card, { backgroundColor: colors.bgSecondary, borderColor: colors.borderDefault }, shadows.md]}>
-        <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>How safe did it feel?</Text>
-        <View style={styles.ratingRow}>
-          {[1, 2, 3, 4, 5].map((value) => (
-            <Pressable
-              key={value}
-              style={[
-                styles.ratingButton,
-                {
-                  borderColor: colors.borderDefault,
-                  backgroundColor: colors.bgSecondary,
-                },
-                rating >= value && {
-                  borderColor: colors.accentHover,
-                  backgroundColor: colors.accent,
-                },
-              ]}
-              onPress={() => setRating(value)}
-            >
-              <Text
-                style={[
-                  styles.ratingLabel,
-                  { color: colors.textSecondary },
-                  rating >= value && { color: colors.textInverse },
-                ]}
-              >
-                {value}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+                  {/* Comments */}
+                  <Text style={styles.sectionLabel}>Comments (optional)</Text>
+                  <TextInput
+                    style={styles.commentInput}
+                    multiline
+                    numberOfLines={4}
+                    placeholder="Any comments about the route?"
+                    placeholderTextColor="#9CA3AF"
+                    value={comments}
+                    onChangeText={setComments}
+                    textAlignVertical="top"
+                  />
 
-        <View style={styles.ratingLegend}>
-          <Text style={[styles.helperText, { color: colors.textMuted }]}>1 = unsafe</Text>
-          <Text style={[styles.helperText, { color: colors.textMuted }]}>5 = very safe</Text>
-        </View>
+                  {/* Buttons */}
+                  <View style={styles.buttonRow}>
+                    <Pressable
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={handleCancel}
+                    >
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </Pressable>
 
-        <TextInput
-          multiline
-          numberOfLines={5}
-          placeholder="Add any route notes, hazard context, or why this route felt better or worse than expected."
-          value={comments}
-          onChangeText={setComments}
-        />
-
-        {feedbackQueued ? (
-          <View style={[styles.noticeCard, { borderColor: colors.borderDefault, backgroundColor: `${colors.bgTertiary}18` }]}>
-            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-              Feedback for this ride is already queued and will sync automatically.
-            </Text>
+                    <Pressable
+                      style={[
+                        styles.button,
+                        styles.submitButton,
+                        submitDisabled && styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleSubmit}
+                      disabled={submitDisabled}
+                    >
+                      <Text
+                        style={[
+                          styles.submitButtonText,
+                          submitDisabled && styles.submitButtonTextDisabled,
+                        ]}
+                      >
+                        Submit
+                      </Text>
+                    </Pressable>
+                  </View>
+                </>
+              )}
+            </View>
           </View>
-        ) : null}
-        {!user ? (
-          <View style={[styles.noticeCard, { borderColor: colors.borderDefault, backgroundColor: `${colors.bgTertiary}18` }]}>
-            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-              Sign in from the account screen if you want this ride feedback stored on the backend.
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* ---- Actions ---- */}
-      <Button
-        variant="primary"
-        size="lg"
-        fullWidth
-        disabled={feedbackLocked}
-        onPress={finishRide}
-      >
-        {queueLabel}
-      </Button>
-
-      <Button
-        variant="secondary"
-        size="lg"
-        fullWidth
-        onPress={() => {
-          resetFlow();
-          router.replace('/route-planning');
-        }}
-      >
-        Skip and start a new route
-      </Button>
-    </Screen>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  /* Card container — replaces StatusCard */
+  root: {
+    flex: 1,
+    backgroundColor: brandColors.bgDeep,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  cardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: space[5],
+  },
   card: {
+    backgroundColor: '#FFFDF5',
     borderRadius: radii.xl,
-    borderWidth: 1,
-    padding: space[4],
+    padding: space[6],
+    gap: space[4],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  thankYouEmoji: {
+    fontSize: 56,
+    textAlign: 'center',
+  },
+  title: {
+    ...text2xl,
+    fontFamily: fontFamily.heading.extraBold,
+    color: '#111827',
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...textBase,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: -space[2],
+  },
+  sectionLabel: {
+    ...textSm,
+    fontFamily: fontFamily.body.bold,
+    color: '#374151',
+    textAlign: 'center',
+  },
+  starRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     gap: space[3],
   },
-  cardTitle: {
-    ...textXl,
+  starIcon: {
+    fontSize: STAR_SIZE,
+    lineHeight: STAR_SIZE + 8,
   },
-  cardBody: {
-    ...textBase,
-  },
-
-  /* Body / helper text */
-  bodyText: {
-    ...textSm,
-  },
-  helperText: {
-    ...textXs,
-  },
-
-  /* Metric grid */
-  metricGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-  },
-  metricTile: {
-    minWidth: 132,
-    flexGrow: 1,
-    borderRadius: radii.md,
-    paddingHorizontal: space[3],
-    paddingVertical: space[3],
-    gap: space[1],
-  },
-  metricLabel: {
-    ...text2xs,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  metricValue: {
-    ...textDataSm,
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 17,
-  },
-
-  /* Detail stack */
-  detailStack: {
-    gap: space[1],
-  },
-
-  /* Rating */
-  ratingRow: {
-    flexDirection: 'row',
-    gap: space[2],
-  },
-  ratingButton: {
-    flex: 1,
-    borderRadius: radii.full,
+  commentInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.lg,
     borderWidth: 1,
-    paddingVertical: space[4],
-    alignItems: 'center',
-  },
-  ratingLabel: {
-    fontFamily: fontFamily.heading.extraBold,
-    fontSize: 20,
-  },
-  ratingLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  /* Notice */
-  noticeCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
+    borderColor: '#E5E7EB',
     padding: space[3],
+    minHeight: 100,
+    fontSize: 15,
+    color: '#111827',
+    fontFamily: fontFamily.body.regular,
   },
-  noticeText: {
-    ...textSm,
+  buttonRow: {
+    flexDirection: 'row',
+    gap: space[3],
+    marginTop: space[2],
+  },
+  button: {
+    flex: 1,
+    paddingVertical: space[4],
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#D1D5DB',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontFamily: fontFamily.body.bold,
+    color: '#374151',
+  },
+  submitButton: {
+    backgroundColor: '#6B7280',
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    fontSize: 16,
+    fontFamily: fontFamily.body.bold,
+    color: '#FFFFFF',
+  },
+  submitButtonTextDisabled: {
+    color: '#D1D5DB',
+  },
+  doneButton: {
+    backgroundColor: '#FDD700',
+    marginTop: space[2],
+    paddingVertical: space[4],
+    minHeight: 52,
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontFamily: fontFamily.body.bold,
+    color: '#111827',
   },
 });

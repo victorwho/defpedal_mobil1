@@ -1,3 +1,4 @@
+import type { RiskSegment } from '@defensivepedal/core';
 import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
+import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
@@ -256,67 +258,6 @@ export default function RoutePreviewScreen() {
       topOverlay={topOverlay}
       footer={
         <>
-          {previewQuery.isPending ? (
-            <View style={styles.sheetHero}>
-              <Spinner size={32} />
-              <Text style={styles.sheetEyebrow}>Preview loading</Text>
-            </View>
-          ) : null}
-
-          {previewQuery.isError ? (
-            <View style={styles.warningPanel}>
-              <Text style={styles.warningTitle}>Preview failed</Text>
-              <Text style={styles.warningBody}>{previewQuery.error.message}</Text>
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={() => {
-                  void previewQuery.refetch();
-                }}
-              >
-                Retry preview
-              </Button>
-            </View>
-          ) : null}
-
-          {selectedRoute ? (
-            <View style={styles.summaryStrip}>
-              <Badge
-                variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
-                size="md"
-              >
-                {routePreview?.selectedMode === 'safe' ? 'Safe' : 'Fast'}
-              </Badge>
-
-              <View style={styles.statGroup}>
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    {(selectedRoute.distanceMeters / 1000).toFixed(1)}
-                  </Text>
-                  <Text style={styles.statUnit}>km</Text>
-                </View>
-
-                <Text style={styles.statDivider}>·</Text>
-
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    {formatDuration(selectedRoute.adjustedDurationSeconds)}
-                  </Text>
-                </View>
-
-                <Text style={styles.statDivider}>·</Text>
-
-                <View style={styles.stat}>
-                  <Text style={styles.statValue}>
-                    ↑{selectedRoute.totalClimbMeters !== null
-                      ? `${Math.round(selectedRoute.totalClimbMeters)} m`
-                      : '—'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ) : null}
-
           <Button
             variant="primary"
             size="lg"
@@ -332,6 +273,71 @@ export default function RoutePreviewScreen() {
         </>
       }
     >
+      {previewQuery.isPending ? (
+        <View style={styles.sheetHero}>
+          <Spinner size={32} />
+          <Text style={styles.sheetEyebrow}>Preview loading</Text>
+        </View>
+      ) : null}
+
+      {previewQuery.isError ? (
+        <View style={styles.warningPanel}>
+          <Text style={styles.warningTitle}>Preview failed</Text>
+          <Text style={styles.warningBody}>{previewQuery.error.message}</Text>
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={() => {
+              void previewQuery.refetch();
+            }}
+          >
+            Retry preview
+          </Button>
+        </View>
+      ) : null}
+
+      {selectedRoute ? (
+        <View style={styles.summaryStrip}>
+          <Badge
+            variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
+            size="md"
+          >
+            {routePreview?.selectedMode === 'safe' ? 'Safe' : 'Fast'}
+          </Badge>
+
+          <View style={styles.statGroup}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>
+                {(selectedRoute.distanceMeters / 1000).toFixed(1)}
+              </Text>
+              <Text style={styles.statUnit}>km</Text>
+            </View>
+
+            <Text style={styles.statDivider}>·</Text>
+
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>
+                {formatDuration(selectedRoute.adjustedDurationSeconds)}
+              </Text>
+            </View>
+
+            <Text style={styles.statDivider}>·</Text>
+
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>
+                ↑{selectedRoute.totalClimbMeters !== null
+                  ? `${Math.round(selectedRoute.totalClimbMeters)} m`
+                  : '—'}
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
+        <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
+      ) : null}
+
       {isMissingApi ? (
         <View style={styles.warningPanel}>
           <Text style={styles.warningTitle}>Missing configuration</Text>

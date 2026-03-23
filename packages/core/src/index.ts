@@ -5,4 +5,5 @@ export * from './navigation';
 export * from './polyline';
 export * from './routeRequest';
 export * from './routeAnalysis';
+export * from './riskDistribution';
 export * from './types';
