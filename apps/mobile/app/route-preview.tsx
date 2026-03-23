@@ -17,6 +17,7 @@ import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
+import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
@@ -336,6 +337,13 @@ export default function RoutePreviewScreen() {
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
         <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
+      ) : null}
+
+      {selectedRoute?.elevationProfile && selectedRoute.elevationProfile.length > 1 ? (
+        <ElevationChart
+          elevationProfile={selectedRoute.elevationProfile}
+          distanceMeters={selectedRoute.distanceMeters}
+        />
       ) : null}
 
       {isMissingApi ? (

@@ -29,7 +29,7 @@ import { useAppStore } from '../src/store/appStore';
 
 // Design system imports
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
-import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
+
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
@@ -543,9 +543,6 @@ export default function NavigationScreen() {
             }
             totalClimbMeters={selectedRoute.totalClimbMeters}
           />
-          {selectedRoute.riskSegments.length > 0 ? (
-            <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
-          ) : null}
         </View>
       </SafeAreaView>
 

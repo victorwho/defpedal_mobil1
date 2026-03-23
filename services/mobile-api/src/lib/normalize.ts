@@ -62,6 +62,7 @@ export const normalizeRoutePreviewResponse = (options: {
       durationSeconds: route.duration,
       adjustedDurationSeconds: adjusted.adjustedDuration,
       totalClimbMeters: elevationProfile ? adjusted.elevationGain : null,
+      elevationProfile: elevationProfile ?? undefined,
       steps: toNavigationSteps(options.routeResponse, index),
       riskSegments: options.riskByRoute[index] ?? [],
       warnings: options.warningsByRoute[index] ?? [],

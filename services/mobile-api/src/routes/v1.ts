@@ -531,6 +531,48 @@ export const buildV1Routes = (
     );
 
     app.post<{
+      Body: { coordinates: number[][] };
+      Reply: { elevationProfile: number[] } | ErrorResponse;
+    }>(
+      '/elevation-profile',
+      {
+        schema: {
+          response: {
+            200: { type: 'object' as const, properties: { elevationProfile: { type: 'array' as const } } },
+            400: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        await applyRateLimit(request, reply, dependencies, 'routePreview');
+
+        const coordinates = request.body?.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          throw new HttpError('Invalid coordinates.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['Body must contain a coordinates array with at least 2 points.'],
+          });
+        }
+
+        try {
+          const elevationProfile = await dependencies.getElevationProfile(
+            coordinates as [number, number][],
+          );
+          return { elevationProfile: elevationProfile ?? [] };
+        } catch (error) {
+          throw new HttpError('Elevation profile fetch failed.', {
+            statusCode: 500,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown error.'],
+          });
+        }
+      },
+    );
+
+    app.post<{
       Body: { geometry: { type: string; coordinates: number[][] } };
       Reply: { riskSegments: RiskSegment[] } | ErrorResponse;
     }>(

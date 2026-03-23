@@ -49,6 +49,7 @@ export interface RouteOption {
   durationSeconds: number;
   adjustedDurationSeconds: number;
   totalClimbMeters: number | null;
+  elevationProfile?: number[];
   steps: NavigationStep[];
   riskSegments: RiskSegment[];
   warnings: string[];

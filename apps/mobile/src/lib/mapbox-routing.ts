@@ -234,10 +234,33 @@ const enrichRouteWithElevation = async (
     route.distanceMeters,
   );
 
+  // Fetch full elevation profile from server in parallel (non-blocking)
+  let elevationProfile: number[] | undefined;
+
+  try {
+    if (mobileEnv.mobileApiUrl) {
+      const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/elevation-profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coordinates }),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { elevationProfile: number[] };
+        if (data.elevationProfile?.length > 0) {
+          elevationProfile = data.elevationProfile;
+        }
+      }
+    }
+  } catch {
+    // Elevation profile is optional — degrade gracefully
+  }
+
   return {
     ...route,
     totalClimbMeters: Math.round(result.elevationGain),
     adjustedDurationSeconds: Math.round(adjustedDurationSeconds),
+    elevationProfile,
   };
 };
 
