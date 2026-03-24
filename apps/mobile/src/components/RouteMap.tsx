@@ -1,7 +1,8 @@
 import type { Coordinate, RouteOption } from '@defensivepedal/core';
+import type { BicycleParkingLocation } from '../lib/bicycle-parking';
 import { decodePolyline } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -32,6 +33,7 @@ type RouteMapProps = {
   } | null;
   fullBleed?: boolean;
   showRouteOverlay?: boolean;
+  bicycleParkingLocations?: readonly BicycleParkingLocation[];
   containerStyle?: StyleProp<ViewStyle>;
 };
 
@@ -74,6 +76,7 @@ export const RouteMap = ({
   offRouteDetails,
   fullBleed = false,
   showRouteOverlay = true,
+  bicycleParkingLocations = [],
   containerStyle,
 }: RouteMapProps) => {
   const decodedRoutes = useMemo<DecodedRoute[]>(
@@ -127,6 +130,21 @@ export const RouteMap = ({
         })) ?? [],
     }),
     [selectedRoute],
+  );
+
+  const bicycleParkingFeatureCollection = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: bicycleParkingLocations.map((loc) => ({
+        type: 'Feature' as const,
+        properties: { id: loc.id, name: loc.name ?? '' },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [loc.lon, loc.lat] as [number, number],
+        },
+      })),
+    }),
+    [bicycleParkingLocations],
   );
 
   const markerFeatureCollection = useMemo(() => {
@@ -191,9 +209,25 @@ export const RouteMap = ({
     followUser && userLocation
       ? ([userLocation.lon, userLocation.lat] as [number, number])
       : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
-        (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
+        (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
+
+  const [selectedParking, setSelectedParking] = useState<[number, number] | null>(null);
+
+  const handleParkingPress = useCallback((event: any) => {
+    try {
+      const feature = event?.features?.[0];
+      const coords = feature?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        setSelectedParking((prev) =>
+          prev && prev[0] === coords[0] && prev[1] === coords[1] ? null : [coords[0], coords[1]],
+        );
+      }
+    } catch {
+      // ignore press errors
+    }
+  }, []);
 
   if (!mobileEnv.mapboxPublicToken) {
     return (
@@ -262,6 +296,48 @@ export const RouteMap = ({
               }}
             />
           </Mapbox.ShapeSource>
+        ) : null}
+
+        {bicycleParkingFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource
+            id="bicycle-parking"
+            shape={bicycleParkingFeatureCollection}
+            onPress={handleParkingPress}
+          >
+            <Mapbox.CircleLayer
+              id="bicycle-parking-bg"
+              minZoomLevel={12}
+              style={{
+                circleColor: '#2196F3',
+                circleRadius: 12,
+                circleStrokeColor: '#FFFFFF',
+                circleStrokeWidth: 1.5,
+                circleOpacity: 0.9,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="bicycle-parking-label"
+              minZoomLevel={12}
+              style={{
+                textField: 'P',
+                textSize: 10,
+                textColor: '#FFFFFF',
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {selectedParking ? (
+          <Mapbox.MarkerView
+            coordinate={selectedParking}
+            anchor={{ x: 0.5, y: 1.2 }}
+          >
+            <View style={styles.parkingCallout}>
+              <Text style={styles.parkingCalloutText}>🚲 Bicycle Parking</Text>
+            </View>
+          </Mapbox.MarkerView>
         ) : null}
 
         {markerFeatureCollection.features.length > 0 ? (
@@ -386,5 +462,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...textSm,
     color: brandColors.textSecondary,
+  },
+  parkingCallout: {
+    backgroundColor: 'rgba(11, 16, 32, 0.92)',
+    borderRadius: radii.lg,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    borderWidth: 1,
+    borderColor: brandColors.borderStrong,
+  },
+  parkingCalloutText: {
+    color: '#FFFFFF',
+    ...textSm,
+    fontFamily: fontFamily.heading.bold,
   },
 });

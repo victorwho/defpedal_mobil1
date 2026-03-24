@@ -3,14 +3,16 @@ import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/RouteMap';
+import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
+import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -49,6 +51,11 @@ export default function RoutePlanningScreen() {
     error: locationError,
     refreshLocation,
   } = useCurrentLocation();
+  const hasValidDestination = routeRequest.destination.lat !== 0 && routeRequest.destination.lon !== 0;
+  const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    hasValidDestination ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
   const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
   const mapUserLocation = currentLocation ?? fallbackUserLocation;
   const planningOrigin = mapUserLocation ?? routeRequest.origin;
@@ -172,6 +179,7 @@ export default function RoutePlanningScreen() {
   };
 
   const handleDestinationSelect = (suggestion: AutocompleteSuggestion) => {
+    Keyboard.dismiss();
     setRouteRequest({ destination: suggestion.coordinates });
     setDestinationQuery(suggestion.label);
     setDestinationHydrated(true);
@@ -220,9 +228,17 @@ export default function RoutePlanningScreen() {
           origin={planningOrigin}
           destination={routeRequest.destination}
           userLocation={mapUserLocation}
-          followUser={Boolean(mapUserLocation) && !customStartEnabled}
+          followUser={Boolean(mapUserLocation) && !customStartEnabled && !hasValidDestination}
           fullBleed
           showRouteOverlay={false}
+          bicycleParkingLocations={parkingLocations}
+        />
+      }
+      rightOverlay={
+        <VoiceGuidanceButton
+          enabled={voiceGuidanceEnabled}
+          onPress={() => setVoiceGuidanceEnabled(!voiceGuidanceEnabled)}
+          compact
         />
       }
       topOverlay={

@@ -13,13 +13,15 @@ import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { RouteMap } from '../src/components/RouteMap';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
+import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -43,6 +45,7 @@ import { fontFamily, textXs, textSm, textBase } from '../src/design-system/token
 
 export default function NavigationScreen() {
   useKeepAwake();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
   const guardPassed = useRouteGuard({
     requiredStates: ['NAVIGATING'],
@@ -69,6 +72,10 @@ export default function NavigationScreen() {
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
+  const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
   const introAnnouncementKeyRef = useRef<string | null>(null);
 
   const selectedRoute =
@@ -444,9 +451,10 @@ export default function NavigationScreen() {
         offRouteDetails={offRouteDetails}
         fullBleed
         showRouteOverlay={false}
+        bicycleParkingLocations={parkingLocations}
       />
 
-      <SafeAreaView style={styles.overlayRoot} pointerEvents="box-none">
+      <View style={[styles.overlayRoot, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">
         {/* ── Top: maneuver card only ── */}
         <View style={styles.topCluster} pointerEvents="box-none">
           <ManeuverCard
@@ -544,7 +552,7 @@ export default function NavigationScreen() {
             totalClimbMeters={selectedRoute.totalClimbMeters}
           />
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Hazard toast notification */}
       {hazardBanner ? (

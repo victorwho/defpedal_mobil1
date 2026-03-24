@@ -119,7 +119,7 @@ export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
       appState: 'IDLE',
-      voiceGuidanceEnabled: true,
+      voiceGuidanceEnabled: false,
       routeRequest: DEFAULT_ROUTE_REQUEST,
       routePreview: null,
       selectedRouteId: null,

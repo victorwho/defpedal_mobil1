@@ -1,9 +1,26 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  KeyboardAvoidingView,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { brandColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const COLLAPSED_HEIGHT = 48; // just handle + peek
+const EXPANDED_RATIO = 0.7; // 70% of screen
+const EXPANDED_HEIGHT = SCREEN_HEIGHT * EXPANDED_RATIO;
+const SNAP_THRESHOLD = 80; // drag distance to trigger snap
 
 type MapStageScreenProps = PropsWithChildren<{
   map: ReactNode;
@@ -14,6 +31,88 @@ type MapStageScreenProps = PropsWithChildren<{
   useBottomSheet?: boolean;
 }>;
 
+const CollapsibleSheet = ({
+  children,
+  footer,
+  bottomInset,
+}: {
+  children: ReactNode;
+  footer?: ReactNode;
+  bottomInset: number;
+}) => {
+  const [expanded, setExpanded] = useState(true);
+  const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
+  const effectiveCollapsed = COLLAPSED_HEIGHT;
+  const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
+  const dragStartHeight = useRef(effectiveExpanded);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
+      onPanResponderGrant: () => {
+        dragStartHeight.current = expanded ? effectiveExpanded : effectiveCollapsed;
+      },
+      onPanResponderMove: (_, gesture) => {
+        const newHeight = Math.max(
+          effectiveCollapsed,
+          Math.min(effectiveExpanded, dragStartHeight.current - gesture.dy),
+        );
+        sheetHeight.setValue(newHeight);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const shouldExpand = expanded
+          ? gesture.dy < SNAP_THRESHOLD
+          : gesture.dy < -SNAP_THRESHOLD;
+
+        const target = shouldExpand ? effectiveExpanded : effectiveCollapsed;
+        setExpanded(shouldExpand);
+        Animated.spring(sheetHeight, {
+          toValue: target,
+          useNativeDriver: false,
+          tension: 60,
+          friction: 12,
+        }).start();
+      },
+    }),
+  ).current;
+
+  const handleTap = () => {
+    const nextExpanded = !expanded;
+    const target = nextExpanded ? effectiveExpanded : effectiveCollapsed;
+    setExpanded(nextExpanded);
+    Animated.spring(sheetHeight, {
+      toValue: target,
+      useNativeDriver: false,
+      tension: 60,
+      friction: 12,
+    }).start();
+  };
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.bottomDock}
+    >
+      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, marginBottom: bottomInset }]}>
+        <View {...panResponder.panHandlers} onTouchEnd={handleTap}>
+          <View style={styles.handle} />
+        </View>
+        {expanded ? (
+          <ScrollView
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        ) : null}
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </Animated.View>
+    </KeyboardAvoidingView>
+  );
+};
+
 export const MapStageScreen = ({
   map,
   topOverlay,
@@ -21,39 +120,28 @@ export const MapStageScreen = ({
   footer,
   children,
   useBottomSheet = false,
-}: MapStageScreenProps) => (
-  <View style={styles.root}>
-    <View style={StyleSheet.absoluteFill}>{map}</View>
-    <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
-      {topOverlay ? <View style={styles.topOverlay} pointerEvents="box-none">{topOverlay}</View> : null}
-      {rightOverlay ? <View style={styles.rightOverlay}>{rightOverlay}</View> : null}
-      <View style={styles.flexSpacer} pointerEvents="box-none" />
+}: MapStageScreenProps) => {
+  const insets = useSafeAreaInsets();
 
-      {useBottomSheet ? (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.bottomDock}
-        >
-          <View style={styles.sheet}>
-            <View style={styles.handle} />
-            <ScrollView
-              contentContainerStyle={styles.content}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {children}
-            </ScrollView>
-            {footer ? <View style={styles.footer}>{footer}</View> : null}
+  return (
+    <View style={styles.root}>
+      <View style={StyleSheet.absoluteFill}>{map}</View>
+      <View style={[styles.safeArea, { paddingTop: insets.top }]} pointerEvents="box-none">
+        {topOverlay ? <View style={styles.topOverlay} pointerEvents="box-none">{topOverlay}</View> : null}
+        {rightOverlay ? <View style={styles.rightOverlay}>{rightOverlay}</View> : null}
+        <View style={styles.flexSpacer} pointerEvents="box-none" />
+
+        {useBottomSheet ? (
+          <CollapsibleSheet footer={footer} bottomInset={insets.bottom}>{children}</CollapsibleSheet>
+        ) : footer ? (
+          <View style={[styles.bottomFooter, { paddingBottom: insets.bottom + space[3] }]} pointerEvents="box-none">
+            {footer}
           </View>
-        </KeyboardAvoidingView>
-      ) : footer ? (
-        <View style={styles.bottomFooter} pointerEvents="box-none">
-          {footer}
-        </View>
-      ) : null}
-    </SafeAreaView>
-  </View>
-);
+        ) : null}
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   root: {
@@ -88,7 +176,6 @@ const styles = StyleSheet.create({
     borderColor: brandColors.borderDefault,
     backgroundColor: 'rgba(11, 16, 32, 0.96)',
     overflow: 'hidden',
-    maxHeight: '70%',
   },
   handle: {
     alignSelf: 'center',
@@ -116,7 +203,6 @@ const styles = StyleSheet.create({
   },
   bottomFooter: {
     paddingHorizontal: space[4],
-    paddingBottom: space[3],
     gap: space[2],
   },
 });

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
+import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
@@ -62,6 +63,10 @@ export default function RoutePreviewScreen() {
   const startNavigation = useAppStore((state) => state.startNavigation);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
+  const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
 
@@ -251,10 +256,11 @@ export default function RoutePreviewScreen() {
           destination={routeRequest.destination}
           fullBleed
           showRouteOverlay={false}
+          bicycleParkingLocations={parkingLocations}
         />
       }
       rightOverlay={
-        <VoiceGuidanceButton enabled={voiceGuidanceEnabled} onPress={toggleVoiceGuidance} />
+        <VoiceGuidanceButton enabled={voiceGuidanceEnabled} onPress={toggleVoiceGuidance} compact />
       }
       topOverlay={topOverlay}
       footer={
