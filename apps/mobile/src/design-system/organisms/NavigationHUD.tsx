@@ -162,11 +162,13 @@ export const FooterCard: React.FC<{
   remainingDurationSeconds: number;
   remainingDistanceMeters: number;
   totalClimbMeters: number | null;
+  isClimbLive?: boolean;
 }> = ({
   nextStep,
   remainingDurationSeconds,
   remainingDistanceMeters,
   totalClimbMeters,
+  isClimbLive = false,
 }) => {
   const nextArrow = nextStep ? getManeuverArrow(nextStep) : null;
   const nextDist = nextStep
@@ -199,7 +201,9 @@ export const FooterCard: React.FC<{
           label="Climb"
           value={
             totalClimbMeters !== null
-              ? `↑${Math.round(totalClimbMeters)} m`
+              ? isClimbLive
+                ? `↑${Math.round(totalClimbMeters)} m ▼`
+                : `~↑${Math.round(totalClimbMeters)} m`
               : '—'
           }
         />

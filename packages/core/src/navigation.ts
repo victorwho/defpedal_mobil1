@@ -353,3 +353,34 @@ export const shouldTriggerAutomaticReroute = (
 
   return now - lastRerouteAtMs >= cooldownMs;
 };
+
+/**
+ * Compute the remaining elevation gain from the current position to the end of the route.
+ *
+ * Uses the elevation profile (sampled array of elevations along the route) and maps
+ * the user's progress (via remaining distance) to find the starting index, then sums
+ * only the positive elevation deltas from that point forward.
+ *
+ * Returns 0 if the profile is empty or progress data is unavailable.
+ */
+export const computeRemainingClimb = (
+  elevationProfile: readonly number[],
+  totalDistanceMeters: number,
+  remainingDistanceMeters: number,
+): number => {
+  if (elevationProfile.length < 2 || totalDistanceMeters <= 0) return 0;
+
+  const progressRatio = Math.max(
+    0,
+    Math.min(1, 1 - remainingDistanceMeters / totalDistanceMeters),
+  );
+  const startIndex = Math.floor(progressRatio * (elevationProfile.length - 1));
+
+  let climb = 0;
+  for (let i = startIndex; i < elevationProfile.length - 1; i++) {
+    const delta = elevationProfile[i + 1] - elevationProfile[i];
+    if (delta > 0) climb += delta;
+  }
+
+  return Math.round(climb);
+};

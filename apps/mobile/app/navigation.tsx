@@ -5,6 +5,7 @@ import {
   buildRerouteRequest,
   getNavigationProgress,
   getPreviewOrigin,
+  computeRemainingClimb,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -12,7 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -89,6 +90,21 @@ export default function NavigationScreen() {
       ? selectedRoute.steps[navigationSession.currentStepIndex + 1] ?? null
       : null;
   const totalSteps = selectedRoute?.steps.length ?? 0;
+
+  const climbData = useMemo(() => {
+    const profile = selectedRoute?.elevationProfile;
+    if (!profile?.length || !selectedRoute || !navigationSession?.remainingDistanceMeters) {
+      return { value: selectedRoute?.totalClimbMeters ?? null, isLive: false };
+    }
+    return {
+      value: computeRemainingClimb(
+        profile,
+        selectedRoute.distanceMeters,
+        navigationSession.remainingDistanceMeters,
+      ),
+      isLive: true,
+    };
+  }, [selectedRoute, navigationSession?.remainingDistanceMeters]);
   const liveCoordinate =
     locationState.sample?.coordinate ??
     navigationSession?.lastKnownCoordinate ??
@@ -549,7 +565,8 @@ export default function NavigationScreen() {
             remainingDistanceMeters={
               navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
             }
-            totalClimbMeters={selectedRoute.totalClimbMeters}
+            totalClimbMeters={climbData.value}
+            isClimbLive={climbData.isLive}
           />
         </View>
       </View>
