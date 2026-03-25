@@ -1,13 +1,13 @@
 /**
  * Design System v1.0 — BottomNav Organism
  *
- * 4 tabs: Explore, Routes, Report, Profile.
+ * 4 tabs: Map, History, Community, Profile.
  * Accent active state. Hides during navigation (controlled by parent).
  * 64px height (layout.bottomNavHeight), safe area aware.
  */
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../ThemeContext';
@@ -19,7 +19,7 @@ import { gray } from '../tokens/colors';
 // Types
 // ---------------------------------------------------------------------------
 
-export type TabKey = 'explore' | 'routes' | 'report' | 'profile';
+export type TabKey = 'map' | 'history' | 'community' | 'profile';
 
 export interface BottomNavProps {
   activeTab: TabKey;
@@ -40,9 +40,9 @@ interface TabConfig {
 }
 
 const TABS: TabConfig[] = [
-  { key: 'explore', label: 'Explore', icon: 'compass-outline', iconActive: 'compass' },
-  { key: 'routes', label: 'Routes', icon: 'map-outline', iconActive: 'map' },
-  { key: 'report', label: 'Report', icon: 'warning-outline', iconActive: 'warning' },
+  { key: 'map', label: 'Map', icon: 'map-outline', iconActive: 'map' },
+  { key: 'history', label: 'History', icon: 'time-outline', iconActive: 'time' },
+  { key: 'community', label: 'Community', icon: 'people-outline', iconActive: 'people' },
   { key: 'profile', label: 'Profile', icon: 'person-outline', iconActive: 'person' },
 ];
 
@@ -67,7 +67,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         {
           backgroundColor: colors.bgPrimary,
           borderTopColor: colors.borderDefault,
-          paddingBottom: Math.max(insets.bottom, space[2]),
+          paddingBottom: insets.bottom + (Platform.OS === 'android' ? 12 : space[2]),
         },
       ]}
     >
@@ -122,7 +122,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    height: layout.bottomNavHeight,
+    minHeight: layout.bottomNavHeight,
+    paddingTop: space[2],
     borderTopWidth: 1,
   },
   tab: {

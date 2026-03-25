@@ -1,0 +1,55 @@
+import { router } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { Screen } from '../src/components/Screen';
+import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { brandColors } from '../src/design-system/tokens/colors';
+import { fontFamily, textBase } from '../src/design-system/tokens/typography';
+import { space } from '../src/design-system/tokens/spacing';
+
+const handleTabPress = (tab: TabKey) => {
+  if (tab === 'map') router.replace('/route-planning');
+  else if (tab === 'community') router.replace('/community');
+  else if (tab === 'profile') router.replace('/profile');
+};
+
+export default function HistoryScreen() {
+  return (
+    <View style={styles.root}>
+      <View style={styles.content}>
+        <Screen title="Ride History" eyebrow="Defensive Pedal" subtitle="Your past rides">
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderText}>Coming soon</Text>
+            <Text style={styles.placeholderSub}>
+              Your ride history will appear here once this feature is ready.
+            </Text>
+          </View>
+        </Screen>
+      </View>
+      <BottomNav activeTab="history" onTabPress={handleTabPress} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: brandColors.bgDeep },
+  content: { flex: 1 },
+  placeholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: space[10],
+    gap: space[2],
+  },
+  placeholderText: {
+    ...textBase,
+    fontFamily: fontFamily.heading.bold,
+    color: brandColors.textPrimary,
+    fontSize: 18,
+  },
+  placeholderSub: {
+    ...textBase,
+    color: brandColors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: space[6],
+  },
+});

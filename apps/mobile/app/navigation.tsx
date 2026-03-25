@@ -32,6 +32,7 @@ import { useAppStore } from '../src/store/appStore';
 
 // Design system imports
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
+import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
@@ -141,6 +142,7 @@ export default function NavigationScreen() {
     message: string;
   } | null>(null);
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hazardTypeLabels = HAZARD_TYPE_OPTIONS.reduce<Record<HazardType, string>>(
@@ -536,6 +538,16 @@ export default function NavigationScreen() {
             />
           </View>
 
+          {/* Menu toggle */}
+          <View style={styles.roundButton}>
+            <IconButton
+              icon={<Ionicons name={showMenu ? 'close' : 'menu'} size={22} color={gray[300]} />}
+              onPress={() => setShowMenu((prev) => !prev)}
+              accessibilityLabel={showMenu ? 'Hide menu' : 'Show menu'}
+              variant="secondary"
+            />
+          </View>
+
           {/* End ride — round gray button with X icon */}
           <View style={styles.roundButton}>
             <IconButton
@@ -635,6 +647,18 @@ export default function NavigationScreen() {
           ))}
         </View>
       </Modal>
+
+      {showMenu ? (
+        <BottomNav
+          activeTab="map"
+          onTabPress={(tab: TabKey) => {
+            setShowMenu(false);
+            if (tab === 'history') router.push('/history');
+            else if (tab === 'community') router.push('/community');
+            else if (tab === 'profile') router.push('/profile');
+          }}
+        />
+      ) : null}
     </View>
   );
 }

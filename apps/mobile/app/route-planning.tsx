@@ -19,6 +19,7 @@ import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 
 import { SearchBar } from '../src/design-system/molecules';
+import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -219,9 +220,16 @@ export default function RoutePlanningScreen() {
     return currentLocationLabelQuery.data?.label ?? formatCoordinateLabel(planningOrigin);
   }, [currentLocation, currentLocationLabelQuery.data?.label, isLocating, planningOrigin, permissionStatus]);
 
+  const handleTabPress = (tab: TabKey) => {
+    if (tab === 'history') router.push('/history');
+    else if (tab === 'community') router.push('/community');
+    else if (tab === 'profile') router.push('/profile');
+  };
+
   // --- Render ---
 
   return (
+    <View style={styles.rootWrapper}>
     <MapStageScreen
       map={
         <RouteMap
@@ -448,6 +456,8 @@ export default function RoutePlanningScreen() {
         ) : null
       }
     />
+    <BottomNav activeTab="map" onTabPress={handleTabPress} />
+    </View>
   );
 }
 
@@ -456,6 +466,9 @@ export default function RoutePlanningScreen() {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  rootWrapper: {
+    flex: 1,
+  },
   topContainer: {
     gap: space[2],
   },
