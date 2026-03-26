@@ -240,6 +240,102 @@ export interface WriteAckResponse {
   acceptedAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Community Feed
+// ---------------------------------------------------------------------------
+
+export const SAFETY_TAG_OPTIONS = [
+  { value: 'bike_lane', label: 'Bike lane' },
+  { value: 'low_traffic', label: 'Low traffic' },
+  { value: 'well_lit', label: 'Well lit' },
+  { value: 'separated_path', label: 'Separated path' },
+  { value: 'residential', label: 'Residential streets' },
+  { value: 'traffic_calmed', label: 'Traffic calmed' },
+  { value: 'avoid_main_road', label: 'Avoids main roads' },
+] as const;
+
+export type SafetyTag = (typeof SAFETY_TAG_OPTIONS)[number]['value'];
+
+export interface FeedProfile {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface FeedItem {
+  id: string;
+  user: FeedProfile;
+  title: string;
+  startLocationText: string;
+  destinationText: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  elevationGainMeters: number | null;
+  averageSpeedMps: number | null;
+  safetyRating: number | null;
+  safetyTags: SafetyTag[];
+  geometryPolyline6: string;
+  note: string | null;
+  sharedAt: string;
+  likeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+}
+
+export interface FeedComment {
+  id: string;
+  user: FeedProfile;
+  body: string;
+  createdAt: string;
+}
+
+export interface ShareTripRequest {
+  tripId?: string;
+  title?: string;
+  startLocationText: string;
+  destinationText: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  elevationGainMeters?: number | null;
+  averageSpeedMps?: number | null;
+  safetyRating?: number | null;
+  geometryPolyline6: string;
+  safetyTags?: SafetyTag[];
+  note?: string;
+  startCoordinate: Coordinate;
+}
+
+export interface FeedRequest {
+  lat: number;
+  lon: number;
+  radiusKm?: number;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface FeedResponse {
+  items: FeedItem[];
+  cursor: string | null;
+}
+
+export interface FeedCommentRequest {
+  body: string;
+}
+
+export interface ProfileUpdateRequest {
+  displayName?: string;
+  autoShareRides?: boolean;
+  trimRouteEndpoints?: boolean;
+}
+
+export interface ProfileResponse {
+  id: string;
+  displayName: string;
+  avatarUrl: string | null;
+  autoShareRides: boolean;
+  trimRouteEndpoints: boolean;
+}
+
 export interface NavigationLocationSample {
   coordinate: Coordinate;
   accuracyMeters?: number | null;

@@ -1,10 +1,14 @@
-import { getPreviewOrigin } from '@defensivepedal/core';
+import { getPreviewOrigin, SAFETY_TAG_OPTIONS } from '@defensivepedal/core';
+import type { SafetyTag, ShareTripRequest } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
+import { SafetyTagChips } from '../src/components/SafetyTagChips';
 import { StatusCard } from '../src/components/StatusCard';
+import { useShareTrip } from '../src/hooks/useFeed';
+import { generateSafetyTags } from '../src/lib/safetyTagGenerator';
 import { mobileTheme } from '../src/lib/theme';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -182,6 +186,18 @@ export default function FeedbackScreen() {
         <Text style={styles.primaryLabel}>{queueLabel}</Text>
       </Pressable>
 
+      {/* Share to Community */}
+      {user ? (
+        <ShareToCommunitySection
+          routeRequest={routeRequest}
+          selectedRoute={selectedRoute}
+          navigationSession={navigationSession}
+          rating={rating}
+          activeTripClientId={activeTripClientId}
+          tripServerIds={tripServerIds}
+        />
+      ) : null}
+
       <Pressable
         style={styles.secondaryButton}
         onPress={() => {
@@ -192,6 +208,131 @@ export default function FeedbackScreen() {
         <Text style={styles.secondaryLabel}>Skip and start a new route</Text>
       </Pressable>
     </Screen>
+  );
+}
+
+function ShareToCommunitySection({
+  routeRequest,
+  selectedRoute,
+  navigationSession,
+  rating,
+  activeTripClientId,
+  tripServerIds,
+}: {
+  routeRequest: ReturnType<typeof useAppStore>['routeRequest'];
+  selectedRoute: ReturnType<typeof useAppStore>['routePreview'] extends { routes: (infer R)[] } | null ? R | null : never;
+  navigationSession: ReturnType<typeof useAppStore>['navigationSession'];
+  rating: number;
+  activeTripClientId: string | null;
+  tripServerIds: Record<string, string>;
+}) {
+  const [showShare, setShowShare] = useState(false);
+  const [shareNote, setShareNote] = useState('');
+  const [selectedTags, setSelectedTags] = useState<SafetyTag[]>([]);
+  const [tagsInitialized, setTagsInitialized] = useState(false);
+  const shareTrip = useShareTrip();
+
+  if (!selectedRoute || !navigationSession) return null;
+
+  // Auto-generate tags on first render of share section
+  if (showShare && !tagsInitialized) {
+    // We don't have composition in RouteOption directly, so start with empty auto tags
+    // In a full implementation we'd pass RouteAnalysis through; for now start empty
+    setSelectedTags([]);
+    setTagsInitialized(true);
+  }
+
+  const origin = getPreviewOrigin(routeRequest);
+  const destination = routeRequest.destination;
+
+  const handleShare = () => {
+    const payload: ShareTripRequest = {
+      tripId: activeTripClientId ? tripServerIds[activeTripClientId] : undefined,
+      startLocationText: `${origin.lat.toFixed(4)}, ${origin.lon.toFixed(4)}`,
+      destinationText: `${destination.lat.toFixed(4)}, ${destination.lon.toFixed(4)}`,
+      distanceMeters: selectedRoute.distanceMeters,
+      durationSeconds: selectedRoute.adjustedDurationSeconds ?? selectedRoute.durationSeconds,
+      elevationGainMeters: selectedRoute.totalClimbMeters,
+      safetyRating: rating > 0 ? rating : undefined,
+      geometryPolyline6: selectedRoute.geometryPolyline6,
+      safetyTags: selectedTags,
+      note: shareNote.trim() || undefined,
+      startCoordinate: origin,
+    };
+
+    shareTrip.mutate(payload);
+  };
+
+  const toggleTag = (tag: SafetyTag) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
+    );
+  };
+
+  if (!showShare) {
+    return (
+      <Pressable style={styles.shareToggleButton} onPress={() => setShowShare(true)}>
+        <Text style={styles.shareToggleLabel}>Share to Community</Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <StatusCard title="Share this ride">
+      <Text style={styles.bodyText}>
+        Share your ride with nearby cyclists. Help others discover safe routes.
+      </Text>
+
+      {/* Safety tag picker */}
+      <Text style={styles.tagPickerLabel}>Route safety tags</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.tagPickerRow}>
+          {SAFETY_TAG_OPTIONS.map((option) => (
+            <Pressable
+              key={option.value}
+              style={[
+                styles.tagPickerChip,
+                selectedTags.includes(option.value) ? styles.tagPickerChipActive : null,
+              ]}
+              onPress={() => toggleTag(option.value)}
+            >
+              <Text
+                style={[
+                  styles.tagPickerText,
+                  selectedTags.includes(option.value) ? styles.tagPickerTextActive : null,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Note input */}
+      <TextInput
+        style={styles.shareNoteInput}
+        placeholder="Add a note about this route (optional)"
+        placeholderTextColor="#94a3b8"
+        value={shareNote}
+        onChangeText={setShareNote}
+        multiline
+        numberOfLines={3}
+      />
+
+      <Pressable
+        style={[
+          styles.primaryButton,
+          shareTrip.isPending ? styles.primaryButtonDisabled : null,
+        ]}
+        disabled={shareTrip.isPending || shareTrip.isSuccess}
+        onPress={handleShare}
+      >
+        <Text style={styles.primaryLabel}>
+          {shareTrip.isSuccess ? 'Shared!' : shareTrip.isPending ? 'Sharing...' : 'Share ride'}
+        </Text>
+      </Pressable>
+    </StatusCard>
   );
 }
 
@@ -319,5 +460,62 @@ const styles = StyleSheet.create({
     color: mobileTheme.colors.textOnDark,
     fontSize: 16,
     fontWeight: '800',
+  },
+  shareToggleButton: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: mobileTheme.colors.borderStrong,
+    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  shareToggleLabel: {
+    color: mobileTheme.colors.brand,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  tagPickerLabel: {
+    color: mobileTheme.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  tagPickerRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  tagPickerChip: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: mobileTheme.colors.border,
+    backgroundColor: mobileTheme.colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  tagPickerChipActive: {
+    borderColor: mobileTheme.colors.borderStrong,
+    backgroundColor: '#fff8d6',
+  },
+  tagPickerText: {
+    color: mobileTheme.colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagPickerTextActive: {
+    color: mobileTheme.colors.textPrimary,
+  },
+  shareNoteInput: {
+    minHeight: 80,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: mobileTheme.colors.border,
+    backgroundColor: mobileTheme.colors.surfaceMuted,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    textAlignVertical: 'top',
+    color: mobileTheme.colors.textPrimary,
+    fontSize: 14,
   },
 });

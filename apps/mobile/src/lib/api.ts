@@ -3,12 +3,18 @@ import type {
   AutocompleteResponse,
   CoverageResponse,
   ErrorResponse,
+  FeedComment,
+  FeedCommentRequest,
+  FeedResponse,
   HazardReportRequest,
   HazardReportResponse,
   NavigationFeedbackRequest,
+  ProfileResponse,
+  ProfileUpdateRequest,
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
   RerouteRequest,
+  ShareTripRequest,
   TripEndRequest,
   TripEndResponse,
   TripStartRequest,
@@ -286,6 +292,41 @@ export const mobileApi = {
   submitFeedback: (payload: NavigationFeedbackRequest) =>
     requestJson<WriteAckResponse>('/v1/feedback', {
       method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  // Community Feed
+  getFeed: (lat: number, lon: number, cursor?: string, limit?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (cursor) params.set('cursor', cursor);
+    if (limit) params.set('limit', String(limit));
+    return requestJson<FeedResponse>(`/v1/feed?${params.toString()}`);
+  },
+  shareTripToFeed: (payload: ShareTripRequest) =>
+    requestJson<{ id: string; sharedAt: string }>('/v1/feed/share', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  likeFeedItem: (tripShareId: string) =>
+    requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/like`, {
+      method: 'POST',
+    }),
+  unlikeFeedItem: (tripShareId: string) =>
+    requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/like`, {
+      method: 'DELETE',
+    }),
+  getFeedComments: (tripShareId: string) =>
+    requestJson<{ comments: FeedComment[] }>(`/v1/feed/${tripShareId}/comments`),
+  postFeedComment: (tripShareId: string, payload: FeedCommentRequest) =>
+    requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getProfile: () =>
+    requestJson<ProfileResponse>('/v1/profile'),
+  updateProfile: (payload: ProfileUpdateRequest) =>
+    requestJson<ProfileResponse>('/v1/profile', {
+      method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 };

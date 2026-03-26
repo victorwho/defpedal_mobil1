@@ -1,8 +1,9 @@
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { StatusCard } from '../src/components/StatusCard';
+import { useProfile, useUpdateProfile } from '../src/hooks/useFeed';
 import { mobileEnv } from '../src/lib/env';
 import { mobileTheme } from '../src/lib/theme';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
@@ -58,7 +59,20 @@ export default function SettingsScreen() {
         </Text>
       </StatusCard>
 
+      {/* Community section */}
+      {user ? <CommunitySettings /> : null}
+
       <View style={styles.tileGrid}>
+        <Link href="/community-feed" asChild>
+          <Pressable>
+            <MenuTile
+              title="Community Feed"
+              description="See rides shared by nearby cyclists and discover safe routes in your area."
+              label="Feed"
+              tone="accent"
+            />
+          </Pressable>
+        </Link>
         <Link href="/auth" asChild>
           <Pressable>
             <MenuTile
@@ -124,6 +138,45 @@ export default function SettingsScreen() {
         </Text>
       </StatusCard>
     </Screen>
+  );
+}
+
+function CommunitySettings() {
+  const profile = useProfile();
+  const updateProfile = useUpdateProfile();
+
+  const autoShare = profile.data?.autoShareRides ?? false;
+  const trimEndpoints = profile.data?.trimRouteEndpoints ?? false;
+
+  return (
+    <StatusCard title="Community settings">
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleCopy}>
+          <Text style={styles.toggleLabel}>Auto-share my rides</Text>
+          <Text style={styles.toggleDescription}>
+            Automatically share completed rides with nearby cyclists.
+          </Text>
+        </View>
+        <Switch
+          value={autoShare}
+          onValueChange={(value) => updateProfile.mutate({ autoShareRides: value })}
+          trackColor={{ true: mobileTheme.colors.brand, false: '#3f3f46' }}
+        />
+      </View>
+      <View style={styles.toggleRow}>
+        <View style={styles.toggleCopy}>
+          <Text style={styles.toggleLabel}>Trim route endpoints</Text>
+          <Text style={styles.toggleDescription}>
+            Remove ~200m from start and end of shared routes for privacy.
+          </Text>
+        </View>
+        <Switch
+          value={trimEndpoints}
+          onValueChange={(value) => updateProfile.mutate({ trimRouteEndpoints: value })}
+          trackColor={{ true: mobileTheme.colors.brand, false: '#3f3f46' }}
+        />
+      </View>
+    </StatusCard>
   );
 }
 
@@ -199,5 +252,26 @@ const styles = StyleSheet.create({
   },
   tileBadgeLabelAccent: {
     color: mobileTheme.colors.brand,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 6,
+  },
+  toggleCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  toggleLabel: {
+    color: mobileTheme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  toggleDescription: {
+    color: mobileTheme.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
