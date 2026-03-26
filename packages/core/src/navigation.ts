@@ -52,6 +52,7 @@ export const createNavigationSession = (
   lastApproachAnnouncementStepId: null,
   offRouteSince: null,
   lastRerouteAt: null,
+  gpsBreadcrumbs: [],
 });
 
 export const setSessionMute = (
@@ -172,6 +173,7 @@ export const resetNavigationSession = (): NavigationSession => ({
   lastApproachAnnouncementStepId: null,
   offRouteSince: null,
   lastRerouteAt: null,
+  gpsBreadcrumbs: [],
 });
 
 export const getAppStateFromSession = (session: NavigationSession | null): AppState => {

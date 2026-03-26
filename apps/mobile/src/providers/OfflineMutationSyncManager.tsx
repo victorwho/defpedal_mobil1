@@ -1,7 +1,7 @@
 import type { NavigationFeedbackRequest, QueuedMutation } from '@defensivepedal/core';
 import { useEffect, useRef } from 'react';
 
-import type { QueuedMutationPayloadByType, QueuedTripEndPayload } from '../lib/offlineQueue';
+import type { QueuedMutationPayloadByType, QueuedTripEndPayload, QueuedTripTrackPayload } from '../lib/offlineQueue';
 import { mobileApi } from '../lib/api';
 import { mobileEnv } from '../lib/env';
 import { telemetry } from '../lib/telemetry';
@@ -29,7 +29,7 @@ const isMutationReady = (
   mutation: QueuedMutation,
   tripServerIds: Record<string, string>,
 ): boolean => {
-  if (mutation.type === 'trip_end') {
+  if (mutation.type === 'trip_end' || mutation.type === 'trip_track') {
     return (
       getResolvedTripId(
         mutation.payload as QueuedTripEndPayload,
@@ -63,6 +63,19 @@ const submitQueuedMutation = async (
       }
 
       return mobileApi.endTrip({
+        ...payload,
+        tripId,
+      });
+    }
+    case 'trip_track': {
+      const payload = mutation.payload as QueuedTripTrackPayload;
+      const tripId = getResolvedTripId(payload, tripServerIds);
+
+      if (!tripId) {
+        return null;
+      }
+
+      return mobileApi.saveTripTrack({
         ...payload,
         tripId,
       });

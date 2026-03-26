@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
+import { Button } from '../src/design-system/atoms/Button';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { brandColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
@@ -18,11 +19,13 @@ export default function HistoryScreen() {
     <View style={styles.root}>
       <View style={styles.content}>
         <Screen title="Ride History" eyebrow="Defensive Pedal" subtitle="Your past rides">
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Coming soon</Text>
-            <Text style={styles.placeholderSub}>
-              Your ride history will appear here once this feature is ready.
+          <View style={styles.section}>
+            <Text style={styles.sectionText}>
+              View all your completed rides, distances, and routes on a map.
             </Text>
+            <Button variant="primary" size="md" onPress={() => router.push('/trips')}>
+              View My Trips
+            </Button>
           </View>
         </Screen>
       </View>
@@ -34,22 +37,16 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brandColors.bgDeep },
   content: { flex: 1 },
-  placeholder: {
+  section: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: space[10],
-    gap: space[2],
+    paddingVertical: space[6],
+    gap: space[4],
   },
-  placeholderText: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 18,
-  },
-  placeholderSub: {
+  sectionText: {
     ...textBase,
     color: brandColors.textSecondary,
     textAlign: 'center',
-    paddingHorizontal: space[6],
+    paddingHorizontal: space[4],
   },
 });

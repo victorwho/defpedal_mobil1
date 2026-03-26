@@ -34,6 +34,12 @@ type RouteMapProps = {
   fullBleed?: boolean;
   showRouteOverlay?: boolean;
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
+  /** GPS trail line (actual ride path) — rendered as a blue line */
+  trailCoordinates?: readonly [number, number][];
+  /** Planned route line — rendered in the specified color */
+  plannedRouteCoordinates?: readonly [number, number][];
+  /** Color for the planned route line (default: green) */
+  plannedRouteColor?: string;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
@@ -77,6 +83,9 @@ export const RouteMap = ({
   fullBleed = false,
   showRouteOverlay = true,
   bicycleParkingLocations = [],
+  trailCoordinates,
+  plannedRouteCoordinates,
+  plannedRouteColor = safetyColors.safe,
   containerStyle,
 }: RouteMapProps) => {
   const decodedRoutes = useMemo<DecodedRoute[]>(
@@ -147,6 +156,46 @@ export const RouteMap = ({
     [bicycleParkingLocations],
   );
 
+  const trailFeatureCollection = useMemo(
+    () =>
+      trailCoordinates && trailCoordinates.length >= 2
+        ? {
+            type: 'FeatureCollection' as const,
+            features: [
+              {
+                type: 'Feature' as const,
+                properties: {},
+                geometry: {
+                  type: 'LineString' as const,
+                  coordinates: trailCoordinates,
+                },
+              },
+            ],
+          }
+        : null,
+    [trailCoordinates],
+  );
+
+  const plannedRouteFeatureCollection = useMemo(
+    () =>
+      plannedRouteCoordinates && plannedRouteCoordinates.length >= 2
+        ? {
+            type: 'FeatureCollection' as const,
+            features: [
+              {
+                type: 'Feature' as const,
+                properties: {},
+                geometry: {
+                  type: 'LineString' as const,
+                  coordinates: plannedRouteCoordinates,
+                },
+              },
+            ],
+          }
+        : null,
+    [plannedRouteCoordinates],
+  );
+
   const markerFeatureCollection = useMemo(() => {
     const fallbackOrigin =
       origin ??
@@ -205,10 +254,17 @@ export const RouteMap = ({
     };
   }, [offRouteDetails]);
 
+  const trailMidpoint = useMemo<[number, number] | null>(() => {
+    if (!trailCoordinates || trailCoordinates.length < 2) return null;
+    const mid = trailCoordinates[Math.floor(trailCoordinates.length / 2)];
+    return mid ?? null;
+  }, [trailCoordinates]);
+
   const cameraCoordinate =
     followUser && userLocation
       ? ([userLocation.lon, userLocation.lat] as [number, number])
       : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
+        trailMidpoint ??
         (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
         (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
@@ -256,6 +312,36 @@ export const RouteMap = ({
           animationMode="easeTo"
           animationDuration={600}
         />
+
+        {plannedRouteFeatureCollection ? (
+          <Mapbox.ShapeSource id="history-planned-route" shape={plannedRouteFeatureCollection}>
+            <Mapbox.LineLayer
+              id="history-planned-route-layer"
+              style={{
+                lineColor: plannedRouteColor,
+                lineWidth: 4,
+                lineOpacity: 0.7,
+                lineJoin: 'round',
+                lineCap: 'round',
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {trailFeatureCollection ? (
+          <Mapbox.ShapeSource id="history-trail" shape={trailFeatureCollection}>
+            <Mapbox.LineLayer
+              id="history-trail-layer"
+              style={{
+                lineColor: '#2196F3',
+                lineWidth: 4,
+                lineOpacity: 0.9,
+                lineJoin: 'round',
+                lineCap: 'round',
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
 
         {routeFeatureCollection.features.length > 0 ? (
           <Mapbox.ShapeSource id="route-alternatives" shape={routeFeatureCollection}>

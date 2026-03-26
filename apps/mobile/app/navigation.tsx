@@ -60,6 +60,7 @@ export default function NavigationScreen() {
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
   const navigationSession = useAppStore((state) => state.navigationSession);
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
+  const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
   const updateNavigationProgress = useAppStore((state) => state.updateNavigationProgress);
   const markApproachAnnouncement = useAppStore((state) => state.markApproachAnnouncement);
   const recordNavigationReroute = useAppStore((state) => state.recordNavigationReroute);
@@ -177,14 +178,32 @@ export default function NavigationScreen() {
       return;
     }
 
+    const endedAt = new Date().toISOString();
+
     enqueueMutation('trip_end', {
       clientTripId: activeTripClientId,
-      endedAt: new Date().toISOString(),
+      endedAt,
       reason,
     });
+
+    // Queue GPS trail + route recording
+    if (navigationSession && selectedRoute) {
+      enqueueMutation('trip_track', {
+        clientTripId: activeTripClientId,
+        routingMode: (routePreview?.selectedMode as 'safe' | 'fast') ?? 'fast',
+        plannedRoutePolyline6: selectedRoute.geometryPolyline6,
+        plannedRouteDistanceMeters: selectedRoute.distanceMeters,
+        gpsBreadcrumbs: navigationSession.gpsBreadcrumbs,
+        endReason: reason,
+        startedAt: navigationSession.startedAt,
+        endedAt,
+      });
+    }
+
     telemetry.capture('trip_end_queued', {
       reason,
       signed_in: Boolean(user),
+      breadcrumbs: navigationSession?.gpsBreadcrumbs.length ?? 0,
     });
   };
 
@@ -338,6 +357,7 @@ export default function NavigationScreen() {
     const progress = getNavigationProgress(selectedRoute, session, locationState.sample.coordinate);
 
     updateNavigationProgress(locationState.sample, progress);
+    appendGpsBreadcrumb(locationState.sample);
 
     const activeStep = selectedRoute.steps[progress.currentStepIndex] ?? null;
 
@@ -364,6 +384,7 @@ export default function NavigationScreen() {
   }, [
     activeTripClientId,
     advanceNavigation,
+    appendGpsBreadcrumb,
     enqueueMutation,
     finishNavigation,
     hasQueuedTripEnd,

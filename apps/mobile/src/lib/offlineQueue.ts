@@ -5,9 +5,14 @@ import type {
   QueuedMutationType,
   TripEndRequest,
   TripStartRequest,
+  TripTrackRequest,
 } from '@defensivepedal/core';
 
 export type QueuedTripEndPayload = Omit<TripEndRequest, 'tripId'> & {
+  tripId?: string;
+};
+
+export type QueuedTripTrackPayload = Omit<TripTrackRequest, 'tripId'> & {
   tripId?: string;
 };
 
@@ -15,6 +20,7 @@ export type QueuedMutationPayloadByType = {
   hazard: HazardReportRequest;
   trip_start: TripStartRequest;
   trip_end: QueuedTripEndPayload;
+  trip_track: QueuedTripTrackPayload;
   feedback: NavigationFeedbackRequest;
 };
 

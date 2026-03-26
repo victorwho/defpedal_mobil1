@@ -228,6 +228,31 @@ export interface TripEndRequest {
   reason: 'completed' | 'stopped';
 }
 
+export interface TripTrackRequest {
+  tripId: string;
+  clientTripId: string;
+  routingMode: 'safe' | 'fast';
+  plannedRoutePolyline6?: string;
+  plannedRouteDistanceMeters?: number;
+  gpsBreadcrumbs: GpsBreadcrumb[];
+  endReason: 'completed' | 'stopped' | 'app_killed';
+  startedAt: string;
+  endedAt: string;
+}
+
+export interface TripHistoryItem {
+  readonly id: string;
+  readonly tripId: string;
+  readonly routingMode: 'safe' | 'fast';
+  readonly plannedRoutePolyline6?: string;
+  readonly plannedRouteDistanceMeters?: number;
+  readonly gpsBreadcrumbs: ReadonlyArray<{ lat: number; lon: number }>;
+  readonly endReason: 'completed' | 'stopped' | 'app_killed' | 'in_progress';
+  readonly startedAt: string;
+  readonly endedAt: string | null;
+  readonly distanceMeters?: number;
+}
+
 export interface TripEndResponse {
   clientTripId: string;
   tripId: string;
@@ -259,6 +284,15 @@ export interface NavigationLocationSample {
   timestamp: number;
 }
 
+export interface GpsBreadcrumb {
+  readonly lat: number;
+  readonly lon: number;
+  readonly ts: number;
+  readonly acc: number | null;
+  readonly spd: number | null;
+  readonly hdg: number | null;
+}
+
 export interface NavigationSession {
   sessionId: string;
   routeId: string;
@@ -280,6 +314,7 @@ export interface NavigationSession {
   rerouteEligible?: boolean;
   offRouteSince?: string | null;
   lastRerouteAt?: string | null;
+  gpsBreadcrumbs: GpsBreadcrumb[];
 }
 
 export interface OfflineRegion {
@@ -298,7 +333,7 @@ export interface OfflineRegion {
   error?: string | null;
 }
 
-export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'feedback';
+export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'feedback';
 export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed';
 
 export interface QueuedMutation {

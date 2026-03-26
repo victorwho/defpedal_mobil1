@@ -15,6 +15,8 @@ import { createRedisSharedStore } from './redisStore';
 import { fetchRiskSegments } from './risk';
 import {
   finishTripRecord,
+  getTripHistory,
+  saveTripTrack,
   startTripRecord,
   submitHazardReport,
   submitNavigationFeedback,
@@ -34,6 +36,8 @@ export type MobileApiDependencies = {
   submitHazardReport: typeof submitHazardReport;
   startTripRecord: typeof startTripRecord;
   finishTripRecord: typeof finishTripRecord;
+  saveTripTrack: typeof saveTripTrack;
+  getTripHistory: typeof getTripHistory;
   submitNavigationFeedback: typeof submitNavigationFeedback;
   routeResponseCache: RouteResponseCache;
   rateLimiter: RateLimiter;
@@ -76,6 +80,8 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     submitHazardReport,
     startTripRecord,
     finishTripRecord,
+    saveTripTrack,
+    getTripHistory,
     submitNavigationFeedback,
     routeResponseCache: sharedStore.routeResponseCache,
     rateLimiter: sharedStore.rateLimiter,

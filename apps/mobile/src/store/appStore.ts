@@ -90,6 +90,7 @@ type AppStore = {
   markApproachAnnouncement: (stepId: string | null) => void;
   recordNavigationReroute: (requestedAt?: string) => void;
   syncNavigationRoute: (routeId: string) => void;
+  appendGpsBreadcrumb: (sample: NavigationLocationSample) => void;
   finishNavigation: () => void;
   setMuted: (isMuted: boolean) => void;
   setFollowing: (isFollowing: boolean) => void;
@@ -218,6 +219,29 @@ export const useAppStore = create<AppStore>()(
             ? syncSessionToRoute(state.navigationSession, routeId)
             : state.navigationSession,
         })),
+      appendGpsBreadcrumb: (sample) =>
+        set((state) => {
+          if (!state.navigationSession) return state;
+          const crumbs = state.navigationSession.gpsBreadcrumbs;
+          // Cap at 2000 points to bound memory
+          if (crumbs.length >= 2000) return state;
+          return {
+            navigationSession: {
+              ...state.navigationSession,
+              gpsBreadcrumbs: [
+                ...crumbs,
+                {
+                  lat: sample.coordinate.lat,
+                  lon: sample.coordinate.lon,
+                  ts: sample.timestamp,
+                  acc: sample.accuracyMeters ?? null,
+                  spd: sample.speedMetersPerSecond ?? null,
+                  hdg: sample.heading ?? null,
+                },
+              ],
+            },
+          };
+        }),
       finishNavigation: () =>
         set((state) => ({
           navigationSession: state.navigationSession

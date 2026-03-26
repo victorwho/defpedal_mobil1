@@ -4,8 +4,10 @@ import type {
   NavigationFeedbackRequest,
   TripEndRequest,
   TripEndResponse,
+  TripHistoryItem,
   TripStartRequest,
   TripStartResponse,
+  TripTrackRequest,
   WriteAckResponse,
 } from '@defensivepedal/core';
 
@@ -213,4 +215,64 @@ export const submitNavigationFeedback = async (
   return {
     acceptedAt: new Date().toISOString(),
   };
+};
+
+export const saveTripTrack = async (
+  request: TripTrackRequest,
+  userId: string,
+): Promise<WriteAckResponse> => {
+  if (supabaseAdmin) {
+    const { error } = await supabaseAdmin.from('trip_tracks').insert([
+      {
+        trip_id: request.tripId,
+        user_id: userId,
+        routing_mode: request.routingMode,
+        planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
+        planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
+        gps_trail: request.gpsBreadcrumbs,
+        end_reason: request.endReason,
+        started_at: request.startedAt,
+        ended_at: request.endedAt,
+      },
+    ]);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  }
+
+  return {
+    acceptedAt: new Date().toISOString(),
+  };
+};
+
+export const getTripHistory = async (
+  userId: string,
+): Promise<TripHistoryItem[]> => {
+  if (!supabaseAdmin) return [];
+
+  const { data, error } = await supabaseAdmin
+    .from('trip_tracks')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, gps_trail, end_reason, started_at, ended_at')
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    tripId: row.trip_id as string,
+    routingMode: row.routing_mode as 'safe' | 'fast',
+    plannedRoutePolyline6: (row.planned_route_polyline6 as string) ?? undefined,
+    plannedRouteDistanceMeters: (row.planned_route_distance_meters as number) ?? undefined,
+    gpsBreadcrumbs: ((row.gps_trail as Array<{ lat: number; lon: number }>) ?? []).map(
+      (pt) => ({ lat: pt.lat, lon: pt.lon }),
+    ),
+    endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
+    startedAt: row.started_at as string,
+    endedAt: (row.ended_at as string) ?? null,
+  }));
 };

@@ -455,6 +455,71 @@ export const buildV1Routes = (
       },
     );
 
+    app.post(
+      '/trips/track',
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
+
+        try {
+          const body = request.body as {
+            tripId: string;
+            clientTripId: string;
+            routingMode: string;
+            plannedRoutePolyline6?: string;
+            plannedRouteDistanceMeters?: number;
+            gpsBreadcrumbs: Array<{ lat: number; lon: number; ts: number; acc: number | null; spd: number | null; hdg: number | null }>;
+            endReason: string;
+            startedAt: string;
+            endedAt: string;
+          };
+
+          return await dependencies.saveTripTrack(
+            {
+              tripId: body.tripId,
+              clientTripId: body.clientTripId,
+              routingMode: body.routingMode as 'safe' | 'fast',
+              plannedRoutePolyline6: body.plannedRoutePolyline6,
+              plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
+              gpsBreadcrumbs: body.gpsBreadcrumbs,
+              endReason: body.endReason as 'completed' | 'stopped' | 'app_killed',
+              startedAt: body.startedAt,
+              endedAt: body.endedAt,
+            },
+            user.id,
+          );
+        } catch (error) {
+          throw new HttpError('Trip track save failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+      },
+    );
+
+    app.get(
+      '/trips/history',
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
+
+        try {
+          return await dependencies.getTripHistory(user.id);
+        } catch (error) {
+          throw new HttpError('Trip history fetch failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+      },
+    );
+
     app.post<{ Body: HazardReportBody; Reply: HazardReportResponse | ErrorResponse }>(
       '/hazards',
       {
