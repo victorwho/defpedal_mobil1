@@ -6,7 +6,7 @@ COPY apps/mobile/package.json apps/mobile/package.json
 COPY packages packages
 COPY services/mobile-api/package.json services/mobile-api/package.json
 
-RUN npm install --workspaces --include-workspace-root=false
+RUN npm install --workspaces --include-workspace-root=false --legacy-peer-deps
 
 COPY tsconfig.json tsconfig.json
 COPY services/mobile-api services/mobile-api

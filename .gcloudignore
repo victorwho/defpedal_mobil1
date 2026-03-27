@@ -1,0 +1,10 @@
+.git
+.claude
+node_modules
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.expo
+dist
+output
+tmp
+*.apk

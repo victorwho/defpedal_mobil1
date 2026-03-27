@@ -323,12 +323,32 @@ export const RouteMap = ({
   return (
     <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
       <Mapbox.MapView style={StyleSheet.absoluteFill} styleURL={Mapbox.StyleURL.Outdoors}>
-        <Mapbox.Camera
-          zoomLevel={followUser && userLocation ? 14 : 12.5}
-          centerCoordinate={cameraCoordinate}
-          animationMode="easeTo"
-          animationDuration={600}
-        />
+        {followUser && userLocation ? (
+          <Mapbox.Camera
+            followUserLocation
+            followUserMode="course"
+            followZoomLevel={16}
+            followPitch={45}
+            animationMode="easeTo"
+            animationDuration={300}
+          />
+        ) : (
+          <Mapbox.Camera
+            zoomLevel={12.5}
+            centerCoordinate={cameraCoordinate}
+            pitch={0}
+            animationMode="easeTo"
+            animationDuration={600}
+          />
+        )}
+
+        {followUser && userLocation ? (
+          <Mapbox.LocationPuck
+            puckBearingEnabled
+            puckBearing="course"
+            visible
+          />
+        ) : null}
 
         {plannedRouteFeatureCollection ? (
           <Mapbox.ShapeSource id="history-planned-route" shape={plannedRouteFeatureCollection}>

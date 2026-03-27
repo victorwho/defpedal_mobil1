@@ -109,13 +109,14 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
-            <View style={styles.userCard}>
+            <Pressable style={styles.userCard} onPress={() => router.push('/auth')}>
               <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>Guest</Text>
-                <Text style={styles.userSub}>Not signed in</Text>
+                <Text style={styles.userSub}>Tap to sign in</Text>
               </View>
-            </View>
+              <Ionicons name="log-in-outline" size={24} color={brandColors.accent} />
+            </Pressable>
           )}
 
           <View style={styles.section}>

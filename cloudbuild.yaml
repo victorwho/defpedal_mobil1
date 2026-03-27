@@ -1,0 +1,12 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest'
+      - '-f'
+      - 'services/mobile-api/Dockerfile'
+      - '.'
+images:
+  - 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest'
+timeout: '600s'
