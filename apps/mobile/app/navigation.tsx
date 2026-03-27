@@ -226,6 +226,7 @@ export default function NavigationScreen() {
         elevationGainMeters: selectedRoute.totalClimbMeters,
         geometryPolyline6: selectedRoute.geometryPolyline6,
         safetyTags: [],
+        startCoordinate: { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon },
       });
     }
 

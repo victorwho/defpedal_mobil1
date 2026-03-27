@@ -14,7 +14,7 @@ import { darkTheme, safetyColors, gray } from '../tokens/colors';
 // Types
 // ---------------------------------------------------------------------------
 
-type IconButtonVariant = 'default' | 'accent' | 'danger';
+type IconButtonVariant = 'default' | 'accent' | 'danger' | 'secondary';
 type IconButtonSize = 'sm' | 'md';
 
 export interface IconButtonProps {
@@ -34,6 +34,7 @@ const variantColor: Record<IconButtonVariant, string> = {
   default: gray[400],
   accent: darkTheme.accent,
   danger: safetyColors.danger,
+  secondary: gray[300],
 };
 
 const sizeMap: Record<IconButtonSize, number> = {

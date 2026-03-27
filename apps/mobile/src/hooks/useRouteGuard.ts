@@ -45,7 +45,7 @@ export const useRouteGuard = (rule: RouteGuardRule): boolean => {
   useEffect(() => {
     if (!effectiveAllow && !redirectedRef.current) {
       redirectedRef.current = true;
-      router.replace(rule.fallback ?? '/route-planning');
+      router.replace((rule.fallback ?? '/route-planning') as any);
     }
   }, [effectiveAllow, rule.fallback]);
 

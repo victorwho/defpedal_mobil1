@@ -52,7 +52,7 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
     case 'stopped':
       return { name: 'close-circle', color: safetyColors.caution };
     case 'app_killed':
-      return { name: 'warning', color: safetyColors.warning };
+      return { name: 'warning', color: safetyColors.danger };
     default:
       return { name: 'ellipsis-horizontal', color: gray[500] };
   }

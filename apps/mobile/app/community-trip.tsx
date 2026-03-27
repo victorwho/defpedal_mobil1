@@ -31,7 +31,7 @@ export default function CommunityTripScreen() {
   const [commentText, setCommentText] = useState('');
 
   const location = useCurrentLocation();
-  const feedQuery = useFeedQuery(location?.lat ?? null, location?.lon ?? null);
+  const feedQuery = useFeedQuery(location?.location?.lat ?? null, location?.location?.lon ?? null);
   const likeToggle = useLikeToggle();
   const commentsQuery = useComments(id ?? null);
   const postComment = usePostComment();

@@ -184,7 +184,7 @@ export const RouteMap = ({
                 properties: {},
                 geometry: {
                   type: 'LineString' as const,
-                  coordinates: trailCoordinates,
+                  coordinates: trailCoordinates as [number, number][],
                 },
               },
             ],
@@ -204,7 +204,7 @@ export const RouteMap = ({
                 properties: {},
                 geometry: {
                   type: 'LineString' as const,
-                  coordinates: plannedRouteCoordinates,
+                  coordinates: plannedRouteCoordinates as [number, number][],
                 },
               },
             ],

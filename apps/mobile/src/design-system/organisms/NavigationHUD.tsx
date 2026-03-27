@@ -304,6 +304,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4],
     paddingVertical: space[2],
   },
+  thenStripStandalone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    borderRadius: radii.xl,
+    backgroundColor: darkTheme.bgPrimary,
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+  },
   thenPrefix: {
     fontFamily: fontFamily.body.bold,
     fontSize: 12,

@@ -41,3 +41,4 @@ ios
 *.njsproj
 *.sln
 *.sw?
+.claude/worktrees/

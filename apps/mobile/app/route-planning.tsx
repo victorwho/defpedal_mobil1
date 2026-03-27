@@ -242,13 +242,6 @@ export default function RoutePlanningScreen() {
           bicycleParkingLocations={parkingLocations}
         />
       }
-      rightOverlay={
-        <VoiceGuidanceButton
-          enabled={voiceGuidanceEnabled}
-          onPress={() => setVoiceGuidanceEnabled(!voiceGuidanceEnabled)}
-          compact
-        />
-      }
       topOverlay={
         <View style={styles.topContainer}>
           {/* Brand logo */}
