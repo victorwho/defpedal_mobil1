@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   PanResponder,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -18,7 +19,7 @@ import { space } from '../design-system/tokens/spacing';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const COLLAPSED_HEIGHT = 48; // just handle + peek
-const EXPANDED_RATIO = 0.7; // 70% of screen
+const EXPANDED_RATIO = 0.65; // 65% of screen
 const EXPANDED_HEIGHT = SCREEN_HEIGHT * EXPANDED_RATIO;
 const SNAP_THRESHOLD = 80; // drag distance to trigger snap
 
@@ -44,60 +45,54 @@ const CollapsibleSheet = ({
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
   const effectiveCollapsed = COLLAPSED_HEIGHT;
   const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
-  const dragStartHeight = useRef(effectiveExpanded);
+  const expandedRef = useRef(true);
+
+  const snapTo = (expand: boolean) => {
+    expandedRef.current = expand;
+    setExpanded(expand);
+    Animated.spring(sheetHeight, {
+      toValue: expand ? effectiveExpanded : effectiveCollapsed,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 10,
+    }).start();
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5,
-      onPanResponderGrant: () => {
-        dragStartHeight.current = expanded ? effectiveExpanded : effectiveCollapsed;
-      },
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
       onPanResponderMove: (_, gesture) => {
+        const startHeight = expandedRef.current ? effectiveExpanded : effectiveCollapsed;
         const newHeight = Math.max(
           effectiveCollapsed,
-          Math.min(effectiveExpanded, dragStartHeight.current - gesture.dy),
+          Math.min(effectiveExpanded, startHeight - gesture.dy),
         );
         sheetHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_, gesture) => {
-        const shouldExpand = expanded
-          ? gesture.dy < SNAP_THRESHOLD
-          : gesture.dy < -SNAP_THRESHOLD;
-
-        const target = shouldExpand ? effectiveExpanded : effectiveCollapsed;
-        setExpanded(shouldExpand);
-        Animated.spring(sheetHeight, {
-          toValue: target,
-          useNativeDriver: false,
-          tension: 60,
-          friction: 12,
-        }).start();
+        // Simple: drag down > threshold = collapse, drag up > threshold = expand
+        if (gesture.dy > SNAP_THRESHOLD) {
+          snapTo(false);
+        } else if (gesture.dy < -SNAP_THRESHOLD) {
+          snapTo(true);
+        } else {
+          // Snap back to current state
+          snapTo(expandedRef.current);
+        }
       },
     }),
   ).current;
-
-  const handleTap = () => {
-    const nextExpanded = !expanded;
-    const target = nextExpanded ? effectiveExpanded : effectiveCollapsed;
-    setExpanded(nextExpanded);
-    Animated.spring(sheetHeight, {
-      toValue: target,
-      useNativeDriver: false,
-      tension: 60,
-      friction: 12,
-    }).start();
-  };
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.bottomDock}
     >
-      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, marginBottom: bottomInset }]}>
-        <View {...panResponder.panHandlers} onTouchEnd={handleTap}>
+      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight }]} {...panResponder.panHandlers}>
+        <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
           <View style={styles.handle} />
-        </View>
+        </Pressable>
         {expanded ? (
           <ScrollView
             contentContainerStyle={styles.content}
@@ -107,8 +102,12 @@ const CollapsibleSheet = ({
             {children}
           </ScrollView>
         ) : null}
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
       </Animated.View>
+      {footer ? (
+        <View style={[styles.fixedFooter, { paddingBottom: bottomInset + space[2] }]}>
+          {footer}
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 };
@@ -134,7 +133,7 @@ export const MapStageScreen = ({
         {useBottomSheet ? (
           <CollapsibleSheet footer={footer} bottomInset={insets.bottom}>{children}</CollapsibleSheet>
         ) : footer ? (
-          <View style={[styles.bottomFooter, { paddingBottom: insets.bottom + space[3] }]} pointerEvents="box-none">
+          <View style={[styles.bottomFooter, { paddingBottom: space[2] }]} pointerEvents="box-none">
             {footer}
           </View>
         ) : null}
@@ -158,7 +157,7 @@ const styles = StyleSheet.create({
   },
   rightOverlay: {
     position: 'absolute',
-    top: '34%',
+    top: '50%',
     right: space[4],
     zIndex: 3,
     gap: space[3],
@@ -177,14 +176,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(11, 16, 32, 0.96)',
     overflow: 'hidden',
   },
+  handleTouchArea: {
+    alignItems: 'center',
+    paddingVertical: space[3],
+  },
   handle: {
-    alignSelf: 'center',
     width: 54,
     height: 6,
     borderRadius: radii.full,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    marginTop: space[3],
-    marginBottom: space[1] + space[0.5],
   },
   content: {
     paddingHorizontal: space[4] + space[0.5],
@@ -199,6 +199,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4] + space[0.5],
     paddingTop: space[3] + space[0.5],
     paddingBottom: space[4] + space[0.5],
+    gap: space[2] + space[0.5],
+  },
+  fixedFooter: {
+    backgroundColor: 'rgba(11, 16, 32, 0.96)',
+    paddingHorizontal: space[4] + space[0.5],
+    paddingTop: space[3],
     gap: space[2] + space[0.5],
   },
   bottomFooter: {

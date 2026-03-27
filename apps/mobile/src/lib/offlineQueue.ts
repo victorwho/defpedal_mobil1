@@ -3,6 +3,7 @@ import type {
   NavigationFeedbackRequest,
   QueuedMutation,
   QueuedMutationType,
+  ShareTripRequest,
   TripEndRequest,
   TripStartRequest,
   TripTrackRequest,
@@ -21,6 +22,7 @@ export type QueuedMutationPayloadByType = {
   trip_start: TripStartRequest;
   trip_end: QueuedTripEndPayload;
   trip_track: QueuedTripTrackPayload;
+  trip_share: ShareTripRequest;
   feedback: NavigationFeedbackRequest;
 };
 

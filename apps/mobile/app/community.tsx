@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { Button } from '../src/design-system/atoms/Button';
 import { brandColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
@@ -19,10 +20,17 @@ export default function CommunityScreen() {
       <View style={styles.content}>
         <Screen title="Community" eyebrow="Defensive Pedal" subtitle="Connect with fellow cyclists">
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Coming soon</Text>
+            <Text style={styles.placeholderText}>Cyclist Community Feed</Text>
             <Text style={styles.placeholderSub}>
-              The cyclist community hub will be available here soon.
+              See rides shared by cyclists in your area, give likes, and leave comments.
             </Text>
+            <Button
+              variant="primary"
+              size="lg"
+              onPress={() => router.push('/community-feed')}
+            >
+              View Community Feed
+            </Button>
           </View>
         </Screen>
       </View>
@@ -38,7 +46,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: space[10],
-    gap: space[2],
+    gap: space[4],
   },
   placeholderText: {
     ...textBase,

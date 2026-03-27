@@ -72,6 +72,7 @@ export default function NavigationScreen() {
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const activeTripClientId = useAppStore((state) => state.activeTripClientId);
   const queuedMutations = useAppStore((state) => state.queuedMutations);
+  const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
@@ -197,6 +198,22 @@ export default function NavigationScreen() {
         endReason: reason,
         startedAt: navigationSession.startedAt,
         endedAt,
+      });
+    }
+
+    // Auto-share to community feed if enabled
+    if (shareTripsPublicly && navigationSession && selectedRoute) {
+      const durationSeconds = Math.round(
+        (new Date(endedAt).getTime() - new Date(navigationSession.startedAt).getTime()) / 1000,
+      );
+      enqueueMutation('trip_share', {
+        startLocationText: routeRequest.origin.lat.toFixed(4) + ', ' + routeRequest.origin.lon.toFixed(4),
+        destinationText: routeRequest.destination.lat.toFixed(4) + ', ' + routeRequest.destination.lon.toFixed(4),
+        distanceMeters: selectedRoute.distanceMeters,
+        durationSeconds,
+        elevationGainMeters: selectedRoute.totalClimbMeters,
+        geometryPolyline6: selectedRoute.geometryPolyline6,
+        safetyTags: [],
       });
     }
 

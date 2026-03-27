@@ -1,0 +1,266 @@
+import type { FeedItem, RouteOption } from '@defensivepedal/core';
+import { formatDistance, formatDuration } from '@defensivepedal/core';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { mobileTheme } from '../lib/theme';
+import { LikeButton } from './LikeButton';
+import { RouteMap } from './RouteMap';
+import { SafetyBadge } from './SafetyBadge';
+import { SafetyTagChips } from './SafetyTagChips';
+
+type FeedCardProps = {
+  item: FeedItem;
+  isVisible: boolean;
+  onLike: (id: string, liked: boolean) => void;
+  onPress: (id: string) => void;
+};
+
+const formatRelativeTime = (isoDate: string): string => {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(isoDate).toLocaleDateString();
+};
+
+const buildSyntheticRoute = (item: FeedItem): RouteOption => ({
+  id: item.id,
+  source: 'custom_osrm',
+  routingEngineVersion: '',
+  routingProfileVersion: '',
+  mapDataVersion: '',
+  riskModelVersion: '',
+  geometryPolyline6: item.geometryPolyline6,
+  distanceMeters: item.distanceMeters,
+  durationSeconds: item.durationSeconds,
+  adjustedDurationSeconds: item.durationSeconds,
+  totalClimbMeters: item.elevationGainMeters,
+  steps: [],
+  riskSegments: [],
+  warnings: [],
+});
+
+export const FeedCard = ({ item, isVisible, onLike, onPress }: FeedCardProps) => {
+  const [expanded, setExpanded] = useState(false);
+  const syntheticRoute = buildSyntheticRoute(item);
+  const initials = item.user.displayName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const handlePress = useCallback(() => onPress(item.id), [item.id, onPress]);
+  const handleLike = useCallback(() => onLike(item.id, item.likedByMe), [item.id, item.likedByMe, onLike]);
+
+  return (
+    <Pressable style={styles.card} onPress={handlePress}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initials}</Text>
+        </View>
+        <View style={styles.headerText}>
+          <Text style={styles.displayName} numberOfLines={1}>
+            {item.user.displayName}
+          </Text>
+          <Text style={styles.timestamp}>{formatRelativeTime(item.sharedAt)}</Text>
+        </View>
+      </View>
+
+      {/* Title */}
+      <Text style={styles.title} numberOfLines={2}>
+        {item.title}
+      </Text>
+
+      {/* Map (lazy-loaded) */}
+      <View style={styles.mapContainer}>
+        {isVisible ? (
+          <RouteMap
+            routes={[syntheticRoute]}
+            selectedRouteId={item.id}
+            showRouteOverlay={false}
+            containerStyle={styles.mapInner}
+          />
+        ) : (
+          <View style={[styles.mapInner, styles.mapPlaceholder]}>
+            <Text style={styles.placeholderText}>Route map</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Safety badge + tags */}
+      <SafetyBadge rating={item.safetyRating} />
+      <SafetyTagChips tags={item.safetyTags} />
+
+      {/* Stats row */}
+      <View style={styles.statsRow}>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Distance</Text>
+          <Text style={styles.statValue}>{formatDistance(item.distanceMeters)}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.statLabel}>Duration</Text>
+          <Text style={styles.statValue}>{formatDuration(item.durationSeconds)}</Text>
+        </View>
+        {item.elevationGainMeters != null ? (
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>Climb</Text>
+            <Text style={styles.statValue}>{Math.round(item.elevationGainMeters)} m</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Note */}
+      {item.note ? (
+        <Pressable onPress={() => setExpanded(!expanded)}>
+          <Text style={styles.note} numberOfLines={expanded ? undefined : 2}>
+            {item.note}
+          </Text>
+          {!expanded && item.note.length > 100 ? (
+            <Text style={styles.readMore}>Read more</Text>
+          ) : null}
+        </Pressable>
+      ) : null}
+
+      {/* Action bar */}
+      <View style={styles.actionBar}>
+        <LikeButton liked={item.likedByMe} count={item.likeCount} onPress={handleLike} />
+        <Pressable style={styles.commentButton} onPress={handlePress}>
+          <Text style={styles.commentIcon}>{'\u{1F4AC}'}</Text>
+          <Text style={styles.commentCount}>
+            {item.commentCount > 0 ? item.commentCount : ''}
+          </Text>
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    borderRadius: mobileTheme.radii.lg,
+    borderWidth: 1,
+    borderColor: mobileTheme.colors.border,
+    backgroundColor: mobileTheme.colors.backgroundPanel,
+    padding: 16,
+    gap: 10,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: mobileTheme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  headerText: {
+    flex: 1,
+    gap: 1,
+  },
+  displayName: {
+    color: mobileTheme.colors.textOnDark,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  timestamp: {
+    color: mobileTheme.colors.textOnDarkMuted,
+    fontSize: 12,
+  },
+  title: {
+    color: mobileTheme.colors.brand,
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  mapContainer: {
+    borderRadius: mobileTheme.radii.md,
+    overflow: 'hidden',
+  },
+  mapInner: {
+    height: 180,
+    borderRadius: mobileTheme.radii.md,
+  },
+  mapPlaceholder: {
+    backgroundColor: mobileTheme.colors.backgroundPanelSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  placeholderText: {
+    color: mobileTheme.colors.textOnDarkMuted,
+    fontSize: 13,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  stat: {
+    flex: 1,
+    borderRadius: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 2,
+  },
+  statLabel: {
+    color: mobileTheme.colors.textOnDarkMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  statValue: {
+    color: mobileTheme.colors.textOnDark,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  note: {
+    color: mobileTheme.colors.textOnDarkMuted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  readMore: {
+    color: mobileTheme.colors.brand,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: mobileTheme.colors.border,
+    paddingTop: 8,
+  },
+  commentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  commentIcon: {
+    fontSize: 18,
+  },
+  commentCount: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: mobileTheme.colors.textOnDarkMuted,
+  },
+});

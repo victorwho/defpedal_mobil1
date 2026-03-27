@@ -1,4 +1,4 @@
-import type { NavigationFeedbackRequest, QueuedMutation } from '@defensivepedal/core';
+import type { NavigationFeedbackRequest, QueuedMutation, ShareTripRequest } from '@defensivepedal/core';
 import { useEffect, useRef } from 'react';
 
 import type { QueuedMutationPayloadByType, QueuedTripEndPayload, QueuedTripTrackPayload } from '../lib/offlineQueue';
@@ -79,6 +79,10 @@ const submitQueuedMutation = async (
         ...payload,
         tripId,
       });
+    }
+    case 'trip_share': {
+      const payload = mutation.payload as ShareTripRequest;
+      return mobileApi.shareTripToFeed(payload);
     }
     case 'feedback': {
       const payload = mutation.payload as QueuedMutationPayloadByType['feedback'];

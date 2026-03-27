@@ -71,6 +71,14 @@ type AppStore = {
   offlineRegions: OfflineRegion[];
   tripServerIds: Record<string, string>;
   activeTripClientId: string | null;
+  shareTripsPublicly: boolean;
+  bikeType: string | null;
+  cyclingFrequency: string | null;
+  avoidUnpaved: boolean;
+  setShareTripsPublicly: (enabled: boolean) => void;
+  setBikeType: (type: string | null) => void;
+  setCyclingFrequency: (frequency: string | null) => void;
+  setAvoidUnpaved: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
@@ -129,6 +137,18 @@ export const useAppStore = create<AppStore>()(
       offlineRegions: [],
       tripServerIds: {},
       activeTripClientId: null,
+      shareTripsPublicly: true,
+      bikeType: null,
+      cyclingFrequency: null,
+      avoidUnpaved: false,
+      setShareTripsPublicly: (enabled) =>
+        set(() => ({ shareTripsPublicly: enabled })),
+      setBikeType: (type) =>
+        set(() => ({ bikeType: type })),
+      setCyclingFrequency: (frequency) =>
+        set(() => ({ cyclingFrequency: frequency })),
+      setAvoidUnpaved: (enabled) =>
+        set(() => ({ avoidUnpaved: enabled })),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -431,6 +451,10 @@ export const useAppStore = create<AppStore>()(
         offlineRegions: state.offlineRegions,
         tripServerIds: state.tripServerIds,
         activeTripClientId: state.activeTripClientId,
+        shareTripsPublicly: state.shareTripsPublicly,
+        bikeType: state.bikeType,
+        cyclingFrequency: state.cyclingFrequency,
+        avoidUnpaved: state.avoidUnpaved,
       }),
     },
   ),

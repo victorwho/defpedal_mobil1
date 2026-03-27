@@ -63,6 +63,7 @@ export default function RoutePreviewScreen() {
   const startNavigation = useAppStore((state) => state.startNavigation);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
+  const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
@@ -70,9 +71,11 @@ export default function RoutePreviewScreen() {
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
 
+  const effectiveRequest = { ...routeRequest, avoidUnpaved };
+
   const previewQuery = useQuery({
-    queryKey: ['route-preview', routeRequest],
-    queryFn: () => mobileApi.previewRoute(routeRequest),
+    queryKey: ['route-preview', effectiveRequest],
+    queryFn: () => mobileApi.previewRoute(effectiveRequest),
     enabled: true,
   });
 
