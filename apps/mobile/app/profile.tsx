@@ -12,7 +12,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
-const BIKE_TYPES = ['Road bike', 'City bike', 'Mountain bike', 'E-bike', 'Recumbent'] as const;
+const BIKE_TYPES = ['Road bike', 'City bike', 'Mountain bike', 'E-bike', 'Recumbent', 'Other'] as const;
 
 const CYCLING_FREQUENCIES = [
   'Daily',

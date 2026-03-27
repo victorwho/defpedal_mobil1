@@ -1,4 +1,4 @@
-import type { Coordinate, RouteOption } from '@defensivepedal/core';
+import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../lib/bicycle-parking';
 import { decodePolyline } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
@@ -34,6 +34,7 @@ type RouteMapProps = {
   fullBleed?: boolean;
   showRouteOverlay?: boolean;
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
+  nearbyHazards?: readonly NearbyHazard[];
   /** GPS trail line (actual ride path) — rendered as a blue line */
   trailCoordinates?: readonly [number, number][];
   /** Planned route line — rendered in the specified color */
@@ -83,6 +84,7 @@ export const RouteMap = ({
   fullBleed = false,
   showRouteOverlay = true,
   bicycleParkingLocations = [],
+  nearbyHazards = [],
   trailCoordinates,
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
@@ -154,6 +156,21 @@ export const RouteMap = ({
       })),
     }),
     [bicycleParkingLocations],
+  );
+
+  const hazardFeatureCollection = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: nearbyHazards.map((h) => ({
+        type: 'Feature' as const,
+        properties: { id: h.id, type: h.hazardType },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [h.lon, h.lat] as [number, number],
+        },
+      })),
+    }),
+    [nearbyHazards],
   );
 
   const trailFeatureCollection = useMemo(
@@ -407,6 +424,31 @@ export const RouteMap = ({
               style={{
                 textField: 'P',
                 textSize: 10,
+                textColor: '#FFFFFF',
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {hazardFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource id="hazards" shape={hazardFeatureCollection}>
+            <Mapbox.CircleLayer
+              id="hazards-bg"
+              style={{
+                circleColor: '#FF6B00',
+                circleRadius: 9,
+                circleStrokeColor: '#FFFFFF',
+                circleStrokeWidth: 2,
+                circleOpacity: 0.9,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="hazards-label"
+              style={{
+                textField: '!',
+                textSize: 13,
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,

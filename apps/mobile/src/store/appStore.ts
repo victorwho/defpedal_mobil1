@@ -143,8 +143,14 @@ export const useAppStore = create<AppStore>()(
       avoidUnpaved: false,
       setShareTripsPublicly: (enabled) =>
         set(() => ({ shareTripsPublicly: enabled })),
-      setBikeType: (type) =>
-        set(() => ({ bikeType: type })),
+      setBikeType: (type) => {
+        const pavedPreferred = type === 'Road bike' || type === 'City bike' || type === 'Recumbent';
+        const unpavedPreferred = type === 'Mountain bike';
+        set((state) => ({
+          bikeType: type,
+          avoidUnpaved: pavedPreferred ? true : unpavedPreferred ? false : state.avoidUnpaved,
+        }));
+      },
       setCyclingFrequency: (frequency) =>
         set(() => ({ cyclingFrequency: frequency })),
       setAvoidUnpaved: (enabled) =>

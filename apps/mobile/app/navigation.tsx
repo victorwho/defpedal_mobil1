@@ -6,6 +6,7 @@ import {
   getNavigationProgress,
   getPreviewOrigin,
   computeRemainingClimb,
+  haversineDistance,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -23,6 +24,7 @@ import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -34,6 +36,7 @@ import { useAppStore } from '../src/store/appStore';
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 
+import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
@@ -80,7 +83,16 @@ export default function NavigationScreen() {
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
+  const { hazards: nearbyHazards } = useNearbyHazards(
+    locationState.sample?.coordinate ?? null,
+    Boolean(navigationSession),
+  );
   const introAnnouncementKeyRef = useRef<string | null>(null);
+  const dismissedHazardIdsRef = useRef<Set<string>>(new Set());
+  const [activeHazardAlert, setActiveHazardAlert] = useState<{
+    hazard: import('@defensivepedal/core').NearbyHazard;
+    distanceMeters: number;
+  } | null>(null);
 
   const selectedRoute =
     routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
@@ -334,6 +346,43 @@ export default function NavigationScreen() {
     };
   }, []);
 
+  // ── Hazard proximity detection ──
+  useEffect(() => {
+    const userCoord = locationState.sample?.coordinate;
+    if (!userCoord || nearbyHazards.length === 0) return;
+
+    const ALERT_RADIUS_M = 100;
+    const DISMISS_RADIUS_M = 150;
+
+    // Check if active alert should be dismissed (user passed it)
+    if (activeHazardAlert) {
+      const dist = haversineDistance(
+        [userCoord.lat, userCoord.lon],
+        [activeHazardAlert.hazard.lat, activeHazardAlert.hazard.lon],
+      );
+      if (dist > DISMISS_RADIUS_M) {
+        // User passed without responding — queue 'pass'
+        mobileApi.validateHazard(activeHazardAlert.hazard.id, 'pass').catch(() => {});
+        dismissedHazardIdsRef.current.add(activeHazardAlert.hazard.id);
+        setActiveHazardAlert(null);
+      }
+      return; // Don't check for new alerts while one is active
+    }
+
+    // Find closest non-dismissed hazard within alert radius
+    for (const hazard of nearbyHazards) {
+      if (dismissedHazardIdsRef.current.has(hazard.id)) continue;
+      const dist = haversineDistance(
+        [userCoord.lat, userCoord.lon],
+        [hazard.lat, hazard.lon],
+      );
+      if (dist <= ALERT_RADIUS_M) {
+        setActiveHazardAlert({ hazard, distanceMeters: Math.round(dist) });
+        break;
+      }
+    }
+  }, [locationState.sample, nearbyHazards, activeHazardAlert]);
+
   useEffect(() => {
     if (!navigationSession || !selectedRoute || navigationSession.isMuted) {
       return;
@@ -508,6 +557,7 @@ export default function NavigationScreen() {
         fullBleed
         showRouteOverlay={false}
         bicycleParkingLocations={parkingLocations}
+        nearbyHazards={nearbyHazards}
       />
 
       <View style={[styles.overlayRoot, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">
@@ -620,6 +670,24 @@ export default function NavigationScreen() {
           />
         </View>
       </View>
+
+      {/* Waze-style hazard proximity alert */}
+      {activeHazardAlert ? (
+        <HazardAlert
+          hazard={activeHazardAlert.hazard}
+          distanceMeters={activeHazardAlert.distanceMeters}
+          onConfirm={() => {
+            mobileApi.validateHazard(activeHazardAlert.hazard.id, 'confirm').catch(() => {});
+            dismissedHazardIdsRef.current.add(activeHazardAlert.hazard.id);
+            setActiveHazardAlert(null);
+          }}
+          onDeny={() => {
+            mobileApi.validateHazard(activeHazardAlert.hazard.id, 'deny').catch(() => {});
+            dismissedHazardIdsRef.current.add(activeHazardAlert.hazard.id);
+            setActiveHazardAlert(null);
+          }}
+        />
+      ) : null}
 
       {/* Hazard toast notification */}
       {hazardBanner ? (

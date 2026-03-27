@@ -204,6 +204,19 @@ export interface HazardReportResponse {
   acceptedAt: string;
 }
 
+export interface NearbyHazard {
+  readonly id: string;
+  readonly lat: number;
+  readonly lon: number;
+  readonly hazardType: HazardType;
+  readonly createdAt: string;
+  readonly confirmCount: number;
+  readonly denyCount: number;
+  readonly distanceMeters?: number;
+}
+
+export type HazardValidationResponse = 'confirm' | 'deny' | 'pass';
+
 export interface TripStartRequest {
   clientTripId: string;
   sessionId: string;

@@ -8,7 +8,9 @@ import type {
   FeedResponse,
   HazardReportRequest,
   HazardReportResponse,
+  HazardValidationResponse,
   NavigationFeedbackRequest,
+  NearbyHazard,
   ProfileResponse,
   ProfileUpdateRequest,
   ReverseGeocodeRequest,
@@ -295,6 +297,19 @@ export const mobileApi = {
     requestJson<WriteAckResponse>('/v1/feedback', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  // ── Hazard Alerts ──
+
+  getNearbyHazards: (lat: number, lon: number, radiusMeters = 1000) =>
+    requestJson<{ hazards: NearbyHazard[] }>(
+      `/v1/hazards/nearby?lat=${lat}&lon=${lon}&radiusMeters=${radiusMeters}`,
+    ).then((res) => res.hazards),
+
+  validateHazard: (hazardId: string, response: HazardValidationResponse) =>
+    requestJson<WriteAckResponse>(`/v1/hazards/${hazardId}/validate`, {
+      method: 'POST',
+      body: JSON.stringify({ response }),
     }),
 
   // ── Community Feed ──

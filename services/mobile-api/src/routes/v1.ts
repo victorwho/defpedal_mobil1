@@ -559,6 +559,114 @@ export const buildV1Routes = (
       },
     );
 
+    // ── Nearby hazards (for navigation alerts) ──
+
+    app.get<{
+      Querystring: { lat: string; lon: string; radiusMeters?: string };
+    }>('/hazards/nearby', async (request, reply) => {
+      const lat = parseFloat(request.query.lat);
+      const lon = parseFloat(request.query.lon);
+      const radiusMeters = parseFloat(request.query.radiusMeters ?? '1000');
+
+      if (Number.isNaN(lat) || Number.isNaN(lon)) {
+        return reply.status(400).send({
+          error: 'Invalid coordinates.',
+          code: 'VALIDATION_ERROR',
+          details: ['lat and lon must be valid numbers.'],
+        });
+      }
+
+      try {
+        // Convert radius to approximate degree delta for bbox query
+        const degDelta = radiusMeters / 111_000;
+        const { data, error } = await dependencies.supabaseAdmin
+          .from('hazards')
+          .select('id, lat, lon, hazard_type, created_at, confirm_count, deny_count, expires_at')
+          .gte('lat', lat - degDelta)
+          .lte('lat', lat + degDelta)
+          .gte('lon', lon - degDelta)
+          .lte('lon', lon + degDelta)
+          .gt('expires_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+
+        const hazards = (data ?? []).map((row: Record<string, unknown>) => ({
+          id: row.id,
+          lat: row.lat,
+          lon: row.lon,
+          hazardType: row.hazard_type,
+          createdAt: row.created_at,
+          confirmCount: row.confirm_count ?? 0,
+          denyCount: row.deny_count ?? 0,
+        }));
+
+        return { hazards };
+      } catch (error) {
+        throw new HttpError('Failed to fetch nearby hazards.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown error.'],
+        });
+      }
+    });
+
+    // ── Hazard validation (Still there? Yes/No) ──
+
+    app.post<{
+      Params: { hazardId: string };
+      Body: { response: 'confirm' | 'deny' | 'pass' };
+    }>('/hazards/:hazardId/validate', async (request, reply) => {
+      const user = await getAuthenticatedUserFromRequest(
+        request,
+        dependencies.authenticateUser,
+      );
+
+      if (!user) {
+        return reply.status(401).send({
+          error: 'Authentication required.',
+          code: 'UNAUTHORIZED',
+          details: ['You must be signed in to validate hazards.'],
+        });
+      }
+
+      const { hazardId } = request.params;
+      const { response: validationResponse } = request.body;
+
+      if (!['confirm', 'deny', 'pass'].includes(validationResponse)) {
+        return reply.status(400).send({
+          error: 'Invalid response.',
+          code: 'VALIDATION_ERROR',
+          details: ['response must be confirm, deny, or pass.'],
+        });
+      }
+
+      try {
+        const { error } = await dependencies.supabaseAdmin
+          .from('hazard_validations')
+          .upsert(
+            {
+              hazard_id: hazardId,
+              user_id: user.id,
+              response: validationResponse,
+              responded_at: new Date().toISOString(),
+            },
+            { onConflict: 'hazard_id,user_id' },
+          );
+
+        if (error) throw error;
+
+        return { acceptedAt: new Date().toISOString() };
+      } catch (error) {
+        throw new HttpError('Hazard validation failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown error.'],
+        });
+      }
+    });
+
     app.post<{ Body: NavigationFeedbackBody; Reply: WriteAckResponse | ErrorResponse }>(
       '/feedback',
       {
