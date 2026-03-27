@@ -59,6 +59,7 @@ import {
   writeAckResponseSchema,
 } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
@@ -579,7 +580,7 @@ export const buildV1Routes = (
       try {
         // Convert radius to approximate degree delta for bbox query
         const degDelta = radiusMeters / 111_000;
-        const { data, error } = await dependencies.supabaseAdmin
+        const { data, error } = await supabaseAdmin!
           .from('hazards')
           .select('id, lat, lon, hazard_type, created_at, confirm_count, deny_count, expires_at')
           .gte('lat', lat - degDelta)
@@ -643,7 +644,7 @@ export const buildV1Routes = (
       }
 
       try {
-        const { error } = await dependencies.supabaseAdmin
+        const { error } = await supabaseAdmin!
           .from('hazard_validations')
           .upsert(
             {

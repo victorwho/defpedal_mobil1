@@ -420,6 +420,7 @@ export interface ShareTripRequest {
   geometryPolyline6: string;
   note?: string | null;
   safetyTags?: SafetyTag[];
+  startCoordinate: Coordinate;
 }
 
 export interface FeedResponse {

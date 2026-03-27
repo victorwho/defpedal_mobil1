@@ -4,6 +4,7 @@ import type {
   FeedItem,
   FeedResponse,
   ProfileResponse,
+  SafetyTag,
   ShareTripRequest,
   WriteAckResponse,
 } from '@defensivepedal/core';
@@ -71,7 +72,7 @@ const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
     elevationGainMeters: row.elevation_gain_meters != null ? Number(row.elevation_gain_meters) : null,
     averageSpeedMps: row.average_speed_mps != null ? Number(row.average_speed_mps) : null,
     safetyRating: row.safety_rating != null ? Number(row.safety_rating) : null,
-    safetyTags: (row.safety_tags as string[]) ?? [],
+    safetyTags: (row.safety_tags as SafetyTag[]) ?? [],
     geometryPolyline6: row.geometry_polyline6 as string,
     note: (row.note as string) ?? null,
     sharedAt: row.shared_at as string,
