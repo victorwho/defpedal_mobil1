@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
@@ -202,12 +202,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
       {/* Suggestions dropdown */}
       {showSuggestions ? (
-        <View
+        <ScrollView
           style={[
             styles.suggestionSheet,
             {
               backgroundColor: colors.bgSecondary,
               borderColor: colors.borderDefault,
+              maxHeight: 280,
             },
             shadows.md,
           ]}
@@ -312,7 +313,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 </Pressable>
               );
             })}
-        </View>
+        </ScrollView>
       ) : null}
     </View>
   );
