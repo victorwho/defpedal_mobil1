@@ -243,6 +243,65 @@ const getSessionToken = (): string => {
 };
 
 // ---------------------------------------------------------------------------
+// Display helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a concise, human-readable secondary text from Mapbox context.
+ * Aims for Google Maps/Waze style: "Street 45, Neighborhood" — not
+ * the full country-level address.
+ */
+const buildSecondaryText = (
+  featureType: SuggestionFeatureType,
+  context: SearchBoxSuggestion['context'] | undefined,
+  fullAddress: string | undefined,
+  placeFormatted: string | undefined,
+): string => {
+  if (!context) return placeFormatted ?? fullAddress ?? '';
+
+  const street = context.address?.street_name;
+  const number = context.address?.address_number;
+  const neighborhood = context.neighborhood?.name ?? context.locality?.name;
+  const place = context.place?.name;
+  const region = context.region?.name;
+
+  const streetFull = street
+    ? number ? `${street} ${number}` : street
+    : undefined;
+
+  switch (featureType) {
+    case 'poi':
+      // POI: "Street 45, Neighborhood" or "Neighborhood, City"
+      return [streetFull, neighborhood ?? place].filter(Boolean).join(', ') || placeFormatted || '';
+    case 'address':
+      // Address: "Neighborhood, City"
+      return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
+    case 'street':
+      // Street: "Neighborhood, City"
+      return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
+    case 'place':
+    case 'locality':
+    case 'neighborhood':
+      // Area: "Region, Country" or just "Region"
+      return [region, context.country?.name].filter(Boolean).join(', ') || placeFormatted || '';
+    default:
+      return placeFormatted ?? fullAddress ?? '';
+  }
+};
+
+/**
+ * Format distance in meters to human-readable "350 m" or "1.2 km".
+ */
+const formatDistanceLabel = (meters: number): string => {
+  if (meters < 1000) {
+    const rounded = Math.round(meters / 50) * 50;
+    return `${Math.max(50, rounded)} m`;
+  }
+  const km = meters / 1000;
+  return km >= 10 ? `${Math.round(km)} km` : `${km.toFixed(1)} km`;
+};
+
+// ---------------------------------------------------------------------------
 // Autocomplete (Search Box API v1 — suggest + retrieve)
 // ---------------------------------------------------------------------------
 
@@ -336,20 +395,32 @@ export const mapboxAutocomplete = async (
       const featureType = toFeatureType(raw.feature_type);
       const category = extractCategory(raw.poi_category, raw.maki);
 
+      // Build concise secondaryText from context
+      const ctx = raw.context;
+      const secondaryText = buildSecondaryText(featureType, ctx, raw.full_address, raw.place_formatted);
+
+      // Build distance label
+      let distanceMeters: number | undefined;
+      let distanceLabel: string | undefined;
+      if (payload.proximity) {
+        distanceMeters = Math.round(
+          haversineDistanceMeters(payload.proximity, coords),
+        );
+        distanceLabel = formatDistanceLabel(distanceMeters);
+      }
+
       const suggestion: AutocompleteSuggestion = {
         id: raw.mapbox_id,
         label,
         primaryText,
+        secondaryText,
         coordinates: coords,
+        distanceMeters,
+        distanceLabel,
         featureType,
+        maki: raw.maki ?? undefined,
         ...(category ? { category } : {}),
       };
-
-      if (payload.proximity) {
-        suggestion.distanceMeters = Math.round(
-          haversineDistanceMeters(payload.proximity, coords),
-        );
-      }
 
       return suggestion;
     } catch {
@@ -364,6 +435,11 @@ export const mapboxAutocomplete = async (
     if (result) {
       suggestions.push(result);
     }
+  }
+
+  // Sort by distance (closest first) when proximity is available
+  if (payload.proximity) {
+    suggestions.sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
   }
 
   return {

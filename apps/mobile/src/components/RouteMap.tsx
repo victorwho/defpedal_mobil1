@@ -1,12 +1,13 @@
 import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../lib/bicycle-parking';
 import { decodePolyline } from '@defensivepedal/core';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import Mapbox from '@rnmapbox/maps';
 import { useCallback, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { brandColors, gray, safetyColors } from '../design-system/tokens/colors';
+import { brandColors, darkTheme, gray, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 import {
@@ -41,6 +42,10 @@ type RouteMapProps = {
   plannedRouteCoordinates?: readonly [number, number][];
   /** Color for the planned route line (default: green) */
   plannedRouteColor?: string;
+  /** Called when user taps the map (used for hazard placement) */
+  onMapTap?: (coordinate: Coordinate) => void;
+  /** When true, shows a crosshair overlay for hazard placement */
+  hazardPlacementMode?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
@@ -88,6 +93,8 @@ export const RouteMap = ({
   trailCoordinates,
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
+  onMapTap,
+  hazardPlacementMode = false,
   containerStyle,
 }: RouteMapProps) => {
   const decodedRoutes = useMemo<DecodedRoute[]>(
@@ -322,7 +329,16 @@ export const RouteMap = ({
 
   return (
     <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
-      <Mapbox.MapView style={StyleSheet.absoluteFill} styleURL={Mapbox.StyleURL.Outdoors}>
+      <Mapbox.MapView
+        style={StyleSheet.absoluteFill}
+        styleURL={Mapbox.StyleURL.Outdoors}
+        onPress={onMapTap ? (event: any) => {
+          const coords = event?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            onMapTap({ lat: coords[1], lon: coords[0] });
+          }
+        } : undefined}
+      >
         {followUser && userLocation ? (
           <Mapbox.Camera
             followUserLocation
@@ -540,6 +556,13 @@ export const RouteMap = ({
         ) : null}
       </Mapbox.MapView>
 
+      {hazardPlacementMode ? (
+        <View style={styles.crosshairOverlay} pointerEvents="none">
+          <Ionicons name="add-circle-outline" size={40} color={darkTheme.accent} />
+          <Text style={styles.crosshairLabel}>Tap map to place hazard</Text>
+        </View>
+      ) : null}
+
       {showRouteOverlay ? (
         <View style={styles.overlay}>
           <Text style={styles.overlayTitle}>
@@ -623,5 +646,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     ...textSm,
     fontFamily: fontFamily.heading.bold,
+  },
+  crosshairOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: space[2],
+  },
+  crosshairLabel: {
+    ...textSm,
+    fontFamily: fontFamily.heading.bold,
+    color: darkTheme.accent,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: space[3],
+    paddingVertical: space[1],
+    borderRadius: radii.md,
+    overflow: 'hidden',
   },
 });

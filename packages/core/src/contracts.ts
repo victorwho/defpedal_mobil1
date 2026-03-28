@@ -125,10 +125,16 @@ export interface AutocompleteSuggestion {
   id: string;
   label: string;
   primaryText: string;
+  /** Concise local address (street + neighborhood), NOT full country-level */
+  secondaryText?: string;
   coordinates: Coordinate;
   distanceMeters?: number;
+  /** Pre-formatted distance: "350 m" or "1.2 km" */
+  distanceLabel?: string;
   featureType?: SuggestionFeatureType;
   category?: string;
+  /** Mapbox maki icon name for specific POI icon mapping */
+  maki?: string;
 }
 
 export interface AutocompleteResponse {

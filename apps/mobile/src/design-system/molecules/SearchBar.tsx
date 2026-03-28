@@ -99,17 +99,23 @@ const FEATURE_TYPE_ICON_MAP: Readonly<Record<string, IoniconsName>> = {
 const getSuggestionIcon = (
   featureType?: SuggestionFeatureType,
   category?: string,
+  maki?: string,
 ): IoniconsName => {
+  // Try maki icon first (most specific for POIs)
+  if (maki) {
+    const normalized = maki.toLowerCase().replace(/[\s-]/g, '_');
+    const match = CATEGORY_ICON_MAP[normalized];
+    if (match) return match;
+  }
+
   if (category) {
     const normalized = category.toLowerCase().replace(/[\s-]/g, '_');
     const match = CATEGORY_ICON_MAP[normalized];
-
     if (match) return match;
   }
 
   if (featureType) {
     const match = FEATURE_TYPE_ICON_MAP[featureType];
-
     if (match) return match;
   }
 
@@ -233,6 +239,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               const iconName = getSuggestionIcon(
                 suggestion.featureType,
                 suggestion.category,
+                suggestion.maki,
               );
 
               return (
@@ -248,7 +255,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 >
                   <Ionicons
                     name={iconName}
-                    size={18}
+                    size={20}
                     color={
                       suggestion.featureType === 'poi'
                         ? colors.accent
@@ -257,26 +264,50 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     style={styles.suggestionIcon}
                   />
                   <View style={styles.suggestionText}>
-                    <Text
-                      style={[
-                        textBase,
-                        {
-                          color: colors.textPrimary,
-                          fontFamily: fontFamily.body.semiBold,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {suggestion.primaryText}
-                    </Text>
-                    <Text
-                      style={[textSm, { color: colors.textSecondary }]}
-                      numberOfLines={1}
-                    >
-                      {suggestion.category
-                        ? `${suggestion.category} · ${suggestion.label}`
-                        : suggestion.label}
-                    </Text>
+                    <View style={styles.suggestionPrimaryRow}>
+                      <Text
+                        style={[
+                          textBase,
+                          {
+                            flex: 1,
+                            color: colors.textPrimary,
+                            fontFamily: fontFamily.body.semiBold,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {suggestion.primaryText}
+                      </Text>
+                      {suggestion.distanceLabel ? (
+                        <Text
+                          style={[
+                            textXs,
+                            {
+                              color: colors.textMuted,
+                              fontFamily: fontFamily.mono.medium,
+                              marginLeft: space[2],
+                            },
+                          ]}
+                        >
+                          {suggestion.distanceLabel}
+                        </Text>
+                      ) : null}
+                    </View>
+                    {suggestion.secondaryText ? (
+                      <Text
+                        style={[textSm, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {suggestion.secondaryText}
+                      </Text>
+                    ) : (
+                      <Text
+                        style={[textSm, { color: colors.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {suggestion.label}
+                      </Text>
+                    )}
                   </View>
                 </Pressable>
               );
@@ -339,5 +370,9 @@ const styles = StyleSheet.create({
   suggestionText: {
     flex: 1,
     gap: 2,
+  },
+  suggestionPrimaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

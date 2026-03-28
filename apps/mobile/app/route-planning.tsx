@@ -1,5 +1,5 @@
-import type { AutocompleteSuggestion, Coordinate } from '@defensivepedal/core';
-import { hasStartOverride } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, Coordinate, HazardType } from '@defensivepedal/core';
+import { HAZARD_TYPE_OPTIONS, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,7 +21,10 @@ import { useAppStore } from '../src/store/appStore';
 import { SearchBar } from '../src/design-system/molecules';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
-import { gray } from '../src/design-system/tokens/colors';
+import { IconButton } from '../src/design-system/atoms/IconButton';
+import { Modal } from '../src/design-system/organisms/Modal';
+import { Toast } from '../src/design-system/molecules/Toast';
+import { darkTheme, gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -68,6 +71,45 @@ export default function RoutePlanningScreen() {
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [destinationHydrated, setDestinationHydrated] = useState(false);
   const syncedOriginKeyRef = useRef<string | null>(null);
+
+  // Hazard reporting state
+  const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
+  const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
+  const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
+  const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const enqueueMutation = useAppStore((state) => state.enqueueMutation);
+  const user = null; // hazard reports work without auth
+
+  const handleHazardTypeSelect = (hazardType: HazardType) => {
+    setHazardPickerOpen(false);
+    setSelectedHazardType(hazardType);
+    setHazardPlacementMode(true);
+  };
+
+  const handleHazardPlacement = (coordinate: Coordinate) => {
+    if (!selectedHazardType) return;
+
+    enqueueMutation('hazard', {
+      coordinate,
+      reportedAt: new Date().toISOString(),
+      source: 'manual',
+      hazardType: selectedHazardType,
+    });
+
+    setHazardPlacementMode(false);
+    setSelectedHazardType(null);
+    setHazardToast({ type: 'success', message: 'Hazard reported! It will sync when online.' });
+    setTimeout(() => setHazardToast(null), 3000);
+  };
+
+  const toggleHazardMode = () => {
+    if (hazardPlacementMode) {
+      setHazardPlacementMode(false);
+      setSelectedHazardType(null);
+    } else {
+      setHazardPickerOpen(true);
+    }
+  };
 
   const deferredStartOverrideQuery = useDeferredValue(startOverrideQuery.trim());
   const deferredDestinationQuery = useDeferredValue(destinationQuery.trim());
@@ -240,6 +282,8 @@ export default function RoutePlanningScreen() {
           fullBleed
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
+          onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
+          hazardPlacementMode={hazardPlacementMode}
         />
       }
       topOverlay={
@@ -421,6 +465,18 @@ export default function RoutePlanningScreen() {
             <Ionicons name="help-circle-outline" size={22} color={gray[700]} />
           </Pressable>
           <Pressable
+            style={[styles.fabButton, hazardPlacementMode && { backgroundColor: darkTheme.accent }]}
+            onPress={toggleHazardMode}
+            accessibilityLabel={hazardPlacementMode ? 'Cancel hazard report' : 'Report hazard'}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={hazardPlacementMode ? 'close' : 'warning'}
+              size={22}
+              color={hazardPlacementMode ? '#000' : darkTheme.accent}
+            />
+          </Pressable>
+          <Pressable
             style={styles.fabButton}
             onPress={() => void refreshLocation()}
             accessibilityLabel="Center on current location"
@@ -447,6 +503,49 @@ export default function RoutePlanningScreen() {
       }
     />
     <BottomNav activeTab="map" onTabPress={handleTabPress} />
+
+    {/* Hazard type picker modal */}
+    <Modal
+      visible={hazardPickerOpen}
+      onClose={() => setHazardPickerOpen(false)}
+      title="Report a hazard"
+      description="Select the type of hazard, then tap the map to place it."
+      footer={
+        <Button variant="secondary" size="md" fullWidth onPress={() => setHazardPickerOpen(false)}>
+          Cancel
+        </Button>
+      }
+    >
+      <View style={styles.hazardOptionList}>
+        {HAZARD_TYPE_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            variant="secondary"
+            size="md"
+            fullWidth
+            leftIcon={
+              <Ionicons
+                name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
+                size={18}
+                color={darkTheme.accent}
+              />
+            }
+            onPress={() => handleHazardTypeSelect(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </View>
+    </Modal>
+
+    {/* Hazard toast */}
+    {hazardToast ? (
+      <Toast
+        message={hazardToast.message}
+        variant={hazardToast.type === 'success' ? 'success' : 'error'}
+        onDismiss={() => setHazardToast(null)}
+      />
+    ) : null}
     </View>
   );
 }
@@ -576,5 +675,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.md,
+  },
+  hazardOptionList: {
+    gap: space[2],
   },
 });
