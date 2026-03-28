@@ -89,15 +89,18 @@ const CollapsibleSheet = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.bottomDock}
     >
-      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight }]} {...panResponder.panHandlers}>
-        <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
-          <View style={styles.handle} />
-        </Pressable>
+      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight }]}>
+        <View {...panResponder.panHandlers}>
+          <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
+            <View style={styles.handle} />
+          </Pressable>
+        </View>
         {expanded ? (
           <ScrollView
             contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
           >
             {children}
           </ScrollView>

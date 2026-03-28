@@ -244,9 +244,6 @@ export default function RoutePlanningScreen() {
       }
       topOverlay={
         <View style={styles.topContainer}>
-          {/* Brand logo */}
-          <BrandLogo size={48} />
-
           {/* Origin card — full width, aligned with destination */}
           {activeField === 'startOverride' ? (
             /* Start override search (expanded) */

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { brandColors, gray } from '../src/design-system/tokens/colors';
@@ -13,13 +13,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { fontFamily, textBase, text3xl, textXs } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
-
-const handleTabPress = (tab: TabKey) => {
-  if (tab === 'map') router.replace('/route-planning');
-  else if (tab === 'community') router.replace('/community');
-  else if (tab === 'profile') router.replace('/profile');
-  else if (tab === 'history') router.replace('/history');
-};
+import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function TripsScreen() {
   const { user } = useAuthSession();

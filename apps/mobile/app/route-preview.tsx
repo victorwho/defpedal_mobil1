@@ -207,26 +207,6 @@ export default function RoutePreviewScreen() {
 
   const topOverlay = (
     <>
-      <View style={styles.topBar}>
-        <Button variant="secondary" size="sm" onPress={returnToPlanning}>
-          Back
-        </Button>
-        <View style={styles.brandCluster}>
-          <BrandLogo size={40} />
-          <View style={styles.brandCopy}>
-            <Text style={styles.topEyebrow}>Defensive Pedal</Text>
-            <Text style={styles.topTitle}>Route preview</Text>
-            <Text style={styles.topSubtitle}>
-              {previewQuery.isPending
-                ? 'Loading alternatives…'
-                : routePreview
-                  ? `${routePreview.routes.length} route${routePreview.routes.length === 1 ? '' : 's'} ready`
-                  : 'Waiting for route data'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
       <View style={styles.metaRow}>
         <Badge variant="neutral" size="md">
           {routePreview?.coverage.status
@@ -261,9 +241,6 @@ export default function RoutePreviewScreen() {
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
         />
-      }
-      rightOverlay={
-        <VoiceGuidanceButton enabled={voiceGuidanceEnabled} onPress={toggleVoiceGuidance} compact />
       }
       topOverlay={topOverlay}
       footer={

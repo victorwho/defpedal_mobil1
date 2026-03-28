@@ -34,7 +34,6 @@ import { useAppStore } from '../src/store/appStore';
 
 // Design system imports
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
-import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -627,7 +626,35 @@ export default function NavigationScreen() {
             />
           </View>
 
-          {/* Menu toggle */}
+          {/* Menu toggle + expanded nav icons */}
+          {showMenu ? (
+            <>
+              <View style={styles.roundButton}>
+                <IconButton
+                  icon={<Ionicons name="time-outline" size={22} color={gray[300]} />}
+                  onPress={() => { setShowMenu(false); router.push('/history'); }}
+                  accessibilityLabel="History"
+                  variant="secondary"
+                />
+              </View>
+              <View style={styles.roundButton}>
+                <IconButton
+                  icon={<Ionicons name="people-outline" size={22} color={gray[300]} />}
+                  onPress={() => { setShowMenu(false); router.push('/community'); }}
+                  accessibilityLabel="Community"
+                  variant="secondary"
+                />
+              </View>
+              <View style={styles.roundButton}>
+                <IconButton
+                  icon={<Ionicons name="person-outline" size={22} color={gray[300]} />}
+                  onPress={() => { setShowMenu(false); router.push('/profile'); }}
+                  accessibilityLabel="Profile"
+                  variant="secondary"
+                />
+              </View>
+            </>
+          ) : null}
           <View style={styles.roundButton}>
             <IconButton
               icon={<Ionicons name={showMenu ? 'close' : 'menu'} size={22} color={gray[300]} />}
@@ -755,17 +782,6 @@ export default function NavigationScreen() {
         </View>
       </Modal>
 
-      {showMenu ? (
-        <BottomNav
-          activeTab="map"
-          onTabPress={(tab: TabKey) => {
-            setShowMenu(false);
-            if (tab === 'history') router.push('/history');
-            else if (tab === 'community') router.push('/community');
-            else if (tab === 'profile') router.push('/profile');
-          }}
-        />
-      ) : null}
     </View>
   );
 }

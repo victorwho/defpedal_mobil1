@@ -2,17 +2,12 @@ import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
-import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { brandColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
-
-const handleTabPress = (tab: TabKey) => {
-  if (tab === 'map') router.replace('/route-planning');
-  else if (tab === 'history') router.replace('/history');
-  else if (tab === 'profile') router.replace('/profile');
-};
+import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function CommunityScreen() {
   return (

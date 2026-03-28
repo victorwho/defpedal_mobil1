@@ -4,7 +4,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Screen } from '../src/components/Screen';
-import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { brandColors, gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
@@ -23,11 +23,7 @@ const CYCLING_FREQUENCIES = [
   'More rarely than once per month',
 ] as const;
 
-const handleTabPress = (tab: TabKey) => {
-  if (tab === 'map') router.replace('/route-planning');
-  else if (tab === 'history') router.replace('/history');
-  else if (tab === 'community') router.replace('/community');
-};
+import { handleTabPress } from '../src/lib/navigation-helpers';
 
 type DropdownPickerProps = {
   label: string;

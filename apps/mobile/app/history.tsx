@@ -3,16 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { Button } from '../src/design-system/atoms/Button';
-import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { brandColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
-
-const handleTabPress = (tab: TabKey) => {
-  if (tab === 'map') router.replace('/route-planning');
-  else if (tab === 'community') router.replace('/community');
-  else if (tab === 'profile') router.replace('/profile');
-};
+import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function HistoryScreen() {
   return (
