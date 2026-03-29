@@ -24,6 +24,7 @@ import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
@@ -79,6 +80,10 @@ export default function NavigationScreen() {
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
   const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
+  const { rentalLocations } = useBicycleRental(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
@@ -557,6 +562,7 @@ export default function NavigationScreen() {
         fullBleed
         showRouteOverlay={false}
         bicycleParkingLocations={parkingLocations}
+        bicycleRentalLocations={rentalLocations}
         nearbyHazards={nearbyHazards}
       />
 

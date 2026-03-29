@@ -13,6 +13,7 @@ import { RouteMap } from '../src/components/RouteMap';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -57,6 +58,10 @@ export default function RoutePlanningScreen() {
   } = useCurrentLocation();
   const hasValidDestination = routeRequest.destination.lat !== 0 && routeRequest.destination.lon !== 0;
   const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    hasValidDestination ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
+  const { rentalLocations } = useBicycleRental(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     hasValidDestination ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
@@ -282,6 +287,7 @@ export default function RoutePlanningScreen() {
           fullBleed
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
+          bicycleRentalLocations={rentalLocations}
           onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
           hazardPlacementMode={hazardPlacementMode}
         />

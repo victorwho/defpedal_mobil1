@@ -1,5 +1,6 @@
 import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../lib/bicycle-parking';
+import type { BicycleRentalLocation } from '../lib/bicycle-rental';
 import { decodePolyline } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Mapbox from '@rnmapbox/maps';
@@ -35,6 +36,7 @@ type RouteMapProps = {
   fullBleed?: boolean;
   showRouteOverlay?: boolean;
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
+  bicycleRentalLocations?: readonly BicycleRentalLocation[];
   nearbyHazards?: readonly NearbyHazard[];
   /** GPS trail line (actual ride path) — rendered as a blue line */
   trailCoordinates?: readonly [number, number][];
@@ -89,6 +91,7 @@ export const RouteMap = ({
   fullBleed = false,
   showRouteOverlay = true,
   bicycleParkingLocations = [],
+  bicycleRentalLocations = [],
   nearbyHazards = [],
   trailCoordinates,
   plannedRouteCoordinates,
@@ -163,6 +166,21 @@ export const RouteMap = ({
       })),
     }),
     [bicycleParkingLocations],
+  );
+
+  const bicycleRentalFeatureCollection = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: bicycleRentalLocations.map((loc) => ({
+        type: 'Feature' as const,
+        properties: { id: loc.id, name: loc.name ?? '' },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [loc.lon, loc.lat] as [number, number],
+        },
+      })),
+    }),
+    [bicycleRentalLocations],
   );
 
   const hazardFeatureCollection = useMemo(
@@ -293,21 +311,6 @@ export const RouteMap = ({
         (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
 
-  const [selectedParking, setSelectedParking] = useState<[number, number] | null>(null);
-
-  const handleParkingPress = useCallback((event: any) => {
-    try {
-      const feature = event?.features?.[0];
-      const coords = feature?.geometry?.coordinates;
-      if (Array.isArray(coords) && coords.length >= 2) {
-        setSelectedParking((prev) =>
-          prev && prev[0] === coords[0] && prev[1] === coords[1] ? null : [coords[0], coords[1]],
-        );
-      }
-    } catch {
-      // ignore press errors
-    }
-  }, []);
 
   if (!mobileEnv.mapboxPublicToken) {
     return (
@@ -441,7 +444,6 @@ export const RouteMap = ({
           <Mapbox.ShapeSource
             id="bicycle-parking"
             shape={bicycleParkingFeatureCollection}
-            onPress={handleParkingPress}
           >
             <Mapbox.CircleLayer
               id="bicycle-parking-bg"
@@ -459,6 +461,36 @@ export const RouteMap = ({
               minZoomLevel={12}
               style={{
                 textField: 'P',
+                textSize: 10,
+                textColor: '#FFFFFF',
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {bicycleRentalFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource
+            id="bicycle-rental"
+            shape={bicycleRentalFeatureCollection}
+          >
+            <Mapbox.CircleLayer
+              id="bicycle-rental-bg"
+              minZoomLevel={12}
+              style={{
+                circleColor: '#2E7D32',
+                circleRadius: 12,
+                circleStrokeColor: '#FFFFFF',
+                circleStrokeWidth: 1.5,
+                circleOpacity: 0.9,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="bicycle-rental-label"
+              minZoomLevel={12}
+              style={{
+                textField: 'R',
                 textSize: 10,
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
@@ -491,17 +523,6 @@ export const RouteMap = ({
               }}
             />
           </Mapbox.ShapeSource>
-        ) : null}
-
-        {selectedParking ? (
-          <Mapbox.MarkerView
-            coordinate={selectedParking}
-            anchor={{ x: 0.5, y: 1.2 }}
-          >
-            <View style={styles.parkingCallout}>
-              <Text style={styles.parkingCalloutText}>🚲 Bicycle Parking</Text>
-            </View>
-          </Mapbox.MarkerView>
         ) : null}
 
         {markerFeatureCollection.features.length > 0 ? (

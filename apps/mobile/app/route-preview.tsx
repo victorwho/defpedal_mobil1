@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
@@ -65,6 +66,10 @@ export default function RoutePreviewScreen() {
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const { parkingLocations } = useBicycleParking(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
+  const { rentalLocations } = useBicycleRental(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
@@ -240,6 +245,7 @@ export default function RoutePreviewScreen() {
           fullBleed
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
+          bicycleRentalLocations={rentalLocations}
         />
       }
       topOverlay={topOverlay}
