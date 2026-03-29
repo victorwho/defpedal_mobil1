@@ -580,28 +580,43 @@ export const buildV1Routes = (
       try {
         // Convert radius to approximate degree delta for bbox query
         const degDelta = radiusMeters / 111_000;
-        const { data, error } = await supabaseAdmin!
+        const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+        if (!supabaseAdmin) throw new Error('Supabase admin client not available');
+
+        // location is JSONB with { latitude, longitude } — use raw SQL filter
+        const { data, error } = await supabaseAdmin
           .from('hazards')
-          .select('id, lat, lon, hazard_type, created_at, confirm_count, deny_count, expires_at')
-          .gte('lat', lat - degDelta)
-          .lte('lat', lat + degDelta)
-          .gte('lon', lon - degDelta)
-          .lte('lon', lon + degDelta)
+          .select('id, location, hazard_type, created_at, confirm_count, deny_count, expires_at')
           .gt('expires_at', new Date().toISOString())
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(200);
 
         if (error) throw error;
 
-        const hazards = (data ?? []).map((row: Record<string, unknown>) => ({
-          id: row.id,
-          lat: row.lat,
-          lon: row.lon,
-          hazardType: row.hazard_type,
-          createdAt: row.created_at,
-          confirmCount: row.confirm_count ?? 0,
-          denyCount: row.deny_count ?? 0,
-        }));
+        // Filter by bbox in JS since JSONB nested fields can't use .gte/.lte
+        const hazards = (data ?? [])
+          .filter((row: Record<string, unknown>) => {
+            const loc = row.location as { latitude?: number; longitude?: number } | null;
+            if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
+            return (
+              loc.latitude >= lat - degDelta &&
+              loc.latitude <= lat + degDelta &&
+              loc.longitude >= lon - degDelta &&
+              loc.longitude <= lon + degDelta
+            );
+          })
+          .map((row: Record<string, unknown>) => {
+            const loc = row.location as { latitude: number; longitude: number };
+            return {
+              id: row.id,
+              lat: loc.latitude,
+              lon: loc.longitude,
+              hazardType: row.hazard_type,
+              createdAt: row.created_at,
+              confirmCount: (row.confirm_count as number) ?? 0,
+              denyCount: (row.deny_count as number) ?? 0,
+            };
+          });
 
         return { hazards };
       } catch (error) {
@@ -644,7 +659,10 @@ export const buildV1Routes = (
       }
 
       try {
-        const { error } = await supabaseAdmin!
+        const { supabaseAdmin: adminClient } = await import('../lib/supabaseAdmin');
+        if (!adminClient) throw new Error('Supabase admin client not available');
+
+        const { error } = await adminClient
           .from('hazard_validations')
           .upsert(
             {

@@ -308,6 +308,7 @@ export const RouteMap = ({
       : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
         trailMidpoint ??
         (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
+        (userLocation ? ([userLocation.lon, userLocation.lat] as [number, number]) : null) ??
         (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
 

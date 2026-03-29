@@ -2,13 +2,14 @@ import type { RiskSegment } from '@defensivepedal/core';
 import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
+import { useWeather } from '../src/hooks/useWeather';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/RouteMap';
@@ -21,6 +22,7 @@ import { useAppStore } from '../src/store/appStore';
 
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
+import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
@@ -73,6 +75,11 @@ export default function RoutePreviewScreen() {
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
+  const { warnings: weatherWarnings } = useWeather(
+    routeRequest.origin.lat,
+    routeRequest.origin.lon,
+  );
+  const [weatherWarningDismissed, setWeatherWarningDismissed] = useState(false);
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
 
@@ -234,6 +241,12 @@ export default function RoutePreviewScreen() {
   if (!guardPassed) return null;
 
   return (
+    <>
+    <WeatherWarningModal
+      warnings={weatherWarnings}
+      visible={weatherWarnings.length > 0 && !weatherWarningDismissed}
+      onDismiss={() => setWeatherWarningDismissed(true)}
+    />
     <MapStageScreen
       useBottomSheet
       map={
@@ -357,6 +370,7 @@ export default function RoutePreviewScreen() {
         </View>
       ) : null}
     </MapStageScreen>
+    </>
   );
 }
 

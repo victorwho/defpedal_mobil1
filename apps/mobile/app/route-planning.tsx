@@ -15,11 +15,13 @@ import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavig
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
+import { useWeather } from '../src/hooks/useWeather';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 
 import { SearchBar } from '../src/design-system/molecules';
+import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
@@ -68,6 +70,10 @@ export default function RoutePlanningScreen() {
   const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
   const mapUserLocation = currentLocation ?? fallbackUserLocation;
   const planningOrigin = mapUserLocation ?? routeRequest.origin;
+  const { weather, isLoading: weatherLoading } = useWeather(
+    planningOrigin?.lat ?? null,
+    planningOrigin?.lon ?? null,
+  );
 
   const [startOverrideQuery, setStartOverrideQuery] = useState('');
   const [destinationQuery, setDestinationQuery] = useState(
@@ -280,8 +286,8 @@ export default function RoutePlanningScreen() {
     <MapStageScreen
       map={
         <RouteMap
-          origin={planningOrigin}
-          destination={routeRequest.destination}
+          origin={mapUserLocation ?? undefined}
+          destination={hasValidDestination ? routeRequest.destination : undefined}
           userLocation={mapUserLocation}
           followUser={Boolean(mapUserLocation) && !customStartEnabled && !hasValidDestination}
           fullBleed
@@ -386,6 +392,11 @@ export default function RoutePlanningScreen() {
               onSelectSuggestion={handleDestinationSelect}
             />
           </View>
+
+          {/* Weather widget — hidden while typing */}
+          {!activeField ? (
+            <WeatherWidget weather={weather} isLoading={weatherLoading} />
+          ) : null}
 
           {/* Safe / Fast routing toggle */}
           <View style={styles.modeToggleRow}>
