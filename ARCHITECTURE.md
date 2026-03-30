@@ -1,166 +1,212 @@
+# Project Architecture
 
-# Project Architecture & Changelog
-
-This document serves as the source of truth for the application's architecture, state management, and recent changes. Refer to this before making structural modifications.
+Last updated: 2026-03-29
 
 ## 1. High-Level Architecture
 
+Defensive Pedal is a **mobile-only** cycling safety app. The legacy React/Vite web app has been fully removed.
+
 ### Core Technologies
-- **Web Framework**: React 19 (Vite)
-- **Mobile Framework**: Expo + React Native scaffold
+- **Mobile Framework**: Expo SDK 52 + React Native (new architecture)
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS on web; React Native StyleSheet scaffold on mobile
-- **Map**: Leaflet on web; `@rnmapbox/maps` scaffold on mobile
-- **Backend**: Supabase (Auth, Database) + Fastify mobile API scaffold
+- **Map**: `@rnmapbox/maps` with Mapbox Standard style ("Shield Mode" basemap)
+- **State**: Zustand with AsyncStorage persistence
+- **Data Fetching**: TanStack Query (React Query)
+- **Backend**: Fastify mobile API (Node.js)
+- **Database**: Supabase (PostgreSQL + PostGIS + Auth)
+- **Routing**: Custom OSRM (safe mode) + Mapbox Directions (fast mode)
+- **Deployment**: Google Cloud Run (europe-central2) for API, EAS Build for mobile
 
-### Key Directories
-- **`/components`**: Pure UI components. `MapWrapper.tsx` is the heaviest component, managing the Leaflet instance directly via refs.
-- **`/services`**: Stateless modules for external APIs (OSRM, Supabase, Nominatim, Elevation, Offline Maps).
-- **`/hooks`**: React hooks for browser APIs (Geolocation, Speech, WakeLock).
-- **`/utils`**: Pure functions for math (Haversine), formatting, and route analysis.
-- **`/packages/core`**: Shared types, route contracts, polyline helpers, navigation helpers, and route analysis for web/mobile/backend.
-- **`/services/mobile-api`**: Fastify backend-for-frontend for mobile routing, coverage, search, risk, and elevation orchestration.
-- **`/apps/mobile`**: Expo React Native app scaffold with typed routes, shared-store wiring, and Mapbox preview shell.
+### Monorepo Structure
+```
+├── apps/mobile/              # Expo React Native app
+│   ├── app/                  # Expo Router screens
+│   ├── src/
+│   │   ├── components/       # RouteMap, MapStageScreen, Screen, BrandLogo
+│   │   ├── design-system/    # Atoms, molecules, organisms, tokens
+│   │   ├── hooks/            # useRouteGuard, useCurrentLocation, useBicycleParking, useBicycleRental, useNearbyHazards, useWeather, useFeed
+│   │   ├── lib/              # api, mapbox-routing, mapbox-search, bicycle-parking, bicycle-rental, weather, elevation, offlineQueue, navigation-helpers
+│   │   ├── providers/        # AuthSession, AppProviders, NavigationLifecycle, OfflineMutationSync
+│   │   └── store/            # appStore (Zustand)
+│   └── android/              # Native Android project (prebuild)
+├── packages/core/            # Shared types, contracts, navigation helpers, risk distribution
+├── services/mobile-api/      # Fastify BFF
+│   ├── src/routes/           # v1.ts (REST endpoints), feed.ts (community)
+│   └── src/lib/              # risk, elevation, auth, cache, submissions, feedSchemas
+└── supabase/migrations/      # Ordered SQL migrations
+```
 
-## 2. Critical Workflows
+## 2. App Screens (Expo Router)
 
-### Navigation State (`App.tsx`)
-The app operates as a global state machine managed in `App.tsx`:
-1.  **IDLE**: Default state. Search visible. Map explores freely.
-2.  **ROUTE_PREVIEW**: Route calculated and displayed. "Start Navigation" button visible. Elevation profiles for *all* routes are fetched in parallel here.
-3.  **NAVIGATING**: 
-    - Wake lock active.
-    - Voice guidance enabled.
-    - Off-route detection (50m threshold).
-    - Map locked to user location (unless manually dragged).
-4.  **AWAITING_FEEDBACK**: Post-trip feedback form.
+| Screen | File | Purpose |
+|--------|------|---------|
+| Route Planning | `app/route-planning.tsx` | Home screen — map, search, weather widget, hazard reporting |
+| Route Preview | `app/route-preview.tsx` | Route visualization, risk distribution, elevation chart |
+| Navigation | `app/navigation.tsx` | Turn-by-turn with 3D follow camera, hazard alerts |
+| Feedback | `app/feedback.tsx` | Post-trip rating + thank-you card |
+| History | `app/history.tsx` | Hub for trip history |
+| Trips | `app/trips.tsx` | Scrollable trip feed with expandable map replay |
+| Community | `app/community.tsx` | Community hub |
+| Community Feed | `app/community-feed.tsx` | Location-based shared trips |
+| Community Trip | `app/community-trip.tsx` | Individual shared trip detail |
+| Profile | `app/profile.tsx` | Bike type, cycling frequency, routing prefs, privacy |
+| Auth | `app/auth.tsx` | Email/password + Google OAuth sign-in |
+| Settings | `app/settings.tsx` | App settings |
+| Offline Maps | `app/offline-maps.tsx` | Download map packs |
+| Diagnostics | `app/diagnostics.tsx` | Debug info, queue state, API health |
 
-### Map Rendering (`MapWrapper.tsx`)
-- **Imperative Handle**: Uses `useImperativeHandle` to expose methods (`recenter`, `getBounds`) to `App.tsx`.
-- **Rendering Strategy**: Direct Leaflet API usage inside `useEffect` hooks rather than `react-leaflet` components. This provides better performance for frequent updates (location tracking).
-- **Layers**: 
-  - `routeLayers`: GeoJSON layers for the path (yellow fill, black outline).
-  - `userMarker`: Custom divIcon.
-  - `offRouteLine`: Dashed line showing the straight distance to the route.
+## 3. State Machine
 
-### Offline Maps Strategy
-1.  **Service Worker (`sw.js`)**: Intercepts requests to `tile.openstreetmap.org` and `basemaps.cartocdn.com`.
-2.  **Caching**: Uses Cache API (`offline-map-tiles`).
-3.  **Download (`services/offlineMaps.ts`)**: 
-    - Calculates tile coordinates for the current map view boundaries.
-    - Downloads tiles for the current zoom level up to +2 levels deeper.
-    - Checks for download size limits (Max 3000 tiles) to prevent browser crashing.
-4.  **Normalization**: `sw.js` normalizes subdomains (a, b, c) to 'a' to ensure cache hits regardless of the specific subdomain requested by Leaflet.
+App state managed in Zustand (`appStore.ts`):
 
-### Authentication
-- Handled via `services/supabase.ts`.
-- `App.tsx` listens to `onAuthStateChange` to update local session state.
-- Supports Email/Password and Google OAuth.
-- Google OAuth redirects to `window.location.origin`.
+```
+IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
+```
 
-## 3. Data Models (`types.ts`)
-- **Route**: GeoJSON geometry + Steps + Legs.
-- **Step**: Maneuver instructions.
-- **Trip**: Stored in Supabase `trips` table (WKT format for PostGIS compatibility).
+Each screen uses `useRouteGuard` to validate it matches the expected state. The guard locks once passed to prevent Zustand persist hydration race conditions.
 
-## 4. Changelog
+### Persisted State
+- `appState`, `routeRequest`, `routePreview`, `selectedRouteId`
+- `navigationSession` (with GPS breadcrumbs)
+- `voiceGuidanceEnabled`, `shareTripsPublicly`, `bikeType`, `cyclingFrequency`, `avoidUnpaved`
+- `queuedMutations` (offline-first write queue)
+- `offlineRegions`, `tripServerIds`, `activeTripClientId`
 
-### [Current Session]
-- **Architecture (Monorepo Migration)**: Added npm workspaces and introduced `apps/mobile`, `packages/core`, and `services/mobile-api` as the first mobile-first migration slice.
-  - Added shared core exports for route contracts, polyline encoding, navigation helpers, and route-analysis logic.
-  - Rewired the existing web app's `types.ts` and `utils/*` modules to use the shared core package.
-- **Feature (Mobile API Scaffold)**: Added a Fastify backend-for-frontend for native clients.
-  - Implemented coverage, route preview, reroute, autocomplete, and reverse-geocode endpoints.
-  - Kept the custom OSRM service as the safe-routing source and Mapbox Directions as the fast-routing source.
-  - Added backend elevation enrichment and Supabase-backed risk-segment enrichment scaffolding.
-- **Feature (React Native Scaffold)**: Added an Expo React Native app shell for the native migration.
-  - Implemented typed routes for onboarding, auth, route planning, route preview, navigation, feedback, offline maps, and settings.
-  - Added a shared Zustand app store and a Mapbox-backed route preview component that consumes the normalized backend contract.
-- **Architecture**: Created `ARCHITECTURE.md` to track system state.
-- **Feature (Auth)**: Added Google OAuth support.
-  - Modified `services/supabase.ts` to include `signInWithGoogle`.
-  - Updated `components/Auth.tsx` with Google button.
-  - Updated `components/Icons.tsx` with `GoogleIcon`.
-- **Bugfix (Map)**: Fixed `mapWrapperRef.current?.getBounds is not a function` error.
-  - Exposed `getBounds` in `MapWrapper.tsx` inside `useImperativeHandle`.
-- **Bugfix (Offline)**: Restored `services/offlineMaps.ts` and updated `sw.js` caching logic to correctly handle tile subdomains.
-- **Feature (Routing)**: Modified `App.tsx` to calculate elevation profiles (Total Climb) for *all* alternative routes, not just the primary one.
-  - Changed `elevationProfile` state to `elevationProfiles` (array).
-  - Implemented parallel fetching of elevation data for all routes in `fetchRoute`.
-  - Updated selection logic to dynamically display analysis for the clicked route.
-- **Bugfix (Elevation)**: Fixed `Cannot set property fetch` error by removing the `importmap` script from `index.html` which conflicted with local dependencies.
-- **Bugfix (Elevation)**: Mitigated Open-Elevation API timeouts by reducing `MAX_POINTS_PER_REQUEST` to 50, increasing `REQUEST_TIMEOUT_MS` to 30s, and increasing `INITIAL_BACKOFF_MS` to 2000ms.
-- **Feature (Elevation)**: Added Open-Meteo as a fallback elevation data provider in `services/elevation.ts` to improve reliability when Open-Elevation fails. Updated `sw.js` to exclude `open-meteo` from caching.
-- **Feature (Risk Data)**: Created `supabase_risk_function.sql` containing a PostGIS function `get_segmented_risk_route` to intersect OSRM routes with the `road_risk_data` table and return a color-coded GeoJSON FeatureCollection.
-- **Bugfix (Risk Data)**: Fixed "set-returning functions are not allowed in WHERE" error in `supabase_risk_function.sql` by moving `ST_Dump` out of the `WHERE` clause into a separate CTE.
-- **Bugfix (Risk Data)**: Fixed "permission denied for table road_risk_data" error by granting SELECT permissions and creating an RLS policy in Supabase.
-- **Bugfix (Risk Data)**: Fixed "canceling statement due to statement timeout" error in `get_segmented_risk_route` by replacing expensive `ST_Buffer(geom::geography)` with `ST_Buffer(geom, 0.00015)` and `ST_Union` with `ST_UnaryUnion(ST_Collect())` for a massive performance boost.
-- **Feature (Risk Data Rendering)**: Updated `MapWrapper.tsx` to render the segmented risk routes (if available) with colors corresponding to the risk score (blue for no data, very safe <33, safe 33-43.5, average 43.5-51.8, elevated 51.8-57.6, risky 57.6-69, very risky 69-101.8, extreme >101.8) instead of the default solid yellow route.
-- **Feature (Risk Legend)**: Added `RiskLegend.tsx` component to display the color coding legend during route preview.
-- **Feature (Elevation Fallback)**: Implemented Mapbox Terrain-RGB raster tile decoding as a highly reliable fallback for elevation data when Open-Elevation and Open-Meteo APIs fail. Added `VITE_MAPBOX_ACCESS_TOKEN` to `.env.example`.
+## 4. Map Architecture
 
-### [Session 3 — 2026-03-21] Elevation Gain, Navigation HUD Redesign & Client-Side Routing
+### Basemap: Shield Mode
+- Mapbox Standard style with `StyleImport` configuration
+- Auto day/dawn/dusk/night lighting (refreshes every 30 min)
+- Safety-semantic road colors: red motorways, brown trunks, sandy cyclable roads
+- Hidden: POI labels, transit labels, 3D buildings
+- Visible: road labels, place labels, greenspace
 
-- **Feature (Elevation Profile)**: Added client-side elevation fetching via Mapbox Tilequery API in a new `apps/mobile/src/lib/elevation.ts` module.
-  - Samples elevation points along the route polyline using the Mapbox `contour` tilequery layer.
-  - Calculates total climb (elevation gain) by summing positive deltas between consecutive sample points, adapted from the webapp's `getAdjustedDuration` algorithm.
-  - Integrated into `mapbox-routing.ts` so both Safe and Fast route responses include `totalClimbMeters` and `adjustedDurationSeconds`.
-- **Feature (Route Preview Redesign)**: Redesigned route preview to show a single compact row with routing mode (Safe/Fast), ETA, distance, and total climb instead of multiple separate cards.
-  - Removed the stacked `SafestRoute`, `FastestRoute`, `ShortestRoute` cards and the duplicate route info card.
-  - Route info row is visible by default (no toggle needed).
-- **Feature (Navigation HUD Redesign)**: Completely redesigned the turn-by-turn navigation overlay:
-  - **ManeuverCard** (top, standalone): Shows the next maneuver with directional arrow, description, and distance (e.g., "→ Turn right in 100 m").
-  - **FooterCard** (bottom): Contains a "Then" strip showing the maneuver after next (e.g., "Then ← Turn left 200 m"), plus a metrics row with ETA, remaining distance, and remaining climb.
-  - **Control rail** (right side): Round gray buttons for recenter/free-map (GPS icon) and end-ride (X icon), plus voice guidance toggle and hazard report button.
-  - Removed previous cluttered multi-card navigation layout.
-- **Feature (Client-Side Routing)**: Moved from backend-dependent routing to direct Mapbox Directions API calls from the mobile client in `mapbox-routing.ts`.
-  - Safe mode uses the custom OSRM backend with cycling profile.
-  - Fast mode uses Mapbox Directions API directly with cycling profile.
-  - Both profiles now return normalized `RouteData` with geometry, steps, duration, distance, elevation, and climb data.
-- **Bugfix (Route Guard Transition)**: Fixed navigation start failing by allowing `'NAVIGATING'` as a transitional state in the route-preview guard, preventing a catch-22 where updating state triggered a redirect before the navigation screen could mount.
-- **New File**: `apps/mobile/src/lib/elevation.ts` — Mapbox Tilequery-based elevation sampling and total climb calculation.
+### Layers (RouteMap.tsx)
+1. **Route alternatives** — LineLayer for unselected (gray) + selected (accent) routes
+2. **Risk segments** — LineLayer with dynamic color from risk score
+3. **Bicycle parking** — Blue circles with "P" label (Overpass API, zoom 12+)
+4. **Bicycle rental** — Dark green circles with "R" label (Overpass API, zoom 12+)
+5. **Hazard markers** — Orange circles with "!" label
+6. **Route markers** — Origin (green), destination (blue), user (blue with stroke)
+7. **Trail/planned route** — For trip replay (blue trail, green/red planned)
+8. **Off-route connector** — Dashed line
 
-### [Session 2 — 2026-03-18] Mobile Design System, Auth & UI Overhaul
+### Camera Modes
+- **Route planning/preview**: Flat top-down, zoom 12.5, centers on destination or user GPS
+- **Navigation (following)**: 3D tilted (pitch 45°), zoom 16, follows user with course heading
+- **Navigation (free)**: Flat overview, user can pan/zoom
 
-#### Design System (Phases 1–7)
-- **Feature (Design Tokens)**: Created atomic design system under `apps/mobile/src/design-system/` with tokens for colors, typography, spacing, radii, and shadows — all matching the webapp's dark theme with yellow accent (`#FBBF24`).
-- **Feature (Atoms)**: Built foundational atoms: `DSText`, `DSButton`, `DSTextInput`, `DSIcon`, `DSDivider`, `DSBadge`, `DSCard`.
-- **Feature (Molecules)**: Built molecule components: `DSSearchBar`, `DSListItem`, `DSToggle`, `DSSegmentedControl`.
-- **Feature (Organisms)**: Built organism components: `DSBottomSheet`, `DSHeader`, `DSEmptyState`.
-- **Feature (Templates)**: Built template layouts: `DSScreenTemplate`, `DSScrollScreenTemplate`.
+## 5. Data Sources
 
-#### Auth & Account Screens
-- **Feature (Auth Screen Redesign)**: Completely rewrote `apps/mobile/app/auth.tsx` to replicate the webapp's clean auth UI: close button header, avatar section, Google OAuth button, divider, email/password form with icons, and segmented login/signup toggle.
-- **Feature (Settings Crash Fix)**: Added try-catch around `useAuthSession()` in both `auth.tsx` and `settings.tsx` to prevent app crashes when the auth context is unavailable.
-- **Feature (Google OAuth)**: Added Google sign-in via Supabase OAuth with `expo-web-browser`.
-  - Added `signInWithGoogle()` to `apps/mobile/src/lib/supabase.ts` using `signInWithOAuth` + `WebBrowser.openAuthSessionAsync`.
-  - Exposed `signInWithGoogle` through `AuthSessionProvider` context.
-  - Added `expo-web-browser` and `expo-crypto` dependencies (required native rebuild).
-  - Configured deep link scheme `defensivepedal-dev://` in `app.config.ts`.
-  - **⚠️ KNOWN ISSUE**: Google sign-in OAuth redirect back to the mobile app does not work reliably on Android. After Google authentication succeeds (session IS created in Supabase), Supabase's HTTP 302 redirect to the custom scheme `defensivepedal-dev://auth/callback` fails in Chrome Custom Tabs — the browser cannot follow 302 redirects to non-HTTPS schemes. The redirect falls back to the Supabase Site URL (the webapp) instead of returning to the mobile app. Multiple approaches were attempted:
-    1. Using `defensivepedal-dev://auth/callback` as redirect — Supabase redirects to webapp instead.
-    2. Using `defensivepedal-dev://auth` as redirect — same issue.
-    3. Direct Google OAuth via `expo-auth-session` + `signInWithIdToken` — blocked by Google ("access blocked: authorization error") because the OAuth client ID is a "Web" type, which only allows `https://` redirect URIs.
-    4. Adding Linking event listeners and `+not-found.tsx` catch-all route as fallbacks — did not resolve the core redirect issue.
-  - **Recommended fix**: Either (a) use `@react-native-google-signin/google-signin` for native Google Sign-In + `supabase.auth.signInWithIdToken()` (requires Android client ID with SHA-1 fingerprint, native rebuild), or (b) create a web intermediary page that receives the Supabase redirect and does a JavaScript `window.location.href` redirect to the custom scheme (JS redirects to custom schemes work in browsers, unlike HTTP 302).
+| Data | Source | Cache |
+|------|--------|-------|
+| Routes (safe) | Custom OSRM backend | TanStack Query |
+| Routes (fast) | Mapbox Directions API | TanStack Query |
+| Risk segments | Supabase RPC `get_segmented_risk_route` | per-request |
+| Elevation profile | Mobile API `/v1/elevation-profile` | per-route |
+| Autocomplete | Mapbox Search Box API v1 | debounced |
+| Bicycle parking | Overpass API (OSM) | 5 min stale |
+| Bicycle rental | Overpass API (OSM) | 5 min stale |
+| Weather + AQI | Open-Meteo (no key) | 15 min stale |
+| Hazards | Supabase `hazards` table | 30 sec refresh |
+| Trip history | Supabase `trip_tracks` table | on-demand |
+| Community feed | Mobile API `/v1/feed/*` | TanStack Query |
 
-#### UI Screens
-- **Feature (Route Planning Redesign)**: Redesigned `route-planning.tsx` with the new design system components.
-- **Feature (FAQ Screen)**: Created new `faq.tsx` screen with expandable accordion-style FAQ items.
+## 6. Offline-First Write Queue
 
-#### Backend & Supabase
-- **Feature (Supabase Service Key)**: Updated `services/mobile-api/.env` with `SUPABASE_SERVICE_ROLE_KEY` for server-side Supabase access.
-- **Bugfix (Hazard Reports)**: Verified hazard reports from the mobile app are correctly stored in Supabase via the mobile API backend.
+Mutations (trips, hazards, feedback, shares) are queued locally in Zustand and flushed by `OfflineMutationSyncManager`:
 
-#### Infrastructure
-- **Bugfix (Windows Path Limit)**: Added CMake `buildStagingDirectory` redirect in `android/build.gradle` to work around Windows 260-char path limit.
-- **Config (Android)**: Set `reactNativeArchitectures=arm64-v8a` in `gradle.properties` for faster builds.
-- **Config (Android)**: Added `RECEIVE_BOOT_COMPLETED` permission in `AndroidManifest.xml`.
-- **Dependencies**: Added `expo-web-browser`, `expo-crypto`, `expo-auth-session`, `react-native-svg`, `react-refresh` to the project.
+```
+enqueueMutation() → queuedMutations[] → flush loop (15s interval) → mobile API → Supabase
+```
 
-## 5. Future Development Rules
-0.  **Changelog Maintenance (AI INSTRUCTION)**: You MUST ALWAYS record any architectural changes, bug fixes, or new features in the Changelog section (Section 4) of this document (`ARCHITECTURE.md`) before completing a task.
-1.  **MapWrapper Access**: Always check `useImperativeHandle` definition in `MapWrapper` when adding new map controls that `App.tsx` needs to trigger (like accessing bounds or markers).
-2.  **Supabase**: When adding tables, ensure Row Level Security (RLS) policies are considered on the backend (though not enforced in frontend code).
-3.  **Routing**: `osrm.ts` handles the custom backend. Do not change the base URL unless the server changes.
-4.  **Dependencies**: Keep external dependencies minimal. Use `fetch` for APIs.
+Queue types: `trip_start`, `trip_end`, `trip_track`, `trip_share`, `hazard`, `feedback`
+
+Trip mutations resolve `clientTripId` → `tripId` via `tripServerIds` mapping.
+
+## 7. Mobile API Endpoints
+
+### Routes (`/v1`)
+- `POST /v1/routes/preview` — Route alternatives with risk enrichment
+- `POST /v1/routes/reroute` — Mid-navigation reroute
+- `POST /v1/risk-segments` — Risk data for a polyline
+- `POST /v1/elevation-profile` — Elevation array for a polyline
+- `POST /v1/search/autocomplete` — Mapbox search proxy
+- `POST /v1/search/reverse-geocode` — Reverse geocoding
+- `GET /v1/coverage` — Safe routing coverage check
+- `POST /v1/trips/start` — Start trip (authenticated)
+- `POST /v1/trips/end` — End trip (authenticated)
+- `POST /v1/trips/track` — Save GPS trail + planned route (authenticated)
+- `GET /v1/trips/history` — User's trip history (authenticated)
+- `POST /v1/feedback` — Navigation feedback (authenticated)
+- `POST /v1/hazards` — Report hazard (authenticated)
+- `GET /v1/hazards/nearby` — Hazards within bbox
+- `POST /v1/hazards/:id/validate` — Confirm/deny hazard
+
+### Community Feed (`/v1`)
+- `GET /v1/feed` — Location-based feed
+- `POST /v1/feed/share` — Share trip
+- `POST /v1/feed/:id/like` — Like/unlike
+- `GET /v1/feed/:id/comments` — Get comments
+- `POST /v1/feed/:id/comments` — Post comment
+- `GET /v1/profile` — User profile
+- `PUT /v1/profile` — Update profile
+
+## 8. Database Tables (Supabase)
+
+| Table | Purpose |
+|-------|---------|
+| `trips` | Trip start/end records |
+| `trip_tracks` | GPS breadcrumbs, planned route polyline, routing mode, end reason |
+| `hazards` | User-reported hazards with location, type, confirm/deny/pass counts |
+| `hazard_validations` | Per-user hazard votes (unique per hazard+user) |
+| `navigation_feedback` | Post-trip safety ratings and comments |
+| `road_risk_data` | Pre-computed road segment risk scores (PostGIS) |
+| `trip_shares` | Community feed shared trips |
+| `trip_likes` | Feed item likes |
+| `trip_comments` | Feed item comments |
+| `user_profiles` | Display name, avatar, bio |
+
+## 9. Profile Preferences
+
+| Setting | Effect |
+|---------|--------|
+| Bike type | Auto-sets "Avoid unpaved" for road/city/recumbent bikes |
+| Cycling frequency | User profile data |
+| Avoid unpaved roads | Appends `&exclude=unpaved` to OSRM requests |
+| Share trips publicly | Auto-shares completed trips to community feed |
+| Voice guidance | On/off for spoken turn-by-turn instructions |
+
+## 10. Build & Deploy
+
+### Dev (USB tethered)
+```bash
+adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
+cd services/mobile-api && npm run dev    # API on :8080
+cd apps/mobile && npx expo start --clear  # Metro on :8081
+```
+
+### Release APK (untethered)
+Build from `C:\dpb` short path (Windows 260-char CMake workaround):
+```bash
+robocopy <repo> C:\dpb /E /XD .git .claude android
+cd C:\dpb && npm install --legacy-peer-deps
+cd apps/mobile && npx expo prebuild --platform android
+cd android && ./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+### Cloud Run API
+```bash
+gcloud builds submit --tag europe-central2-docker.pkg.dev/<project>/defpedal-api/mobile-api:latest
+gcloud run deploy defpedal-api --image <image> --region europe-central2 --allow-unauthenticated
+```
+
+## 11. Development Rules
+
+1. **Immutability**: Always create new objects, never mutate existing ones
+2. **Small files**: 200-400 lines typical, 800 max
+3. **Error handling**: Handle errors at every level, fail fast with clear messages
+4. **Input validation**: Validate at system boundaries
+5. **No hardcoded secrets**: Use environment variables
+6. **Changelog**: Update `progress.md` with every feature/fix

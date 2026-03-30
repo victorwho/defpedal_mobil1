@@ -31,12 +31,12 @@ import { zustandStorage } from '../lib/storage';
 
 const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   origin: {
-    lat: 44.4268,
-    lon: 26.1025,
+    lat: 0,
+    lon: 0,
   },
   destination: {
-    lat: 44.4378,
-    lon: 26.0946,
+    lat: 0,
+    lon: 0,
   },
   mode: 'safe',
   avoidUnpaved: false,

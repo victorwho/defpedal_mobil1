@@ -60,16 +60,16 @@ export default function RoutePlanningScreen() {
   } = useCurrentLocation();
   const hasValidDestination = routeRequest.destination.lat !== 0 && routeRequest.destination.lon !== 0;
   const { parkingLocations } = useBicycleParking(
-    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
-    hasValidDestination ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null),
+    hasValidDestination ? routeRequest.destination : null,
   );
   const { rentalLocations } = useBicycleRental(
-    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
-    hasValidDestination ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null),
+    hasValidDestination ? routeRequest.destination : null,
   );
   const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
   const mapUserLocation = currentLocation ?? fallbackUserLocation;
-  const planningOrigin = mapUserLocation ?? routeRequest.origin;
+  const planningOrigin = mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null);
   const { weather, isLoading: weatherLoading } = useWeather(
     planningOrigin?.lat ?? null,
     planningOrigin?.lon ?? null,
@@ -289,7 +289,7 @@ export default function RoutePlanningScreen() {
           origin={mapUserLocation ?? undefined}
           destination={hasValidDestination ? routeRequest.destination : undefined}
           userLocation={mapUserLocation}
-          followUser={Boolean(mapUserLocation) && !customStartEnabled && !hasValidDestination}
+          followUser={false}
           fullBleed
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}

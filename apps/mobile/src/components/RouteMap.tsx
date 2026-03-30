@@ -4,7 +4,7 @@ import type { BicycleRentalLocation } from '../lib/bicycle-rental';
 import { decodePolyline } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Mapbox from '@rnmapbox/maps';
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -60,6 +60,19 @@ type DecodedRoute = {
 
 const DEFAULT_CENTER: [number, number] = [26.1025, 44.4268];
 
+// --- Shield Mode basemap ---
+const STANDARD_STYLE_URL = 'mapbox://styles/mapbox/standard';
+
+const getLightPreset = (): string => {
+  const hour = new Date().getHours();
+  if (hour >= 6 && hour < 8) return 'dawn';
+  if (hour >= 18 && hour < 20) return 'dusk';
+  if (hour >= 20 || hour < 6) return 'night';
+  return 'day';
+};
+
+const LIGHT_REFRESH_MS = 30 * 60 * 1000; // 30 minutes
+
 const toMarkerFeature = (
   coordinate: Coordinate | undefined,
   kind: 'origin' | 'destination' | 'user',
@@ -100,6 +113,37 @@ export const RouteMap = ({
   hazardPlacementMode = false,
   containerStyle,
 }: RouteMapProps) => {
+  const [lightPreset, setLightPreset] = useState(getLightPreset);
+
+  // Refresh light preset every 30 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLightPreset(getLightPreset());
+    }, LIGHT_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  const shieldModeConfig = useMemo(() => ({
+    lightPreset,
+    font: 'Montserrat',
+    showPointOfInterestLabels: 'false',
+    showTransitLabels: 'false',
+    show3dObjects: 'false',
+    showPedestrianRoads: 'false',
+    showRoadLabels: 'true',
+    showPlaceLabels: 'true',
+    colorLand: '#E8E4DE',
+    colorWater: '#B8C5CC',
+    colorGreenspace: '#8DB580',
+    colorMotorways: '#A0695A',
+    colorTrunks: '#B8917E',
+    colorRoads: '#D4C9A8',
+    colorIndustrial: '#DDD8D0',
+    colorCommercial: '#DDD8D0',
+    colorEducation: '#DDD8D0',
+    colorMedical: '#DDD8D0',
+  }), [lightPreset]);
+
   const decodedRoutes = useMemo<DecodedRoute[]>(
     () =>
       routes.map((route, index) => ({
@@ -309,7 +353,6 @@ export const RouteMap = ({
         trailMidpoint ??
         (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
         (userLocation ? ([userLocation.lon, userLocation.lat] as [number, number]) : null) ??
-        (origin ? ([origin.lon, origin.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
 
 
@@ -335,7 +378,7 @@ export const RouteMap = ({
     <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
       <Mapbox.MapView
         style={StyleSheet.absoluteFill}
-        styleURL={Mapbox.StyleURL.Outdoors}
+        styleURL={STANDARD_STYLE_URL}
         onPress={onMapTap ? (event: any) => {
           const coords = event?.geometry?.coordinates;
           if (Array.isArray(coords) && coords.length >= 2) {
@@ -343,6 +386,8 @@ export const RouteMap = ({
           }
         } : undefined}
       >
+        <Mapbox.StyleImport id="basemap" existing config={shieldModeConfig} />
+
         {followUser && userLocation ? (
           <Mapbox.Camera
             followUserLocation
@@ -354,6 +399,7 @@ export const RouteMap = ({
           />
         ) : (
           <Mapbox.Camera
+            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}`}
             zoomLevel={12.5}
             centerCoordinate={cameraCoordinate}
             pitch={0}
