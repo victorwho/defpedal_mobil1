@@ -242,6 +242,48 @@ export const RouteMap = ({
     [nearbyHazards],
   );
 
+  // Build striped hazard zone line segments along the route
+  const hazardZoneFeatureCollection = useMemo(() => {
+    const routeCoords = selectedRoute?.coordinates;
+    if (!routeCoords || routeCoords.length < 2 || nearbyHazards.length === 0) {
+      return { type: 'FeatureCollection' as const, features: [] as any[] };
+    }
+
+    const features = nearbyHazards.map((hazard) => {
+      // Find closest point on route to this hazard
+      let minDist = Infinity;
+      let closestIdx = 0;
+      for (let i = 0; i < routeCoords.length; i++) {
+        const dx = routeCoords[i][0] - hazard.lon;
+        const dy = routeCoords[i][1] - hazard.lat;
+        const dist = dx * dx + dy * dy;
+        if (dist < minDist) {
+          minDist = dist;
+          closestIdx = i;
+        }
+      }
+
+      // Extract ~50m before and after (approx 5-10 route points each direction)
+      const SPREAD = 8;
+      const startIdx = Math.max(0, closestIdx - SPREAD);
+      const endIdx = Math.min(routeCoords.length - 1, closestIdx + SPREAD);
+      const segment = routeCoords.slice(startIdx, endIdx + 1);
+
+      if (segment.length < 2) return null;
+
+      return {
+        type: 'Feature' as const,
+        properties: { id: hazard.id },
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: segment,
+        },
+      };
+    }).filter(Boolean);
+
+    return { type: 'FeatureCollection' as const, features };
+  }, [selectedRoute, nearbyHazards]);
+
   const trailFeatureCollection = useMemo(
     () =>
       trailCoordinates && trailCoordinates.length >= 2
@@ -542,6 +584,32 @@ export const RouteMap = ({
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {hazardZoneFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource id="hazard-zones" shape={hazardZoneFeatureCollection}>
+            <Mapbox.LineLayer
+              id="hazard-zone-black"
+              style={{
+                lineColor: '#000000',
+                lineWidth: 8,
+                lineOpacity: 0.9,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }}
+            />
+            <Mapbox.LineLayer
+              id="hazard-zone-red"
+              style={{
+                lineColor: '#DC2626',
+                lineWidth: 6,
+                lineDasharray: [1, 1.5],
+                lineOpacity: 0.95,
+                lineCap: 'butt',
+                lineJoin: 'round',
               }}
             />
           </Mapbox.ShapeSource>

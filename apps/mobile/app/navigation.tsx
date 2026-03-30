@@ -6,6 +6,7 @@ import {
   getNavigationProgress,
   getPreviewOrigin,
   computeRemainingClimb,
+  decodePolyline,
   haversineDistance,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
@@ -87,9 +88,31 @@ export default function NavigationScreen() {
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
+  // Query hazards along the entire route, not just near the user
+  const routeMidpoint = useMemo(() => {
+    if (!selectedRoute) return null;
+    const coords = decodePolyline(selectedRoute.geometryPolyline6);
+    if (coords.length === 0) return null;
+    const mid = coords[Math.floor(coords.length / 2)];
+    return { lat: mid[1], lon: mid[0] };
+  }, [selectedRoute]);
+
+  // Use route midpoint as query center with radius covering the full route
+  const hazardQueryCoordinate = routeMidpoint
+    ?? locationState.sample?.coordinate
+    ?? navigationSession?.lastKnownCoordinate
+    ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null);
+
+  // Compute radius to cover full route (half the route distance, min 1km, max 10km)
+  const hazardRadius = useMemo(() => {
+    const routeDist = selectedRoute?.distanceMeters ?? 2000;
+    return Math.max(1000, Math.min(10000, routeDist / 2));
+  }, [selectedRoute]);
+
   const { hazards: nearbyHazards } = useNearbyHazards(
-    locationState.sample?.coordinate ?? null,
+    hazardQueryCoordinate,
     Boolean(navigationSession),
+    hazardRadius,
   );
   const introAnnouncementKeyRef = useRef<string | null>(null);
   const dismissedHazardIdsRef = useRef<Set<string>>(new Set());

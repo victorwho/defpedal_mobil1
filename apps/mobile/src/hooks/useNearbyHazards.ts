@@ -14,6 +14,7 @@ const RADIUS_METERS = 1000;
 export const useNearbyHazards = (
   userCoordinate: Coordinate | null,
   enabled: boolean,
+  radiusMeters: number = RADIUS_METERS,
 ): {
   hazards: readonly NearbyHazard[];
   isLoading: boolean;
@@ -23,12 +24,13 @@ export const useNearbyHazards = (
       'nearby-hazards',
       userCoordinate?.lat.toFixed(3),
       userCoordinate?.lon.toFixed(3),
+      radiusMeters,
     ],
     queryFn: () =>
       mobileApi.getNearbyHazards(
         userCoordinate!.lat,
         userCoordinate!.lon,
-        RADIUS_METERS,
+        radiusMeters,
       ),
     enabled: enabled && userCoordinate !== null,
     staleTime: STALE_TIME_MS,
