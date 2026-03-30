@@ -580,7 +580,6 @@ export const buildV1Routes = (
       try {
         // Convert radius to approximate degree delta for bbox query
         const degDelta = radiusMeters / 111_000;
-        const { supabaseAdmin } = await import('../lib/supabaseAdmin');
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
 
         // location is JSONB with { latitude, longitude } — use raw SQL filter
@@ -659,10 +658,9 @@ export const buildV1Routes = (
       }
 
       try {
-        const { supabaseAdmin: adminClient } = await import('../lib/supabaseAdmin');
-        if (!adminClient) throw new Error('Supabase admin client not available');
+        if (!supabaseAdmin) throw new Error('Supabase admin client not available');
 
-        const { error } = await adminClient
+        const { error } = await supabaseAdmin
           .from('hazard_validations')
           .upsert(
             {
