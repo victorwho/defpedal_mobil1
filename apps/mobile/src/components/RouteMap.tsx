@@ -1,5 +1,6 @@
 import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../lib/bicycle-parking';
+import type { BicycleLaneSegment } from '../lib/bicycle-lanes';
 import type { BicycleRentalLocation } from '../lib/bicycle-rental';
 import { decodePolyline } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -37,6 +38,8 @@ type RouteMapProps = {
   showRouteOverlay?: boolean;
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
   bicycleRentalLocations?: readonly BicycleRentalLocation[];
+  bicycleLaneSegments?: readonly BicycleLaneSegment[];
+  showBicycleLanes?: boolean;
   nearbyHazards?: readonly NearbyHazard[];
   /** Bumped to force camera re-center (e.g. when user taps locate button) */
   recenterKey?: number;
@@ -107,6 +110,8 @@ export const RouteMap = ({
   showRouteOverlay = true,
   bicycleParkingLocations = [],
   bicycleRentalLocations = [],
+  bicycleLaneSegments = [],
+  showBicycleLanes = false,
   nearbyHazards = [],
   recenterKey = 0,
   trailCoordinates,
@@ -228,6 +233,23 @@ export const RouteMap = ({
       })),
     }),
     [bicycleRentalLocations],
+  );
+
+  const bicycleLaneFeatureCollection = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: showBicycleLanes
+        ? bicycleLaneSegments.map((seg) => ({
+            type: 'Feature' as const,
+            properties: { id: seg.id },
+            geometry: {
+              type: 'LineString' as const,
+              coordinates: seg.coordinates as [number, number][],
+            },
+          }))
+        : [],
+    }),
+    [bicycleLaneSegments, showBicycleLanes],
   );
 
   const hazardFeatureCollection = useMemo(
@@ -488,6 +510,22 @@ export const RouteMap = ({
                 lineColor: '#2196F3',
                 lineWidth: 4,
                 lineOpacity: 0.9,
+                lineJoin: 'round',
+                lineCap: 'round',
+                lineEmissiveStrength: 1,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {bicycleLaneFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource id="bicycle-lanes" shape={bicycleLaneFeatureCollection}>
+            <Mapbox.LineLayer
+              id="bicycle-lanes-layer"
+              style={{
+                lineColor: '#4A9EAF',
+                lineWidth: 3,
+                lineOpacity: 0.8,
                 lineJoin: 'round',
                 lineCap: 'round',
                 lineEmissiveStrength: 1,

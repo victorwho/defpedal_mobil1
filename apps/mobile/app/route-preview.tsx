@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useBicycleLanes } from '../src/hooks/useBicycleLanes';
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useWeather } from '../src/hooks/useWeather';
@@ -72,6 +73,10 @@ export default function RoutePreviewScreen() {
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
   const { rentalLocations } = useBicycleRental(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+  );
+  const { laneSegments } = useBicycleLanes(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
@@ -259,6 +264,8 @@ export default function RoutePreviewScreen() {
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
           bicycleRentalLocations={rentalLocations}
+          bicycleLaneSegments={laneSegments}
+          showBicycleLanes
         />
       }
       topOverlay={topOverlay}

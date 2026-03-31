@@ -13,6 +13,7 @@ import { RouteMap } from '../src/components/RouteMap';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
+import { useBicycleLanes } from '../src/hooks/useBicycleLanes';
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useWeather } from '../src/hooks/useWeather';
@@ -67,6 +68,11 @@ export default function RoutePlanningScreen() {
     mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null),
     hasValidDestination ? routeRequest.destination : null,
   );
+  const { laneSegments } = useBicycleLanes(
+    mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null),
+    hasValidDestination ? routeRequest.destination : null,
+  );
+  const [showBikeLanes, setShowBikeLanes] = useState(true);
   const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
   const mapUserLocation = currentLocation ?? fallbackUserLocation;
   const planningOrigin = mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null);
@@ -296,6 +302,8 @@ export default function RoutePlanningScreen() {
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
           bicycleRentalLocations={rentalLocations}
+          bicycleLaneSegments={laneSegments}
+          showBicycleLanes={showBikeLanes}
           recenterKey={recenterKey}
           onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
           hazardPlacementMode={hazardPlacementMode}
@@ -503,6 +511,14 @@ export default function RoutePlanningScreen() {
             accessibilityRole="button"
           >
             <Ionicons name="locate" size={22} color={gray[700]} />
+          </Pressable>
+          <Pressable
+            style={[styles.fabButton, showBikeLanes && { backgroundColor: 'rgba(74, 158, 175, 0.25)' }]}
+            onPress={() => setShowBikeLanes((v) => !v)}
+            accessibilityLabel={showBikeLanes ? 'Hide bike lanes' : 'Show bike lanes'}
+            accessibilityRole="button"
+          >
+            <Ionicons name="bicycle" size={22} color={showBikeLanes ? '#4A9EAF' : gray[700]} />
           </Pressable>
         </View>
       }
