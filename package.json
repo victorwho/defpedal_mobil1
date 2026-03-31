@@ -25,6 +25,7 @@
     "typecheck:mobile": "npm run typecheck --workspace @defensivepedal/mobile",
     "typecheck:api": "npm run typecheck --workspace @defensivepedal/mobile-api",
     "typecheck": "npm run typecheck:api && npm run typecheck:mobile",
+    "check:bundle": "bash ./scripts/check-bundle.sh",
     "validate:mobile": "npm run typecheck && npm run build:api",
     "validate": "npm run validate:mobile"
   },
@@ -33,7 +34,9 @@
     "expo-auth-session": "~55.0.8",
     "expo-router": "~55.0.5",
     "react": "19.2.1",
-    "react-native-svg": "^15.15.3"
+    "react-dom": "^19.2.4",
+    "react-native-svg": "^15.15.3",
+    "react-refresh": "^0.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
