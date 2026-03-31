@@ -38,6 +38,8 @@ type RouteMapProps = {
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
   bicycleRentalLocations?: readonly BicycleRentalLocation[];
   nearbyHazards?: readonly NearbyHazard[];
+  /** Bumped to force camera re-center (e.g. when user taps locate button) */
+  recenterKey?: number;
   /** GPS trail line (actual ride path) — rendered as a blue line */
   trailCoordinates?: readonly [number, number][];
   /** Planned route line — rendered in the specified color */
@@ -106,6 +108,7 @@ export const RouteMap = ({
   bicycleParkingLocations = [],
   bicycleRentalLocations = [],
   nearbyHazards = [],
+  recenterKey = 0,
   trailCoordinates,
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
@@ -389,11 +392,14 @@ export const RouteMap = ({
   }, [trailCoordinates]);
 
   const cameraCoordinate =
-    followUser && userLocation
+    // When recenter is requested, prioritize user location
+    recenterKey > 0 && userLocation
       ? ([userLocation.lon, userLocation.lat] as [number, number])
-      : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
-        trailMidpoint ??
-        (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
+      : followUser && userLocation
+        ? ([userLocation.lon, userLocation.lat] as [number, number])
+        : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
+          trailMidpoint ??
+          (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
         (userLocation ? ([userLocation.lon, userLocation.lat] as [number, number]) : null) ??
         DEFAULT_CENTER;
 
@@ -441,7 +447,7 @@ export const RouteMap = ({
           />
         ) : (
           <Mapbox.Camera
-            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}`}
+            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}-${recenterKey}`}
             zoomLevel={12.5}
             centerCoordinate={cameraCoordinate}
             pitch={0}
@@ -468,6 +474,7 @@ export const RouteMap = ({
                 lineOpacity: 0.7,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -483,6 +490,7 @@ export const RouteMap = ({
                 lineOpacity: 0.9,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -499,6 +507,7 @@ export const RouteMap = ({
                 lineWidth: 4,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
             <Mapbox.LineLayer
@@ -509,6 +518,7 @@ export const RouteMap = ({
                 lineWidth: 6,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -524,6 +534,7 @@ export const RouteMap = ({
                 lineOpacity: 0.95,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -543,6 +554,7 @@ export const RouteMap = ({
                 circleStrokeColor: '#FFFFFF',
                 circleStrokeWidth: 1.5,
                 circleOpacity: 0.9,
+                circleEmissiveStrength: 1,
               }}
             />
             <Mapbox.SymbolLayer
@@ -554,6 +566,7 @@ export const RouteMap = ({
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
+                textEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -573,6 +586,7 @@ export const RouteMap = ({
                 circleStrokeColor: '#FFFFFF',
                 circleStrokeWidth: 1.5,
                 circleOpacity: 0.9,
+                circleEmissiveStrength: 1,
               }}
             />
             <Mapbox.SymbolLayer
@@ -584,6 +598,7 @@ export const RouteMap = ({
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
+                textEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -599,6 +614,7 @@ export const RouteMap = ({
                 lineOpacity: 0.9,
                 lineCap: 'round',
                 lineJoin: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
             <Mapbox.LineLayer
@@ -610,6 +626,7 @@ export const RouteMap = ({
                 lineOpacity: 0.95,
                 lineCap: 'butt',
                 lineJoin: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -625,6 +642,7 @@ export const RouteMap = ({
                 circleStrokeColor: '#FFFFFF',
                 circleStrokeWidth: 2,
                 circleOpacity: 0.9,
+                circleEmissiveStrength: 1,
               }}
             />
             <Mapbox.SymbolLayer
@@ -635,6 +653,7 @@ export const RouteMap = ({
                 textColor: '#FFFFFF',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
+                textEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -650,6 +669,7 @@ export const RouteMap = ({
                 circleRadius: 6,
                 circleStrokeColor: gray[50],
                 circleStrokeWidth: 2,
+                circleEmissiveStrength: 1,
               }}
             />
             <Mapbox.CircleLayer
@@ -660,6 +680,7 @@ export const RouteMap = ({
                 circleRadius: 6,
                 circleStrokeColor: gray[50],
                 circleStrokeWidth: 2,
+                circleEmissiveStrength: 1,
               }}
             />
             <Mapbox.CircleLayer
@@ -670,6 +691,7 @@ export const RouteMap = ({
                 circleRadius: 7,
                 circleStrokeColor: brandColors.textPrimary,
                 circleStrokeWidth: 3,
+                circleEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>
@@ -686,6 +708,7 @@ export const RouteMap = ({
                 lineOpacity: 0.95,
                 lineJoin: 'round',
                 lineCap: 'round',
+                lineEmissiveStrength: 1,
               }}
             />
           </Mapbox.ShapeSource>

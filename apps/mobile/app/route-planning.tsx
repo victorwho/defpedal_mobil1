@@ -83,6 +83,8 @@ export default function RoutePlanningScreen() {
   const [destinationHydrated, setDestinationHydrated] = useState(false);
   const syncedOriginKeyRef = useRef<string | null>(null);
 
+  const [recenterKey, setRecenterKey] = useState(0);
+
   // Hazard reporting state
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
@@ -294,6 +296,7 @@ export default function RoutePlanningScreen() {
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
           bicycleRentalLocations={rentalLocations}
+          recenterKey={recenterKey}
           onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
           hazardPlacementMode={hazardPlacementMode}
         />
@@ -495,7 +498,7 @@ export default function RoutePlanningScreen() {
           </Pressable>
           <Pressable
             style={styles.fabButton}
-            onPress={() => void refreshLocation()}
+            onPress={() => { void refreshLocation(); setRecenterKey((k) => k + 1); }}
             accessibilityLabel="Center on current location"
             accessibilityRole="button"
           >
