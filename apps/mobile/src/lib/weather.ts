@@ -23,6 +23,14 @@ export interface WeatherData {
   readonly dailyTempMin: number;
   readonly dailyPrecipMax: number;
   readonly dailyWindMax: number;
+  /** Max precip probability from current hour to end of day */
+  readonly remainingPrecipMax: number;
+  /** Max wind speed from current hour to end of day */
+  readonly remainingWindMax: number;
+  /** Min temperature from current hour to end of day */
+  readonly remainingTempMin: number;
+  /** Max temperature from current hour to end of day */
+  readonly remainingTempMax: number;
   readonly airQuality: AirQualityData | null;
 }
 
@@ -137,6 +145,12 @@ type OpenMeteoResponse = {
     wind_speed_10m_max: number[];
     weather_code: number[];
   };
+  hourly?: {
+    time: string[];
+    temperature_2m: number[];
+    precipitation_probability: number[];
+    wind_speed_10m: number[];
+  };
 };
 
 /**
@@ -153,6 +167,7 @@ export const fetchWeather = async (
       longitude: lon.toFixed(4),
       current: 'temperature_2m,weather_code,wind_speed_10m,precipitation_probability',
       daily: 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max',
+      hourly: 'temperature_2m,precipitation_probability,wind_speed_10m',
       timezone: 'auto',
       forecast_days: '1',
     });
@@ -172,6 +187,23 @@ export const fetchWeather = async (
     const data = (await weatherResponse.json()) as OpenMeteoResponse;
     const wmo = resolveWmo(data.current.weather_code);
 
+    // Compute remaining-day aggregates from hourly data (current hour onward)
+    const now = new Date();
+    const currentHour = now.getHours();
+    const hourlyTimes = data.hourly?.time ?? [];
+    const startIdx = hourlyTimes.findIndex((t) => {
+      const h = new Date(t).getHours();
+      return h >= currentHour;
+    });
+    const remainingTemps = startIdx >= 0 ? (data.hourly?.temperature_2m ?? []).slice(startIdx) : [];
+    const remainingPrecips = startIdx >= 0 ? (data.hourly?.precipitation_probability ?? []).slice(startIdx) : [];
+    const remainingWinds = startIdx >= 0 ? (data.hourly?.wind_speed_10m ?? []).slice(startIdx) : [];
+
+    const remainingPrecipMax = remainingPrecips.length > 0 ? Math.max(...remainingPrecips) : (data.daily.precipitation_probability_max[0] ?? 0);
+    const remainingWindMax = remainingWinds.length > 0 ? Math.round(Math.max(...remainingWinds)) : Math.round(data.daily.wind_speed_10m_max[0]);
+    const remainingTempMin = remainingTemps.length > 0 ? Math.round(Math.min(...remainingTemps)) : Math.round(data.daily.temperature_2m_min[0]);
+    const remainingTempMax = remainingTemps.length > 0 ? Math.round(Math.max(...remainingTemps)) : Math.round(data.daily.temperature_2m_max[0]);
+
     return {
       temperature: Math.round(data.current.temperature_2m),
       weatherCode: data.current.weather_code,
@@ -183,6 +215,10 @@ export const fetchWeather = async (
       dailyTempMin: Math.round(data.daily.temperature_2m_min[0]),
       dailyPrecipMax: data.daily.precipitation_probability_max[0] ?? 0,
       dailyWindMax: Math.round(data.daily.wind_speed_10m_max[0]),
+      remainingPrecipMax,
+      remainingWindMax,
+      remainingTempMin,
+      remainingTempMax,
       airQuality,
     };
   } catch {
@@ -205,35 +241,35 @@ const PM25_THRESHOLD = 25;
 export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[] => {
   const warnings: WeatherWarning[] = [];
 
-  if (data.dailyPrecipMax > RAIN_THRESHOLD) {
+  if (data.remainingPrecipMax > RAIN_THRESHOLD) {
     warnings.push({
       type: 'rain',
       icon: 'rainy',
-      message: `High chance of rain today (${data.dailyPrecipMax}%)`,
+      message: `High chance of rain later today (${data.remainingPrecipMax}%)`,
     });
   }
 
-  if (data.temperature < FREEZE_THRESHOLD) {
+  if (data.remainingTempMin < FREEZE_THRESHOLD) {
     warnings.push({
       type: 'freezing',
       icon: 'snow',
-      message: `Freezing temperature: ${data.temperature}°C`,
+      message: `Freezing expected: ${data.remainingTempMin}°C`,
     });
   }
 
-  if (data.dailyTempMax - data.dailyTempMin > TEMP_DROP_THRESHOLD) {
+  if (data.remainingTempMax - data.remainingTempMin > TEMP_DROP_THRESHOLD) {
     warnings.push({
       type: 'temp_drop',
       icon: 'thermometer',
-      message: `Temperature swing today: ${data.dailyTempMin}°C → ${data.dailyTempMax}°C`,
+      message: `Temperature swing remaining: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C`,
     });
   }
 
-  if (data.dailyWindMax > WIND_THRESHOLD) {
+  if (data.remainingWindMax > WIND_THRESHOLD) {
     warnings.push({
       type: 'wind',
       icon: 'flag',
-      message: `Strong wind: ${data.dailyWindMax} km/h`,
+      message: `Strong wind expected: ${data.remainingWindMax} km/h`,
     });
   }
 
