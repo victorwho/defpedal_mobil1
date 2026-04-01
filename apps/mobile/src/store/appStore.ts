@@ -95,6 +95,8 @@ type AppStore = {
   setQuietHours: (start: string, end: string) => void;
   setShowBicycleLanes: (enabled: boolean) => void;
   setPoiVisibility: (category: string, enabled: boolean) => void;
+  showRouteComparison: boolean;
+  setShowRouteComparison: (enabled: boolean) => void;
   setShareTripsPublicly: (enabled: boolean) => void;
   setBikeType: (type: string | null) => void;
   setCyclingFrequency: (frequency: string | null) => void;
@@ -157,6 +159,7 @@ export const useAppStore = create<AppStore>()(
       offlineRegions: [],
       tripServerIds: {},
       activeTripClientId: null,
+      showRouteComparison: true,
       shareTripsPublicly: true,
       bikeType: null,
       cyclingFrequency: null,
@@ -189,6 +192,8 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           poiVisibility: { ...state.poiVisibility, [category]: enabled },
         })),
+      setShowRouteComparison: (enabled) =>
+        set(() => ({ showRouteComparison: enabled })),
       setShareTripsPublicly: (enabled) =>
         set(() => ({ shareTripsPublicly: enabled })),
       setBikeType: (type) => {
@@ -505,6 +510,7 @@ export const useAppStore = create<AppStore>()(
         offlineRegions: state.offlineRegions,
         tripServerIds: state.tripServerIds,
         activeTripClientId: state.activeTripClientId,
+        showRouteComparison: state.showRouteComparison,
         shareTripsPublicly: state.shareTripsPublicly,
         showBicycleLanes: state.showBicycleLanes,
         poiVisibility: state.poiVisibility,

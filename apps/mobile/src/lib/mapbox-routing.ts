@@ -350,6 +350,58 @@ export const directPreviewRoute = async (
     ),
   );
 
+  // Compute safe vs fast risk comparison if enabled
+  let comparisonLabel: string | undefined;
+  if (request.showRouteComparison && enrichedRoutes.length > 0) {
+    try {
+      const avgRisk = (segments: readonly RiskSegment[]) => {
+        if (segments.length === 0) return 0;
+        const total = segments.reduce((sum, s) => sum + s.riskScore, 0);
+        return total / segments.length;
+      };
+
+      const currentSegments = enrichedRoutes[0].riskSegments;
+      let comparisonSegments: readonly RiskSegment[] = [];
+
+      if (mode === 'safe') {
+        // Fetch fast route for comparison
+        const fastRawRoutes = await fetchMapboxRoutes(origin, destination);
+        if (fastRawRoutes.length > 0) {
+          const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0);
+          const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
+          comparisonSegments = fastEnriched.riskSegments;
+        }
+      } else {
+        // Fetch safe route for comparison
+        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved);
+        if (safeRawRoutes.length > 0) {
+          const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0);
+          const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);
+          comparisonSegments = safeEnriched.riskSegments;
+        }
+      }
+
+      if (currentSegments.length > 0 && comparisonSegments.length > 0) {
+        const currentAvg = avgRisk(currentSegments);
+        const comparisonAvg = avgRisk(comparisonSegments);
+
+        if (mode === 'safe' && comparisonAvg > 0 && currentAvg < comparisonAvg) {
+          const saferPercent = Math.round((1 - currentAvg / comparisonAvg) * 100);
+          if (saferPercent > 0) {
+            comparisonLabel = `${saferPercent}% safer than fast route`;
+          }
+        } else if (mode === 'fast' && comparisonAvg > 0 && currentAvg > comparisonAvg) {
+          const lessPercent = Math.round((1 - comparisonAvg / currentAvg) * 100);
+          if (lessPercent > 0) {
+            comparisonLabel = `${lessPercent}% less safe than safe route`;
+          }
+        }
+      }
+    } catch {
+      // Comparison failed silently — don't block the main response
+    }
+  }
+
   const coverage: CoverageRegion = {
     countryCode: request.countryHint?.toUpperCase() ?? 'UNKNOWN',
     status: 'supported',
@@ -361,6 +413,7 @@ export const directPreviewRoute = async (
     routes: enrichedRoutes,
     selectedMode: mode,
     coverage,
+    comparisonLabel,
     generatedAt: new Date().toISOString(),
   };
 };

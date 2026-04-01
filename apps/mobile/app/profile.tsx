@@ -92,6 +92,8 @@ export default function ProfileScreen() {
   const setCyclingFrequency = useAppStore((state) => state.setCyclingFrequency);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const setAvoidUnpaved = useAppStore((state) => state.setAvoidUnpaved);
+  const showRouteComparison = useAppStore((state) => state.showRouteComparison);
+  const setShowRouteComparison = useAppStore((state) => state.setShowRouteComparison);
   const notifyWeather = useAppStore((state) => state.notifyWeather);
   const setNotifyWeather = useAppStore((state) => state.setNotifyWeather);
   const notifyHazard = useAppStore((state) => state.notifyHazard);
@@ -175,6 +177,23 @@ export default function ProfileScreen() {
               </View>
               <View style={[styles.toggle, avoidUnpaved && styles.toggleOn]}>
                 <View style={[styles.toggleThumb, avoidUnpaved && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => setShowRouteComparison(!showRouteComparison)}
+            >
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Compare safe vs fast route</Text>
+                <Text style={styles.settingDescription}>
+                  {showRouteComparison
+                    ? 'Shows how much safer your route is vs fast routing'
+                    : 'Route comparison disabled'}
+                </Text>
+              </View>
+              <View style={[styles.toggle, showRouteComparison && styles.toggleOn]}>
+                <View style={[styles.toggleThumb, showRouteComparison && styles.toggleThumbOn]} />
               </View>
             </Pressable>
 

@@ -70,6 +70,7 @@ export interface RoutePreviewRequest {
   startOverride?: Coordinate;
   mode: RoutingMode;
   avoidUnpaved: boolean;
+  showRouteComparison?: boolean;
   locale: string;
   countryHint?: string;
   debug?: boolean;
@@ -83,6 +84,7 @@ export interface RoutePreviewResponse {
   routes: RouteOption[];
   selectedMode: RoutingMode;
   coverage: CoverageRegion;
+  comparisonLabel?: string;
   generatedAt: string;
   debug?: RouteDebugInfo[];
 }

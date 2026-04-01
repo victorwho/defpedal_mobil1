@@ -3,7 +3,8 @@ import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Speech from 'expo-speech';
 
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
@@ -94,10 +95,12 @@ export default function RoutePreviewScreen() {
     routeRequest.origin.lon,
   );
   const [weatherWarningDismissed, setWeatherWarningDismissed] = useState(false);
+  const [switchingToSafe, setSwitchingToSafe] = useState(false);
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
 
-  const effectiveRequest = { ...routeRequest, avoidUnpaved };
+  const showRouteComparison = useAppStore((state) => state.showRouteComparison);
+  const effectiveRequest = { ...routeRequest, avoidUnpaved, showRouteComparison };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -108,6 +111,7 @@ export default function RoutePreviewScreen() {
   useEffect(() => {
     if (previewQuery.data) {
       setRoutePreview(previewQuery.data);
+      setSwitchingToSafe(false);
     }
   }, [previewQuery.data, setRoutePreview]);
 
@@ -362,6 +366,50 @@ export default function RoutePreviewScreen() {
         <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
       ) : null}
 
+      {routePreview?.comparisonLabel ? (
+        <View>
+          <View style={[
+            styles.comparisonBadge,
+            routePreview.comparisonLabel.includes('less safe') && styles.comparisonBadgeWarning,
+          ]}>
+            <Ionicons
+              name={routePreview.comparisonLabel.includes('less safe') ? 'warning' : 'shield-checkmark'}
+              size={18}
+              color={routePreview.comparisonLabel.includes('less safe') ? '#F59E0B' : '#22C55E'}
+            />
+            <Text style={[
+              styles.comparisonText,
+              routePreview.comparisonLabel.includes('less safe') && styles.comparisonTextWarning,
+            ]}>
+              {routePreview.comparisonLabel}
+            </Text>
+          </View>
+          {routePreview.comparisonLabel.includes('less safe') ? (
+            <Pressable
+              style={styles.switchToSafeButton}
+              onPress={() => {
+                setSwitchingToSafe(true);
+                const setRoutingMode = useAppStore.getState().setRoutingMode;
+                setRoutingMode('safe');
+              }}
+              disabled={switchingToSafe}
+            >
+              {switchingToSafe ? (
+                <>
+                  <Spinner size={16} />
+                  <Text style={styles.switchToSafeText}>Switching to safe route...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="shield-checkmark" size={16} color="#22C55E" />
+                  <Text style={styles.switchToSafeText}>Switch to safe route</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       {selectedRoute?.elevationProfile && selectedRoute.elevationProfile.length > 1 ? (
         <ElevationChart
           elevationProfile={selectedRoute.elevationProfile}
@@ -486,6 +534,46 @@ const styles = StyleSheet.create({
   statDivider: {
     ...textSm,
     color: darkTheme.textMuted,
+  },
+  comparisonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    backgroundColor: 'rgba(34, 197, 94, 0.08)',
+  },
+  comparisonText: {
+    ...textSm,
+    fontFamily: fontFamily.heading.bold,
+    color: '#22C55E',
+  },
+  comparisonBadgeWarning: {
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+  },
+  comparisonTextWarning: {
+    color: '#F59E0B',
+  },
+  switchToSafeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+    marginTop: space[2],
+    paddingVertical: space[3],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.4)',
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+  },
+  switchToSafeText: {
+    ...textSm,
+    fontFamily: fontFamily.heading.bold,
+    color: '#22C55E',
   },
   warningPanel: {
     borderRadius: radii['2xl'],

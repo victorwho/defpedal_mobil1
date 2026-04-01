@@ -828,10 +828,9 @@ export const buildV1Routes = (
         });
       },
     );
-  };
 
   // ── Push token registration ──
-  routes.put(
+  app.put(
     '/push-token',
     async (request, reply) => {
       const user = await requireWriteUser(request, reply, dependencies);
@@ -869,7 +868,7 @@ export const buildV1Routes = (
     },
   );
 
-  routes.delete(
+  app.delete(
     '/push-token',
     async (request, reply) => {
       const user = await requireWriteUser(request, reply, dependencies);
@@ -891,7 +890,7 @@ export const buildV1Routes = (
   );
 
   // ── Admin notification send ──
-  routes.post(
+  app.post(
     '/notifications/send',
     async (request, reply) => {
       const user = await requireWriteUser(request, reply, dependencies);
@@ -924,6 +923,8 @@ export const buildV1Routes = (
       }
     },
   );
+
+  };
 
   return routes;
 };
