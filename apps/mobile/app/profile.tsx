@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -82,7 +83,7 @@ const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select
 };
 
 export default function ProfileScreen() {
-  const { user } = useAuthSession();
+  const { user, signOut } = useAuthSession();
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
   const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
   const bikeType = useAppStore((state) => state.bikeType);
@@ -285,6 +286,28 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
           </View>
+
+          {user ? (
+            <Pressable
+              style={styles.signOutButton}
+              onPress={() => {
+                Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await signOut();
+                      router.replace('/route-planning' as any);
+                    },
+                  },
+                ]);
+              }}
+            >
+              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </Pressable>
+          ) : null}
         </Screen>
       </View>
       <BottomNav activeTab="profile" onTabPress={handleTabPress} />
@@ -412,5 +435,21 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     fontFamily: fontFamily.body.medium,
     color: brandColors.accent,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+    paddingVertical: space[4],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+  },
+  signOutText: {
+    ...textBase,
+    fontFamily: fontFamily.body.medium,
+    color: '#EF4444',
   },
 });

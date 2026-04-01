@@ -1,4 +1,3 @@
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
@@ -6,12 +5,23 @@ import { router } from 'expo-router';
 
 import { mobileApi } from './api';
 
+// Use require() at call-time to avoid top-level native module crash
+const getNotifications = () => {
+  try {
+    return require('expo-notifications') as typeof import('expo-notifications');
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Configure foreground notification behavior.
  * Must be called once at app startup.
  */
 export const configureNotificationHandler = () => {
-  Notifications.setNotificationHandler({
+  const N = getNotifications();
+  if (!N) return;
+  N.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
       shouldPlaySound: true,
@@ -27,17 +37,15 @@ export const configureNotificationHandler = () => {
  * and send it to the server.
  */
 export const registerForPushNotifications = async (): Promise<string | null> => {
-  // Only real devices can receive push notifications
-  if (!Device.isDevice) {
-    return null;
-  }
+  const N = getNotifications();
+  if (!N) return null;
 
   // Check/request permission
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  const { status: existingStatus } = await N.getPermissionsAsync();
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await N.requestPermissionsAsync();
     finalStatus = status;
   }
 
@@ -47,20 +55,28 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
 
   // Android: set notification channel
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Default',
-      importance: Notifications.AndroidImportance.HIGH,
+    await N.setNotificationChannelAsync('default', {
+      name: 'Defensive Pedal',
+      importance: N.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FACC15',
     });
   }
 
-  // Get Expo push token
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: projectId ?? undefined,
-  });
-  const expoPushToken = tokenData.data;
+  // Get Expo push token — requires EAS project ID
+  let expoPushToken: string | null = null;
+  try {
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    const tokenData = await N.getExpoPushTokenAsync({
+      projectId: projectId ?? undefined,
+    });
+    expoPushToken = tokenData.data;
+  } catch {
+    // Token registration fails without EAS project ID — permission still granted
+    return null;
+  }
+
+  if (!expoPushToken) return null;
 
   // Register token with server
   try {
@@ -91,7 +107,7 @@ export const unregisterPushToken = async (): Promise<void> => {
  * Handle notification tap — navigate to the relevant screen.
  */
 export const handleNotificationResponse = (
-  response: Notifications.NotificationResponse,
+  response: any,
 ): void => {
   const data = response.notification.request.content.data as Record<string, unknown> | undefined;
   if (!data?.type) return;
