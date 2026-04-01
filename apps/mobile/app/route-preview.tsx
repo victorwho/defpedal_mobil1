@@ -7,8 +7,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
-import { useBicycleLanes } from '../src/hooks/useBicycleLanes';
+// Bike lanes use Mapbox vector tiles directly
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
+import { useBikeShops } from '../src/hooks/useBikeShops';
+import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useWeather } from '../src/hooks/useWeather';
 import { BrandLogo } from '../src/components/BrandLogo';
@@ -58,6 +60,7 @@ export default function RoutePreviewScreen() {
     requiredStates: ['IDLE', 'ROUTE_PREVIEW', 'NAVIGATING'],
   });
   const routeRequest = useAppStore((state) => state.routeRequest);
+  const poiVisibility = useAppStore((state) => state.poiVisibility);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const routePreview = useAppStore((state) => state.routePreview);
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
@@ -76,9 +79,15 @@ export default function RoutePreviewScreen() {
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
-  const { laneSegments } = useBicycleLanes(
+  const { shops: bikeShopLocations } = useBikeShops(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    poiVisibility?.repair ?? false,
+  );
+  const { searchedPois } = usePoiSearch(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    poiVisibility,
   );
   const { warnings: weatherWarnings } = useWeather(
     routeRequest.origin.lat,
@@ -264,8 +273,10 @@ export default function RoutePreviewScreen() {
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
           bicycleRentalLocations={rentalLocations}
-          bicycleLaneSegments={laneSegments}
+          bikeShopLocations={bikeShopLocations}
+          searchedPois={searchedPois}
           showBicycleLanes
+          poiVisibility={poiVisibility}
         />
       }
       topOverlay={topOverlay}

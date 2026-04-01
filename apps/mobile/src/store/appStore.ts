@@ -75,6 +75,17 @@ type AppStore = {
   bikeType: string | null;
   cyclingFrequency: string | null;
   avoidUnpaved: boolean;
+  showBicycleLanes: boolean;
+  poiVisibility: {
+    hydration: boolean;
+    repair: boolean;
+    restroom: boolean;
+    bikeRental: boolean;
+    bikeParking: boolean;
+    supplies: boolean;
+  };
+  setShowBicycleLanes: (enabled: boolean) => void;
+  setPoiVisibility: (category: string, enabled: boolean) => void;
   setShareTripsPublicly: (enabled: boolean) => void;
   setBikeType: (type: string | null) => void;
   setCyclingFrequency: (frequency: string | null) => void;
@@ -141,6 +152,21 @@ export const useAppStore = create<AppStore>()(
       bikeType: null,
       cyclingFrequency: null,
       avoidUnpaved: false,
+      showBicycleLanes: true,
+      poiVisibility: {
+        hydration: false,
+        repair: false,
+        restroom: false,
+        bikeRental: false,
+        bikeParking: false,
+        supplies: false,
+      },
+      setShowBicycleLanes: (enabled) =>
+        set(() => ({ showBicycleLanes: enabled })),
+      setPoiVisibility: (category, enabled) =>
+        set((state) => ({
+          poiVisibility: { ...state.poiVisibility, [category]: enabled },
+        })),
       setShareTripsPublicly: (enabled) =>
         set(() => ({ shareTripsPublicly: enabled })),
       setBikeType: (type) => {
@@ -458,6 +484,8 @@ export const useAppStore = create<AppStore>()(
         tripServerIds: state.tripServerIds,
         activeTripClientId: state.activeTripClientId,
         shareTripsPublicly: state.shareTripsPublicly,
+        showBicycleLanes: state.showBicycleLanes,
+        poiVisibility: state.poiVisibility,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,

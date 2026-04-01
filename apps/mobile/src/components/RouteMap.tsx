@@ -1,12 +1,15 @@
 import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../lib/bicycle-parking';
-import type { BicycleLaneSegment } from '../lib/bicycle-lanes';
+// Bike lanes now use Mapbox vector tiles (no Overpass API needed)
 import type { BicycleRentalLocation } from '../lib/bicycle-rental';
+import type { BikeShopLocation } from '../lib/bicycle-shops';
+import type { SearchedPoi } from '../lib/poi-search';
 import { decodePolyline } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Mapbox from '@rnmapbox/maps';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
+import { Dimensions, Linking, Pressable } from 'react-native';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, darkTheme, gray, safetyColors } from '../design-system/tokens/colors';
@@ -38,8 +41,17 @@ type RouteMapProps = {
   showRouteOverlay?: boolean;
   bicycleParkingLocations?: readonly BicycleParkingLocation[];
   bicycleRentalLocations?: readonly BicycleRentalLocation[];
-  bicycleLaneSegments?: readonly BicycleLaneSegment[];
+  bikeShopLocations?: readonly BikeShopLocation[];
+  searchedPois?: readonly SearchedPoi[];
   showBicycleLanes?: boolean;
+  poiVisibility?: {
+    hydration: boolean;
+    repair: boolean;
+    restroom: boolean;
+    medical: boolean;
+    transit: boolean;
+    supplies: boolean;
+  };
   nearbyHazards?: readonly NearbyHazard[];
   /** Bumped to force camera re-center (e.g. when user taps locate button) */
   recenterKey?: number;
@@ -110,8 +122,10 @@ export const RouteMap = ({
   showRouteOverlay = true,
   bicycleParkingLocations = [],
   bicycleRentalLocations = [],
-  bicycleLaneSegments = [],
+  bikeShopLocations = [],
+  searchedPois = [],
   showBicycleLanes = false,
+  poiVisibility,
   nearbyHazards = [],
   recenterKey = 0,
   trailCoordinates,
@@ -122,6 +136,68 @@ export const RouteMap = ({
   containerStyle,
 }: RouteMapProps) => {
   const [lightPreset, setLightPreset] = useState(getLightPreset);
+  const mapViewRef = useRef<Mapbox.MapView | null>(null);
+  const [selectedPoi, setSelectedPoi] = useState<{
+    name: string;
+    type: string;
+    website?: string;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+
+  const makiToType: Record<string, string> = useMemo(() => ({
+    'drinking-water': 'Water Fountain',
+    'cafe': 'Café',
+    'bicycle': 'Bike Shop',
+    'toilet': 'Restroom',
+    'bicycle-share': 'Bike Rental',
+    'convenience': 'Convenience Store',
+    'grocery': 'Grocery Store',
+  }), []);
+
+  const handlePoiPress = useCallback(async (event: any) => {
+    try {
+      const feature = event?.features?.[0];
+      if (!feature) return;
+      const props = feature.properties ?? {};
+      const coords = feature.geometry?.coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) return;
+
+      const name = props.name ?? 'Unknown';
+
+      // Toggle off if same POI tapped again
+      if (selectedPoi && selectedPoi.name === name) {
+        setSelectedPoi(null);
+        return;
+      }
+
+      // Convert geo coords to screen position
+      let screenX = 200;
+      let screenY = 300;
+      try {
+        const mapRef = mapViewRef.current;
+        if (mapRef) {
+          const point = await (mapRef as any).getPointInView([coords[0], coords[1]]);
+          if (Array.isArray(point) && point.length >= 2) {
+            screenX = point[0];
+            screenY = point[1];
+          }
+        }
+      } catch {
+        // fallback to defaults
+      }
+
+      setSelectedPoi({
+        name,
+        type: makiToType[props.maki] ?? props.type ?? 'Point of Interest',
+        website: props.website_url || undefined,
+        screenX,
+        screenY,
+      });
+    } catch {
+      // ignore
+    }
+  }, [makiToType, selectedPoi]);
 
   // Refresh light preset every 30 minutes
   useEffect(() => {
@@ -205,6 +281,10 @@ export const RouteMap = ({
     [selectedRoute],
   );
 
+  const parkingVisible = poiVisibility?.bikeParking ?? false;
+  const rentalVisible = poiVisibility?.bikeRental ?? false;
+  const repairVisible = poiVisibility?.repair ?? false;
+
   const bicycleParkingFeatureCollection = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
@@ -235,21 +315,62 @@ export const RouteMap = ({
     [bicycleRentalLocations],
   );
 
-  const bicycleLaneFeatureCollection = useMemo(
+  const bikeShopFeatureCollection = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
-      features: showBicycleLanes
-        ? bicycleLaneSegments.map((seg) => ({
-            type: 'Feature' as const,
-            properties: { id: seg.id },
-            geometry: {
-              type: 'LineString' as const,
-              coordinates: seg.coordinates as [number, number][],
-            },
-          }))
-        : [],
+      features: bikeShopLocations.map((loc) => ({
+        type: 'Feature' as const,
+        properties: {
+          id: loc.id,
+          name: loc.name ?? '',
+          repair: loc.repairService ? 'yes' : 'no',
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [loc.lon, loc.lat] as [number, number],
+        },
+      })),
     }),
-    [bicycleLaneSegments, showBicycleLanes],
+    [bikeShopLocations],
+  );
+
+  // Map Mapbox Search category to our label letter
+  const categoryToLabel: Record<string, string> = {
+    fountain: 'W', cafe: 'W', coffee_shop: 'W',
+    convenience_store: 'S', supermarket: 'S', grocery: 'S',
+  };
+
+  // Map Mapbox Search categories to our visibility keys
+  const categoryToVisKey: Record<string, keyof NonNullable<typeof poiVisibility>> = {
+    fountain: 'hydration', cafe: 'hydration', coffee_shop: 'hydration',
+    convenience_store: 'supplies', supermarket: 'supplies', grocery: 'supplies',
+  };
+
+  const searchedPoiFeatureCollection = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: searchedPois
+        .filter((poi) => {
+          const visKey = categoryToVisKey[poi.category];
+          return visKey ? (poiVisibility?.[visKey] ?? false) : false;
+        })
+        .map((poi) => ({
+          type: 'Feature' as const,
+          properties: {
+            id: poi.id,
+            name: poi.name,
+            label: categoryToLabel[poi.category] ?? '•',
+            address: poi.address ?? '',
+            website: poi.website ?? '',
+            type: poi.category,
+          },
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [poi.lon, poi.lat] as [number, number],
+          },
+        })),
+    }),
+    [searchedPois, poiVisibility],
   );
 
   const hazardFeatureCollection = useMemo(
@@ -447,6 +568,7 @@ export const RouteMap = ({
   return (
     <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
       <Mapbox.MapView
+        ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
         styleURL={STANDARD_STYLE_URL}
         onPress={onMapTap ? (event: any) => {
@@ -518,21 +640,123 @@ export const RouteMap = ({
           </Mapbox.ShapeSource>
         ) : null}
 
-        {bicycleLaneFeatureCollection.features.length > 0 ? (
-          <Mapbox.ShapeSource id="bicycle-lanes" shape={bicycleLaneFeatureCollection}>
-            <Mapbox.LineLayer
-              id="bicycle-lanes-layer"
-              style={{
-                lineColor: '#4A9EAF',
-                lineWidth: 3,
-                lineOpacity: 0.8,
-                lineJoin: 'round',
-                lineCap: 'round',
-                lineEmissiveStrength: 1,
-              }}
-            />
-          </Mapbox.ShapeSource>
-        ) : null}
+        {/* Single VectorSource for bike lanes + POIs from Mapbox Streets v8 */}
+        <Mapbox.VectorSource
+          id="mapbox-streets-overlay"
+          url="mapbox://mapbox.mapbox-streets-v8"
+          onPress={handlePoiPress}
+        >
+          {showBicycleLanes ? (
+            <>
+              <Mapbox.LineLayer
+                id="bike-lanes-cycleway"
+                sourceLayerID="road"
+                filter={['all',
+                  ['==', ['get', 'class'], 'path'],
+                  ['==', ['get', 'type'], 'cycleway'],
+                ]}
+                style={{
+                  lineColor: '#4A9EAF',
+                  lineWidth: 3,
+                  lineOpacity: 0.85,
+                  lineJoin: 'round',
+                  lineCap: 'round',
+                  lineEmissiveStrength: 1,
+                }}
+              />
+              <Mapbox.LineLayer
+                id="bike-lanes-onroad"
+                sourceLayerID="road"
+                filter={['==', ['get', 'bike_lane'], 'yes']}
+                style={{
+                  lineColor: '#4A9EAF',
+                  lineWidth: 2,
+                  lineOpacity: 0.7,
+                  lineJoin: 'round',
+                  lineCap: 'round',
+                  lineDasharray: [2, 1],
+                  lineEmissiveStrength: 1,
+                }}
+              />
+            </>
+          ) : null}
+          <Mapbox.CircleLayer
+            id="poi-hydration"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.hydration ? ['in', ['get', 'maki'], ['literal', ['drinking-water', 'cafe']]] : ['==', ['get', 'maki'], '__off__']}
+            style={{ circleColor: '#D4A843', circleRadius: 10, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 1.5, circleEmissiveStrength: 1 }}
+          />
+          <Mapbox.SymbolLayer
+            id="poi-hydration-icon"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.hydration ? ['in', ['get', 'maki'], ['literal', ['drinking-water', 'cafe']]] : ['==', ['get', 'maki'], '__off__']}
+            style={{ textField: 'W', textSize: 11, textColor: '#1A1A1A', textAllowOverlap: true, textIgnorePlacement: true, textEmissiveStrength: 1 }}
+          />
+          <Mapbox.CircleLayer
+            id="poi-repair"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.repair ? ['any',
+              ['==', ['get', 'maki'], 'bicycle'],
+              ['all', ['==', ['get', 'maki'], 'shop'], ['match', ['get', 'type'], ['Bicycle', 'Bicycle Shop', 'Bike', 'Bike Shop', 'Bicycle Repair'], true, false]],
+            ] : ['==', ['get', 'maki'], '__off__']}
+            style={{ circleColor: '#D4A843', circleRadius: 10, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 1.5, circleEmissiveStrength: 1 }}
+          />
+          <Mapbox.SymbolLayer
+            id="poi-repair-icon"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.repair ? ['any',
+              ['==', ['get', 'maki'], 'bicycle'],
+              ['all', ['==', ['get', 'maki'], 'shop'], ['match', ['get', 'type'], ['Bicycle', 'Bicycle Shop', 'Bike', 'Bike Shop', 'Bicycle Repair'], true, false]],
+            ] : ['==', ['get', 'maki'], '__off__']}
+            style={{ textField: 'B', textSize: 11, textColor: '#1A1A1A', textAllowOverlap: true, textIgnorePlacement: true, textEmissiveStrength: 1 }}
+          />
+          <Mapbox.CircleLayer
+            id="poi-restroom"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.restroom ? ['==', ['get', 'maki'], 'toilet'] : ['==', ['get', 'maki'], '__off__']}
+            style={{ circleColor: '#D4A843', circleRadius: 10, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 1.5, circleEmissiveStrength: 1 }}
+          />
+          <Mapbox.SymbolLayer
+            id="poi-restroom-icon"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.restroom ? ['==', ['get', 'maki'], 'toilet'] : ['==', ['get', 'maki'], '__off__']}
+            style={{ textField: 'WC', textSize: 9, textColor: '#1A1A1A', textAllowOverlap: true, textIgnorePlacement: true, textEmissiveStrength: 1 }}
+          />
+          <Mapbox.CircleLayer
+            id="poi-bike-rental-vt"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.bikeRental ? ['==', ['get', 'maki'], 'bicycle-share'] : ['==', ['get', 'maki'], '__off__']}
+            style={{ circleColor: '#D4A843', circleRadius: 10, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 1.5, circleEmissiveStrength: 1 }}
+          />
+          <Mapbox.SymbolLayer
+            id="poi-bike-rental-vt-icon"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.bikeRental ? ['==', ['get', 'maki'], 'bicycle-share'] : ['==', ['get', 'maki'], '__off__']}
+            style={{ textField: 'R', textSize: 11, textColor: '#1A1A1A', textAllowOverlap: true, textIgnorePlacement: true, textEmissiveStrength: 1 }}
+          />
+          <Mapbox.CircleLayer
+            id="poi-supplies"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.supplies ? ['in', ['get', 'maki'], ['literal', ['convenience', 'grocery']]] : ['==', ['get', 'maki'], '__off__']}
+            style={{ circleColor: '#D4A843', circleRadius: 10, circleStrokeColor: '#FFFFFF', circleStrokeWidth: 1.5, circleEmissiveStrength: 1 }}
+          />
+          <Mapbox.SymbolLayer
+            id="poi-supplies-icon"
+            sourceLayerID="poi_label"
+            minZoomLevel={14}
+            filter={poiVisibility?.supplies ? ['in', ['get', 'maki'], ['literal', ['convenience', 'grocery']]] : ['==', ['get', 'maki'], '__off__']}
+            style={{ textField: 'S', textSize: 11, textColor: '#1A1A1A', textAllowOverlap: true, textIgnorePlacement: true, textEmissiveStrength: 1 }}
+          />
+        </Mapbox.VectorSource>
 
         {routeFeatureCollection.features.length > 0 ? (
           <Mapbox.ShapeSource id="route-alternatives" shape={routeFeatureCollection}>
@@ -578,8 +802,9 @@ export const RouteMap = ({
           </Mapbox.ShapeSource>
         ) : null}
 
-        {bicycleParkingFeatureCollection.features.length > 0 ? (
+        {parkingVisible && bicycleParkingFeatureCollection.features.length > 0 ? (
           <Mapbox.ShapeSource
+            key="bicycle-parking-visible"
             id="bicycle-parking"
             shape={bicycleParkingFeatureCollection}
           >
@@ -587,11 +812,11 @@ export const RouteMap = ({
               id="bicycle-parking-bg"
               minZoomLevel={12}
               style={{
-                circleColor: '#2196F3',
-                circleRadius: 12,
+                circleColor: '#D4A843',
+                circleRadius: parkingVisible ? 10 : 0,
                 circleStrokeColor: '#FFFFFF',
-                circleStrokeWidth: 1.5,
-                circleOpacity: 0.9,
+                circleStrokeWidth: parkingVisible ? 1.5 : 0,
+                circleOpacity: parkingVisible ? 0.9 : 0,
                 circleEmissiveStrength: 1,
               }}
             />
@@ -600,8 +825,9 @@ export const RouteMap = ({
               minZoomLevel={12}
               style={{
                 textField: 'P',
-                textSize: 10,
-                textColor: '#FFFFFF',
+                textSize: 11,
+                textColor: '#1A1A1A',
+                textOpacity: parkingVisible ? 1 : 0,
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
                 textEmissiveStrength: 1,
@@ -610,8 +836,9 @@ export const RouteMap = ({
           </Mapbox.ShapeSource>
         ) : null}
 
-        {bicycleRentalFeatureCollection.features.length > 0 ? (
+        {rentalVisible && bicycleRentalFeatureCollection.features.length > 0 ? (
           <Mapbox.ShapeSource
+            key="bicycle-rental-visible"
             id="bicycle-rental"
             shape={bicycleRentalFeatureCollection}
           >
@@ -619,11 +846,11 @@ export const RouteMap = ({
               id="bicycle-rental-bg"
               minZoomLevel={12}
               style={{
-                circleColor: '#2E7D32',
-                circleRadius: 12,
+                circleColor: '#D4A843',
+                circleRadius: rentalVisible ? 10 : 0,
                 circleStrokeColor: '#FFFFFF',
-                circleStrokeWidth: 1.5,
-                circleOpacity: 0.9,
+                circleStrokeWidth: rentalVisible ? 1.5 : 0,
+                circleOpacity: rentalVisible ? 0.9 : 0,
                 circleEmissiveStrength: 1,
               }}
             />
@@ -632,8 +859,73 @@ export const RouteMap = ({
               minZoomLevel={12}
               style={{
                 textField: 'R',
-                textSize: 10,
-                textColor: '#FFFFFF',
+                textSize: 11,
+                textColor: '#1A1A1A',
+                textOpacity: rentalVisible ? 1 : 0,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+                textEmissiveStrength: 1,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {repairVisible && bikeShopFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource key="bike-shops-visible" id="bike-shops" shape={bikeShopFeatureCollection}>
+            <Mapbox.CircleLayer
+              id="bike-shop-bg"
+              minZoomLevel={12}
+              style={{
+                circleColor: '#D4A843',
+                circleRadius: repairVisible ? 10 : 0,
+                circleStrokeColor: '#FFFFFF',
+                circleStrokeWidth: repairVisible ? 1.5 : 0,
+                circleOpacity: repairVisible ? 0.9 : 0,
+                circleEmissiveStrength: 1,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="bike-shop-label"
+              minZoomLevel={12}
+              style={{
+                textField: 'B',
+                textSize: 11,
+                textColor: '#1A1A1A',
+                textOpacity: repairVisible ? 1 : 0,
+                textAllowOverlap: true,
+                textIgnorePlacement: true,
+                textEmissiveStrength: 1,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
+        {searchedPoiFeatureCollection.features.length > 0 ? (
+          <Mapbox.ShapeSource
+            key={`searched-pois-${searchedPoiFeatureCollection.features.length}`}
+            id="searched-pois"
+            shape={searchedPoiFeatureCollection}
+            onPress={handlePoiPress}
+          >
+            <Mapbox.CircleLayer
+              id="searched-poi-bg"
+              minZoomLevel={11}
+              style={{
+                circleColor: '#D4A843',
+                circleRadius: 10,
+                circleStrokeColor: '#FFFFFF',
+                circleStrokeWidth: 1.5,
+                circleOpacity: 0.9,
+                circleEmissiveStrength: 1,
+              }}
+            />
+            <Mapbox.SymbolLayer
+              id="searched-poi-label"
+              minZoomLevel={11}
+              style={{
+                textField: ['get', 'label'],
+                textSize: 11,
+                textColor: '#1A1A1A',
                 textAllowOverlap: true,
                 textIgnorePlacement: true,
                 textEmissiveStrength: 1,
@@ -751,6 +1043,8 @@ export const RouteMap = ({
             />
           </Mapbox.ShapeSource>
         ) : null}
+
+        {/* POI layers are inside mapbox-streets-overlay VectorSource above */}
       </Mapbox.MapView>
 
       {hazardPlacementMode ? (
@@ -759,6 +1053,42 @@ export const RouteMap = ({
           <Text style={styles.crosshairLabel}>Tap map to place hazard</Text>
         </View>
       ) : null}
+
+      {selectedPoi ? (() => {
+        const screenW = Dimensions.get('window').width;
+        const screenH = Dimensions.get('window').height;
+        const cardW = screenW * 0.44;
+        const cardH = 60;
+        // Position card to the right of dot, or left if too close to right edge
+        const toRight = selectedPoi.screenX < screenW * 0.55;
+        const cardLeft = toRight
+          ? Math.min(selectedPoi.screenX + 16, screenW - cardW - 8)
+          : Math.max(selectedPoi.screenX - cardW - 16, 8);
+        // Vertically center on the dot, clamped to screen
+        const cardTop = Math.max(8, Math.min(selectedPoi.screenY - cardH / 2, screenH - cardH - 8));
+
+        return (
+          <Pressable
+            style={[styles.poiCard, { left: cardLeft, top: cardTop, width: cardW }]}
+            onPress={() => setSelectedPoi(null)}
+          >
+            <View style={styles.poiCardContent}>
+              <View style={styles.poiCardHeader}>
+                <Text style={styles.poiCardType}>{selectedPoi.type}</Text>
+                <Pressable onPress={() => setSelectedPoi(null)} hitSlop={8}>
+                  <Ionicons name="close" size={12} color={gray[400]} />
+                </Pressable>
+              </View>
+              <Text style={styles.poiCardName} numberOfLines={1}>{selectedPoi.name}</Text>
+              {selectedPoi.website ? (
+                <Pressable onPress={() => { void Linking.openURL(selectedPoi.website!); }}>
+                  <Text style={styles.poiCardLink}>website ↗</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      })() : null}
 
       {showRouteOverlay ? (
         <View style={styles.overlay}>
@@ -859,5 +1189,40 @@ const styles = StyleSheet.create({
     paddingVertical: space[1],
     borderRadius: radii.md,
     overflow: 'hidden',
+  },
+  poiCard: {
+    position: 'absolute',
+    zIndex: 25,
+  },
+  poiCardContent: {
+    backgroundColor: 'rgba(11, 16, 32, 0.93)',
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: brandColors.borderDefault,
+    paddingHorizontal: space[2] + space[0.5],
+    paddingVertical: space[2],
+    gap: 2,
+  },
+  poiCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  poiCardType: {
+    fontSize: 8,
+    fontFamily: fontFamily.heading.bold,
+    color: '#D4A843',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  poiCardName: {
+    fontSize: 11,
+    fontFamily: fontFamily.body.medium,
+    color: brandColors.textPrimary,
+  },
+  poiCardLink: {
+    fontSize: 10,
+    color: '#4A9EAF',
+    fontFamily: fontFamily.body.medium,
   },
 });

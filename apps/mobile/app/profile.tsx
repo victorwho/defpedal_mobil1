@@ -91,6 +91,19 @@ export default function ProfileScreen() {
   const setCyclingFrequency = useAppStore((state) => state.setCyclingFrequency);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const setAvoidUnpaved = useAppStore((state) => state.setAvoidUnpaved);
+  const showBicycleLanes = useAppStore((state) => state.showBicycleLanes);
+  const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
+  const poiVisibility = useAppStore((state) => state.poiVisibility);
+  const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
+
+  const poiCategories = [
+    { key: 'hydration', label: 'Water & Cafés', description: 'Drinking fountains and cafés' },
+    { key: 'repair', label: 'Bike Shops', description: 'Bicycle repair and shops' },
+    { key: 'bikeRental', label: 'Bike Rental', description: 'Bicycle rental stations' },
+    { key: 'bikeParking', label: 'Bike Parking', description: 'Bicycle parking locations' },
+    { key: 'restroom', label: 'Restrooms', description: 'Public toilets' },
+    { key: 'supplies', label: 'Supplies', description: 'Convenience stores, grocery' },
+  ] as const;
 
   return (
     <View style={styles.root}>
@@ -154,6 +167,43 @@ export default function ProfileScreen() {
                 <View style={[styles.toggleThumb, avoidUnpaved && styles.toggleThumbOn]} />
               </View>
             </Pressable>
+
+            <Pressable
+              style={styles.settingRow}
+              onPress={() => setShowBicycleLanes(!showBicycleLanes)}
+            >
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Show bike lanes on map</Text>
+                <Text style={styles.settingDescription}>
+                  {showBicycleLanes
+                    ? 'Cycling infrastructure is visible on the map'
+                    : 'Bike lanes are hidden from the map'}
+                </Text>
+              </View>
+              <View style={[styles.toggle, showBicycleLanes && styles.toggleOn]}>
+                <View style={[styles.toggleThumb, showBicycleLanes && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Points of Interest</Text>
+
+            {poiCategories.map((cat) => (
+              <Pressable
+                key={cat.key}
+                style={styles.settingRow}
+                onPress={() => setPoiVisibility(cat.key, !poiVisibility[cat.key])}
+              >
+                <View style={styles.settingTextCol}>
+                  <Text style={styles.settingLabel}>{cat.label}</Text>
+                  <Text style={styles.settingDescription}>{cat.description}</Text>
+                </View>
+                <View style={[styles.toggle, poiVisibility[cat.key] && styles.toggleOn]}>
+                  <View style={[styles.toggleThumb, poiVisibility[cat.key] && styles.toggleThumbOn]} />
+                </View>
+              </Pressable>
+            ))}
           </View>
 
           <View style={styles.section}>

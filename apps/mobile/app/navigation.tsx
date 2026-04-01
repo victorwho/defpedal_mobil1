@@ -25,8 +25,10 @@ import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
-import { useBicycleLanes } from '../src/hooks/useBicycleLanes';
+// Bike lanes use Mapbox vector tiles directly
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
+import { useBikeShops } from '../src/hooks/useBikeShops';
+import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
@@ -74,6 +76,7 @@ export default function NavigationScreen() {
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setFollowing = useAppStore((state) => state.setFollowing);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
+  const poiVisibility = useAppStore((state) => state.poiVisibility);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const activeTripClientId = useAppStore((state) => state.activeTripClientId);
   const queuedMutations = useAppStore((state) => state.queuedMutations);
@@ -89,9 +92,15 @@ export default function NavigationScreen() {
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
   );
-  const { laneSegments } = useBicycleLanes(
+  const { shops: bikeShopLocations } = useBikeShops(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    poiVisibility?.repair ?? false,
+  );
+  const { searchedPois } = usePoiSearch(
+    routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
+    routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
+    poiVisibility,
   );
   // Query hazards along the entire route, not just near the user
   const routeMidpoint = useMemo(() => {
@@ -591,8 +600,10 @@ export default function NavigationScreen() {
         showRouteOverlay={false}
         bicycleParkingLocations={parkingLocations}
         bicycleRentalLocations={rentalLocations}
-        bicycleLaneSegments={laneSegments}
+        bikeShopLocations={bikeShopLocations}
+        searchedPois={searchedPois}
         showBicycleLanes
+        poiVisibility={poiVisibility}
         nearbyHazards={nearbyHazards}
       />
 
