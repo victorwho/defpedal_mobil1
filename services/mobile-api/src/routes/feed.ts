@@ -247,6 +247,25 @@ export const buildFeedRoutes = (
           });
         }
 
+        // Fire-and-forget community notification to trip owner
+        void (async () => {
+          try {
+            const { data: share } = await db
+              .from('trip_shares')
+              .select('user_id')
+              .eq('id', request.params.id)
+              .single();
+            if (share && share.user_id !== user.id) {
+              const { dispatchNotification } = await import('../lib/notifications');
+              await dispatchNotification(share.user_id, 'community', {
+                title: 'Someone liked your ride! 🚴',
+                body: 'A fellow cyclist appreciated your trip.',
+                data: { type: 'community', tripShareId: request.params.id },
+              });
+            }
+          } catch { /* ignore notification failures */ }
+        })();
+
         return { acceptedAt: new Date().toISOString() };
       },
     );
@@ -392,6 +411,25 @@ export const buildFeedRoutes = (
             details: [error.message],
           });
         }
+
+        // Fire-and-forget community notification to trip owner
+        void (async () => {
+          try {
+            const { data: share } = await db
+              .from('trip_shares')
+              .select('user_id')
+              .eq('id', request.params.id)
+              .single();
+            if (share && share.user_id !== user.id) {
+              const { dispatchNotification } = await import('../lib/notifications');
+              await dispatchNotification(share.user_id, 'community', {
+                title: 'New comment on your trip 💬',
+                body: request.body.body.trim().slice(0, 100),
+                data: { type: 'community', tripShareId: request.params.id },
+              });
+            }
+          } catch { /* ignore notification failures */ }
+        })();
 
         return { acceptedAt: new Date().toISOString() };
       },

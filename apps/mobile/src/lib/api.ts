@@ -347,4 +347,16 @@ export const mobileApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+
+  // Push notifications
+  registerPushToken: (expoPushToken: string, deviceId: string, platform: string) =>
+    requestJson<WriteAckResponse>('/v1/push-token', {
+      method: 'PUT',
+      body: JSON.stringify({ expoPushToken, deviceId, platform }),
+    }),
+  unregisterPushToken: (deviceId: string) =>
+    requestJson<WriteAckResponse>('/v1/push-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ deviceId }),
+    }),
 };

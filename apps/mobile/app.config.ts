@@ -142,6 +142,12 @@ export default () => ({
       'expo-router',
       'expo-font',
       '@rnmapbox/maps',
+      [
+        'expo-notifications',
+        {
+          color: '#FACC15',
+        },
+      ],
       ['./plugins/withAndroidCleartextTraffic', { enabled: usesCleartextTraffic }],
       [
         'expo-location',
@@ -173,7 +179,7 @@ export default () => ({
       supportsTablet: false,
       bundleIdentifier: appIdentifierByVariant[appVariant],
       infoPlist: {
-        UIBackgroundModes: ['location', 'processing'],
+        UIBackgroundModes: ['location', 'processing', 'remote-notification'],
       },
     },
     android: {
@@ -185,6 +191,7 @@ export default () => ({
         'FOREGROUND_SERVICE',
         'RECEIVE_BOOT_COMPLETED',
         'WAKE_LOCK',
+        'POST_NOTIFICATIONS',
       ],
     },
     extra: {

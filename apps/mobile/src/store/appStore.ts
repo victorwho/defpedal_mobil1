@@ -84,6 +84,15 @@ type AppStore = {
     bikeParking: boolean;
     supplies: boolean;
   };
+  notifyWeather: boolean;
+  notifyHazard: boolean;
+  notifyCommunity: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  setNotifyWeather: (enabled: boolean) => void;
+  setNotifyHazard: (enabled: boolean) => void;
+  setNotifyCommunity: (enabled: boolean) => void;
+  setQuietHours: (start: string, end: string) => void;
   setShowBicycleLanes: (enabled: boolean) => void;
   setPoiVisibility: (category: string, enabled: boolean) => void;
   setShareTripsPublicly: (enabled: boolean) => void;
@@ -152,6 +161,19 @@ export const useAppStore = create<AppStore>()(
       bikeType: null,
       cyclingFrequency: null,
       avoidUnpaved: false,
+      notifyWeather: true,
+      notifyHazard: true,
+      notifyCommunity: true,
+      quietHoursStart: '22:00',
+      quietHoursEnd: '07:00',
+      setNotifyWeather: (enabled) =>
+        set(() => ({ notifyWeather: enabled })),
+      setNotifyHazard: (enabled) =>
+        set(() => ({ notifyHazard: enabled })),
+      setNotifyCommunity: (enabled) =>
+        set(() => ({ notifyCommunity: enabled })),
+      setQuietHours: (start, end) =>
+        set(() => ({ quietHoursStart: start, quietHoursEnd: end })),
       showBicycleLanes: true,
       poiVisibility: {
         hydration: false,
@@ -486,6 +508,11 @@ export const useAppStore = create<AppStore>()(
         shareTripsPublicly: state.shareTripsPublicly,
         showBicycleLanes: state.showBicycleLanes,
         poiVisibility: state.poiVisibility,
+        notifyWeather: state.notifyWeather,
+        notifyHazard: state.notifyHazard,
+        notifyCommunity: state.notifyCommunity,
+        quietHoursStart: state.quietHoursStart,
+        quietHoursEnd: state.quietHoursEnd,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,

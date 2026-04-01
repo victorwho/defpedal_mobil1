@@ -830,5 +830,100 @@ export const buildV1Routes = (
     );
   };
 
+  // ── Push token registration ──
+  routes.put(
+    '/push-token',
+    async (request, reply) => {
+      const user = await requireWriteUser(request, reply, dependencies);
+      if (!user) return;
+
+      const { expoPushToken, deviceId, platform } = request.body as {
+        expoPushToken: string;
+        deviceId: string;
+        platform: string;
+      };
+
+      if (!expoPushToken || !deviceId || !platform) {
+        return reply.status(400).send({ error: 'Missing required fields' });
+      }
+
+      const { error } = await supabaseAdmin
+        .from('push_tokens')
+        .upsert(
+          {
+            user_id: user.id,
+            expo_push_token: expoPushToken,
+            device_id: deviceId,
+            platform,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,device_id' },
+        );
+
+      if (error) {
+        request.log.error({ error }, 'push token upsert failed');
+        return reply.status(500).send({ error: 'Failed to register push token' });
+      }
+
+      return reply.send({ acceptedAt: new Date().toISOString() });
+    },
+  );
+
+  routes.delete(
+    '/push-token',
+    async (request, reply) => {
+      const user = await requireWriteUser(request, reply, dependencies);
+      if (!user) return;
+
+      const { deviceId } = request.body as { deviceId: string };
+      if (!deviceId) {
+        return reply.status(400).send({ error: 'Missing deviceId' });
+      }
+
+      await supabaseAdmin
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('device_id', deviceId);
+
+      return reply.send({ acceptedAt: new Date().toISOString() });
+    },
+  );
+
+  // ── Admin notification send ──
+  routes.post(
+    '/notifications/send',
+    async (request, reply) => {
+      const user = await requireWriteUser(request, reply, dependencies);
+      if (!user) return;
+
+      const { dispatchNotification, broadcastNotification } = await import('../lib/notifications');
+      const { userId, category, title, body, data } = request.body as {
+        userId?: string;
+        category: string;
+        title: string;
+        body: string;
+        data?: Record<string, unknown>;
+      };
+
+      if (!category || !title || !body) {
+        return reply.status(400).send({ error: 'Missing required fields: category, title, body' });
+      }
+
+      try {
+        if (userId) {
+          await dispatchNotification(userId, category as any, { title, body, data });
+          return reply.send({ sent: 1 });
+        }
+
+        const count = await broadcastNotification(category as any, { title, body, data });
+        return reply.send({ sent: count });
+      } catch (err) {
+        request.log.error({ err }, 'notification send failed');
+        return reply.status(500).send({ error: 'Failed to send notification' });
+      }
+    },
+  );
+
   return routes;
 };

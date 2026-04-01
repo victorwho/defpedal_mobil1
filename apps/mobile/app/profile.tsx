@@ -91,6 +91,15 @@ export default function ProfileScreen() {
   const setCyclingFrequency = useAppStore((state) => state.setCyclingFrequency);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const setAvoidUnpaved = useAppStore((state) => state.setAvoidUnpaved);
+  const notifyWeather = useAppStore((state) => state.notifyWeather);
+  const setNotifyWeather = useAppStore((state) => state.setNotifyWeather);
+  const notifyHazard = useAppStore((state) => state.notifyHazard);
+  const setNotifyHazard = useAppStore((state) => state.setNotifyHazard);
+  const notifyCommunity = useAppStore((state) => state.notifyCommunity);
+  const setNotifyCommunity = useAppStore((state) => state.setNotifyCommunity);
+  const quietHoursStart = useAppStore((state) => state.quietHoursStart);
+  const quietHoursEnd = useAppStore((state) => state.quietHoursEnd);
+  const setQuietHours = useAppStore((state) => state.setQuietHours);
   const showBicycleLanes = useAppStore((state) => state.showBicycleLanes);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
@@ -204,6 +213,56 @@ export default function ProfileScreen() {
                 </View>
               </Pressable>
             ))}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notifications</Text>
+
+            <Pressable style={styles.settingRow} onPress={() => setNotifyWeather(!notifyWeather)}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Weather Alerts</Text>
+                <Text style={styles.settingDescription}>
+                  {notifyWeather ? 'Get warned about bad weather before rides' : 'Weather alerts are off'}
+                </Text>
+              </View>
+              <View style={[styles.toggle, notifyWeather && styles.toggleOn]}>
+                <View style={[styles.toggleThumb, notifyWeather && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <Pressable style={styles.settingRow} onPress={() => setNotifyHazard(!notifyHazard)}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Hazard Alerts</Text>
+                <Text style={styles.settingDescription}>
+                  {notifyHazard ? 'Get notified about hazards near your routes' : 'Hazard alerts are off'}
+                </Text>
+              </View>
+              <View style={[styles.toggle, notifyHazard && styles.toggleOn]}>
+                <View style={[styles.toggleThumb, notifyHazard && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <Pressable style={styles.settingRow} onPress={() => setNotifyCommunity(!notifyCommunity)}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Community</Text>
+                <Text style={styles.settingDescription}>
+                  {notifyCommunity ? 'Get notified about likes and comments' : 'Community notifications are off'}
+                </Text>
+              </View>
+              <View style={[styles.toggle, notifyCommunity && styles.toggleOn]}>
+                <View style={[styles.toggleThumb, notifyCommunity && styles.toggleThumbOn]} />
+              </View>
+            </Pressable>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Quiet Hours</Text>
+                <Text style={styles.settingDescription}>
+                  No notifications {quietHoursStart} → {quietHoursEnd}
+                </Text>
+              </View>
+              <Ionicons name="time-outline" size={20} color={gray[400]} />
+            </View>
           </View>
 
           <View style={styles.section}>
