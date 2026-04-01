@@ -462,7 +462,12 @@ export default function NavigationScreen() {
       return;
     }
 
-    const progress = getNavigationProgress(selectedRoute, session, locationState.sample.coordinate);
+    const progress = getNavigationProgress(
+      selectedRoute,
+      session,
+      locationState.sample.coordinate,
+      locationState.sample.accuracyMeters ?? 0,
+    );
 
     updateNavigationProgress(locationState.sample, progress);
     appendGpsBreadcrumb(locationState.sample);

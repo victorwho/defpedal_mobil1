@@ -9,7 +9,7 @@ import { decodePolyline } from './polyline';
 
 export type AppState = 'IDLE' | 'ROUTE_PREVIEW' | 'NAVIGATING' | 'AWAITING_FEEDBACK';
 
-export const OFF_ROUTE_THRESHOLD_METERS = 50;
+export const OFF_ROUTE_THRESHOLD_METERS = 100;
 export const APPROACH_ANNOUNCEMENT_METERS = 50;
 export const ARRIVAL_THRESHOLD_METERS = 25;
 export const AUTO_REROUTE_DELAY_MS = 60000;
@@ -192,10 +192,19 @@ export const getAppStateFromSession = (session: NavigationSession | null): AppSt
   return 'NAVIGATING';
 };
 
+/**
+ * Determine if the user is off-route, accounting for GPS accuracy.
+ * The effective threshold is the base threshold + GPS accuracy (clamped to 50m).
+ * This prevents false off-route triggers when GPS is inaccurate near buildings.
+ */
 export const isOffRoute = (
   distanceToRouteMeters: number,
   thresholdMeters = OFF_ROUTE_THRESHOLD_METERS,
-): boolean => distanceToRouteMeters > thresholdMeters;
+  gpsAccuracyMeters = 0,
+): boolean => {
+  const accuracyBuffer = Math.min(gpsAccuracyMeters, 50); // clamp so bad GPS doesn't prevent all rerouting
+  return distanceToRouteMeters > thresholdMeters + accuracyBuffer;
+};
 
 export const shouldAnnounceApproach = (
   distanceToManeuverMeters: number,
@@ -236,6 +245,7 @@ export const getNavigationProgress = (
   route: RouteOption,
   session: NavigationSession,
   location: Coordinate,
+  gpsAccuracyMeters = 0,
 ): NavigationProgressSnapshot => {
   const routeCoordinates = decodePolyline(route.geometryPolyline6);
   const totalSteps = route.steps.length;
@@ -259,7 +269,7 @@ export const getNavigationProgress = (
         [snappedCoordinate.lat, snappedCoordinate.lon],
       )
     : 0;
-  const offRoute = isOffRoute(distanceToRouteMeters);
+  const offRoute = isOffRoute(distanceToRouteMeters, OFF_ROUTE_THRESHOLD_METERS, gpsAccuracyMeters);
 
   const maneuverIndices = route.steps.map((step) =>
     findClosestPointIndex([step.maneuver.location[1], step.maneuver.location[0]], routeCoordinates),

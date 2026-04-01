@@ -12,6 +12,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { handleTabPress } from '../src/lib/navigation-helpers';
 
 import { LikeButton } from '../src/components/LikeButton';
 import { RouteMap } from '../src/components/RouteMap';
@@ -79,10 +83,13 @@ export default function CommunityTripScreen() {
     );
   }, [id, commentText, postComment]);
 
+  const insets = useSafeAreaInsets();
+
   if (!item) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Text style={styles.loadingText}>Loading trip details...</Text>
+        <BottomNav activeTab="community" onTabPress={handleTabPress} />
       </View>
     );
   }
@@ -90,8 +97,9 @@ export default function CommunityTripScreen() {
   const comments = commentsQuery.data?.comments ?? [];
 
   return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <FlatList
@@ -194,6 +202,8 @@ export default function CommunityTripScreen() {
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+    <BottomNav activeTab="community" onTabPress={handleTabPress} />
+    </View>
   );
 }
 
@@ -210,6 +220,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: mobileTheme.colors.background,
+  },
+  flex: {
+    flex: 1,
   },
   content: {
     padding: 16,

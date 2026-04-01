@@ -5,20 +5,23 @@ import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
   type ViewToken,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FeedCard } from '../src/components/FeedCard';
+import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useFeedQuery, useLikeToggle } from '../src/hooks/useFeed';
 import { mobileTheme } from '../src/lib/theme';
 
 export default function CommunityFeedScreen() {
   const { location: currentLocation } = useCurrentLocation();
+  const insets = useSafeAreaInsets();
   const lat = currentLocation?.lat ?? null;
   const lon = currentLocation?.lon ?? null;
 
@@ -79,17 +82,18 @@ export default function CommunityFeedScreen() {
 
   if (!lat || !lon) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
           <Text style={styles.loadingText}>Getting your location...</Text>
         </View>
-      </SafeAreaView>
+      <BottomNav activeTab="community" onTabPress={handleTabPress} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
         <Text style={styles.headerEyebrow}>Community</Text>
         <Text style={styles.headerTitle}>Nearby Rides</Text>
@@ -133,7 +137,8 @@ export default function CommunityFeedScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    <BottomNav activeTab="community" onTabPress={handleTabPress} />
+    </View>
   );
 }
 
