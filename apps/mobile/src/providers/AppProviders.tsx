@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../design-system';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { NavigationLifecycleManager } from './NavigationLifecycleManager';
+import { DailyWeatherScheduler } from './DailyWeatherScheduler';
 import { NotificationProvider } from './NotificationProvider';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
 import { TelemetryProvider } from './TelemetryProvider';
@@ -20,6 +21,7 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
             <NavigationLifecycleManager />
             <OfflineMutationSyncManager />
             <NotificationProvider />
+            <DailyWeatherScheduler />
             {children}
           </QueryClientProvider>
         </TelemetryProvider>

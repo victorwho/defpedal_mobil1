@@ -1,12 +1,17 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import { router } from 'expo-router';
 
 import { mobileApi } from './api';
 
+const hasNativeModule = Boolean(
+  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotificationPresenter,
+);
+
 // Use require() at call-time to avoid top-level native module crash
 const getNotifications = () => {
+  if (!hasNativeModule) return null;
   try {
     return require('expo-notifications') as typeof import('expo-notifications');
   } catch {

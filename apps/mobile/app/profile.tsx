@@ -240,9 +240,9 @@ export default function ProfileScreen() {
 
             <Pressable style={styles.settingRow} onPress={() => setNotifyWeather(!notifyWeather)}>
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Weather Alerts</Text>
+                <Text style={styles.settingLabel}>Daily Weather Brief</Text>
                 <Text style={styles.settingDescription}>
-                  {notifyWeather ? 'Get warned about bad weather before rides' : 'Weather alerts are off'}
+                  {notifyWeather ? 'Daily 9am cycling weather forecast & advice' : 'Daily weather notification is off'}
                 </Text>
               </View>
               <View style={[styles.toggle, notifyWeather && styles.toggleOn]}>
