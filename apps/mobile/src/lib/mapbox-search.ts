@@ -276,7 +276,7 @@ const buildSecondaryText = (
     case 'address':
       // Address: "Neighborhood, City"
       return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
-    case 'street':
+    case 'street' as string:
       // Street: "Neighborhood, City"
       return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
     case 'place':

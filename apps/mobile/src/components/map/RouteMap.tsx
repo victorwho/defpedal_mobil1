@@ -157,7 +157,7 @@ export const RouteMap = ({
         {followUser && userLocation ? (
           <Mapbox.Camera
             followUserLocation
-            followUserMode="course"
+            followUserMode={'course' as Mapbox.UserTrackingMode}
             followZoomLevel={16}
             followPitch={45}
             animationMode="easeTo"
@@ -177,7 +177,7 @@ export const RouteMap = ({
         {followUser && userLocation ? (
           <Mapbox.LocationPuck
             puckBearingEnabled
-            puckBearing="course"
+            puckBearing={'course' as const}
             visible
           />
         ) : null}
