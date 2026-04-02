@@ -11,7 +11,7 @@ import type {
   UserStats,
   WriteAckResponse,
 } from '@defensivepedal/core';
-import { calculateCo2SavedKg } from '@defensivepedal/core';
+import { calculateCo2SavedKg, calculateTrailDistanceMeters } from '@defensivepedal/core';
 
 import { supabaseAdmin } from './supabaseAdmin';
 
@@ -224,6 +224,10 @@ export const saveTripTrack = async (
   userId: string,
 ): Promise<WriteAckResponse> => {
   if (supabaseAdmin) {
+    const actualDistance = request.gpsBreadcrumbs.length >= 2
+      ? calculateTrailDistanceMeters(request.gpsBreadcrumbs)
+      : null;
+
     const { error } = await supabaseAdmin.from('trip_tracks').insert([
       {
         trip_id: request.tripId,
@@ -231,6 +235,7 @@ export const saveTripTrack = async (
         routing_mode: request.routingMode,
         planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
         planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
+        actual_distance_meters: actualDistance,
         gps_trail: request.gpsBreadcrumbs,
         end_reason: request.endReason,
         started_at: request.startedAt,

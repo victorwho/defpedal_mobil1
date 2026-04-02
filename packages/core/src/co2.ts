@@ -5,6 +5,8 @@
  * Cycling direct emissions are effectively 0 g/km.
  */
 
+import { haversineDistance } from './distance';
+
 /** EU average CO2 emissions for new passenger cars (grams per km). */
 export const CO2_GRAMS_PER_KM = 120;
 
@@ -34,6 +36,25 @@ export function formatCo2Saved(co2Kg: number): string {
   if (co2Kg < 0.1) return `${Math.round(co2Kg * 1000)} g`;
   if (co2Kg < 1000) return `${parseFloat(co2Kg.toFixed(1))} kg`;
   return `${parseFloat((co2Kg / 1000).toFixed(1))} t`;
+}
+
+/**
+ * Calculate total distance in meters from a GPS breadcrumb trail.
+ * Sums haversine distances between consecutive points.
+ * @param breadcrumbs - Array of {lat, lon} points
+ * @returns Total distance in meters
+ */
+export function calculateTrailDistanceMeters(
+  breadcrumbs: ReadonlyArray<{ readonly lat: number; readonly lon: number }>,
+): number {
+  if (breadcrumbs.length < 2) return 0;
+  let total = 0;
+  for (let i = 1; i < breadcrumbs.length; i++) {
+    const prev = breadcrumbs[i - 1];
+    const curr = breadcrumbs[i];
+    total += haversineDistance([prev.lat, prev.lon], [curr.lat, curr.lon]);
+  }
+  return total;
 }
 
 /**

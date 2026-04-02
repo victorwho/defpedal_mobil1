@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateCo2SavedKg,
+  calculateTrailDistanceMeters,
   formatCo2Saved,
   calculateEquivalentTreeDays,
   CO2_GRAMS_PER_KM,
@@ -95,5 +96,37 @@ describe('calculateEquivalentTreeDays', () => {
 
   it('scales linearly', () => {
     expect(calculateEquivalentTreeDays(44)).toBe(730);
+  });
+});
+
+describe('calculateTrailDistanceMeters', () => {
+  it('returns 0 for empty trail', () => {
+    expect(calculateTrailDistanceMeters([])).toBe(0);
+  });
+
+  it('returns 0 for single point', () => {
+    expect(calculateTrailDistanceMeters([{ lat: 44.4, lon: 26.1 }])).toBe(0);
+  });
+
+  it('calculates distance between two points', () => {
+    // ~111 km between lat 44 and lat 45 at same lon
+    const dist = calculateTrailDistanceMeters([
+      { lat: 44.0, lon: 26.0 },
+      { lat: 45.0, lon: 26.0 },
+    ]);
+    expect(dist).toBeGreaterThan(110_000);
+    expect(dist).toBeLessThan(112_000);
+  });
+
+  it('sums consecutive segments', () => {
+    const trail = [
+      { lat: 44.0, lon: 26.0 },
+      { lat: 44.001, lon: 26.0 },
+      { lat: 44.002, lon: 26.0 },
+    ];
+    const total = calculateTrailDistanceMeters(trail);
+    // Two ~111m segments
+    expect(total).toBeGreaterThan(200);
+    expect(total).toBeLessThan(250);
   });
 });
