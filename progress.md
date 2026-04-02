@@ -14,6 +14,7 @@ Update it at the end of each implementation slice.
 - Webapp cleanup (2026-03-22): all legacy React/Vite/Leaflet webapp code has been removed from the repo root — components/, hooks/, utils/, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json, and webapp dependencies (leaflet, react-dom, vite, vitest, jsdom, testing-library). Root SQL files moved to supabase/migrations/legacy/. Root tsconfig.json cleaned of DOM libs. The repo is now mobile-only.
 - Preview tunnel note: preview mobile development can now auto-sync the active ngrok URL into `apps/mobile/.env.preview` through `npm run sync:mobile:preview-url` and `npm run dev:mobile:preview`
 - CO2 savings feature (2026-04-02): full-stack CO2 savings calculator shipped — per-trip and cumulative environmental impact tracking across trip history, community feed, and profile. Uses actual GPS trail distance (not planned route) for accuracy. Deployed to Cloud Run.
+- Trip Statistics Dashboard (2026-04-02): full-stack stats dashboard embedded inline in the History tab. Features: period selector (week/month/all time), summary cards (rides, distance, duration, CO2 saved), riding streak tracker (current + longest), ride frequency bar chart, safe vs fast route mode split. Backed by new `get_trip_stats_dashboard` Supabase RPC with timezone-aware bucketing, performance index, and new `GET /v1/stats/dashboard` Fastify endpoint. 16 new tests (9 unit + 7 integration), all passing. Deployed to Cloud Run.
 
 ## Phase Status
 

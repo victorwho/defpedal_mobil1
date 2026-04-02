@@ -9,6 +9,7 @@ import type {
   RoutePreviewRequest,
   TripEndResponse,
   TripStartResponse,
+  TripStatsDashboard,
   UserStats,
   WriteAckResponse,
   ReverseGeocodeResponse,
@@ -1052,6 +1053,100 @@ export const buildV1Routes = (
         return await dependencies.getUserStats(user.id);
       } catch (error) {
         throw new HttpError('Stats fetch failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown error.'],
+        });
+      }
+    },
+  );
+
+  // GET /v1/stats/dashboard — full trip statistics dashboard
+  app.get<{ Querystring: { tz?: string }; Reply: TripStatsDashboard | ErrorResponse }>(
+    '/stats/dashboard',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          properties: {
+            tz: { type: 'string', maxLength: 50 },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'totals', 'weekly', 'monthly',
+              'currentStreakDays', 'longestStreakDays', 'modeSplit',
+            ],
+            properties: {
+              totals: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['totalTrips', 'totalDistanceMeters', 'totalCo2SavedKg', 'totalDurationSeconds'],
+                properties: {
+                  totalTrips: { type: 'integer' },
+                  totalDistanceMeters: { type: 'number' },
+                  totalCo2SavedKg: { type: 'number' },
+                  totalDurationSeconds: { type: 'number' },
+                },
+              },
+              weekly: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['periodStart', 'trips', 'distanceMeters', 'durationSeconds'],
+                  properties: {
+                    periodStart: { type: 'string' },
+                    trips: { type: 'integer' },
+                    distanceMeters: { type: 'number' },
+                    durationSeconds: { type: 'number' },
+                  },
+                },
+              },
+              monthly: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['periodStart', 'trips', 'distanceMeters', 'durationSeconds'],
+                  properties: {
+                    periodStart: { type: 'string' },
+                    trips: { type: 'integer' },
+                    distanceMeters: { type: 'number' },
+                    durationSeconds: { type: 'number' },
+                  },
+                },
+              },
+              currentStreakDays: { type: 'integer' },
+              longestStreakDays: { type: 'integer' },
+              modeSplit: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['safeTrips', 'fastTrips'],
+                properties: {
+                  safeTrips: { type: 'integer' },
+                  fastTrips: { type: 'integer' },
+                },
+              },
+            },
+          },
+          401: errorResponseSchema,
+          429: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = await requireWriteUser(request, dependencies);
+      await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+      try {
+        return await dependencies.getTripStatsDashboard(user.id, request.query.tz ?? 'UTC');
+      } catch (error) {
+        throw new HttpError('Stats dashboard fetch failed.', {
           statusCode: 502,
           code: 'UPSTREAM_ERROR',
           details: [error instanceof Error ? error.message : 'Unknown error.'],

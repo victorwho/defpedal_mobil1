@@ -418,6 +418,29 @@ export interface UserStats {
   readonly totalDurationSeconds: number;
 }
 
+// ── Trip Statistics Dashboard ──
+
+export interface TripStatsBucket {
+  readonly periodStart: string;
+  readonly trips: number;
+  readonly distanceMeters: number;
+  readonly durationSeconds: number;
+}
+
+export interface TripStatsModeSplit {
+  readonly safeTrips: number;
+  readonly fastTrips: number;
+}
+
+export interface TripStatsDashboard {
+  readonly totals: UserStats;
+  readonly weekly: readonly TripStatsBucket[];
+  readonly monthly: readonly TripStatsBucket[];
+  readonly currentStreakDays: number;
+  readonly longestStreakDays: number;
+  readonly modeSplit: TripStatsModeSplit;
+}
+
 export interface FeedComment {
   id: string;
   user: FeedProfile;

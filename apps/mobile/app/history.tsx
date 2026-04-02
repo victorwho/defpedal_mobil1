@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatCo2Saved, calculateEquivalentTreeDays } from '@defensivepedal/core';
 
 import { Screen } from '../src/components/Screen';
+import { StatsDashboard } from '../src/components/StatsDashboard';
 import { Button } from '../src/design-system/atoms/Button';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { brandColors, safetyColors } from '../src/design-system/tokens/colors';
@@ -64,6 +65,8 @@ export default function HistoryScreen() {
               ) : null}
             </View>
           ) : null}
+
+          {user ? <StatsDashboard /> : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionText}>

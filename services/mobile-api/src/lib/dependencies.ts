@@ -16,6 +16,7 @@ import { fetchRiskSegments } from './risk';
 import {
   finishTripRecord,
   getTripHistory,
+  getTripStatsDashboard,
   getUserStats,
   saveTripTrack,
   startTripRecord,
@@ -40,6 +41,7 @@ export type MobileApiDependencies = {
   saveTripTrack: typeof saveTripTrack;
   getTripHistory: typeof getTripHistory;
   getUserStats: typeof getUserStats;
+  getTripStatsDashboard: typeof getTripStatsDashboard;
   submitNavigationFeedback: typeof submitNavigationFeedback;
   routeResponseCache: RouteResponseCache;
   rateLimiter: RateLimiter;
@@ -85,6 +87,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     saveTripTrack,
     getTripHistory,
     getUserStats,
+    getTripStatsDashboard,
     submitNavigationFeedback,
     routeResponseCache: sharedStore.routeResponseCache,
     rateLimiter: sharedStore.rateLimiter,

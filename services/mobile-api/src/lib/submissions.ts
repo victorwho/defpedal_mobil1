@@ -7,6 +7,7 @@ import type {
   TripHistoryItem,
   TripStartRequest,
   TripStartResponse,
+  TripStatsDashboard,
   TripTrackRequest,
   UserStats,
   WriteAckResponse,
@@ -313,4 +314,73 @@ export const getTripHistory = async (
     startedAt: row.started_at as string,
     endedAt: (row.ended_at as string) ?? null,
   }));
+};
+
+export const getTripStatsDashboard = async (
+  userId: string,
+  timeZone: string = 'UTC',
+): Promise<TripStatsDashboard> => {
+  const emptyDashboard: TripStatsDashboard = {
+    totals: { totalTrips: 0, totalDistanceMeters: 0, totalCo2SavedKg: 0, totalDurationSeconds: 0 },
+    weekly: [],
+    monthly: [],
+    currentStreakDays: 0,
+    longestStreakDays: 0,
+    modeSplit: { safeTrips: 0, fastTrips: 0 },
+  };
+
+  if (!supabaseAdmin) {
+    return emptyDashboard;
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('get_trip_stats_dashboard', {
+    requesting_user_id: userId,
+    time_zone: timeZone,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const raw = data as {
+    totals: { totalTrips: number; totalDistanceMeters: number; totalDurationSeconds: number };
+    weekly: Array<{ period_start: string; trips: number; distance_meters: number; duration_seconds: number }>;
+    monthly: Array<{ period_start: string; trips: number; distance_meters: number; duration_seconds: number }>;
+    currentStreakDays: number;
+    longestStreakDays: number;
+    modeSplit: { safeTrips: number; fastTrips: number };
+  } | null;
+
+  if (!raw) {
+    return emptyDashboard;
+  }
+
+  const totalDistanceMeters = Number(raw.totals.totalDistanceMeters ?? 0);
+
+  return {
+    totals: {
+      totalTrips: Number(raw.totals.totalTrips ?? 0),
+      totalDistanceMeters,
+      totalCo2SavedKg: calculateCo2SavedKg(totalDistanceMeters),
+      totalDurationSeconds: Number(raw.totals.totalDurationSeconds ?? 0),
+    },
+    weekly: (raw.weekly ?? []).map((b) => ({
+      periodStart: b.period_start,
+      trips: b.trips,
+      distanceMeters: b.distance_meters,
+      durationSeconds: b.duration_seconds,
+    })),
+    monthly: (raw.monthly ?? []).map((b) => ({
+      periodStart: b.period_start,
+      trips: b.trips,
+      distanceMeters: b.distance_meters,
+      durationSeconds: b.duration_seconds,
+    })),
+    currentStreakDays: raw.currentStreakDays ?? 0,
+    longestStreakDays: raw.longestStreakDays ?? 0,
+    modeSplit: {
+      safeTrips: raw.modeSplit?.safeTrips ?? 0,
+      fastTrips: raw.modeSplit?.fastTrips ?? 0,
+    },
+  };
 };
