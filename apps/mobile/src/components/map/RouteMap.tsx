@@ -65,6 +65,7 @@ export const RouteMap = ({
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
   onMapTap,
+  onMapLongPress,
   hazardPlacementMode = false,
   containerStyle,
 }: RouteMapProps) => {
@@ -149,6 +150,12 @@ export const RouteMap = ({
           const coords = event?.geometry?.coordinates;
           if (Array.isArray(coords) && coords.length >= 2) {
             onMapTap({ lat: coords[1], lon: coords[0] });
+          }
+        } : undefined}
+        onLongPress={onMapLongPress ? (event: any) => {
+          const coords = event?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            onMapLongPress({ lat: coords[1], lon: coords[0] });
           }
         } : undefined}
       >

@@ -104,11 +104,33 @@ export default function RoutePlanningScreen() {
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
   const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
+  const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const user = null; // hazard reports work without auth
 
+  const handleMapLongPress = (coordinate: Coordinate) => {
+    setPendingHazardCoordinate(coordinate);
+    setHazardPickerOpen(true);
+  };
+
   const handleHazardTypeSelect = (hazardType: HazardType) => {
+    // If long-press initiated, submit directly at that coordinate
+    if (pendingHazardCoordinate) {
+      enqueueMutation('hazard', {
+        coordinate: pendingHazardCoordinate,
+        reportedAt: new Date().toISOString(),
+        source: 'manual',
+        hazardType,
+      });
+      setPendingHazardCoordinate(null);
+      setHazardPickerOpen(false);
+      setHazardToast({ type: 'success', message: 'Hazard reported! It will sync when online.' });
+      setTimeout(() => setHazardToast(null), 3000);
+      return;
+    }
+
+    // FAB-initiated: enter placement mode
     setHazardPickerOpen(false);
     setSelectedHazardType(hazardType);
     setHazardPlacementMode(true);
@@ -317,6 +339,7 @@ export default function RoutePlanningScreen() {
           poiVisibility={poiVisibility}
           recenterKey={recenterKey}
           onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
+          onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
         />
       }

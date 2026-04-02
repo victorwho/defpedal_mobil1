@@ -1,6 +1,8 @@
 import type {
   AutocompleteRequest,
   AutocompleteResponse,
+  CommunityStats,
+  Coordinate,
   CoverageResponse,
   ErrorResponse,
   FeedComment,
@@ -9,12 +11,17 @@ import type {
   HazardReportRequest,
   HazardReportResponse,
   HazardValidationResponse,
+  ImpactDashboard,
   NavigationFeedbackRequest,
   NearbyHazard,
+  NeighborhoodSafetyScore,
   ProfileResponse,
   ProfileUpdateRequest,
+  QuizAnswer,
+  QuizQuestion,
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
+  RideImpact,
   ShareTripRequest,
   RerouteRequest,
   TripEndRequest,
@@ -36,6 +43,7 @@ import {
   mapboxAutocomplete,
   mapboxReverseGeocode,
   mapboxGetCoverage,
+  reverseGeocodeLocality,
 } from './mapbox-search';
 import {
   directPreviewRoute,
@@ -372,5 +380,60 @@ export const mobileApi = {
     requestJson<WriteAckResponse>('/v1/push-token', {
       method: 'DELETE',
       body: JSON.stringify({ deviceId }),
+    }),
+
+  // ── Community Stats ──
+
+  getCommunityStats: (lat: number, lon: number, radiusKm = 15) => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      radiusKm: String(radiusKm),
+    });
+    return requestJson<CommunityStats>(`/v1/community/stats?${params.toString()}`);
+  },
+
+  reverseGeocodeLocality: (lat: number, lon: number) =>
+    reverseGeocodeLocality(lat, lon),
+
+  // ── Habit Engine ──
+
+  fetchLoopRoute: (origin: Coordinate, distanceMeters: number, safetyFloor?: number) =>
+    requestJson<RoutePreviewResponse>('/v1/loop-route', {
+      method: 'POST',
+      body: JSON.stringify({
+        origin,
+        distancePreferenceMeters: distanceMeters,
+        ...(safetyFloor != null ? { safetyFloor } : {}),
+      }),
+    }),
+
+  fetchSafetyScore: (lat: number, lon: number, radiusKm?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (radiusKm != null) params.set('radiusKm', String(radiusKm));
+    return requestJson<NeighborhoodSafetyScore>(`/v1/safety-score?${params.toString()}`);
+  },
+
+  recordRideImpact: (tripId: string, distanceMeters: number) =>
+    requestJson<RideImpact>(`/v1/rides/${tripId}/impact`, {
+      method: 'POST',
+      body: JSON.stringify({ distanceMeters }),
+    }),
+
+  fetchRideImpact: (tripId: string) =>
+    requestJson<RideImpact>(`/v1/rides/${tripId}/impact`),
+
+  fetchImpactDashboard: (timeZone?: string) => {
+    const params = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : '';
+    return requestJson<ImpactDashboard>(`/v1/impact-dashboard${params}`);
+  },
+
+  fetchDailyQuiz: () =>
+    requestJson<QuizQuestion>('/v1/quiz/daily'),
+
+  submitQuizAnswer: (questionId: string, selectedIndex: number) =>
+    requestJson<QuizAnswer>('/v1/quiz/answer', {
+      method: 'POST',
+      body: JSON.stringify({ questionId, selectedIndex }),
     }),
 };

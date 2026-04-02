@@ -1,19 +1,29 @@
+import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery } from '@tanstack/react-query';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { brandColors, gray } from '../src/design-system/tokens/colors';
-import { fontFamily, textBase, textSm } from '../src/design-system/tokens/typography';
+import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
+import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
+import { mobileApi } from '../src/lib/api';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
+
+const GUARDIAN_TIER_CONFIG: Record<GuardianTier, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; min: number }> = {
+  reporter: { label: 'Reporter', icon: 'clipboard-outline', color: '#9CA3AF', min: 0 },
+  watchdog: { label: 'Watchdog', icon: 'eye-outline', color: '#60A5FA', min: 5 },
+  sentinel: { label: 'Sentinel', icon: 'shield-outline', color: '#A78BFA', min: 15 },
+  guardian_angel: { label: 'Guardian Angel', icon: 'shield-checkmark', color: '#FACC15', min: 50 },
+};
 
 const BIKE_TYPES = ['Road bike', 'City bike', 'Mountain bike', 'E-bike', 'Recumbent', 'Other'] as const;
 
@@ -84,9 +94,52 @@ const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select
   );
 };
 
+const GuardianSection = () => {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data } = useQuery<ImpactDashboard>({
+    queryKey: ['impact-dashboard-profile'],
+    queryFn: () => mobileApi.fetchImpactDashboard(tz),
+    staleTime: 5 * 60_000,
+  });
+
+  if (!data) return null;
+
+  const tier = GUARDIAN_TIER_CONFIG[data.guardianTier];
+  const tiers = Object.entries(GUARDIAN_TIER_CONFIG) as [GuardianTier, typeof tier][];
+  const currentIdx = tiers.findIndex(([t]) => t === data.guardianTier);
+  const nextTier = tiers[currentIdx + 1];
+  const remaining = nextTier ? nextTier[1].min - data.totalHazardsReported : 0;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Guardian tier</Text>
+      <View style={styles.guardianCard}>
+        <View style={styles.guardianRow}>
+          <View style={[styles.guardianBadge, { borderColor: tier.color }]}>
+            <Ionicons name={tier.icon} size={24} color={tier.color} />
+          </View>
+          <View style={styles.guardianTextCol}>
+            <Text style={[styles.guardianTierName, { color: tier.color }]}>{tier.label}</Text>
+            <Text style={styles.guardianHazards}>{data.totalHazardsReported} hazards reported</Text>
+          </View>
+        </View>
+        {nextTier ? (
+          <Text style={styles.guardianProgress}>
+            {remaining} more report{remaining !== 1 ? 's' : ''} to reach {nextTier[1].label}
+          </Text>
+        ) : (
+          <Text style={[styles.guardianProgress, { color: brandColors.accent }]}>
+            Maximum tier reached!
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+};
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { user, signOut } = useAuthSession();
+  const { user, signOut, signInAnonymously } = useAuthSession();
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
   const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
   const bikeType = useAppStore((state) => state.bikeType);
@@ -147,6 +200,8 @@ export default function ProfileScreen() {
               <Ionicons name="log-in-outline" size={24} color={brandColors.accent} />
             </Pressable>
           )}
+
+          <GuardianSection />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About you</Text>
@@ -324,8 +379,12 @@ export default function ProfileScreen() {
                     text: 'Sign Out',
                     style: 'destructive',
                     onPress: async () => {
+                      // Reset onboarding and create anonymous session,
+                      // then navigate directly to onboarding
+                      useAppStore.getState().setOnboardingCompleted(false);
                       await signOut();
-                      router.replace('/route-planning' as any);
+                      await signInAnonymously();
+                      router.replace('/onboarding' as any);
                     },
                   },
                 ]);
@@ -478,5 +537,43 @@ const styles = StyleSheet.create({
     ...textBase,
     fontFamily: fontFamily.body.medium,
     color: '#EF4444',
+  },
+  guardianCard: {
+    backgroundColor: 'rgba(17, 24, 39, 0.86)',
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: brandColors.borderDefault,
+    padding: space[4],
+    gap: space[3],
+  },
+  guardianRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+  },
+  guardianBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  guardianTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  guardianTierName: {
+    ...textBase,
+    fontFamily: fontFamily.heading.bold,
+  },
+  guardianHazards: {
+    ...textXs,
+    color: gray[400],
+  },
+  guardianProgress: {
+    ...textXs,
+    color: gray[400],
   },
 });

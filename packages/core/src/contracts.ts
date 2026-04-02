@@ -386,6 +386,7 @@ export interface FeedProfile {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+  guardianTier: GuardianTier | null;
 }
 
 export interface FeedItem {
@@ -441,6 +442,17 @@ export interface TripStatsDashboard {
   readonly modeSplit: TripStatsModeSplit;
 }
 
+// ── Community Stats ──
+
+export interface CommunityStats {
+  readonly localityName: string | null;
+  readonly totalTrips: number;
+  readonly totalDistanceMeters: number;
+  readonly totalDurationSeconds: number;
+  readonly totalCo2SavedKg: number;
+  readonly uniqueRiders: number;
+}
+
 export interface FeedComment {
   id: string;
   user: FeedProfile;
@@ -477,6 +489,7 @@ export interface ProfileUpdateRequest {
   displayName?: string;
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
+  cyclingGoal?: CyclingGoal | null;
 }
 
 export interface ProfileResponse {
@@ -485,4 +498,79 @@ export interface ProfileResponse {
   avatarUrl: string | null;
   autoShareRides: boolean;
   trimRouteEndpoints: boolean;
+  cyclingGoal: CyclingGoal | null;
+  guardianTier: GuardianTier | null;
+}
+
+// ─── Habit Engine Types ──────────────────────────────────────────
+
+export type CyclingGoal = 'commute' | 'explore' | 'beginner';
+
+export type GuardianTier = 'reporter' | 'watchdog' | 'sentinel' | 'guardian_angel';
+
+export interface RideImpact {
+  readonly tripId: string;
+  readonly co2SavedKg: number;
+  readonly moneySavedEur: number;
+  readonly hazardsWarnedCount: number;
+  readonly distanceMeters: number;
+  readonly equivalentText: string | null;
+}
+
+export interface StreakState {
+  readonly currentStreak: number;
+  readonly longestStreak: number;
+  readonly lastQualifyingDate: string | null;
+  readonly freezeAvailable: boolean;
+  readonly freezeUsedDate: string | null;
+}
+
+export interface ImpactDashboard {
+  readonly streak: StreakState;
+  readonly totalCo2SavedKg: number;
+  readonly totalMoneySavedEur: number;
+  readonly totalHazardsReported: number;
+  readonly totalRidersProtected: number;
+  readonly guardianTier: GuardianTier;
+  readonly thisWeek: {
+    readonly rides: number;
+    readonly co2SavedKg: number;
+    readonly moneySavedEur: number;
+    readonly hazardsReported: number;
+  };
+}
+
+export interface QuizQuestion {
+  readonly id: string;
+  readonly questionText: string;
+  readonly options: readonly string[];
+  readonly category: string;
+  readonly difficulty: number;
+}
+
+export interface QuizAnswer {
+  readonly questionId: string;
+  readonly selectedIndex: number;
+  readonly isCorrect: boolean;
+  readonly explanation: string;
+}
+
+export interface UserBadge {
+  readonly badgeKey: string;
+  readonly earnedAt: string;
+  readonly metadata: Record<string, unknown>;
+}
+
+export interface NeighborhoodSafetyScore {
+  readonly score: number;
+  readonly totalSegments: number;
+  readonly safestCount: number;
+  readonly dangerousCount: number;
+}
+
+export interface RewardEquivalent {
+  readonly category: 'co2' | 'money';
+  readonly equivalentText: string;
+  readonly thresholdValue: number;
+  readonly unit: string;
 }

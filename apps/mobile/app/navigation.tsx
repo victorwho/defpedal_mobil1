@@ -17,7 +17,7 @@ import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
@@ -48,6 +48,7 @@ import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { IconButton } from '../src/design-system/atoms/IconButton';
+import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -57,6 +58,7 @@ import { fontFamily, textXs, textSm, textBase } from '../src/design-system/token
 export default function NavigationScreen() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
+  const haptics = useHaptics();
   const { user } = useAuthSession();
   const guardPassed = useRouteGuard({
     requiredStates: ['NAVIGATING'],
@@ -292,6 +294,7 @@ export default function NavigationScreen() {
       return;
     }
 
+    haptics.medium();
     setHazardPickerOpen(false);
     enqueueMutation('hazard', {
       coordinate: mapUserCoordinate,
@@ -677,9 +680,9 @@ export default function NavigationScreen() {
             />
           </View>
 
-          <View style={styles.roundButton}>
+          <View style={styles.hazardFab}>
             <IconButton
-              icon={<Ionicons name="warning" size={22} color={darkTheme.accent} />}
+              icon={<Ionicons name="warning" size={26} color={darkTheme.textInverse} />}
               onPress={openHazardPicker}
               accessibilityLabel="Report hazard"
               variant="accent"
@@ -817,52 +820,47 @@ export default function NavigationScreen() {
         </View>
       ) : null}
 
-      {/* Hazard picker modal */}
-      <Modal
-        visible={hazardPickerOpen}
-        onClose={() => {
-          setHazardPickerOpen(false);
-        }}
-        title="What should we mark here?"
-        description="This saves the hazard at your current rider location for later sync."
-        footer={
-          <Button
-            variant="secondary"
-            size="md"
-            fullWidth
-            onPress={() => {
-              setHazardPickerOpen(false);
-            }}
-          >
-            Cancel
-          </Button>
-        }
-      >
-        <View style={styles.hazardOptionList}>
-          {HAZARD_TYPE_OPTIONS.map((option) => (
-            <Button
-              key={option.value}
-              variant="secondary"
-              size="md"
-              fullWidth
-              leftIcon={
-                <View style={styles.hazardOptionIconWrap}>
-                  <Ionicons
-                    name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
-                    size={18}
-                    color={darkTheme.accent}
-                  />
-                </View>
-              }
-              onPress={() => {
-                queueHazardReport(option.value);
-              }}
+      {/* Hazard quick-pick grid overlay */}
+      {hazardPickerOpen ? (
+        <Pressable
+          style={styles.hazardGridOverlay}
+          onPress={() => setHazardPickerOpen(false)}
+        >
+          <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.hazardGridTitle}>Report hazard</Text>
+            <View style={styles.hazardGrid}>
+              {([
+                { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
+                { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
+                { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
+                { value: 'construction' as HazardType, label: 'Construction', icon: 'construct-outline' as const },
+                { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
+                { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+              ]).map((item) => (
+                <Pressable
+                  key={item.value}
+                  style={({ pressed }) => [
+                    styles.hazardGridItem,
+                    pressed && styles.hazardGridItemPressed,
+                  ]}
+                  onPress={() => queueHazardReport(item.value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Report ${item.label}`}
+                >
+                  <Ionicons name={item.icon} size={24} color={brandColors.accent} />
+                  <Text style={styles.hazardGridLabel}>{item.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable
+              style={styles.hazardGridCancel}
+              onPress={() => setHazardPickerOpen(false)}
             >
-              {option.label}
-            </Button>
-          ))}
-        </View>
-      </Modal>
+              <Text style={styles.hazardGridCancelText}>Cancel</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      ) : null}
 
     </View>
   );
@@ -913,16 +911,69 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
-  hazardOptionList: {
-    gap: space[3],
+  hazardGridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+    paddingHorizontal: space[4],
+    paddingBottom: space[8],
+    zIndex: 50,
   },
-  hazardOptionIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.full,
+  hazardGridCard: {
+    backgroundColor: darkTheme.bgPrimary,
+    borderRadius: radii['2xl'],
+    padding: space[4],
+    gap: space[3],
+    ...shadows.lg,
+  },
+  hazardGridTitle: {
+    ...textSm,
+    fontFamily: fontFamily.heading.semiBold,
+    color: darkTheme.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  hazardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space[2],
+  },
+  hazardGridItem: {
+    width: '31%' as unknown as number,
+    alignItems: 'center',
+    gap: space[1],
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.lg,
+    paddingVertical: space[3],
+    paddingHorizontal: space[1],
+  },
+  hazardGridItemPressed: {
+    backgroundColor: darkTheme.bgTertiary,
+  },
+  hazardGridLabel: {
+    ...textXs,
+    color: darkTheme.textSecondary,
+    textAlign: 'center',
+  },
+  hazardGridCancel: {
+    alignItems: 'center',
+    paddingVertical: space[2],
+  },
+  hazardGridCancelText: {
+    ...textSm,
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textMuted,
+  },
+  hazardFab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: brandColors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
+    ...shadows.md,
   },
   roundButton: {
     width: 44,

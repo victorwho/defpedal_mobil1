@@ -541,7 +541,7 @@ describe('GET /v1/feed/:id/comments', () => {
           user_id: 'user-abc',
           body: 'Nice ride!',
           created_at: new Date().toISOString(),
-          profiles: { display_name: 'Alice', avatar_url: null },
+          profiles: { display_name: 'Alice', avatar_url: null, guardian_tier: 'reporter' },
         },
       ],
       error: null,

@@ -90,6 +90,7 @@ export const profileUpdateRequestSchema = {
     displayName: { type: 'string', minLength: 1, maxLength: 100 },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
+    cyclingGoal: { type: ['string', 'null'] },
   },
 } as const;
 
@@ -100,11 +101,12 @@ export const profileUpdateRequestSchema = {
 const feedProfileSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl'],
+  required: ['id', 'displayName', 'avatarUrl', 'guardianTier'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
     avatarUrl: { type: ['string', 'null'] },
+    guardianTier: { type: ['string', 'null'] },
   },
 } as const;
 
@@ -175,13 +177,47 @@ export const feedCommentsResponseSchema = {
 export const profileResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints'],
+  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'guardianTier'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
     avatarUrl: { type: ['string', 'null'] },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
+    cyclingGoal: { type: ['string', 'null'] },
+    guardianTier: { type: ['string', 'null'] },
+  },
+} as const;
+
+// ---------------------------------------------------------------------------
+// Community stats schemas
+// ---------------------------------------------------------------------------
+
+export const communityStatsQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['lat', 'lon'],
+  properties: {
+    lat: { type: 'number', minimum: -90, maximum: 90 },
+    lon: { type: 'number', minimum: -180, maximum: 180 },
+    radiusKm: { type: 'number', minimum: 1, maximum: 100 },
+  },
+} as const;
+
+export const communityStatsResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'localityName', 'totalTrips', 'totalDistanceMeters',
+    'totalDurationSeconds', 'totalCo2SavedKg', 'uniqueRiders',
+  ],
+  properties: {
+    localityName: { type: ['string', 'null'] },
+    totalTrips: { type: 'integer' },
+    totalDistanceMeters: { type: 'number' },
+    totalDurationSeconds: { type: 'number' },
+    totalCo2SavedKg: { type: 'number' },
+    uniqueRiders: { type: 'integer' },
   },
 } as const;
 
@@ -201,6 +237,11 @@ export type ShareTripBody = ShareTripRequest;
 export type FeedCommentBody = FeedCommentRequest;
 export type ProfileUpdateBody = ProfileUpdateRequest;
 export type TripShareIdParams = { id: string };
+export type CommunityStatsQuerystring = {
+  lat: number;
+  lon: number;
+  radiusKm?: number;
+};
 
 // ---------------------------------------------------------------------------
 // Normalizers

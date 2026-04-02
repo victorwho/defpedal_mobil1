@@ -10,6 +10,7 @@ import {
   isOAuthInProgress,
   isSupabaseConfigured,
   resolveOAuthCallback,
+  signInAnonymously,
   signInWithEmail,
   signInWithGoogle,
   signOut,
@@ -22,11 +23,13 @@ type AuthSessionContextValue = {
   session: MobileAuthSession | null;
   user: MobileAuthUser | null;
   isLoading: boolean;
+  isAnonymous: boolean;
   isConfigured: boolean;
   isSupabaseConfigured: boolean;
   isDeveloperBypassAvailable: boolean;
   authError: string | null;
   clearAuthError: () => void;
+  signInAnonymously: typeof signInAnonymously;
   signInWithEmail: typeof signInWithEmail;
   signUpWithEmail: typeof signUpWithEmail;
   signInWithGoogle: typeof signInWithGoogle;
@@ -43,8 +46,16 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
 
   useEffect(() => {
     let isMounted = true;
-    const syncCurrentSession = async () => {
-      const currentSession = await getCurrentSession();
+    let anonSignInAttempted = false;
+
+    const syncCurrentSession = async (allowAnonSignIn: boolean) => {
+      let currentSession = await getCurrentSession();
+
+      // Auto-sign-in anonymously on first launch only (not on auth state changes)
+      if (!currentSession && allowAnonSignIn && !anonSignInAttempted && isSupabaseConfigured()) {
+        anonSignInAttempted = true;
+        currentSession = await signInAnonymously();
+      }
 
       if (isMounted) {
         setSession(currentSession);
@@ -52,13 +63,15 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       }
     };
 
-    void syncCurrentSession();
+    // Initial mount: allow anonymous sign-in
+    void syncCurrentSession(true);
 
+    // Auth state changes: only sync, never trigger anonymous sign-in
     const unsubscribe = subscribeToAuthSessionChanges(() => {
-      void syncCurrentSession();
+      void syncCurrentSession(false);
     });
     const subscription = supabaseClient?.auth.onAuthStateChange(() => {
-      void syncCurrentSession();
+      void syncCurrentSession(false);
     }).data.subscription;
 
     return () => {
@@ -128,11 +141,13 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       session,
       user: session?.user ?? null,
       isLoading,
+      isAnonymous: session?.isAnonymous === true,
       isConfigured: isSupabaseConfigured() || isDeveloperAuthBypassAvailable(),
       isSupabaseConfigured: isSupabaseConfigured(),
       isDeveloperBypassAvailable: isDeveloperAuthBypassAvailable(),
       authError,
       clearAuthError,
+      signInAnonymously,
       signInWithEmail,
       signUpWithEmail,
       signInWithGoogle,

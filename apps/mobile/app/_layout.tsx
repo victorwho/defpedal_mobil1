@@ -1,4 +1,4 @@
-import { Stack, usePathname } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,6 +7,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { mobileEnv } from '../src/lib/env';
 import { AppProviders } from '../src/providers/AppProviders';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useAppStore } from '../src/store/appStore';
 import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
 import { fontAssets } from '../src/design-system/fonts';
@@ -34,6 +36,34 @@ const RouteTelemetryObserver = () => {
   return null;
 };
 
+/**
+ * Redirects first-time users to the onboarding flow.
+ *
+ * Only triggers for anonymous sessions (fresh install auto-sign-in).
+ * Never triggers for null sessions (signed out) or authenticated sessions.
+ * This prevents redirect loops on sign-out.
+ */
+const OnboardingGuard = () => {
+  const pathname = usePathname();
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const authCtx = useAuthSessionOptional();
+
+  // Don't redirect if already in onboarding screens
+  if (pathname.startsWith('/onboarding')) return null;
+
+  // Wait for auth to settle
+  if (authCtx?.isLoading) return null;
+
+  // Only redirect to onboarding for anonymous sessions (fresh install).
+  // Null session (signed out) → show normal app (user can sign in from profile).
+  // Authenticated session → show normal app.
+  if (onboardingCompleted === false && authCtx?.isAnonymous === true) {
+    return <Redirect href="/onboarding/index" />;
+  }
+
+  return null;
+};
+
 const RootLayoutInner = () => {
   const { colors } = useTheme();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
@@ -49,6 +79,7 @@ const RootLayoutInner = () => {
     <>
       <StatusBar style="light" />
       <RouteTelemetryObserver />
+      <OnboardingGuard />
       {showValidationOverlay ? (
         <View pointerEvents="none" style={styles.validationOverlay}>
           <Text style={styles.validationLabel}>Validation build active</Text>

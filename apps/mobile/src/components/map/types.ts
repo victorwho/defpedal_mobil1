@@ -44,6 +44,8 @@ export type RouteMapProps = {
   plannedRouteColor?: string;
   /** Called when user taps the map (used for hazard placement) */
   onMapTap?: (coordinate: Coordinate) => void;
+  /** Called when user long-presses the map (used for armchair hazard reporting) */
+  onMapLongPress?: (coordinate: Coordinate) => void;
   /** When true, shows a crosshair overlay for hazard placement */
   hazardPlacementMode?: boolean;
   containerStyle?: StyleProp<ViewStyle>;

@@ -175,7 +175,12 @@ export const useFeatureCollections = ({
       type: 'FeatureCollection' as const,
       features: nearbyHazards.map((h) => ({
         type: 'Feature' as const,
-        properties: { id: h.id, type: h.hazardType },
+        properties: {
+          id: h.id,
+          type: h.hazardType,
+          confirmCount: h.confirmCount,
+          denyCount: h.denyCount,
+        },
         geometry: {
           type: 'Point' as const,
           coordinates: [h.lon, h.lat] as [number, number],

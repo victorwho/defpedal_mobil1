@@ -507,6 +507,44 @@ export const mapboxReverseGeocode = async (
 };
 
 // ---------------------------------------------------------------------------
+// Reverse Geocode — Locality Name
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the city/place name from a coordinate using Mapbox reverse geocode.
+ * Returns the `context.place.name` from the first feature, or `null` when
+ * the coordinate cannot be resolved to a named place.
+ */
+export const reverseGeocodeLocality = async (
+  lat: number,
+  lon: number,
+): Promise<string | null> => {
+  const token = ensureMapboxToken();
+  const params = new URLSearchParams({
+    longitude: String(lon),
+    latitude: String(lat),
+    access_token: token,
+    types: 'place',
+    limit: '1',
+  });
+
+  const url = `${MAPBOX_GEOCODING_BASE}/reverse?${params.toString()}`;
+
+  try {
+    const response = await fetchWithTimeout(url);
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const feature = data.features?.[0];
+
+    return feature?.properties.name ?? null;
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Coverage Check
 // ---------------------------------------------------------------------------
 

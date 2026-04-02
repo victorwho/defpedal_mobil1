@@ -1,4 +1,5 @@
 import type {
+  CyclingGoal,
   OfflineRegion,
   NavigationLocationSample,
   QueuedMutation,
@@ -7,6 +8,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
   RoutingMode,
+  StreakState,
 } from '@defensivepedal/core';
 import {
   advanceNavigationStep,
@@ -94,6 +96,26 @@ type AppStore = {
   notifyCommunity: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+  onboardingCompleted: boolean;
+  cyclingGoal: CyclingGoal | null;
+  cachedStreak: StreakState | null;
+  cachedImpact: {
+    totalCo2Kg: number;
+    totalMoneyEur: number;
+    totalHazardsWarned: number;
+  } | null;
+  notificationPermissionAsked: boolean;
+  earnedMilestones: readonly string[];
+  setOnboardingCompleted: (completed: boolean) => void;
+  setCyclingGoal: (goal: CyclingGoal | null) => void;
+  setCachedStreak: (streak: StreakState | null) => void;
+  setCachedImpact: (impact: {
+    totalCo2Kg: number;
+    totalMoneyEur: number;
+    totalHazardsWarned: number;
+  } | null) => void;
+  setNotificationPermissionAsked: (asked: boolean) => void;
+  addEarnedMilestone: (milestoneKey: string) => void;
   setNotifyWeather: (enabled: boolean) => void;
   setNotifyHazard: (enabled: boolean) => void;
   setNotifyCommunity: (enabled: boolean) => void;
@@ -176,6 +198,28 @@ export const useAppStore = create<AppStore>()(
       notifyCommunity: true,
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
+      onboardingCompleted: false,
+      cyclingGoal: null,
+      cachedStreak: null,
+      cachedImpact: null,
+      notificationPermissionAsked: false,
+      earnedMilestones: [],
+      setOnboardingCompleted: (completed) =>
+        set(() => ({ onboardingCompleted: completed })),
+      setCyclingGoal: (goal) =>
+        set(() => ({ cyclingGoal: goal })),
+      setCachedStreak: (streak) =>
+        set(() => ({ cachedStreak: streak })),
+      setCachedImpact: (impact) =>
+        set(() => ({ cachedImpact: impact })),
+      setNotificationPermissionAsked: (asked) =>
+        set(() => ({ notificationPermissionAsked: asked })),
+      addEarnedMilestone: (milestoneKey) =>
+        set((state) => ({
+          earnedMilestones: state.earnedMilestones.includes(milestoneKey)
+            ? state.earnedMilestones
+            : [...state.earnedMilestones, milestoneKey],
+        })),
       setNotifyWeather: (enabled) =>
         set(() => ({ notifyWeather: enabled })),
       setNotifyHazard: (enabled) =>
@@ -601,6 +645,12 @@ export const useAppStore = create<AppStore>()(
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,
+        onboardingCompleted: state.onboardingCompleted,
+        cyclingGoal: state.cyclingGoal,
+        cachedStreak: state.cachedStreak,
+        cachedImpact: state.cachedImpact,
+        notificationPermissionAsked: state.notificationPermissionAsked,
+        earnedMilestones: state.earnedMilestones,
       }),
     },
   ),

@@ -106,6 +106,24 @@ export const requireAuthenticatedUser = async (
   return user;
 };
 
+export const requireFullUser = async (
+  request: FastifyRequest,
+  verifyAccessToken: (accessToken: string) => Promise<AuthenticatedUser | null>,
+): Promise<AuthenticatedUser> => {
+  const user = await requireAuthenticatedUser(request, verifyAccessToken);
+
+  // Anonymous Supabase users have no email. Reject them for sensitive operations.
+  if (!user.email) {
+    throw new HttpError('Full account required.', {
+      statusCode: 403,
+      code: 'UNAUTHORIZED',
+      details: ['Sign in with Google or email to perform this action.'],
+    });
+  }
+
+  return user;
+};
+
 export const getAuthenticatedUserFromRequest = async (
   request: FastifyRequest,
   verifyAccessToken: (accessToken: string) => Promise<AuthenticatedUser | null>,

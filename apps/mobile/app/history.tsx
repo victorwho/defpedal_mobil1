@@ -66,6 +66,17 @@ export default function HistoryScreen() {
             </View>
           ) : null}
 
+          {user ? (
+            <Button
+              variant="secondary"
+              size="md"
+              leftIcon={<Ionicons name="bar-chart-outline" size={18} color={brandColors.accent} />}
+              onPress={() => router.push('/impact-dashboard')}
+            >
+              Full Impact Dashboard
+            </Button>
+          ) : null}
+
           {user ? <StatsDashboard /> : null}
 
           <View style={styles.section}>
