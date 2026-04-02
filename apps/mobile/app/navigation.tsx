@@ -103,6 +103,10 @@ export default function NavigationScreen() {
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
     poiVisibility,
   );
+
+  const selectedRoute =
+    routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
+
   // Query hazards along the entire route, not just near the user
   const routeMidpoint = useMemo(() => {
     if (!selectedRoute) return null;
@@ -136,8 +140,6 @@ export default function NavigationScreen() {
     distanceMeters: number;
   } | null>(null);
 
-  const selectedRoute =
-    routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
   const currentStep =
     selectedRoute && navigationSession
       ? selectedRoute.steps[navigationSession.currentStepIndex] ?? null

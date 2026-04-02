@@ -62,6 +62,8 @@ export default function RoutePlanningScreen() {
     error: locationError,
     refreshLocation,
   } = useCurrentLocation();
+  const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
+  const mapUserLocation = currentLocation ?? fallbackUserLocation;
   const hasValidDestination = routeRequest.destination.lat !== 0 && routeRequest.destination.lon !== 0;
   const { parkingLocations } = useBicycleParking(
     mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null),
@@ -82,8 +84,6 @@ export default function RoutePlanningScreen() {
     poiVisibility,
   );
   const showBikeLanes = useAppStore((state) => state.showBicycleLanes);
-  const fallbackUserLocation = backgroundSnapshot.latestLocation?.coordinate ?? null;
-  const mapUserLocation = currentLocation ?? fallbackUserLocation;
   const planningOrigin = mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null);
   const { weather, isLoading: weatherLoading } = useWeather(
     planningOrigin?.lat ?? null,
@@ -160,11 +160,11 @@ export default function RoutePlanningScreen() {
     queryKey: ['reverse-geocode', 'current-origin', planningOrigin],
     queryFn: () =>
       mobileApi.reverseGeocode({
-        coordinate: planningOrigin,
+        coordinate: planningOrigin!,
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
       }),
-    enabled: Boolean(mobileEnv.mapboxPublicToken) && Boolean(mapUserLocation),
+    enabled: Boolean(mobileEnv.mapboxPublicToken) && Boolean(planningOrigin),
     retry: false,
   });
 
@@ -287,7 +287,7 @@ export default function RoutePlanningScreen() {
       if (isLocating) return 'Resolving location...';
       return planningOrigin ? formatCoordinateLabel(planningOrigin) : 'Waiting for GPS...';
     }
-    return currentLocationLabelQuery.data?.label ?? formatCoordinateLabel(planningOrigin);
+    return currentLocationLabelQuery.data?.label ?? (planningOrigin ? formatCoordinateLabel(planningOrigin) : 'Waiting for GPS...');
   }, [currentLocation, currentLocationLabelQuery.data?.label, isLocating, planningOrigin, permissionStatus]);
 
   const handleTabPress = (tab: TabKey) => {

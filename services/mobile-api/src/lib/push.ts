@@ -52,8 +52,8 @@ export const sendPushNotification = async (
 
     if (!response.ok) return null;
 
-    const result = await response.json();
-    const ticket = result?.data as PushTicket | undefined;
+    const result: { data?: PushTicket } = await response.json();
+    const ticket = result?.data;
 
     if (ticket?.status === 'ok' && ticket.id) {
       return ticket.id;
@@ -98,8 +98,8 @@ export const sendBatchPushNotifications = async (
         continue;
       }
 
-      const result = await response.json();
-      const tickets = (result?.data ?? []) as PushTicket[];
+      const result: { data?: PushTicket[] } = await response.json();
+      const tickets = result?.data ?? [];
 
       for (const ticket of tickets) {
         results.push(ticket.status === 'ok' ? (ticket.id ?? null) : null);
@@ -133,8 +133,8 @@ export const checkReceipts = async (
 
     if (!response.ok) return invalidTokens;
 
-    const result = await response.json();
-    const receipts = (result?.data ?? {}) as Record<string, PushReceipt>;
+    const result: { data?: Record<string, PushReceipt> } = await response.json();
+    const receipts = result?.data ?? {};
 
     for (const [, receipt] of Object.entries(receipts)) {
       if (
