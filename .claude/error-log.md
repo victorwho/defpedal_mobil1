@@ -96,3 +96,13 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Pattern:** `taskkill //F //IM node.exe` kills Metro. Next app open shows blank screen. `curl http://localhost:8081/status` returns nothing.
 **Fix:** Restart Metro: `cd apps/mobile && npx expo start --clear`. Wait for "Waiting on http://localhost:8081" before opening app.
 **Occurrences:** After every Metro restart
+
+### 18. Cloud Run serves old code after `gcloud builds submit`
+**Pattern:** `gcloud builds submit` builds and pushes a new Docker image, but Cloud Run keeps serving the old revision. The new endpoints return 404.
+**Fix:** After `gcloud builds submit`, you MUST also run `gcloud run deploy defpedal-api --image <image-url> --region europe-central2 --platform managed --allow-unauthenticated` to create a new revision. Verify with `gcloud run revisions list --service defpedal-api --region europe-central2`.
+**Occurrences:** CO2 stats endpoint deployment (2026-04-02)
+
+### 19. Dev app points to production API, not localhost
+**Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
+**Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).
+**Occurrences:** CO2 feature testing (2026-04-02)

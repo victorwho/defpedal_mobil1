@@ -34,7 +34,9 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - Production URL: `https://defpedal-api-1081412761678.europe-central2.run.app`
 - GCP Project: `gen-lang-client-0895796477`
 - Region: `europe-central2`
-- Redeploy: `gcloud builds submit --config cloudbuild.yaml --timeout=600`
+- Build image: `gcloud builds submit --config cloudbuild.yaml --timeout=600`
+- Deploy new revision: `gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated`
+- **Important:** `gcloud builds submit` only pushes the image. You MUST also run `gcloud run deploy` to create a new revision, otherwise Cloud Run keeps serving the old code.
 
 ## App Variants
 
@@ -351,12 +353,12 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Profile with bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles
 - Sign in (Google OAuth) / sign out
 - Offline mutation queue (trips, hazards, feedback sync when online)
+- CO2 savings per trip (actual GPS distance, EU avg 120g/km) on trip history cards, community feed, and "Your Impact" stats card in History tab
 
 ### Known Incomplete
 - Push notifications (needs EAS project ID + native rebuild)
 - iPhone validation (no macOS hardware available)
 - Redis-backed production caching/rate-limiting
-- CO2 savings calculation for trips
 - Notification Provider disabled (returns null)
 
 ### Known Issues
@@ -370,7 +372,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 ```
 APP_VARIANT=development
 EXPO_PUBLIC_APP_ENV=development
-EXPO_PUBLIC_MOBILE_API_URL=http://localhost:8080
+EXPO_PUBLIC_MOBILE_API_URL=https://defpedal-api-1081412761678.europe-central2.run.app
 EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.eyJ1...  # Mapbox public token
 EXPO_PUBLIC_SUPABASE_URL=https://uobubaulcdcuggnetzei.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbG...     # Supabase anon key
@@ -396,7 +398,7 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 - Project ID: `uobubaulcdcuggnetzei`
 - Region: (Supabase cloud)
 - Key tables: `road_risk_data`, `hazards`, `trips`, `trip_tracks`, `navigation_feedback`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `profiles`, `push_tokens`
-- Key RPC: `get_segmented_risk_route`, `get_nearby_feed`
+- Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`
 
 ### OSRM Server
 - Hosted on GCP project `osrmro1` in `europe-central2-c`
