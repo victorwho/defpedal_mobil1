@@ -3,6 +3,7 @@ import {
   AUTO_REROUTE_DELAY_MS,
   HAZARD_TYPE_OPTIONS,
   buildRerouteRequest,
+  calculateTrailDistanceMeters,
   getNavigationProgress,
   getPreviewOrigin,
   computeRemainingClimb,
@@ -263,10 +264,13 @@ export default function NavigationScreen() {
       const durationSeconds = Math.round(
         (new Date(endedAt).getTime() - new Date(navigationSession.startedAt).getTime()) / 1000,
       );
+      const actualDistance = navigationSession.gpsBreadcrumbs.length >= 2
+        ? calculateTrailDistanceMeters(navigationSession.gpsBreadcrumbs)
+        : selectedRoute.distanceMeters;
       enqueueMutation('trip_share', {
         startLocationText: routeRequest.origin.lat.toFixed(4) + ', ' + routeRequest.origin.lon.toFixed(4),
         destinationText: routeRequest.destination.lat.toFixed(4) + ', ' + routeRequest.destination.lon.toFixed(4),
-        distanceMeters: selectedRoute.distanceMeters,
+        distanceMeters: actualDistance,
         durationSeconds,
         elevationGainMeters: selectedRoute.totalClimbMeters,
         geometryPolyline6: selectedRoute.geometryPolyline6,
