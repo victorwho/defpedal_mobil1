@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-03-23
+Last updated: 2026-04-02
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -13,6 +13,7 @@ Update it at the end of each implementation slice.
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
 - Webapp cleanup (2026-03-22): all legacy React/Vite/Leaflet webapp code has been removed from the repo root — components/, hooks/, utils/, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json, and webapp dependencies (leaflet, react-dom, vite, vitest, jsdom, testing-library). Root SQL files moved to supabase/migrations/legacy/. Root tsconfig.json cleaned of DOM libs. The repo is now mobile-only.
 - Preview tunnel note: preview mobile development can now auto-sync the active ngrok URL into `apps/mobile/.env.preview` through `npm run sync:mobile:preview-url` and `npm run dev:mobile:preview`
+- CO2 savings feature (2026-04-02): full-stack CO2 savings calculator shipped — per-trip and cumulative environmental impact tracking across trip history, community feed, and profile. Uses actual GPS trail distance (not planned route) for accuracy. Deployed to Cloud Run.
 
 ## Phase Status
 
@@ -303,6 +304,31 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Exit criteria:
   - remaining: Android and iPhone each have one documented smoke-tested path
   - completed: preview release workflow has a documented preflight and rollback path
+
+### CO2 Savings Calculator (2026-04-02)
+
+- Status: Done
+- Evidence:
+  - `packages/core/src/co2.ts` — calculateCo2SavedKg, formatCo2Saved, calculateEquivalentTreeDays, calculateTrailDistanceMeters (EU avg 120g CO2/km)
+  - `packages/core/src/co2.test.ts` — 22 unit tests covering all functions
+  - `packages/core/src/contracts.ts` — UserStats type, co2SavedKg field on FeedItem
+  - `services/mobile-api/src/routes/v1.ts` — GET /v1/stats endpoint (cumulative user stats)
+  - `services/mobile-api/src/lib/submissions.ts` — getUserStats via Supabase RPC, actual_distance_meters stored on trip save
+  - `services/mobile-api/src/routes/feed.ts` — co2SavedKg computed in feed item mapper
+  - `services/mobile-api/src/lib/feedSchemas.ts` — co2SavedKg added to JSON Schema (prevents Fastify stripping)
+  - `apps/mobile/src/design-system/atoms/Co2Badge.tsx` — reusable leaf + CO2 display component
+  - `apps/mobile/src/design-system/organisms/TripCard.tsx` — CO2 from actual GPS trail distance
+  - `apps/mobile/src/components/FeedCard.tsx` — CO2 Saved stat in community feed cards
+  - `apps/mobile/app/history.tsx` — "Your Impact" card (trips, km cycled, CO2 saved, tree-days)
+  - `apps/mobile/app/navigation.tsx` — shares actual GPS distance to community feed
+  - `supabase/migrations/202604020001_user_trip_stats.sql` — get_user_trip_stats RPC
+  - `supabase/migrations/202604020002_actual_distance_meters.sql` — actual_distance_meters column + updated RPC
+- Key decisions:
+  - CO2 = distance_km × 0.12 kg (EU avg 120g/km for cars, ~0g for cycling)
+  - Uses actual GPS trail distance via haversine sum, falls back to planned route distance
+  - Stats RPC uses COALESCE(actual_distance_meters, planned_route_distance_meters) for backwards compatibility
+  - "Your Impact" card placed in History tab (not Profile) per user preference
+  - API deployed to Cloud Run (revision defpedal-api-00006-rmg)
 
 ### Phase 5: Staging and handoff
 
