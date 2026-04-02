@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { mobileTheme } from '../lib/theme';
-import { LikeButton } from './LikeButton';
+import { ReactionBar } from './LikeButton';
 import { RouteMap } from './RouteMap';
 import { SafetyBadge } from './SafetyBadge';
 import { SafetyTagChips } from './SafetyTagChips';
@@ -13,6 +13,7 @@ type FeedCardProps = {
   item: FeedItem;
   isVisible: boolean;
   onLike: (id: string, liked: boolean) => void;
+  onLove: (id: string, loved: boolean) => void;
   onPress: (id: string) => void;
 };
 
@@ -45,7 +46,7 @@ const buildSyntheticRoute = (item: FeedItem): RouteOption => ({
   warnings: [],
 });
 
-export const FeedCard = ({ item, isVisible, onLike, onPress }: FeedCardProps) => {
+export const FeedCard = ({ item, isVisible, onLike, onLove, onPress }: FeedCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const syntheticRoute = buildSyntheticRoute(item);
   const initials = item.user.displayName
@@ -57,6 +58,7 @@ export const FeedCard = ({ item, isVisible, onLike, onPress }: FeedCardProps) =>
 
   const handlePress = useCallback(() => onPress(item.id), [item.id, onPress]);
   const handleLike = useCallback(() => onLike(item.id, item.likedByMe), [item.id, item.likedByMe, onLike]);
+  const handleLove = useCallback(() => onLove(item.id, item.lovedByMe ?? false), [item.id, item.lovedByMe, onLove]);
 
   return (
     <Pressable style={styles.card} onPress={handlePress}>
@@ -130,13 +132,16 @@ export const FeedCard = ({ item, isVisible, onLike, onPress }: FeedCardProps) =>
 
       {/* Action bar */}
       <View style={styles.actionBar}>
-        <LikeButton liked={item.likedByMe} count={item.likeCount} onPress={handleLike} />
-        <Pressable style={styles.commentButton} onPress={handlePress}>
-          <Text style={styles.commentIcon}>{'\u{1F4AC}'}</Text>
-          <Text style={styles.commentCount}>
-            {item.commentCount > 0 ? item.commentCount : ''}
-          </Text>
-        </Pressable>
+        <ReactionBar
+          likeCount={item.likeCount}
+          loveCount={item.loveCount ?? 0}
+          commentCount={item.commentCount}
+          likedByMe={item.likedByMe}
+          lovedByMe={item.lovedByMe ?? false}
+          onLike={handleLike}
+          onLove={handleLove}
+          onComment={handlePress}
+        />
       </View>
     </Pressable>
   );

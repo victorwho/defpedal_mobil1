@@ -404,8 +404,10 @@ export interface FeedItem {
   note: string | null;
   sharedAt: string;
   likeCount: number;
+  loveCount: number;
   commentCount: number;
   likedByMe: boolean;
+  lovedByMe: boolean;
 }
 
 export interface FeedComment {

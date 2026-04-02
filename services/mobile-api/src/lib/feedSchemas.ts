@@ -115,7 +115,7 @@ export const feedItemSchema = {
     'id', 'user', 'title', 'startLocationText', 'destinationText',
     'distanceMeters', 'durationSeconds', 'elevationGainMeters',
     'averageSpeedMps', 'safetyRating', 'safetyTags', 'geometryPolyline6',
-    'note', 'sharedAt', 'likeCount', 'commentCount', 'likedByMe',
+    'note', 'sharedAt', 'likeCount', 'loveCount', 'commentCount', 'likedByMe', 'lovedByMe',
   ],
   properties: {
     id: { type: 'string' },
@@ -133,8 +133,10 @@ export const feedItemSchema = {
     note: { type: ['string', 'null'] },
     sharedAt: { type: 'string', format: 'date-time' },
     likeCount: { type: 'integer' },
+    loveCount: { type: 'integer' },
     commentCount: { type: 'integer' },
     likedByMe: { type: 'boolean' },
+    lovedByMe: { type: 'boolean' },
   },
 } as const;
 

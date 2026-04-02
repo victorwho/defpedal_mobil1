@@ -77,8 +77,10 @@ const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
     note: (row.note as string) ?? null,
     sharedAt: row.shared_at as string,
     likeCount: Number(row.like_count ?? 0),
+    loveCount: Number(row.love_count ?? 0),
     commentCount: Number(row.comment_count ?? 0),
     likedByMe: Boolean(row.liked_by_me),
+    lovedByMe: Boolean(row.loved_by_me ?? false),
   };
 };
 
@@ -310,6 +312,51 @@ export const buildFeedRoutes = (
           });
         }
 
+        return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    // POST /feed/:id/love
+    app.post<{ Params: TripShareIdParams; Reply: WriteAckResponse | ErrorResponse }>(
+      '/feed/:id/love',
+      {
+        schema: {
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+          response: {
+            200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
+            401: errorResponseSchema, 502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireUser(request, dependencies);
+        const db = ensureSupabase();
+        const { error } = await db.from('trip_loves').upsert(
+          { trip_share_id: request.params.id, user_id: user.id },
+          { onConflict: 'trip_share_id,user_id' },
+        );
+        if (error) throw new HttpError('Love failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+        return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    // DELETE /feed/:id/love
+    app.delete<{ Params: TripShareIdParams; Reply: WriteAckResponse | ErrorResponse }>(
+      '/feed/:id/love',
+      {
+        schema: {
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+          response: {
+            200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
+            401: errorResponseSchema, 502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireUser(request, dependencies);
+        const db = ensureSupabase();
+        const { error } = await db.from('trip_loves').delete().eq('trip_share_id', request.params.id).eq('user_id', user.id);
+        if (error) throw new HttpError('Unlove failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
         return { acceptedAt: new Date().toISOString() };
       },
     );

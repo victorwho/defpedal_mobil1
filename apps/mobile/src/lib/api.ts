@@ -333,6 +333,14 @@ export const mobileApi = {
     requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/like`, {
       method: 'DELETE',
     }),
+  loveFeedItem: (tripShareId: string) =>
+    requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/love`, {
+      method: 'POST',
+    }),
+  unloveFeedItem: (tripShareId: string) =>
+    requestJson<WriteAckResponse>(`/v1/feed/${tripShareId}/love`, {
+      method: 'DELETE',
+    }),
   getFeedComments: (tripShareId: string) =>
     requestJson<{ comments: FeedComment[] }>(`/v1/feed/${tripShareId}/comments`),
   postFeedComment: (tripShareId: string, payload: FeedCommentRequest) =>

@@ -16,7 +16,7 @@ import { FeedCard } from '../src/components/FeedCard';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
-import { useFeedQuery, useLikeToggle } from '../src/hooks/useFeed';
+import { useFeedQuery, useLikeToggle, useLoveToggle } from '../src/hooks/useFeed';
 import { mobileTheme } from '../src/lib/theme';
 
 export default function CommunityFeedScreen() {
@@ -36,6 +36,7 @@ export default function CommunityFeedScreen() {
   } = useFeedQuery(lat, lon);
 
   const likeToggle = useLikeToggle();
+  const loveToggle = useLoveToggle();
 
   // Track visible items for lazy map loading
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
@@ -56,6 +57,13 @@ export default function CommunityFeedScreen() {
     [likeToggle],
   );
 
+  const handleLove = useCallback(
+    (id: string, loved: boolean) => {
+      loveToggle.mutate({ id, loved });
+    },
+    [loveToggle],
+  );
+
   const handlePress = useCallback((id: string) => {
     router.push({ pathname: '/community-trip', params: { id } });
   }, []);
@@ -72,10 +80,11 @@ export default function CommunityFeedScreen() {
         item={item}
         isVisible={visibleIds.has(item.id)}
         onLike={handleLike}
+        onLove={handleLove}
         onPress={handlePress}
       />
     ),
-    [visibleIds, handleLike, handlePress],
+    [visibleIds, handleLike, handleLove, handlePress],
   );
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);

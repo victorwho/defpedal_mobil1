@@ -109,6 +109,64 @@ export const useLikeToggle = () => {
 };
 
 // ---------------------------------------------------------------------------
+// Love toggle (optimistic)
+// ---------------------------------------------------------------------------
+
+export const useLoveToggle = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, loved }: { id: string; loved: boolean }) => {
+      if (loved) {
+        return mobileApi.unloveFeedItem(id);
+      }
+      return mobileApi.loveFeedItem(id);
+    },
+    onMutate: async ({ id, loved }) => {
+      await queryClient.cancelQueries({ queryKey: [FEED_KEY] });
+
+      const previousData = queryClient.getQueriesData<{ pages: FeedResponse[] }>({
+        queryKey: [FEED_KEY],
+      });
+
+      queryClient.setQueriesData<{ pages: FeedResponse[]; pageParams: unknown[] }>(
+        { queryKey: [FEED_KEY] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item: FeedItem) =>
+                item.id === id
+                  ? {
+                      ...item,
+                      lovedByMe: !loved,
+                      loveCount: (item.loveCount ?? 0) + (loved ? -1 : 1),
+                    }
+                  : item,
+              ),
+            })),
+          };
+        },
+      );
+
+      return { previousData };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousData) {
+        context.previousData.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+    },
+  });
+};
+
+// ---------------------------------------------------------------------------
 // Comments
 // ---------------------------------------------------------------------------
 

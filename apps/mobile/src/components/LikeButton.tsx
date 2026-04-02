@@ -1,6 +1,28 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors, gray } from '../design-system/tokens/colors';
+
+type ReactionButtonProps = {
+  active: boolean;
+  count: number;
+  onPress: () => void;
+  icon: 'thumbs-up' | 'heart';
+  activeColor: string;
+};
+
+const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionButtonProps) => {
+  const iconName = active
+    ? (icon === 'thumbs-up' ? 'thumbs-up' : 'heart')
+    : (icon === 'thumbs-up' ? 'thumbs-up-outline' : 'heart-outline');
+
+  return (
+    <Pressable style={[styles.button, active && styles.buttonActive]} onPress={onPress}>
+      <Ionicons name={iconName} size={20} color={active ? activeColor : gray[400]} />
+      <Text style={[styles.count, active && { color: activeColor }]}>{count}</Text>
+    </Pressable>
+  );
+};
 
 type LikeButtonProps = {
   liked: boolean;
@@ -9,37 +31,83 @@ type LikeButtonProps = {
 };
 
 export const LikeButton = ({ liked, count, onPress }: LikeButtonProps) => (
-  <Pressable style={styles.button} onPress={onPress}>
-    <Text style={[styles.icon, liked ? styles.iconActive : null]}>
-      {liked ? '\u2665' : '\u2661'}
-    </Text>
-    <Text style={[styles.count, liked ? styles.countActive : null]}>
-      {count > 0 ? count : ''}
-    </Text>
-  </Pressable>
+  <ReactionButton
+    active={liked}
+    count={count}
+    onPress={onPress}
+    icon="thumbs-up"
+    activeColor={brandColors.accent}
+  />
+);
+
+type LoveButtonProps = {
+  loved: boolean;
+  count: number;
+  onPress: () => void;
+};
+
+export const LoveButton = ({ loved, count, onPress }: LoveButtonProps) => (
+  <ReactionButton
+    active={loved}
+    count={count}
+    onPress={onPress}
+    icon="heart"
+    activeColor="#EF4444"
+  />
+);
+
+type ReactionBarProps = {
+  likeCount: number;
+  loveCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  lovedByMe: boolean;
+  onLike: () => void;
+  onLove: () => void;
+  onComment: () => void;
+};
+
+export const ReactionBar = ({
+  likeCount,
+  loveCount,
+  commentCount,
+  likedByMe,
+  lovedByMe,
+  onLike,
+  onLove,
+  onComment,
+}: ReactionBarProps) => (
+  <View style={styles.bar}>
+    <LikeButton liked={likedByMe} count={likeCount} onPress={onLike} />
+    <LoveButton loved={lovedByMe} count={loveCount} onPress={onLove} />
+    <Pressable style={styles.button} onPress={onComment}>
+      <Ionicons name="chatbubble-outline" size={18} color={gray[400]} />
+      <Text style={styles.count}>{commentCount}</Text>
+    </Pressable>
+  </View>
 );
 
 const styles = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 4,
+  },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
+    borderRadius: 16,
   },
-  icon: {
-    fontSize: 20,
-    color: mobileTheme.colors.textOnDarkMuted,
-  },
-  iconActive: {
-    color: mobileTheme.colors.danger,
+  buttonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   count: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: mobileTheme.colors.textOnDarkMuted,
-  },
-  countActive: {
-    color: mobileTheme.colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
+    color: gray[400],
   },
 });
