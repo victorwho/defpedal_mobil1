@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { mobileTheme } from '../lib/theme';
 import { ReactionBar } from './LikeButton';
-import { RouteMap } from './RouteMap';
+import { RouteMap } from './map';
 import { SafetyBadge } from './SafetyBadge';
 import { SafetyTagChips } from './SafetyTagChips';
 

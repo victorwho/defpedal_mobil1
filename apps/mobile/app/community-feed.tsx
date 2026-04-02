@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -11,6 +12,8 @@ import {
   type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FeedCard } from '../src/components/FeedCard';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
@@ -20,7 +23,13 @@ import { useFeedQuery, useLikeToggle, useLoveToggle } from '../src/hooks/useFeed
 import { mobileTheme } from '../src/lib/theme';
 
 export default function CommunityFeedScreen() {
-  const { location: currentLocation } = useCurrentLocation();
+  const {
+    location: currentLocation,
+    permissionStatus,
+    isLoading: isLocating,
+    error: locationError,
+    refreshLocation,
+  } = useCurrentLocation();
   const insets = useSafeAreaInsets();
   const lat = currentLocation?.lat ?? null;
   const lon = currentLocation?.lon ?? null;
@@ -90,13 +99,41 @@ export default function CommunityFeedScreen() {
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);
 
   if (!lat || !lon) {
+    const isDenied = permissionStatus === 'denied';
+    const hasError = !isLocating && (isDenied || locationError != null);
+
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
-          <Text style={styles.loadingText}>Getting your location...</Text>
+        <View style={styles.headerBar}>
+          <Text style={styles.headerEyebrow}>Community</Text>
+          <Text style={styles.headerTitle}>Nearby Rides</Text>
         </View>
-      <BottomNav activeTab="community" onTabPress={handleTabPress} />
+        <View style={styles.centered}>
+          {hasError ? (
+            <>
+              <Ionicons name="location-outline" size={48} color={mobileTheme.colors.brand} />
+              <Text style={styles.emptyTitle}>
+                {isDenied ? 'Location access needed' : 'Unable to get location'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {isDenied
+                  ? 'Enable location permission to see rides shared by cyclists near you.'
+                  : locationError ?? 'Something went wrong resolving your location.'}
+              </Text>
+              <Pressable style={styles.retryButton} onPress={() => void refreshLocation()}>
+                <Text style={styles.retryButtonText}>
+                  {isDenied ? 'Grant Location Access' : 'Try Again'}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
+              <Text style={styles.loadingText}>Getting your location...</Text>
+            </>
+          )}
+        </View>
+        <BottomNav activeTab="community" onTabPress={handleTabPress} />
       </View>
     );
   }
@@ -211,5 +248,17 @@ const styles = StyleSheet.create({
   footer: {
     paddingVertical: 24,
     alignItems: 'center',
+  },
+  retryButton: {
+    marginTop: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: mobileTheme.colors.brand,
+  },
+  retryButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

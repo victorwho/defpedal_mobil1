@@ -544,6 +544,27 @@ export default function DiagnosticsScreen() {
         <Text style={[styles.dataText, { color: colors.textSecondary }]}>In-app offline regions: <Text style={styles.monoValue}>{offlineRegions.length}</Text></Text>
         <Text style={[styles.dataText, { color: colors.textSecondary }]}>Active session: <Text style={styles.monoValue}>{navigationSession?.state ?? 'idle'}</Text></Text>
         <Text style={[styles.dataText, { color: colors.textSecondary }]}>Queue detail: <Text style={styles.monoValue}>{queueDetail}</Text></Text>
+        {queuedMutations.some((m) => m.status === 'dead') ? (
+          <View style={{ marginTop: space[2] }}>
+            <Text style={[styles.dataText, { color: colors.danger, marginBottom: space[1] }]}>
+              {queuedMutations.filter((m) => m.status === 'dead').length} mutation(s) permanently failed (max retries exceeded)
+            </Text>
+            <Button
+              variant="secondary"
+              size="sm"
+              onPress={() => {
+                const count = useAppStore.getState().retryDeadMutations();
+                setDevStatusMessage(
+                  count > 0
+                    ? `Reset ${count} dead mutation(s) for retry.`
+                    : 'No dead mutations to retry.',
+                );
+              }}
+            >
+              Retry dead mutations
+            </Button>
+          </View>
+        ) : null}
       </DiagnosticCard>
 
       {screenError ? (

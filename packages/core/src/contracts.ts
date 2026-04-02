@@ -355,7 +355,7 @@ export interface OfflineRegion {
 }
 
 export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback';
-export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed';
+export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed' | 'dead';
 
 export interface QueuedMutation {
   id: string;

@@ -9,7 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
-import { RouteMap } from '../src/components/RouteMap';
+import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
@@ -417,7 +417,7 @@ export default function RoutePlanningScreen() {
 
           {/* Weather widget — hidden while typing */}
           {!activeField ? (
-            <WeatherWidget weather={weather} isLoading={weatherLoading} />
+            <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
           {/* Safe / Fast routing toggle */}

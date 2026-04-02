@@ -216,7 +216,7 @@ export const buildFeedRoutes = (
           params: {
             type: 'object',
             required: ['id'],
-            properties: { id: { type: 'string', minLength: 1 } },
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
           },
           response: {
             200: {
@@ -280,7 +280,7 @@ export const buildFeedRoutes = (
           params: {
             type: 'object',
             required: ['id'],
-            properties: { id: { type: 'string', minLength: 1 } },
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
           },
           response: {
             200: {
@@ -321,7 +321,7 @@ export const buildFeedRoutes = (
       '/feed/:id/love',
       {
         schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1, format: 'uuid' } } },
           response: {
             200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
             401: errorResponseSchema, 502: errorResponseSchema,
@@ -345,7 +345,7 @@ export const buildFeedRoutes = (
       '/feed/:id/love',
       {
         schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1 } } },
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1, format: 'uuid' } } },
           response: {
             200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
             401: errorResponseSchema, 502: errorResponseSchema,
@@ -369,7 +369,7 @@ export const buildFeedRoutes = (
           params: {
             type: 'object',
             required: ['id'],
-            properties: { id: { type: 'string', minLength: 1 } },
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
           },
           response: {
             200: feedCommentsResponseSchema,
@@ -422,7 +422,7 @@ export const buildFeedRoutes = (
           params: {
             type: 'object',
             required: ['id'],
-            properties: { id: { type: 'string', minLength: 1 } },
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
           },
           body: feedCommentRequestSchema,
           response: {

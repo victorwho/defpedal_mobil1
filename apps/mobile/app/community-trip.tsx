@@ -18,7 +18,7 @@ import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 import { LikeButton } from '../src/components/LikeButton';
-import { RouteMap } from '../src/components/RouteMap';
+import { RouteMap } from '../src/components/map';
 import { SafetyBadge } from '../src/components/SafetyBadge';
 import { SafetyTagChips } from '../src/components/SafetyTagChips';
 import {

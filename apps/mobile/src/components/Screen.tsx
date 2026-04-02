@@ -18,14 +18,22 @@ type ScreenProps = PropsWithChildren<{
   eyebrow?: string;
   subtitle?: string;
   aside?: ReactNode;
+  /** Extra bottom padding added to ScrollView content (e.g. to clear a BottomNav). */
+  contentBottomPadding?: number;
 }>;
 
-export const Screen = ({ title, eyebrow, subtitle, aside, children }: ScreenProps) => (
+export const Screen = ({ title, eyebrow, subtitle, aside, children, contentBottomPadding }: ScreenProps) => (
   <SafeAreaView style={styles.safeArea}>
     <View style={styles.canvas}>
       <View style={[styles.glow, styles.glowTop]} />
       <View style={[styles.glow, styles.glowBottom]} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          contentBottomPadding != null && { paddingBottom: contentBottomPadding },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.headerShell}>
           <View style={styles.headerRow}>
             <View style={styles.brandRow}>
