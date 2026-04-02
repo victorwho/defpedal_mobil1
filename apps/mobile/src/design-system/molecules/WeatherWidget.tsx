@@ -10,6 +10,8 @@ import { fontFamily, textSm } from '../tokens/typography';
 type WeatherWidgetProps = {
   weather: WeatherData | null;
   isLoading: boolean;
+  /** When false the widget hides instead of showing a permanent loading spinner. */
+  hasLocation?: boolean;
 };
 
 const precipColor = (pct: number): string => {
@@ -22,7 +24,10 @@ const windColor = (speed: number): string => {
   return gray[400];
 };
 
-export const WeatherWidget = ({ weather, isLoading }: WeatherWidgetProps) => {
+export const WeatherWidget = ({ weather, isLoading, hasLocation = true }: WeatherWidgetProps) => {
+  // Hide entirely when we have no location to fetch weather for
+  if (!hasLocation && !weather) return null;
+
   if (isLoading) {
     return (
       <View style={styles.card}>

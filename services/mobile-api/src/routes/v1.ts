@@ -458,6 +458,42 @@ export const buildV1Routes = (
 
     app.post(
       '/trips/track',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['tripId', 'clientTripId', 'routingMode', 'gpsBreadcrumbs', 'endReason', 'startedAt', 'endedAt'],
+            properties: {
+              tripId: { type: 'string', minLength: 1, maxLength: 100 },
+              clientTripId: { type: 'string', minLength: 1, maxLength: 100 },
+              routingMode: { type: 'string', enum: ['safe', 'fast'] },
+              plannedRoutePolyline6: { type: 'string', maxLength: 500000 },
+              plannedRouteDistanceMeters: { type: 'number', minimum: 0, maximum: 1000000 },
+              gpsBreadcrumbs: {
+                type: 'array',
+                maxItems: 10000,
+                items: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['lat', 'lon', 'ts'],
+                  properties: {
+                    lat: { type: 'number', minimum: -90, maximum: 90 },
+                    lon: { type: 'number', minimum: -180, maximum: 180 },
+                    ts: { type: 'number' },
+                    acc: { type: ['number', 'null'] },
+                    spd: { type: ['number', 'null'] },
+                    hdg: { type: ['number', 'null'] },
+                  },
+                },
+              },
+              endReason: { type: 'string', enum: ['completed', 'stopped', 'app_killed'] },
+              startedAt: { type: 'string', format: 'date-time' },
+              endedAt: { type: 'string', format: 'date-time' },
+            },
+          },
+        },
+      },
       async (request, reply) => {
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', {
@@ -468,11 +504,11 @@ export const buildV1Routes = (
           const body = request.body as {
             tripId: string;
             clientTripId: string;
-            routingMode: string;
+            routingMode: 'safe' | 'fast';
             plannedRoutePolyline6?: string;
             plannedRouteDistanceMeters?: number;
             gpsBreadcrumbs: Array<{ lat: number; lon: number; ts: number; acc: number | null; spd: number | null; hdg: number | null }>;
-            endReason: string;
+            endReason: 'completed' | 'stopped' | 'app_killed';
             startedAt: string;
             endedAt: string;
           };
@@ -481,11 +517,11 @@ export const buildV1Routes = (
             {
               tripId: body.tripId,
               clientTripId: body.clientTripId,
-              routingMode: body.routingMode as 'safe' | 'fast',
+              routingMode: body.routingMode,
               plannedRoutePolyline6: body.plannedRoutePolyline6,
               plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
               gpsBreadcrumbs: body.gpsBreadcrumbs,
-              endReason: body.endReason as 'completed' | 'stopped' | 'app_killed',
+              endReason: body.endReason,
               startedAt: body.startedAt,
               endedAt: body.endedAt,
             },
@@ -632,7 +668,25 @@ export const buildV1Routes = (
     app.post<{
       Params: { hazardId: string };
       Body: { response: 'confirm' | 'deny' | 'pass' };
-    }>('/hazards/:hazardId/validate', async (request, reply) => {
+    }>('/hazards/:hazardId/validate', {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['hazardId'],
+          properties: {
+            hazardId: { type: 'string', format: 'uuid' },
+          },
+        },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['response'],
+          properties: {
+            response: { type: 'string', enum: ['confirm', 'deny', 'pass'] },
+          },
+        },
+      },
+    }, async (request, reply) => {
       const user = await getAuthenticatedUserFromRequest(
         request,
         dependencies.authenticateUser,
@@ -648,14 +702,6 @@ export const buildV1Routes = (
 
       const { hazardId } = request.params;
       const { response: validationResponse } = request.body;
-
-      if (!['confirm', 'deny', 'pass'].includes(validationResponse)) {
-        return reply.status(400).send({
-          error: 'Invalid response.',
-          code: 'VALIDATION_ERROR',
-          details: ['response must be confirm, deny, or pass.'],
-        });
-      }
 
       try {
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
@@ -832,9 +878,22 @@ export const buildV1Routes = (
   // ── Push token registration ──
   app.put(
     '/push-token',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['expoPushToken', 'deviceId', 'platform'],
+          properties: {
+            expoPushToken: { type: 'string', minLength: 1, maxLength: 200 },
+            deviceId: { type: 'string', minLength: 1, maxLength: 200 },
+            platform: { type: 'string', enum: ['android', 'ios'] },
+          },
+        },
+      },
+    },
     async (request, reply) => {
-      const user = await requireWriteUser(request, reply, dependencies);
-      if (!user) return;
+      const user = await requireWriteUser(request, dependencies);
 
       const { expoPushToken, deviceId, platform } = request.body as {
         expoPushToken: string;
@@ -870,9 +929,20 @@ export const buildV1Routes = (
 
   app.delete(
     '/push-token',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['deviceId'],
+          properties: {
+            deviceId: { type: 'string', minLength: 1, maxLength: 200 },
+          },
+        },
+      },
+    },
     async (request, reply) => {
-      const user = await requireWriteUser(request, reply, dependencies);
-      if (!user) return;
+      const user = await requireWriteUser(request, dependencies);
 
       const { deviceId } = request.body as { deviceId: string };
       if (!deviceId) {
@@ -890,11 +960,33 @@ export const buildV1Routes = (
   );
 
   // ── Admin notification send ──
+  // NOTE: This endpoint is restricted to the internal admin bypass token only.
+  // Regular Supabase-authenticated users are rejected regardless of their role.
   app.post(
     '/notifications/send',
     async (request, reply) => {
-      const user = await requireWriteUser(request, reply, dependencies);
-      if (!user) return;
+      // Only allow the dev-auth bypass user (internal/admin use only).
+      // A real Supabase user JWT must never be able to reach this.
+      if (!config.devAuthBypass.enabled) {
+        return reply.status(403).send({
+          error: 'This endpoint is disabled.',
+          code: 'UNAUTHORIZED',
+        });
+      }
+
+      const authHeader = request.headers.authorization ?? '';
+      const accessToken = authHeader.toLowerCase().startsWith('bearer ')
+        ? authHeader.slice(7).trim()
+        : '';
+
+      const { authenticateDeveloperBypassToken } = await import('../lib/auth');
+      const adminUser = authenticateDeveloperBypassToken(accessToken);
+      if (!adminUser) {
+        return reply.status(403).send({
+          error: 'Admin access required.',
+          code: 'UNAUTHORIZED',
+        });
+      }
 
       const { dispatchNotification, broadcastNotification } = await import('../lib/notifications');
       const { userId, category, title, body, data } = request.body as {
@@ -909,13 +1001,18 @@ export const buildV1Routes = (
         return reply.status(400).send({ error: 'Missing required fields: category, title, body' });
       }
 
+      const VALID_CATEGORIES = ['weather', 'hazard', 'community', 'system'];
+      if (!VALID_CATEGORIES.includes(category)) {
+        return reply.status(400).send({ error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` });
+      }
+
       try {
         if (userId) {
-          await dispatchNotification(userId, category as any, { title, body, data });
+          await dispatchNotification(userId, category as 'weather' | 'hazard' | 'community' | 'system', { title, body, data });
           return reply.send({ sent: 1 });
         }
 
-        const count = await broadcastNotification(category as any, { title, body, data });
+        const count = await broadcastNotification(category as 'weather' | 'hazard' | 'community' | 'system', { title, body, data });
         return reply.send({ sent: count });
       } catch (err) {
         request.log.error({ err }, 'notification send failed');

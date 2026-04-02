@@ -7,7 +7,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
     "typecheck": "tsc -p tsconfig.json",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@defensivepedal/core": "file:../../packages/core",
@@ -18,9 +21,12 @@
     "redis": "^5.11.0"
   },
   "devDependencies": {
-    "esbuild": "^0.25.12",
     "@types/pngjs": "^6.0.5",
+    "@vitest/coverage-istanbul": "^4.1.2",
+    "@vitest/coverage-v8": "^4.1.2",
+    "esbuild": "^0.25.12",
     "tsx": "^4.20.5",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "vitest": "^4.1.2"
   }
 }

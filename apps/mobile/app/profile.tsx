@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { brandColors, gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm } from '../src/design-system/tokens/typography';
-import { space } from '../src/design-system/tokens/spacing';
+import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
@@ -83,6 +85,7 @@ const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select
 };
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const { user, signOut } = useAuthSession();
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
   const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
@@ -120,7 +123,12 @@ export default function ProfileScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        <Screen title="Profile" eyebrow="Defensive Pedal" subtitle="Your account and settings">
+        <Screen
+          title="Profile"
+          eyebrow="Defensive Pedal"
+          subtitle="Your account and settings"
+          contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
+        >
           {user ? (
             <View style={styles.userCard}>
               <Ionicons name="person-circle-outline" size={48} color={brandColors.accent} />

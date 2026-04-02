@@ -22,7 +22,8 @@ const getSupabaseAdmin = () => {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Missing Supabase credentials for notifications');
-  return createClient(url, key);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped DB schema
+  return createClient<any>(url, key);
 };
 
 const categoryToField: Record<NotificationCategory, keyof UserPrefs | null> = {
@@ -59,7 +60,7 @@ const isInQuietHours = (prefs: UserPrefs): boolean => {
 };
 
 const logNotification = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string,
   category: NotificationCategory,
   payload: NotificationPayload,

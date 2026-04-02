@@ -38,7 +38,7 @@ export const feedQuerystringSchema = {
     lat: { type: 'number', minimum: -90, maximum: 90 },
     lon: { type: 'number', minimum: -180, maximum: 180 },
     radiusKm: { type: 'number', minimum: 1, maximum: 100 },
-    cursor: { type: 'string' },
+    cursor: { type: 'string', maxLength: 50 },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
   },
 } as const;
@@ -57,8 +57,8 @@ export const shareTripRequestSchema = {
   properties: {
     tripId: { type: 'string', minLength: 1 },
     title: { type: 'string', maxLength: 200 },
-    startLocationText: { type: 'string', minLength: 1 },
-    destinationText: { type: 'string', minLength: 1 },
+    startLocationText: { type: 'string', minLength: 1, maxLength: 500 },
+    destinationText: { type: 'string', minLength: 1, maxLength: 500 },
     distanceMeters: { type: 'number', minimum: 0 },
     durationSeconds: { type: 'number', minimum: 0 },
     elevationGainMeters: { type: ['number', 'null'] },

@@ -20,7 +20,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
-import { RouteMap } from '../src/components/RouteMap';
+import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
@@ -103,6 +103,10 @@ export default function NavigationScreen() {
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
     poiVisibility,
   );
+
+  const selectedRoute =
+    routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
+
   // Query hazards along the entire route, not just near the user
   const routeMidpoint = useMemo(() => {
     if (!selectedRoute) return null;
@@ -136,8 +140,6 @@ export default function NavigationScreen() {
     distanceMeters: number;
   } | null>(null);
 
-  const selectedRoute =
-    routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
   const currentStep =
     selectedRoute && navigationSession
       ? selectedRoute.steps[navigationSession.currentStepIndex] ?? null

@@ -16,7 +16,7 @@ import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useWeather } from '../src/hooks/useWeather';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
-import { RouteMap } from '../src/components/RouteMap';
+import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import { mobileApi } from '../src/lib/api';

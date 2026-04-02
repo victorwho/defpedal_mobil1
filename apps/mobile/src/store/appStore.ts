@@ -29,6 +29,11 @@ import { create } from 'zustand';
 import type { QueuedMutationPayloadByType } from '../lib/offlineQueue';
 import { zustandStorage } from '../lib/storage';
 
+const MAX_QUEUE_SIZE = 500;
+
+/** Trip-related mutation types that should not be dropped during queue eviction. */
+const TRIP_CRITICAL_TYPES = new Set(['trip_start', 'trip_end', 'trip_track']);
+
 const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   origin: {
     lat: 0,
@@ -137,6 +142,8 @@ type AppStore = {
   markMutationSyncing: (mutationId: string) => void;
   resolveMutation: (mutationId: string) => void;
   failMutation: (mutationId: string, errorMessage: string) => void;
+  killMutation: (mutationId: string, errorMessage: string) => void;
+  retryDeadMutations: () => number;
   recoverSyncingMutations: (errorMessage?: string) => void;
   setTripServerId: (clientTripId: string, tripId: string) => void;
   setActiveTripClientId: (clientTripId: string | null) => void;
@@ -408,9 +415,44 @@ export const useAppStore = create<AppStore>()(
       enqueueMutation: (type, payload) => {
         const mutation = createQueuedMutationRecord(type, payload);
 
-        set((state) => ({
-          queuedMutations: [...state.queuedMutations, mutation],
-        }));
+        set((state) => {
+          let nextQueue = [...state.queuedMutations, mutation];
+
+          // Enforce queue size bounds by evicting the oldest non-trip, non-syncing items.
+          if (nextQueue.length > MAX_QUEUE_SIZE) {
+            const overage = nextQueue.length - MAX_QUEUE_SIZE;
+            let dropped = 0;
+
+            nextQueue = nextQueue.filter((item) => {
+              if (dropped >= overage) return true;
+              // Never drop items currently syncing or trip-critical items.
+              if (item.status === 'syncing' || TRIP_CRITICAL_TYPES.has(item.type)) return true;
+              // Prefer dropping dead items first, then oldest queued/failed.
+              if (item.status === 'dead') {
+                dropped++;
+                return false;
+              }
+
+              return true;
+            });
+
+            // If we still haven't dropped enough, drop oldest non-syncing failed/queued items.
+            if (nextQueue.length > MAX_QUEUE_SIZE) {
+              const remainingOverage = nextQueue.length - MAX_QUEUE_SIZE;
+              let secondPassDropped = 0;
+
+              nextQueue = nextQueue.filter((item) => {
+                if (secondPassDropped >= remainingOverage) return true;
+                if (item.status === 'syncing') return true;
+                if (item.id === mutation.id) return true; // Keep the new mutation
+                secondPassDropped++;
+                return false;
+              });
+            }
+          }
+
+          return { queuedMutations: nextQueue };
+        });
 
         return mutation.id;
       },
@@ -445,6 +487,43 @@ export const useAppStore = create<AppStore>()(
               : mutation,
           ),
         })),
+      killMutation: (mutationId, errorMessage) =>
+        set((state) => ({
+          queuedMutations: state.queuedMutations.map((mutation) =>
+            mutation.id === mutationId
+              ? {
+                  ...mutation,
+                  status: 'dead',
+                  retryCount: mutation.retryCount + 1,
+                  lastAttemptAt: new Date().toISOString(),
+                  lastError: `[MAX RETRIES] ${errorMessage}`,
+                }
+              : mutation,
+          ),
+        })),
+      retryDeadMutations: () => {
+        const state = get();
+        const deadMutations = state.queuedMutations.filter(
+          (mutation) => mutation.status === 'dead',
+        );
+
+        if (deadMutations.length === 0) return 0;
+
+        set((currentState) => ({
+          queuedMutations: currentState.queuedMutations.map((mutation) =>
+            mutation.status === 'dead'
+              ? {
+                  ...mutation,
+                  status: 'queued',
+                  retryCount: 0,
+                  lastError: null,
+                }
+              : mutation,
+          ),
+        }));
+
+        return deadMutations.length;
+      },
       recoverSyncingMutations: (errorMessage = 'Recovered an unfinished sync attempt.') =>
         set((state) => ({
           queuedMutations: state.queuedMutations.map((mutation) =>

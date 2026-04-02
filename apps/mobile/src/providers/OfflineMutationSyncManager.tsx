@@ -9,6 +9,22 @@ import { useAppStore } from '../store/appStore';
 
 const SYNC_INTERVAL_MS = 15000;
 const MUTATION_SYNC_TIMEOUT_MS = 10000;
+const MAX_RETRY_COUNT = 5;
+const BACKOFF_BASE_MS = 1000;
+
+/** Returns the backoff delay in ms for a given retry count (exponential: 1s, 2s, 4s, 8s, 16s). */
+const getBackoffDelay = (retryCount: number): number =>
+  BACKOFF_BASE_MS * Math.pow(2, Math.min(retryCount, MAX_RETRY_COUNT));
+
+/** Returns true if enough time has passed since the last attempt for this mutation's retry count. */
+const isBackoffElapsed = (mutation: QueuedMutation): boolean => {
+  if (!mutation.lastAttemptAt || mutation.retryCount === 0) {
+    return true;
+  }
+
+  const elapsed = Date.now() - new Date(mutation.lastAttemptAt).getTime();
+  return elapsed >= getBackoffDelay(mutation.retryCount - 1);
+};
 
 const getResolvedTripId = (
   payload: { clientTripId?: string; tripId?: string },
@@ -39,6 +55,32 @@ const isMutationReady = (
   }
 
   return true;
+};
+
+/** Trip-related types that must be ordered (trip_start before trip_end/trip_track). */
+const TRIP_DEPENDENT_TYPES = new Set(['trip_end', 'trip_track']);
+
+/**
+ * Returns true if this mutation should be skipped (not blocked) in the current flush cycle.
+ * Reasons to skip: backoff not elapsed, dependency not ready, already dead.
+ */
+const shouldSkipMutation = (
+  mutation: QueuedMutation,
+  tripServerIds: Record<string, string>,
+): boolean => {
+  if (mutation.status === 'dead' || mutation.status === 'syncing') {
+    return true;
+  }
+
+  if (!isBackoffElapsed(mutation)) {
+    return true;
+  }
+
+  if (!isMutationReady(mutation, tripServerIds)) {
+    return true;
+  }
+
+  return false;
 };
 
 const submitQueuedMutation = async (
@@ -155,25 +197,32 @@ export const OfflineMutationSyncManager = () => {
       flushingRef.current = true;
 
       try {
-        while (!cancelled) {
+        // Recover any mutations stuck in 'syncing' state (e.g., from a crash mid-sync).
+        const initialState = useAppStore.getState();
+
+        if (initialState.queuedMutations.some((mutation) => mutation.status === 'syncing')) {
+          initialState.recoverSyncingMutations('Recovered an unfinished sync attempt.');
+        }
+
+        // Process mutations one at a time, skipping those not ready or in backoff.
+        // We loop through indices rather than caching the array, since the store
+        // updates immutably after each operation and we re-read fresh state.
+        let processedCount = 0;
+        const maxPerFlush = 20; // Prevent runaway loops
+
+        while (!cancelled && processedCount < maxPerFlush) {
           const state = useAppStore.getState();
 
-          if (state.queuedMutations.some((mutation) => mutation.status === 'syncing')) {
-            state.recoverSyncingMutations('Recovered an unfinished sync attempt.');
-          }
-
+          // Find the next mutation eligible for sync.
           const mutation = state.queuedMutations.find(
-            (current) => current.status !== 'syncing',
+            (current) => !shouldSkipMutation(current, state.tripServerIds),
           );
 
           if (!mutation) {
             break;
           }
 
-          if (!isMutationReady(mutation, state.tripServerIds)) {
-            break;
-          }
-
+          processedCount++;
           state.markMutationSyncing(mutation.id);
 
           try {
@@ -201,19 +250,35 @@ export const OfflineMutationSyncManager = () => {
               remaining_queue_count: Math.max(state.queuedMutations.length - 1, 0),
             });
           } catch (error) {
-            state.failMutation(
-              mutation.id,
-              error instanceof Error ? error.message : 'Offline sync failed.',
-            );
-            telemetry.capture('offline_sync_failed', {
-              mutation_type: mutation.type,
-              queue_count: state.queuedMutations.length,
-            });
+            const errorMessage = error instanceof Error ? error.message : 'Offline sync failed.';
+            const nextRetryCount = mutation.retryCount + 1;
+
+            if (nextRetryCount >= MAX_RETRY_COUNT) {
+              // Mutation has exceeded max retries — mark as dead.
+              state.killMutation(mutation.id, errorMessage);
+              telemetry.capture('offline_sync_dead', {
+                mutation_type: mutation.type,
+                mutation_id: mutation.id,
+                retry_count: nextRetryCount,
+                error: errorMessage,
+              });
+            } else {
+              state.failMutation(mutation.id, errorMessage);
+              telemetry.capture('offline_sync_failed', {
+                mutation_type: mutation.type,
+                retry_count: nextRetryCount,
+                backoff_ms: getBackoffDelay(nextRetryCount - 1),
+              });
+            }
+
             telemetry.captureError(error, {
               feature: 'offline_sync',
               mutation_type: mutation.type,
+              retry_count: nextRetryCount,
             });
-            break;
+
+            // Continue processing other mutations instead of breaking.
+            // The failed mutation will be skipped on the next iteration due to backoff.
           }
         }
       } finally {
