@@ -1,20 +1,17 @@
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useQuery } from '@tanstack/react-query';
-import { formatCo2Saved, calculateEquivalentTreeDays } from '@defensivepedal/core';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { brandColors, gray, safetyColors } from '../src/design-system/tokens/colors';
-import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
+import { brandColors, gray } from '../src/design-system/tokens/colors';
+import { fontFamily, textBase, textSm } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { mobileApi } from '../src/lib/api';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
@@ -114,13 +111,6 @@ export default function ProfileScreen() {
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['user-stats'],
-    queryFn: () => mobileApi.getUserStats(),
-    enabled: Boolean(user),
-    staleTime: 120_000,
-  });
-
   const poiCategories = [
     { key: 'hydration', label: 'Water & Cafés', description: 'Drinking fountains and cafés' },
     { key: 'repair', label: 'Bike Shops', description: 'Bicycle repair and shops' },
@@ -157,42 +147,6 @@ export default function ProfileScreen() {
               <Ionicons name="log-in-outline" size={24} color={brandColors.accent} />
             </Pressable>
           )}
-
-          {user ? (
-            <View style={styles.impactCard}>
-              <View style={styles.impactHeader}>
-                <Ionicons name="leaf-outline" size={20} color={safetyColors.safe} />
-                <Text style={styles.impactTitle}>Your Impact</Text>
-              </View>
-              {statsLoading ? (
-                <ActivityIndicator size="small" color={safetyColors.safe} />
-              ) : stats ? (
-                <View style={styles.impactRow}>
-                  <View style={styles.impactStat}>
-                    <Text style={styles.impactValue}>{stats.totalTrips}</Text>
-                    <Text style={styles.impactLabel}>Trips</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={styles.impactValue}>
-                      {(stats.totalDistanceMeters / 1000).toFixed(0)} km
-                    </Text>
-                    <Text style={styles.impactLabel}>Cycled</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: safetyColors.safe }]}>
-                      {formatCo2Saved(stats.totalCo2SavedKg)}
-                    </Text>
-                    <Text style={styles.impactLabel}>CO2 Saved</Text>
-                  </View>
-                </View>
-              ) : null}
-              {stats && stats.totalCo2SavedKg > 0 ? (
-                <Text style={styles.impactTreeNote}>
-                  Equivalent to {calculateEquivalentTreeDays(stats.totalCo2SavedKg)} days of a tree absorbing CO2
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About you</Text>
@@ -411,53 +365,6 @@ const styles = StyleSheet.create({
   userSub: {
     ...textSm,
     color: brandColors.textSecondary,
-  },
-  impactCard: {
-    padding: space[4],
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.2)',
-    backgroundColor: 'rgba(74, 222, 128, 0.05)',
-    gap: space[3],
-  },
-  impactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  impactTitle: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: safetyColors.safe,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  impactRow: {
-    flexDirection: 'row',
-    gap: space[3],
-  },
-  impactStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  impactValue: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 18,
-  },
-  impactLabel: {
-    ...textXs,
-    color: brandColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  impactTreeNote: {
-    ...textXs,
-    color: brandColors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
   section: {
     gap: space[3],
