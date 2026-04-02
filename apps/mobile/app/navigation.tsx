@@ -40,6 +40,7 @@ import { useAppStore } from '../src/store/appStore';
 // Design system imports
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
 
+import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
@@ -49,7 +50,7 @@ import { IconButton } from '../src/design-system/atoms/IconButton';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { darkTheme, safetyColors, gray } from '../src/design-system/tokens/colors';
+import { brandColors, darkTheme, safetyColors, gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
 
 export default function NavigationScreen() {
@@ -198,6 +199,7 @@ export default function NavigationScreen() {
   } | null>(null);
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showElevationProgress, setShowElevationProgress] = useState(false);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hazardTypeLabels = HAZARD_TYPE_OPTIONS.reduce<Record<HazardType, string>>(
@@ -678,6 +680,18 @@ export default function NavigationScreen() {
             />
           </View>
 
+          {/* Elevation progress toggle */}
+          {selectedRoute?.elevationProfile?.length ? (
+            <View style={styles.roundButton}>
+              <IconButton
+                icon={<Ionicons name={showElevationProgress ? 'analytics' : 'analytics-outline'} size={22} color={showElevationProgress ? brandColors.accent : gray[300]} />}
+                onPress={() => setShowElevationProgress((prev) => !prev)}
+                accessibilityLabel={showElevationProgress ? 'Hide elevation' : 'Show elevation'}
+                variant="secondary"
+              />
+            </View>
+          ) : null}
+
           {/* Menu toggle + expanded nav icons */}
           {showMenu ? (
             <>
@@ -735,8 +749,18 @@ export default function NavigationScreen() {
           </View>
         </View>
 
-        {/* ── Bottom: "then" strip + metrics ── */}
+        {/* ── Bottom: elevation progress + "then" strip + metrics ── */}
         <View style={styles.bottomCluster} pointerEvents="box-none">
+          {showElevationProgress && selectedRoute?.elevationProfile?.length ? (
+            <ElevationProgressCard
+              elevationProfile={selectedRoute.elevationProfile}
+              totalDistanceMeters={selectedRoute.distanceMeters}
+              remainingDistanceMeters={
+                navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
+              }
+              isOffRoute={offRouteDetails !== null}
+            />
+          ) : null}
           <FooterCard
             nextStep={nextStep}
             remainingDurationSeconds={Math.round(
@@ -870,7 +894,7 @@ const styles = StyleSheet.create({
   floatingControlRail: {
     position: 'absolute',
     right: space[4],
-    top: '48%',
+    top: '38%',
     transform: [{ translateY: -140 }],
     width: 92,
     gap: space[3],
