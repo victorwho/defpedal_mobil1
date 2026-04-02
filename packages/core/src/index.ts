@@ -1,3 +1,4 @@
+export * from './co2';
 export * from './contracts';
 export * from './distance';
 export * from './formatters';

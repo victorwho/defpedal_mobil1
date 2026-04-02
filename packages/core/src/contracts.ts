@@ -405,9 +405,17 @@ export interface FeedItem {
   sharedAt: string;
   likeCount: number;
   loveCount: number;
+  co2SavedKg: number | null;
   commentCount: number;
   likedByMe: boolean;
   lovedByMe: boolean;
+}
+
+export interface UserStats {
+  readonly totalTrips: number;
+  readonly totalDistanceMeters: number;
+  readonly totalCo2SavedKg: number;
+  readonly totalDurationSeconds: number;
 }
 
 export interface FeedComment {

@@ -8,6 +8,7 @@ import type {
   ShareTripRequest,
   WriteAckResponse,
 } from '@defensivepedal/core';
+import { calculateCo2SavedKg } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
 import { requireAuthenticatedUser } from '../lib/auth';
@@ -78,6 +79,7 @@ const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
     sharedAt: row.shared_at as string,
     likeCount: Number(row.like_count ?? 0),
     loveCount: Number(row.love_count ?? 0),
+    co2SavedKg: calculateCo2SavedKg(Number(row.distance_meters) || 0),
     commentCount: Number(row.comment_count ?? 0),
     likedByMe: Boolean(row.liked_by_me),
     lovedByMe: Boolean(row.loved_by_me ?? false),

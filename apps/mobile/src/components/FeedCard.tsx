@@ -1,5 +1,5 @@
 import type { FeedItem, RouteOption } from '@defensivepedal/core';
-import { formatDistance, formatDuration } from '@defensivepedal/core';
+import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -114,6 +114,12 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress }: FeedCardP
           <View style={styles.stat}>
             <Text style={styles.statLabel}>Climb</Text>
             <Text style={styles.statValue}>{Math.round(item.elevationGainMeters)} m</Text>
+          </View>
+        ) : null}
+        {item.co2SavedKg != null && item.co2SavedKg > 0 ? (
+          <View style={styles.stat}>
+            <Text style={styles.statLabel}>CO2 Saved</Text>
+            <Text style={[styles.statValue, { color: '#4ADE80' }]}>{formatCo2Saved(item.co2SavedKg)}</Text>
           </View>
         ) : null}
       </View>

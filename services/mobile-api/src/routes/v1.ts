@@ -9,6 +9,7 @@ import type {
   RoutePreviewRequest,
   TripEndResponse,
   TripStartResponse,
+  UserStats,
   WriteAckResponse,
   ReverseGeocodeResponse,
   RoutePreviewResponse,
@@ -1017,6 +1018,44 @@ export const buildV1Routes = (
       } catch (err) {
         request.log.error({ err }, 'notification send failed');
         return reply.status(500).send({ error: 'Failed to send notification' });
+      }
+    },
+  );
+
+  // GET /v1/stats — cumulative user trip stats + CO2 savings
+  app.get<{ Reply: UserStats | ErrorResponse }>(
+    '/stats',
+    {
+      schema: {
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['totalTrips', 'totalDistanceMeters', 'totalCo2SavedKg', 'totalDurationSeconds'],
+            properties: {
+              totalTrips: { type: 'integer' },
+              totalDistanceMeters: { type: 'number' },
+              totalCo2SavedKg: { type: 'number' },
+              totalDurationSeconds: { type: 'number' },
+            },
+          },
+          401: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = await requireWriteUser(request, dependencies);
+      await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+      try {
+        return await dependencies.getUserStats(user.id);
+      } catch (error) {
+        throw new HttpError('Stats fetch failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown error.'],
+        });
       }
     },
   );

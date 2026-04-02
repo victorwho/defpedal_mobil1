@@ -8,8 +8,10 @@ import type {
   TripStartRequest,
   TripStartResponse,
   TripTrackRequest,
+  UserStats,
   WriteAckResponse,
 } from '@defensivepedal/core';
+import { calculateCo2SavedKg } from '@defensivepedal/core';
 
 import { supabaseAdmin } from './supabaseAdmin';
 
@@ -243,6 +245,37 @@ export const saveTripTrack = async (
 
   return {
     acceptedAt: new Date().toISOString(),
+  };
+};
+
+export const getUserStats = async (
+  userId: string,
+): Promise<UserStats> => {
+  if (!supabaseAdmin) {
+    return {
+      totalTrips: 0,
+      totalDistanceMeters: 0,
+      totalCo2SavedKg: 0,
+      totalDurationSeconds: 0,
+    };
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('get_user_trip_stats', {
+    requesting_user_id: userId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const totalDistanceMeters = Number(row?.total_distance_meters ?? 0);
+
+  return {
+    totalTrips: Number(row?.total_trips ?? 0),
+    totalDistanceMeters,
+    totalCo2SavedKg: calculateCo2SavedKg(totalDistanceMeters),
+    totalDurationSeconds: Number(row?.total_duration_seconds ?? 0),
   };
 };
 

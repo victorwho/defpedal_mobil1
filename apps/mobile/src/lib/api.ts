@@ -23,6 +23,7 @@ import type {
   TripStartRequest,
   TripStartResponse,
   TripTrackRequest,
+  UserStats,
   RoutePreviewRequest,
   RoutePreviewResponse,
   WriteAckResponse,
@@ -288,6 +289,8 @@ export const mobileApi = {
     }),
   getTripHistory: () =>
     requestJson<TripHistoryItem[]>('/v1/trips/history'),
+  getUserStats: () =>
+    requestJson<UserStats>('/v1/stats'),
   saveTripTrack: (payload: TripTrackRequest) =>
     requestJson<WriteAckResponse>('/v1/trips/track', {
       method: 'POST',

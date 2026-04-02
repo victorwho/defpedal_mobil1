@@ -1,9 +1,10 @@
 import type { TripHistoryItem } from '@defensivepedal/core';
-import { decodePolyline } from '@defensivepedal/core';
+import { calculateCo2SavedKg, decodePolyline } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { Co2Badge } from '../atoms/Co2Badge';
 import { RouteMap } from '../../components/map';
 import { brandColors, safetyColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
@@ -94,6 +95,7 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
             <Ionicons name="time-outline" size={14} color={gray[400]} />
             <Text style={styles.metricText}>{formatDuration(trip.startedAt, trip.endedAt)}</Text>
           </View>
+          <Co2Badge co2SavedKg={calculateCo2SavedKg(trip.plannedRouteDistanceMeters ?? 0)} size="sm" />
         </View>
 
         <View style={styles.badgeCol}>
