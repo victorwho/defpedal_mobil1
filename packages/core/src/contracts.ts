@@ -565,8 +565,10 @@ export interface UserBadge {
 export interface NeighborhoodSafetyScore {
   readonly score: number;
   readonly totalSegments: number;
-  readonly safestCount: number;
-  readonly dangerousCount: number;
+  readonly safeCount: number;
+  readonly averageCount: number;
+  readonly riskyCount: number;
+  readonly veryRiskyCount: number;
 }
 
 export interface RewardEquivalent {

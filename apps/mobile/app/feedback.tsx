@@ -422,7 +422,7 @@ export default function FeedbackScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={brandColors.accent} size="large" />
           </View>
-        ) : step === 'impact' && rideImpact ? (
+        ) : step === 'impact' && rideImpact && rideImpact.distanceMeters > 50 ? (
           <ImpactStep
             rideImpact={rideImpact}
             dashboard={dashboard}

@@ -414,6 +414,18 @@ export const mobileApi = {
     return requestJson<NeighborhoodSafetyScore>(`/v1/safety-score?${params.toString()}`);
   },
 
+  fetchRiskMap: async (lat: number, lon: number, radiusKm?: number): Promise<GeoJSON.FeatureCollection> => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (radiusKm != null) params.set('radiusKm', String(radiusKm));
+    const baseUrl = ensureBaseUrl();
+    // Direct fetch without auth — risk map is public safety data
+    const response = await fetch(`${baseUrl}/v1/risk-map?${params.toString()}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) return { type: 'FeatureCollection', features: [] };
+    return response.json();
+  },
+
   recordRideImpact: (tripId: string, distanceMeters: number) =>
     requestJson<RideImpact>(`/v1/rides/${tripId}/impact`, {
       method: 'POST',

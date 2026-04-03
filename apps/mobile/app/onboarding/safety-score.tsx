@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
 import { brandColors, darkTheme, safetyColors } from '../../src/design-system/tokens/colors';
@@ -24,14 +25,15 @@ import { mobileApi } from '../../src/lib/api';
 // ---------------------------------------------------------------------------
 
 const FALLBACK_SCORE: NeighborhoodSafetyScore = {
-  score: 72,
+  score: 52,
   totalSegments: 45,
-  safestCount: 14,
-  dangerousCount: 3,
+  safeCount: 18,
+  averageCount: 12,
+  riskyCount: 10,
+  veryRiskyCount: 5,
 };
 
 const ANIMATION_DURATION_MS = 1500;
-const AUTO_DISMISS_MS = 5000;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -42,6 +44,8 @@ export default function OnboardingSafetyScoreScreen() {
   const { location } = useCurrentLocation();
 
   const [scoreData, setScoreData] = useState<NeighborhoodSafetyScore | null>(null);
+  const [pendingRiskGeoJson, setPendingRiskGeoJson] = useState<GeoJSON.FeatureCollection | null>(null);
+  const [riskGeoJson, setRiskGeoJson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -70,8 +74,18 @@ export default function OnboardingSafetyScoreScreen() {
 
     const fetchScore = async () => {
       try {
-        const result = await mobileApi.fetchSafetyScore(location.lat, location.lon, 1);
-        if (!cancelled) setScoreData(result);
+        const [scoreResult, riskResult] = await Promise.allSettled([
+          mobileApi.fetchSafetyScore(location.lat, location.lon, 1),
+          mobileApi.fetchRiskMap(location.lat, location.lon, 1),
+        ]);
+        if (!cancelled) {
+          setScoreData(
+            scoreResult.status === 'fulfilled' ? scoreResult.value : FALLBACK_SCORE,
+          );
+          if (riskResult.status === 'fulfilled') {
+            setPendingRiskGeoJson(riskResult.value);
+          }
+        }
       } catch {
         if (!cancelled) setScoreData(FALLBACK_SCORE);
       } finally {
@@ -86,7 +100,14 @@ export default function OnboardingSafetyScoreScreen() {
     };
   }, [location]);
 
-  // Animate score once data is ready
+  // Delay applying risk overlay to let MapView fully mount (avoids Mapbox view:null error)
+  useEffect(() => {
+    if (!pendingRiskGeoJson) return;
+    const timer = setTimeout(() => setRiskGeoJson(pendingRiskGeoJson), 3000);
+    return () => clearTimeout(timer);
+  }, [pendingRiskGeoJson]);
+
+  // Animate score once data is ready (no auto-dismiss — user taps card to continue)
   useEffect(() => {
     if (!scoreData || hasAnimated.current) return;
     hasAnimated.current = true;
@@ -103,24 +124,20 @@ export default function OnboardingSafetyScoreScreen() {
         useNativeDriver: false,
       }),
     ]).start();
-
-    const timer = setTimeout(navigateNext, AUTO_DISMISS_MS);
-    return () => clearTimeout(timer);
-  }, [scoreData, animatedValue, fadeIn, navigateNext]);
+  }, [scoreData, animatedValue, fadeIn]);
 
   const score = scoreData?.score ?? FALLBACK_SCORE.score;
-  const safestCount = scoreData?.safestCount ?? FALLBACK_SCORE.safestCount;
-  const dangerousCount = scoreData?.dangerousCount ?? FALLBACK_SCORE.dangerousCount;
+  const safeCount = scoreData?.safeCount ?? FALLBACK_SCORE.safeCount;
+  const averageCount = scoreData?.averageCount ?? FALLBACK_SCORE.averageCount;
+  const riskyCount = scoreData?.riskyCount ?? FALLBACK_SCORE.riskyCount;
+  const veryRiskyCount = scoreData?.veryRiskyCount ?? FALLBACK_SCORE.veryRiskyCount;
 
   const scoreColor =
-    score >= 70 ? safetyColors.safe : score >= 40 ? safetyColors.caution : safetyColors.danger;
+    score >= 50 ? safetyColors.safe : score >= 30 ? safetyColors.caution : safetyColors.danger;
 
   return (
-    <Pressable
-      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
-      onPress={navigateNext}
-    >
-      {/* Real map background with Shield Mode (or fallback) */}
+    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      {/* Interactive map with risk overlay — zoomable and scrollable */}
       {location ? (
         <View style={styles.mapContainer}>
           <RouteMap
@@ -130,8 +147,8 @@ export default function OnboardingSafetyScoreScreen() {
             fullBleed
             showRouteOverlay={false}
             showBicycleLanes
+            riskOverlay={riskGeoJson}
           />
-          <View style={styles.mapOverlay} />
         </View>
       ) : (
         <View style={styles.mapPlaceholder}>
@@ -140,7 +157,6 @@ export default function OnboardingSafetyScoreScreen() {
               <View key={i} style={styles.mapStreet} />
             ))}
           </View>
-          <View style={styles.mapOverlay} />
         </View>
       )}
 
@@ -152,43 +168,53 @@ export default function OnboardingSafetyScoreScreen() {
         </View>
       ) : null}
 
-      {/* Floating card */}
+      {/* Compact card at bottom — doesn't block map interaction */}
       {scoreData ? (
-        <Animated.View style={[styles.cardContainer, { opacity: fadeIn }]}>
-          <View style={styles.card}>
-            <Text style={styles.cardEyebrow}>Your neighborhood</Text>
-
-            <View style={styles.scoreRow}>
-              <Animated.Text style={[styles.scoreValue, { color: scoreColor }]}>
-                {animatedValue.interpolate({
-                  inputRange: [0, score],
-                  outputRange: ['0', String(Math.round(score))],
-                })}
-              </Animated.Text>
-              <Text style={styles.scoreLabel}>/100 safety score</Text>
+        <Animated.View style={[styles.cardContainer, { opacity: fadeIn, bottom: insets.bottom + space[4] }]}>
+          <Pressable style={styles.card} onPress={navigateNext}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardEyebrow}>Your neighborhood</Text>
+              <View style={styles.scoreRow}>
+                <Animated.Text style={[styles.scoreValue, { color: scoreColor }]}>
+                  {animatedValue.interpolate({
+                    inputRange: [0, score],
+                    outputRange: ['0', String(Math.round(score))],
+                  })}
+                </Animated.Text>
+                <Text style={styles.scoreLabel}>/100</Text>
+              </View>
             </View>
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: safetyColors.safe }]}>
-                  {safestCount}
-                </Text>
-                <Text style={styles.statLabel}>safe streets</Text>
+                <Text style={[styles.statValue, { color: '#4CAF50' }]}>{safeCount}</Text>
+                <Text style={styles.statLabel}>safe</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: safetyColors.danger }]}>
-                  {dangerousCount}
-                </Text>
-                <Text style={styles.statLabel}>high-risk streets</Text>
+                <Text style={[styles.statValue, { color: '#FFEB3B' }]}>{averageCount}</Text>
+                <Text style={styles.statLabel}>average</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: '#FF9800' }]}>{riskyCount}</Text>
+                <Text style={styles.statLabel}>risky</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: '#F44336' }]}>{veryRiskyCount}</Text>
+                <Text style={styles.statLabel}>v.risky</Text>
               </View>
             </View>
 
-            <Text style={styles.tapHint}>Tap anywhere to continue</Text>
-          </View>
+            <View style={styles.continueRow}>
+              <Text style={styles.tapHint}>Continue</Text>
+              <Ionicons name="chevron-forward" size={16} color={brandColors.accent} />
+            </View>
+          </Pressable>
         </Animated.View>
       ) : null}
-    </Pressable>
+    </View>
   );
 }
 
@@ -218,10 +244,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(250, 204, 21, 0.08)',
     borderRadius: 1,
   },
-  mapOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(17, 24, 39, 0.5)',
-  },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -233,58 +255,61 @@ const styles = StyleSheet.create({
     color: darkTheme.textSecondary,
   },
   cardContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: space[5],
+    position: 'absolute',
+    bottom: space[4],
+    left: space[4],
+    right: space[4],
   },
   card: {
-    width: '100%',
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
+    backgroundColor: 'rgba(31, 41, 55, 0.92)',
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: darkTheme.borderDefault,
-    padding: space[6],
-    gap: space[4],
-    alignItems: 'center',
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    gap: space[2],
     ...shadows.lg,
   },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
   cardEyebrow: {
-    ...textXs,
+    ...textSm,
     fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
     color: brandColors.accent,
   },
   scoreRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: space[2],
+    gap: space[1],
   },
   scoreValue: {
-    ...textDataLg,
     fontFamily: fontFamily.mono.bold,
-    fontSize: 48,
-    lineHeight: 52,
+    fontSize: 28,
+    lineHeight: 32,
   },
   scoreLabel: {
-    ...textBase,
+    ...textSm,
     fontFamily: fontFamily.body.medium,
     color: darkTheme.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space[4],
+    justifyContent: 'center',
+    gap: space[3],
   },
   statItem: {
-    alignItems: 'center',
-    gap: 2,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
   },
   statValue: {
     fontFamily: fontFamily.mono.bold,
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 16,
+    lineHeight: 20,
   },
   statLabel: {
     ...textXs,
@@ -292,12 +317,19 @@ const styles = StyleSheet.create({
   },
   statDivider: {
     width: 1,
-    height: 32,
+    height: 16,
     backgroundColor: darkTheme.borderDefault,
+  },
+  continueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
   },
   tapHint: {
     ...textSm,
-    color: darkTheme.textMuted,
+    fontFamily: fontFamily.body.semiBold,
+    color: brandColors.accent,
     paddingTop: space[2],
   },
 });

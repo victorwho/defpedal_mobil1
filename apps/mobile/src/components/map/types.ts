@@ -49,6 +49,8 @@ export type RouteMapProps = {
   onMapLongPress?: (coordinate: Coordinate) => void;
   /** When true, shows a crosshair overlay for hazard placement */
   hazardPlacementMode?: boolean;
+  /** GeoJSON FeatureCollection of road risk segments to render as colored overlay */
+  riskOverlay?: GeoJSON.FeatureCollection | null;
   containerStyle?: StyleProp<ViewStyle>;
 };
 

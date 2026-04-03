@@ -1340,12 +1340,14 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['score', 'totalSegments', 'safestCount', 'dangerousCount'],
+              required: ['score', 'totalSegments', 'safeCount', 'averageCount', 'riskyCount', 'veryRiskyCount'],
               properties: {
                 score: { type: 'number' },
                 totalSegments: { type: 'integer' },
-                safestCount: { type: 'integer' },
-                dangerousCount: { type: 'integer' },
+                safeCount: { type: 'integer' },
+                averageCount: { type: 'integer' },
+                riskyCount: { type: 'integer' },
+                veryRiskyCount: { type: 'integer' },
               },
             },
             401: errorResponseSchema,
@@ -1386,11 +1388,66 @@ export const buildV1Routes = (
         const row = Array.isArray(data) ? data[0] : data;
 
         return {
-          score: Number(row?.avg_score ?? 0),
+          score: Math.max(0, Math.min(100, Math.round(100 - Number(row?.avg_score ?? 0)))),
           totalSegments: Number(row?.total_segments ?? 0),
-          safestCount: Number(row?.safest_count ?? 0),
-          dangerousCount: Number(row?.dangerous_count ?? 0),
+          safeCount: Number(row?.safe_count ?? 0),
+          averageCount: Number(row?.average_count ?? 0),
+          riskyCount: Number(row?.risky_count ?? 0),
+          veryRiskyCount: Number(row?.very_risky_count ?? 0),
         };
+      },
+    );
+
+    // GET /v1/risk-map — road risk segments as GeoJSON within radius
+    app.get<{
+      Querystring: { lat: number; lon: number; radiusKm?: number };
+    }>(
+      '/risk-map',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['lat', 'lon'],
+            properties: {
+              lat: { type: 'number', minimum: -90, maximum: 90 },
+              lon: { type: 'number', minimum: -180, maximum: 180 },
+              radiusKm: { type: 'number', minimum: 0.1, maximum: 5 },
+            },
+          },
+          response: {
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        // Risk map is read-only public safety data — auth optional
+        // Still try to authenticate for rate limiting, but don't require it
+        const user = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
+        if (user) {
+          await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+        }
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { lat, lon, radiusKm } = request.query;
+        const radiusMeters = (radiusKm ?? 1) * 1000;
+
+        const { data, error } = await supabaseAdmin.rpc('get_road_risk_geojson', {
+          p_lat: lat,
+          p_lon: lon,
+          p_radius_meters: radiusMeters,
+        });
+
+        if (error) {
+          request.log.error({ event: 'risk_map_error', error: error.message }, 'risk map query failed');
+          throw new HttpError('Risk map query failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+        }
+
+        return data ?? { type: 'FeatureCollection', features: [] };
       },
     );
 

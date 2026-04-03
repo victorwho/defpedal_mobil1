@@ -68,6 +68,7 @@ export const RouteMap = ({
   onMapTap,
   onMapLongPress,
   hazardPlacementMode = false,
+  riskOverlay,
   containerStyle,
 }: RouteMapProps) => {
   const mapViewRef = useRef<Mapbox.MapView | null>(null);
@@ -202,6 +203,34 @@ export const RouteMap = ({
           poiVisibility={poiVisibility}
           onPoiPress={handlePoiPress}
         />
+
+        {riskOverlay && riskOverlay.features.length > 0 ? (
+          <Mapbox.ShapeSource id="risk-overlay" shape={riskOverlay}>
+            <Mapbox.LineLayer
+              id="risk-overlay-line"
+              style={{
+                lineWidth: 4,
+                lineColor: [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'riskScore'],
+                  0, '#4CAF50',               // Very safe = green
+                  33, '#4CAF50',
+                  43.5, '#8BC34A',            // Safe = light green
+                  51.8, '#FFEB3B',            // Average = yellow
+                  57.6, '#FF9800',            // Elevated = orange
+                  69, '#FF5722',              // Risky = deep orange
+                  101.8, '#F44336',           // Very risky = red
+                  120, '#000000',             // Extreme = black
+                ],
+                lineOpacity: 0.8,
+                lineCap: 'round',
+                lineJoin: 'round',
+                lineEmissiveStrength: 1,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
 
         <RouteLayers
           routeFeatureCollection={routeFeatureCollection}

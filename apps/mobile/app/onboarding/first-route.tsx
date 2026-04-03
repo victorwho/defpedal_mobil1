@@ -299,7 +299,12 @@ export default function OnboardingFirstRouteScreen() {
       <View style={styles.impactRow}>
         <ImpactTile value={String(co2Kg)} unit="kg" label="CO2 saved" color={safetyColors.safe} />
         <ImpactTile value={String(moneyEur)} unit="EUR" label="Money saved" color={brandColors.accent} />
-        <ImpactTile value="—" unit="" label="If you ride this" color={safetyColors.caution} />
+        <ImpactTile
+          value={selectedRoute ? String(selectedRoute.riskSegments.filter((s) => s.riskScore >= 60).length) : '—'}
+          unit=""
+          label="Hazards on route"
+          color={safetyColors.caution}
+        />
       </View>
 
       {/* Actions */}
