@@ -354,12 +354,26 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Sign in (Google OAuth) / sign out
 - Offline mutation queue (trips, hazards, feedback sync when online)
 - CO2 savings per trip (actual GPS distance, EU avg 120g/km) on trip history cards, community feed, and "Your Impact" stats card in History tab
+- Community stats by locality (total trips, km, time, CO2 for nearby cyclists)
+- Multi-stop routes (up to 3 intermediate waypoints with autocomplete search, yellow map markers)
+- **Habit Engine:**
+  - Anonymous auth (Supabase) — app works without account, merges data on signup
+  - 5-screen onboarding flow (location → safety score → cycling goal → circuit route → signup)
+  - Post-ride impact summary (animated CO2/money/hazards counters with variable equivalents)
+  - Streak engine (4AM cutoff, 5 qualifying actions, freeze mechanic, weekly reset)
+  - Impact Dashboard (streak chain, lifetime counters, guardian tier, weekly summary)
+  - Daily safety quiz (50+ questions, streak qualifier)
+  - Enhanced hazard reporting (2-tap FAB during navigation, armchair long-press, confirm/deny counts)
+  - Guardian tier system (reporter → watchdog → sentinel → guardian angel, auto-promotion)
+  - Milestone share cards with detection and deduplication
+  - Scheduled notifications (streak protection, weekly impact, social digest)
 
 ### Known Incomplete
-- Push notifications (needs EAS project ID + native rebuild)
+- Push notifications (needs EAS project ID + native rebuild for actual delivery)
 - iPhone validation (no macOS hardware available)
 - Redis-backed production caching/rate-limiting
-- Notification Provider disabled (returns null)
+- Quiet hours not enforced in notification triggers
+- Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
 
 ### Known Issues
 - Off-route detection can still trigger in dense urban areas with poor GPS
