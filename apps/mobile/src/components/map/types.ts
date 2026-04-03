@@ -19,6 +19,7 @@ export type RouteMapProps = {
   selectedRouteId?: string | null;
   origin?: Coordinate;
   destination?: Coordinate;
+  waypoints?: readonly Coordinate[];
   userLocation?: Coordinate | null;
   followUser?: boolean;
   offRouteDetails?: {

@@ -39,9 +39,10 @@ const RouteTelemetryObserver = () => {
 /**
  * Redirects first-time users to the onboarding flow.
  *
- * Only triggers for anonymous sessions (fresh install auto-sign-in).
- * Never triggers for null sessions (signed out) or authenticated sessions.
- * This prevents redirect loops on sign-out.
+ * Triggers when onboardingCompleted is false and user has no real (non-anonymous)
+ * account. This covers: fresh install (null session before anon sign-in),
+ * anonymous session (after auto sign-in), and post-sign-out (reset to anon).
+ * Does NOT trigger for authenticated users (Google sign-in).
  */
 const OnboardingGuard = () => {
   const pathname = usePathname();
@@ -51,14 +52,16 @@ const OnboardingGuard = () => {
   // Don't redirect if already in onboarding screens
   if (pathname.startsWith('/onboarding')) return null;
 
-  // Wait for auth to settle
+  // Wait for auth to settle before making redirect decisions
   if (authCtx?.isLoading) return null;
 
-  // Only redirect to onboarding for anonymous sessions (fresh install).
-  // Null session (signed out) → show normal app (user can sign in from profile).
-  // Authenticated session → show normal app.
-  if (onboardingCompleted === false && authCtx?.isAnonymous === true) {
-    return <Redirect href="/onboarding/index" />;
+  // A "real" session = authenticated with a non-anonymous account (e.g. Google)
+  const hasRealAccount = authCtx?.user != null && authCtx.isAnonymous === false;
+
+  // Redirect to onboarding if not completed and no real account.
+  // This covers: null session (fresh install pre-anon), anonymous session, post-sign-out.
+  if (onboardingCompleted === false && !hasRealAccount) {
+    return <Redirect href="/onboarding" />;
   }
 
   return null;

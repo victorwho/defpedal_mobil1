@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -23,6 +23,24 @@ export default function OnboardingPermissionScreen() {
   const insets = useSafeAreaInsets();
   const [denied, setDenied] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+
+  // If location is already granted (returning user / cleared data but kept permission),
+  // auto-advance to safety score screen
+  useEffect(() => {
+    let cancelled = false;
+    const checkExisting = async () => {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (!cancelled && status === 'granted') {
+          router.replace('/onboarding/safety-score');
+        }
+      } catch {
+        // Ignore — user will tap the button
+      }
+    };
+    void checkExisting();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleEnableLocation = async () => {
     setIsRequesting(true);

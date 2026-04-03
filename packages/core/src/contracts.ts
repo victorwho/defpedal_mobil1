@@ -67,6 +67,7 @@ export interface RouteDebugInfo {
 export interface RoutePreviewRequest {
   origin: Coordinate;
   destination: Coordinate;
+  waypoints?: readonly Coordinate[];
   startOverride?: Coordinate;
   mode: RoutingMode;
   avoidUnpaved: boolean;

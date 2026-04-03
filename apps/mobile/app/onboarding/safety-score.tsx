@@ -48,8 +48,11 @@ export default function OnboardingSafetyScoreScreen() {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const hasAnimated = useRef(false);
 
+  const hasNavigatedRef = useRef(false);
   const navigateNext = useCallback(() => {
-    router.push('/onboarding/goal-selection');
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    router.replace('/onboarding/goal-selection');
   }, []);
 
   // Fetch real safety score when location is available

@@ -13,6 +13,7 @@ type UseFeatureCollectionsParams = {
   selectedRouteId?: string | null;
   origin?: Coordinate;
   destination?: Coordinate;
+  waypoints?: readonly Coordinate[];
   userLocation?: Coordinate | null;
   offRouteDetails?: { user: Coordinate; snapped: Coordinate } | null;
   bicycleParkingLocations: readonly BicycleParkingLocation[];
@@ -30,6 +31,7 @@ export const useFeatureCollections = ({
   selectedRouteId,
   origin,
   destination,
+  waypoints,
   userLocation,
   offRouteDetails,
   bicycleParkingLocations,
@@ -289,15 +291,20 @@ export const useFeatureCollections = ({
           }
         : undefined);
 
+    const waypointFeatures = (waypoints ?? []).map((wp, index) =>
+      toMarkerFeature(wp, `waypoint-${index}`),
+    );
+
     return {
       type: 'FeatureCollection' as const,
       features: [
         toMarkerFeature(fallbackOrigin, 'origin'),
+        ...waypointFeatures,
         toMarkerFeature(fallbackDestination, 'destination'),
         toMarkerFeature(userLocation ?? undefined, 'user'),
       ].filter((feature): feature is NonNullable<typeof feature> => Boolean(feature)),
     };
-  }, [destination, origin, selectedRoute, userLocation]);
+  }, [destination, origin, selectedRoute, userLocation, waypoints]);
 
   const offRouteFeatureCollection = useMemo(() => {
     if (!offRouteDetails) {

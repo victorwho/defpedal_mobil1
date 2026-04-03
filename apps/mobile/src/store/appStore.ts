@@ -131,6 +131,9 @@ type AppStore = {
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
+  addWaypoint: (coordinate: Coordinate) => void;
+  removeWaypoint: (index: number) => void;
+  clearWaypoints: () => void;
   setRoutePreview: (
     response: RoutePreviewResponse | null,
     options?: {
@@ -278,6 +281,27 @@ export const useAppStore = create<AppStore>()(
           routeRequest: {
             ...state.routeRequest,
             ...request,
+          },
+        })),
+      addWaypoint: (coordinate) =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: [...(state.routeRequest.waypoints ?? []), coordinate],
+          },
+        })),
+      removeWaypoint: (index) =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: (state.routeRequest.waypoints ?? []).filter((_, i) => i !== index),
+          },
+        })),
+      clearWaypoints: () =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: [],
           },
         })),
       setRoutePreview: (response, options) =>

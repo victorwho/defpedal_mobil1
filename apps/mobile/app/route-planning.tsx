@@ -36,7 +36,9 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily } from '../src/design-system/tokens/typography';
 
-type ActiveField = 'startOverride' | 'destination' | null;
+type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
+
+const MAX_WAYPOINTS = 3;
 
 const formatCoordinateLabel = (coordinate: Coordinate) =>
   `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
@@ -50,7 +52,10 @@ export default function RoutePlanningScreen() {
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
+  const addWaypoint = useAppStore((state) => state.addWaypoint);
+  const removeWaypoint = useAppStore((state) => state.removeWaypoint);
   const customStartEnabled = hasStartOverride(routeRequest);
+  const waypoints = routeRequest.waypoints ?? [];
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
@@ -94,6 +99,7 @@ export default function RoutePlanningScreen() {
   const [destinationQuery, setDestinationQuery] = useState(
     formatCoordinateLabel(routeRequest.destination),
   );
+  const [waypointQueries, setWaypointQueries] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [destinationHydrated, setDestinationHydrated] = useState(false);
   const syncedOriginKeyRef = useRef<string | null>(null);
@@ -163,6 +169,15 @@ export default function RoutePlanningScreen() {
 
   const deferredStartOverrideQuery = useDeferredValue(startOverrideQuery.trim());
   const deferredDestinationQuery = useDeferredValue(destinationQuery.trim());
+
+  // Active waypoint search query (reused for whichever waypoint field is active)
+  const activeWaypointIndex = activeField?.startsWith('waypoint-')
+    ? parseInt(activeField.split('-')[1], 10)
+    : -1;
+  const activeWaypointQuery = activeWaypointIndex >= 0
+    ? (waypointQueries[activeWaypointIndex] ?? '').trim()
+    : '';
+  const deferredWaypointQuery = useDeferredValue(activeWaypointQuery);
 
   // Sync GPS origin into route request
   useEffect(() => {
@@ -242,6 +257,26 @@ export default function RoutePlanningScreen() {
       deferredDestinationQuery.length >= 2,
   });
 
+  // Waypoint autocomplete (shared query for whichever waypoint field is active)
+  const waypointAutocompleteQuery = useQuery({
+    queryKey: [
+      'autocomplete', 'waypoint', deferredWaypointQuery,
+      routeRequest.origin, routeRequest.locale, routeRequest.countryHint,
+    ],
+    queryFn: () =>
+      mobileApi.autocomplete({
+        query: deferredWaypointQuery,
+        proximity: routeRequest.origin,
+        locale: routeRequest.locale,
+        countryHint: routeRequest.countryHint,
+        limit: 5,
+      }),
+    enabled:
+      Boolean(mobileEnv.mapboxPublicToken) &&
+      activeWaypointIndex >= 0 &&
+      deferredWaypointQuery.length >= 2,
+  });
+
   // Coverage check
   const coverageQuery = useQuery({
     queryKey: ['coverage', routeRequest.destination, routeRequest.countryHint],
@@ -282,6 +317,29 @@ export default function RoutePlanningScreen() {
   const clearStartOverride = () => {
     setRouteRequest({ startOverride: undefined });
     setStartOverrideQuery('');
+    setActiveField(null);
+  };
+
+  const handleAddStop = () => {
+    if (waypoints.length >= MAX_WAYPOINTS) return;
+    setWaypointQueries((prev) => [...prev, '']);
+    setActiveField(`waypoint-${waypoints.length}` as ActiveField);
+  };
+
+  const handleWaypointSelect = (index: number, suggestion: AutocompleteSuggestion) => {
+    Keyboard.dismiss();
+    addWaypoint(suggestion.coordinates);
+    setWaypointQueries((prev) => {
+      const next = [...prev];
+      next[index] = suggestion.label;
+      return next;
+    });
+    setActiveField(null);
+  };
+
+  const handleRemoveWaypoint = (index: number) => {
+    removeWaypoint(index);
+    setWaypointQueries((prev) => prev.filter((_, i) => i !== index));
     setActiveField(null);
   };
 
@@ -327,6 +385,7 @@ export default function RoutePlanningScreen() {
         <RouteMap
           origin={mapUserLocation ?? undefined}
           destination={hasValidDestination ? routeRequest.destination : undefined}
+          waypoints={waypoints.length > 0 ? waypoints : undefined}
           userLocation={mapUserLocation}
           followUser={false}
           fullBleed
@@ -437,6 +496,99 @@ export default function RoutePlanningScreen() {
               onSelectSuggestion={handleDestinationSelect}
             />
           </View>
+
+          {/* Waypoint stops — shown between destination and weather */}
+          {waypoints.map((wp, index) => (
+            <View key={`waypoint-${index}`} style={styles.waypointRow}>
+              <View style={styles.waypointDot}>
+                <Text style={styles.waypointDotText}>{index + 1}</Text>
+              </View>
+              {activeField === `waypoint-${index}` ? (
+                <View style={styles.waypointSearchWrap}>
+                  <SearchBar
+                    label={`Stop ${index + 1}`}
+                    value={waypointQueries[index] ?? ''}
+                    placeholder="Search for a stop"
+                    active
+                    isLoading={waypointAutocompleteQuery.isPending}
+                    suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
+                    onFocus={() => setActiveField(`waypoint-${index}` as ActiveField)}
+                    onChangeText={(value) => {
+                      setWaypointQueries((prev) => {
+                        const next = [...prev];
+                        next[index] = value;
+                        return next;
+                      });
+                      setActiveField(`waypoint-${index}` as ActiveField);
+                    }}
+                    onClear={() => handleRemoveWaypoint(index)}
+                    onSelectSuggestion={(s) => handleWaypointSelect(index, s)}
+                  />
+                </View>
+              ) : (
+                <View style={styles.waypointLabel}>
+                  <Text style={styles.waypointLabelText} numberOfLines={1}>
+                    {waypointQueries[index] || formatCoordinateLabel(wp)}
+                  </Text>
+                </View>
+              )}
+              <Pressable
+                style={styles.waypointRemove}
+                onPress={() => handleRemoveWaypoint(index)}
+                hitSlop={8}
+                accessibilityLabel={`Remove stop ${index + 1}`}
+                accessibilityRole="button"
+              >
+                <Ionicons name="close-circle" size={18} color={gray[400]} />
+              </Pressable>
+            </View>
+          ))}
+
+          {/* Pending waypoint being searched (not yet added to store) */}
+          {waypointQueries.length > waypoints.length ? (
+            <View style={styles.waypointRow}>
+              <View style={styles.waypointDot}>
+                <Text style={styles.waypointDotText}>{waypoints.length + 1}</Text>
+              </View>
+              <View style={styles.waypointSearchWrap}>
+                <SearchBar
+                  label={`Stop ${waypoints.length + 1}`}
+                  value={waypointQueries[waypoints.length] ?? ''}
+                  placeholder="Search for a stop"
+                  active
+                  isLoading={waypointAutocompleteQuery.isPending}
+                  suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
+                  onFocus={() => setActiveField(`waypoint-${waypoints.length}` as ActiveField)}
+                  onChangeText={(value) => {
+                    setWaypointQueries((prev) => {
+                      const next = [...prev];
+                      next[waypoints.length] = value;
+                      return next;
+                    });
+                    setActiveField(`waypoint-${waypoints.length}` as ActiveField);
+                  }}
+                  onClear={() => {
+                    setWaypointQueries((prev) => prev.slice(0, -1));
+                    setActiveField(null);
+                  }}
+                  onSelectSuggestion={(s) => handleWaypointSelect(waypoints.length, s)}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {/* Add stop button — discrete, only when not at max */}
+          {!activeField && waypoints.length < MAX_WAYPOINTS && waypointQueries.length <= waypoints.length ? (
+            <Pressable
+              style={styles.addStopButton}
+              onPress={handleAddStop}
+              accessibilityLabel="Add a stop"
+              accessibilityRole="button"
+            >
+              <Ionicons name="add-circle-outline" size={16} color={gray[400]} />
+              <Text style={styles.addStopText}>Add stop</Text>
+            </Pressable>
+          ) : null}
 
           {/* Weather widget — hidden while typing */}
           {!activeField ? (
@@ -740,5 +892,60 @@ const styles = StyleSheet.create({
   },
   hazardOptionList: {
     gap: space[2],
+  },
+  // Waypoint styles
+  waypointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingLeft: space[1],
+  },
+  waypointDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: gray[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waypointDotText: {
+    fontSize: 11,
+    fontFamily: fontFamily.mono.bold,
+    color: '#FFFFFF',
+  },
+  waypointSearchWrap: {
+    flex: 1,
+  },
+  waypointLabel: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.lg,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    ...shadows.sm,
+  },
+  waypointLabelText: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: gray[800],
+  },
+  waypointRemove: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addStopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    alignSelf: 'flex-start',
+    paddingVertical: space[1],
+    paddingHorizontal: space[2],
+  },
+  addStopText: {
+    fontSize: 13,
+    fontFamily: fontFamily.body.medium,
+    color: gray[400],
   },
 });

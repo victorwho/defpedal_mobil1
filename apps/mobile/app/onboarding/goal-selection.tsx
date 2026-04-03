@@ -1,5 +1,6 @@
 import type { CyclingGoal } from '@defensivepedal/core';
 import { router } from 'expo-router';
+import { useRef } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -49,12 +50,18 @@ export default function OnboardingGoalSelectionScreen() {
   const insets = useSafeAreaInsets();
   const setCyclingGoal = useAppStore((s) => s.setCyclingGoal);
 
+  const hasNavigatedRef = useRef(false);
+
   const handleSelect = (goal: CyclingGoal) => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
     setCyclingGoal(goal);
     router.push('/onboarding/first-route');
   };
 
   const handleDismiss = () => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
     setCyclingGoal('commute');
     router.push('/onboarding/first-route');
   };
