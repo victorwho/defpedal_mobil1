@@ -14,6 +14,7 @@ import { useTheme } from '../ThemeContext';
 import { space, layout } from '../tokens/spacing';
 import { fontFamily, text2xs } from '../tokens/typography';
 import { gray } from '../tokens/colors';
+import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,16 +35,16 @@ export interface BottomNavProps {
 
 interface TabConfig {
   key: TabKey;
-  label: string;
+  labelKey: string;
   icon: keyof typeof Ionicons.glyphMap;
   iconActive: keyof typeof Ionicons.glyphMap;
 }
 
 const TABS: TabConfig[] = [
-  { key: 'map', label: 'Map', icon: 'map-outline', iconActive: 'map' },
-  { key: 'history', label: 'History', icon: 'time-outline', iconActive: 'time' },
-  { key: 'community', label: 'Community', icon: 'people-outline', iconActive: 'people' },
-  { key: 'profile', label: 'Profile', icon: 'person-outline', iconActive: 'person' },
+  { key: 'map', labelKey: 'tabs.map', icon: 'map-outline', iconActive: 'map' },
+  { key: 'history', labelKey: 'tabs.history', icon: 'time-outline', iconActive: 'time' },
+  { key: 'community', labelKey: 'tabs.community', icon: 'people-outline', iconActive: 'people' },
+  { key: 'profile', labelKey: 'tabs.profile', icon: 'person-outline', iconActive: 'person' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -57,6 +58,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 }) => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   if (hidden) return null;
 
@@ -83,7 +85,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             onPress={() => onTabPress(tab.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={tab.label}
+            accessibilityLabel={t(tab.labelKey)}
           >
             <Ionicons
               name={active ? tab.iconActive : tab.icon}
@@ -101,7 +103,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 },
               ]}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </Text>
             {active ? (
               <View

@@ -37,6 +37,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily } from '../src/design-system/tokens/typography';
 import { duration, easing } from '../src/design-system/tokens/motion';
+import { useT } from '../src/hooks/useTranslation';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -125,6 +126,7 @@ export default function RoutePlanningScreen() {
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
+  const t = useT();
 
   // Saved routes — show when destination is empty and user is signed in
   const savedRoutesQuery = useQuery({
@@ -714,7 +716,7 @@ export default function RoutePlanningScreen() {
               accessibilityRole="button"
             >
               <Ionicons name="add-circle-outline" size={16} color={gray[400]} />
-              <Text style={styles.addStopText}>Add stop</Text>
+              <Text style={styles.addStopText}>{t('planning.addStop')}</Text>
             </Pressable>
           ) : null}
 
@@ -746,7 +748,7 @@ export default function RoutePlanningScreen() {
                   routeRequest.mode === 'safe' && styles.modeToggleLabelActive,
                 ]}
               >
-                Safe
+                {t('planning.safe')}
               </Text>
             </Pressable>
             <Pressable
@@ -770,7 +772,7 @@ export default function RoutePlanningScreen() {
                   routeRequest.mode === 'fast' && styles.modeToggleLabelActive,
                 ]}
               >
-                Fast
+                {t('planning.fast')}
               </Text>
             </Pressable>
           </View>
@@ -868,7 +870,7 @@ export default function RoutePlanningScreen() {
                 router.push('/route-preview');
               }}
             >
-              Preview route
+              {t('planning.previewRoute')}
             </Button>
           </View>
         ) : null
@@ -883,7 +885,7 @@ export default function RoutePlanningScreen() {
         onPress={() => setHazardPickerOpen(false)}
       >
         <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
-          <Text style={styles.hazardGridTitle}>Report hazard</Text>
+          <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
           <View style={styles.hazardGrid}>
             {([
               { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },

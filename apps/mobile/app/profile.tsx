@@ -21,6 +21,7 @@ import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
+import { useT } from '../src/hooks/useTranslation';
 
 const GUARDIAN_TIER_CONFIG: Record<GuardianTier, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; min: number }> = {
   reporter: { label: 'Reporter', icon: 'clipboard-outline', color: '#9CA3AF', min: 0 },
@@ -208,6 +209,7 @@ export default function ProfileScreen() {
     staleTime: 120_000,
   });
 
+  const t = useT();
   const locale = useAppStore((state) => state.locale);
   const setLocale = useAppStore((state) => state.setLocale);
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
@@ -247,9 +249,9 @@ export default function ProfileScreen() {
     <View style={styles.root}>
       <View style={styles.content}>
         <Screen
-          title="Profile"
-          eyebrow="Defensive Pedal"
-          subtitle="Your account and settings"
+          title={t('profile.title')}
+          eyebrow={t('profile.eyebrow')}
+          subtitle={t('profile.subtitle')}
           contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
         >
           {user ? (
@@ -333,8 +335,8 @@ export default function ProfileScreen() {
             <Pressable style={styles.userCard} onPress={() => router.push('/auth')}>
               <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>Guest</Text>
-                <Text style={styles.userSub}>Tap to sign in</Text>
+                <Text style={styles.userName}>{t('common.guest')}</Text>
+                <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
               </View>
               <Ionicons name="log-in-outline" size={24} color={brandColors.accent} />
             </Pressable>
@@ -343,7 +345,7 @@ export default function ProfileScreen() {
           <GuardianSection />
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Language</Text>
+            <Text style={styles.sectionTitle}>{t('profile.language')}</Text>
             <View style={styles.languageRow}>
               {(['en', 'ro'] as const).map((loc) => (
                 <Pressable
@@ -360,7 +362,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>About you</Text>
+            <Text style={styles.sectionTitle}>{t('profile.aboutYou')}</Text>
 
             <DropdownPicker
               label="Type of bike"
@@ -380,14 +382,14 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Routing preferences</Text>
+            <Text style={styles.sectionTitle}>{t('profile.routingPreferences')}</Text>
 
             <Pressable
               style={styles.settingRow}
               onPress={() => setAvoidUnpaved(!avoidUnpaved)}
             >
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Avoid unpaved roads</Text>
+                <Text style={styles.settingLabel}>{t('profile.avoidUnpaved')}</Text>
                 <Text style={styles.settingDescription}>
                   {avoidUnpaved
                     ? 'Routes will stay on paved surfaces'
@@ -404,7 +406,7 @@ export default function ProfileScreen() {
               onPress={() => setShowRouteComparison(!showRouteComparison)}
             >
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Compare safe vs fast route</Text>
+                <Text style={styles.settingLabel}>{t('profile.compareRoutes')}</Text>
                 <Text style={styles.settingDescription}>
                   {showRouteComparison
                     ? 'Shows how much safer your route is vs fast routing'
@@ -421,7 +423,7 @@ export default function ProfileScreen() {
               onPress={() => setShowBicycleLanes(!showBicycleLanes)}
             >
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Show bike lanes on map</Text>
+                <Text style={styles.settingLabel}>{t('profile.showBikeLanes')}</Text>
                 <Text style={styles.settingDescription}>
                   {showBicycleLanes
                     ? 'Cycling infrastructure is visible on the map'
@@ -435,7 +437,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Points of Interest</Text>
+            <Text style={styles.sectionTitle}>{t('profile.pointsOfInterest')}</Text>
 
             {poiCategories.map((cat) => (
               <Pressable
@@ -455,11 +457,11 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notifications</Text>
+            <Text style={styles.sectionTitle}>{t('profile.notifications')}</Text>
 
             <Pressable style={styles.settingRow} onPress={() => setNotifyWeather(!notifyWeather)}>
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Daily Weather Brief</Text>
+                <Text style={styles.settingLabel}>{t('profile.dailyWeather')}</Text>
                 <Text style={styles.settingDescription}>
                   {notifyWeather ? 'Daily 9am cycling weather forecast & advice' : 'Daily weather notification is off'}
                 </Text>
@@ -471,7 +473,7 @@ export default function ProfileScreen() {
 
             <Pressable style={styles.settingRow} onPress={() => setNotifyHazard(!notifyHazard)}>
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Hazard Alerts</Text>
+                <Text style={styles.settingLabel}>{t('profile.hazardAlerts')}</Text>
                 <Text style={styles.settingDescription}>
                   {notifyHazard ? 'Get notified about hazards near your routes' : 'Hazard alerts are off'}
                 </Text>
@@ -483,7 +485,7 @@ export default function ProfileScreen() {
 
             <Pressable style={styles.settingRow} onPress={() => setNotifyCommunity(!notifyCommunity)}>
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Community</Text>
+                <Text style={styles.settingLabel}>{t('profile.community')}</Text>
                 <Text style={styles.settingDescription}>
                   {notifyCommunity ? 'Get notified about likes and comments' : 'Community notifications are off'}
                 </Text>
@@ -495,7 +497,7 @@ export default function ProfileScreen() {
 
             <View style={styles.settingRow}>
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Quiet Hours</Text>
+                <Text style={styles.settingLabel}>{t('profile.quietHours')}</Text>
                 <Text style={styles.settingDescription}>
                   No notifications {quietHoursStart} → {quietHoursEnd}
                 </Text>
@@ -505,14 +507,14 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Privacy</Text>
+            <Text style={styles.sectionTitle}>{t('profile.privacy')}</Text>
 
             <Pressable
               style={styles.settingRow}
               onPress={() => setShareTripsPublicly(!shareTripsPublicly)}
             >
               <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>Share trips publicly</Text>
+                <Text style={styles.settingLabel}>{t('profile.shareTrips')}</Text>
                 <Text style={styles.settingDescription}>
                   {shareTripsPublicly
                     ? 'Your rides are shared in the community feed'
@@ -547,7 +549,7 @@ export default function ProfileScreen() {
               }}
             >
               <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-              <Text style={styles.signOutText}>Sign Out</Text>
+              <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
             </Pressable>
           ) : null}
         </Screen>
