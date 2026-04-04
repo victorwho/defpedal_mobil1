@@ -66,7 +66,7 @@
 - [x] DONE — Inline streak, guardian tier, daily quiz (2026-04-03)
 - [x] DONE — EUR saved + hazards in stats cards (2026-04-03)
 - [x] DONE — Streak chain direction fix (fills left-to-right) (2026-04-04)
-- [ ] NOT STARTED — Trip comparison (compare two rides on same route)
+- [x] DONE — Trip comparison (select 2 trips from history, side-by-side stats + map) (2026-04-04)
 
 ## UX & Visual Polish
 - [x] DONE — Tighten right-hand FAB buttons (reduced sizes + gaps on nav/planning/MapStage) (2026-04-04)

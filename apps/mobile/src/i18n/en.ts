@@ -432,6 +432,27 @@ export const en = {
     subtitle: 'Frequently asked questions',
   },
 
+  // ── Trip Comparison ──
+  compare: {
+    title: 'Trip Comparison',
+    select: 'Compare',
+    selectTrips: 'Select 2 trips to compare',
+    cancel: 'Cancel',
+    compare: 'Compare selected',
+    distance: 'Distance',
+    duration: 'Duration',
+    avgSpeed: 'Avg Speed',
+    co2Saved: 'CO2 Saved',
+    mode: 'Mode',
+    date: 'Date',
+    trip1: 'Trip 1',
+    trip2: 'Trip 2',
+    faster: 'faster',
+    slower: 'slower',
+    longer: 'longer',
+    shorter: 'shorter',
+  },
+
   // ── User Profile ──
   userProfile: {
     loading: 'Loading...',

@@ -434,6 +434,27 @@ export const ro: TranslationKeys = {
     subtitle: 'Răspunsuri la întrebările comune',
   },
 
+  // ── Trip Comparison ──
+  compare: {
+    title: 'Comparație curse',
+    select: 'Compară',
+    selectTrips: 'Selectează 2 curse pentru comparație',
+    cancel: 'Anulează',
+    compare: 'Compară selectate',
+    distance: 'Distanță',
+    duration: 'Durată',
+    avgSpeed: 'Viteză medie',
+    co2Saved: 'CO2 economisit',
+    mode: 'Mod',
+    date: 'Data',
+    trip1: 'Cursa 1',
+    trip2: 'Cursa 2',
+    faster: 'mai rapid',
+    slower: 'mai lent',
+    longer: 'mai lung',
+    shorter: 'mai scurt',
+  },
+
   // ── User Profile ──
   userProfile: {
     loading: 'Se încarcă...',
