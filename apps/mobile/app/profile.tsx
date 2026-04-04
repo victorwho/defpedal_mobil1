@@ -1,9 +1,11 @@
 import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert, Image, NativeModules } from 'react-native';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+// expo-image-picker is a native module — lazy require to avoid crash if not in APK
+const hasImagePicker = Boolean(NativeModules.ExpoImagePicker);
 import { useQuery } from '@tanstack/react-query';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +17,8 @@ import { fontFamily, textBase, textSm, textXs } from '../src/design-system/token
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { mobileApi } from '../src/lib/api';
+import { supabaseClient } from '../src/lib/supabase';
+import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
@@ -144,6 +148,58 @@ export default function ProfileScreen() {
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSaving, setUsernameSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleAvatarPick = async () => {
+    if (!user || !supabaseClient) return;
+
+    if (!hasImagePicker) {
+      Alert.alert('Rebuild required', 'Photo picker needs a native rebuild. Run: cd android && ./gradlew installDebug');
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ImagePicker = require('expo-image-picker') as typeof import('expo-image-picker');
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    setAvatarUploading(true);
+    try {
+      const ext = asset.uri.split('.').pop() ?? 'jpg';
+      const path = `${user.id}/avatar.${ext}`;
+
+      // Read the image as a blob for upload
+      const response = await fetch(asset.uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabaseClient.storage
+        .from('avatars')
+        .upload(path, blob, { upsert: true, contentType: asset.mimeType ?? 'image/jpeg' });
+
+      if (uploadError) throw uploadError;
+
+      // Build public URL
+      const publicUrl = `${mobileEnv.supabaseUrl}/storage/v1/object/public/avatars/${path}`;
+      // Append cache-bust so the Image component reloads
+      const avatarUrl = `${publicUrl}?t=${Date.now()}`;
+
+      await mobileApi.updateProfile({ avatarUrl });
+      void refetchProfile();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      Alert.alert('Photo upload failed', msg);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const { data: profile, refetch: refetchProfile } = useQuery({
     queryKey: ['profile'],
@@ -196,7 +252,19 @@ export default function ProfileScreen() {
         >
           {user ? (
             <View style={styles.userCard}>
-              <Ionicons name="person-circle-outline" size={48} color={brandColors.accent} />
+              <Pressable onPress={handleAvatarPick} style={styles.avatarWrapper}>
+                {avatarUploading ? (
+                  <View style={styles.avatarPlaceholder}>
+                    <ActivityIndicator color={brandColors.accent} />
+                  </View>
+                ) : profile?.avatarUrl ? (
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="camera-outline" size={22} color={gray[400]} />
+                  </View>
+                )}
+              </Pressable>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>
                   {profile?.username ? `@${profile.username}` : user.email ?? 'Rider'}
@@ -482,6 +550,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: brandColors.borderDefault,
     backgroundColor: 'rgba(17, 24, 39, 0.86)',
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    borderColor: brandColors.accent,
+  },
+  avatarPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: gray[600],
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   userInfo: { flex: 1, gap: space[1] },
   userName: {

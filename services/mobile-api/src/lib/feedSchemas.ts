@@ -89,6 +89,7 @@ export const profileUpdateRequestSchema = {
   properties: {
     displayName: { type: 'string', minLength: 1, maxLength: 100 },
     username: { type: 'string', minLength: 3, maxLength: 30, pattern: '^[a-zA-Z0-9_]+$' },
+    avatarUrl: { type: ['string', 'null'] },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },

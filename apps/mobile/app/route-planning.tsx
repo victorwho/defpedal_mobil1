@@ -3,7 +3,7 @@ import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -32,10 +32,11 @@ import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
-import { space } from '../src/design-system/tokens/spacing';
+import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily } from '../src/design-system/tokens/typography';
+import { duration, easing } from '../src/design-system/tokens/motion';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -117,6 +118,11 @@ export default function RoutePlanningScreen() {
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
+
+  // Collapsible UI — tap map to toggle FABs, weather, bottom nav
+  const [uiCollapsed, setUiCollapsed] = useState(false);
+  const uiOpacity = useRef(new Animated.Value(1)).current;
+
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
 
@@ -151,6 +157,19 @@ export default function RoutePlanningScreen() {
     void mobileApi.useSavedRoute(route.id);
     router.push('/route-preview');
   }, [setRouteRequest, setDestinationQuery, setDestinationHydrated, setWaypointQueries]);
+
+  const handleMapTap = useCallback(() => {
+    // Don't toggle while in hazard placement mode
+    if (hazardPlacementMode) return;
+    const next = !uiCollapsed;
+    setUiCollapsed(next);
+    Animated.timing(uiOpacity, {
+      toValue: next ? 0 : 1,
+      duration: duration.fast,
+      easing: easing.default,
+      useNativeDriver: true,
+    }).start();
+  }, [hazardPlacementMode, uiCollapsed, uiOpacity]);
 
   const handleMapLongPress = (coordinate: Coordinate) => {
     setPendingHazardCoordinate(coordinate);
@@ -459,6 +478,7 @@ export default function RoutePlanningScreen() {
           poiVisibility={poiVisibility}
           nearbyHazards={nearbyHazards}
           recenterKey={recenterKey}
+          onMapTap={handleMapTap}
           onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
           onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
@@ -698,8 +718,8 @@ export default function RoutePlanningScreen() {
             </Pressable>
           ) : null}
 
-          {/* Weather widget — hidden while typing */}
-          {!activeField ? (
+          {/* Weather widget — hidden while typing or when UI collapsed */}
+          {!activeField && !uiCollapsed ? (
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
@@ -757,7 +777,7 @@ export default function RoutePlanningScreen() {
         </View>
       }
       rightOverlay={
-        <View style={styles.fabColumn}>
+        <Animated.View style={[styles.fabColumn, { opacity: uiOpacity }]} pointerEvents={uiCollapsed ? 'none' : 'auto'}>
           <Pressable
             style={styles.fabButton}
             onPress={() => router.push('/settings')}
@@ -816,7 +836,7 @@ export default function RoutePlanningScreen() {
               <Ionicons name="bookmark" size={22} color={brandColors.accent} />
             </Pressable>
           ) : null}
-        </View>
+        </Animated.View>
       }
       footer={
         hazardPlacementMode ? (
@@ -838,21 +858,23 @@ export default function RoutePlanningScreen() {
             </Button>
           </View>
         ) : canPreview ? (
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onPress={() => {
-              setActiveField(null);
-              router.push('/route-preview');
-            }}
-          >
-            Preview route
-          </Button>
+          <View style={uiCollapsed ? styles.footerCollapsed : undefined}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onPress={() => {
+                setActiveField(null);
+                router.push('/route-preview');
+              }}
+            >
+              Preview route
+            </Button>
+          </View>
         ) : null
       }
     />
-    <BottomNav activeTab="map" onTabPress={handleTabPress} />
+    <BottomNav activeTab="map" onTabPress={handleTabPress} hidden={uiCollapsed} />
 
     {/* Hazard quick-pick grid overlay (same style as navigation) */}
     {hazardPickerOpen ? (
@@ -1059,12 +1081,12 @@ const styles = StyleSheet.create({
     ...shadows.md,
   },
   fabColumn: {
-    gap: space[3],
+    gap: space[2],
   },
   fabButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1072,6 +1094,9 @@ const styles = StyleSheet.create({
   },
   hazardOptionList: {
     gap: space[2],
+  },
+  footerCollapsed: {
+    marginBottom: layout.bottomNavHeight,
   },
   hazardPlacementFooter: {
     gap: space[2],

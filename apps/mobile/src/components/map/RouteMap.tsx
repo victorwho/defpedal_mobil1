@@ -179,7 +179,7 @@ export const RouteMap = ({
           <Mapbox.Camera
             followUserLocation
             followUserMode={'course' as Mapbox.UserTrackingMode}
-            followZoomLevel={16}
+            followZoomLevel={17.5}
             followPitch={45}
             animationMode="easeTo"
             animationDuration={300}

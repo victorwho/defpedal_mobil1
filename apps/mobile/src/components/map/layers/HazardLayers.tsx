@@ -8,8 +8,9 @@ type HazardLayersProps = {
 };
 
 /**
- * Renders striped red/black hazard zones along the route
- * and orange hazard marker dots with "!" labels.
+ * Renders hazard zones along the route with a subtle striped
+ * warning pattern (semi-transparent dark-red base + lighter red
+ * dashes) and orange hazard marker dots with "!" labels.
  */
 export const HazardLayers = React.memo(({
   hazardZoneFeatureCollection,
@@ -20,23 +21,23 @@ export const HazardLayers = React.memo(({
     {hazardZoneFeatureCollection.features.length > 0 ? (
       <Mapbox.ShapeSource id="hazard-zones" shape={hazardZoneFeatureCollection}>
         <Mapbox.LineLayer
-          id="hazard-zone-black"
+          id="hazard-zone-base"
           style={{
-            lineColor: '#000000',
-            lineWidth: 8,
-            lineOpacity: 0.9,
+            lineColor: '#7F1D1D',
+            lineWidth: 7,
+            lineOpacity: 0.55,
             lineCap: 'round',
             lineJoin: 'round',
             lineEmissiveStrength: 1,
           }}
         />
         <Mapbox.LineLayer
-          id="hazard-zone-red"
+          id="hazard-zone-stripe"
           style={{
-            lineColor: '#DC2626',
-            lineWidth: 6,
-            lineDasharray: [1, 1.5],
-            lineOpacity: 0.95,
+            lineColor: '#EF4444',
+            lineWidth: 5,
+            lineDasharray: [1, 2],
+            lineOpacity: 0.7,
             lineCap: 'butt',
             lineJoin: 'round',
             lineEmissiveStrength: 1,

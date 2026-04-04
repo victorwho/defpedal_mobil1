@@ -37,16 +37,16 @@
 - [x] DONE — Crosshair + Report button flow (2026-04-03)
 - [x] DONE — Waypoint reordering (up/down arrows to reorder stops) (2026-04-04)
 - [x] DONE — Saved routes / favorite routes (2026-04-04)
-- [ ] NOT STARTED — Cleaner address display (strip postal code, country, county from destination/stop labels)
-- [ ] NOT STARTED — Collapsible UI: hide/show FAB buttons, weather widget, and bottom nav with a single gesture (tap-to-toggle or scroll-based auto-hide)
+- [x] DONE — Cleaner address display (strip postal code, country, county from destination/stop labels) (2026-04-04)
+- [x] DONE — Collapsible UI: tap map to toggle FABs, weather widget, and bottom nav with fade animation (2026-04-04)
 
 ## Navigation
 - [x] DONE — Speed indicator in footer card (2026-04-03)
 - [x] DONE — Footer card metric dividers (2026-04-03)
 - [x] DONE — Hazard zone size reduced 50% (2026-04-03)
 - [x] DONE — Hazard alert radius reduced 30% (2026-04-03)
-- [ ] NOT STARTED — Softer hazard shading (stripes on route color, not on black)
-- [ ] NOT STARTED — Zoom in closer during navigation (increase followZoomLevel)
+- [x] DONE — Softer hazard shading (semi-transparent dark-red base + lighter red dashes) (2026-04-04)
+- [x] DONE — Zoom in closer during navigation (followZoomLevel 16→17.5) (2026-04-04)
 - [ ] NOT STARTED — Turn-by-turn voice guidance improvements
 - [ ] NOT STARTED — Reroute through waypoints (multi-stop reroute)
 
@@ -59,18 +59,18 @@
 ## Profile
 - [x] DONE — Username field (set/edit) (2026-04-03)
 - [x] DONE — Guardian tier section (2026-04-03)
-- [ ] NOT STARTED — Profile photo upload
-- [ ] NOT STARTED — Export ride data (GPX/CSV) — needs content:// URI via FileProvider or expo-sharing
+- [x] DONE — Profile photo upload (expo-image-picker + Supabase Storage + avatar display) (2026-04-04)
+- [x] DONE — Export ride data (GPX via expo-file-system + native share sheet) (2026-04-04)
 
 ## History
 - [x] DONE — Inline streak, guardian tier, daily quiz (2026-04-03)
 - [x] DONE — EUR saved + hazards in stats cards (2026-04-03)
-- [ ] NOT STARTED — Streak chain direction fix (should fill left-to-right, currently right-to-left)
+- [x] DONE — Streak chain direction fix (fills left-to-right) (2026-04-04)
 - [ ] NOT STARTED — Trip comparison (compare two rides on same route)
 
 ## UX & Visual Polish
-- [ ] NOT STARTED — Tighten right-hand FAB buttons (reduce size/spacing, prevent overlap with weather/route preview)
-- [ ] NOT STARTED — Change fonts: Montserrat for headings/titles, Roboto for body text
+- [x] DONE — Tighten right-hand FAB buttons (reduced sizes + gaps on nav/planning/MapStage) (2026-04-04)
+- [x] DONE — Change fonts: Montserrat for headings, Roboto for body text (replaced DM Sans) (2026-04-04)
 - [ ] NOT STARTED — Push Notifications — EAS project setup + server-side push via Expo
 
 ## Internationalization
@@ -78,7 +78,7 @@
 
 ## Technical Debt
 - [ ] NOT STARTED — Install @testing-library/react for hook tests (tests written but can't run)
-- [ ] NOT STARTED — Deduplicate qualifyStreakAsync helper (v1.ts and feed.ts have copies)
+- [x] DONE — Deduplicate qualifyStreakAsync helper (extracted to lib/streaks.ts) (2026-04-04)
 - [ ] NOT STARTED — Add `source` field to hazard reporting API (distinguish in-ride vs manual vs armchair)
 - [ ] NOT STARTED — Social digest notification subquery needs manual DB validation
 - [!] BLOCKED — iPhone validation (no macOS hardware available)

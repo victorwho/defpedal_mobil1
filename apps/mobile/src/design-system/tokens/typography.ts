@@ -3,7 +3,7 @@
  *
  * Three font families:
  *   - Montserrat  → Display, headings, HUD
- *   - DM Sans     → Body, UI labels, descriptions
+ *   - Roboto      → Body, UI labels, descriptions
  *   - Roboto Mono → Risk scores, distances, times, data
  *
  * Font names must match the keys used in useFonts() / expo-font loading.
@@ -24,10 +24,10 @@ export const fontFamily = {
 
   /** Body, UI labels, descriptions */
   body: {
-    regular: 'DMSans-Regular',
-    medium: 'DMSans-Medium',
-    semiBold: 'DMSans-SemiBold',
-    bold: 'DMSans-Bold',
+    regular: 'Roboto-Regular',
+    medium: 'Roboto-Medium',
+    semiBold: 'Roboto-SemiBold',
+    bold: 'Roboto-Bold',
   },
 
   /** Risk scores, distances, times, data */

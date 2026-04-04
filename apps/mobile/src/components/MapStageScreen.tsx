@@ -161,9 +161,9 @@ const styles = StyleSheet.create({
   rightOverlay: {
     position: 'absolute',
     top: '50%',
-    right: space[4],
+    right: space[3],
     zIndex: 3,
-    gap: space[3],
+    gap: space[2],
   },
   flexSpacer: {
     flex: 1,

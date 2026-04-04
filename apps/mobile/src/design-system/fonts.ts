@@ -13,11 +13,11 @@ export const fontAssets = {
   'Montserrat-Bold': require('../../assets/fonts/Montserrat-Bold.ttf'),
   'Montserrat-ExtraBold': require('../../assets/fonts/Montserrat-ExtraBold.ttf'),
 
-  // DM Sans — body, UI labels
-  'DMSans-Regular': require('../../assets/fonts/DMSans-Regular.ttf'),
-  'DMSans-Medium': require('../../assets/fonts/DMSans-Medium.ttf'),
-  'DMSans-SemiBold': require('../../assets/fonts/DMSans-SemiBold.ttf'),
-  'DMSans-Bold': require('../../assets/fonts/DMSans-Bold.ttf'),
+  // Roboto — body, UI labels
+  'Roboto-Regular': require('../../assets/fonts/Roboto-Regular.ttf'),
+  'Roboto-Medium': require('../../assets/fonts/Roboto-Medium.ttf'),
+  'Roboto-SemiBold': require('../../assets/fonts/Roboto-SemiBold.ttf'),
+  'Roboto-Bold': require('../../assets/fonts/Roboto-Bold.ttf'),
 
   // Roboto Mono — data display
   'RobotoMono-Medium': require('../../assets/fonts/RobotoMono-Medium.ttf'),

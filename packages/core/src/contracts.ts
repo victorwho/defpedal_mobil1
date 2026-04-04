@@ -515,6 +515,7 @@ export interface FeedCommentRequest {
 export interface ProfileUpdateRequest {
   displayName?: string;
   username?: string;
+  avatarUrl?: string | null;
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
   cyclingGoal?: CyclingGoal | null;

@@ -93,20 +93,21 @@ const buildLinksFromStreak = (
   const links: Array<{ status: ChainLinkStatus; dayIndex: number }> = [];
 
   for (let i = 0; i < maxVisible; i++) {
-    const dayIndex = maxVisible - i;
-    const isToday = i === 0;
+    const dayIndex = i + 1;
     const isWithinStreak = i < streakState.currentStreak;
+    const isLeadingEdge =
+      isWithinStreak && i === streakState.currentStreak - 1;
 
     let status: ChainLinkStatus;
-    if (isToday && !isWithinStreak) {
+    if (isLeadingEdge) {
       status = 'today';
-    } else if (isWithinStreak || isToday) {
+    } else if (isWithinStreak) {
       status = 'active';
     } else {
       status = 'missed';
     }
 
-    links.unshift({ status, dayIndex });
+    links.push({ status, dayIndex });
   }
 
   return links;

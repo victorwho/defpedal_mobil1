@@ -62,26 +62,8 @@ const ensureSupabase = () => {
 
 const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
 
-/** Fire-and-forget streak qualification. */
-const qualifyStreakAsync = (
-  userId: string,
-  actionType: string,
-  request: FastifyRequest,
-): void => {
-  if (!supabaseAdmin) return;
-  const tz = (request.headers['x-timezone'] as string | undefined) ?? 'UTC';
-  void supabaseAdmin
-    .rpc('qualify_streak_action', {
-      p_user_id: userId,
-      p_action_type: actionType,
-      p_time_zone: tz,
-    })
-    .then(({ error }) => {
-      if (error) {
-        request.log.warn({ event: 'streak_qualify_error', actionType, error: error.message }, 'streak qualification failed');
-      }
-    });
-};
+// Streak helpers (shared with v1.ts)
+import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
 
 const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
   const profile = row.profiles as Record<string, unknown> | null;
@@ -282,7 +264,7 @@ export const buildFeedRoutes = (
           });
         }
 
-        qualifyStreakAsync(user.id, 'trip_share', request);
+        qualifyStreakAsync(user.id, 'trip_share', getTimezone(request), request.log);
 
         return {
           id: data.id as string,
@@ -590,6 +572,7 @@ export const buildFeedRoutes = (
         if (request.body.autoShareRides !== undefined) updates.auto_share_rides = request.body.autoShareRides;
         if (request.body.trimRouteEndpoints !== undefined) updates.trim_route_endpoints = request.body.trimRouteEndpoints;
         if (request.body.cyclingGoal !== undefined) updates.cycling_goal = request.body.cyclingGoal;
+        if (request.body.avatarUrl !== undefined) updates.avatar_url = request.body.avatarUrl;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db

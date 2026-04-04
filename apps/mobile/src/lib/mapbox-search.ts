@@ -247,6 +247,39 @@ const getSessionToken = (): string => {
 // ---------------------------------------------------------------------------
 
 /**
+ * Strip postal code, country, and region/county from a raw address string
+ * using the structured Mapbox context to know exactly which substrings
+ * to remove.  Falls back to the raw string if nothing can be stripped.
+ */
+const stripAddressNoise = (
+  raw: string,
+  context: SearchBoxSuggestion['context'] | undefined,
+): string => {
+  if (!context) return raw;
+
+  const stripTerms: string[] = [];
+  if (context.country?.name) stripTerms.push(context.country.name);
+  if (context.region?.name) stripTerms.push(context.region.name);
+  if (context.postcode?.name) stripTerms.push(context.postcode.name);
+
+  if (stripTerms.length === 0) return raw;
+
+  const cleaned = raw
+    .split(', ')
+    .map(segment => {
+      let s = segment;
+      for (const term of stripTerms) {
+        s = s.replace(term, '').trim();
+      }
+      return s;
+    })
+    .filter(segment => segment.length > 0)
+    .join(', ');
+
+  return cleaned.replace(/,\s*$/, '').trim() || raw;
+};
+
+/**
  * Build a concise, human-readable secondary text from Mapbox context.
  * Aims for Google Maps/Waze style: "Street 45, Neighborhood" — not
  * the full country-level address.
@@ -282,8 +315,8 @@ const buildSecondaryText = (
     case 'place':
     case 'locality':
     case 'neighborhood':
-      // Area: "Region, Country" or just "Region"
-      return [region, context.country?.name].filter(Boolean).join(', ') || placeFormatted || '';
+      // Area: just "Region" — country stripped
+      return region || placeFormatted || '';
     default:
       return placeFormatted ?? fullAddress ?? '';
   }
@@ -390,13 +423,14 @@ export const mapboxAutocomplete = async (
       };
 
       const primaryText = raw.name_preferred ?? raw.name ?? query;
-      const label =
+      const rawLabel =
         raw.full_address ?? raw.place_formatted ?? primaryText;
       const featureType = toFeatureType(raw.feature_type);
       const category = extractCategory(raw.poi_category, raw.maki);
 
       // Build concise secondaryText from context
       const ctx = raw.context;
+      const label = stripAddressNoise(rawLabel, ctx);
       const secondaryText = buildSecondaryText(featureType, ctx, raw.full_address, raw.place_formatted);
 
       // Build distance label
