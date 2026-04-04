@@ -1,4 +1,4 @@
-import { Redirect, Stack, usePathname } from 'expo-router';
+import { Stack, router, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -54,41 +54,37 @@ const OnboardingGuard = () => {
   const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
   const authCtx = useAuthSessionOptional();
   const hasIncrementedRef = useRef(false);
+  const hasRedirectedRef = useRef(false);
 
-  // Wait for auth to settle before making any decisions
-  if (authCtx?.isLoading) return null;
-
-  // A "real" session = authenticated with a non-anonymous account (e.g. Google)
-  const hasRealAccount = authCtx?.user != null && authCtx.isAnonymous === false;
-
-  // Real account: never redirect, never prompt
-  if (hasRealAccount) return null;
+  const isLoading = authCtx?.isLoading ?? true;
+  const hasRealAccount = authCtx?.user != null && authCtx?.isAnonymous === false;
 
   // Increment anonymous open count once per app launch
-  if (!hasIncrementedRef.current && !hasRealAccount) {
-    hasIncrementedRef.current = true;
-    incrementAnonymousOpenCount();
-  }
+  useEffect(() => {
+    if (!hasIncrementedRef.current && !hasRealAccount && !isLoading) {
+      hasIncrementedRef.current = true;
+      incrementAnonymousOpenCount();
+    }
+  }, [hasRealAccount, isLoading, incrementAnonymousOpenCount]);
 
-  // Don't redirect if already in onboarding, signup, or feedback screens
-  if (pathname.startsWith('/onboarding')) return null;
-  if (pathname === '/feedback') return null;
-  if (pathname === '/navigation') return null;
+  // Redirect logic — imperative to avoid render-loop from <Redirect>
+  useEffect(() => {
+    if (isLoading || hasRealAccount) return;
+    if (pathname.startsWith('/onboarding')) return;
+    if (pathname === '/feedback' || pathname === '/navigation') return;
+    if (hasRedirectedRef.current) return;
 
-  // Count 1 + onboarding not done: first-time user → onboarding flow
-  if (onboardingCompleted === false) {
-    return <Redirect href="/onboarding" />;
-  }
-
-  // Count >= 5: mandatory signup (no skip allowed)
-  if (anonymousOpenCount >= 5) {
-    return <Redirect href="/onboarding/signup-prompt?mandatory=true" />;
-  }
-
-  // Count 2-4: dismissible signup prompt
-  if (anonymousOpenCount >= 2) {
-    return <Redirect href="/onboarding/signup-prompt" />;
-  }
+    if (onboardingCompleted === false) {
+      hasRedirectedRef.current = true;
+      router.replace('/onboarding/index' as never);
+    } else if (anonymousOpenCount >= 5) {
+      hasRedirectedRef.current = true;
+      router.replace('/onboarding/signup-prompt?mandatory=true' as never);
+    } else if (anonymousOpenCount >= 2) {
+      hasRedirectedRef.current = true;
+      router.replace('/onboarding/signup-prompt' as never);
+    }
+  }, [isLoading, hasRealAccount, pathname, onboardingCompleted, anonymousOpenCount]);
 
   return null;
 };

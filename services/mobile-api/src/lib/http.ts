@@ -7,6 +7,7 @@ import type {
   HazardReportRequest,
   NavigationFeedbackRequest,
   ReverseGeocodeRequest,
+  SavedRouteCreateRequest,
   TripEndRequest,
   TripStartRequest,
   RerouteRequest,
@@ -33,6 +34,8 @@ export type HazardReportBody = HazardReportRequest;
 export type TripStartBody = TripStartRequest;
 export type TripEndBody = TripEndRequest;
 export type NavigationFeedbackBody = NavigationFeedbackRequest;
+
+export type SavedRouteCreateBody = SavedRouteCreateRequest;
 
 export type RoutePreviewBody = WithOptional<
   RoutePreviewRequest,
@@ -752,6 +755,62 @@ export const routePreviewResponseSchema = {
     },
   },
 } as const;
+
+// ── Saved Routes Schemas ──
+
+export const savedRouteCreateRequestSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'origin', 'destination', 'mode', 'avoidUnpaved'],
+  properties: {
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    origin: coordinateSchema,
+    destination: coordinateSchema,
+    waypoints: {
+      type: 'array',
+      maxItems: 3,
+      items: coordinateSchema,
+    },
+    mode: { type: 'string', enum: ['safe', 'fast'] },
+    avoidUnpaved: { type: 'boolean' },
+  },
+} as const;
+
+export const savedRouteResponseSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    origin: coordinateSchema,
+    destination: coordinateSchema,
+    waypoints: { type: 'array', items: coordinateSchema },
+    mode: { type: 'string' },
+    avoidUnpaved: { type: 'boolean' },
+    createdAt: { type: 'string' },
+    lastUsedAt: { type: 'string' },
+  },
+} as const;
+
+export const savedRouteListResponseSchema = {
+  type: 'object',
+  properties: {
+    routes: {
+      type: 'array',
+      items: savedRouteResponseSchema,
+    },
+  },
+} as const;
+
+export const normalizeSavedRouteCreateRequest = (
+  body: SavedRouteCreateBody,
+): SavedRouteCreateRequest => ({
+  name: body.name.trim(),
+  origin: body.origin,
+  destination: body.destination,
+  waypoints: body.waypoints ?? [],
+  mode: body.mode,
+  avoidUnpaved: body.avoidUnpaved,
+});
 
 export class HttpError extends Error {
   readonly statusCode: number;

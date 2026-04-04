@@ -104,7 +104,9 @@ export interface ErrorResponse {
     | 'RATE_LIMITED'
     | 'UNAUTHORIZED'
     | 'UPSTREAM_ERROR'
-    | 'INTERNAL_ERROR';
+    | 'INTERNAL_ERROR'
+    | 'NOT_FOUND'
+    | 'CONFLICT';
   details?: string[];
 }
 
@@ -602,4 +604,27 @@ export interface RewardEquivalent {
   readonly equivalentText: string;
   readonly thresholdValue: number;
   readonly unit: string;
+}
+
+// ── Saved Routes ──
+
+export interface SavedRoute {
+  readonly id: string;
+  readonly name: string;
+  readonly origin: Coordinate;
+  readonly destination: Coordinate;
+  readonly waypoints: readonly Coordinate[];
+  readonly mode: RoutingMode;
+  readonly avoidUnpaved: boolean;
+  readonly createdAt: string;
+  readonly lastUsedAt: string;
+}
+
+export interface SavedRouteCreateRequest {
+  readonly name: string;
+  readonly origin: Coordinate;
+  readonly destination: Coordinate;
+  readonly waypoints?: readonly Coordinate[];
+  readonly mode: RoutingMode;
+  readonly avoidUnpaved: boolean;
 }

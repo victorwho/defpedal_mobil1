@@ -35,33 +35,46 @@
 - [x] DONE — Hazards visible on planning map (2026-04-03)
 - [x] DONE — Tappable hazard info cards (2026-04-03)
 - [x] DONE — Crosshair + Report button flow (2026-04-03)
-- [ ] NOT STARTED — Waypoint reordering (drag to reorder stops)
-- [ ] NOT STARTED — Saved routes / favorite routes
+- [x] DONE — Waypoint reordering (up/down arrows to reorder stops) (2026-04-04)
+- [x] DONE — Saved routes / favorite routes (2026-04-04)
+- [ ] NOT STARTED — Cleaner address display (strip postal code, country, county from destination/stop labels)
+- [ ] NOT STARTED — Collapsible UI: hide/show FAB buttons, weather widget, and bottom nav with a single gesture (tap-to-toggle or scroll-based auto-hide)
 
 ## Navigation
 - [x] DONE — Speed indicator in footer card (2026-04-03)
 - [x] DONE — Footer card metric dividers (2026-04-03)
 - [x] DONE — Hazard zone size reduced 50% (2026-04-03)
 - [x] DONE — Hazard alert radius reduced 30% (2026-04-03)
+- [ ] NOT STARTED — Softer hazard shading (stripes on route color, not on black)
+- [ ] NOT STARTED — Zoom in closer during navigation (increase followZoomLevel)
 - [ ] NOT STARTED — Turn-by-turn voice guidance improvements
 - [ ] NOT STARTED — Reroute through waypoints (multi-stop reroute)
 
 ## Community
 - [x] DONE — Like/love counter optimistic update fix (2026-04-03)
 - [x] DONE — Username displayed in feed (2026-04-03)
-- [ ] NOT STARTED — Follow/unfollow users
-- [ ] NOT STARTED — User profile page (view other user's trips)
+- [x] DONE — Follow/unfollow users (2026-04-03)
+- [x] DONE — User profile page (view other user's trips) (2026-04-03)
 
 ## Profile
 - [x] DONE — Username field (set/edit) (2026-04-03)
 - [x] DONE — Guardian tier section (2026-04-03)
 - [ ] NOT STARTED — Profile photo upload
-- [ ] NOT STARTED — Export ride data (GPX/CSV)
+- [ ] NOT STARTED — Export ride data (GPX/CSV) — needs content:// URI via FileProvider or expo-sharing
 
 ## History
 - [x] DONE — Inline streak, guardian tier, daily quiz (2026-04-03)
 - [x] DONE — EUR saved + hazards in stats cards (2026-04-03)
+- [ ] NOT STARTED — Streak chain direction fix (should fill left-to-right, currently right-to-left)
 - [ ] NOT STARTED — Trip comparison (compare two rides on same route)
+
+## UX & Visual Polish
+- [ ] NOT STARTED — Tighten right-hand FAB buttons (reduce size/spacing, prevent overlap with weather/route preview)
+- [ ] NOT STARTED — Change fonts: Montserrat for headings/titles, Roboto for body text
+- [ ] NOT STARTED — Push Notifications — EAS project setup + server-side push via Expo
+
+## Internationalization
+- [ ] NOT STARTED — Romanian language option (profile setting, all UI text translatable via i18n)
 
 ## Technical Debt
 - [ ] NOT STARTED — Install @testing-library/react for hook tests (tests written but can't run)
@@ -70,4 +83,4 @@
 - [ ] NOT STARTED — Social digest notification subquery needs manual DB validation
 - [!] BLOCKED — iPhone validation (no macOS hardware available)
 - [ ] NOT STARTED — Redis-backed production caching/rate-limiting
-- [ ] NOT STARTED — Merge feature/habitengine branch to main
+- [x] DONE — Merge feature/habitengine branch to main (2026-04-03)

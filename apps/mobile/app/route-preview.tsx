@@ -1,9 +1,9 @@
 import type { RiskSegment } from '@defensivepedal/core';
 import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Speech from 'expo-speech';
 
@@ -235,6 +235,38 @@ export default function RoutePreviewScreen() {
     router.push('/navigation');
   };
 
+  // ── Save Route ──
+  const queryClient = useQueryClient();
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [saveRouteName, setSaveRouteName] = useState('');
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  const handleSaveRoute = useCallback(async () => {
+    if (!saveRouteName.trim()) return;
+    setSavingRoute(true);
+    try {
+      await mobileApi.saveRoute({
+        name: saveRouteName.trim(),
+        origin: routeRequest.origin,
+        destination: routeRequest.destination,
+        waypoints: routeRequest.waypoints ?? [],
+        mode: routeRequest.mode,
+        avoidUnpaved: routeRequest.avoidUnpaved,
+      });
+      void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+      setSaveModalVisible(false);
+      setSaveRouteName('');
+      setSaveToast('Route saved!');
+      setTimeout(() => setSaveToast(null), 3000);
+    } catch {
+      setSaveToast('Failed to save route');
+      setTimeout(() => setSaveToast(null), 3000);
+    } finally {
+      setSavingRoute(false);
+    }
+  }, [saveRouteName, routeRequest, queryClient]);
+
   const topOverlay = (
     <>
       <View style={styles.metaRow}>
@@ -295,9 +327,24 @@ export default function RoutePreviewScreen() {
           >
             {selectedRoute ? 'Start navigation' : 'No route selected'}
           </Button>
-          <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
-            Back to planning
-          </Button>
+          <View style={styles.footerSecondaryRow}>
+            <View style={styles.footerSecondaryButton}>
+              <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
+                Back to planning
+              </Button>
+            </View>
+            {user ? (
+              <Pressable
+                style={styles.saveRouteButton}
+                onPress={() => setSaveModalVisible(true)}
+                accessibilityLabel="Save this route"
+                accessibilityRole="button"
+              >
+                <Ionicons name="bookmark-outline" size={18} color={darkTheme.accent} />
+                <Text style={styles.saveRouteLabel}>Save</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </>
       }
     >
@@ -436,6 +483,47 @@ export default function RoutePreviewScreen() {
         </View>
       ) : null}
     </MapStageScreen>
+
+    {/* Save route modal */}
+    {saveModalVisible ? (
+      <Pressable style={styles.modalOverlay} onPress={() => setSaveModalVisible(false)}>
+        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.modalTitle}>Save Route</Text>
+          <TextInput
+            style={styles.modalInput}
+            value={saveRouteName}
+            onChangeText={setSaveRouteName}
+            placeholder="Route name (e.g. Morning commute)"
+            placeholderTextColor={darkTheme.textMuted}
+            autoFocus
+            maxLength={100}
+          />
+          <View style={styles.modalButtonRow}>
+            <Button variant="ghost" size="md" onPress={() => setSaveModalVisible(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!saveRouteName.trim() || savingRoute}
+              onPress={handleSaveRoute}
+            >
+              {savingRoute ? 'Saving...' : 'Save'}
+            </Button>
+          </View>
+        </Pressable>
+      </Pressable>
+    ) : null}
+
+    {/* Save toast */}
+    {saveToast ? (
+      <View style={styles.toastContainer}>
+        <View style={styles.toastPill}>
+          <Ionicons name="checkmark-circle" size={16} color={darkTheme.accent} />
+          <Text style={styles.toastText}>{saveToast}</Text>
+        </View>
+      </View>
+    ) : null}
     </>
   );
 }
@@ -593,5 +681,85 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: darkTheme.textPrimary,
     lineHeight: 18,
+  },
+  footerSecondaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+  },
+  footerSecondaryButton: {
+    flex: 1,
+  },
+  saveRouteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+  },
+  saveRouteLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.accent,
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  modalCard: {
+    width: '85%',
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.xl,
+    padding: space[5],
+    gap: space[3],
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: fontFamily.heading.bold,
+    color: darkTheme.textPrimary,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+    borderRadius: radii.md,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+    fontSize: 15,
+    fontFamily: fontFamily.body.regular,
+    color: darkTheme.textPrimary,
+  },
+  modalButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: space[2],
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  toastPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.full,
+    paddingVertical: space[2],
+    paddingHorizontal: space[4],
+    ...shadows.md,
+  },
+  toastText: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textPrimary,
   },
 });

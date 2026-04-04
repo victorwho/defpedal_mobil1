@@ -61,6 +61,7 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
 
 export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
   const icon = endReasonIcon(trip.endReason);
+  const hasGpsTrail = trip.gpsBreadcrumbs.length > 0;
 
   const trailCoords = useMemo<[number, number][]>(
     () => trip.gpsBreadcrumbs.map((pt) => [pt.lon, pt.lat]),
@@ -132,6 +133,7 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
           />
         </View>
       ) : null}
+
     </View>
   );
 };

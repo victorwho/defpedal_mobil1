@@ -17,7 +17,7 @@ export const getLightPreset = (): string => {
 
 export const toMarkerFeature = (
   coordinate: Coordinate | undefined,
-  kind: 'origin' | 'destination' | 'user',
+  kind: 'origin' | 'destination' | 'user' | `waypoint-${number}`,
 ) => {
   if (!coordinate) {
     return null;

@@ -18,6 +18,22 @@ export const buildApp = (options: {
   });
   const dependencies = createMobileApiDependencies(options.dependencies);
 
+  // Allow GET requests with Content-Type: application/json but no body.
+  // The mobile client sends this header on all requests via XMLHttpRequest defaults.
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = typeof body === 'string' ? body : '';
+    if (!text.trim()) {
+      done(null, undefined);
+      return;
+    }
+    try {
+      done(null, JSON.parse(text));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
+
   void app.register(cors, {
     origin:
       config.corsOrigin === '*'

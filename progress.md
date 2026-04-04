@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-03
+Last updated: 2026-04-04
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -18,6 +18,10 @@ Update it at the end of each implementation slice.
 - Community Stats by Locality (2026-04-02): community section shows aggregate stats (trips, km, time, CO2) for nearby cyclists with locality name via Mapbox reverse geocoding. New `get_community_stats` Supabase RPC + `GET /v1/community/stats` endpoint.
 - Habit Engine (2026-04-02 to 2026-04-03): major feature set across 7 phases. Includes: anonymous auth (Supabase), 5-screen onboarding flow (location permission → safety score → cycling goal → circuit route to nearest POI → deferred signup), post-ride impact summary (animated CO2/money/hazards counters with variable equivalents), streak engine (4AM cutoff, 5 qualifying actions, freeze mechanic), Impact Dashboard (StreakChain, AnimatedCounters, guardian tier progress), daily safety quiz (50+ questions), enhanced hazard reporting (2-tap FAB, armchair long-press, confirm/deny display), guardian tier system (reporter→watchdog→sentinel→guardian angel with auto-promotion trigger), milestone share cards, scheduled notifications (streak protection, weekly impact, social digest), community stats by locality. 6 new DB tables, 5 RPCs, 3 triggers, 26 reward equivalents seeded, 40+ new integration tests. All deployed to Cloud Run + Supabase.
 - Multi-Stop Routes (2026-04-03): support for intermediate stops (waypoints) in route planning. Waypoints field added to RoutePreviewRequest, OSRM/Mapbox routing extended, Zustand store actions (add/remove/clear), discrete "Add stop" UI with autocomplete (max 3 stops), yellow waypoint markers on map. Works with both safe and fast routing modes.
+- Session 4 features (2026-04-04): three features in a single session:
+  - **Saved Routes**: Full-stack saved routes — `saved_routes` Supabase table with RLS, 4 API endpoints (GET/POST/DELETE/PATCH), API client methods, save button on route preview with name modal, saved routes list on route planning screen (shown when destination empty). Users can save frequently used routes and reload them with one tap.
+  - **Waypoint Reordering**: `reorderWaypoints` store action + up/down chevron buttons on waypoint rows. Keeps `waypointQueries` labels synced with reordered coordinates.
+  - **GPX Export**: `buildGpxString` utility generates GPX 1.1 XML from trip GPS breadcrumbs + planned route polyline. Export button on TripCard writes to cache via `expo-file-system` File API and opens native share sheet.
 
 ## Phase Status
 

@@ -20,6 +20,7 @@ import type {
   GuardianTier,
   QuizQuestion,
   QuizAnswer,
+  SavedRoute,
 } from '@defensivepedal/core';
 import { getPreviewOrigin } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
@@ -70,6 +71,11 @@ import {
   type RoutePreviewBody,
   type TripEndBody,
   type TripStartBody,
+  normalizeSavedRouteCreateRequest,
+  savedRouteCreateRequestSchema,
+  savedRouteListResponseSchema,
+  savedRouteResponseSchema,
+  type SavedRouteCreateBody,
   writeAckResponseSchema,
 } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
@@ -2053,6 +2059,128 @@ export const buildV1Routes = (
             validation_count: Number(h.validation_count ?? 0),
           })),
         };
+      },
+    );
+
+    // ── Saved Routes ──
+
+    app.get<{ Reply: { routes: SavedRoute[] } }>(
+      '/saved-routes',
+      {},
+      async (request) => {
+        const user = await requireWriteUser(request, dependencies);
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const { data, error } = await supabaseAdmin
+          .from('saved_routes')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('last_used_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          request.log.error({ event: 'saved_routes_list_error', error: error.message }, 'failed to list saved routes');
+          throw new HttpError('Failed to load saved routes.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        const routes: SavedRoute[] = (data ?? []).map((row) => ({
+          id: row.id as string,
+          name: row.name as string,
+          origin: row.origin as SavedRoute['origin'],
+          destination: row.destination as SavedRoute['destination'],
+          waypoints: (row.waypoints as SavedRoute['waypoints']) ?? [],
+          mode: (row.mode as SavedRoute['mode']) ?? 'safe',
+          avoidUnpaved: (row.avoid_unpaved as boolean) ?? false,
+          createdAt: row.created_at as string,
+          lastUsedAt: row.last_used_at as string,
+        }));
+
+        return { routes };
+      },
+    );
+
+    app.post<{ Body: SavedRouteCreateBody; Reply: SavedRoute }>(
+      '/saved-routes',
+      { schema: { body: savedRouteCreateRequestSchema } },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const payload = normalizeSavedRouteCreateRequest(request.body);
+
+        const { data, error } = await supabaseAdmin
+          .from('saved_routes')
+          .insert({
+            user_id: user.id,
+            name: payload.name,
+            origin: payload.origin,
+            destination: payload.destination,
+            waypoints: payload.waypoints,
+            mode: payload.mode,
+            avoid_unpaved: payload.avoidUnpaved,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          request.log.error({ event: 'saved_route_create_error', error: error.message }, 'failed to create saved route');
+          throw new HttpError('Failed to save route.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        reply.status(201);
+        return {
+          id: data.id as string,
+          name: data.name as string,
+          origin: data.origin as SavedRoute['origin'],
+          destination: data.destination as SavedRoute['destination'],
+          waypoints: (data.waypoints as SavedRoute['waypoints']) ?? [],
+          mode: (data.mode as SavedRoute['mode']) ?? 'safe',
+          avoidUnpaved: (data.avoid_unpaved as boolean) ?? false,
+          createdAt: data.created_at as string,
+          lastUsedAt: data.last_used_at as string,
+        };
+      },
+    );
+
+    app.delete<{ Params: { id: string } }>(
+      '/saved-routes/:id',
+      async (request) => {
+        const user = await requireWriteUser(request, dependencies);
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const { error } = await supabaseAdmin
+          .from('saved_routes')
+          .delete()
+          .eq('id', request.params.id)
+          .eq('user_id', user.id);
+
+        if (error) {
+          request.log.error({ event: 'saved_route_delete_error', error: error.message }, 'failed to delete saved route');
+          throw new HttpError('Failed to delete saved route.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    app.patch<{ Params: { id: string } }>(
+      '/saved-routes/:id/use',
+      async (request) => {
+        const user = await requireWriteUser(request, dependencies);
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const { error } = await supabaseAdmin
+          .from('saved_routes')
+          .update({ last_used_at: new Date().toISOString() })
+          .eq('id', request.params.id)
+          .eq('user_id', user.id);
+
+        if (error) {
+          request.log.error({ event: 'saved_route_use_error', error: error.message }, 'failed to update saved route');
+          throw new HttpError('Failed to update saved route.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        return { acceptedAt: new Date().toISOString() };
       },
     );
 

@@ -1,8 +1,8 @@
-import type { AutocompleteSuggestion, Coordinate, HazardType } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
 import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -22,6 +22,7 @@ import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useWeather } from '../src/hooks/useWeather';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
+import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 import { SearchBar } from '../src/design-system/molecules';
@@ -54,6 +55,7 @@ export default function RoutePlanningScreen() {
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
   const addWaypoint = useAppStore((state) => state.addWaypoint);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
+  const reorderWaypoints = useAppStore((state) => state.reorderWaypoints);
   const customStartEnabled = hasStartOverride(routeRequest);
   const waypoints = routeRequest.waypoints ?? [];
   const poiVisibility = useAppStore((state) => state.poiVisibility);
@@ -114,8 +116,41 @@ export default function RoutePlanningScreen() {
   const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
-  const user = null; // hazard reports work without auth
+  const { user } = useAuthSession();
+
+  // Saved routes — show when destination is empty and user is signed in
+  const savedRoutesQuery = useQuery({
+    queryKey: ['saved-routes'],
+    queryFn: () => mobileApi.getSavedRoutes(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+
+  const handleLoadSavedRoute = useCallback((route: SavedRoute) => {
+    setRouteRequest({
+      destination: route.destination,
+      origin: route.origin,
+      mode: route.mode,
+      avoidUnpaved: route.avoidUnpaved,
+    });
+    if (route.waypoints.length > 0) {
+      // Clear then add each waypoint
+      useAppStore.getState().clearWaypoints();
+      const labels: string[] = [];
+      for (const wp of route.waypoints) {
+        useAppStore.getState().addWaypoint(wp);
+        labels.push(formatCoordinateLabel(wp));
+      }
+      setWaypointQueries(labels);
+    }
+    setDestinationQuery(route.name);
+    setDestinationHydrated(true);
+    // Touch last_used_at
+    void mobileApi.useSavedRoute(route.id);
+    router.push('/route-preview');
+  }, [setRouteRequest, setDestinationQuery, setDestinationHydrated, setWaypointQueries]);
 
   const handleMapLongPress = (coordinate: Coordinate) => {
     setPendingHazardCoordinate(coordinate);
@@ -345,6 +380,30 @@ export default function RoutePlanningScreen() {
     setActiveField(null);
   };
 
+  /** Swap waypoint at `index` with the current destination. */
+  const handleSwapWithDestination = (index: number) => {
+    const wp = waypoints[index];
+    if (!wp) return;
+    const oldDest = routeRequest.destination;
+    const oldDestLabel = destinationQuery;
+    // Set the waypoint as the new destination
+    setRouteRequest({ destination: wp });
+    setDestinationQuery(waypointQueries[index] || formatCoordinateLabel(wp));
+    setDestinationHydrated(true);
+    // Replace the waypoint with the old destination
+    removeWaypoint(index);
+    // Re-add old destination as waypoint at the same index
+    // We need to do this via store directly since addWaypoint appends
+    const currentWps = [...(useAppStore.getState().routeRequest.waypoints ?? [])];
+    currentWps.splice(index, 0, oldDest);
+    setRouteRequest({ waypoints: currentWps });
+    setWaypointQueries((prev) => {
+      const next = [...prev];
+      next[index] = oldDestLabel;
+      return next;
+    });
+  };
+
   const toggleVoiceGuidance = () => {
     const nextEnabled = !voiceGuidanceEnabled;
     setVoiceGuidanceEnabled(nextEnabled);
@@ -535,6 +594,52 @@ export default function RoutePlanningScreen() {
                   </Text>
                 </View>
               )}
+              {index > 0 ? (
+                <Pressable
+                  style={styles.waypointReorder}
+                  onPress={() => {
+                    reorderWaypoints(index, index - 1);
+                    setWaypointQueries((prev) => {
+                      const next = [...prev];
+                      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                      return next;
+                    });
+                  }}
+                  hitSlop={8}
+                  accessibilityLabel={`Move stop ${index + 1} up`}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="chevron-up" size={16} color={gray[200]} />
+                </Pressable>
+              ) : null}
+              {index < waypoints.length - 1 ? (
+                <Pressable
+                  style={styles.waypointReorder}
+                  onPress={() => {
+                    reorderWaypoints(index, index + 1);
+                    setWaypointQueries((prev) => {
+                      const next = [...prev];
+                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                      return next;
+                    });
+                  }}
+                  hitSlop={8}
+                  accessibilityLabel={`Move stop ${index + 1} down`}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="chevron-down" size={16} color={gray[200]} />
+                </Pressable>
+              ) : hasValidDestination ? (
+                <Pressable
+                  style={styles.waypointReorder}
+                  onPress={() => handleSwapWithDestination(index)}
+                  hitSlop={8}
+                  accessibilityLabel={`Swap stop ${index + 1} with destination`}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="chevron-down" size={16} color={gray[200]} />
+                </Pressable>
+              ) : null}
               <Pressable
                 style={styles.waypointRemove}
                 onPress={() => handleRemoveWaypoint(index)}
@@ -542,7 +647,7 @@ export default function RoutePlanningScreen() {
                 accessibilityLabel={`Remove stop ${index + 1}`}
                 accessibilityRole="button"
               >
-                <Ionicons name="close-circle" size={18} color={gray[400]} />
+                <Ionicons name="close-circle" size={18} color={gray[200]} />
               </Pressable>
             </View>
           ))}
@@ -701,6 +806,16 @@ export default function RoutePlanningScreen() {
           >
             <Ionicons name="locate" size={22} color={gray[700]} />
           </Pressable>
+          {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
+            <Pressable
+              style={styles.fabButton}
+              onPress={() => setSavedRoutesOpen(true)}
+              accessibilityLabel="Saved routes"
+              accessibilityRole="button"
+            >
+              <Ionicons name="bookmark" size={22} color={brandColors.accent} />
+            </Pressable>
+          ) : null}
         </View>
       }
       footer={
@@ -790,6 +905,40 @@ export default function RoutePlanningScreen() {
           onDismiss={() => setHazardToast(null)}
         />
       </View>
+    ) : null}
+
+    {/* Saved routes modal */}
+    {savedRoutesOpen ? (
+      <Pressable style={styles.savedRoutesOverlay} onPress={() => setSavedRoutesOpen(false)}>
+        <Pressable style={styles.savedRoutesModal} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.savedRoutesTitle}>Saved Routes</Text>
+          {(savedRoutesQuery.data ?? []).map((route) => (
+            <Pressable
+              key={route.id}
+              style={styles.savedRouteRow}
+              onPress={() => {
+                setSavedRoutesOpen(false);
+                handleLoadSavedRoute(route);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Load saved route: ${route.name}`}
+            >
+              <Ionicons name="bookmark" size={16} color={brandColors.accent} />
+              <View style={styles.savedRouteTextWrap}>
+                <Text style={styles.savedRouteName} numberOfLines={1}>{route.name}</Text>
+                <Text style={styles.savedRouteMode}>
+                  {route.mode === 'safe' ? 'Safe' : 'Fast'}
+                  {route.waypoints.length > 0 ? ` · ${route.waypoints.length} stop${route.waypoints.length > 1 ? 's' : ''}` : ''}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={gray[500]} />
+            </Pressable>
+          ))}
+          <Pressable style={styles.savedRoutesCancel} onPress={() => setSavedRoutesOpen(false)}>
+            <Text style={styles.savedRoutesCancelText}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
     ) : null}
     </View>
   );
@@ -1025,6 +1174,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body.medium,
     color: gray[800],
   },
+  waypointReorder: {
+    padding: 2,
+  },
   waypointRemove: {
     width: 28,
     height: 28,
@@ -1043,5 +1195,59 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fontFamily.body.medium,
     color: gray[400],
+  },
+  savedRoutesOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  savedRoutesModal: {
+    width: '85%',
+    maxHeight: '70%',
+    backgroundColor: darkTheme.bgPrimary,
+    borderRadius: radii.xl,
+    padding: space[4],
+    gap: space[2],
+  },
+  savedRoutesTitle: {
+    fontSize: 18,
+    fontFamily: fontFamily.heading.bold,
+    color: darkTheme.textPrimary,
+    marginBottom: space[1],
+  },
+  savedRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingVertical: space[2],
+    paddingHorizontal: space[2],
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.md,
+  },
+  savedRouteTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  savedRouteName: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textPrimary,
+  },
+  savedRouteMode: {
+    fontSize: 12,
+    fontFamily: fontFamily.body.regular,
+    color: gray[400],
+  },
+  savedRoutesCancel: {
+    alignItems: 'center',
+    paddingVertical: space[2],
+    marginTop: space[1],
+  },
+  savedRoutesCancelText: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textMuted,
   },
 });

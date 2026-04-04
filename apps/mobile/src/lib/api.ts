@@ -22,6 +22,8 @@ import type {
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
   RideImpact,
+  SavedRoute,
+  SavedRouteCreateRequest,
   ShareTripRequest,
   UserPublicProfile,
   RerouteRequest,
@@ -460,4 +462,25 @@ export const mobileApi = {
 
   getUserProfile: (userId: string) =>
     requestJson<UserPublicProfile>(`/v1/users/${userId}/profile`),
+
+  // ── Saved Routes ──
+
+  getSavedRoutes: () =>
+    requestJson<{ routes: SavedRoute[] }>('/v1/saved-routes').then((res) => res.routes),
+
+  saveRoute: (payload: SavedRouteCreateRequest) =>
+    requestJson<SavedRoute>('/v1/saved-routes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSavedRoute: (id: string) =>
+    requestJson<WriteAckResponse>(`/v1/saved-routes/${id}`, {
+      method: 'DELETE',
+    }),
+
+  useSavedRoute: (id: string) =>
+    requestJson<WriteAckResponse>(`/v1/saved-routes/${id}/use`, {
+      method: 'PATCH',
+    }),
 };

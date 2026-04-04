@@ -1,4 +1,5 @@
 import type {
+  Coordinate,
   CyclingGoal,
   OfflineRegion,
   NavigationLocationSample,
@@ -137,6 +138,7 @@ type AppStore = {
   addWaypoint: (coordinate: Coordinate) => void;
   removeWaypoint: (index: number) => void;
   clearWaypoints: () => void;
+  reorderWaypoints: (fromIndex: number, toIndex: number) => void;
   setRoutePreview: (
     response: RoutePreviewResponse | null,
     options?: {
@@ -312,6 +314,21 @@ export const useAppStore = create<AppStore>()(
             waypoints: [],
           },
         })),
+      reorderWaypoints: (fromIndex, toIndex) =>
+        set((state) => {
+          const current = [...(state.routeRequest.waypoints ?? [])];
+          if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) {
+            return state;
+          }
+          const [moved] = current.splice(fromIndex, 1);
+          current.splice(toIndex, 0, moved);
+          return {
+            routeRequest: {
+              ...state.routeRequest,
+              waypoints: current,
+            },
+          };
+        }),
       setRoutePreview: (response, options) =>
         set((state) => {
           if (!response) {
