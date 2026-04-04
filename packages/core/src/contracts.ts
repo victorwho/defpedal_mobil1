@@ -548,6 +548,8 @@ export interface RideImpact {
   readonly hazardsWarnedCount: number;
   readonly distanceMeters: number;
   readonly equivalentText: string | null;
+  readonly personalMicrolives: number;
+  readonly communitySeconds: number;
 }
 
 export interface StreakState {
@@ -571,6 +573,8 @@ export interface ImpactDashboard {
     readonly moneySavedEur: number;
     readonly hazardsReported: number;
   };
+  readonly totalMicrolives: number;
+  readonly totalCommunitySeconds: number;
 }
 
 export interface QuizQuestion {

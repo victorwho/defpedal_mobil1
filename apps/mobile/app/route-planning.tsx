@@ -27,6 +27,7 @@ import { useAppStore } from '../src/store/appStore';
 
 import { SearchBar } from '../src/design-system/molecules';
 import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
+import { TimeBankWidget } from '../src/design-system/molecules/TimeBankWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
@@ -129,6 +130,14 @@ export default function RoutePlanningScreen() {
   const setShowHistoryOverlay = useAppStore((state) => state.setShowHistoryOverlay);
   const { user } = useAuthSession();
   const t = useT();
+
+  // Impact dashboard — for Time Bank widget
+  const dashboardQuery = useQuery({
+    queryKey: ['impact-dashboard'],
+    queryFn: () => mobileApi.fetchImpactDashboard(Intl.DateTimeFormat().resolvedOptions().timeZone),
+    enabled: Boolean(user),
+    staleTime: 300_000,
+  });
 
   // History overlay — past ride GPS trails on the map
   const historyQuery = useQuery({
@@ -744,6 +753,14 @@ export default function RoutePlanningScreen() {
           {/* Weather widget — hidden while typing or when UI collapsed */}
           {!activeField && !uiCollapsed ? (
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
+          ) : null}
+
+          {/* Time Bank widget — show accumulated microlives */}
+          {!activeField && !uiCollapsed && user && dashboardQuery.data ? (
+            <TimeBankWidget
+              totalMicrolives={dashboardQuery.data.totalMicrolives}
+              totalCommunitySeconds={dashboardQuery.data.totalCommunitySeconds}
+            />
           ) : null}
 
           {/* Safe / Fast routing toggle */}

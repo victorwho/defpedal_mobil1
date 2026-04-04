@@ -1,5 +1,11 @@
 import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
-import { calculateTrailDistanceMeters, getPreviewOrigin } from '@defensivepedal/core';
+import {
+  calculateTrailDistanceMeters,
+  getPreviewOrigin,
+  calculatePersonalMicrolives,
+  calculateCommunitySeconds,
+  mapBikeTypeToVehicle,
+} from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -286,8 +292,10 @@ export default function FeedbackScreen() {
     const distMeters = breadcrumbs.length >= 2
       ? calculateTrailDistanceMeters(breadcrumbs)
       : route?.distanceMeters ?? 0;
-    const co2 = distMeters / 1000 * 0.12;
-    const money = distMeters / 1000 * 0.35;
+    const distKm = distMeters / 1000;
+    const co2 = distKm * 0.12;
+    const money = distKm * 0.35;
+    const vehicle = mapBikeTypeToVehicle(store.bikeType);
     return {
       tripId: store.activeTripClientId ?? 'local',
       co2SavedKg: co2,
@@ -297,6 +305,8 @@ export default function FeedbackScreen() {
       equivalentText: co2 >= 0.5 ? 'Planting a small tree seedling'
         : co2 >= 0.1 ? 'Charging a smartphone 12 times'
         : null,
+      personalMicrolives: calculatePersonalMicrolives(distKm, vehicle, null),
+      communitySeconds: calculateCommunitySeconds(distKm, vehicle),
     };
   }, []);
 

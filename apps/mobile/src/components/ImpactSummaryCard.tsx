@@ -1,4 +1,5 @@
 import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
+import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 
@@ -92,6 +93,30 @@ export const ImpactSummaryCard = ({
   staggerDelayMs = 800,
 }: ImpactSummaryCardProps) => (
   <View style={styles.card}>
+    {/* Microlives hero */}
+    {rideImpact.personalMicrolives > 0 ? (
+      <View style={styles.microlivesHero}>
+        <StaggeredCounter
+          targetValue={rideImpact.personalMicrolives}
+          decimals={1}
+          label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
+          equivalentText={null}
+          color="#F2C30F"
+          delayMs={0}
+          suffix=" ML"
+        />
+        <StaggeredCounter
+          targetValue={rideImpact.communitySeconds}
+          decimals={0}
+          label={`${formatCommunitySeconds(rideImpact.communitySeconds)} donated to your city`}
+          equivalentText={null}
+          color="#60A5FA"
+          delayMs={staggerDelayMs}
+          suffix=" sec"
+        />
+      </View>
+    ) : null}
+
     {/* This ride's impact */}
     <Text style={styles.sectionTitle}>This ride's impact</Text>
 
@@ -103,7 +128,7 @@ export const ImpactSummaryCard = ({
         label="CO2 saved"
         equivalentText={rideImpact.equivalentText}
         color={safetyColors.safe}
-        delayMs={0}
+        delayMs={staggerDelayMs * 2}
       />
       <StaggeredCounter
         targetValue={rideImpact.moneySavedEur}
@@ -112,7 +137,7 @@ export const ImpactSummaryCard = ({
         label="Money saved"
         equivalentText={null}
         color={brandColors.accent}
-        delayMs={staggerDelayMs}
+        delayMs={staggerDelayMs * 3}
       />
       <StaggeredCounter
         targetValue={rideImpact.hazardsWarnedCount}
@@ -120,7 +145,7 @@ export const ImpactSummaryCard = ({
         label="Hazards warned"
         equivalentText={null}
         color={safetyColors.caution}
-        delayMs={staggerDelayMs * 2}
+        delayMs={staggerDelayMs * 4}
       />
     </View>
 
@@ -168,6 +193,12 @@ const styles = StyleSheet.create({
     padding: space[5],
     gap: space[5],
     ...shadows.lg,
+  },
+  microlivesHero: {
+    gap: space[3],
+    paddingBottom: space[3],
+    borderBottomWidth: 1,
+    borderBottomColor: darkTheme.borderDefault,
   },
   sectionTitle: {
     ...textSm,

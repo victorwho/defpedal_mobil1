@@ -1460,7 +1460,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1468,6 +1468,8 @@ export const buildV1Routes = (
                 hazardsWarnedCount: { type: 'integer' },
                 distanceMeters: { type: 'number' },
                 equivalentText: { type: ['string', 'null'] },
+                personalMicrolives: { type: 'number' },
+                communitySeconds: { type: 'number' },
               },
             },
             401: errorResponseSchema,
@@ -1529,6 +1531,35 @@ export const buildV1Routes = (
           equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
         }
 
+        // Also compute and record microlives
+        let personalMicrolives = 0;
+        let communitySeconds = 0;
+        try {
+          // Fetch bike_type and aqi from the trip_track record
+          const { data: trackData } = await supabaseAdmin
+            .from('trip_tracks')
+            .select('bike_type, aqi_at_start')
+            .eq('trip_id', tripId)
+            .single();
+
+          const { data: mlData } = await supabaseAdmin.rpc('record_ride_microlives', {
+            p_trip_id: tripId,
+            p_user_id: user.id,
+            p_distance_meters: distanceMeters,
+            p_bike_type: (trackData?.bike_type as string) ?? 'acoustic',
+            p_european_aqi: (trackData?.aqi_at_start as number) ?? null,
+            p_validated: true,
+          });
+
+          if (mlData) {
+            const ml = typeof mlData === 'object' ? mlData : {};
+            personalMicrolives = Number((ml as Record<string, unknown>).personalMicrolives ?? 0);
+            communitySeconds = Number((ml as Record<string, unknown>).communitySeconds ?? 0);
+          }
+        } catch {
+          // Microlives recording failure is non-fatal
+        }
+
         return {
           tripId,
           co2SavedKg,
@@ -1536,6 +1567,8 @@ export const buildV1Routes = (
           hazardsWarnedCount: Number(row?.hazards_warned_count ?? 0),
           distanceMeters: Number(row?.distance_meters ?? 0),
           equivalentText,
+          personalMicrolives,
+          communitySeconds,
         };
       },
     );
@@ -1557,7 +1590,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1565,6 +1598,8 @@ export const buildV1Routes = (
                 hazardsWarnedCount: { type: 'integer' },
                 distanceMeters: { type: 'number' },
                 equivalentText: { type: ['string', 'null'] },
+                personalMicrolives: { type: 'number' },
+                communitySeconds: { type: 'number' },
               },
             },
             401: errorResponseSchema,
@@ -1643,6 +1678,19 @@ export const buildV1Routes = (
           equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
         }
 
+        // Fetch microlives for this trip if available
+        let personalMicrolives = 0;
+        let communitySeconds = 0;
+        const { data: mlRow } = await supabaseAdmin
+          .from('ride_microlives')
+          .select('personal_microlives, community_seconds')
+          .eq('trip_id', impactRow.trip_id)
+          .maybeSingle();
+        if (mlRow) {
+          personalMicrolives = Number((mlRow as Record<string, unknown>).personal_microlives ?? 0);
+          communitySeconds = Number((mlRow as Record<string, unknown>).community_seconds ?? 0);
+        }
+
         return {
           tripId: impactRow.trip_id as string,
           co2SavedKg: Number(impactRow.co2_saved_kg),
@@ -1650,6 +1698,8 @@ export const buildV1Routes = (
           hazardsWarnedCount: Number(impactRow.hazards_warned_count ?? 0),
           distanceMeters: Number(impactRow.distance_meters ?? 0),
           equivalentText,
+          personalMicrolives,
+          communitySeconds,
         };
       },
     );
@@ -1762,6 +1812,8 @@ export const buildV1Routes = (
             moneySavedEur: Number(thisWeek?.moneySavedEur ?? 0),
             hazardsReported: 0,
           },
+          totalMicrolives: Number(totals?.totalMicrolives ?? 0),
+          totalCommunitySeconds: Number(totals?.totalCommunitySeconds ?? 0),
         };
       },
     );

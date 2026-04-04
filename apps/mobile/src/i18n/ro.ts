@@ -434,6 +434,15 @@ export const ro: TranslationKeys = {
     subtitle: 'Răspunsuri la întrebările comune',
   },
 
+  // ── Microlives ──
+  microlives: {
+    lifeEarned: 'de viață câștigată',
+    donatedToCity: 'donată orașului tău',
+    timeBank: 'Banca de Timp',
+    personalLifeGained: 'Viață câștigată în această cursă',
+    communityDonation: 'Donat comunității',
+  },
+
   // ── Trip Comparison ──
   compare: {
     title: 'Comparație curse',

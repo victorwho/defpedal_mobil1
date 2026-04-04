@@ -432,6 +432,15 @@ export const en = {
     subtitle: 'Frequently asked questions',
   },
 
+  // ── Microlives ──
+  microlives: {
+    lifeEarned: 'of life earned',
+    donatedToCity: 'donated to your city',
+    timeBank: 'Time Bank',
+    personalLifeGained: 'Life gained this ride',
+    communityDonation: 'Donated to community',
+  },
+
   // ── Trip Comparison ──
   compare: {
     title: 'Trip Comparison',
