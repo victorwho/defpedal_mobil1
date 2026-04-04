@@ -30,15 +30,14 @@ const GUARDIAN_TIER_CONFIG: Record<GuardianTier, { label: string; icon: keyof ty
   guardian_angel: { label: 'Guardian Angel', icon: 'shield-checkmark', color: '#FACC15', min: 50 },
 };
 
-const BIKE_TYPES = ['Road bike', 'City bike', 'Mountain bike', 'E-bike', 'Recumbent', 'Other'] as const;
+const BIKE_TYPE_KEYS = [
+  'profile.bikeRoad', 'profile.bikeCity', 'profile.bikeMountain',
+  'profile.bikeEbike', 'profile.bikeRecumbent', 'profile.bikeOther',
+] as const;
 
-const CYCLING_FREQUENCIES = [
-  'Daily',
-  'Several times a week',
-  'Once a week',
-  'A few times a month',
-  'Once a month',
-  'More rarely than once per month',
+const CYCLING_FREQUENCY_KEYS = [
+  'profile.freqDaily', 'profile.freqSeveralWeek', 'profile.freqOnceWeek',
+  'profile.freqFewMonth', 'profile.freqOnceMonth', 'profile.freqRarely',
 ] as const;
 
 import { handleTabPress } from '../src/lib/navigation-helpers';
@@ -237,13 +236,13 @@ export default function ProfileScreen() {
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
 
   const poiCategories = [
-    { key: 'hydration', label: 'Water & Cafés', description: 'Drinking fountains and cafés' },
-    { key: 'repair', label: 'Bike Shops', description: 'Bicycle repair and shops' },
-    { key: 'bikeRental', label: 'Bike Rental', description: 'Bicycle rental stations' },
-    { key: 'bikeParking', label: 'Bike Parking', description: 'Bicycle parking locations' },
-    { key: 'restroom', label: 'Restrooms', description: 'Public toilets' },
-    { key: 'supplies', label: 'Supplies', description: 'Convenience stores, grocery' },
-  ] as const;
+    { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
+    { key: 'repair' as const, label: t('profile.poiRepair'), description: t('profile.poiRepairDesc') },
+    { key: 'bikeRental' as const, label: t('profile.poiRental'), description: t('profile.poiRentalDesc') },
+    { key: 'bikeParking' as const, label: t('profile.poiParking'), description: t('profile.poiParkingDesc') },
+    { key: 'restroom' as const, label: t('profile.poiRestroom'), description: t('profile.poiRestroomDesc') },
+    { key: 'supplies' as const, label: t('profile.poiSupplies'), description: t('profile.poiSuppliesDesc') },
+  ];
 
   return (
     <View style={styles.root}>
@@ -365,19 +364,19 @@ export default function ProfileScreen() {
             <Text style={styles.sectionTitle}>{t('profile.aboutYou')}</Text>
 
             <DropdownPicker
-              label="Type of bike"
+              label={t('profile.bikeType')}
               value={bikeType}
-              options={BIKE_TYPES}
+              options={BIKE_TYPE_KEYS.map((k) => t(k))}
               onSelect={setBikeType}
-              placeholder="Select your bike type"
+              placeholder={t('profile.selectBikeType')}
             />
 
             <DropdownPicker
-              label="Cycling frequency"
+              label={t('profile.cyclingFrequency')}
               value={cyclingFrequency}
-              options={CYCLING_FREQUENCIES}
+              options={CYCLING_FREQUENCY_KEYS.map((k) => t(k))}
               onSelect={setCyclingFrequency}
-              placeholder="How often do you cycle?"
+              placeholder={t('profile.howOften')}
             />
           </View>
 
