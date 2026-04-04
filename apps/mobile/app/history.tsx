@@ -18,6 +18,7 @@ import { fontFamily, textBase, textSm, textXs } from '../src/design-system/token
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
+import { useT } from '../src/hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Guardian tier config
@@ -64,6 +65,7 @@ const getTierProgress = (currentTier: GuardianTier, hazardsReported: number) => 
 
 export default function HistoryScreen() {
   const { user } = useAuthSession();
+  const t = useT();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -86,14 +88,14 @@ export default function HistoryScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        <Screen title="History" eyebrow="Defensive Pedal" subtitle="Your cycling journey">
+        <Screen title={t('history.title')} eyebrow={t('history.eyebrow')} subtitle={t('history.subtitle')}>
 
           {/* 1. Your Impact */}
           {user ? (
             <View style={styles.impactCard}>
               <View style={styles.impactHeader}>
                 <Ionicons name="leaf-outline" size={20} color={safetyColors.safe} />
-                <Text style={styles.impactTitle}>Your Impact</Text>
+                <Text style={styles.impactTitle}>{t('history.yourImpact')}</Text>
               </View>
               {statsLoading ? (
                 <ActivityIndicator size="small" color={safetyColors.safe} />
@@ -102,19 +104,19 @@ export default function HistoryScreen() {
                 <View style={styles.impactRow}>
                   <View style={styles.impactStat}>
                     <Text style={styles.impactValue}>{stats.totalTrips}</Text>
-                    <Text style={styles.impactLabel}>Trips</Text>
+                    <Text style={styles.impactLabel}>{t('history.trips')}</Text>
                   </View>
                   <View style={styles.impactStat}>
                     <Text style={styles.impactValue}>
-                      {(stats.totalDistanceMeters / 1000).toFixed(0)} km
+                      {(stats.totalDistanceMeters / 1000).toFixed(0)} {t('common.km')}
                     </Text>
-                    <Text style={styles.impactLabel}>Cycled</Text>
+                    <Text style={styles.impactLabel}>{t('history.cycled')}</Text>
                   </View>
                   <View style={styles.impactStat}>
                     <Text style={[styles.impactValue, { color: safetyColors.safe }]}>
                       {formatCo2Saved(stats.totalCo2SavedKg)}
                     </Text>
-                    <Text style={styles.impactLabel}>CO2 Saved</Text>
+                    <Text style={styles.impactLabel}>{t('history.co2Saved')}</Text>
                   </View>
                 </View>
                 <View style={styles.impactRow}>
@@ -122,19 +124,19 @@ export default function HistoryScreen() {
                     <Text style={[styles.impactValue, { color: brandColors.accent }]}>
                       {stats ? `€${(stats.totalDistanceMeters / 1000 * 0.35).toFixed(0)}` : '—'}
                     </Text>
-                    <Text style={styles.impactLabel}>EUR Saved</Text>
+                    <Text style={styles.impactLabel}>{t('history.eurSaved')}</Text>
                   </View>
                   <View style={styles.impactStat}>
                     <Text style={[styles.impactValue, { color: safetyColors.caution }]}>
                       {dashboard ? String(dashboard.totalHazardsReported) : '—'}
                     </Text>
-                    <Text style={styles.impactLabel}>Hazards</Text>
+                    <Text style={styles.impactLabel}>{t('history.hazards')}</Text>
                   </View>
                   <View style={styles.impactStat}>
                     <Text style={[styles.impactValue, { color: safetyColors.info }]}>
                       {dashboard ? String(dashboard.totalRidersProtected) : '—'}
                     </Text>
-                    <Text style={styles.impactLabel}>Protected</Text>
+                    <Text style={styles.impactLabel}>{t('history.protected')}</Text>
                   </View>
                 </View>
               </>
@@ -203,8 +205,8 @@ export default function HistoryScreen() {
               <View style={styles.quizCardLeft}>
                 <Ionicons name="help-circle-outline" size={22} color={brandColors.accent} />
                 <View>
-                  <Text style={styles.quizCardTitle}>Daily Safety Quiz</Text>
-                  <Text style={styles.quizCardSubtitle}>Test your cycling knowledge</Text>
+                  <Text style={styles.quizCardTitle}>{t('history.dailyQuiz')}</Text>
+                  <Text style={styles.quizCardSubtitle}>{t('history.dailyQuizSub')}</Text>
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={18} color={darkTheme.textMuted} />
@@ -214,7 +216,7 @@ export default function HistoryScreen() {
           {/* 6. View My Trips */}
           <View style={styles.section}>
             <Button variant="primary" size="md" fullWidth onPress={() => router.push('/trips')}>
-              View My Trips
+              {t('history.viewTrips')}
             </Button>
           </View>
         </Screen>

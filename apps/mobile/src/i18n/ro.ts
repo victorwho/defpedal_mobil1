@@ -14,6 +14,13 @@ export const ro: TranslationKeys = {
     retry: 'Reîncearcă',
     guest: 'Vizitator',
     signedIn: 'Conectat',
+    yes: 'Da',
+    no: 'Nu',
+    km: 'km',
+    mAhead: '{{distance}} m înainte',
+    mAway: '{{distance}} m',
+    confirmed_one: '{{count}} persoană a confirmat',
+    confirmed_other: '{{count}} persoane au confirmat',
   },
 
   // ── Tabs ──
@@ -44,6 +51,15 @@ export const ro: TranslationKeys = {
     riskDistribution: 'Distribuția riscului',
     elevationProfile: 'Profil altitudine',
     routeComparison: 'Comparație trasee',
+    previewLoading: 'Se încarcă previzualizarea',
+    previewFailed: 'Previzualizare eșuată',
+    noRoutes: 'Niciun traseu disponibil',
+    noRouteSelected: 'Niciun traseu selectat',
+    backToPlanning: 'Înapoi la planificare',
+    retryPreview: 'Reîncearcă previzualizarea',
+    coverage: 'Acoperire:',
+    coveragePending: 'Acoperire în așteptare',
+    routeName: 'Nume traseu (ex. Drum spre muncă)',
   },
 
   // ── Navigation ──
@@ -55,7 +71,15 @@ export const ro: TranslationKeys = {
     endRide: 'Termină cursa',
     recenter: 'Recentrează',
     offRoute: 'Ești în afara traseului',
-    rerouting: 'Se recalculează...',
+    offRouteCountdown: 'În afara traseului. Redirecționare automată în {{seconds}}s.',
+    offRouteReady: 'În afara traseului. Redirecționare manuală disponibilă.',
+    rerouting: 'Se solicită un traseu nou de la poziția GPS.',
+    rerouteNow: 'Redirecționează acum',
+    retryGps: 'Reîncearcă GPS',
+    gpsLive: 'GPS activ',
+    syncOn: 'Sincronizare',
+    anonymousRide: 'Cursă anonimă',
+    step: 'Pas {{current}}/{{total}}',
   },
 
   // ── Feedback ──
@@ -64,6 +88,22 @@ export const ro: TranslationKeys = {
     subtitle: 'Feedback-ul tău ne ajută să îmbunătățim traseele',
     submit: 'Trimite feedback',
     skip: 'Sari peste',
+    greatRide: 'Cursă excelentă!',
+    positiveImpact: 'Iată impactul pozitiv al cursei tale.',
+    continue: 'Continuă',
+    howSafe: 'Cât de sigură a fost cursa?',
+    safetyHelps: 'Feedback-ul tău ajută la îmbunătățirea traseelor viitoare.',
+    perceivedSafety: 'Siguranță percepută',
+    commentsOptional: 'Comentarii (opțional)',
+    commentsPlaceholder: 'Comentarii despre traseu?',
+    thankYou: 'Mulțumim!',
+    thankYouSub: 'Feedback-ul tău face străzile mai sigure pentru toți.',
+    milestone: 'Ai atins un reper!',
+    shareAchievement: 'Distribuie realizarea',
+    maybeLater: 'Poate mai târziu',
+    saveProgress: 'Salvează progresul',
+    signUpKeepStreak: 'Creează cont pentru a-ți păstra seria și a-ți urmări impactul.',
+    continueGoogle: 'Continuă cu Google',
   },
 
   // ── Profile ──
@@ -78,8 +118,6 @@ export const ro: TranslationKeys = {
     minChars: 'Minim 3 caractere',
     usernameTaken: 'Nume utilizator deja folosit',
     language: 'Limbă',
-
-    // Sections
     aboutYou: 'Despre tine',
     bikeType: 'Tipul bicicletei',
     cyclingFrequency: 'Cât de des pedalezi?',
@@ -104,22 +142,47 @@ export const ro: TranslationKeys = {
   // ── History ──
   history: {
     title: 'Istoric',
-    subtitle: 'Cursele și impactul tău',
+    eyebrow: 'Defensive Pedal',
+    subtitle: 'Călătoria ta pe bicicletă',
     noTrips: 'Nicio cursă încă',
+    yourImpact: 'Impactul tău',
+    trips: 'Curse',
+    cycled: 'Pedalat',
     totalRides: 'Total curse',
     totalDistance: 'Distanță totală',
     totalDuration: 'Durată totală',
     co2Saved: 'CO2 economisit',
     eurSaved: 'EUR economisiți',
+    hazards: 'Pericole',
+    protected: 'Protejat',
     currentStreak: 'Serie curentă',
     longestStreak: 'Cea mai lungă serie',
     exportGpx: 'Exportă GPX',
+    viewTrips: 'Vezi cursele mele',
+    dailyQuiz: 'Quiz zilnic de siguranță',
+    dailyQuizSub: 'Testează-ți cunoștințele de ciclism',
+  },
+
+  // ── Trips ──
+  tripsScreen: {
+    title: 'Istoric',
+    subtitle: 'Cursele mele',
+    loading: 'Se încarcă cursele\u2026',
+    loadFailed: 'Încărcarea curselor a eșuat. Încearcă din nou.',
+    noRides: 'Nicio cursă încă',
+    noRidesSub: 'Completează o cursă și istoricul va apărea aici.',
+    completed: 'Finalizată',
+    stopped: 'Oprită',
+    appKilled: 'Aplicație închisă',
   },
 
   // ── Community ──
   communityScreen: {
     title: 'Comunitate',
-    subtitle: 'Cicliști din apropiere',
+    subtitle: 'Conectează-te cu alți cicliști',
+    feedTitle: 'Flux comunitar de cicliști',
+    feedSub: 'Vezi cursele distribuite de cicliștii din zona ta.',
+    viewFeed: 'Vezi fluxul comunitar',
     feed: 'Flux',
     noActivity: 'Nicio activitate în apropiere',
     like: 'Apreciază',
@@ -128,6 +191,35 @@ export const ro: TranslationKeys = {
     follow: 'Urmărește',
     unfollow: 'Nu mai urmări',
     shareRide: 'Distribuie cursa',
+    locationNeeded: 'Acces la locație necesar',
+    locationFailed: 'Nu s-a putut obține locația',
+    locationPrompt: 'Activează permisiunea de locație pentru a vedea cursele din apropiere.',
+    gettingLocation: 'Se obține locația...',
+    grantLocation: 'Acordă acces la locație',
+    tryAgain: 'Încearcă din nou',
+    noRidesNearby: 'Nicio cursă distribuită în apropiere',
+    beFirst: 'Completează o cursă și fii primul care o distribuie!',
+  },
+
+  // ── Community Stats ──
+  communityStats: {
+    loading: 'Se încarcă statisticile comunității...',
+    title: 'Comunitatea ta de ciclism',
+    cyclistsIn: 'Cicliști în',
+    totalRides: 'Total curse',
+    distance: 'Distanță',
+    rideTime: 'Timp pedalat',
+    co2Saved: 'CO2 economisit',
+    activeRider_one: 'ciclist activ',
+    activeRider_other: 'cicliști activi',
+  },
+
+  // ── Feed Card ──
+  feedCard: {
+    now: 'acum',
+    minsAgo: 'acum {{count}}m',
+    hoursAgo: 'acum {{count}}h',
+    daysAgo: 'acum {{count}}z',
   },
 
   // ── Hazard Reporting ──
@@ -145,12 +237,109 @@ export const ro: TranslationKeys = {
     deny: 'Dispărut',
   },
 
+  // ── Search ──
+  search: {
+    searching: 'Se caută locuri\u2026',
+    noMatches: 'Niciun rezultat încă. Continuă să tastezi sau încearcă un reper din apropiere.',
+  },
+
   // ── Weather ──
   weather: {
     feelsLike: 'Se simte ca',
     wind: 'Vânt',
     aqi: 'Calitate aer',
     precipitation: 'Precipitații',
+    loadingWeather: 'Se încarcă meteo...',
+  },
+
+  // ── Stats Dashboard ──
+  stats: {
+    week: 'Săptămână',
+    month: 'Lună',
+    allTime: 'Total',
+    trips: 'Curse',
+    distance: 'Distanță',
+    duration: 'Durată',
+    co2Saved: 'CO2 economisit',
+    avgSpeed: 'Viteză medie',
+  },
+
+  // ── Streak ──
+  streak: {
+    dayStreak: 'Serie de {{count}} zile',
+    frozen: 'Înghețat',
+    freezeReady: 'Înghețare disponibilă',
+    freezeUsed: 'Înghețare folosită',
+    keepItUp: 'Continuă tot așa!',
+    startChain: 'Începe seria ta azi!',
+    longest: 'Cea mai lungă:',
+  },
+
+  // ── Guardian Tiers ──
+  guardian: {
+    reporter: 'Raportor',
+    watchdog: 'Supraveghetor',
+    sentinel: 'Santinelă',
+    guardianAngel: 'Înger păzitor',
+    maxTier: 'Nivel maxim atins!',
+  },
+
+  // ── Auth ──
+  auth: {
+    signIn: 'Conectare',
+    signUp: 'Înregistrare',
+    email: 'Email',
+    password: 'Parolă',
+    submit: 'Trimite',
+    enterBoth: 'Introdu email-ul și parola.',
+    signedInSuccess: 'Conectare reușită.',
+    accountCreated: 'Cont creat. Verifică email-ul dacă este necesară confirmarea.',
+    authFailed: 'Autentificare eșuată.',
+    devSession: 'Sesiune dezvoltator activată pentru',
+    devSignInFailed: 'Autentificarea dezvoltator a eșuat.',
+  },
+
+  // ── Settings ──
+  settings: {
+    title: 'Meniu',
+    subtitle: 'Centru de control',
+    signedInAccount: 'Cont conectat',
+    active: 'Activ',
+    offline: 'Mod local',
+    noSession: 'Nicio sesiune de cont activă.',
+    provider: 'Furnizor:',
+    sync: 'Sincronizare:',
+    syncReady: 'Gata pentru curse, pericole și feedback',
+    account: 'Cont',
+    accountSub: 'Conectare, creare cont sau deconectare',
+    offlineMaps: 'Hărți offline',
+    offlineMapsSub: 'Descarcă pachete de hărți pentru utilizare offline',
+    diagnostics: 'Diagnosticare',
+    diagnosticsSub: 'Verifică conectivitatea și starea serviciilor',
+    welcomeFlow: 'Flux de bun venit',
+    welcomeFlowSub: 'Repornește experiența de introducere',
+    environment: 'Mediu:',
+    variant: 'Variantă:',
+  },
+
+  // ── Diagnostics ──
+  diag: {
+    title: 'Diagnosticare',
+    subtitle: 'Starea aplicației și conectivitate',
+    checking: 'Se verifică...',
+    passed: 'Trecut',
+    failed: 'Eșuat',
+    timeout: 'Expirat',
+  },
+
+  // ── Offline Maps ──
+  offlineMaps: {
+    title: 'Hărți offline',
+    subtitle: 'Descarcă hărți pentru utilizare offline',
+    download: 'Descarcă',
+    downloading: 'Se descarcă...',
+    downloaded: 'Descărcat',
+    delete: 'Șterge',
   },
 
   // ── Onboarding ──
@@ -162,6 +351,26 @@ export const ro: TranslationKeys = {
     createAccount: 'Creează cont',
     skip: 'Sari deocamdată',
     getStarted: 'Începe',
+    oneMoreThing: 'Încă un lucru',
+    chooseUsername: 'Alege un nume de utilizator',
+    usernameSub: 'Așa te vor vedea ceilalți cicliști.',
+    usernamePlaceholder: 'nume_utilizator',
+    whatBringsYou: 'Ce te aduce aici?',
+    personalizeHelp: 'Ne ajută să personalizăm experiența ta.',
+    commuteSafely: 'Naveta în siguranță',
+    commuteSafelySub: 'Găsește cel mai sigur drum la muncă și înapoi.',
+    exploreRoutes: 'Explorează trasee noi',
+    exploreRoutesSub: 'Descoperă trasee sigure de ciclism în zona ta.',
+    startCycling: 'Începe să pedalezi (sunt nervos)',
+    startCyclingSub: 'Capătă încredere cu ghidaj de siguranță.',
+    skipStep: 'Sari acest pas',
+    findingDestinations: 'Se caută destinații apropiate...',
+    planFirstRoute: 'Planifică primul tău traseu',
+    locationEnabled: 'Locație activată',
+    safetyScoreViewed: 'Scor siguranță vizualizat',
+    goalSelected: 'Obiectiv selectat',
+    firstRouteExplored: 'Primul traseu explorat',
+    accountCreated: 'Cont creat',
   },
 
   // ── Impact ──
@@ -173,10 +382,15 @@ export const ro: TranslationKeys = {
     equivalent: 'echivalent cu',
   },
 
-  // ── Streak ──
-  streak: {
-    dayStreak: 'Serie de {{count}} zile',
-    frozen: 'Înghețat',
-    keepItUp: 'Continuă tot așa!',
+  // ── FAQ ──
+  faq: {
+    title: 'Întrebări frecvente',
+    subtitle: 'Răspunsuri la întrebările comune',
+  },
+
+  // ── User Profile ──
+  userProfile: {
+    loading: 'Se încarcă...',
+    notFound: 'Utilizator negăsit',
   },
 } as const;

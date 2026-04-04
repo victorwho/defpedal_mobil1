@@ -10,26 +10,28 @@ import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { useCommunityStats } from '../src/hooks/useCommunityStats';
 import { handleTabPress } from '../src/lib/navigation-helpers';
+import { useT } from '../src/hooks/useTranslation';
 
 export default function CommunityScreen() {
+  const t = useT();
   const { stats, isLoading, error } = useCommunityStats();
 
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        <Screen title="Community" eyebrow="Defensive Pedal" subtitle="Connect with fellow cyclists">
+        <Screen title={t('communityScreen.title')} eyebrow={t('common.appName')} subtitle={t('communityScreen.subtitle')}>
           <CommunityStatsCard stats={stats} isLoading={isLoading} error={error} />
           <View style={styles.placeholder}>
-            <Text style={styles.placeholderText}>Cyclist Community Feed</Text>
+            <Text style={styles.placeholderText}>{t('communityScreen.feedTitle')}</Text>
             <Text style={styles.placeholderSub}>
-              See rides shared by cyclists in your area, give likes, and leave comments.
+              {t('communityScreen.feedSub')}
             </Text>
             <Button
               variant="primary"
               size="lg"
               onPress={() => router.push('/community-feed')}
             >
-              View Community Feed
+              {t('communityScreen.viewFeed')}
             </Button>
           </View>
         </Screen>

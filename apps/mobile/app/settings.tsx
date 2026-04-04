@@ -11,6 +11,7 @@ import { shadows } from '../src/design-system/tokens/shadows';
 import { textLg, textSm, textBase, fontFamily } from '../src/design-system/tokens/typography';
 import { mobileEnv } from '../src/lib/env';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useT } from '../src/hooks/useTranslation';
 
 export default function SettingsScreen() {
   const authCtx = useAuthSessionOptional();
@@ -19,11 +20,12 @@ export default function SettingsScreen() {
   const session = authCtx?.session ?? null;
   const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
   const { colors } = useTheme();
+  const t = useT();
 
   return (
     <Screen
-      title="Menu"
-      eyebrow="Control room"
+      title={t('settings.title')}
+      eyebrow={t('settings.subtitle')}
       subtitle="The native menu now mirrors the web app more closely: account first, then ride tools, diagnostics, and environment status."
     >
       {/* ── Account status card ── */}
@@ -43,20 +45,20 @@ export default function SettingsScreen() {
               { color: user ? colors.textInverse : colors.textPrimary },
             ]}
           >
-            {user ? 'Signed-in account' : 'Account'}
+            {user ? t('settings.signedInAccount') : t('settings.account')}
           </Text>
           <Badge variant={user ? 'accent' : 'neutral'} size="sm">
-            {user ? 'Active' : 'Offline'}
+            {user ? t('settings.active') : t('settings.offline')}
           </Badge>
         </View>
         <Text style={[textSm, { color: user ? colors.textInverse : colors.textSecondary }]}>
-          {user ? user.email ?? user.id : 'No active account session.'}
+          {user ? user.email ?? user.id : t('settings.noSession')}
         </Text>
         <Text style={[textSm, { color: user ? colors.textInverse : colors.textSecondary }]}>
-          Provider: {session?.provider ?? 'none'}
+          {t('settings.provider')} {session?.provider ?? 'none'}
         </Text>
         <Text style={[textSm, { color: user ? colors.textInverse : colors.textSecondary }]}>
-          Sync: {isConfigured ? 'Ready for trips, hazards, and feedback' : 'Local-only mode'}
+          {t('settings.sync')} {isConfigured ? t('settings.syncReady') : t('settings.offline')}
         </Text>
       </View>
 
@@ -66,8 +68,8 @@ export default function SettingsScreen() {
           <Pressable>
             <MenuItem
               icon="person-outline"
-              label="Account"
-              description="Sign in, create an account, or use the local developer bypass for validation."
+              label={t('settings.account')}
+              description={t('settings.accountSub')}
               rightAccessory={
                 <Badge variant={user ? 'accent' : 'neutral'} size="sm">
                   {user ? 'Manage' : 'Open'}
@@ -80,8 +82,8 @@ export default function SettingsScreen() {
           <Pressable>
             <MenuItem
               icon="map-outline"
-              label="Offline maps"
-              description="Download route packs and check whether the current ride is ready for no-signal use."
+              label={t('settings.offlineMaps')}
+              description={t('settings.offlineMapsSub')}
               rightAccessory={
                 <Badge variant="neutral" size="sm">
                   Maps
@@ -94,8 +96,8 @@ export default function SettingsScreen() {
           <Pressable>
             <MenuItem
               icon="pulse-outline"
-              label="Diagnostics"
-              description="Inspect queue health, API reachability, permissions, and background movement recovery."
+              label={t('settings.diagnostics')}
+              description={t('settings.diagnosticsSub')}
               rightAccessory={
                 <Badge variant="info" size="sm">
                   QA
@@ -108,8 +110,8 @@ export default function SettingsScreen() {
           <Pressable>
             <MenuItem
               icon="book-outline"
-              label="Welcome flow"
-              description="Replay the rider introduction and permission story with the updated native walkthrough."
+              label={t('settings.welcomeFlow')}
+              description={t('settings.welcomeFlowSub')}
               rightAccessory={
                 <Badge variant="neutral" size="sm">
                   Guide
@@ -132,10 +134,10 @@ export default function SettingsScreen() {
       >
         <Text style={[textLg, { color: colors.textPrimary }]}>App wiring</Text>
         <Text style={[textSm, { color: colors.textSecondary }]}>
-          Environment: {mobileEnv.appEnv}
+          {t('settings.environment')} {mobileEnv.appEnv}
         </Text>
         <Text style={[textSm, { color: colors.textSecondary }]}>
-          Variant: {mobileEnv.appVariant}
+          {t('settings.variant')} {mobileEnv.appVariant}
         </Text>
         <Text style={[textSm, { color: colors.textSecondary }]}>
           Mobile API URL: {mobileEnv.mobileApiUrl || 'Not set'}

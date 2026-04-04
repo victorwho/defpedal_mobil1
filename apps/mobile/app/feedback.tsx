@@ -35,6 +35,7 @@ import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+import { useT } from '../src/hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Star rating (preserved from original)
@@ -88,25 +89,28 @@ type ImpactStepProps = {
   readonly onContinue: () => void;
 };
 
-const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => (
-  <ScrollView
-    contentContainerStyle={styles.impactScrollContent}
-    showsVerticalScrollIndicator={false}
-  >
-    <Text style={styles.impactHeadline}>Great ride!</Text>
-    <Text style={styles.impactSubtext}>
-      Here is the positive impact of your trip.
-    </Text>
+const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => {
+  const t = useT();
+  return (
+    <ScrollView
+      contentContainerStyle={styles.impactScrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.impactHeadline}>{t('feedback.greatRide')}</Text>
+      <Text style={styles.impactSubtext}>
+        {t('feedback.positiveImpact')}
+      </Text>
 
-    <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} />
+      <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} />
 
-    <View style={styles.impactActions}>
-      <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
-        Continue
-      </Button>
-    </View>
-  </ScrollView>
-);
+      <View style={styles.impactActions}>
+        <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
+          {t('feedback.continue')}
+        </Button>
+      </View>
+    </ScrollView>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Step 2: Star rating + comment (preserved logic)
@@ -118,6 +122,7 @@ type RatingStepProps = {
 };
 
 const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
+  const t = useT();
   const { user } = useAuthSession();
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
@@ -176,15 +181,15 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
     return (
       <View style={styles.cardContainer}>
         <View style={styles.card}>
-          <Text style={styles.title}>Thank you!</Text>
+          <Text style={styles.title}>{t('feedback.thankYou')}</Text>
           <Text style={styles.subtitle}>
-            Your feedback makes the streets safer for everyone.
+            {t('feedback.thankYouSub')}
           </Text>
           <Pressable
             style={[styles.button, styles.doneButton]}
             onPress={onDone}
           >
-            <Text style={styles.doneButtonText}>Done</Text>
+            <Text style={styles.doneButtonText}>{t('common.done')}</Text>
           </Pressable>
         </View>
       </View>
@@ -198,20 +203,20 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
     >
       <View style={styles.cardContainer}>
         <View style={styles.card}>
-          <Text style={styles.title}>How safe was your trip?</Text>
+          <Text style={styles.title}>{t('feedback.howSafe')}</Text>
           <Text style={styles.subtitle}>
-            Your feedback helps improve future routes.
+            {t('feedback.safetyHelps')}
           </Text>
 
-          <Text style={styles.sectionLabel}>Perceived safety</Text>
+          <Text style={styles.sectionLabel}>{t('feedback.perceivedSafety')}</Text>
           <StarRow rating={rating} onSelect={setRating} />
 
-          <Text style={styles.sectionLabel}>Comments (optional)</Text>
+          <Text style={styles.sectionLabel}>{t('feedback.commentsOptional')}</Text>
           <TextInput
             style={styles.commentInput}
             multiline
             numberOfLines={4}
-            placeholder="Any comments about the route?"
+            placeholder={t('feedback.commentsPlaceholder')}
             placeholderTextColor="#9CA3AF"
             value={comments}
             onChangeText={setComments}
@@ -223,7 +228,7 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
               style={[styles.button, styles.cancelButton]}
               onPress={onCancel}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
             </Pressable>
 
             <Pressable
@@ -241,7 +246,7 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
                   submitDisabled && styles.submitButtonTextDisabled,
                 ]}
               >
-                Submit
+                {t('feedback.submit')}
               </Text>
             </Pressable>
           </View>
@@ -263,6 +268,7 @@ export default function FeedbackScreen() {
   });
   const authCtx = useAuthSessionOptional();
 
+  const t = useT();
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
   const activeTripClientId = useAppStore((s) => s.activeTripClientId);
   const tripServerIds = useAppStore((s) => s.tripServerIds);
@@ -430,7 +436,7 @@ export default function FeedbackScreen() {
         <Modal
           visible
           onClose={handleDismissMilestone}
-          title="You hit a milestone!"
+          title={t('feedback.milestone')}
           description={MILESTONE_CONFIGS[pendingMilestone].subtitle}
           footer={
             <View style={styles.milestoneFooter}>
@@ -440,14 +446,14 @@ export default function FeedbackScreen() {
                 fullWidth
                 onPress={() => void handleShareMilestone()}
               >
-                Share your achievement
+                {t('feedback.shareAchievement')}
               </Button>
               <Button
                 variant="ghost"
                 size="md"
                 onPress={handleDismissMilestone}
               >
-                Maybe later
+                {t('feedback.maybeLater')}
               </Button>
             </View>
           }
@@ -461,8 +467,8 @@ export default function FeedbackScreen() {
         <Modal
           visible
           onClose={handleSignupDismiss}
-          title="Save your progress"
-          description="Sign up to keep your streak, impact stats, and ride history across devices."
+          title={t('feedback.saveProgress')}
+          description={t('feedback.signUpKeepStreak')}
           footer={
             <View style={styles.signupPromptFooter}>
               <Pressable
@@ -479,10 +485,10 @@ export default function FeedbackScreen() {
                 <View style={styles.signupGoogleIcon}>
                   <Text style={styles.signupGoogleG}>G</Text>
                 </View>
-                <Text style={styles.signupGoogleLabel}>Continue with Google</Text>
+                <Text style={styles.signupGoogleLabel}>{t('feedback.continueGoogle')}</Text>
               </Pressable>
               <Button variant="ghost" size="md" onPress={handleSignupDismiss}>
-                Maybe later
+                {t('feedback.maybeLater')}
               </Button>
             </View>
           }

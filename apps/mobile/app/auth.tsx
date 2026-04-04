@@ -24,6 +24,7 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useT } from '../src/hooks/useTranslation';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
@@ -36,6 +37,7 @@ export default function AuthScreen() {
   const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
   const contextAuthError = authCtx?.authError ?? null;
 
+  const t = useT();
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +52,7 @@ export default function AuthScreen() {
   const submit = async () => {
     if (!authCtx) return;
     if (!email.trim() || !password) {
-      setErrorMessage('Enter both email and password.');
+      setErrorMessage(t('auth.enterBoth'));
       return;
     }
 
@@ -72,11 +74,11 @@ export default function AuthScreen() {
 
       setStatusMessage(
         mode === 'sign-in'
-          ? 'Signed in successfully.'
-          : 'Account created. Check your email if confirmation is required.',
+          ? t('auth.signedInSuccess')
+          : t('auth.accountCreated'),
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Authentication failed.');
+      setErrorMessage(error instanceof Error ? error.message : t('auth.authFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -91,10 +93,10 @@ export default function AuthScreen() {
     try {
       const result = await authCtx.signInWithDeveloperBypass();
       setStatusMessage(
-        `Developer session enabled for ${result.user.email ?? result.user.id}.`,
+        `${t('auth.devSession')} ${result.user.email ?? result.user.id}.`,
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Developer sign-in failed.');
+      setErrorMessage(error instanceof Error ? error.message : t('auth.devSignInFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -146,7 +148,7 @@ export default function AuthScreen() {
         >
           <Ionicons name="close" size={24} color={darkTheme.textPrimary} />
         </Pressable>
-        <Text style={styles.headerTitle}>Account</Text>
+        <Text style={styles.headerTitle}>{t('settings.account')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -160,7 +162,7 @@ export default function AuthScreen() {
           <View style={styles.avatarCircle}>
             <BrandLogo size={64} />
           </View>
-          <Text style={styles.brandName}>Defensive Pedal</Text>
+          <Text style={styles.brandName}>{t('common.appName')}</Text>
         </View>
 
         {/* ── Signed-in state ── */}
@@ -182,7 +184,7 @@ export default function AuthScreen() {
                 fullWidth
                 onPress={() => void handleSignOut()}
               >
-                Sign out
+                {t('profile.signOut')}
               </Button>
             </View>
 
@@ -214,7 +216,7 @@ export default function AuthScreen() {
                     mode === 'sign-in' && styles.segmentLabelActive,
                   ]}
                 >
-                  Log in
+                  {t('auth.signIn')}
                 </Text>
               </Pressable>
               <Pressable
@@ -236,7 +238,7 @@ export default function AuthScreen() {
                     mode === 'sign-up' && styles.segmentLabelActive,
                   ]}
                 >
-                  Sign up
+                  {t('auth.signUp')}
                 </Text>
               </Pressable>
             </View>
@@ -266,7 +268,7 @@ export default function AuthScreen() {
               <View style={styles.googleIconWrap}>
                 <Text style={styles.googleG}>G</Text>
               </View>
-              <Text style={styles.googleLabel}>Continue with Google</Text>
+              <Text style={styles.googleLabel}>{t('feedback.continueGoogle')}</Text>
             </Pressable>
 
             {/* Divider */}
@@ -279,7 +281,7 @@ export default function AuthScreen() {
             {/* Email field */}
             <View style={styles.fieldStack}>
               <TextInput
-                label="Email"
+                label={t('auth.email')}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -292,7 +294,7 @@ export default function AuthScreen() {
                 }
               />
               <TextInput
-                label="Password"
+                label={t('auth.password')}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -321,7 +323,7 @@ export default function AuthScreen() {
               loading={isSubmitting}
               onPress={() => void submit()}
             >
-              {mode === 'sign-in' ? 'Sign in with email' : 'Create account'}
+              {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
             </Button>
 
             {/* Mode toggle text */}
@@ -337,7 +339,7 @@ export default function AuthScreen() {
                 }}
               >
                 <Text style={styles.toggleLink}>
-                  {mode === 'sign-in' ? 'Sign up' : 'Log in'}
+                  {mode === 'sign-in' ? t('auth.signUp') : t('auth.signIn')}
                 </Text>
               </Pressable>
             </View>

@@ -12,6 +12,13 @@ export const en = {
     retry: 'Retry',
     guest: 'Guest',
     signedIn: 'Signed in',
+    yes: 'Yes',
+    no: 'No',
+    km: 'km',
+    mAhead: '{{distance}} m ahead',
+    mAway: '{{distance}} m',
+    confirmed_one: '{{count}} person confirmed',
+    confirmed_other: '{{count}} people confirmed',
   },
 
   // ── Tabs ──
@@ -42,6 +49,15 @@ export const en = {
     riskDistribution: 'Risk distribution',
     elevationProfile: 'Elevation profile',
     routeComparison: 'Route comparison',
+    previewLoading: 'Preview loading',
+    previewFailed: 'Preview failed',
+    noRoutes: 'No routes available',
+    noRouteSelected: 'No route selected',
+    backToPlanning: 'Back to planning',
+    retryPreview: 'Retry preview',
+    coverage: 'Coverage:',
+    coveragePending: 'Coverage pending',
+    routeName: 'Route name (e.g. Morning commute)',
   },
 
   // ── Navigation ──
@@ -53,7 +69,15 @@ export const en = {
     endRide: 'End ride',
     recenter: 'Recenter',
     offRoute: 'You are off route',
-    rerouting: 'Rerouting...',
+    offRouteCountdown: 'Off route. Automatic reroute will fire in {{seconds}}s.',
+    offRouteReady: 'Off route. Manual reroute is ready.',
+    rerouting: 'Requesting a new route from the rider\u2019s live GPS position.',
+    rerouteNow: 'Reroute now',
+    retryGps: 'Retry GPS',
+    gpsLive: 'GPS live',
+    syncOn: 'Sync on',
+    anonymousRide: 'Anonymous ride',
+    step: 'Step {{current}}/{{total}}',
   },
 
   // ── Feedback ──
@@ -62,6 +86,22 @@ export const en = {
     subtitle: 'Your feedback helps us improve routes',
     submit: 'Submit feedback',
     skip: 'Skip',
+    greatRide: 'Great ride!',
+    positiveImpact: 'Here is the positive impact of your trip.',
+    continue: 'Continue',
+    howSafe: 'How safe was your trip?',
+    safetyHelps: 'Your feedback helps improve future routes.',
+    perceivedSafety: 'Perceived safety',
+    commentsOptional: 'Comments (optional)',
+    commentsPlaceholder: 'Any comments about the route?',
+    thankYou: 'Thank you!',
+    thankYouSub: 'Your feedback makes the streets safer for everyone.',
+    milestone: 'You hit a milestone!',
+    shareAchievement: 'Share your achievement',
+    maybeLater: 'Maybe later',
+    saveProgress: 'Save your progress',
+    signUpKeepStreak: 'Sign up to keep your streak and track your impact.',
+    continueGoogle: 'Continue with Google',
   },
 
   // ── Profile ──
@@ -76,8 +116,6 @@ export const en = {
     minChars: 'Min 3 characters',
     usernameTaken: 'Username taken',
     language: 'Language',
-
-    // Sections
     aboutYou: 'About you',
     bikeType: 'Type of bike',
     cyclingFrequency: 'How often do you cycle?',
@@ -102,22 +140,47 @@ export const en = {
   // ── History ──
   history: {
     title: 'History',
-    subtitle: 'Your rides and impact',
+    eyebrow: 'Defensive Pedal',
+    subtitle: 'Your cycling journey',
     noTrips: 'No trips yet',
+    yourImpact: 'Your Impact',
+    trips: 'Trips',
+    cycled: 'Cycled',
     totalRides: 'Total rides',
     totalDistance: 'Total distance',
     totalDuration: 'Total duration',
-    co2Saved: 'CO2 saved',
-    eurSaved: 'EUR saved',
+    co2Saved: 'CO2 Saved',
+    eurSaved: 'EUR Saved',
+    hazards: 'Hazards',
+    protected: 'Protected',
     currentStreak: 'Current streak',
     longestStreak: 'Longest streak',
     exportGpx: 'Export GPX',
+    viewTrips: 'View My Trips',
+    dailyQuiz: 'Daily Safety Quiz',
+    dailyQuizSub: 'Test your cycling knowledge',
+  },
+
+  // ── Trips ──
+  tripsScreen: {
+    title: 'History',
+    subtitle: 'My Trips',
+    loading: 'Loading your rides\u2026',
+    loadFailed: 'Failed to load trips. Please try again.',
+    noRides: 'No rides yet',
+    noRidesSub: 'Complete a ride and your trip history will appear here.',
+    completed: 'Completed',
+    stopped: 'Stopped',
+    appKilled: 'App closed',
   },
 
   // ── Community ──
   communityScreen: {
     title: 'Community',
-    subtitle: 'Nearby cyclists',
+    subtitle: 'Connect with fellow cyclists',
+    feedTitle: 'Cyclist Community Feed',
+    feedSub: 'See rides shared by cyclists in your area.',
+    viewFeed: 'View Community Feed',
     feed: 'Feed',
     noActivity: 'No activity nearby',
     like: 'Like',
@@ -126,6 +189,35 @@ export const en = {
     follow: 'Follow',
     unfollow: 'Unfollow',
     shareRide: 'Share ride',
+    locationNeeded: 'Location access needed',
+    locationFailed: 'Unable to get location',
+    locationPrompt: 'Enable location permission to see rides near you.',
+    gettingLocation: 'Getting your location...',
+    grantLocation: 'Grant Location Access',
+    tryAgain: 'Try Again',
+    noRidesNearby: 'No rides shared nearby yet',
+    beFirst: 'Complete a ride and be the first to share!',
+  },
+
+  // ── Community Stats ──
+  communityStats: {
+    loading: 'Loading community stats...',
+    title: 'Your cycling community',
+    cyclistsIn: 'Cyclists in',
+    totalRides: 'Total rides',
+    distance: 'Distance',
+    rideTime: 'Ride time',
+    co2Saved: 'CO2 saved',
+    activeRider_one: 'active rider',
+    activeRider_other: 'active riders',
+  },
+
+  // ── Feed Card ──
+  feedCard: {
+    now: 'now',
+    minsAgo: '{{count}}m ago',
+    hoursAgo: '{{count}}h ago',
+    daysAgo: '{{count}}d ago',
   },
 
   // ── Hazard Reporting ──
@@ -143,12 +235,109 @@ export const en = {
     deny: 'Gone',
   },
 
+  // ── Search ──
+  search: {
+    searching: 'Searching places\u2026',
+    noMatches: 'No matches yet. Keep typing or try a nearby landmark.',
+  },
+
   // ── Weather ──
   weather: {
     feelsLike: 'Feels like',
     wind: 'Wind',
     aqi: 'AQI',
     precipitation: 'Precipitation',
+    loadingWeather: 'Loading weather...',
+  },
+
+  // ── Stats Dashboard ──
+  stats: {
+    week: 'Week',
+    month: 'Month',
+    allTime: 'All Time',
+    trips: 'Trips',
+    distance: 'Distance',
+    duration: 'Duration',
+    co2Saved: 'CO2 Saved',
+    avgSpeed: 'Avg Speed',
+  },
+
+  // ── Streak ──
+  streak: {
+    dayStreak: '{{count}}-day streak',
+    frozen: 'Frozen',
+    freezeReady: 'Freeze ready',
+    freezeUsed: 'Freeze used',
+    keepItUp: 'Keep it up!',
+    startChain: 'Start your chain today!',
+    longest: 'Longest:',
+  },
+
+  // ── Guardian Tiers ──
+  guardian: {
+    reporter: 'Reporter',
+    watchdog: 'Watchdog',
+    sentinel: 'Sentinel',
+    guardianAngel: 'Guardian Angel',
+    maxTier: 'Maximum tier reached!',
+  },
+
+  // ── Auth ──
+  auth: {
+    signIn: 'Sign in',
+    signUp: 'Sign up',
+    email: 'Email',
+    password: 'Password',
+    submit: 'Submit',
+    enterBoth: 'Enter both email and password.',
+    signedInSuccess: 'Signed in successfully.',
+    accountCreated: 'Account created. Check your email if confirmation is required.',
+    authFailed: 'Authentication failed.',
+    devSession: 'Developer session enabled for',
+    devSignInFailed: 'Developer sign-in failed.',
+  },
+
+  // ── Settings ──
+  settings: {
+    title: 'Menu',
+    subtitle: 'Control room',
+    signedInAccount: 'Signed-in account',
+    active: 'Active',
+    offline: 'Local-only mode',
+    noSession: 'No active account session.',
+    provider: 'Provider:',
+    sync: 'Sync:',
+    syncReady: 'Ready for trips, hazards, and feedback',
+    account: 'Account',
+    accountSub: 'Sign in, create an account, or sign out',
+    offlineMaps: 'Offline maps',
+    offlineMapsSub: 'Download route packs for offline use',
+    diagnostics: 'Diagnostics',
+    diagnosticsSub: 'Check app wiring and service status',
+    welcomeFlow: 'Welcome flow',
+    welcomeFlowSub: 'Restart the onboarding experience',
+    environment: 'Environment:',
+    variant: 'Variant:',
+  },
+
+  // ── Diagnostics ──
+  diag: {
+    title: 'Diagnostics',
+    subtitle: 'App health and connectivity',
+    checking: 'Checking...',
+    passed: 'Passed',
+    failed: 'Failed',
+    timeout: 'Timed out',
+  },
+
+  // ── Offline Maps ──
+  offlineMaps: {
+    title: 'Offline Maps',
+    subtitle: 'Download maps for offline use',
+    download: 'Download',
+    downloading: 'Downloading...',
+    downloaded: 'Downloaded',
+    delete: 'Delete',
   },
 
   // ── Onboarding ──
@@ -160,6 +349,26 @@ export const en = {
     createAccount: 'Create account',
     skip: 'Skip for now',
     getStarted: 'Get started',
+    oneMoreThing: 'One more thing',
+    chooseUsername: 'Choose a username',
+    usernameSub: 'This is how other cyclists will see you.',
+    usernamePlaceholder: 'your_username',
+    whatBringsYou: 'What brings you here?',
+    personalizeHelp: 'This helps us personalize your experience.',
+    commuteSafely: 'Commute safely',
+    commuteSafelySub: 'Find the safest route to work and back.',
+    exploreRoutes: 'Explore new routes',
+    exploreRoutesSub: 'Discover safe cycling paths in your area.',
+    startCycling: 'Start cycling (I\u2019m nervous)',
+    startCyclingSub: 'Get comfortable with safety guidance.',
+    skipStep: 'Skip this step',
+    findingDestinations: 'Finding nearby destinations...',
+    planFirstRoute: 'Plan your first route',
+    locationEnabled: 'Location enabled',
+    safetyScoreViewed: 'Safety score viewed',
+    goalSelected: 'Goal selected',
+    firstRouteExplored: 'First route explored',
+    accountCreated: 'Account created',
   },
 
   // ── Impact ──
@@ -171,11 +380,16 @@ export const en = {
     equivalent: 'equivalent to',
   },
 
-  // ── Streak ──
-  streak: {
-    dayStreak: '{{count}}-day streak',
-    frozen: 'Frozen',
-    keepItUp: 'Keep it up!',
+  // ── FAQ ──
+  faq: {
+    title: 'FAQ',
+    subtitle: 'Frequently asked questions',
+  },
+
+  // ── User Profile ──
+  userProfile: {
+    loading: 'Loading...',
+    notFound: 'User not found',
   },
 } as const;
 

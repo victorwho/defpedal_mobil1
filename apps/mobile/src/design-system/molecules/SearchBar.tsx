@@ -18,6 +18,7 @@ import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { fontFamily } from '../tokens/typography';
 import { textSm, textXs, textBase, textLg } from '../tokens/typography';
+import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -141,6 +142,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSelectSuggestion,
 }) => {
   const { colors } = useTheme();
+  const t = useT();
   const showSuggestions =
     active && (isLoading || Boolean(errorMessage) || suggestions.length > 0);
 
@@ -217,7 +219,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             <View style={styles.helperRow}>
               <Spinner size={16} />
               <Text style={[textSm, { color: colors.textSecondary }]}>
-                Searching places…
+                {t('search.searching')}
               </Text>
             </View>
           ) : null}
@@ -230,7 +232,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {!isLoading && !errorMessage && suggestions.length === 0 ? (
             <Text style={[textSm, { color: colors.textSecondary }]}>
-              No matches yet. Keep typing or try a nearby landmark.
+              {t('search.noMatches')}
             </Text>
           ) : null}
 

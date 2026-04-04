@@ -14,9 +14,11 @@ import { fontFamily, textBase, text3xl, textXs } from '../src/design-system/toke
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
+import { useT } from '../src/hooks/useTranslation';
 
 export default function TripsScreen() {
   const { user } = useAuthSession();
+  const t = useT();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: trips, isLoading, error } = useQuery({
@@ -47,27 +49,27 @@ export default function TripsScreen() {
         <View style={styles.header}>
           <View style={styles.headerRow}>
             <Button variant="secondary" size="sm" onPress={() => router.replace('/history')}>
-              ← History
+              ← {t('tripsScreen.title')}
             </Button>
           </View>
-          <Text style={styles.eyebrow}>DEFENSIVE PEDAL</Text>
-          <Text style={styles.title}>My Trips</Text>
+          <Text style={styles.eyebrow}>{t('history.eyebrow').toUpperCase()}</Text>
+          <Text style={styles.title}>{t('tripsScreen.subtitle')}</Text>
         </View>
 
         {isLoading ? (
           <View style={styles.center}>
             <ActivityIndicator size="large" color={brandColors.accent} />
-            <Text style={styles.loadingText}>Loading your rides…</Text>
+            <Text style={styles.loadingText}>{t('tripsScreen.loading')}</Text>
           </View>
         ) : error ? (
           <View style={styles.center}>
-            <Text style={styles.errorText}>Failed to load trips. Please try again.</Text>
+            <Text style={styles.errorText}>{t('tripsScreen.loadFailed')}</Text>
           </View>
         ) : !trips?.length ? (
           <View style={styles.center}>
-            <Text style={styles.emptyTitle}>No rides yet</Text>
+            <Text style={styles.emptyTitle}>{t('tripsScreen.noRides')}</Text>
             <Text style={styles.emptyText}>
-              Complete a ride and your trip history will appear here.
+              {t('tripsScreen.noRidesSub')}
             </Text>
           </View>
         ) : (

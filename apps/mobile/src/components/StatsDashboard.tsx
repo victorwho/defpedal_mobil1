@@ -21,6 +21,7 @@ import {
 import { space } from '../design-system/tokens/spacing';
 import { radii } from '../design-system/tokens/radii';
 import { useStatsDashboard, type StatsPeriod } from '../hooks/useStatsDashboard';
+import { useT } from '../hooks/useTranslation';
 
 // ── Skeleton Placeholder ──
 
@@ -87,11 +88,13 @@ function SkeletonModeSplit() {
 
 // ── Period Selector ──
 
-const PERIODS: readonly { readonly key: StatsPeriod; readonly label: string }[] = [
-  { key: 'week', label: 'Week' },
-  { key: 'month', label: 'Month' },
-  { key: 'all', label: 'All Time' },
-] as const;
+const PERIOD_KEYS: readonly StatsPeriod[] = ['week', 'month', 'all'] as const;
+
+const PERIOD_LABEL_KEYS: Record<StatsPeriod, string> = {
+  week: 'stats.week',
+  month: 'stats.month',
+  all: 'stats.allTime',
+};
 
 type PeriodSelectorProps = {
   readonly selected: StatsPeriod;
@@ -99,9 +102,10 @@ type PeriodSelectorProps = {
 };
 
 function PeriodSelector({ selected, onSelect }: PeriodSelectorProps) {
+  const t = useT();
   return (
     <View style={styles.periodRow}>
-      {PERIODS.map(({ key, label }) => {
+      {PERIOD_KEYS.map((key) => {
         const isActive = selected === key;
         return (
           <Pressable
@@ -115,7 +119,7 @@ function PeriodSelector({ selected, onSelect }: PeriodSelectorProps) {
                 isActive && styles.periodChipTextActive,
               ]}
             >
-              {label}
+              {t(PERIOD_LABEL_KEYS[key])}
             </Text>
           </Pressable>
         );
@@ -369,6 +373,7 @@ function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
 // ── Composite Dashboard Component ──
 
 function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly dashboard: TripStatsDashboard; readonly period: StatsPeriod; readonly hazardsReported?: number }) {
+  const t = useT();
   const buckets = period === 'all' ? dashboard.monthly : dashboard.weekly;
 
   return (
@@ -377,37 +382,37 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
         <SummaryCard
           icon="bicycle-outline"
           iconColor={brandColors.accent}
-          label="Rides"
+          label={t('stats.trips')}
           value={String(dashboard.totals.totalTrips)}
         />
         <SummaryCard
           icon="speedometer-outline"
           iconColor={safetyColors.info}
-          label="Distance"
+          label={t('stats.distance')}
           value={formatDistance(dashboard.totals.totalDistanceMeters)}
         />
         <SummaryCard
           icon="time-outline"
           iconColor={safetyColors.caution}
-          label="Duration"
+          label={t('stats.duration')}
           value={formatDuration(dashboard.totals.totalDurationSeconds)}
         />
         <SummaryCard
           icon="leaf-outline"
           iconColor={safetyColors.safe}
-          label="CO2 Saved"
+          label={t('stats.co2Saved')}
           value={formatCo2Saved(dashboard.totals.totalCo2SavedKg)}
         />
         <SummaryCard
           icon="cash-outline"
           iconColor={brandColors.accent}
-          label="EUR Saved"
+          label={t('history.eurSaved')}
           value={`€${(dashboard.totals.totalDistanceMeters / 1000 * 0.35).toFixed(0)}`}
         />
         <SummaryCard
           icon="warning-outline"
           iconColor={safetyColors.caution}
-          label="Hazards"
+          label={t('history.hazards')}
           value={String(hazardsReported)}
         />
       </View>

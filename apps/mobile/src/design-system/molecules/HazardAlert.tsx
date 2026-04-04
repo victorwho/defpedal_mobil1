@@ -7,6 +7,7 @@ import { brandColors, gray, safetyColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
+import { useT } from '../../hooks/useTranslation';
 
 const HAZARD_ICONS: Record<HazardType, string> = {
   illegally_parked_car: 'car-outline',
@@ -37,12 +38,13 @@ export const HazardAlert = ({
   onConfirm,
   onDeny,
 }: HazardAlertProps) => {
+  const t = useT();
   const iconName = HAZARD_ICONS[hazard.hazardType] ?? 'warning-outline';
   const label = getHazardLabel(hazard.hazardType);
   const distanceText =
     distanceMeters < 100
-      ? `${Math.round(distanceMeters)} m ahead`
-      : `${Math.round(distanceMeters)} m`;
+      ? t('common.mAhead', { distance: Math.round(distanceMeters) })
+      : t('common.mAway', { distance: Math.round(distanceMeters) });
 
   return (
     <View style={styles.container}>
@@ -55,20 +57,20 @@ export const HazardAlert = ({
       </View>
 
       <View style={styles.promptRow}>
-        <Text style={styles.promptText}>Still there?</Text>
+        <Text style={styles.promptText}>{t('hazard.stillThere')}</Text>
         <View style={styles.buttons}>
           <Pressable style={styles.yesButton} onPress={onConfirm}>
-            <Text style={styles.yesText}>Yes</Text>
+            <Text style={styles.yesText}>{t('common.yes')}</Text>
           </Pressable>
           <Pressable style={styles.noButton} onPress={onDeny}>
-            <Text style={styles.noText}>No</Text>
+            <Text style={styles.noText}>{t('common.no')}</Text>
           </Pressable>
         </View>
       </View>
 
       {hazard.confirmCount > 0 ? (
         <Text style={styles.confirmCount}>
-          {hazard.confirmCount} {hazard.confirmCount === 1 ? 'person' : 'people'} confirmed
+          {t(hazard.confirmCount === 1 ? 'common.confirmed_one' : 'common.confirmed_other', { count: hazard.confirmCount })}
         </Text>
       ) : null}
     </View>

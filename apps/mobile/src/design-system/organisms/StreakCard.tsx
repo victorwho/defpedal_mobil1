@@ -14,6 +14,7 @@ import { space } from '../tokens/spacing';
 import { fontFamily, textDataLg, textSm, textXs } from '../tokens/typography';
 
 import { StreakChain } from './StreakChain';
+import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -24,12 +25,13 @@ export interface StreakCardProps {
 }
 
 export const StreakCard = ({ streakState }: StreakCardProps) => {
+  const t = useT();
   const hasStreak = streakState.currentStreak > 0;
 
   const freezeLabel = streakState.freezeAvailable
-    ? 'Freeze ready'
+    ? t('streak.freezeReady')
     : streakState.freezeUsedDate
-      ? 'Freeze used'
+      ? t('streak.freezeUsed')
       : null;
 
   return (
@@ -39,7 +41,7 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
         <View style={styles.streakNumberSection}>
           <Text style={styles.flameIcon}>~</Text>
           <Text style={styles.streakNumber}>{streakState.currentStreak}</Text>
-          <Text style={styles.streakUnit}>day streak</Text>
+          <Text style={styles.streakUnit}>{t('streak.dayStreak', { count: streakState.currentStreak })}</Text>
         </View>
       </View>
 
@@ -51,13 +53,13 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
           scrollable={false}
         />
       ) : (
-        <Text style={styles.encouragement}>Start your chain today!</Text>
+        <Text style={styles.encouragement}>{t('streak.startChain')}</Text>
       )}
 
       {/* Bottom row: longest + freeze status */}
       <View style={styles.bottomRow}>
         <Text style={styles.longestText}>
-          Longest: {streakState.longestStreak}d
+          {t('streak.longest')} {streakState.longestStreak}d
         </Text>
         {freezeLabel ? (
           <View style={[

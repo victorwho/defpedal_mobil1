@@ -21,6 +21,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
+import { useT } from '../src/hooks/useTranslation';
 import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
@@ -86,6 +87,8 @@ export default function NavigationScreen() {
   const activeTripClientId = useAppStore((state) => state.activeTripClientId);
   const queuedMutations = useAppStore((state) => state.queuedMutations);
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
+
+  const t = useT();
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
@@ -520,7 +523,7 @@ export default function NavigationScreen() {
         route_id: selectedRoute.id,
         session_id: navigationSession?.sessionId ?? 'unknown',
       });
-      speak('You have arrived at your destination.');
+      speak(t('nav.arrived'));
       finishNavigation();
       router.replace('/feedback');
     }
@@ -551,7 +554,7 @@ export default function NavigationScreen() {
 
       const mins = Math.round(remaining / 60);
       if (mins < 1) return;
-      speak(mins === 1 ? 'About 1 minute remaining.' : `About ${mins} minutes remaining.`);
+      speak(mins === 1 ? t('nav.minutesRemaining_one') : t('nav.minutesRemaining_other', { count: mins }));
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
@@ -611,10 +614,10 @@ export default function NavigationScreen() {
 
   const gpsChipLabel =
     locationState.permissionStatus === 'granted'
-      ? 'GPS live'
+      ? t('nav.gpsLive')
       : `GPS ${locationState.permissionStatus}`;
-  const syncChipLabel = user ? `Sync on \u00b7 ${pendingQueueCount}` : 'Anonymous ride';
-  const progressChipLabel = `Step ${navigationSession.currentStepIndex + 1}/${Math.max(totalSteps, 1)}`;
+  const syncChipLabel = user ? `${t('nav.syncOn')} \u00b7 ${pendingQueueCount}` : t('nav.anonymousRide');
+  const progressChipLabel = t('nav.step', { current: navigationSession.currentStepIndex + 1, total: Math.max(totalSteps, 1) });
   const bgChipLabel = `BG ${backgroundSnapshot.status.status}`;
 
   const warningMessage = locationState.error
@@ -623,19 +626,19 @@ export default function NavigationScreen() {
       ? rerouteMutation.error.message
       : navigationSession.rerouteEligible
         ? rerouteMutation.isPending
-          ? 'Requesting a new route from the rider\u2019s live GPS position.'
+          ? t('nav.rerouting')
           : offRouteCountdownSeconds !== null && offRouteCountdownSeconds > 0
-            ? `Off route. Automatic reroute will fire in ${offRouteCountdownSeconds}s.`
-            : 'Off route. Manual reroute is ready.'
+            ? t('nav.offRouteCountdown', { seconds: offRouteCountdownSeconds })
+            : t('nav.offRouteReady')
         : null;
 
   const warningAction = locationState.error
-    ? { label: 'Retry GPS', handler: () => void locationState.refreshLocation() }
+    ? { label: t('nav.retryGps'), handler: () => void locationState.refreshLocation() }
     : navigationSession.rerouteEligible &&
         !rerouteMutation.isPending &&
         mobileEnv.mobileApiUrl &&
         locationState.sample
-      ? { label: 'Reroute now', handler: () => rerouteMutation.mutate(locationState.sample!.coordinate) }
+      ? { label: t('nav.rerouteNow'), handler: () => rerouteMutation.mutate(locationState.sample!.coordinate) }
       : null;
 
   if (!guardPassed) return null;
@@ -791,7 +794,7 @@ export default function NavigationScreen() {
                 finishNavigation();
                 router.push('/feedback');
               }}
-              accessibilityLabel="End ride"
+              accessibilityLabel={t('nav.endRide')}
               variant="secondary"
             />
           </View>

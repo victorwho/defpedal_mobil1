@@ -21,8 +21,10 @@ import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useFeedQuery, useLikeToggle, useLoveToggle } from '../src/hooks/useFeed';
 import { mobileTheme } from '../src/lib/theme';
+import { useT } from '../src/hooks/useTranslation';
 
 export default function CommunityFeedScreen() {
+  const t = useT();
   const {
     location: currentLocation,
     permissionStatus,
@@ -106,31 +108,31 @@ export default function CommunityFeedScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.headerBar}>
-          <Text style={styles.headerEyebrow}>Community</Text>
-          <Text style={styles.headerTitle}>Nearby Rides</Text>
+          <Text style={styles.headerEyebrow}>{t('communityScreen.title')}</Text>
+          <Text style={styles.headerTitle}>{t('communityScreen.feed')}</Text>
         </View>
         <View style={styles.centered}>
           {hasError ? (
             <>
               <Ionicons name="location-outline" size={48} color={mobileTheme.colors.brand} />
               <Text style={styles.emptyTitle}>
-                {isDenied ? 'Location access needed' : 'Unable to get location'}
+                {isDenied ? t('communityScreen.locationNeeded') : t('communityScreen.locationFailed')}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {isDenied
-                  ? 'Enable location permission to see rides shared by cyclists near you.'
-                  : locationError ?? 'Something went wrong resolving your location.'}
+                  ? t('communityScreen.locationPrompt')
+                  : locationError ?? t('communityScreen.locationFailed')}
               </Text>
               <Pressable style={styles.retryButton} onPress={() => void refreshLocation()}>
                 <Text style={styles.retryButtonText}>
-                  {isDenied ? 'Grant Location Access' : 'Try Again'}
+                  {isDenied ? t('communityScreen.grantLocation') : t('communityScreen.tryAgain')}
                 </Text>
               </Pressable>
             </>
           ) : (
             <>
               <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
-              <Text style={styles.loadingText}>Getting your location...</Text>
+              <Text style={styles.loadingText}>{t('communityScreen.gettingLocation')}</Text>
             </>
           )}
         </View>
@@ -142,8 +144,8 @@ export default function CommunityFeedScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.headerBar}>
-        <Text style={styles.headerEyebrow}>Community</Text>
-        <Text style={styles.headerTitle}>Nearby Rides</Text>
+        <Text style={styles.headerEyebrow}>{t('communityScreen.title')}</Text>
+        <Text style={styles.headerTitle}>{t('communityScreen.feed')}</Text>
       </View>
 
       <FlatList
@@ -169,9 +171,9 @@ export default function CommunityFeedScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No rides shared nearby yet</Text>
+              <Text style={styles.emptyTitle}>{t('communityScreen.noRidesNearby')}</Text>
               <Text style={styles.emptySubtitle}>
-                Complete a ride and be the first to share a safe route in your area!
+                {t('communityScreen.beFirst')}
               </Text>
             </View>
           )

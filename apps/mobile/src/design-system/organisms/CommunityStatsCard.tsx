@@ -12,6 +12,7 @@ import {
   textLg,
   textDataMd,
 } from '../tokens/typography';
+import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,11 +72,13 @@ export const CommunityStatsCard = ({
   isLoading,
   error,
 }: CommunityStatsCardProps) => {
+  const t = useT();
+
   if (isLoading) {
     return (
       <View style={styles.card}>
         <ActivityIndicator color={brandColors.accent} size="small" />
-        <Text style={styles.loadingText}>Loading community stats...</Text>
+        <Text style={styles.loadingText}>{t('communityStats.loading')}</Text>
       </View>
     );
   }
@@ -93,8 +96,8 @@ export const CommunityStatsCard = ({
   }
 
   const heading = stats.localityName
-    ? `Cyclists in ${stats.localityName}`
-    : 'Your cycling community';
+    ? `${t('communityStats.cyclistsIn')} ${stats.localityName}`
+    : t('communityStats.title');
 
   return (
     <View style={styles.card}>
@@ -103,30 +106,30 @@ export const CommunityStatsCard = ({
       <View style={styles.grid}>
         <StatTile
           value={String(stats.totalTrips)}
-          unit="trips"
-          label="Total rides"
+          unit={t('history.trips').toLowerCase()}
+          label={t('communityStats.totalRides')}
         />
         <StatTile
           value={formatDistance(stats.totalDistanceMeters)}
-          unit="km"
-          label="Distance"
+          unit={t('common.km')}
+          label={t('communityStats.distance')}
         />
         <StatTile
           value={formatDuration(stats.totalDurationSeconds)}
           unit="hrs"
-          label="Ride time"
+          label={t('communityStats.rideTime')}
         />
         <StatTile
           value={formatCo2(stats.totalCo2SavedKg)}
           unit="kg"
-          label="CO2 saved"
+          label={t('communityStats.co2Saved')}
         />
       </View>
 
       <View style={styles.riderRow}>
         <Text style={styles.riderCount}>{stats.uniqueRiders}</Text>
         <Text style={styles.riderLabel}>
-          {stats.uniqueRiders === 1 ? 'active rider' : 'active riders'}
+          {t(stats.uniqueRiders === 1 ? 'communityStats.activeRider_one' : 'communityStats.activeRider_other')}
         </Text>
       </View>
     </View>
