@@ -3,7 +3,7 @@ import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -117,7 +117,7 @@ export default function RoutePlanningScreen() {
   const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
   const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
-  const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string; coordinate?: Coordinate; hazardType?: string } | null>(null);
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
 
   // Collapsible UI — tap map to toggle FABs, weather, bottom nav
@@ -125,8 +125,28 @@ export default function RoutePlanningScreen() {
   const uiOpacity = useRef(new Animated.Value(1)).current;
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
+  const showHistoryOverlay = useAppStore((state) => state.showHistoryOverlay);
+  const setShowHistoryOverlay = useAppStore((state) => state.setShowHistoryOverlay);
   const { user } = useAuthSession();
   const t = useT();
+
+  // History overlay — past ride GPS trails on the map
+  const historyQuery = useQuery({
+    queryKey: ['trip-history'],
+    queryFn: () => mobileApi.getTripHistory(),
+    enabled: Boolean(user) && showHistoryOverlay,
+    staleTime: 300_000,
+  });
+
+  const historyTrails = useMemo(() => {
+    if (!showHistoryOverlay || !historyQuery.data) return undefined;
+    return historyQuery.data
+      .filter((trip) => trip.gpsBreadcrumbs.length >= 2)
+      .map((trip) => ({
+        coordinates: trip.gpsBreadcrumbs.map((b) => [b.lon, b.lat] as [number, number]),
+        mode: trip.routingMode,
+      }));
+  }, [showHistoryOverlay, historyQuery.data]);
 
   // Saved routes — show when destination is empty and user is signed in
   const savedRoutesQuery = useQuery({
@@ -189,8 +209,8 @@ export default function RoutePlanningScreen() {
       });
       setPendingHazardCoordinate(null);
       setHazardPickerOpen(false);
-      setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
-      setTimeout(() => setHazardToast(null), 3000);
+      setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: pendingHazardCoordinate, hazardType });
+      setTimeout(() => setHazardToast(null), 5000);
       return;
     }
 
@@ -212,8 +232,8 @@ export default function RoutePlanningScreen() {
 
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
-    setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
-    setTimeout(() => setHazardToast(null), 3000);
+    setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
+    setTimeout(() => setHazardToast(null), 5000);
   };
 
   const toggleHazardMode = () => {
@@ -484,6 +504,7 @@ export default function RoutePlanningScreen() {
           onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
           onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
+          historyTrails={historyTrails}
         />
       }
       topOverlay={
@@ -828,6 +849,16 @@ export default function RoutePlanningScreen() {
           >
             <Ionicons name="locate" size={22} color={gray[700]} />
           </Pressable>
+          {user ? (
+            <Pressable
+              style={[styles.fabButton, showHistoryOverlay && { backgroundColor: darkTheme.accent }]}
+              onPress={() => setShowHistoryOverlay(!showHistoryOverlay)}
+              accessibilityLabel="Toggle ride history overlay"
+              accessibilityRole="button"
+            >
+              <Ionicons name="trail-sign" size={22} color={showHistoryOverlay ? '#000' : gray[700]} />
+            </Pressable>
+          ) : null}
           {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
             <Pressable
               style={styles.fabButton}
@@ -928,6 +959,21 @@ export default function RoutePlanningScreen() {
           variant={hazardToast.type === 'success' ? 'success' : 'error'}
           onDismiss={() => setHazardToast(null)}
         />
+        {hazardToast.type === 'success' && hazardToast.coordinate ? (
+          <Pressable
+            style={styles.shareHazardButton}
+            onPress={() => {
+              const label = hazardToast.hazardType ?? 'hazard';
+              const loc = hazardToast.coordinate!;
+              void Share.share({
+                message: `⚠️ Cycling hazard reported: ${label} near ${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}. Stay safe! — Defensive Pedal`,
+              });
+            }}
+          >
+            <Ionicons name="share-social-outline" size={16} color={brandColors.accent} />
+            <Text style={styles.shareHazardText}>{t('communityScreen.shareRide').replace('ride', 'alert')}</Text>
+          </Pressable>
+        ) : null}
       </View>
     ) : null}
 
@@ -1110,6 +1156,19 @@ const styles = StyleSheet.create({
     left: space[4],
     right: space[4],
     zIndex: 200,
+  },
+  shareHazardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[1],
+    paddingVertical: space[2],
+    marginTop: space[1],
+  },
+  shareHazardText: {
+    ...textXs,
+    fontFamily: fontFamily.body.bold,
+    color: brandColors.accent,
   },
   hazardGridOverlay: {
     ...StyleSheet.absoluteFillObject,

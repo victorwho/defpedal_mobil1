@@ -3,7 +3,7 @@
 ## Habit Engine — Remaining Work
 
 ### Phase 5: Notifications
-- [~] IN PROGRESS — Push notification delivery (server schedules, but EAS project ID not configured for native delivery)
+- [x] DONE — Push notification delivery (EAS project configured, token registration on sign-in, server dispatch) (2026-04-04)
 - [!] BLOCKED — Quiet hours enforcement in notification triggers (server code exists but doesn't check quiet_hours before sending)
 - [x] DONE — Push notification registration on sign-in (permission prompt + token sent to server) (2026-04-04)
 
@@ -17,8 +17,8 @@
 - [ ] NOT STARTED — Unlockable feature tiers (Night Ride at 5, Weather Safety at 15, Analytics at 30)
 - [ ] NOT STARTED — Tomorrow's route safety preview (needs saved commute routes)
 - [ ] NOT STARTED — "Convince a non-cyclist" sharing flow (needs web page for routes)
-- [ ] NOT STARTED — Personal safety map overlay (ride history as colored lines on map)
-- [ ] NOT STARTED — Hazard alert sharing (share card with hazard details)
+- [x] DONE — Personal safety map overlay (ride history as colored lines, FAB toggle, safe=green/fast=blue) (2026-04-04)
+- [x] DONE — Hazard alert sharing (share button on hazard toast, native share sheet with location) (2026-04-04)
 
 ## Onboarding
 - [x] DONE — Risk overlay on safety score map (2026-04-03)

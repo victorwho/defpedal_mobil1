@@ -107,10 +107,12 @@ type AppStore = {
     totalHazardsWarned: number;
   } | null;
   locale: 'en' | 'ro';
+  showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
   earnedMilestones: readonly string[];
   setLocale: (locale: 'en' | 'ro') => void;
+  setShowHistoryOverlay: (show: boolean) => void;
   setOnboardingCompleted: (completed: boolean) => void;
   incrementAnonymousOpenCount: () => void;
   resetAnonymousOpenCount: () => void;
@@ -215,10 +217,12 @@ export const useAppStore = create<AppStore>()(
       cachedStreak: null,
       cachedImpact: null,
       locale: 'en',
+      showHistoryOverlay: false,
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
       earnedMilestones: [],
       setLocale: (locale) => set(() => ({ locale })),
+      setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
       incrementAnonymousOpenCount: () =>

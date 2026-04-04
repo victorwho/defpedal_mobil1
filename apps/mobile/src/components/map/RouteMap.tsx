@@ -207,6 +207,7 @@ export const RouteMap = ({
           trailFeatureCollection={trailFeatureCollection}
           plannedRouteFeatureCollection={plannedRouteFeatureCollection}
           plannedRouteColor={plannedRouteColor}
+          historyTrails={props.historyTrails}
         />
 
         <VectorTileLayers
