@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType } from '@defensivepedal/core';
-import { HAZARD_TYPE_OPTIONS, hasStartOverride } from '@defensivepedal/core';
+import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import { useBicycleParking } from '../src/hooks/useBicycleParking';
 // Bike lanes now use Mapbox vector tiles directly (no hook needed)
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
+import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useWeather } from '../src/hooks/useWeather';
@@ -28,9 +29,8 @@ import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
-import { Modal } from '../src/design-system/organisms/Modal';
 import { Toast } from '../src/design-system/molecules/Toast';
-import { darkTheme, gray } from '../src/design-system/tokens/colors';
+import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -94,6 +94,7 @@ export default function RoutePlanningScreen() {
     planningOrigin?.lat ?? null,
     planningOrigin?.lon ?? null,
   );
+  const { hazards: nearbyHazards } = useNearbyHazards(planningOrigin, true, 2000);
 
   const [startOverrideQuery, setStartOverrideQuery] = useState('');
   const [destinationQuery, setDestinationQuery] = useState(
@@ -111,6 +112,7 @@ export default function RoutePlanningScreen() {
   const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
   const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
   const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
+  const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const user = null; // hazard reports work without auth
@@ -131,7 +133,7 @@ export default function RoutePlanningScreen() {
       });
       setPendingHazardCoordinate(null);
       setHazardPickerOpen(false);
-      setHazardToast({ type: 'success', message: 'Hazard reported! It will sync when online.' });
+      setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
       setTimeout(() => setHazardToast(null), 3000);
       return;
     }
@@ -142,11 +144,11 @@ export default function RoutePlanningScreen() {
     setHazardPlacementMode(true);
   };
 
-  const handleHazardPlacement = (coordinate: Coordinate) => {
-    if (!selectedHazardType) return;
+  const handleHazardPlacementConfirm = () => {
+    if (!selectedHazardType || !mapCenterCoordinate) return;
 
     enqueueMutation('hazard', {
-      coordinate,
+      coordinate: mapCenterCoordinate,
       reportedAt: new Date().toISOString(),
       source: 'manual',
       hazardType: selectedHazardType,
@@ -154,7 +156,7 @@ export default function RoutePlanningScreen() {
 
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
-    setHazardToast({ type: 'success', message: 'Hazard reported! It will sync when online.' });
+    setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
     setTimeout(() => setHazardToast(null), 3000);
   };
 
@@ -396,10 +398,11 @@ export default function RoutePlanningScreen() {
           searchedPois={searchedPois}
           showBicycleLanes={showBikeLanes}
           poiVisibility={poiVisibility}
+          nearbyHazards={nearbyHazards}
           recenterKey={recenterKey}
-          onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
           onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
+          onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
         />
       }
       topOverlay={
@@ -701,7 +704,25 @@ export default function RoutePlanningScreen() {
         </View>
       }
       footer={
-        canPreview ? (
+        hazardPlacementMode ? (
+          <View style={styles.hazardPlacementFooter}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onPress={handleHazardPlacementConfirm}
+            >
+              Report here
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              onPress={() => { setHazardPlacementMode(false); setSelectedHazardType(null); }}
+            >
+              Cancel
+            </Button>
+          </View>
+        ) : canPreview ? (
           <Button
             variant="primary"
             size="lg"
@@ -718,47 +739,57 @@ export default function RoutePlanningScreen() {
     />
     <BottomNav activeTab="map" onTabPress={handleTabPress} />
 
-    {/* Hazard type picker modal */}
-    <Modal
-      visible={hazardPickerOpen}
-      onClose={() => setHazardPickerOpen(false)}
-      title="Report a hazard"
-      description="Select the type of hazard, then tap the map to place it."
-      footer={
-        <Button variant="secondary" size="md" fullWidth onPress={() => setHazardPickerOpen(false)}>
-          Cancel
-        </Button>
-      }
-    >
-      <View style={styles.hazardOptionList}>
-        {HAZARD_TYPE_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            variant="secondary"
-            size="md"
-            fullWidth
-            leftIcon={
-              <Ionicons
-                name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
-                size={18}
-                color={darkTheme.accent}
-              />
-            }
-            onPress={() => handleHazardTypeSelect(option.value)}
+    {/* Hazard quick-pick grid overlay (same style as navigation) */}
+    {hazardPickerOpen ? (
+      <Pressable
+        style={styles.hazardGridOverlay}
+        onPress={() => setHazardPickerOpen(false)}
+      >
+        <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.hazardGridTitle}>Report hazard</Text>
+          <View style={styles.hazardGrid}>
+            {([
+              { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
+              { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
+              { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
+              { value: 'construction' as HazardType, label: 'Construction', icon: 'construct-outline' as const },
+              { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
+              { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+            ]).map((item) => (
+              <Pressable
+                key={item.value}
+                style={({ pressed }) => [
+                  styles.hazardGridItem,
+                  pressed && styles.hazardGridItemPressed,
+                ]}
+                onPress={() => handleHazardTypeSelect(item.value)}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${item.label}`}
+              >
+                <Ionicons name={item.icon} size={24} color={brandColors.accent} />
+                <Text style={styles.hazardGridLabel}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            style={styles.hazardGridCancel}
+            onPress={() => setHazardPickerOpen(false)}
           >
-            {option.label}
-          </Button>
-        ))}
-      </View>
-    </Modal>
+            <Text style={styles.hazardGridCancelText}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    ) : null}
 
     {/* Hazard toast */}
     {hazardToast ? (
-      <Toast
-        message={hazardToast.message}
-        variant={hazardToast.type === 'success' ? 'success' : 'error'}
-        onDismiss={() => setHazardToast(null)}
-      />
+      <View style={styles.hazardToastContainer}>
+        <Toast
+          message={hazardToast.message}
+          variant={hazardToast.type === 'success' ? 'success' : 'error'}
+          onDismiss={() => setHazardToast(null)}
+        />
+      </View>
     ) : null}
     </View>
   );
@@ -892,6 +923,71 @@ const styles = StyleSheet.create({
   },
   hazardOptionList: {
     gap: space[2],
+  },
+  hazardPlacementFooter: {
+    gap: space[2],
+    alignItems: 'center',
+  },
+  hazardToastContainer: {
+    position: 'absolute',
+    bottom: '20%',
+    left: space[4],
+    right: space[4],
+    zIndex: 200,
+  },
+  hazardGridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    paddingHorizontal: space[4],
+    paddingBottom: space[6],
+    zIndex: 100,
+  },
+  hazardGridCard: {
+    backgroundColor: darkTheme.bgPrimary,
+    borderRadius: radii['2xl'],
+    padding: space[4],
+    gap: space[3],
+    ...shadows.lg,
+  },
+  hazardGridTitle: {
+    fontFamily: fontFamily.heading.semiBold,
+    fontSize: 14,
+    color: darkTheme.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  hazardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space[2],
+  },
+  hazardGridItem: {
+    width: '31%' as unknown as number,
+    alignItems: 'center',
+    gap: space[1],
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.lg,
+    paddingVertical: space[3],
+    paddingHorizontal: space[1],
+  },
+  hazardGridItemPressed: {
+    backgroundColor: darkTheme.bgTertiary,
+  },
+  hazardGridLabel: {
+    fontSize: 11,
+    color: darkTheme.textSecondary,
+    textAlign: 'center',
+  },
+  hazardGridCancel: {
+    alignItems: 'center',
+    paddingVertical: space[2],
+  },
+  hazardGridCancelText: {
+    fontFamily: fontFamily.body.medium,
+    fontSize: 14,
+    color: darkTheme.textMuted,
   },
   // Waypoint styles
   waypointRow: {

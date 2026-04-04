@@ -23,6 +23,7 @@ import type {
   ReverseGeocodeResponse,
   RideImpact,
   ShareTripRequest,
+  UserPublicProfile,
   RerouteRequest,
   TripEndRequest,
   TripEndResponse,
@@ -366,7 +367,7 @@ export const mobileApi = {
     requestJson<ProfileResponse>('/v1/profile'),
   updateProfile: (payload: ProfileUpdateRequest) =>
     requestJson<ProfileResponse>('/v1/profile', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 
@@ -448,4 +449,15 @@ export const mobileApi = {
       method: 'POST',
       body: JSON.stringify({ questionId, selectedIndex }),
     }),
+
+  // ── Social ──
+
+  followUser: (userId: string) =>
+    requestJson<{ followedAt: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }),
+
+  unfollowUser: (userId: string) =>
+    requestJson<{ unfollowedAt: string }>(`/v1/users/${userId}/follow`, { method: 'DELETE' }),
+
+  getUserProfile: (userId: string) =>
+    requestJson<UserPublicProfile>(`/v1/users/${userId}/profile`),
 };

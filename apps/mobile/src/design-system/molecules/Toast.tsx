@@ -143,7 +143,6 @@ export const Toast: React.FC<ToastProps> = ({
       <Ionicons name={cfg.icon} size={20} color={cfg.accent} />
       <Text
         style={[textSm, styles.message, { fontFamily: fontFamily.body.medium }]}
-        numberOfLines={2}
       >
         {message}
       </Text>
@@ -185,9 +184,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: space[4],
     paddingVertical: space[3],
-    borderRadius: radii.full,
+    borderRadius: radii.xl,
     gap: space[3],
-    maxWidth: '92%',
+    maxWidth: '95%',
     minWidth: 200,
   },
   message: {

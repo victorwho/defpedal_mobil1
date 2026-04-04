@@ -1605,20 +1605,68 @@ export const buildV1Routes = (
           .eq('user_id', user.id)
           .single();
 
-        if (error || !data) {
-          throw new HttpError('Ride impact not found.', {
-            statusCode: 404,
-            code: 'BAD_REQUEST',
+        let impactRow = data;
+
+        // Auto-compute impact if not found — look up distance from trip_tracks
+        if (error || !impactRow) {
+          const { data: track } = await supabaseAdmin
+            .from('trip_tracks')
+            .select('actual_distance_meters, planned_route_distance_meters')
+            .eq('trip_id', request.params.tripId)
+            .eq('user_id', user.id)
+            .single();
+
+          if (!track) {
+            throw new HttpError('Trip not found.', { statusCode: 404, code: 'NOT_FOUND' });
+          }
+
+          const distMeters = Number(track.actual_distance_meters ?? track.planned_route_distance_meters ?? 0);
+
+          // Auto-record the impact
+          const { data: created } = await supabaseAdmin.rpc('record_ride_impact', {
+            p_trip_id: request.params.tripId,
+            p_user_id: user.id,
+            p_distance_meters: distMeters,
           });
+
+          const createdRow = Array.isArray(created) ? created[0] : created;
+          if (createdRow) {
+            impactRow = createdRow;
+          } else {
+            // Fallback: compute client-side
+            impactRow = {
+              trip_id: request.params.tripId,
+              co2_saved_kg: distMeters / 1000 * 0.12,
+              money_saved_eur: distMeters / 1000 * 0.35,
+              hazards_warned_count: 0,
+              distance_meters: distMeters,
+            };
+          }
+        }
+
+        // Pick a random reward equivalent
+        let equivalentText: string | null = null;
+        const co2 = Number(impactRow.co2_saved_kg ?? 0);
+        const money = Number(impactRow.money_saved_eur ?? 0);
+        const { data: equivalents } = await supabaseAdmin
+          .from('reward_equivalents')
+          .select('equivalent_text')
+          .or(`and(category.eq.co2,threshold_value.lte.${co2}),and(category.eq.money,threshold_value.lte.${money})`)
+          .order('threshold_value', { ascending: false })
+          .limit(10);
+
+        if (equivalents && equivalents.length > 0) {
+          const randomIndex = Math.floor(Math.random() * equivalents.length);
+          equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
         }
 
         return {
-          tripId: data.trip_id as string,
-          co2SavedKg: Number(data.co2_saved_kg),
-          moneySavedEur: Number(data.money_saved_eur),
-          hazardsWarnedCount: Number(data.hazards_warned_count),
-          distanceMeters: Number(data.distance_meters),
-          equivalentText: null,
+          tripId: impactRow.trip_id as string,
+          co2SavedKg: Number(impactRow.co2_saved_kg),
+          moneySavedEur: Number(impactRow.money_saved_eur),
+          hazardsWarnedCount: Number(impactRow.hazards_warned_count ?? 0),
+          distanceMeters: Number(impactRow.distance_meters ?? 0),
+          equivalentText,
         };
       },
     );

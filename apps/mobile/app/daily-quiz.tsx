@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -156,7 +157,12 @@ export default function DailyQuizScreen() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + space[6] }]}>
+    <ScrollView
+      style={[styles.root, { paddingTop: insets.top }]}
+      contentContainerStyle={[styles.rootContent, { paddingBottom: insets.bottom + space[6] }]}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable
@@ -245,7 +251,7 @@ export default function DailyQuizScreen() {
           />
         </View>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -257,6 +263,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: darkTheme.bgDeep,
+  },
+  rootContent: {
+    flexGrow: 1,
   },
   header: {
     flexDirection: 'row',

@@ -4,6 +4,7 @@ import React from 'react';
 type HazardLayersProps = {
   hazardZoneFeatureCollection: any;
   hazardFeatureCollection: any;
+  onHazardPress?: (properties: { id: string; type: string; confirmCount: number; denyCount: number }) => void;
 };
 
 /**
@@ -13,6 +14,7 @@ type HazardLayersProps = {
 export const HazardLayers = React.memo(({
   hazardZoneFeatureCollection,
   hazardFeatureCollection,
+  onHazardPress,
 }: HazardLayersProps) => (
   <>
     {hazardZoneFeatureCollection.features.length > 0 ? (
@@ -44,7 +46,22 @@ export const HazardLayers = React.memo(({
     ) : null}
 
     {hazardFeatureCollection.features.length > 0 ? (
-      <Mapbox.ShapeSource id="hazards" shape={hazardFeatureCollection}>
+      <Mapbox.ShapeSource
+        id="hazards"
+        shape={hazardFeatureCollection}
+        onPress={onHazardPress ? (event: any) => {
+          const feature = event?.features?.[0];
+          if (feature?.properties) {
+            onHazardPress({
+              id: feature.properties.id ?? '',
+              type: feature.properties.type ?? 'other',
+              confirmCount: Number(feature.properties.confirmCount ?? 0),
+              denyCount: Number(feature.properties.denyCount ?? 0),
+            });
+          }
+        } : undefined}
+        hitbox={{ width: 30, height: 30 }}
+      >
         <Mapbox.CircleLayer
           id="hazards-bg"
           style={{

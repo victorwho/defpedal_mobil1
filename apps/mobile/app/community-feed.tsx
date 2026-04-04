@@ -91,9 +91,10 @@ export default function CommunityFeedScreen() {
         onLike={handleLike}
         onLove={handleLove}
         onPress={handlePress}
+        onUserPress={(userId) => router.push(`/user-profile?id=${userId}`)}
       />
     ),
-    [visibleIds, handleLike, handleLove, handlePress],
+    [visibleIds, handleLike, handleLove, handlePress, router],
   );
 
   const keyExtractor = useCallback((item: FeedItem) => item.id, []);

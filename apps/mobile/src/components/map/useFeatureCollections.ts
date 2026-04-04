@@ -211,7 +211,7 @@ export const useFeatureCollections = ({
         }
       }
 
-      const SPREAD = 8;
+      const SPREAD = 4;
       const startIdx = Math.max(0, closestIdx - SPREAD);
       const endIdx = Math.min(routeCoords.length - 1, closestIdx + SPREAD);
       const segment = routeCoords.slice(startIdx, endIdx + 1);

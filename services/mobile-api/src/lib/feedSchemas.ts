@@ -88,6 +88,7 @@ export const profileUpdateRequestSchema = {
   additionalProperties: false,
   properties: {
     displayName: { type: 'string', minLength: 1, maxLength: 100 },
+    username: { type: 'string', minLength: 3, maxLength: 30, pattern: '^[a-zA-Z0-9_]+$' },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
@@ -177,10 +178,11 @@ export const feedCommentsResponseSchema = {
 export const profileResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'guardianTier'],
+  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'guardianTier', 'username'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
+    username: { type: ['string', 'null'] },
     avatarUrl: { type: ['string', 'null'] },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },

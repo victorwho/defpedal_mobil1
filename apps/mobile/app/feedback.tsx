@@ -1,7 +1,7 @@
 import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
-import { getPreviewOrigin } from '@defensivepedal/core';
+import { calculateTrailDistanceMeters, getPreviewOrigin } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -270,65 +270,61 @@ export default function FeedbackScreen() {
   const addEarnedMilestone = useAppStore((s) => s.addEarnedMilestone);
   const resetFlow = useAppStore((s) => s.resetFlow);
 
-  // Feature flag: show new impact flow only for onboarded users
-  const showImpactStep = onboardingCompleted === true;
-  const [step, setStep] = useState<FeedbackStep>(showImpactStep ? 'impact' : 'rating');
+  // Compute impact synchronously on mount from store data
+  const initialImpact = useMemo<RideImpact>(() => {
+    const store = useAppStore.getState();
+    const session = store.navigationSession;
+    const preview = store.routePreview;
+    const route = preview?.routes.find((r) => r.id === store.selectedRouteId) ?? preview?.routes[0] ?? null;
+    const breadcrumbs = session?.gpsBreadcrumbs ?? [];
+    const distMeters = breadcrumbs.length >= 2
+      ? calculateTrailDistanceMeters(breadcrumbs)
+      : route?.distanceMeters ?? 0;
+    const co2 = distMeters / 1000 * 0.12;
+    const money = distMeters / 1000 * 0.35;
+    return {
+      tripId: store.activeTripClientId ?? 'local',
+      co2SavedKg: co2,
+      moneySavedEur: money,
+      hazardsWarnedCount: 0,
+      distanceMeters: distMeters,
+      equivalentText: co2 >= 0.5 ? 'Planting a small tree seedling'
+        : co2 >= 0.1 ? 'Charging a smartphone 12 times'
+        : null,
+    };
+  }, []);
 
-  const [rideImpact, setRideImpact] = useState<RideImpact | null>(null);
+  const [step, setStep] = useState<FeedbackStep>('impact');
+  const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
-  const [impactLoading, setImpactLoading] = useState(showImpactStep);
+  const [impactLoading, setImpactLoading] = useState(false);
 
-  // Fetch impact data when in impact step
+  // Try to enhance impact data from server (non-blocking — local data already shown)
   useEffect(() => {
-    if (!showImpactStep) return;
-
     const tripServerId = activeTripClientId
       ? tripServerIds[activeTripClientId]
       : null;
 
-    if (!tripServerId) {
-      // No server trip ID yet — skip impact step
-      setStep('rating');
-      setImpactLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
-    const fetchImpact = async () => {
+    const enhance = async () => {
       try {
-        const [impactResult, dashboardResult] = await Promise.allSettled([
-          mobileApi.fetchRideImpact(tripServerId),
-          mobileApi.fetchImpactDashboard(
-            Intl.DateTimeFormat().resolvedOptions().timeZone,
-          ),
-        ]);
-
-        if (cancelled) return;
-
-        if (impactResult.status === 'fulfilled') {
-          setRideImpact(impactResult.value);
-        } else {
-          // Impact fetch failed — fall back to rating step
-          setStep('rating');
+        // Upgrade with server data if available
+        if (tripServerId) {
+          const result = await mobileApi.fetchRideImpact(tripServerId);
+          if (!cancelled) setRideImpact(result);
         }
-
-        if (dashboardResult.status === 'fulfilled') {
-          setDashboard(dashboardResult.value);
-        }
-      } catch {
-        if (!cancelled) setStep('rating');
-      } finally {
-        if (!cancelled) setImpactLoading(false);
-      }
+        // Fetch dashboard for milestone detection
+        const dash = await mobileApi.fetchImpactDashboard(
+          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        );
+        if (!cancelled) setDashboard(dash);
+      } catch { /* server enhancement is optional */ }
     };
 
-    void fetchImpact();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [showImpactStep, activeTripClientId, tripServerIds]);
+    void enhance();
+    return () => { cancelled = true; };
+  }, [activeTripClientId, tripServerIds]);
 
   // Milestone detection
   const [pendingMilestone, setPendingMilestone] = useState<MilestoneKey | null>(null);
@@ -418,11 +414,7 @@ export default function FeedbackScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea}>
-        {step === 'impact' && impactLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={brandColors.accent} size="large" />
-          </View>
-        ) : step === 'impact' && rideImpact && rideImpact.distanceMeters > 50 ? (
+        {step === 'impact' ? (
           <ImpactStep
             rideImpact={rideImpact}
             dashboard={dashboard}

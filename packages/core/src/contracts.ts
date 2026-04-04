@@ -390,6 +390,30 @@ export interface FeedProfile {
   guardianTier: GuardianTier | null;
 }
 
+export interface UserPublicProfile {
+  readonly id: string;
+  readonly displayName: string;
+  readonly username: string | null;
+  readonly avatarUrl: string | null;
+  readonly guardianTier: GuardianTier;
+  readonly totalTrips: number;
+  readonly totalDistanceMeters: number;
+  readonly totalCo2SavedKg: number;
+  readonly totalHazardsReported: number;
+  readonly followersCount: number;
+  readonly followingCount: number;
+  readonly isFollowedByMe: boolean;
+  readonly recentTrips: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly distanceMeters: number;
+    readonly durationSeconds: number;
+    readonly safetyRating: number | null;
+    readonly sharedAt: string;
+    readonly geometryPolyline6: string;
+  }[];
+}
+
 export interface FeedItem {
   id: string;
   user: FeedProfile;
@@ -488,6 +512,7 @@ export interface FeedCommentRequest {
 
 export interface ProfileUpdateRequest {
   displayName?: string;
+  username?: string;
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
   cyclingGoal?: CyclingGoal | null;
@@ -496,6 +521,7 @@ export interface ProfileUpdateRequest {
 export interface ProfileResponse {
   id: string;
   displayName: string;
+  username: string | null;
   avatarUrl: string | null;
   autoShareRides: boolean;
   trimRouteEndpoints: boolean;

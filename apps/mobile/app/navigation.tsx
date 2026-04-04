@@ -167,6 +167,18 @@ export default function NavigationScreen() {
       isLive: true,
     };
   }, [selectedRoute, navigationSession?.remainingDistanceMeters]);
+
+  const totalDescentMeters = useMemo(() => {
+    const profile = selectedRoute?.elevationProfile;
+    if (!profile || profile.length < 2) return null;
+    let descent = 0;
+    for (let i = 1; i < profile.length; i++) {
+      const diff = profile[i] - profile[i - 1];
+      if (diff < 0) descent += Math.abs(diff);
+    }
+    return Math.round(descent);
+  }, [selectedRoute?.elevationProfile]);
+
   const liveCoordinate =
     locationState.sample?.coordinate ??
     navigationSession?.lastKnownCoordinate ??
@@ -404,8 +416,8 @@ export default function NavigationScreen() {
     const userCoord = locationState.sample?.coordinate;
     if (!userCoord || nearbyHazards.length === 0) return;
 
-    const ALERT_RADIUS_M = 100;
-    const DISMISS_RADIUS_M = 150;
+    const ALERT_RADIUS_M = 70;
+    const DISMISS_RADIUS_M = 105;
 
     // Check if active alert should be dismissed (user passed it)
     if (activeHazardAlert) {
@@ -779,7 +791,13 @@ export default function NavigationScreen() {
               navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
             }
             totalClimbMeters={climbData.value}
+            totalDescentMeters={totalDescentMeters}
             isClimbLive={climbData.isLive}
+            speedKmh={
+              locationState.sample?.speedMetersPerSecond != null
+                ? locationState.sample.speedMetersPerSecond * 3.6
+                : null
+            }
           />
         </View>
       </View>

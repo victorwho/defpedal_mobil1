@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,12 +42,16 @@ export default function OnboardingSignupPromptScreen() {
   const insets = useSafeAreaInsets();
   const authCtx = useAuthSessionOptional();
   const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
+  const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
   const routePreview = useAppStore((s) => s.routePreview);
+  const params = useLocalSearchParams<{ mandatory?: string }>();
+  const isMandatory = params.mandatory === 'true';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const finishOnboarding = () => {
     setOnboardingCompleted(true);
+    resetAnonymousOpenCount();
     // Navigate to route-preview if a loop route was generated, otherwise route-planning
     const hasRoute = routePreview != null && routePreview.routes.length > 0;
     router.replace(hasRoute ? '/route-preview' : '/route-planning');
@@ -66,7 +70,10 @@ export default function OnboardingSignupPromptScreen() {
         return;
       }
 
-      finishOnboarding();
+      // After sign-up, prompt for username
+      setOnboardingCompleted(true);
+      resetAnonymousOpenCount();
+      router.replace('/onboarding/choose-username');
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {
@@ -83,15 +90,19 @@ export default function OnboardingSignupPromptScreen() {
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.glowTop} />
 
-      <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-        <Ionicons name="chevron-back" size={24} color={darkTheme.textPrimary} />
-      </Pressable>
+      {!isMandatory ? (
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+          <Ionicons name="chevron-back" size={24} color={darkTheme.textPrimary} />
+        </Pressable>
+      ) : <View style={styles.backButton} />}
 
       <View style={styles.headerSection}>
         <Text style={styles.eyebrow}>Almost there</Text>
         <Text style={styles.title}>Create your account</Text>
         <Text style={styles.subtitle}>
-          Sync your rides, earn streaks, and join the community. You can always do this later.
+          {isMandatory
+            ? 'Create an account to continue using Defensive Pedal. Your data will be preserved.'
+            : 'Sync your rides, earn streaks, and join the community. You can always do this later.'}
         </Text>
       </View>
 
@@ -160,12 +171,14 @@ export default function OnboardingSignupPromptScreen() {
         ) : null}
       </View>
 
-      {/* Dismiss */}
-      <View style={styles.footer}>
-        <Pressable onPress={finishOnboarding} hitSlop={12}>
-          <Text style={styles.dismissText}>Maybe later</Text>
-        </Pressable>
-      </View>
+      {/* Dismiss — hidden when mandatory */}
+      {!isMandatory ? (
+        <View style={styles.footer}>
+          <Pressable onPress={finishOnboarding} hitSlop={12}>
+            <Text style={styles.dismissText}>Maybe later</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -105,8 +105,11 @@ type AppStore = {
     totalHazardsWarned: number;
   } | null;
   notificationPermissionAsked: boolean;
+  anonymousOpenCount: number;
   earnedMilestones: readonly string[];
   setOnboardingCompleted: (completed: boolean) => void;
+  incrementAnonymousOpenCount: () => void;
+  resetAnonymousOpenCount: () => void;
   setCyclingGoal: (goal: CyclingGoal | null) => void;
   setCachedStreak: (streak: StreakState | null) => void;
   setCachedImpact: (impact: {
@@ -206,9 +209,14 @@ export const useAppStore = create<AppStore>()(
       cachedStreak: null,
       cachedImpact: null,
       notificationPermissionAsked: false,
+      anonymousOpenCount: 0,
       earnedMilestones: [],
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
+      incrementAnonymousOpenCount: () =>
+        set((state) => ({ anonymousOpenCount: state.anonymousOpenCount + 1 })),
+      resetAnonymousOpenCount: () =>
+        set(() => ({ anonymousOpenCount: 0 })),
       setCyclingGoal: (goal) =>
         set(() => ({ cyclingGoal: goal })),
       setCachedStreak: (streak) =>
@@ -674,6 +682,7 @@ export const useAppStore = create<AppStore>()(
         cachedStreak: state.cachedStreak,
         cachedImpact: state.cachedImpact,
         notificationPermissionAsked: state.notificationPermissionAsked,
+        anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
       }),
     },

@@ -298,26 +298,25 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[3],
+    justifyContent: 'space-evenly',
   },
   statItem: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
+    alignItems: 'center',
+    gap: 1,
+    paddingHorizontal: 2,
   },
   statValue: {
     fontFamily: fontFamily.mono.bold,
-    fontSize: 16,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 18,
   },
   statLabel: {
-    ...textXs,
+    fontSize: 9,
     color: darkTheme.textSecondary,
   },
   statDivider: {
     width: 1,
-    height: 16,
+    height: 14,
     backgroundColor: darkTheme.borderDefault,
   },
   continueRow: {

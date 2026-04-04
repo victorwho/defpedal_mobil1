@@ -22,6 +22,7 @@ type FeedCardProps = {
   onLike: (id: string, liked: boolean) => void;
   onLove: (id: string, loved: boolean) => void;
   onPress: (id: string) => void;
+  onUserPress?: (userId: string) => void;
 };
 
 const formatRelativeTime = (isoDate: string): string => {
@@ -53,7 +54,7 @@ const buildSyntheticRoute = (item: FeedItem): RouteOption => ({
   warnings: [],
 });
 
-export const FeedCard = ({ item, isVisible, onLike, onLove, onPress }: FeedCardProps) => {
+export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const syntheticRoute = buildSyntheticRoute(item);
   const initials = item.user.displayName
@@ -76,9 +77,11 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress }: FeedCardP
         </View>
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
-            <Text style={styles.displayName} numberOfLines={1}>
-              {item.user.displayName}
-            </Text>
+            <Pressable onPress={onUserPress ? () => onUserPress(item.user.id) : undefined} disabled={!onUserPress}>
+              <Text style={styles.displayName} numberOfLines={1}>
+                {item.user.displayName}
+              </Text>
+            </Pressable>
             {item.user.guardianTier && item.user.guardianTier !== 'reporter' && TIER_BADGES[item.user.guardianTier] ? (
               <View style={[styles.tierPill, { backgroundColor: TIER_BADGES[item.user.guardianTier].bg }]}>
                 <Text style={[styles.tierPillText, { color: TIER_BADGES[item.user.guardianTier].color }]}>

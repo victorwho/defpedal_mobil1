@@ -37,31 +37,57 @@ const RouteTelemetryObserver = () => {
 };
 
 /**
- * Redirects first-time users to the onboarding flow.
+ * Guards app entry based on auth state and anonymous open count.
  *
- * Triggers when onboardingCompleted is false and user has no real (non-anonymous)
- * account. This covers: fresh install (null session before anon sign-in),
- * anonymous session (after auto sign-in), and post-sign-out (reset to anon).
- * Does NOT trigger for authenticated users (Google sign-in).
+ * Logic:
+ * - Real account (Google): always pass through, no prompts.
+ * - Anonymous, count 1, onboarding not done: onboarding flow.
+ * - Anonymous, count 2-4, onboarding done: dismissible signup prompt.
+ * - Anonymous, count >= 5: mandatory signup (no skip).
+ *
+ * The anonymousOpenCount is incremented once per app launch (via ref).
  */
 const OnboardingGuard = () => {
   const pathname = usePathname();
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
+  const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
   const authCtx = useAuthSessionOptional();
+  const hasIncrementedRef = useRef(false);
 
-  // Don't redirect if already in onboarding screens
-  if (pathname.startsWith('/onboarding')) return null;
-
-  // Wait for auth to settle before making redirect decisions
+  // Wait for auth to settle before making any decisions
   if (authCtx?.isLoading) return null;
 
   // A "real" session = authenticated with a non-anonymous account (e.g. Google)
   const hasRealAccount = authCtx?.user != null && authCtx.isAnonymous === false;
 
-  // Redirect to onboarding if not completed and no real account.
-  // This covers: null session (fresh install pre-anon), anonymous session, post-sign-out.
-  if (onboardingCompleted === false && !hasRealAccount) {
+  // Real account: never redirect, never prompt
+  if (hasRealAccount) return null;
+
+  // Increment anonymous open count once per app launch
+  if (!hasIncrementedRef.current && !hasRealAccount) {
+    hasIncrementedRef.current = true;
+    incrementAnonymousOpenCount();
+  }
+
+  // Don't redirect if already in onboarding, signup, or feedback screens
+  if (pathname.startsWith('/onboarding')) return null;
+  if (pathname === '/feedback') return null;
+  if (pathname === '/navigation') return null;
+
+  // Count 1 + onboarding not done: first-time user → onboarding flow
+  if (onboardingCompleted === false) {
     return <Redirect href="/onboarding" />;
+  }
+
+  // Count >= 5: mandatory signup (no skip allowed)
+  if (anonymousOpenCount >= 5) {
+    return <Redirect href="/onboarding/signup-prompt?mandatory=true" />;
+  }
+
+  // Count 2-4: dismissible signup prompt
+  if (anonymousOpenCount >= 2) {
+    return <Redirect href="/onboarding/signup-prompt" />;
   }
 
   return null;

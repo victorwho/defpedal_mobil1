@@ -2,7 +2,7 @@ import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 
@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
+import { brandColors, darkTheme, gray, safetyColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -140,6 +140,18 @@ const GuardianSection = () => {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, signOut, signInAnonymously } = useAuthSession();
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSaving, setUsernameSaving] = useState(false);
+
+  const { data: profile, refetch: refetchProfile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => mobileApi.getProfile(),
+    enabled: Boolean(user),
+    staleTime: 120_000,
+  });
+
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
   const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
   const bikeType = useAppStore((state) => state.bikeType);
@@ -186,8 +198,65 @@ export default function ProfileScreen() {
             <View style={styles.userCard}>
               <Ionicons name="person-circle-outline" size={48} color={brandColors.accent} />
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{user.email ?? 'Rider'}</Text>
-                <Text style={styles.userSub}>Signed in</Text>
+                <Text style={styles.userName}>
+                  {profile?.username ? `@${profile.username}` : user.email ?? 'Rider'}
+                </Text>
+                <Text style={styles.userSub}>
+                  {profile?.username ? user.email ?? 'Signed in' : 'Signed in'}
+                </Text>
+                {!editingUsername ? (
+                  <Pressable
+                    onPress={() => {
+                      setEditingUsername(true);
+                      setUsernameInput(profile?.username ?? '');
+                      setUsernameError(null);
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.editUsernameLink}>
+                      {profile?.username ? 'Change username' : 'Set username'}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.usernameEditRow}>
+                    <Text style={styles.usernameAt}>@</Text>
+                    <TextInput
+                      style={styles.usernameInput}
+                      value={usernameInput}
+                      onChangeText={(t) => { setUsernameInput(t.replace(/[^a-zA-Z0-9_]/g, '')); setUsernameError(null); }}
+                      placeholder="username"
+                      placeholderTextColor={gray[500]}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={30}
+                      autoFocus
+                    />
+                    <Pressable
+                      onPress={async () => {
+                        if (usernameInput.length < 3) { setUsernameError('Min 3 characters'); return; }
+                        setUsernameSaving(true);
+                        try {
+                          await mobileApi.updateProfile({ username: usernameInput.toLowerCase() });
+                          setEditingUsername(false);
+                          void refetchProfile();
+                        } catch (err: unknown) {
+                          const msg = err instanceof Error ? err.message : 'Failed';
+                          setUsernameError(msg.includes('taken') || msg.includes('409') ? 'Username taken' : msg);
+                        } finally {
+                          setUsernameSaving(false);
+                        }
+                      }}
+                      style={styles.usernameSaveBtn}
+                      disabled={usernameSaving}
+                    >
+                      <Text style={styles.usernameSaveText}>{usernameSaving ? '...' : 'Save'}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setEditingUsername(false)} hitSlop={8}>
+                      <Ionicons name="close" size={18} color={gray[400]} />
+                    </Pressable>
+                  </View>
+                )}
+                {usernameError ? <Text style={styles.usernameError}>{usernameError}</Text> : null}
               </View>
             </View>
           ) : (
@@ -424,6 +493,48 @@ const styles = StyleSheet.create({
   userSub: {
     ...textSm,
     color: brandColors.textSecondary,
+  },
+  editUsernameLink: {
+    ...textXs,
+    color: brandColors.accent,
+    fontFamily: fontFamily.body.medium,
+    marginTop: 2,
+  },
+  usernameEditRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: space[1],
+  },
+  usernameAt: {
+    fontFamily: fontFamily.mono.bold,
+    fontSize: 14,
+    color: brandColors.accent,
+  },
+  usernameInput: {
+    flex: 1,
+    fontFamily: fontFamily.mono.medium,
+    fontSize: 14,
+    color: darkTheme.textPrimary,
+    borderBottomWidth: 1,
+    borderBottomColor: brandColors.accent,
+    paddingVertical: 2,
+  },
+  usernameSaveBtn: {
+    paddingHorizontal: space[2],
+    paddingVertical: space[1],
+    backgroundColor: brandColors.accent,
+    borderRadius: radii.sm,
+  },
+  usernameSaveText: {
+    fontFamily: fontFamily.body.bold,
+    fontSize: 12,
+    color: '#000',
+  },
+  usernameError: {
+    ...textXs,
+    color: safetyColors.danger,
+    marginTop: 2,
   },
   section: {
     gap: space[3],

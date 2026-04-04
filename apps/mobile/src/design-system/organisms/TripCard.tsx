@@ -89,7 +89,12 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
         <View style={styles.metricsCol}>
           <View style={styles.metric}>
             <Ionicons name="resize-outline" size={14} color={gray[400]} />
-            <Text style={styles.metricText}>{formatDistance(trip.plannedRouteDistanceMeters)}</Text>
+            <Text style={styles.metricText}>{formatDistance(
+              trip.distanceMeters
+                ?? (trip.gpsBreadcrumbs.length >= 2
+                  ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
+                  : trip.plannedRouteDistanceMeters ?? 0)
+            )}</Text>
           </View>
           <View style={styles.metric}>
             <Ionicons name="time-outline" size={14} color={gray[400]} />
