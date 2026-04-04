@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
 
 import type { MobileAuthSession, MobileAuthUser } from '../lib/devAuth';
+import { registerForPushNotifications } from '../lib/push-notifications';
 import {
   activateDeveloperBypassSession,
   getCurrentSession,
@@ -133,6 +134,13 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       linkingSub.remove();
     };
   }, []);
+
+  // Register for push notifications when a non-anonymous user signs in
+  useEffect(() => {
+    if (session?.user && !session.isAnonymous) {
+      void registerForPushNotifications();
+    }
+  }, [session?.user?.id, session?.isAnonymous]);
 
   const clearAuthError = () => setAuthError(null);
 
