@@ -270,10 +270,10 @@ export default function ProfileScreen() {
               </Pressable>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>
-                  {profile?.username ? `@${profile.username}` : user.email ?? 'Rider'}
+                  {profile?.username ? `@${profile.username}` : user.email ?? t('profile.rider')}
                 </Text>
                 <Text style={styles.userSub}>
-                  {profile?.username ? user.email ?? 'Signed in' : 'Signed in'}
+                  {profile?.username ? user.email ?? t('common.signedIn') : t('common.signedIn')}
                 </Text>
                 {!editingUsername ? (
                   <Pressable
@@ -285,7 +285,7 @@ export default function ProfileScreen() {
                     hitSlop={8}
                   >
                     <Text style={styles.editUsernameLink}>
-                      {profile?.username ? 'Change username' : 'Set username'}
+                      {profile?.username ? t('profile.changeUsername') : t('profile.setUsername')}
                     </Text>
                   </Pressable>
                 ) : (
@@ -391,8 +391,8 @@ export default function ProfileScreen() {
                 <Text style={styles.settingLabel}>{t('profile.avoidUnpaved')}</Text>
                 <Text style={styles.settingDescription}>
                   {avoidUnpaved
-                    ? 'Routes will stay on paved surfaces'
-                    : 'Routes may include unpaved roads'}
+                    ? t('profile.avoidUnpavedOn')
+                    : t('profile.avoidUnpavedOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, avoidUnpaved && styles.toggleOn]}>
@@ -408,8 +408,8 @@ export default function ProfileScreen() {
                 <Text style={styles.settingLabel}>{t('profile.compareRoutes')}</Text>
                 <Text style={styles.settingDescription}>
                   {showRouteComparison
-                    ? 'Shows how much safer your route is vs fast routing'
-                    : 'Route comparison disabled'}
+                    ? t('profile.compareRoutesOn')
+                    : t('profile.compareRoutesOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, showRouteComparison && styles.toggleOn]}>
@@ -425,8 +425,8 @@ export default function ProfileScreen() {
                 <Text style={styles.settingLabel}>{t('profile.showBikeLanes')}</Text>
                 <Text style={styles.settingDescription}>
                   {showBicycleLanes
-                    ? 'Cycling infrastructure is visible on the map'
-                    : 'Bike lanes are hidden from the map'}
+                    ? t('profile.showBikeLanesOn')
+                    : t('profile.showBikeLanesOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, showBicycleLanes && styles.toggleOn]}>
@@ -462,7 +462,7 @@ export default function ProfileScreen() {
               <View style={styles.settingTextCol}>
                 <Text style={styles.settingLabel}>{t('profile.dailyWeather')}</Text>
                 <Text style={styles.settingDescription}>
-                  {notifyWeather ? 'Daily 9am cycling weather forecast & advice' : 'Daily weather notification is off'}
+                  {notifyWeather ? t('profile.dailyWeatherOn') : t('profile.dailyWeatherOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, notifyWeather && styles.toggleOn]}>
@@ -474,7 +474,7 @@ export default function ProfileScreen() {
               <View style={styles.settingTextCol}>
                 <Text style={styles.settingLabel}>{t('profile.hazardAlerts')}</Text>
                 <Text style={styles.settingDescription}>
-                  {notifyHazard ? 'Get notified about hazards near your routes' : 'Hazard alerts are off'}
+                  {notifyHazard ? t('profile.hazardAlertsOn') : t('profile.hazardAlertsOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, notifyHazard && styles.toggleOn]}>
@@ -486,7 +486,7 @@ export default function ProfileScreen() {
               <View style={styles.settingTextCol}>
                 <Text style={styles.settingLabel}>{t('profile.community')}</Text>
                 <Text style={styles.settingDescription}>
-                  {notifyCommunity ? 'Get notified about likes and comments' : 'Community notifications are off'}
+                  {notifyCommunity ? t('profile.communityOn') : t('profile.communityOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, notifyCommunity && styles.toggleOn]}>
@@ -498,7 +498,7 @@ export default function ProfileScreen() {
               <View style={styles.settingTextCol}>
                 <Text style={styles.settingLabel}>{t('profile.quietHours')}</Text>
                 <Text style={styles.settingDescription}>
-                  No notifications {quietHoursStart} → {quietHoursEnd}
+                  {t('profile.quietHoursDesc', { start: quietHoursStart, end: quietHoursEnd })}
                 </Text>
               </View>
               <Ionicons name="time-outline" size={20} color={gray[400]} />
@@ -516,8 +516,8 @@ export default function ProfileScreen() {
                 <Text style={styles.settingLabel}>{t('profile.shareTrips')}</Text>
                 <Text style={styles.settingDescription}>
                   {shareTripsPublicly
-                    ? 'Your rides are shared in the community feed'
-                    : 'Your rides are private and not shared'}
+                    ? t('profile.shareTripsOn')
+                    : t('profile.shareTripsOff')}
                 </Text>
               </View>
               <View style={[styles.toggle, shareTripsPublicly && styles.toggleOn]}>
@@ -530,10 +530,10 @@ export default function ProfileScreen() {
             <Pressable
               style={styles.signOutButton}
               onPress={() => {
-                Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-                  { text: 'Cancel', style: 'cancel' },
+                Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
+                  { text: t('common.cancel'), style: 'cancel' },
                   {
-                    text: 'Sign Out',
+                    text: t('profile.signOut'),
                     style: 'destructive',
                     onPress: async () => {
                       // Reset onboarding and create anonymous session,
