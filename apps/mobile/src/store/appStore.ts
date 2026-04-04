@@ -17,6 +17,7 @@ import {
   createNavigationSession,
   resetNavigationSession,
   recordRerouteAttempt,
+  setSessionPreAnnouncement,
   setSessionApproachAnnouncement,
   setSessionFollowMode,
   setSessionMute,
@@ -105,9 +106,11 @@ type AppStore = {
     totalMoneyEur: number;
     totalHazardsWarned: number;
   } | null;
+  locale: 'en' | 'ro';
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
   earnedMilestones: readonly string[];
+  setLocale: (locale: 'en' | 'ro') => void;
   setOnboardingCompleted: (completed: boolean) => void;
   incrementAnonymousOpenCount: () => void;
   resetAnonymousOpenCount: () => void;
@@ -152,6 +155,7 @@ type AppStore = {
     sample: NavigationLocationSample,
     snapshot: NavigationProgressSnapshot,
   ) => void;
+  markPreAnnouncement: (stepId: string | null) => void;
   markApproachAnnouncement: (stepId: string | null) => void;
   recordNavigationReroute: (requestedAt?: string) => void;
   syncNavigationRoute: (routeId: string) => void;
@@ -210,9 +214,11 @@ export const useAppStore = create<AppStore>()(
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
+      locale: 'en',
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
       earnedMilestones: [],
+      setLocale: (locale) => set(() => ({ locale })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
       incrementAnonymousOpenCount: () =>
@@ -347,11 +353,16 @@ export const useAppStore = create<AppStore>()(
             ? preferredRouteId
             : response.routes[0]?.id ?? null;
 
+          // Preserve NAVIGATING state during reroute — don't drop back to ROUTE_PREVIEW
+          const isNavigating = state.appState === 'NAVIGATING';
           return {
             routePreview: response,
             selectedRouteId: nextSelectedRouteId,
-            appState:
-              response.routes.length > 0 ? ('ROUTE_PREVIEW' as AppState) : ('IDLE' as AppState),
+            appState: isNavigating
+              ? ('NAVIGATING' as AppState)
+              : response.routes.length > 0
+                ? ('ROUTE_PREVIEW' as AppState)
+                : ('IDLE' as AppState),
           };
         }),
       setSelectedRouteId: (routeId) =>
@@ -377,6 +388,12 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           navigationSession: state.navigationSession
             ? updateNavigationSessionProgress(state.navigationSession, sample, snapshot)
+            : state.navigationSession,
+        })),
+      markPreAnnouncement: (stepId) =>
+        set((state) => ({
+          navigationSession: state.navigationSession
+            ? setSessionPreAnnouncement(state.navigationSession, stepId)
             : state.navigationSession,
         })),
       markApproachAnnouncement: (stepId) =>

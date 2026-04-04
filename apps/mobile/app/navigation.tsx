@@ -73,6 +73,7 @@ export default function NavigationScreen() {
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
   const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
   const updateNavigationProgress = useAppStore((state) => state.updateNavigationProgress);
+  const markPreAnnouncement = useAppStore((state) => state.markPreAnnouncement);
   const markApproachAnnouncement = useAppStore((state) => state.markApproachAnnouncement);
   const recordNavigationReroute = useAppStore((state) => state.recordNavigationReroute);
   const syncNavigationRoute = useAppStore((state) => state.syncNavigationRoute);
@@ -311,7 +312,7 @@ export default function NavigationScreen() {
     enqueueMutation('hazard', {
       coordinate: mapUserCoordinate,
       reportedAt: new Date().toISOString(),
-      source: 'manual',
+      source: 'in_ride',
       hazardType,
     });
     telemetry.capture('hazard_report_queued', {
@@ -497,6 +498,12 @@ export default function NavigationScreen() {
 
     const activeStep = selectedRoute.steps[progress.currentStepIndex] ?? null;
 
+    if (progress.shouldPreAnnounce && activeStep) {
+      markPreAnnouncement(activeStep.id);
+      const dist = Math.round(progress.distanceToManeuverMeters ?? 200);
+      speak(`In ${dist} meters, ${activeStep.instruction}`);
+    }
+
     if (progress.shouldAnnounceApproach && activeStep) {
       markApproachAnnouncement(activeStep.id);
       speak(`In 50 meters, ${activeStep.instruction}`);
@@ -525,11 +532,30 @@ export default function NavigationScreen() {
     finishNavigation,
     hasQueuedTripEnd,
     locationState.sample,
+    markPreAnnouncement,
     markApproachAnnouncement,
     navigationSession?.sessionId,
     selectedRoute,
     updateNavigationProgress,
   ]);
+
+  // Announce ETA every 5 minutes
+  useEffect(() => {
+    if (!navigationSession || !voiceGuidanceEnabled || navigationSession.isMuted) return;
+
+    const interval = setInterval(() => {
+      const session = useAppStore.getState().navigationSession;
+      if (!session || session.state !== 'navigating') return;
+      const remaining = session.remainingDurationSeconds ?? 0;
+      if (remaining <= 0) return;
+
+      const mins = Math.round(remaining / 60);
+      if (mins < 1) return;
+      speak(mins === 1 ? 'About 1 minute remaining.' : `About ${mins} minutes remaining.`);
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [navigationSession?.sessionId, voiceGuidanceEnabled, navigationSession?.isMuted]);
 
   useEffect(() => {
     if (
@@ -641,6 +667,7 @@ export default function NavigationScreen() {
           <ManeuverCard
             currentStep={currentStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
+            onPress={() => { if (currentStep) speak(currentStep.instruction); }}
           />
 
           {warningMessage ? (

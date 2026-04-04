@@ -206,7 +206,7 @@ export type HazardType = (typeof HAZARD_TYPE_OPTIONS)[number]['value'];
 export interface HazardReportRequest {
   coordinate: Coordinate;
   reportedAt: string;
-  source?: 'manual' | 'automatic';
+  source?: 'in_ride' | 'manual' | 'armchair';
   hazardType?: HazardType;
 }
 
@@ -330,6 +330,7 @@ export interface NavigationSession {
   lastKnownSpeedMetersPerSecond?: number | null;
   lastLocationAccuracyMeters?: number | null;
   lastSnappedCoordinate?: Coordinate;
+  lastPreAnnouncementStepId?: string | null;
   lastApproachAnnouncementStepId?: string | null;
   distanceToManeuverMeters?: number | null;
   distanceToRouteMeters?: number | null;

@@ -182,7 +182,7 @@ export default function RoutePlanningScreen() {
       enqueueMutation('hazard', {
         coordinate: pendingHazardCoordinate,
         reportedAt: new Date().toISOString(),
-        source: 'manual',
+        source: 'armchair',
         hazardType,
       });
       setPendingHazardCoordinate(null);

@@ -10,7 +10,7 @@
 import React from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
 import { formatDistance } from '@defensivepedal/core';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { space } from '../tokens/spacing';
 import { radii } from '../tokens/radii';
@@ -98,7 +98,8 @@ const formatETA = (remainingSec: number): string => {
 export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
   distanceToManeuverMeters: number | null;
-}> = ({ currentStep, distanceToManeuverMeters }) => {
+  onPress?: () => void;
+}> = ({ currentStep, distanceToManeuverMeters, onPress }) => {
   const arrow = getManeuverArrow(currentStep);
   const description = getManeuverDescription(currentStep);
   const distance =
@@ -108,12 +109,16 @@ export const ManeuverCard: React.FC<{
         ? formatDistance(Math.round(currentStep.distanceMeters))
         : '—';
 
+  const Wrapper = onPress ? Pressable : View;
+
   return (
-    <View
+    <Wrapper
+      onPress={onPress}
       style={[styles.maneuverCard, shadows.lg]}
       accessibilityRole="summary"
       accessibilityLabel={`${description}, in ${distance}`}
       accessibilityLiveRegion="polite"
+      accessibilityHint={onPress ? 'Tap to hear instruction again' : undefined}
     >
       <Text style={styles.arrow}>{arrow}</Text>
       <Text style={styles.maneuverDesc} numberOfLines={1}>
@@ -121,7 +126,7 @@ export const ManeuverCard: React.FC<{
       </Text>
       <Text style={styles.maneuverDivider}>·</Text>
       <Text style={styles.maneuverDist}>{distance}</Text>
-    </View>
+    </Wrapper>
   );
 };
 

@@ -47,7 +47,7 @@
 - [x] DONE — Hazard alert radius reduced 30% (2026-04-03)
 - [x] DONE — Softer hazard shading (semi-transparent dark-red base + lighter red dashes) (2026-04-04)
 - [x] DONE — Zoom in closer during navigation (followZoomLevel 16→17.5) (2026-04-04)
-- [ ] NOT STARTED — Turn-by-turn voice guidance improvements
+- [x] DONE — Voice guidance: 200m pre-announce, ETA every 5min, tap ManeuverCard to re-announce (2026-04-04)
 - [ ] NOT STARTED — Reroute through waypoints (multi-stop reroute)
 
 ## Community
@@ -74,12 +74,12 @@
 - [ ] NOT STARTED — Push Notifications — EAS project setup + server-side push via Expo
 
 ## Internationalization
-- [ ] NOT STARTED — Romanian language option (profile setting, all UI text translatable via i18n)
+- [x] DONE — Romanian language: i18n framework + en/ro translation files + language picker in profile (2026-04-04)
 
 ## Technical Debt
 - [ ] NOT STARTED — Install @testing-library/react for hook tests (tests written but can't run)
 - [x] DONE — Deduplicate qualifyStreakAsync helper (extracted to lib/streaks.ts) (2026-04-04)
-- [ ] NOT STARTED — Add `source` field to hazard reporting API (distinguish in-ride vs manual vs armchair)
+- [x] DONE — Add `source` field to hazard reporting API (in_ride/manual/armchair) (2026-04-04)
 - [ ] NOT STARTED — Social digest notification subquery needs manual DB validation
 - [!] BLOCKED — iPhone validation (no macOS hardware available)
 - [ ] NOT STARTED — Redis-backed production caching/rate-limiting

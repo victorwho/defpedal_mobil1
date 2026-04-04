@@ -10,10 +10,12 @@ import { decodePolyline } from './polyline';
 export type AppState = 'IDLE' | 'ROUTE_PREVIEW' | 'NAVIGATING' | 'AWAITING_FEEDBACK';
 
 export const OFF_ROUTE_THRESHOLD_METERS = 100;
+export const PRE_ANNOUNCEMENT_METERS = 200;
 export const APPROACH_ANNOUNCEMENT_METERS = 50;
 export const ARRIVAL_THRESHOLD_METERS = 25;
 export const AUTO_REROUTE_DELAY_MS = 60000;
 export const REROUTE_COOLDOWN_MS = 60000;
+export const ETA_ANNOUNCEMENT_INTERVAL_MS = 5 * 60 * 1000;
 
 export interface NavigationProgressSnapshot {
   currentStepIndex: number;
@@ -22,6 +24,7 @@ export interface NavigationProgressSnapshot {
   distanceToManeuverMeters: number | null;
   remainingDistanceMeters: number;
   remainingDurationSeconds: number;
+  shouldPreAnnounce: boolean;
   shouldAnnounceApproach: boolean;
   shouldAdvanceStep: boolean;
   shouldCompleteNavigation: boolean;
@@ -87,6 +90,14 @@ export const setSessionRerouteEligible = (
   rerouteEligible,
 });
 
+export const setSessionPreAnnouncement = (
+  session: NavigationSession,
+  stepId: string | null,
+): NavigationSession => ({
+  ...session,
+  lastPreAnnouncementStepId: stepId,
+});
+
 export const setSessionApproachAnnouncement = (
   session: NavigationSession,
   stepId: string | null,
@@ -103,6 +114,7 @@ export const syncSessionToRoute = (
   routeId,
   currentStepIndex: 0,
   state: 'navigating',
+  lastPreAnnouncementStepId: null,
   lastApproachAnnouncementStepId: null,
   distanceToManeuverMeters: undefined,
   distanceToRouteMeters: undefined,
@@ -206,6 +218,14 @@ export const isOffRoute = (
   return distanceToRouteMeters > thresholdMeters + accuracyBuffer;
 };
 
+export const shouldPreAnnounce = (
+  distanceToManeuverMeters: number,
+  hasPreAnnounced: boolean,
+): boolean =>
+  !hasPreAnnounced &&
+  distanceToManeuverMeters <= PRE_ANNOUNCEMENT_METERS &&
+  distanceToManeuverMeters > APPROACH_ANNOUNCEMENT_METERS;
+
 export const shouldAnnounceApproach = (
   distanceToManeuverMeters: number,
   hasAnnouncedApproach: boolean,
@@ -275,10 +295,14 @@ export const getNavigationProgress = (
     findClosestPointIndex([step.maneuver.location[1], step.maneuver.location[0]], routeCoordinates),
   );
 
-  const currentStepIndex =
-    !offRoute && (session.offRouteSince || session.rerouteEligible)
-      ? getUpcomingStepIndex(maneuverIndices, closestPointIndex, totalSteps)
-      : clampedStepIndex;
+  // Always recalculate the step index from the rider's position when
+  // off-route or returning to the route after being off-route.  Using
+  // the stale clampedStepIndex caused metrics to freeze.
+  const shouldRecalcStep =
+    offRoute || session.offRouteSince != null || session.rerouteEligible;
+  const currentStepIndex = shouldRecalcStep
+    ? getUpcomingStepIndex(maneuverIndices, closestPointIndex, totalSteps)
+    : clampedStepIndex;
   const currentStep = route.steps[currentStepIndex] ?? null;
 
   if (!currentStep) {
@@ -289,6 +313,7 @@ export const getNavigationProgress = (
       distanceToManeuverMeters: null,
       remainingDistanceMeters: 0,
       remainingDurationSeconds: 0,
+      shouldPreAnnounce: false,
       shouldAnnounceApproach: false,
       shouldAdvanceStep: false,
       shouldCompleteNavigation: false,
@@ -316,6 +341,7 @@ export const getNavigationProgress = (
   const remainingDurationSeconds =
     currentStep.durationSeconds * (1 - clampedProgress) +
     futureSteps.reduce((total, step) => total + step.durationSeconds, 0);
+  const alreadyPreAnnounced = session.lastPreAnnouncementStepId === currentStep.id;
   const alreadyAnnouncedApproach = session.lastApproachAnnouncementStepId === currentStep.id;
   const arrivedAtManeuver = hasArrived(distanceToManeuverMeters);
 
@@ -327,6 +353,7 @@ export const getNavigationProgress = (
     remainingDistanceMeters: arrivedAtManeuver && currentStepIndex >= totalSteps - 1 ? 0 : remainingDistanceMeters,
     remainingDurationSeconds:
       arrivedAtManeuver && currentStepIndex >= totalSteps - 1 ? 0 : remainingDurationSeconds,
+    shouldPreAnnounce: shouldPreAnnounce(distanceToManeuverMeters, alreadyPreAnnounced),
     shouldAnnounceApproach: shouldAnnounceApproach(
       distanceToManeuverMeters,
       alreadyAnnouncedApproach,

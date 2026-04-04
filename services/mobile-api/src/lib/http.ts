@@ -516,7 +516,7 @@ export const hazardReportRequestSchema = {
     reportedAt: dateTimeSchema,
     source: {
       type: 'string',
-      enum: ['manual', 'automatic'],
+      enum: ['in_ride', 'manual', 'armchair'],
     },
     hazardType: {
       type: 'string',

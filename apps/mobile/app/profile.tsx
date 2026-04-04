@@ -208,6 +208,8 @@ export default function ProfileScreen() {
     staleTime: 120_000,
   });
 
+  const locale = useAppStore((state) => state.locale);
+  const setLocale = useAppStore((state) => state.setLocale);
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
   const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
   const bikeType = useAppStore((state) => state.bikeType);
@@ -339,6 +341,23 @@ export default function ProfileScreen() {
           )}
 
           <GuardianSection />
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Language</Text>
+            <View style={styles.languageRow}>
+              {(['en', 'ro'] as const).map((loc) => (
+                <Pressable
+                  key={loc}
+                  style={[styles.languagePill, locale === loc && styles.languagePillActive]}
+                  onPress={() => setLocale(loc)}
+                >
+                  <Text style={[styles.languagePillText, locale === loc && styles.languagePillTextActive]}>
+                    {loc === 'en' ? 'English' : 'Română'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About you</Text>
@@ -634,6 +653,30 @@ const styles = StyleSheet.create({
     color: brandColors.accent,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
+  },
+  languageRow: {
+    flexDirection: 'row',
+    gap: space[2],
+  },
+  languagePill: {
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: gray[600],
+  },
+  languagePillActive: {
+    backgroundColor: brandColors.accent,
+    borderColor: brandColors.accent,
+  },
+  languagePillText: {
+    ...textSm,
+    fontFamily: fontFamily.body.medium,
+    color: gray[400],
+  },
+  languagePillTextActive: {
+    color: '#000',
+    fontFamily: fontFamily.body.bold,
   },
   settingRow: {
     flexDirection: 'row',

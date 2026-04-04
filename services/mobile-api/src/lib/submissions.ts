@@ -62,6 +62,7 @@ export const submitHazardReport = async (
       reported_at: request.reportedAt,
       day: now.toISOString().substring(0, 10),
       time_of_day: now.toTimeString().substring(0, 8),
+      ...(request.source ? { source: request.source } : {}),
     };
 
     let error: { message: string } | null = null;
