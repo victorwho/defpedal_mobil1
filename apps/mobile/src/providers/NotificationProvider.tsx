@@ -8,25 +8,22 @@
  * when the native module is not compiled into the APK.
  */
 import { useEffect, useRef } from 'react';
-import { NativeModules } from 'react-native';
 
 import {
   configureNotificationHandler,
   handleNotificationResponse,
 } from '../lib/push-notifications';
 
-const hasNativeModule = Boolean(
-  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotificationPresenter,
-);
-
+let _notifications: typeof import('expo-notifications') | null | undefined;
 const getNotifications = () => {
-  if (!hasNativeModule) return null;
+  if (_notifications !== undefined) return _notifications;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('expo-notifications') as typeof import('expo-notifications');
+    _notifications = require('expo-notifications') as typeof import('expo-notifications');
   } catch {
-    return null;
+    _notifications = null;
   }
+  return _notifications;
 };
 
 export const NotificationProvider = () => {

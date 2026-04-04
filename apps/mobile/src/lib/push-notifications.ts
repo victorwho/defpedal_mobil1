@@ -5,18 +5,18 @@ import { router } from 'expo-router';
 
 import { mobileApi } from './api';
 
-const hasNativeModule = Boolean(
-  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotificationPresenter,
-);
-
-// Use require() at call-time to avoid top-level native module crash
+// Lazy require at call-time — try/catch handles the case where the
+// native module isn't compiled in (local dev without native rebuild).
+let _notifications: typeof import('expo-notifications') | null | undefined;
 const getNotifications = () => {
-  if (!hasNativeModule) return null;
+  if (_notifications !== undefined) return _notifications;
   try {
-    return require('expo-notifications') as typeof import('expo-notifications');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _notifications = require('expo-notifications') as typeof import('expo-notifications');
   } catch {
-    return null;
+    _notifications = null;
   }
+  return _notifications;
 };
 
 /**
