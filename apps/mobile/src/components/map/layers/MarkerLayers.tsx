@@ -41,6 +41,17 @@ export const MarkerLayers = React.memo(({
           }}
         />
         <Mapbox.CircleLayer
+          id="route-marker-waypoint"
+          filter={['all', ['has', 'kind'], ['!=', ['get', 'kind'], 'origin'], ['!=', ['get', 'kind'], 'destination'], ['!=', ['get', 'kind'], 'user']]}
+          style={{
+            circleColor: brandColors.accent,
+            circleRadius: 5,
+            circleStrokeColor: gray[50],
+            circleStrokeWidth: 2,
+            circleEmissiveStrength: 1,
+          }}
+        />
+        <Mapbox.CircleLayer
           id="route-marker-user"
           filter={['==', ['get', 'kind'], 'user']}
           style={{

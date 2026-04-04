@@ -1,19 +1,24 @@
 import type {
+  CommunityStats,
+  CyclingGoal,
   ErrorResponse,
   FeedComment,
   FeedItem,
   FeedResponse,
+  GuardianTier,
   ProfileResponse,
   SafetyTag,
   ShareTripRequest,
   WriteAckResponse,
 } from '@defensivepedal/core';
 import { calculateCo2SavedKg } from '@defensivepedal/core';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import { requireAuthenticatedUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import {
+  communityStatsQuerystringSchema,
+  communityStatsResponseSchema,
   errorResponseSchema,
   feedCommentRequestSchema,
   feedCommentsResponseSchema,
@@ -23,6 +28,7 @@ import {
   profileResponseSchema,
   profileUpdateRequestSchema,
   shareTripRequestSchema,
+  type CommunityStatsQuerystring,
   type FeedCommentBody,
   type FeedQuerystring,
   type ProfileUpdateBody,
@@ -56,14 +62,37 @@ const ensureSupabase = () => {
 
 const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
 
+/** Fire-and-forget streak qualification. */
+const qualifyStreakAsync = (
+  userId: string,
+  actionType: string,
+  request: FastifyRequest,
+): void => {
+  if (!supabaseAdmin) return;
+  const tz = (request.headers['x-timezone'] as string | undefined) ?? 'UTC';
+  void supabaseAdmin
+    .rpc('qualify_streak_action', {
+      p_user_id: userId,
+      p_action_type: actionType,
+      p_time_zone: tz,
+    })
+    .then(({ error }) => {
+      if (error) {
+        request.log.warn({ event: 'streak_qualify_error', actionType, error: error.message }, 'streak qualification failed');
+      }
+    });
+};
+
 const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
   const profile = row.profiles as Record<string, unknown> | null;
+  const username = profile?.username as string | null;
   return {
     id: row.id as string,
     user: {
       id: row.user_id as string,
-      displayName: (profile?.display_name as string) ?? 'Rider',
+      displayName: username ? `@${username}` : (profile?.display_name as string) ?? 'Rider',
       avatarUrl: (profile?.avatar_url as string) ?? null,
+      guardianTier: (profile?.guardian_tier as GuardianTier) ?? null,
     },
     title: (row.title as string) ?? '',
     startLocationText: (row.start_location_text as string) ?? '',
@@ -144,6 +173,56 @@ export const buildFeedRoutes = (
       },
     );
 
+    // GET /community/stats — aggregate stats for nearby community
+    app.get<{ Querystring: CommunityStatsQuerystring; Reply: CommunityStats | ErrorResponse }>(
+      '/community/stats',
+      {
+        schema: {
+          querystring: communityStatsQuerystringSchema,
+          response: {
+            200: communityStatsResponseSchema,
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        await requireUser(request, dependencies);
+        const db = ensureSupabase();
+
+        const { lat, lon, radiusKm: rawRadius } = request.query;
+        const radiusMeters = (rawRadius ?? DEFAULT_RADIUS_KM) * 1000;
+
+        const { data, error } = await db.rpc('get_community_stats', {
+          user_lat: lat,
+          user_lon: lon,
+          radius_meters: radiusMeters,
+        });
+
+        if (error) {
+          request.log.error({ event: 'community_stats_error', error: error.message }, 'community stats query failed');
+          throw new HttpError('Community stats query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const row = Array.isArray(data) ? data[0] : data;
+        const totalDistanceMeters = Number(row?.total_distance_meters ?? 0);
+
+        return {
+          localityName: null,
+          totalTrips: Number(row?.total_trips ?? 0),
+          totalDistanceMeters,
+          totalDurationSeconds: Number(row?.total_duration_seconds ?? 0),
+          totalCo2SavedKg: calculateCo2SavedKg(totalDistanceMeters),
+          uniqueRiders: Number(row?.unique_riders ?? 0),
+        };
+      },
+    );
+
     // POST /feed/share — share a trip
     app.post<{ Body: ShareTripBody; Reply: { id: string; sharedAt: string } | ErrorResponse }>(
       '/feed/share',
@@ -202,6 +281,8 @@ export const buildFeedRoutes = (
             details: [error?.message ?? 'Unknown error.'],
           });
         }
+
+        qualifyStreakAsync(user.id, 'trip_share', request);
 
         return {
           id: data.id as string,
@@ -386,7 +467,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('feed_comments')
-          .select('id, user_id, body, created_at, profiles(display_name, avatar_url)')
+          .select('id, user_id, body, created_at, profiles(display_name, avatar_url, guardian_tier)')
           .eq('trip_share_id', request.params.id)
           .order('created_at', { ascending: true });
 
@@ -400,12 +481,14 @@ export const buildFeedRoutes = (
 
         const comments: FeedComment[] = (data ?? []).map((row: Record<string, unknown>) => {
           const profile = row.profiles as Record<string, unknown> | null;
+          const commentUsername = profile?.username as string | null;
           return {
             id: row.id as string,
             user: {
               id: row.user_id as string,
-              displayName: (profile?.display_name as string) ?? 'Rider',
+              displayName: commentUsername ? `@${commentUsername}` : (profile?.display_name as string) ?? 'Rider',
               avatarUrl: (profile?.avatar_url as string) ?? null,
+              guardianTier: (profile?.guardian_tier as GuardianTier) ?? null,
             },
             body: row.body as string,
             createdAt: row.created_at as string,
@@ -503,8 +586,10 @@ export const buildFeedRoutes = (
 
         const updates: Record<string, unknown> = {};
         if (request.body.displayName !== undefined) updates.display_name = request.body.displayName.trim();
+        if (request.body.username !== undefined) updates.username = request.body.username.trim().toLowerCase();
         if (request.body.autoShareRides !== undefined) updates.auto_share_rides = request.body.autoShareRides;
         if (request.body.trimRouteEndpoints !== undefined) updates.trim_route_endpoints = request.body.trimRouteEndpoints;
+        if (request.body.cyclingGoal !== undefined) updates.cycling_goal = request.body.cyclingGoal;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db
@@ -512,6 +597,14 @@ export const buildFeedRoutes = (
             .upsert({ id: user.id, ...updates }, { onConflict: 'id' });
 
           if (error) {
+            // Check for unique constraint violation on username
+            if (error.code === '23505' && error.message.includes('username')) {
+              throw new HttpError('Username already taken.', {
+                statusCode: 409,
+                code: 'CONFLICT',
+                details: ['This username is already in use. Please choose a different one.'],
+              });
+            }
             throw new HttpError('Profile update failed.', {
               statusCode: 502,
               code: 'UPSTREAM_ERROR',
@@ -522,7 +615,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, avatar_url, auto_share_rides, trim_route_endpoints')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
           .eq('id', user.id)
           .single();
 
@@ -537,9 +630,12 @@ export const buildFeedRoutes = (
         return {
           id: data.id as string,
           displayName: data.display_name as string,
+          username: (data.username as string) ?? null,
           avatarUrl: (data.avatar_url as string) ?? null,
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
+          cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
+          guardianTier: (data.guardian_tier as GuardianTier) ?? null,
         };
       },
     );
@@ -562,7 +658,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, avatar_url, auto_share_rides, trim_route_endpoints')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
           .eq('id', user.id)
           .single();
 
@@ -573,7 +669,7 @@ export const buildFeedRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, avatar_url, auto_share_rides, trim_route_endpoints')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
             .single();
 
           if (createError || !created) {
@@ -587,19 +683,103 @@ export const buildFeedRoutes = (
           return {
             id: created.id as string,
             displayName: created.display_name as string,
+            username: (created.username as string) ?? null,
             avatarUrl: (created.avatar_url as string) ?? null,
             autoShareRides: Boolean(created.auto_share_rides),
             trimRouteEndpoints: Boolean(created.trim_route_endpoints),
+            cyclingGoal: (created.cycling_goal as CyclingGoal) ?? null,
+            guardianTier: (created.guardian_tier as GuardianTier) ?? null,
           };
         }
 
         return {
           id: data.id as string,
           displayName: data.display_name as string,
+          username: (data.username as string) ?? null,
           avatarUrl: (data.avatar_url as string) ?? null,
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
+          cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
+          guardianTier: (data.guardian_tier as GuardianTier) ?? null,
         };
+      },
+    );
+
+    // POST /users/:id/follow — follow a user
+    app.post<{ Params: { id: string } }>(
+      '/users/:id/follow',
+      {
+        schema: {
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+          response: { 200: { type: 'object', properties: { followedAt: { type: 'string' } } }, 401: errorResponseSchema, 409: errorResponseSchema },
+        },
+      },
+      async (request) => {
+        const user = await requireUser(request, dependencies);
+        const db = ensureSupabase();
+        const targetId = request.params.id;
+
+        if (targetId === user.id) {
+          throw new HttpError('Cannot follow yourself.', { statusCode: 400, code: 'BAD_REQUEST' });
+        }
+
+        const { error } = await db.from('user_follows').insert({ follower_id: user.id, following_id: targetId });
+
+        if (error) {
+          if (error.code === '23505') return { followedAt: new Date().toISOString() }; // already following
+          throw new HttpError('Follow failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+        }
+
+        return { followedAt: new Date().toISOString() };
+      },
+    );
+
+    // DELETE /users/:id/follow — unfollow a user
+    app.delete<{ Params: { id: string } }>(
+      '/users/:id/follow',
+      {
+        schema: {
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+          response: { 200: { type: 'object', properties: { unfollowedAt: { type: 'string' } } }, 401: errorResponseSchema },
+        },
+      },
+      async (request) => {
+        const user = await requireUser(request, dependencies);
+        const db = ensureSupabase();
+
+        await db.from('user_follows').delete().match({ follower_id: user.id, following_id: request.params.id });
+
+        return { unfollowedAt: new Date().toISOString() };
+      },
+    );
+
+    // GET /users/:id/profile — public user profile with trips and follow status
+    app.get<{ Params: { id: string } }>(
+      '/users/:id/profile',
+      {
+        schema: {
+          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
+          response: { 401: errorResponseSchema, 404: errorResponseSchema, 502: errorResponseSchema },
+        },
+      },
+      async (request) => {
+        const user = await requireUser(request, dependencies);
+        const db = ensureSupabase();
+
+        const { data, error } = await db.rpc('get_user_public_profile', {
+          p_user_id: request.params.id,
+          p_requesting_user_id: user.id,
+        });
+
+        if (error) {
+          throw new HttpError('Profile fetch failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+        }
+
+        if (!data) {
+          throw new HttpError('User not found.', { statusCode: 404, code: 'NOT_FOUND' });
+        }
+
+        return data;
       },
     );
   };

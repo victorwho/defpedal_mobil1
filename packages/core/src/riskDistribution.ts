@@ -14,8 +14,8 @@ export interface RiskDistributionEntry {
 }
 
 export const RISK_CATEGORIES: readonly RiskCategory[] = [
-  { label: 'Very safe', minScore: -Infinity, maxScore: 30, color: '#4CAF50' },
-  { label: 'Safe', minScore: 30, maxScore: 43.5, color: '#8BC34A' },
+  { label: 'Very safe', minScore: -Infinity, maxScore: 33, color: '#4CAF50' },
+  { label: 'Safe', minScore: 33, maxScore: 43.5, color: '#8BC34A' },
   { label: 'Average', minScore: 43.5, maxScore: 51.8, color: '#FFEB3B' },
   { label: 'Elevated', minScore: 51.8, maxScore: 57.6, color: '#FF9800' },
   { label: 'Risky', minScore: 57.6, maxScore: 69, color: '#FF5722' },

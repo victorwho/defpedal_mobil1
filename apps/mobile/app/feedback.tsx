@@ -1,10 +1,14 @@
-import { getPreviewOrigin } from '@defensivepedal/core';
+import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
+import { calculateTrailDistanceMeters, getPreviewOrigin } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -12,13 +16,29 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { brandColors } from '../src/design-system/tokens/colors';
+import { ImpactSummaryCard } from '../src/components/ImpactSummaryCard';
+import {
+  type MilestoneKey,
+  MilestoneShareCard,
+  MILESTONE_CONFIGS,
+  detectNewMilestones,
+  getMilestoneShareText,
+} from '../src/components/MilestoneShareCard';
+import { Button } from '../src/design-system/atoms';
+import { Modal } from '../src/design-system/organisms/Modal';
+import { brandColors, darkTheme } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
+import { mobileApi } from '../src/lib/api';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+
+// ---------------------------------------------------------------------------
+// Star rating (preserved from original)
+// ---------------------------------------------------------------------------
 
 const STAR_SIZE = 40;
 const STAR_COLOR_ACTIVE = '#FACC15';
@@ -58,11 +78,47 @@ function StarRow({
   );
 }
 
-export default function FeedbackScreen() {
+// ---------------------------------------------------------------------------
+// Step 1: Impact summary
+// ---------------------------------------------------------------------------
+
+type ImpactStepProps = {
+  readonly rideImpact: RideImpact;
+  readonly dashboard: ImpactDashboard | null;
+  readonly onContinue: () => void;
+};
+
+const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => (
+  <ScrollView
+    contentContainerStyle={styles.impactScrollContent}
+    showsVerticalScrollIndicator={false}
+  >
+    <Text style={styles.impactHeadline}>Great ride!</Text>
+    <Text style={styles.impactSubtext}>
+      Here is the positive impact of your trip.
+    </Text>
+
+    <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} />
+
+    <View style={styles.impactActions}>
+      <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
+        Continue
+      </Button>
+    </View>
+  </ScrollView>
+);
+
+// ---------------------------------------------------------------------------
+// Step 2: Star rating + comment (preserved logic)
+// ---------------------------------------------------------------------------
+
+type RatingStepProps = {
+  readonly onDone: () => void;
+  readonly onCancel: () => void;
+};
+
+const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
   const { user } = useAuthSession();
-  const guardPassed = useRouteGuard({
-    requiredStates: ['AWAITING_FEEDBACK'],
-  });
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -75,7 +131,6 @@ export default function FeedbackScreen() {
   const tripServerIds = useAppStore((s) => s.tripServerIds);
   const queuedMutations = useAppStore((s) => s.queuedMutations);
   const enqueueMutation = useAppStore((s) => s.enqueueMutation);
-  const resetFlow = useAppStore((s) => s.resetFlow);
 
   const selectedRoute =
     routePreview?.routes.find((r) => r.id === selectedRouteId) ??
@@ -117,14 +172,241 @@ export default function FeedbackScreen() {
     setSubmitted(true);
   };
 
-  const handleDone = () => {
+  if (submitted) {
+    return (
+      <View style={styles.cardContainer}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Thank you!</Text>
+          <Text style={styles.subtitle}>
+            Your feedback makes the streets safer for everyone.
+          </Text>
+          <Pressable
+            style={[styles.button, styles.doneButton]}
+            onPress={onDone}
+          >
+            <Text style={styles.doneButtonText}>Done</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.keyboardView}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <View style={styles.cardContainer}>
+        <View style={styles.card}>
+          <Text style={styles.title}>How safe was your trip?</Text>
+          <Text style={styles.subtitle}>
+            Your feedback helps improve future routes.
+          </Text>
+
+          <Text style={styles.sectionLabel}>Perceived safety</Text>
+          <StarRow rating={rating} onSelect={setRating} />
+
+          <Text style={styles.sectionLabel}>Comments (optional)</Text>
+          <TextInput
+            style={styles.commentInput}
+            multiline
+            numberOfLines={4}
+            placeholder="Any comments about the route?"
+            placeholderTextColor="#9CA3AF"
+            value={comments}
+            onChangeText={setComments}
+            textAlignVertical="top"
+          />
+
+          <View style={styles.buttonRow}>
+            <Pressable
+              style={[styles.button, styles.cancelButton]}
+              onPress={onCancel}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.button,
+                styles.submitButton,
+                submitDisabled && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmit}
+              disabled={submitDisabled}
+            >
+              <Text
+                style={[
+                  styles.submitButtonText,
+                  submitDisabled && styles.submitButtonTextDisabled,
+                ]}
+              >
+                Submit
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Main screen
+// ---------------------------------------------------------------------------
+
+type FeedbackStep = 'impact' | 'rating';
+
+export default function FeedbackScreen() {
+  const guardPassed = useRouteGuard({
+    requiredStates: ['AWAITING_FEEDBACK'],
+  });
+  const authCtx = useAuthSessionOptional();
+
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const activeTripClientId = useAppStore((s) => s.activeTripClientId);
+  const tripServerIds = useAppStore((s) => s.tripServerIds);
+  const earnedMilestones = useAppStore((s) => s.earnedMilestones);
+  const addEarnedMilestone = useAppStore((s) => s.addEarnedMilestone);
+  const resetFlow = useAppStore((s) => s.resetFlow);
+
+  // Compute impact synchronously on mount from store data
+  const initialImpact = useMemo<RideImpact>(() => {
+    const store = useAppStore.getState();
+    const session = store.navigationSession;
+    const preview = store.routePreview;
+    const route = preview?.routes.find((r) => r.id === store.selectedRouteId) ?? preview?.routes[0] ?? null;
+    const breadcrumbs = session?.gpsBreadcrumbs ?? [];
+    const distMeters = breadcrumbs.length >= 2
+      ? calculateTrailDistanceMeters(breadcrumbs)
+      : route?.distanceMeters ?? 0;
+    const co2 = distMeters / 1000 * 0.12;
+    const money = distMeters / 1000 * 0.35;
+    return {
+      tripId: store.activeTripClientId ?? 'local',
+      co2SavedKg: co2,
+      moneySavedEur: money,
+      hazardsWarnedCount: 0,
+      distanceMeters: distMeters,
+      equivalentText: co2 >= 0.5 ? 'Planting a small tree seedling'
+        : co2 >= 0.1 ? 'Charging a smartphone 12 times'
+        : null,
+    };
+  }, []);
+
+  const [step, setStep] = useState<FeedbackStep>('impact');
+  const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
+  const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+
+  // Try to enhance impact data from server (non-blocking — local data already shown)
+  useEffect(() => {
+    const tripServerId = activeTripClientId
+      ? tripServerIds[activeTripClientId]
+      : null;
+
+    let cancelled = false;
+
+    const enhance = async () => {
+      try {
+        // Upgrade with server data if available
+        if (tripServerId) {
+          const result = await mobileApi.fetchRideImpact(tripServerId);
+          if (!cancelled) setRideImpact(result);
+        }
+        // Fetch dashboard for milestone detection
+        const dash = await mobileApi.fetchImpactDashboard(
+          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        );
+        if (!cancelled) setDashboard(dash);
+      } catch { /* server enhancement is optional */ }
+    };
+
+    void enhance();
+    return () => { cancelled = true; };
+  }, [activeTripClientId, tripServerIds]);
+
+  // Milestone detection
+  const [pendingMilestone, setPendingMilestone] = useState<MilestoneKey | null>(null);
+
+  useEffect(() => {
+    if (!dashboard) return;
+
+    const newMilestones = detectNewMilestones({
+      streakDays: dashboard.streak.currentStreak,
+      totalDistanceKm: (dashboard.totalCo2SavedKg / 0.12), // reverse from CO2 to approximate km
+      totalRides: dashboard.thisWeek.rides, // approximate — full total not in dashboard
+      totalCo2Kg: dashboard.totalCo2SavedKg,
+      guardianTier: dashboard.guardianTier,
+      earnedMilestones,
+    });
+
+    if (newMilestones.length > 0) {
+      setPendingMilestone(newMilestones[0]);
+    }
+  }, [dashboard, earnedMilestones]);
+
+  const handleShareMilestone = async () => {
+    if (!pendingMilestone) return;
+
+    addEarnedMilestone(pendingMilestone);
+    const shareText = getMilestoneShareText(pendingMilestone);
+
+    try {
+      await Share.share({ message: shareText });
+    } catch {
+      // User cancelled share — that's fine
+    }
+
+    setPendingMilestone(null);
+  };
+
+  const handleDismissMilestone = () => {
+    if (pendingMilestone) {
+      addEarnedMilestone(pendingMilestone);
+    }
+    setPendingMilestone(null);
+  };
+
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  const [signupSubmitting, setSignupSubmitting] = useState(false);
+  const signupPromptShownRef = useRef(false);
+
+  const navigateAway = () => {
     resetFlow();
     router.replace('/route-planning');
   };
 
+  const handleDone = () => {
+    // Show signup prompt for anonymous users (once per session)
+    if (authCtx?.isAnonymous && !signupPromptShownRef.current) {
+      signupPromptShownRef.current = true;
+      setShowSignupPrompt(true);
+      return;
+    }
+    navigateAway();
+  };
+
   const handleCancel = () => {
-    resetFlow();
-    router.replace('/route-planning');
+    navigateAway();
+  };
+
+  const handleSignupGoogle = async () => {
+    if (!authCtx) return;
+    setSignupSubmitting(true);
+    try {
+      await authCtx.signInWithGoogle();
+    } catch {
+      // Ignore — user cancelled or error
+    } finally {
+      setSignupSubmitting(false);
+      navigateAway();
+    }
+  };
+
+  const handleSignupDismiss = () => {
+    setShowSignupPrompt(false);
+    navigateAway();
   };
 
   if (!guardPassed) return null;
@@ -132,88 +414,87 @@ export default function FeedbackScreen() {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          style={styles.keyboardView}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.cardContainer}>
-            <View style={styles.card}>
-              {submitted ? (
-                <>
-                  <Text style={styles.thankYouEmoji}>🙏</Text>
-                  <Text style={styles.title}>Thank you!</Text>
-                  <Text style={styles.subtitle}>
-                    Thank you for submitting feedback, you are making the street safer for everyone 🤗
-                  </Text>
-                  <Pressable
-                    style={[styles.button, styles.doneButton]}
-                    onPress={handleDone}
-                  >
-                    <Text style={styles.doneButtonText}>Done</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  {/* Title */}
-                  <Text style={styles.title}>How safe was your trip?</Text>
-                  <Text style={styles.subtitle}>
-                    Your feedback helps improve future routes.
-                  </Text>
-
-                  {/* Star rating */}
-                  <Text style={styles.sectionLabel}>Perceived safety</Text>
-                  <StarRow rating={rating} onSelect={setRating} />
-
-                  {/* Comments */}
-                  <Text style={styles.sectionLabel}>Comments (optional)</Text>
-                  <TextInput
-                    style={styles.commentInput}
-                    multiline
-                    numberOfLines={4}
-                    placeholder="Any comments about the route?"
-                    placeholderTextColor="#9CA3AF"
-                    value={comments}
-                    onChangeText={setComments}
-                    textAlignVertical="top"
-                  />
-
-                  {/* Buttons */}
-                  <View style={styles.buttonRow}>
-                    <Pressable
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={handleCancel}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={[
-                        styles.button,
-                        styles.submitButton,
-                        submitDisabled && styles.submitButtonDisabled,
-                      ]}
-                      onPress={handleSubmit}
-                      disabled={submitDisabled}
-                    >
-                      <Text
-                        style={[
-                          styles.submitButtonText,
-                          submitDisabled && styles.submitButtonTextDisabled,
-                        ]}
-                      >
-                        Submit
-                      </Text>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+        {step === 'impact' ? (
+          <ImpactStep
+            rideImpact={rideImpact}
+            dashboard={dashboard}
+            onContinue={() => setStep('rating')}
+          />
+        ) : (
+          <RatingStep onDone={handleDone} onCancel={handleCancel} />
+        )}
       </SafeAreaView>
+
+      {/* Milestone share modal */}
+      {pendingMilestone ? (
+        <Modal
+          visible
+          onClose={handleDismissMilestone}
+          title="You hit a milestone!"
+          description={MILESTONE_CONFIGS[pendingMilestone].subtitle}
+          footer={
+            <View style={styles.milestoneFooter}>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                onPress={() => void handleShareMilestone()}
+              >
+                Share your achievement
+              </Button>
+              <Button
+                variant="ghost"
+                size="md"
+                onPress={handleDismissMilestone}
+              >
+                Maybe later
+              </Button>
+            </View>
+          }
+        >
+          <MilestoneShareCard milestoneKey={pendingMilestone} />
+        </Modal>
+      ) : null}
+
+      {/* Anonymous signup prompt after ride */}
+      {showSignupPrompt ? (
+        <Modal
+          visible
+          onClose={handleSignupDismiss}
+          title="Save your progress"
+          description="Sign up to keep your streak, impact stats, and ride history across devices."
+          footer={
+            <View style={styles.signupPromptFooter}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.signupGoogleButton,
+                  pressed && { opacity: 0.8 },
+                  signupSubmitting && { opacity: 0.4 },
+                ]}
+                onPress={() => void handleSignupGoogle()}
+                disabled={signupSubmitting}
+                accessibilityRole="button"
+                accessibilityLabel="Sign in with Google"
+              >
+                <View style={styles.signupGoogleIcon}>
+                  <Text style={styles.signupGoogleG}>G</Text>
+                </View>
+                <Text style={styles.signupGoogleLabel}>Continue with Google</Text>
+              </Pressable>
+              <Button variant="ghost" size="md" onPress={handleSignupDismiss}>
+                Maybe later
+              </Button>
+            </View>
+          }
+        />
+      ) : null}
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   root: {
@@ -223,6 +504,34 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Impact step
+  impactScrollContent: {
+    paddingHorizontal: space[5],
+    paddingVertical: space[6],
+    gap: space[4],
+  },
+  impactHeadline: {
+    ...text2xl,
+    fontFamily: fontFamily.heading.extraBold,
+    color: darkTheme.textPrimary,
+    textAlign: 'center',
+  },
+  impactSubtext: {
+    ...textBase,
+    color: darkTheme.textSecondary,
+    textAlign: 'center',
+    marginTop: -space[2],
+  },
+  impactActions: {
+    gap: space[3],
+    paddingTop: space[2],
+  },
+  // Rating step (preserved)
   keyboardView: {
     flex: 1,
   },
@@ -241,10 +550,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 8,
-  },
-  thankYouEmoji: {
-    fontSize: 56,
-    textAlign: 'center',
   },
   title: {
     ...text2xl,
@@ -328,5 +633,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fontFamily.body.bold,
     color: '#111827',
+  },
+  milestoneFooter: {
+    gap: space[2],
+    alignItems: 'center',
+  },
+  signupPromptFooter: {
+    gap: space[3],
+    alignItems: 'center',
+  },
+  signupGoogleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 52,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+    backgroundColor: darkTheme.bgSecondary,
+    gap: space[3],
+  },
+  signupGoogleIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signupGoogleG: {
+    fontFamily: fontFamily.body.bold,
+    fontSize: 14,
+    color: '#4285F4',
+    marginTop: -1,
+  },
+  signupGoogleLabel: {
+    ...textSm,
+    fontFamily: fontFamily.body.bold,
+    color: darkTheme.textPrimary,
   },
 });

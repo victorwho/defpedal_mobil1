@@ -113,13 +113,25 @@ const mapRoute = (
 // Fetch routes from OSRM (safe mode)
 // ---------------------------------------------------------------------------
 
+const buildCoordString = (
+  origin: Coordinate,
+  destination: Coordinate,
+  waypoints?: readonly Coordinate[],
+): string => {
+  const points = [origin, ...(waypoints ?? []), destination];
+  return points.map((p) => `${p.lon},${p.lat}`).join(';');
+};
+
 const fetchOsrmRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
   avoidUnpaved: boolean,
+  waypoints?: readonly Coordinate[],
 ): Promise<Route[]> => {
-  const coords = `${origin.lon},${origin.lat};${destination.lon},${destination.lat}`;
-  let url = `${OSRM_API_BASE}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=true&annotations=true`;
+  const coords = buildCoordString(origin, destination, waypoints);
+  // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
+  const hasWaypoints = waypoints && waypoints.length > 0;
+  let url = `${OSRM_API_BASE}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
     url += '&exclude=unpaved';
@@ -150,6 +162,7 @@ const fetchOsrmRoutes = async (
 const fetchMapboxRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
+  waypoints?: readonly Coordinate[],
 ): Promise<Route[]> => {
   const token = mobileEnv.mapboxPublicToken;
 
@@ -157,9 +170,10 @@ const fetchMapboxRoutes = async (
     throw new Error('EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN is not configured.');
   }
 
-  const coords = `${origin.lon},${origin.lat};${destination.lon},${destination.lat}`;
+  const coords = buildCoordString(origin, destination, waypoints);
+  const hasWaypoints = waypoints && waypoints.length > 0;
   const params = new URLSearchParams({
-    alternatives: 'true',
+    alternatives: hasWaypoints ? 'false' : 'true',
     geometries: 'geojson',
     steps: 'true',
     overview: 'full',
@@ -327,10 +341,12 @@ export const directPreviewRoute = async (
   const source: 'custom_osrm' | 'mapbox' =
     mode === 'safe' ? 'custom_osrm' : 'mapbox';
 
+  const waypoints = request.waypoints;
+
   const rawRoutes =
     mode === 'safe'
-      ? await fetchOsrmRoutes(origin, destination, request.avoidUnpaved)
-      : await fetchMapboxRoutes(origin, destination);
+      ? await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, waypoints)
+      : await fetchMapboxRoutes(origin, destination, waypoints);
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
     mapRoute(route, source, index),
@@ -365,7 +381,7 @@ export const directPreviewRoute = async (
 
       if (mode === 'safe') {
         // Fetch fast route for comparison
-        const fastRawRoutes = await fetchMapboxRoutes(origin, destination);
+        const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints);
         if (fastRawRoutes.length > 0) {
           const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
@@ -373,7 +389,7 @@ export const directPreviewRoute = async (
         }
       } else {
         // Fetch safe route for comparison
-        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved);
+        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, waypoints);
         if (safeRawRoutes.length > 0) {
           const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0);
           const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);

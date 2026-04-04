@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-02
+Last updated: 2026-04-03
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -15,6 +15,9 @@ Update it at the end of each implementation slice.
 - Preview tunnel note: preview mobile development can now auto-sync the active ngrok URL into `apps/mobile/.env.preview` through `npm run sync:mobile:preview-url` and `npm run dev:mobile:preview`
 - CO2 savings feature (2026-04-02): full-stack CO2 savings calculator shipped — per-trip and cumulative environmental impact tracking across trip history, community feed, and profile. Uses actual GPS trail distance (not planned route) for accuracy. Deployed to Cloud Run.
 - Trip Statistics Dashboard (2026-04-02): full-stack stats dashboard embedded inline in the History tab. Features: period selector (week/month/all time), summary cards (rides, distance, duration, CO2 saved), riding streak tracker (current + longest), ride frequency bar chart, safe vs fast route mode split. Backed by new `get_trip_stats_dashboard` Supabase RPC with timezone-aware bucketing, performance index, and new `GET /v1/stats/dashboard` Fastify endpoint. 16 new tests (9 unit + 7 integration), all passing. Deployed to Cloud Run.
+- Community Stats by Locality (2026-04-02): community section shows aggregate stats (trips, km, time, CO2) for nearby cyclists with locality name via Mapbox reverse geocoding. New `get_community_stats` Supabase RPC + `GET /v1/community/stats` endpoint.
+- Habit Engine (2026-04-02 to 2026-04-03): major feature set across 7 phases. Includes: anonymous auth (Supabase), 5-screen onboarding flow (location permission → safety score → cycling goal → circuit route to nearest POI → deferred signup), post-ride impact summary (animated CO2/money/hazards counters with variable equivalents), streak engine (4AM cutoff, 5 qualifying actions, freeze mechanic), Impact Dashboard (StreakChain, AnimatedCounters, guardian tier progress), daily safety quiz (50+ questions), enhanced hazard reporting (2-tap FAB, armchair long-press, confirm/deny display), guardian tier system (reporter→watchdog→sentinel→guardian angel with auto-promotion trigger), milestone share cards, scheduled notifications (streak protection, weekly impact, social digest), community stats by locality. 6 new DB tables, 5 RPCs, 3 triggers, 26 reward equivalents seeded, 40+ new integration tests. All deployed to Cloud Run + Supabase.
+- Multi-Stop Routes (2026-04-03): support for intermediate stops (waypoints) in route planning. Waypoints field added to RoutePreviewRequest, OSRM/Mapbox routing extended, Zustand store actions (add/remove/clear), discrete "Add stop" UI with autocomplete (max 3 stops), yellow waypoint markers on map. Works with both safe and fast routing modes.
 
 ## Phase Status
 

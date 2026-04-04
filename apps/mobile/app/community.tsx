@@ -3,17 +3,22 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { CommunityStatsCard } from '../src/design-system/organisms/CommunityStatsCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { brandColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
+import { useCommunityStats } from '../src/hooks/useCommunityStats';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function CommunityScreen() {
+  const { stats, isLoading, error } = useCommunityStats();
+
   return (
     <View style={styles.root}>
       <View style={styles.content}>
         <Screen title="Community" eyebrow="Defensive Pedal" subtitle="Connect with fellow cyclists">
+          <CommunityStatsCard stats={stats} isLoading={isLoading} error={error} />
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>Cyclist Community Feed</Text>
             <Text style={styles.placeholderSub}>

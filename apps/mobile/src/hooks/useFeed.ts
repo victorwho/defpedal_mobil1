@@ -103,7 +103,10 @@ export const useLikeToggle = () => {
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+      // Delay invalidation to let the server process the like before refetching
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+      }, 3000);
     },
   });
 };
@@ -161,7 +164,9 @@ export const useLoveToggle = () => {
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+      }, 3000);
     },
   });
 };

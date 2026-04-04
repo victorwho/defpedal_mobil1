@@ -67,6 +67,7 @@ export interface RouteDebugInfo {
 export interface RoutePreviewRequest {
   origin: Coordinate;
   destination: Coordinate;
+  waypoints?: readonly Coordinate[];
   startOverride?: Coordinate;
   mode: RoutingMode;
   avoidUnpaved: boolean;
@@ -386,6 +387,31 @@ export interface FeedProfile {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+  guardianTier: GuardianTier | null;
+}
+
+export interface UserPublicProfile {
+  readonly id: string;
+  readonly displayName: string;
+  readonly username: string | null;
+  readonly avatarUrl: string | null;
+  readonly guardianTier: GuardianTier;
+  readonly totalTrips: number;
+  readonly totalDistanceMeters: number;
+  readonly totalCo2SavedKg: number;
+  readonly totalHazardsReported: number;
+  readonly followersCount: number;
+  readonly followingCount: number;
+  readonly isFollowedByMe: boolean;
+  readonly recentTrips: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly distanceMeters: number;
+    readonly durationSeconds: number;
+    readonly safetyRating: number | null;
+    readonly sharedAt: string;
+    readonly geometryPolyline6: string;
+  }[];
 }
 
 export interface FeedItem {
@@ -441,6 +467,17 @@ export interface TripStatsDashboard {
   readonly modeSplit: TripStatsModeSplit;
 }
 
+// ── Community Stats ──
+
+export interface CommunityStats {
+  readonly localityName: string | null;
+  readonly totalTrips: number;
+  readonly totalDistanceMeters: number;
+  readonly totalDurationSeconds: number;
+  readonly totalCo2SavedKg: number;
+  readonly uniqueRiders: number;
+}
+
 export interface FeedComment {
   id: string;
   user: FeedProfile;
@@ -475,14 +512,94 @@ export interface FeedCommentRequest {
 
 export interface ProfileUpdateRequest {
   displayName?: string;
+  username?: string;
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
+  cyclingGoal?: CyclingGoal | null;
 }
 
 export interface ProfileResponse {
   id: string;
   displayName: string;
+  username: string | null;
   avatarUrl: string | null;
   autoShareRides: boolean;
   trimRouteEndpoints: boolean;
+  cyclingGoal: CyclingGoal | null;
+  guardianTier: GuardianTier | null;
+}
+
+// ─── Habit Engine Types ──────────────────────────────────────────
+
+export type CyclingGoal = 'commute' | 'explore' | 'beginner';
+
+export type GuardianTier = 'reporter' | 'watchdog' | 'sentinel' | 'guardian_angel';
+
+export interface RideImpact {
+  readonly tripId: string;
+  readonly co2SavedKg: number;
+  readonly moneySavedEur: number;
+  readonly hazardsWarnedCount: number;
+  readonly distanceMeters: number;
+  readonly equivalentText: string | null;
+}
+
+export interface StreakState {
+  readonly currentStreak: number;
+  readonly longestStreak: number;
+  readonly lastQualifyingDate: string | null;
+  readonly freezeAvailable: boolean;
+  readonly freezeUsedDate: string | null;
+}
+
+export interface ImpactDashboard {
+  readonly streak: StreakState;
+  readonly totalCo2SavedKg: number;
+  readonly totalMoneySavedEur: number;
+  readonly totalHazardsReported: number;
+  readonly totalRidersProtected: number;
+  readonly guardianTier: GuardianTier;
+  readonly thisWeek: {
+    readonly rides: number;
+    readonly co2SavedKg: number;
+    readonly moneySavedEur: number;
+    readonly hazardsReported: number;
+  };
+}
+
+export interface QuizQuestion {
+  readonly id: string;
+  readonly questionText: string;
+  readonly options: readonly string[];
+  readonly category: string;
+  readonly difficulty: number;
+}
+
+export interface QuizAnswer {
+  readonly questionId: string;
+  readonly selectedIndex: number;
+  readonly isCorrect: boolean;
+  readonly explanation: string;
+}
+
+export interface UserBadge {
+  readonly badgeKey: string;
+  readonly earnedAt: string;
+  readonly metadata: Record<string, unknown>;
+}
+
+export interface NeighborhoodSafetyScore {
+  readonly score: number;
+  readonly totalSegments: number;
+  readonly safeCount: number;
+  readonly averageCount: number;
+  readonly riskyCount: number;
+  readonly veryRiskyCount: number;
+}
+
+export interface RewardEquivalent {
+  readonly category: 'co2' | 'money';
+  readonly equivalentText: string;
+  readonly thresholdValue: number;
+  readonly unit: string;
 }

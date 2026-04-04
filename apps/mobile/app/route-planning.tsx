@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType } from '@defensivepedal/core';
-import { HAZARD_TYPE_OPTIONS, hasStartOverride } from '@defensivepedal/core';
+import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import { useBicycleParking } from '../src/hooks/useBicycleParking';
 // Bike lanes now use Mapbox vector tiles directly (no hook needed)
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
+import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useWeather } from '../src/hooks/useWeather';
@@ -28,15 +29,16 @@ import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
-import { Modal } from '../src/design-system/organisms/Modal';
 import { Toast } from '../src/design-system/molecules/Toast';
-import { darkTheme, gray } from '../src/design-system/tokens/colors';
+import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily } from '../src/design-system/tokens/typography';
 
-type ActiveField = 'startOverride' | 'destination' | null;
+type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
+
+const MAX_WAYPOINTS = 3;
 
 const formatCoordinateLabel = (coordinate: Coordinate) =>
   `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
@@ -50,7 +52,10 @@ export default function RoutePlanningScreen() {
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
+  const addWaypoint = useAppStore((state) => state.addWaypoint);
+  const removeWaypoint = useAppStore((state) => state.removeWaypoint);
   const customStartEnabled = hasStartOverride(routeRequest);
+  const waypoints = routeRequest.waypoints ?? [];
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
@@ -89,11 +94,13 @@ export default function RoutePlanningScreen() {
     planningOrigin?.lat ?? null,
     planningOrigin?.lon ?? null,
   );
+  const { hazards: nearbyHazards } = useNearbyHazards(planningOrigin, true, 2000);
 
   const [startOverrideQuery, setStartOverrideQuery] = useState('');
   const [destinationQuery, setDestinationQuery] = useState(
     formatCoordinateLabel(routeRequest.destination),
   );
+  const [waypointQueries, setWaypointQueries] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [destinationHydrated, setDestinationHydrated] = useState(false);
   const syncedOriginKeyRef = useRef<string | null>(null);
@@ -104,21 +111,44 @@ export default function RoutePlanningScreen() {
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
   const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
+  const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
+  const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const user = null; // hazard reports work without auth
 
+  const handleMapLongPress = (coordinate: Coordinate) => {
+    setPendingHazardCoordinate(coordinate);
+    setHazardPickerOpen(true);
+  };
+
   const handleHazardTypeSelect = (hazardType: HazardType) => {
+    // If long-press initiated, submit directly at that coordinate
+    if (pendingHazardCoordinate) {
+      enqueueMutation('hazard', {
+        coordinate: pendingHazardCoordinate,
+        reportedAt: new Date().toISOString(),
+        source: 'manual',
+        hazardType,
+      });
+      setPendingHazardCoordinate(null);
+      setHazardPickerOpen(false);
+      setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
+      setTimeout(() => setHazardToast(null), 3000);
+      return;
+    }
+
+    // FAB-initiated: enter placement mode
     setHazardPickerOpen(false);
     setSelectedHazardType(hazardType);
     setHazardPlacementMode(true);
   };
 
-  const handleHazardPlacement = (coordinate: Coordinate) => {
-    if (!selectedHazardType) return;
+  const handleHazardPlacementConfirm = () => {
+    if (!selectedHazardType || !mapCenterCoordinate) return;
 
     enqueueMutation('hazard', {
-      coordinate,
+      coordinate: mapCenterCoordinate,
       reportedAt: new Date().toISOString(),
       source: 'manual',
       hazardType: selectedHazardType,
@@ -126,7 +156,7 @@ export default function RoutePlanningScreen() {
 
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
-    setHazardToast({ type: 'success', message: 'Hazard reported! It will sync when online.' });
+    setHazardToast({ type: 'success', message: 'Reported! Other cyclists will be warned.' });
     setTimeout(() => setHazardToast(null), 3000);
   };
 
@@ -141,6 +171,15 @@ export default function RoutePlanningScreen() {
 
   const deferredStartOverrideQuery = useDeferredValue(startOverrideQuery.trim());
   const deferredDestinationQuery = useDeferredValue(destinationQuery.trim());
+
+  // Active waypoint search query (reused for whichever waypoint field is active)
+  const activeWaypointIndex = activeField?.startsWith('waypoint-')
+    ? parseInt(activeField.split('-')[1], 10)
+    : -1;
+  const activeWaypointQuery = activeWaypointIndex >= 0
+    ? (waypointQueries[activeWaypointIndex] ?? '').trim()
+    : '';
+  const deferredWaypointQuery = useDeferredValue(activeWaypointQuery);
 
   // Sync GPS origin into route request
   useEffect(() => {
@@ -220,6 +259,26 @@ export default function RoutePlanningScreen() {
       deferredDestinationQuery.length >= 2,
   });
 
+  // Waypoint autocomplete (shared query for whichever waypoint field is active)
+  const waypointAutocompleteQuery = useQuery({
+    queryKey: [
+      'autocomplete', 'waypoint', deferredWaypointQuery,
+      routeRequest.origin, routeRequest.locale, routeRequest.countryHint,
+    ],
+    queryFn: () =>
+      mobileApi.autocomplete({
+        query: deferredWaypointQuery,
+        proximity: routeRequest.origin,
+        locale: routeRequest.locale,
+        countryHint: routeRequest.countryHint,
+        limit: 5,
+      }),
+    enabled:
+      Boolean(mobileEnv.mapboxPublicToken) &&
+      activeWaypointIndex >= 0 &&
+      deferredWaypointQuery.length >= 2,
+  });
+
   // Coverage check
   const coverageQuery = useQuery({
     queryKey: ['coverage', routeRequest.destination, routeRequest.countryHint],
@@ -260,6 +319,29 @@ export default function RoutePlanningScreen() {
   const clearStartOverride = () => {
     setRouteRequest({ startOverride: undefined });
     setStartOverrideQuery('');
+    setActiveField(null);
+  };
+
+  const handleAddStop = () => {
+    if (waypoints.length >= MAX_WAYPOINTS) return;
+    setWaypointQueries((prev) => [...prev, '']);
+    setActiveField(`waypoint-${waypoints.length}` as ActiveField);
+  };
+
+  const handleWaypointSelect = (index: number, suggestion: AutocompleteSuggestion) => {
+    Keyboard.dismiss();
+    addWaypoint(suggestion.coordinates);
+    setWaypointQueries((prev) => {
+      const next = [...prev];
+      next[index] = suggestion.label;
+      return next;
+    });
+    setActiveField(null);
+  };
+
+  const handleRemoveWaypoint = (index: number) => {
+    removeWaypoint(index);
+    setWaypointQueries((prev) => prev.filter((_, i) => i !== index));
     setActiveField(null);
   };
 
@@ -305,6 +387,7 @@ export default function RoutePlanningScreen() {
         <RouteMap
           origin={mapUserLocation ?? undefined}
           destination={hasValidDestination ? routeRequest.destination : undefined}
+          waypoints={waypoints.length > 0 ? waypoints : undefined}
           userLocation={mapUserLocation}
           followUser={false}
           fullBleed
@@ -315,9 +398,11 @@ export default function RoutePlanningScreen() {
           searchedPois={searchedPois}
           showBicycleLanes={showBikeLanes}
           poiVisibility={poiVisibility}
+          nearbyHazards={nearbyHazards}
           recenterKey={recenterKey}
-          onMapTap={hazardPlacementMode ? handleHazardPlacement : undefined}
+          onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
+          onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
         />
       }
       topOverlay={
@@ -414,6 +499,99 @@ export default function RoutePlanningScreen() {
               onSelectSuggestion={handleDestinationSelect}
             />
           </View>
+
+          {/* Waypoint stops — shown between destination and weather */}
+          {waypoints.map((wp, index) => (
+            <View key={`waypoint-${index}`} style={styles.waypointRow}>
+              <View style={styles.waypointDot}>
+                <Text style={styles.waypointDotText}>{index + 1}</Text>
+              </View>
+              {activeField === `waypoint-${index}` ? (
+                <View style={styles.waypointSearchWrap}>
+                  <SearchBar
+                    label={`Stop ${index + 1}`}
+                    value={waypointQueries[index] ?? ''}
+                    placeholder="Search for a stop"
+                    active
+                    isLoading={waypointAutocompleteQuery.isPending}
+                    suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
+                    onFocus={() => setActiveField(`waypoint-${index}` as ActiveField)}
+                    onChangeText={(value) => {
+                      setWaypointQueries((prev) => {
+                        const next = [...prev];
+                        next[index] = value;
+                        return next;
+                      });
+                      setActiveField(`waypoint-${index}` as ActiveField);
+                    }}
+                    onClear={() => handleRemoveWaypoint(index)}
+                    onSelectSuggestion={(s) => handleWaypointSelect(index, s)}
+                  />
+                </View>
+              ) : (
+                <View style={styles.waypointLabel}>
+                  <Text style={styles.waypointLabelText} numberOfLines={1}>
+                    {waypointQueries[index] || formatCoordinateLabel(wp)}
+                  </Text>
+                </View>
+              )}
+              <Pressable
+                style={styles.waypointRemove}
+                onPress={() => handleRemoveWaypoint(index)}
+                hitSlop={8}
+                accessibilityLabel={`Remove stop ${index + 1}`}
+                accessibilityRole="button"
+              >
+                <Ionicons name="close-circle" size={18} color={gray[400]} />
+              </Pressable>
+            </View>
+          ))}
+
+          {/* Pending waypoint being searched (not yet added to store) */}
+          {waypointQueries.length > waypoints.length ? (
+            <View style={styles.waypointRow}>
+              <View style={styles.waypointDot}>
+                <Text style={styles.waypointDotText}>{waypoints.length + 1}</Text>
+              </View>
+              <View style={styles.waypointSearchWrap}>
+                <SearchBar
+                  label={`Stop ${waypoints.length + 1}`}
+                  value={waypointQueries[waypoints.length] ?? ''}
+                  placeholder="Search for a stop"
+                  active
+                  isLoading={waypointAutocompleteQuery.isPending}
+                  suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
+                  onFocus={() => setActiveField(`waypoint-${waypoints.length}` as ActiveField)}
+                  onChangeText={(value) => {
+                    setWaypointQueries((prev) => {
+                      const next = [...prev];
+                      next[waypoints.length] = value;
+                      return next;
+                    });
+                    setActiveField(`waypoint-${waypoints.length}` as ActiveField);
+                  }}
+                  onClear={() => {
+                    setWaypointQueries((prev) => prev.slice(0, -1));
+                    setActiveField(null);
+                  }}
+                  onSelectSuggestion={(s) => handleWaypointSelect(waypoints.length, s)}
+                />
+              </View>
+            </View>
+          ) : null}
+
+          {/* Add stop button — discrete, only when not at max */}
+          {!activeField && waypoints.length < MAX_WAYPOINTS && waypointQueries.length <= waypoints.length ? (
+            <Pressable
+              style={styles.addStopButton}
+              onPress={handleAddStop}
+              accessibilityLabel="Add a stop"
+              accessibilityRole="button"
+            >
+              <Ionicons name="add-circle-outline" size={16} color={gray[400]} />
+              <Text style={styles.addStopText}>Add stop</Text>
+            </Pressable>
+          ) : null}
 
           {/* Weather widget — hidden while typing */}
           {!activeField ? (
@@ -526,7 +704,25 @@ export default function RoutePlanningScreen() {
         </View>
       }
       footer={
-        canPreview ? (
+        hazardPlacementMode ? (
+          <View style={styles.hazardPlacementFooter}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onPress={handleHazardPlacementConfirm}
+            >
+              Report here
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              onPress={() => { setHazardPlacementMode(false); setSelectedHazardType(null); }}
+            >
+              Cancel
+            </Button>
+          </View>
+        ) : canPreview ? (
           <Button
             variant="primary"
             size="lg"
@@ -543,47 +739,57 @@ export default function RoutePlanningScreen() {
     />
     <BottomNav activeTab="map" onTabPress={handleTabPress} />
 
-    {/* Hazard type picker modal */}
-    <Modal
-      visible={hazardPickerOpen}
-      onClose={() => setHazardPickerOpen(false)}
-      title="Report a hazard"
-      description="Select the type of hazard, then tap the map to place it."
-      footer={
-        <Button variant="secondary" size="md" fullWidth onPress={() => setHazardPickerOpen(false)}>
-          Cancel
-        </Button>
-      }
-    >
-      <View style={styles.hazardOptionList}>
-        {HAZARD_TYPE_OPTIONS.map((option) => (
-          <Button
-            key={option.value}
-            variant="secondary"
-            size="md"
-            fullWidth
-            leftIcon={
-              <Ionicons
-                name={option.value === 'other' ? 'ellipsis-horizontal' : 'warning'}
-                size={18}
-                color={darkTheme.accent}
-              />
-            }
-            onPress={() => handleHazardTypeSelect(option.value)}
+    {/* Hazard quick-pick grid overlay (same style as navigation) */}
+    {hazardPickerOpen ? (
+      <Pressable
+        style={styles.hazardGridOverlay}
+        onPress={() => setHazardPickerOpen(false)}
+      >
+        <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
+          <Text style={styles.hazardGridTitle}>Report hazard</Text>
+          <View style={styles.hazardGrid}>
+            {([
+              { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
+              { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
+              { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
+              { value: 'construction' as HazardType, label: 'Construction', icon: 'construct-outline' as const },
+              { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
+              { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+            ]).map((item) => (
+              <Pressable
+                key={item.value}
+                style={({ pressed }) => [
+                  styles.hazardGridItem,
+                  pressed && styles.hazardGridItemPressed,
+                ]}
+                onPress={() => handleHazardTypeSelect(item.value)}
+                accessibilityRole="button"
+                accessibilityLabel={`Report ${item.label}`}
+              >
+                <Ionicons name={item.icon} size={24} color={brandColors.accent} />
+                <Text style={styles.hazardGridLabel}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            style={styles.hazardGridCancel}
+            onPress={() => setHazardPickerOpen(false)}
           >
-            {option.label}
-          </Button>
-        ))}
-      </View>
-    </Modal>
+            <Text style={styles.hazardGridCancelText}>Cancel</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    ) : null}
 
     {/* Hazard toast */}
     {hazardToast ? (
-      <Toast
-        message={hazardToast.message}
-        variant={hazardToast.type === 'success' ? 'success' : 'error'}
-        onDismiss={() => setHazardToast(null)}
-      />
+      <View style={styles.hazardToastContainer}>
+        <Toast
+          message={hazardToast.message}
+          variant={hazardToast.type === 'success' ? 'success' : 'error'}
+          onDismiss={() => setHazardToast(null)}
+        />
+      </View>
     ) : null}
     </View>
   );
@@ -717,5 +923,125 @@ const styles = StyleSheet.create({
   },
   hazardOptionList: {
     gap: space[2],
+  },
+  hazardPlacementFooter: {
+    gap: space[2],
+    alignItems: 'center',
+  },
+  hazardToastContainer: {
+    position: 'absolute',
+    bottom: '20%',
+    left: space[4],
+    right: space[4],
+    zIndex: 200,
+  },
+  hazardGridOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+    paddingHorizontal: space[4],
+    paddingBottom: space[6],
+    zIndex: 100,
+  },
+  hazardGridCard: {
+    backgroundColor: darkTheme.bgPrimary,
+    borderRadius: radii['2xl'],
+    padding: space[4],
+    gap: space[3],
+    ...shadows.lg,
+  },
+  hazardGridTitle: {
+    fontFamily: fontFamily.heading.semiBold,
+    fontSize: 14,
+    color: darkTheme.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    textAlign: 'center',
+  },
+  hazardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space[2],
+  },
+  hazardGridItem: {
+    width: '31%' as unknown as number,
+    alignItems: 'center',
+    gap: space[1],
+    backgroundColor: darkTheme.bgSecondary,
+    borderRadius: radii.lg,
+    paddingVertical: space[3],
+    paddingHorizontal: space[1],
+  },
+  hazardGridItemPressed: {
+    backgroundColor: darkTheme.bgTertiary,
+  },
+  hazardGridLabel: {
+    fontSize: 11,
+    color: darkTheme.textSecondary,
+    textAlign: 'center',
+  },
+  hazardGridCancel: {
+    alignItems: 'center',
+    paddingVertical: space[2],
+  },
+  hazardGridCancelText: {
+    fontFamily: fontFamily.body.medium,
+    fontSize: 14,
+    color: darkTheme.textMuted,
+  },
+  // Waypoint styles
+  waypointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingLeft: space[1],
+  },
+  waypointDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: gray[600],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waypointDotText: {
+    fontSize: 11,
+    fontFamily: fontFamily.mono.bold,
+    color: '#FFFFFF',
+  },
+  waypointSearchWrap: {
+    flex: 1,
+  },
+  waypointLabel: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radii.lg,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    ...shadows.sm,
+  },
+  waypointLabelText: {
+    fontSize: 14,
+    fontFamily: fontFamily.body.medium,
+    color: gray[800],
+  },
+  waypointRemove: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addStopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    alignSelf: 'flex-start',
+    paddingVertical: space[1],
+    paddingHorizontal: space[2],
+  },
+  addStopText: {
+    fontSize: 13,
+    fontFamily: fontFamily.body.medium,
+    color: gray[400],
   },
 });

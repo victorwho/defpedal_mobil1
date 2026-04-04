@@ -368,7 +368,7 @@ function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
 
 // ── Composite Dashboard Component ──
 
-function DashboardContent({ dashboard, period }: { readonly dashboard: TripStatsDashboard; readonly period: StatsPeriod }) {
+function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly dashboard: TripStatsDashboard; readonly period: StatsPeriod; readonly hazardsReported?: number }) {
   const buckets = period === 'all' ? dashboard.monthly : dashboard.weekly;
 
   return (
@@ -398,6 +398,18 @@ function DashboardContent({ dashboard, period }: { readonly dashboard: TripStats
           label="CO2 Saved"
           value={formatCo2Saved(dashboard.totals.totalCo2SavedKg)}
         />
+        <SummaryCard
+          icon="cash-outline"
+          iconColor={brandColors.accent}
+          label="EUR Saved"
+          value={`€${(dashboard.totals.totalDistanceMeters / 1000 * 0.35).toFixed(0)}`}
+        />
+        <SummaryCard
+          icon="warning-outline"
+          iconColor={safetyColors.caution}
+          label="Hazards"
+          value={String(hazardsReported)}
+        />
       </View>
 
       <StreakDisplay
@@ -415,7 +427,7 @@ function DashboardContent({ dashboard, period }: { readonly dashboard: TripStats
   );
 }
 
-export function StatsDashboard() {
+export function StatsDashboard({ hazardsReported = 0 }: { readonly hazardsReported?: number } = {}) {
   const [period, setPeriod] = useState<StatsPeriod>('week');
   const { data: dashboard, isLoading, error } = useStatsDashboard();
 
@@ -436,7 +448,7 @@ export function StatsDashboard() {
           <Text style={styles.errorText}>Could not load statistics.</Text>
         </View>
       ) : dashboard ? (
-        <DashboardContent dashboard={dashboard} period={period} />
+        <DashboardContent dashboard={dashboard} period={period} hazardsReported={hazardsReported} />
       ) : null}
     </>
   );

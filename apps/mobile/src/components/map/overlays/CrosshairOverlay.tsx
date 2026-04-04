@@ -9,7 +9,7 @@ import { fontFamily, textSm } from '../../../design-system/tokens/typography';
 export const CrosshairOverlay = React.memo(() => (
   <View style={styles.crosshairOverlay} pointerEvents="none">
     <Ionicons name="add-circle-outline" size={40} color={darkTheme.accent} />
-    <Text style={styles.crosshairLabel}>Tap map to place hazard</Text>
+    <Text style={styles.crosshairLabel}>Move map to position</Text>
   </View>
 ));
 
@@ -18,8 +18,9 @@ CrosshairOverlay.displayName = 'CrosshairOverlay';
 const styles = StyleSheet.create({
   crosshairOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
+    paddingBottom: '40%',
     gap: space[2],
   },
   crosshairLabel: {

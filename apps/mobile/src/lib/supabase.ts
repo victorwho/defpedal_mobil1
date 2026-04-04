@@ -61,6 +61,7 @@ const toMobileAuthSession = (
   user: {
     id: string;
     email?: string | null;
+    is_anonymous?: boolean;
   },
 ): MobileAuthSession => ({
   accessToken,
@@ -70,6 +71,7 @@ const toMobileAuthSession = (
     email: user.email ?? null,
     provider: 'supabase',
   },
+  isAnonymous: user.is_anonymous === true,
 });
 
 const getCurrentSupabaseSession = async (): Promise<MobileAuthSession | null> => {
@@ -105,6 +107,18 @@ export const activateDeveloperBypassSession = async (): Promise<MobileAuthSessio
   await secureStorage.setItem(DEV_AUTH_SESSION_KEY, JSON.stringify(session));
   emitAuthSessionChange();
   return session;
+};
+
+export const signInAnonymously = async (): Promise<MobileAuthSession | null> => {
+  const client = requireSupabaseClient();
+  const { data, error } = await client.auth.signInAnonymously();
+
+  if (error || !data.session) {
+    return null;
+  }
+
+  emitAuthSessionChange();
+  return toMobileAuthSession(data.session.access_token, data.session.user);
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
@@ -268,7 +282,8 @@ export const getCurrentSession = async (): Promise<MobileAuthSession | null> => 
       const parsed = JSON.parse(persistedDeveloperSession) as unknown;
 
       if (isMobileAuthSession(parsed)) {
-        return parsed;
+        // Normalize old persisted sessions that lack isAnonymous
+        return { ...parsed, isAnonymous: parsed.isAnonymous ?? false };
       }
     } catch {
       // Ignore malformed payloads and fall back to the Supabase session.

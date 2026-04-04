@@ -1,4 +1,4 @@
-import { Stack, usePathname } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -7,6 +7,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { mobileEnv } from '../src/lib/env';
 import { AppProviders } from '../src/providers/AppProviders';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useAppStore } from '../src/store/appStore';
 import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
 import { fontAssets } from '../src/design-system/fonts';
@@ -34,6 +36,63 @@ const RouteTelemetryObserver = () => {
   return null;
 };
 
+/**
+ * Guards app entry based on auth state and anonymous open count.
+ *
+ * Logic:
+ * - Real account (Google): always pass through, no prompts.
+ * - Anonymous, count 1, onboarding not done: onboarding flow.
+ * - Anonymous, count 2-4, onboarding done: dismissible signup prompt.
+ * - Anonymous, count >= 5: mandatory signup (no skip).
+ *
+ * The anonymousOpenCount is incremented once per app launch (via ref).
+ */
+const OnboardingGuard = () => {
+  const pathname = usePathname();
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
+  const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
+  const authCtx = useAuthSessionOptional();
+  const hasIncrementedRef = useRef(false);
+
+  // Wait for auth to settle before making any decisions
+  if (authCtx?.isLoading) return null;
+
+  // A "real" session = authenticated with a non-anonymous account (e.g. Google)
+  const hasRealAccount = authCtx?.user != null && authCtx.isAnonymous === false;
+
+  // Real account: never redirect, never prompt
+  if (hasRealAccount) return null;
+
+  // Increment anonymous open count once per app launch
+  if (!hasIncrementedRef.current && !hasRealAccount) {
+    hasIncrementedRef.current = true;
+    incrementAnonymousOpenCount();
+  }
+
+  // Don't redirect if already in onboarding, signup, or feedback screens
+  if (pathname.startsWith('/onboarding')) return null;
+  if (pathname === '/feedback') return null;
+  if (pathname === '/navigation') return null;
+
+  // Count 1 + onboarding not done: first-time user → onboarding flow
+  if (onboardingCompleted === false) {
+    return <Redirect href="/onboarding" />;
+  }
+
+  // Count >= 5: mandatory signup (no skip allowed)
+  if (anonymousOpenCount >= 5) {
+    return <Redirect href="/onboarding/signup-prompt?mandatory=true" />;
+  }
+
+  // Count 2-4: dismissible signup prompt
+  if (anonymousOpenCount >= 2) {
+    return <Redirect href="/onboarding/signup-prompt" />;
+  }
+
+  return null;
+};
+
 const RootLayoutInner = () => {
   const { colors } = useTheme();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
@@ -49,6 +108,7 @@ const RootLayoutInner = () => {
     <>
       <StatusBar style="light" />
       <RouteTelemetryObserver />
+      <OnboardingGuard />
       {showValidationOverlay ? (
         <View pointerEvents="none" style={styles.validationOverlay}>
           <Text style={styles.validationLabel}>Validation build active</Text>

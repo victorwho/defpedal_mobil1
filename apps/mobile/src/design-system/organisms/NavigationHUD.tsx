@@ -162,13 +162,17 @@ export const FooterCard: React.FC<{
   remainingDurationSeconds: number;
   remainingDistanceMeters: number;
   totalClimbMeters: number | null;
+  totalDescentMeters?: number | null;
   isClimbLive?: boolean;
+  speedKmh?: number | null;
 }> = ({
   nextStep,
   remainingDurationSeconds,
   remainingDistanceMeters,
   totalClimbMeters,
+  totalDescentMeters,
   isClimbLive = false,
+  speedKmh,
 }) => {
   const nextArrow = nextStep ? getManeuverArrow(nextStep) : null;
   const nextDist = nextStep
@@ -192,19 +196,29 @@ export const FooterCard: React.FC<{
 
       {/* Metrics row */}
       <View style={styles.metricRow}>
+        <MetricCell
+          label="Speed"
+          value={speedKmh != null ? `${Math.round(speedKmh)}` : '—'}
+          unit="km/h"
+        />
+        <View style={styles.metricDivider} />
         <MetricCell label="ETA" value={formatETA(remainingDurationSeconds)} />
+        <View style={styles.metricDivider} />
         <MetricCell
           label="Dist"
           value={`${(remainingDistanceMeters / 1000).toFixed(1)} km`}
         />
+        <View style={styles.metricDivider} />
         <MetricCell
-          label="Climb"
+          label={totalDescentMeters != null && totalDescentMeters > (totalClimbMeters ?? 0) ? 'Descent' : 'Climb'}
           value={
-            totalClimbMeters !== null
-              ? isClimbLive
-                ? `↑${Math.round(totalClimbMeters)} m ▼`
-                : `~↑${Math.round(totalClimbMeters)} m`
-              : '—'
+            totalDescentMeters != null && totalDescentMeters > (totalClimbMeters ?? 0)
+              ? `↓${Math.round(totalDescentMeters)} m`
+              : totalClimbMeters !== null
+                ? isClimbLive
+                  ? `↑${Math.round(totalClimbMeters)} m`
+                  : `~↑${Math.round(totalClimbMeters)} m`
+                : '—'
           }
         />
       </View>
@@ -235,13 +249,17 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = (props) => (
 // Sub-component
 // ---------------------------------------------------------------------------
 
-const MetricCell: React.FC<{ label: string; value: string }> = ({
+const MetricCell: React.FC<{ label: string; value: string; unit?: string }> = ({
   label,
   value,
+  unit,
 }) => (
-  <View style={styles.metricCell} accessibilityLabel={`${label}: ${value}`}>
+  <View style={styles.metricCell} accessibilityLabel={`${label}: ${value}${unit ? ` ${unit}` : ''}`}>
     <Text style={styles.metricLabel}>{label}</Text>
-    <Text style={[textDataSm, { color: '#FFFFFF' }]}>{value}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+      <Text style={[textDataSm, { color: '#FFFFFF' }]}>{value}</Text>
+      {unit ? <Text style={[{ fontSize: 10, color: gray[400] }]}>{unit}</Text> : null}
+    </View>
   </View>
 );
 
@@ -333,11 +351,19 @@ const styles = StyleSheet.create({
   },
   metricRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: space[4],
     paddingVertical: space[3],
   },
+  metricDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: darkTheme.borderDefault,
+    marginHorizontal: space[1],
+  },
   metricCell: {
     flex: 1,
+    alignItems: 'center',
     gap: 2,
   },
   metricLabel: {

@@ -1,4 +1,5 @@
 import type {
+  CyclingGoal,
   OfflineRegion,
   NavigationLocationSample,
   QueuedMutation,
@@ -7,6 +8,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
   RoutingMode,
+  StreakState,
 } from '@defensivepedal/core';
 import {
   advanceNavigationStep,
@@ -94,6 +96,29 @@ type AppStore = {
   notifyCommunity: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
+  onboardingCompleted: boolean;
+  cyclingGoal: CyclingGoal | null;
+  cachedStreak: StreakState | null;
+  cachedImpact: {
+    totalCo2Kg: number;
+    totalMoneyEur: number;
+    totalHazardsWarned: number;
+  } | null;
+  notificationPermissionAsked: boolean;
+  anonymousOpenCount: number;
+  earnedMilestones: readonly string[];
+  setOnboardingCompleted: (completed: boolean) => void;
+  incrementAnonymousOpenCount: () => void;
+  resetAnonymousOpenCount: () => void;
+  setCyclingGoal: (goal: CyclingGoal | null) => void;
+  setCachedStreak: (streak: StreakState | null) => void;
+  setCachedImpact: (impact: {
+    totalCo2Kg: number;
+    totalMoneyEur: number;
+    totalHazardsWarned: number;
+  } | null) => void;
+  setNotificationPermissionAsked: (asked: boolean) => void;
+  addEarnedMilestone: (milestoneKey: string) => void;
   setNotifyWeather: (enabled: boolean) => void;
   setNotifyHazard: (enabled: boolean) => void;
   setNotifyCommunity: (enabled: boolean) => void;
@@ -109,6 +134,9 @@ type AppStore = {
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
+  addWaypoint: (coordinate: Coordinate) => void;
+  removeWaypoint: (index: number) => void;
+  clearWaypoints: () => void;
   setRoutePreview: (
     response: RoutePreviewResponse | null,
     options?: {
@@ -176,6 +204,33 @@ export const useAppStore = create<AppStore>()(
       notifyCommunity: true,
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
+      onboardingCompleted: false,
+      cyclingGoal: null,
+      cachedStreak: null,
+      cachedImpact: null,
+      notificationPermissionAsked: false,
+      anonymousOpenCount: 0,
+      earnedMilestones: [],
+      setOnboardingCompleted: (completed) =>
+        set(() => ({ onboardingCompleted: completed })),
+      incrementAnonymousOpenCount: () =>
+        set((state) => ({ anonymousOpenCount: state.anonymousOpenCount + 1 })),
+      resetAnonymousOpenCount: () =>
+        set(() => ({ anonymousOpenCount: 0 })),
+      setCyclingGoal: (goal) =>
+        set(() => ({ cyclingGoal: goal })),
+      setCachedStreak: (streak) =>
+        set(() => ({ cachedStreak: streak })),
+      setCachedImpact: (impact) =>
+        set(() => ({ cachedImpact: impact })),
+      setNotificationPermissionAsked: (asked) =>
+        set(() => ({ notificationPermissionAsked: asked })),
+      addEarnedMilestone: (milestoneKey) =>
+        set((state) => ({
+          earnedMilestones: state.earnedMilestones.includes(milestoneKey)
+            ? state.earnedMilestones
+            : [...state.earnedMilestones, milestoneKey],
+        })),
       setNotifyWeather: (enabled) =>
         set(() => ({ notifyWeather: enabled })),
       setNotifyHazard: (enabled) =>
@@ -234,6 +289,27 @@ export const useAppStore = create<AppStore>()(
           routeRequest: {
             ...state.routeRequest,
             ...request,
+          },
+        })),
+      addWaypoint: (coordinate) =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: [...(state.routeRequest.waypoints ?? []), coordinate],
+          },
+        })),
+      removeWaypoint: (index) =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: (state.routeRequest.waypoints ?? []).filter((_, i) => i !== index),
+          },
+        })),
+      clearWaypoints: () =>
+        set((state) => ({
+          routeRequest: {
+            ...state.routeRequest,
+            waypoints: [],
           },
         })),
       setRoutePreview: (response, options) =>
@@ -601,6 +677,13 @@ export const useAppStore = create<AppStore>()(
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,
+        onboardingCompleted: state.onboardingCompleted,
+        cyclingGoal: state.cyclingGoal,
+        cachedStreak: state.cachedStreak,
+        cachedImpact: state.cachedImpact,
+        notificationPermissionAsked: state.notificationPermissionAsked,
+        anonymousOpenCount: state.anonymousOpenCount,
+        earnedMilestones: state.earnedMilestones,
       }),
     },
   ),

@@ -19,6 +19,7 @@ export type RouteMapProps = {
   selectedRouteId?: string | null;
   origin?: Coordinate;
   destination?: Coordinate;
+  waypoints?: readonly Coordinate[];
   userLocation?: Coordinate | null;
   followUser?: boolean;
   offRouteDetails?: {
@@ -44,8 +45,14 @@ export type RouteMapProps = {
   plannedRouteColor?: string;
   /** Called when user taps the map (used for hazard placement) */
   onMapTap?: (coordinate: Coordinate) => void;
+  /** Called when user long-presses the map (used for armchair hazard reporting) */
+  onMapLongPress?: (coordinate: Coordinate) => void;
   /** When true, shows a crosshair overlay for hazard placement */
   hazardPlacementMode?: boolean;
+  /** Called when map center changes (used for crosshair-based hazard placement) */
+  onCenterChange?: (coordinate: Coordinate) => void;
+  /** GeoJSON FeatureCollection of road risk segments to render as colored overlay */
+  riskOverlay?: GeoJSON.FeatureCollection | null;
   containerStyle?: StyleProp<ViewStyle>;
 };
 

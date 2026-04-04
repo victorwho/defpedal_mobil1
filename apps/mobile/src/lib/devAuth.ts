@@ -10,6 +10,7 @@ export type MobileAuthSession = {
   accessToken: string;
   provider: MobileAuthProvider;
   user: MobileAuthUser;
+  isAnonymous: boolean;
 };
 
 export type DeveloperBypassConfig = {
@@ -40,6 +41,7 @@ export const buildDeveloperBypassSession = (
       email: email || null,
       provider: 'dev-bypass',
     },
+    isAnonymous: false,
   };
 };
 
@@ -68,6 +70,7 @@ export const isMobileAuthSession = (value: unknown): value is MobileAuthSession 
     typeof candidateUser.id === 'string' &&
     (typeof candidateUser.email === 'string' || candidateUser.email === null) &&
     (provider === 'supabase' || provider === 'dev-bypass') &&
-    (userProvider === 'supabase' || userProvider === 'dev-bypass')
+    (userProvider === 'supabase' || userProvider === 'dev-bypass') &&
+    (candidate.isAnonymous === undefined || typeof candidate.isAnonymous === 'boolean')
   );
 };

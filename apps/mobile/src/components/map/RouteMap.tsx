@@ -15,10 +15,11 @@
  * 11. Overlays — crosshair, POI card, route info
  */
 import Mapbox from '@rnmapbox/maps';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { brandColors } from '../../design-system/tokens/colors';
-import { safetyColors } from '../../design-system/tokens/colors';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { brandColors, darkTheme, safetyColors } from '../../design-system/tokens/colors';
+import { shadows } from '../../design-system/tokens/shadows';
 import { radii } from '../../design-system/tokens/radii';
 import { space } from '../../design-system/tokens/spacing';
 import { fontFamily, textSm } from '../../design-system/tokens/typography';
@@ -48,6 +49,7 @@ export const RouteMap = ({
   selectedRouteId,
   origin,
   destination,
+  waypoints,
   userLocation,
   followUser = false,
   offRouteDetails,
@@ -65,11 +67,17 @@ export const RouteMap = ({
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
   onMapTap,
+  onMapLongPress,
   hazardPlacementMode = false,
+  onCenterChange,
+  riskOverlay,
   containerStyle,
 }: RouteMapProps) => {
   const mapViewRef = useRef<Mapbox.MapView | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<SelectedPoiState>(null);
+  const [selectedHazard, setSelectedHazard] = useState<{
+    id: string; type: string; confirmCount: number; denyCount: number;
+  } | null>(null);
 
   const shieldModeConfig = useShieldMode();
 
@@ -92,6 +100,7 @@ export const RouteMap = ({
     selectedRouteId,
     origin,
     destination,
+    waypoints,
     userLocation,
     offRouteDetails,
     bicycleParkingLocations,
@@ -145,10 +154,22 @@ export const RouteMap = ({
         ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
         styleURL={STANDARD_STYLE_URL}
+        onCameraChanged={onCenterChange ? (state: any) => {
+          const center = state?.properties?.center;
+          if (Array.isArray(center) && center.length >= 2) {
+            onCenterChange({ lat: center[1], lon: center[0] });
+          }
+        } : undefined}
         onPress={onMapTap ? (event: any) => {
           const coords = event?.geometry?.coordinates;
           if (Array.isArray(coords) && coords.length >= 2) {
             onMapTap({ lat: coords[1], lon: coords[0] });
+          }
+        } : undefined}
+        onLongPress={onMapLongPress ? (event: any) => {
+          const coords = event?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            onMapLongPress({ lat: coords[1], lon: coords[0] });
           }
         } : undefined}
       >
@@ -194,6 +215,34 @@ export const RouteMap = ({
           onPoiPress={handlePoiPress}
         />
 
+        {riskOverlay && riskOverlay.features.length > 0 ? (
+          <Mapbox.ShapeSource id="risk-overlay" shape={riskOverlay}>
+            <Mapbox.LineLayer
+              id="risk-overlay-line"
+              style={{
+                lineWidth: 4,
+                lineColor: [
+                  'interpolate',
+                  ['linear'],
+                  ['get', 'riskScore'],
+                  0, '#4CAF50',               // Very safe = green
+                  33, '#4CAF50',
+                  43.5, '#8BC34A',            // Safe = light green
+                  51.8, '#FFEB3B',            // Average = yellow
+                  57.6, '#FF9800',            // Elevated = orange
+                  69, '#FF5722',              // Risky = deep orange
+                  101.8, '#F44336',           // Very risky = red
+                  120, '#000000',             // Extreme = black
+                ],
+                lineOpacity: 0.8,
+                lineCap: 'round',
+                lineJoin: 'round',
+                lineEmissiveStrength: 1,
+              }}
+            />
+          </Mapbox.ShapeSource>
+        ) : null}
+
         <RouteLayers
           routeFeatureCollection={routeFeatureCollection}
           riskFeatureCollection={riskFeatureCollection}
@@ -216,6 +265,7 @@ export const RouteMap = ({
         <HazardLayers
           hazardZoneFeatureCollection={hazardZoneFeatureCollection}
           hazardFeatureCollection={hazardFeatureCollection}
+          onHazardPress={(props) => { setSelectedHazard(props); setSelectedPoi(null); }}
         />
 
         <MarkerLayers
@@ -230,6 +280,28 @@ export const RouteMap = ({
         <PoiCard selectedPoi={selectedPoi} onDismiss={dismissPoi} />
       ) : null}
 
+      {selectedHazard ? (
+        <Pressable
+          style={styles.hazardCardOverlay}
+          onPress={() => setSelectedHazard(null)}
+        >
+          <View style={styles.hazardCard}>
+            <View style={styles.hazardCardRow}>
+              <Ionicons name="warning" size={20} color="#FF6B00" />
+              <Text style={styles.hazardCardType}>
+                {HAZARD_LABELS[selectedHazard.type] ?? selectedHazard.type}
+              </Text>
+            </View>
+            <View style={styles.hazardCardRow}>
+              <Ionicons name="thumbs-up-outline" size={16} color={safetyColors.safe} />
+              <Text style={styles.hazardCardCount}>{selectedHazard.confirmCount}</Text>
+              <Ionicons name="thumbs-down-outline" size={16} color={safetyColors.danger} style={{ marginLeft: 12 }} />
+              <Text style={styles.hazardCardCount}>{selectedHazard.denyCount}</Text>
+            </View>
+          </View>
+        </Pressable>
+      ) : null}
+
       {showRouteOverlay ? (
         <RouteInfoOverlay
           selectedRoute={selectedRoute}
@@ -240,6 +312,19 @@ export const RouteMap = ({
       ) : null}
     </View>
   );
+};
+
+const HAZARD_LABELS: Record<string, string> = {
+  illegally_parked_car: 'Parked car',
+  blocked_bike_lane: 'Blocked lane',
+  missing_bike_lane: 'Missing bike lane',
+  pothole: 'Pothole',
+  poor_surface: 'Poor surface',
+  narrow_street: 'Narrow street',
+  dangerous_intersection: 'Dangerous intersection',
+  construction: 'Construction',
+  aggressive_traffic: 'Aggressive traffic',
+  other: 'Other hazard',
 };
 
 const styles = StyleSheet.create({
@@ -273,5 +358,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     ...textSm,
     color: brandColors.textSecondary,
+  },
+  hazardCardOverlay: {
+    position: 'absolute',
+    bottom: '25%',
+    alignSelf: 'center',
+  },
+  hazardCard: {
+    backgroundColor: 'rgba(31, 41, 55, 0.95)',
+    borderRadius: radii.lg,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    gap: space[1],
+    ...shadows.lg,
+  },
+  hazardCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+  },
+  hazardCardType: {
+    fontFamily: fontFamily.body.semiBold,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  hazardCardCount: {
+    fontFamily: fontFamily.mono.bold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
+  hazardCardHint: {
+    fontSize: 11,
+    color: darkTheme.textMuted,
+    textAlign: 'center',
   },
 });

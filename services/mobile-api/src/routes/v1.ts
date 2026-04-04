@@ -14,6 +14,12 @@ import type {
   WriteAckResponse,
   ReverseGeocodeResponse,
   RoutePreviewResponse,
+  NeighborhoodSafetyScore,
+  RideImpact,
+  ImpactDashboard,
+  GuardianTier,
+  QuizQuestion,
+  QuizAnswer,
 } from '@defensivepedal/core';
 import { getPreviewOrigin } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
@@ -22,6 +28,12 @@ import { config } from '../config';
 import { getAuthenticatedUserFromRequest, requireAuthenticatedUser } from '../lib/auth';
 import { buildCacheKey } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
+import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
+import {
+  sendStreakProtectionReminders,
+  sendWeeklyImpactSummary,
+  sendSocialImpactDigest,
+} from '../lib/scheduledNotifications';
 import {
   autocompleteRequestSchema,
   autocompleteResponseSchema,
@@ -65,6 +77,34 @@ import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
+
+/** Extract timezone from x-timezone header, default to UTC. */
+const getTimezone = (request: FastifyRequest): string =>
+  (request.headers['x-timezone'] as string | undefined) ?? 'UTC';
+
+/**
+ * Fire-and-forget: call qualify_streak_action RPC.
+ * Failures are logged but never propagate to the caller.
+ */
+const qualifyStreakAsync = (
+  userId: string,
+  actionType: string,
+  timeZone: string,
+  logger: FastifyRequest['log'],
+): void => {
+  if (!supabaseAdmin) return;
+  void supabaseAdmin
+    .rpc('qualify_streak_action', {
+      p_user_id: userId,
+      p_action_type: actionType,
+      p_time_zone: timeZone,
+    })
+    .then(({ error }) => {
+      if (error) {
+        logger.warn({ event: 'streak_qualify_error', actionType, error: error.message }, 'streak qualification failed');
+      }
+    });
+};
 
 const buildEmptyRouteResponse = (
   mode: RoutePreviewBody['mode'],
@@ -447,7 +487,9 @@ export const buildV1Routes = (
         });
 
         try {
-          return await dependencies.finishTripRecord(normalizeTripEndRequest(request.body), user.id);
+          const result = await dependencies.finishTripRecord(normalizeTripEndRequest(request.body), user.id);
+          qualifyStreakAsync(user.id, 'ride', getTimezone(request), request.log);
+          return result;
         } catch (error) {
           throw new HttpError('Trip completion failed.', {
             statusCode: 502,
@@ -584,10 +626,15 @@ export const buildV1Routes = (
         });
 
         try {
-          return await dependencies.submitHazardReport(
+          const result = await dependencies.submitHazardReport(
             normalizeHazardReportRequest(request.body),
             user?.id ?? null,
           );
+          // Streak qualification (fire-and-forget)
+          if (user?.id) {
+            qualifyStreakAsync(user.id, 'hazard_report', getTimezone(request), request.log);
+          }
+          return result;
         } catch (error) {
           throw new HttpError('Hazard report failed.', {
             statusCode: 502,
@@ -721,6 +768,8 @@ export const buildV1Routes = (
           );
 
         if (error) throw error;
+
+        qualifyStreakAsync(user.id, 'hazard_validate', getTimezone(request), request.log);
 
         return { acceptedAt: new Date().toISOString() };
       } catch (error) {
@@ -1154,6 +1203,904 @@ export const buildV1Routes = (
       }
     },
   );
+
+    // POST /v1/loop-route — generate a circular loop route from origin
+    app.post<{
+      Body: {
+        origin: { lat: number; lon: number };
+        distancePreferenceMeters: number;
+        safetyFloor?: number;
+        waypointCount?: 2 | 3;
+      };
+      Reply: RoutePreviewResponse | ErrorResponse;
+    }>(
+      '/loop-route',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['origin', 'distancePreferenceMeters'],
+            properties: {
+              origin: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['lat', 'lon'],
+                properties: {
+                  lat: { type: 'number', minimum: -90, maximum: 90 },
+                  lon: { type: 'number', minimum: -180, maximum: 180 },
+                },
+              },
+              distancePreferenceMeters: { type: 'number', minimum: 500, maximum: 50000 },
+              safetyFloor: { type: 'number', minimum: 0, maximum: 100 },
+              waypointCount: { type: 'integer', enum: [2, 3] },
+            },
+          },
+          response: {
+            200: routePreviewResponseSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        const { origin, distancePreferenceMeters, safetyFloor, waypointCount } = request.body;
+
+        const loopRequest: LoopRouteRequest = {
+          origin,
+          distancePreferenceMeters,
+          safetyFloor,
+          waypointCount,
+        };
+
+        try {
+          const routeResponse = await fetchLoopRoute(loopRequest);
+
+          const elevationsByRoute = await Promise.all(
+            routeResponse.routes.map(async (route) => {
+              try {
+                return await dependencies.getElevationProfile(route.geometry.coordinates);
+              } catch {
+                return null;
+              }
+            }),
+          );
+
+          const riskByRoute = await Promise.all(
+            routeResponse.routes.map(async (route) => {
+              try {
+                return await dependencies.fetchRiskSegments(route.geometry);
+              } catch {
+                return [];
+              }
+            }),
+          );
+
+          const warningsByRoute = routeResponse.routes.map((_, index) => {
+            const warnings: string[] = [];
+            if (!elevationsByRoute[index]) {
+              warnings.push('Elevation data unavailable; terrain-adjusted ETA is approximate.');
+            }
+            if (riskByRoute[index].length === 0) {
+              warnings.push('Risk overlay unavailable for this route preview.');
+            }
+            return warnings;
+          });
+
+          const coverageResponse = dependencies.buildCoverageResponse(origin);
+          const coverage = coverageResponse.matched ?? coverageResponse.regions[0] ?? {
+            countryCode: '',
+            status: 'partial' as const,
+            safeRouting: true,
+            fastRouting: false,
+          };
+
+          return dependencies.normalizeRoutePreviewResponse({
+            routeResponse,
+            mode: 'safe',
+            coverage,
+            elevationsByRoute,
+            riskByRoute,
+            warningsByRoute,
+          });
+        } catch (error) {
+          throw new HttpError('Failed to generate loop route.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+      },
+    );
+
+    // GET /v1/safety-score — neighborhood safety score from road risk data
+    app.get<{
+      Querystring: { lat: number; lon: number; radiusKm?: number };
+      Reply: NeighborhoodSafetyScore | ErrorResponse;
+    }>(
+      '/safety-score',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['lat', 'lon'],
+            properties: {
+              lat: { type: 'number', minimum: -90, maximum: 90 },
+              lon: { type: 'number', minimum: -180, maximum: 180 },
+              radiusKm: { type: 'number', minimum: 0.1, maximum: 10 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['score', 'totalSegments', 'safeCount', 'averageCount', 'riskyCount', 'veryRiskyCount'],
+              properties: {
+                score: { type: 'number' },
+                totalSegments: { type: 'integer' },
+                safeCount: { type: 'integer' },
+                averageCount: { type: 'integer' },
+                riskyCount: { type: 'integer' },
+                veryRiskyCount: { type: 'integer' },
+              },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+          });
+        }
+
+        const { lat, lon, radiusKm } = request.query;
+        const radiusMeters = (radiusKm ?? 1) * 1000;
+
+        const { data, error } = await supabaseAdmin.rpc('get_neighborhood_safety_score', {
+          p_lat: lat,
+          p_lon: lon,
+          p_radius_meters: radiusMeters,
+        });
+
+        if (error) {
+          request.log.error({ event: 'safety_score_error', error: error.message }, 'safety score query failed');
+          throw new HttpError('Safety score query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const row = Array.isArray(data) ? data[0] : data;
+
+        return {
+          score: Math.max(0, Math.min(100, Math.round(100 - Number(row?.avg_score ?? 0)))),
+          totalSegments: Number(row?.total_segments ?? 0),
+          safeCount: Number(row?.safe_count ?? 0),
+          averageCount: Number(row?.average_count ?? 0),
+          riskyCount: Number(row?.risky_count ?? 0),
+          veryRiskyCount: Number(row?.very_risky_count ?? 0),
+        };
+      },
+    );
+
+    // GET /v1/risk-map — road risk segments as GeoJSON within radius
+    app.get<{
+      Querystring: { lat: number; lon: number; radiusKm?: number };
+    }>(
+      '/risk-map',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['lat', 'lon'],
+            properties: {
+              lat: { type: 'number', minimum: -90, maximum: 90 },
+              lon: { type: 'number', minimum: -180, maximum: 180 },
+              radiusKm: { type: 'number', minimum: 0.1, maximum: 5 },
+            },
+          },
+          response: {
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        // Risk map is read-only public safety data — auth optional
+        // Still try to authenticate for rate limiting, but don't require it
+        const user = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
+        if (user) {
+          await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+        }
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { lat, lon, radiusKm } = request.query;
+        const radiusMeters = (radiusKm ?? 1) * 1000;
+
+        const { data, error } = await supabaseAdmin.rpc('get_road_risk_geojson', {
+          p_lat: lat,
+          p_lon: lon,
+          p_radius_meters: radiusMeters,
+        });
+
+        if (error) {
+          request.log.error({ event: 'risk_map_error', error: error.message }, 'risk map query failed');
+          throw new HttpError('Risk map query failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+        }
+
+        return data ?? { type: 'FeatureCollection', features: [] };
+      },
+    );
+
+    // POST /v1/rides/:tripId/impact — record ride impact and return with random equivalent
+    app.post<{
+      Params: { tripId: string };
+      Body: { distanceMeters: number };
+      Reply: RideImpact | ErrorResponse;
+    }>(
+      '/rides/:tripId/impact',
+      {
+        schema: {
+          params: {
+            type: 'object',
+            required: ['tripId'],
+            properties: { tripId: { type: 'string', format: 'uuid' } },
+          },
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['distanceMeters'],
+            properties: {
+              distanceMeters: { type: 'number', minimum: 0 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText'],
+              properties: {
+                tripId: { type: 'string' },
+                co2SavedKg: { type: 'number' },
+                moneySavedEur: { type: 'number' },
+                hazardsWarnedCount: { type: 'integer' },
+                distanceMeters: { type: 'number' },
+                equivalentText: { type: ['string', 'null'] },
+              },
+            },
+            401: errorResponseSchema,
+            409: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { tripId } = request.params;
+        const { distanceMeters } = request.body;
+
+        // Call record_ride_impact RPC
+        const { data, error } = await supabaseAdmin.rpc('record_ride_impact', {
+          p_trip_id: tripId,
+          p_user_id: user.id,
+          p_distance_meters: distanceMeters,
+        });
+
+        if (error) {
+          // UNIQUE constraint violation = already recorded
+          if (error.code === '23505') {
+            throw new HttpError('Impact already recorded for this trip.', {
+              statusCode: 409,
+              code: 'BAD_REQUEST',
+              details: [error.message],
+            });
+          }
+          request.log.error({ event: 'ride_impact_error', error: error.message }, 'ride impact recording failed');
+          throw new HttpError('Failed to record ride impact.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const row = Array.isArray(data) ? data[0] : data;
+        const co2SavedKg = Number(row?.co2_saved_kg ?? 0);
+        const moneySavedEur = Number(row?.money_saved_eur ?? 0);
+
+        // Pick a random reward equivalent that matches the user's savings
+        let equivalentText: string | null = null;
+        const { data: equivalents } = await supabaseAdmin
+          .from('reward_equivalents')
+          .select('equivalent_text')
+          .or(`and(category.eq.co2,threshold_value.lte.${co2SavedKg}),and(category.eq.money,threshold_value.lte.${moneySavedEur})`)
+          .order('threshold_value', { ascending: false })
+          .limit(10);
+
+        if (equivalents && equivalents.length > 0) {
+          const randomIndex = Math.floor(Math.random() * equivalents.length);
+          equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
+        }
+
+        return {
+          tripId,
+          co2SavedKg,
+          moneySavedEur,
+          hazardsWarnedCount: Number(row?.hazards_warned_count ?? 0),
+          distanceMeters: Number(row?.distance_meters ?? 0),
+          equivalentText,
+        };
+      },
+    );
+
+    // GET /v1/rides/:tripId/impact — fetch existing ride impact
+    app.get<{
+      Params: { tripId: string };
+      Reply: RideImpact | ErrorResponse;
+    }>(
+      '/rides/:tripId/impact',
+      {
+        schema: {
+          params: {
+            type: 'object',
+            required: ['tripId'],
+            properties: { tripId: { type: 'string', format: 'uuid' } },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText'],
+              properties: {
+                tripId: { type: 'string' },
+                co2SavedKg: { type: 'number' },
+                moneySavedEur: { type: 'number' },
+                hazardsWarnedCount: { type: 'integer' },
+                distanceMeters: { type: 'number' },
+                equivalentText: { type: ['string', 'null'] },
+              },
+            },
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { data, error } = await supabaseAdmin
+          .from('ride_impacts')
+          .select('trip_id, co2_saved_kg, money_saved_eur, hazards_warned_count, distance_meters')
+          .eq('trip_id', request.params.tripId)
+          .eq('user_id', user.id)
+          .single();
+
+        let impactRow = data;
+
+        // Auto-compute impact if not found — look up distance from trip_tracks
+        if (error || !impactRow) {
+          const { data: track } = await supabaseAdmin
+            .from('trip_tracks')
+            .select('actual_distance_meters, planned_route_distance_meters')
+            .eq('trip_id', request.params.tripId)
+            .eq('user_id', user.id)
+            .single();
+
+          if (!track) {
+            throw new HttpError('Trip not found.', { statusCode: 404, code: 'NOT_FOUND' });
+          }
+
+          const distMeters = Number(track.actual_distance_meters ?? track.planned_route_distance_meters ?? 0);
+
+          // Auto-record the impact
+          const { data: created } = await supabaseAdmin.rpc('record_ride_impact', {
+            p_trip_id: request.params.tripId,
+            p_user_id: user.id,
+            p_distance_meters: distMeters,
+          });
+
+          const createdRow = Array.isArray(created) ? created[0] : created;
+          if (createdRow) {
+            impactRow = createdRow;
+          } else {
+            // Fallback: compute client-side
+            impactRow = {
+              trip_id: request.params.tripId,
+              co2_saved_kg: distMeters / 1000 * 0.12,
+              money_saved_eur: distMeters / 1000 * 0.35,
+              hazards_warned_count: 0,
+              distance_meters: distMeters,
+            };
+          }
+        }
+
+        // Pick a random reward equivalent
+        let equivalentText: string | null = null;
+        const co2 = Number(impactRow.co2_saved_kg ?? 0);
+        const money = Number(impactRow.money_saved_eur ?? 0);
+        const { data: equivalents } = await supabaseAdmin
+          .from('reward_equivalents')
+          .select('equivalent_text')
+          .or(`and(category.eq.co2,threshold_value.lte.${co2}),and(category.eq.money,threshold_value.lte.${money})`)
+          .order('threshold_value', { ascending: false })
+          .limit(10);
+
+        if (equivalents && equivalents.length > 0) {
+          const randomIndex = Math.floor(Math.random() * equivalents.length);
+          equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
+        }
+
+        return {
+          tripId: impactRow.trip_id as string,
+          co2SavedKg: Number(impactRow.co2_saved_kg),
+          moneySavedEur: Number(impactRow.money_saved_eur),
+          hazardsWarnedCount: Number(impactRow.hazards_warned_count ?? 0),
+          distanceMeters: Number(impactRow.distance_meters ?? 0),
+          equivalentText,
+        };
+      },
+    );
+
+    // GET /v1/impact-dashboard — full impact dashboard
+    app.get<{
+      Querystring: { tz?: string };
+      Reply: ImpactDashboard | ErrorResponse;
+    }>(
+      '/impact-dashboard',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            properties: {
+              tz: { type: 'string', maxLength: 50 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'streak', 'totalCo2SavedKg', 'totalMoneySavedEur',
+                'totalHazardsReported', 'totalRidersProtected',
+                'guardianTier', 'thisWeek',
+              ],
+              properties: {
+                streak: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['currentStreak', 'longestStreak', 'lastQualifyingDate', 'freezeAvailable', 'freezeUsedDate'],
+                  properties: {
+                    currentStreak: { type: 'integer' },
+                    longestStreak: { type: 'integer' },
+                    lastQualifyingDate: { type: ['string', 'null'] },
+                    freezeAvailable: { type: 'boolean' },
+                    freezeUsedDate: { type: ['string', 'null'] },
+                  },
+                },
+                totalCo2SavedKg: { type: 'number' },
+                totalMoneySavedEur: { type: 'number' },
+                totalHazardsReported: { type: 'integer' },
+                totalRidersProtected: { type: 'integer' },
+                guardianTier: { type: 'string' },
+                thisWeek: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: ['rides', 'co2SavedKg', 'moneySavedEur', 'hazardsReported'],
+                  properties: {
+                    rides: { type: 'integer' },
+                    co2SavedKg: { type: 'number' },
+                    moneySavedEur: { type: 'number' },
+                    hazardsReported: { type: 'integer' },
+                  },
+                },
+              },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const tz = request.query.tz ?? 'UTC';
+
+        const { data, error } = await supabaseAdmin.rpc('get_impact_dashboard', {
+          p_user_id: user.id,
+          p_time_zone: tz,
+        });
+
+        if (error) {
+          request.log.error({ event: 'impact_dashboard_error', error: error.message }, 'impact dashboard query failed');
+          throw new HttpError('Impact dashboard query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        // RPC returns JSONB, parse the result
+        const d = (typeof data === 'string' ? JSON.parse(data) : data) as Record<string, unknown>;
+        const streak = d.streak as Record<string, unknown> | undefined;
+        const totals = d.totals as Record<string, unknown> | undefined;
+        const thisWeek = d.thisWeek as Record<string, unknown> | undefined;
+
+        return {
+          streak: {
+            currentStreak: Number(streak?.currentStreak ?? 0),
+            longestStreak: Number(streak?.longestStreak ?? 0),
+            lastQualifyingDate: (streak?.lastQualifyingDate as string) ?? null,
+            freezeAvailable: Boolean(streak?.freezeAvailable ?? false),
+            freezeUsedDate: null as string | null,
+          },
+          totalCo2SavedKg: Number(totals?.totalCo2SavedKg ?? 0),
+          totalMoneySavedEur: Number(totals?.totalMoneySavedEur ?? 0),
+          totalHazardsReported: Number(totals?.totalHazardsReported ?? 0),
+          totalRidersProtected: Number(totals?.totalRidersProtected ?? 0),
+          guardianTier: ((d.guardianTier as string) ?? 'reporter') as GuardianTier,
+          thisWeek: {
+            rides: Number(thisWeek?.rides ?? 0),
+            co2SavedKg: Number(thisWeek?.co2SavedKg ?? 0),
+            moneySavedEur: Number(thisWeek?.moneySavedEur ?? 0),
+            hazardsReported: 0,
+          },
+        };
+      },
+    );
+
+    // GET /v1/quiz/daily — random unasked question (30-day cooldown)
+    app.get<{ Reply: QuizQuestion | ErrorResponse }>(
+      '/quiz/daily',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['id', 'questionText', 'options', 'category', 'difficulty'],
+              properties: {
+                id: { type: 'string' },
+                questionText: { type: 'string' },
+                options: { type: 'array', items: { type: 'string' } },
+                category: { type: 'string' },
+                difficulty: { type: 'integer' },
+              },
+            },
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        // Get question IDs answered in the last 30 days
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentAnswers } = await supabaseAdmin
+          .from('user_quiz_history')
+          .select('question_id')
+          .eq('user_id', user.id)
+          .gte('answered_at', thirtyDaysAgo);
+
+        const excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
+
+        // Fetch all questions, exclude recently answered
+        let query = supabaseAdmin
+          .from('quiz_questions')
+          .select('id, question_text, options, category, difficulty');
+
+        if (excludeIds.length > 0) {
+          query = query.not('id', 'in', `(${excludeIds.join(',')})`);
+        }
+
+        const { data: questions, error } = await query;
+
+        if (error) {
+          throw new HttpError('Quiz query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        if (!questions || questions.length === 0) {
+          throw new HttpError('No quiz questions available.', {
+            statusCode: 404,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        // Pick a random question
+        const randomIndex = Math.floor(Math.random() * questions.length);
+        const q = questions[randomIndex] as Record<string, unknown>;
+
+        return {
+          id: q.id as string,
+          questionText: q.question_text as string,
+          options: q.options as string[],
+          category: q.category as string,
+          difficulty: Number(q.difficulty),
+        };
+      },
+    );
+
+    // POST /v1/quiz/answer — record answer, qualify streak, return result
+    app.post<{
+      Body: { questionId: string; selectedIndex: number };
+      Reply: QuizAnswer | ErrorResponse;
+    }>(
+      '/quiz/answer',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['questionId', 'selectedIndex'],
+            properties: {
+              questionId: { type: 'string', format: 'uuid' },
+              selectedIndex: { type: 'integer', minimum: 0, maximum: 3 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['questionId', 'selectedIndex', 'isCorrect', 'explanation'],
+              properties: {
+                questionId: { type: 'string' },
+                selectedIndex: { type: 'integer' },
+                isCorrect: { type: 'boolean' },
+                explanation: { type: 'string' },
+              },
+            },
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { questionId, selectedIndex } = request.body;
+
+        // Fetch the question to check the answer
+        const { data: question, error: qError } = await supabaseAdmin
+          .from('quiz_questions')
+          .select('correct_index, explanation')
+          .eq('id', questionId)
+          .single();
+
+        if (qError || !question) {
+          throw new HttpError('Question not found.', {
+            statusCode: 404,
+            code: 'BAD_REQUEST',
+          });
+        }
+
+        const isCorrect = selectedIndex === (question.correct_index as number);
+
+        // Record the answer (upsert — 30-day cooldown means we might re-answer)
+        const { error: insertError } = await supabaseAdmin
+          .from('user_quiz_history')
+          .upsert(
+            {
+              user_id: user.id,
+              question_id: questionId,
+              selected_index: selectedIndex,
+              is_correct: isCorrect,
+              answered_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id,question_id' },
+          );
+
+        if (insertError) {
+          request.log.error({ event: 'quiz_answer_error', error: insertError.message }, 'quiz answer recording failed');
+          throw new HttpError('Failed to record quiz answer.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [insertError.message],
+          });
+        }
+
+        // Qualify streak (fire-and-forget)
+        qualifyStreakAsync(user.id, 'quiz', getTimezone(request), request.log);
+
+        return {
+          questionId,
+          selectedIndex,
+          isCorrect,
+          explanation: question.explanation as string,
+        };
+      },
+    );
+
+    // GET /v1/hazards/my-impact — how many cyclists were protected by user's hazard reports
+    app.get<{
+      Reply: {
+        totalHazardsReported: number;
+        activeHazards: number;
+        ridersProtected: number;
+        validationsReceived: number;
+        topHazards: Array<{
+          id: string;
+          hazard_type: string | null;
+          created_at: string;
+          expires_at: string | null;
+          confirm_count: number;
+          deny_count: number;
+          validation_count: number;
+        }>;
+      } | ErrorResponse;
+    }>(
+      '/hazards/my-impact',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['totalHazardsReported', 'activeHazards', 'ridersProtected', 'validationsReceived', 'topHazards'],
+              properties: {
+                totalHazardsReported: { type: 'integer' },
+                activeHazards: { type: 'integer' },
+                ridersProtected: { type: 'integer' },
+                validationsReceived: { type: 'integer' },
+                topHazards: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      id: { type: 'string' },
+                      hazard_type: { type: ['string', 'null'] },
+                      created_at: { type: 'string' },
+                      expires_at: { type: ['string', 'null'] },
+                      confirm_count: { type: 'integer' },
+                      deny_count: { type: 'integer' },
+                      validation_count: { type: 'integer' },
+                    },
+                  },
+                },
+              },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const { data, error } = await supabaseAdmin.rpc('get_hazard_reporter_impact', {
+          p_user_id: user.id,
+        });
+
+        if (error) {
+          request.log.error({ event: 'hazard_impact_error', error: error.message }, 'hazard reporter impact query failed');
+          throw new HttpError('Hazard impact query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const d = (typeof data === 'string' ? JSON.parse(data) : data) as Record<string, unknown>;
+        const topHazards = (d.topHazards as Array<Record<string, unknown>> | undefined) ?? [];
+
+        return {
+          totalHazardsReported: Number(d.totalHazardsReported ?? 0),
+          activeHazards: Number(d.activeHazards ?? 0),
+          ridersProtected: Number(d.ridersProtected ?? 0),
+          validationsReceived: Number(d.validationsReceived ?? 0),
+          topHazards: topHazards.map((h) => ({
+            id: h.id as string,
+            hazard_type: (h.hazard_type as string) ?? null,
+            created_at: h.created_at as string,
+            expires_at: (h.expires_at as string) ?? null,
+            confirm_count: Number(h.confirm_count ?? 0),
+            deny_count: Number(h.deny_count ?? 0),
+            validation_count: Number(h.validation_count ?? 0),
+          })),
+        };
+      },
+    );
+
+    // ── Cron-triggered notification endpoints ──
+    // Called by Cloud Scheduler with a shared secret in the Authorization header.
+    // These are NOT user-facing — they process all eligible users in batch.
+
+    const CRON_SECRET = process.env.CRON_SECRET ?? '';
+
+    const verifyCronAuth = (request: FastifyRequest): void => {
+      if (!CRON_SECRET) {
+        throw new HttpError('Cron secret not configured.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+      }
+      const auth = request.headers.authorization;
+      if (auth !== `Bearer ${CRON_SECRET}`) {
+        throw new HttpError('Unauthorized cron call.', { statusCode: 401, code: 'UNAUTHORIZED' });
+      }
+    };
+
+    // POST /v1/cron/streak-reminders — 8 PM daily
+    app.post(
+      '/cron/streak-reminders',
+      async (request) => {
+        verifyCronAuth(request);
+        const result = await sendStreakProtectionReminders(request.log);
+        return { ok: true, ...result };
+      },
+    );
+
+    // POST /v1/cron/weekly-impact — Sunday 9 AM
+    app.post(
+      '/cron/weekly-impact',
+      async (request) => {
+        verifyCronAuth(request);
+        const result = await sendWeeklyImpactSummary(request.log);
+        return { ok: true, ...result };
+      },
+    );
+
+    // POST /v1/cron/social-digest — 7 PM daily
+    app.post(
+      '/cron/social-digest',
+      async (request) => {
+        verifyCronAuth(request);
+        const result = await sendSocialImpactDigest(request.log);
+        return { ok: true, ...result };
+      },
+    );
 
   };
 

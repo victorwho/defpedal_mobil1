@@ -1,6 +1,8 @@
 import type {
   AutocompleteRequest,
   AutocompleteResponse,
+  CommunityStats,
+  Coordinate,
   CoverageResponse,
   ErrorResponse,
   FeedComment,
@@ -9,13 +11,19 @@ import type {
   HazardReportRequest,
   HazardReportResponse,
   HazardValidationResponse,
+  ImpactDashboard,
   NavigationFeedbackRequest,
   NearbyHazard,
+  NeighborhoodSafetyScore,
   ProfileResponse,
   ProfileUpdateRequest,
+  QuizAnswer,
+  QuizQuestion,
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
+  RideImpact,
   ShareTripRequest,
+  UserPublicProfile,
   RerouteRequest,
   TripEndRequest,
   TripEndResponse,
@@ -36,6 +44,7 @@ import {
   mapboxAutocomplete,
   mapboxReverseGeocode,
   mapboxGetCoverage,
+  reverseGeocodeLocality,
 } from './mapbox-search';
 import {
   directPreviewRoute,
@@ -358,7 +367,7 @@ export const mobileApi = {
     requestJson<ProfileResponse>('/v1/profile'),
   updateProfile: (payload: ProfileUpdateRequest) =>
     requestJson<ProfileResponse>('/v1/profile', {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(payload),
     }),
 
@@ -373,4 +382,82 @@ export const mobileApi = {
       method: 'DELETE',
       body: JSON.stringify({ deviceId }),
     }),
+
+  // ── Community Stats ──
+
+  getCommunityStats: (lat: number, lon: number, radiusKm = 15) => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      radiusKm: String(radiusKm),
+    });
+    return requestJson<CommunityStats>(`/v1/community/stats?${params.toString()}`);
+  },
+
+  reverseGeocodeLocality: (lat: number, lon: number) =>
+    reverseGeocodeLocality(lat, lon),
+
+  // ── Habit Engine ──
+
+  fetchLoopRoute: (origin: Coordinate, distanceMeters: number, safetyFloor?: number) =>
+    requestJson<RoutePreviewResponse>('/v1/loop-route', {
+      method: 'POST',
+      body: JSON.stringify({
+        origin,
+        distancePreferenceMeters: distanceMeters,
+        ...(safetyFloor != null ? { safetyFloor } : {}),
+      }),
+    }),
+
+  fetchSafetyScore: (lat: number, lon: number, radiusKm?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (radiusKm != null) params.set('radiusKm', String(radiusKm));
+    return requestJson<NeighborhoodSafetyScore>(`/v1/safety-score?${params.toString()}`);
+  },
+
+  fetchRiskMap: async (lat: number, lon: number, radiusKm?: number): Promise<GeoJSON.FeatureCollection> => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (radiusKm != null) params.set('radiusKm', String(radiusKm));
+    const baseUrl = ensureBaseUrl();
+    // Direct fetch without auth — risk map is public safety data
+    const response = await fetch(`${baseUrl}/v1/risk-map?${params.toString()}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) return { type: 'FeatureCollection', features: [] };
+    return response.json();
+  },
+
+  recordRideImpact: (tripId: string, distanceMeters: number) =>
+    requestJson<RideImpact>(`/v1/rides/${tripId}/impact`, {
+      method: 'POST',
+      body: JSON.stringify({ distanceMeters }),
+    }),
+
+  fetchRideImpact: (tripId: string) =>
+    requestJson<RideImpact>(`/v1/rides/${tripId}/impact`),
+
+  fetchImpactDashboard: (timeZone?: string) => {
+    const params = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : '';
+    return requestJson<ImpactDashboard>(`/v1/impact-dashboard${params}`);
+  },
+
+  fetchDailyQuiz: () =>
+    requestJson<QuizQuestion>('/v1/quiz/daily'),
+
+  submitQuizAnswer: (questionId: string, selectedIndex: number) =>
+    requestJson<QuizAnswer>('/v1/quiz/answer', {
+      method: 'POST',
+      body: JSON.stringify({ questionId, selectedIndex }),
+    }),
+
+  // ── Social ──
+
+  followUser: (userId: string) =>
+    requestJson<{ followedAt: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }),
+
+  unfollowUser: (userId: string) =>
+    requestJson<{ unfollowedAt: string }>(`/v1/users/${userId}/follow`, { method: 'DELETE' }),
+
+  getUserProfile: (userId: string) =>
+    requestJson<UserPublicProfile>(`/v1/users/${userId}/profile`),
 };

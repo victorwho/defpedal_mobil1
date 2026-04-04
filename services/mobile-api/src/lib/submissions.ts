@@ -292,7 +292,7 @@ export const getTripHistory = async (
 
   const { data, error } = await supabaseAdmin
     .from('trip_tracks')
-    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, gps_trail, end_reason, started_at, ended_at')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at')
     .eq('user_id', userId)
     .order('started_at', { ascending: false })
     .limit(50);
@@ -313,6 +313,7 @@ export const getTripHistory = async (
     endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
     startedAt: row.started_at as string,
     endedAt: (row.ended_at as string) ?? null,
+    distanceMeters: (row.actual_distance_meters as number) ?? undefined,
   }));
 };
 
