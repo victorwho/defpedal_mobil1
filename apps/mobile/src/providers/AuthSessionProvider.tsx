@@ -135,12 +135,12 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     };
   }, []);
 
-  // Register for push notifications when a non-anonymous user signs in
+  // Register for push notifications when user session is available
   useEffect(() => {
-    if (session?.user && !session.isAnonymous) {
+    if (session?.user && !isLoading) {
       void registerForPushNotifications();
     }
-  }, [session?.user?.id, session?.isAnonymous]);
+  }, [session?.user?.id, isLoading]);
 
   const clearAuthError = () => setAuthError(null);
 

@@ -93,12 +93,11 @@ export default function TripCompareScreen() {
 
   // Camera center
   const mapCenter = useMemo(() => {
-    const all = trailA;
-    if (all.length === 0) return null;
-    const sumLat = all.reduce((s, c) => s + c[1], 0);
-    const sumLon = all.reduce((s, c) => s + c[0], 0);
-    return { lat: sumLat / all.length, lon: sumLon / all.length };
-  }, [trailA, trailB]);
+    if (trailA.length === 0) return null;
+    const sumLat = trailA.reduce((s, c) => s + c[1], 0);
+    const sumLon = trailA.reduce((s, c) => s + c[0], 0);
+    return { lat: sumLat / trailA.length, lon: sumLon / trailA.length };
+  }, [trailA]);
 
   if (!tripA || !tripB || !metricsA || !metricsB) {
     return (
@@ -123,16 +122,17 @@ export default function TripCompareScreen() {
           <Text style={styles.title}>{t('compare.title')}</Text>
         </View>
 
-        {/* Map with both trails */}
-        <View style={styles.mapContainer}>
-          <RouteMap
-            origin={mapCenter ?? undefined}
-            followUser={false}
-            trailCoordinates={trailA}
-            fullBleed={false}
-          />
-          {/* Map shows Trip 1 GPS trail */}
-        </View>
+        {/* Map with Trip 1 GPS trail */}
+        {mapCenter && trailA.length >= 2 ? (
+          <View style={styles.mapContainer}>
+            <RouteMap
+              origin={mapCenter}
+              followUser={false}
+              trailCoordinates={trailA}
+              fullBleed={false}
+            />
+          </View>
+        ) : null}
 
         {/* Stats comparison table */}
         <View style={[styles.card, shadows.md]}>
@@ -164,8 +164,8 @@ export default function TripCompareScreen() {
           />
           <StatRow
             label={t('compare.avgSpeed')}
-            value1={formatSpeed(metricsA.avgSpeedMps)}
-            value2={formatSpeed(metricsB.avgSpeedMps)}
+            value1={formatSpeed(metricsA.avgSpeedMps) ?? '—'}
+            value2={formatSpeed(metricsB.avgSpeedMps) ?? '—'}
             highlight={fasterTrip}
           />
           <StatRow
