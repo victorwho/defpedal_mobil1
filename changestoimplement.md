@@ -48,7 +48,7 @@
 - [x] DONE — Softer hazard shading (semi-transparent dark-red base + lighter red dashes) (2026-04-04)
 - [x] DONE — Zoom in closer during navigation (followZoomLevel 16→17.5) (2026-04-04)
 - [x] DONE — Voice guidance: 200m pre-announce, ETA every 5min, tap ManeuverCard to re-announce (2026-04-04)
-- [ ] NOT STARTED — Reroute through waypoints (multi-stop reroute)
+- [x] DONE — Reroute through waypoints (strips passed waypoints based on rider position on polyline) (2026-04-04)
 
 ## Community
 - [x] DONE — Like/love counter optimistic update fix (2026-04-03)

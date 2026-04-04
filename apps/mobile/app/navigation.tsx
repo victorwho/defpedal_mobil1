@@ -114,14 +114,17 @@ export default function NavigationScreen() {
   const selectedRoute =
     routePreview?.routes.find((route) => route.id === selectedRouteId) ?? routePreview?.routes[0];
 
+  const routeCoordinates = useMemo(
+    () => (selectedRoute ? decodePolyline(selectedRoute.geometryPolyline6) : []),
+    [selectedRoute],
+  );
+
   // Query hazards along the entire route, not just near the user
   const routeMidpoint = useMemo(() => {
-    if (!selectedRoute) return null;
-    const coords = decodePolyline(selectedRoute.geometryPolyline6);
-    if (coords.length === 0) return null;
-    const mid = coords[Math.floor(coords.length / 2)];
+    if (routeCoordinates.length === 0) return null;
+    const mid = routeCoordinates[Math.floor(routeCoordinates.length / 2)];
     return { lat: mid[1], lon: mid[0] };
-  }, [selectedRoute]);
+  }, [routeCoordinates]);
 
   // Use route midpoint as query center with radius covering the full route
   const hazardQueryCoordinate = routeMidpoint
@@ -369,7 +372,7 @@ export default function NavigationScreen() {
 
   const rerouteMutation = useMutation({
     mutationFn: (origin: Coordinate) =>
-      mobileApi.reroute(buildRerouteRequest(routeRequest, selectedRoute?.id, origin)),
+      mobileApi.reroute(buildRerouteRequest(routeRequest, selectedRoute?.id, origin, routeCoordinates)),
     onMutate: () => {
       recordNavigationReroute();
       telemetry.capture('reroute_requested', {
