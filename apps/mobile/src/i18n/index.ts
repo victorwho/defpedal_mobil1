@@ -2,11 +2,11 @@
  * Lightweight i18n system for Defensive Pedal.
  *
  * - Two locales: 'en' (default) and 'ro'
- * - Detects device locale at startup via expo-localization
+ * - Detects device locale via React Native NativeModules (no native dependency)
  * - Persisted locale override via Zustand appStore
  * - Simple dot-path key lookup with {{variable}} interpolation
  */
-import { getLocales } from 'expo-localization';
+import { NativeModules, Platform } from 'react-native';
 
 import { en, type TranslationKeys } from './en';
 import { ro } from './ro';
@@ -17,11 +17,15 @@ const translations: Record<Locale, TranslationKeys> = { en, ro };
 
 /**
  * Detect the device's preferred locale, falling back to 'en'.
+ * Uses React Native built-ins — no expo-localization needed.
  */
 export const getDeviceLocale = (): Locale => {
-  const deviceLocales = getLocales();
-  const primary = deviceLocales[0]?.languageCode ?? 'en';
-  return primary === 'ro' ? 'ro' : 'en';
+  const deviceLang =
+    Platform.OS === 'android'
+      ? NativeModules.I18nManager?.localeIdentifier?.split('_')[0]
+      : NativeModules.SettingsManager?.settings?.AppleLocale?.split('_')[0] ??
+        NativeModules.SettingsManager?.settings?.AppleLanguages?.[0]?.split('-')[0];
+  return deviceLang === 'ro' ? 'ro' : 'en';
 };
 
 /**
