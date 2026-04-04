@@ -262,6 +262,8 @@ export interface TripTrackRequest {
   endReason: 'completed' | 'stopped' | 'app_killed';
   startedAt: string;
   endedAt: string;
+  bikeType?: string;
+  aqiAtStart?: number | null;
 }
 
 export interface TripHistoryItem {

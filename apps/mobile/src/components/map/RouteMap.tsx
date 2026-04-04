@@ -70,6 +70,7 @@ export const RouteMap = ({
   onMapLongPress,
   hazardPlacementMode = false,
   onCenterChange,
+  historyTrails,
   riskOverlay,
   containerStyle,
 }: RouteMapProps) => {
@@ -207,7 +208,7 @@ export const RouteMap = ({
           trailFeatureCollection={trailFeatureCollection}
           plannedRouteFeatureCollection={plannedRouteFeatureCollection}
           plannedRouteColor={plannedRouteColor}
-          historyTrails={props.historyTrails}
+          historyTrails={historyTrails}
         />
 
         <VectorTileLayers

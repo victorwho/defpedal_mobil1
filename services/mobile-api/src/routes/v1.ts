@@ -515,6 +515,8 @@ export const buildV1Routes = (
               endReason: { type: 'string', enum: ['completed', 'stopped', 'app_killed'] },
               startedAt: { type: 'string', format: 'date-time' },
               endedAt: { type: 'string', format: 'date-time' },
+              bikeType: { type: 'string', maxLength: 50 },
+              aqiAtStart: { type: ['integer', 'null'], minimum: 0, maximum: 500 },
             },
           },
         },

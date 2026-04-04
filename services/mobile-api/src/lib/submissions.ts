@@ -242,6 +242,8 @@ export const saveTripTrack = async (
         end_reason: request.endReason,
         started_at: request.startedAt,
         ended_at: request.endedAt,
+        bike_type: request.bikeType ?? null,
+        aqi_at_start: request.aqiAtStart ?? null,
       },
     ]);
 

@@ -268,6 +268,7 @@ export default function NavigationScreen() {
 
     // Queue GPS trail + route recording
     if (navigationSession && selectedRoute) {
+      const store = useAppStore.getState();
       enqueueMutation('trip_track', {
         clientTripId: activeTripClientId,
         routingMode: (routePreview?.selectedMode as 'safe' | 'fast') ?? 'fast',
@@ -277,6 +278,8 @@ export default function NavigationScreen() {
         endReason: reason,
         startedAt: navigationSession.startedAt,
         endedAt,
+        bikeType: store.bikeType ?? undefined,
+        aqiAtStart: null, // TODO: capture AQI at navigation start
       });
     }
 

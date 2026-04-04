@@ -35,7 +35,7 @@ import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { fontFamily } from '../src/design-system/tokens/typography';
+import { fontFamily, textXs } from '../src/design-system/tokens/typography';
 import { duration, easing } from '../src/design-system/tokens/motion';
 import { useT } from '../src/hooks/useTranslation';
 
