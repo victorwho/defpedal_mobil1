@@ -22,6 +22,16 @@ Update it at the end of each implementation slice.
   - **Saved Routes**: Full-stack saved routes — `saved_routes` Supabase table with RLS, 4 API endpoints (GET/POST/DELETE/PATCH), API client methods, save button on route preview with name modal, saved routes list on route planning screen (shown when destination empty). Users can save frequently used routes and reload them with one tap.
   - **Waypoint Reordering**: `reorderWaypoints` store action + up/down chevron buttons on waypoint rows. Keeps `waypointQueries` labels synced with reordered coordinates.
   - **GPX Export**: `buildGpxString` utility generates GPX 1.1 XML from trip GPS breadcrumbs + planned route polyline. Export button on TripCard writes to cache via `expo-file-system` File API and opens native share sheet.
+- Session 5 features (2026-04-04): major UX polish, i18n, voice guidance, and bug fixes:
+  - **UX Polish**: Cleaner address labels (strip postal/country/region), streak chain left-to-right fill, navigation zoom 16→17.5, tighter FABs, softer hazard zones (dark red + lighter red), Roboto body font (replacing DM Sans)
+  - **Collapsible UI**: Tap map on route-planning to toggle FABs, weather, bottom nav with fade animation
+  - **Profile Photo Upload**: expo-image-picker + Supabase Storage avatars bucket + avatar display with dashed placeholder
+  - **Voice Guidance**: 200m pre-announce, ETA every 5min, tap ManeuverCard to re-announce
+  - **Romanian i18n**: Full i18n framework — en/ro translation files (~300 keys), useT() hook, language picker in Profile. Wired into all 16+ screens: navigation, feedback, auth, settings, history, trips, community, profile (including all toggle descriptions, POI categories, bike types, frequencies, sign-out alert)
+  - **Hazard Source Field**: in_ride/manual/armchair distinguishes how hazards were reported. DB migration + API schema update
+  - **Fix: Stale Navigation Metrics**: Navigation distance/ETA/climb no longer freeze after off-route or reroute. Root causes: appState reset during reroute, frozen step index when off-route, missing lastPreAnnouncementStepId reset. 5 diagnostic tests
+  - **Tech Debt**: Deduplicated qualifyStreakAsync into shared lib/streaks.ts
+  - **EAS Build**: Set up Expo EAS project, preview build profile, Mapbox download token hook, internal distribution APK pipeline
 
 ## Phase Status
 
