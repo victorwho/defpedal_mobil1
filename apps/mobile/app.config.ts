@@ -195,6 +195,9 @@ export default () => ({
       ],
     },
     extra: {
+      eas: {
+        projectId: 'f8bcd740-c785-47a3-beed-26891c89425a',
+      },
       appEnv,
       appVariant,
       mobileApiUrl,
