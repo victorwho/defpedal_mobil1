@@ -1,5 +1,5 @@
 import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
-import { formatCo2Saved, calculateEquivalentTreeDays } from '@defensivepedal/core';
+import { formatCo2Saved, calculateEquivalentTreeDays, formatMicrolivesAsTime } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -101,6 +101,15 @@ export default function HistoryScreen() {
                 <ActivityIndicator size="small" color={safetyColors.safe} />
               ) : stats ? (
                 <>
+                {dashboard && dashboard.totalMicrolives > 0 ? (
+                  <View style={styles.microlivesRow}>
+                    <Ionicons name="heart" size={16} color="#F2C30F" />
+                    <Text style={styles.microlivesValue}>
+                      +{formatMicrolivesAsTime(dashboard.totalMicrolives)}
+                    </Text>
+                    <Text style={styles.microlivesLabel}>{t('microlives.lifeEarned')}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.impactRow}>
                   <View style={styles.impactStat}>
                     <Text style={styles.impactValue}>{stats.totalTrips}</Text>
@@ -248,6 +257,24 @@ const styles = StyleSheet.create({
     color: safetyColors.safe,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
+  },
+  microlivesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingBottom: space[2],
+    marginBottom: space[2],
+    borderBottomWidth: 1,
+    borderBottomColor: brandColors.borderDefault,
+  },
+  microlivesValue: {
+    ...textBase,
+    fontFamily: fontFamily.heading.bold,
+    color: '#F2C30F',
+  },
+  microlivesLabel: {
+    ...textXs,
+    color: darkTheme.textMuted,
   },
   impactRow: {
     flexDirection: 'row',

@@ -1,4 +1,5 @@
 import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
+import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -158,6 +159,39 @@ export default function ImpactDashboardScreen() {
             />
           }
         >
+          {/* 0. Time Bank — Microlives */}
+          {data.totalMicrolives > 0 ? (
+            <View style={styles.card}>
+              <Text style={styles.cardHeader}>Time Bank</Text>
+              <View style={styles.counterBlock}>
+                <AnimatedCounter
+                  targetValue={data.totalMicrolives}
+                  suffix=" ML"
+                  decimals={1}
+                  duration={1500}
+                  style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: '#F2C30F' }}
+                />
+                <Text style={styles.counterLabel}>
+                  +{formatMicrolivesAsTime(data.totalMicrolives)} of life earned
+                </Text>
+              </View>
+              {data.totalCommunitySeconds > 0 ? (
+                <View style={styles.counterBlock}>
+                  <AnimatedCounter
+                    targetValue={data.totalCommunitySeconds}
+                    suffix=" sec"
+                    decimals={0}
+                    duration={1500}
+                    style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: '#60A5FA' }}
+                  />
+                  <Text style={styles.counterLabel}>
+                    {formatCommunitySeconds(data.totalCommunitySeconds)} donated to your city
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* 1. Streak */}
           <StreakCard streakState={data.streak} />
 
