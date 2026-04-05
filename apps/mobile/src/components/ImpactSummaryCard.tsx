@@ -93,34 +93,21 @@ export const ImpactSummaryCard = ({
   staggerDelayMs = 800,
 }: ImpactSummaryCardProps) => (
   <View style={styles.card}>
-    {/* Microlives hero */}
-    {rideImpact.personalMicrolives > 0 ? (
-      <View style={styles.microlivesHero}>
+    {/* This ride's impact — microlives first, then CO2/money/hazards */}
+    <Text style={styles.sectionTitle}>This ride's impact</Text>
+
+    <View style={styles.countersColumn}>
+      {rideImpact.personalMicrolives > 0 ? (
         <StaggeredCounter
           targetValue={rideImpact.personalMicrolives}
           decimals={1}
           label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
-          equivalentText={null}
+          equivalentText={rideImpact.communitySeconds > 0 ? `${formatCommunitySeconds(rideImpact.communitySeconds)} donated to your city` : null}
           color="#F2C30F"
           delayMs={0}
           suffix=" ML"
         />
-        <StaggeredCounter
-          targetValue={rideImpact.communitySeconds}
-          decimals={0}
-          label={`${formatCommunitySeconds(rideImpact.communitySeconds)} donated to your city`}
-          equivalentText={null}
-          color="#60A5FA"
-          delayMs={staggerDelayMs}
-          suffix=" sec"
-        />
-      </View>
-    ) : null}
-
-    {/* This ride's impact */}
-    <Text style={styles.sectionTitle}>This ride's impact</Text>
-
-    <View style={styles.countersColumn}>
+      ) : null}
       <StaggeredCounter
         targetValue={rideImpact.co2SavedKg}
         suffix=" kg"
@@ -128,7 +115,7 @@ export const ImpactSummaryCard = ({
         label="CO2 saved"
         equivalentText={rideImpact.equivalentText}
         color={safetyColors.safe}
-        delayMs={staggerDelayMs * 2}
+        delayMs={rideImpact.personalMicrolives > 0 ? staggerDelayMs : 0}
       />
       <StaggeredCounter
         targetValue={rideImpact.moneySavedEur}
@@ -137,15 +124,7 @@ export const ImpactSummaryCard = ({
         label="Money saved"
         equivalentText={null}
         color={brandColors.accent}
-        delayMs={staggerDelayMs * 3}
-      />
-      <StaggeredCounter
-        targetValue={rideImpact.hazardsWarnedCount}
-        decimals={0}
-        label="Hazards warned"
-        equivalentText={null}
-        color={safetyColors.caution}
-        delayMs={staggerDelayMs * 4}
+        delayMs={rideImpact.personalMicrolives > 0 ? staggerDelayMs * 2 : staggerDelayMs}
       />
     </View>
 
@@ -193,12 +172,6 @@ const styles = StyleSheet.create({
     padding: space[5],
     gap: space[5],
     ...shadows.lg,
-  },
-  microlivesHero: {
-    gap: space[3],
-    paddingBottom: space[3],
-    borderBottomWidth: 1,
-    borderBottomColor: darkTheme.borderDefault,
   },
   sectionTitle: {
     ...textSm,

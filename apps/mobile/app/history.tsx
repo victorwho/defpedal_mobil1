@@ -101,7 +101,7 @@ export default function HistoryScreen() {
                 <ActivityIndicator size="small" color={safetyColors.safe} />
               ) : stats ? (
                 <>
-                {dashboard && dashboard.totalMicrolives > 0 ? (
+                {dashboard ? (
                   <View style={styles.microlivesRow}>
                     <Ionicons name="heart" size={16} color="#F2C30F" />
                     <Text style={styles.microlivesValue}>

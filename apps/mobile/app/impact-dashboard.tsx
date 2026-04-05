@@ -160,7 +160,7 @@ export default function ImpactDashboardScreen() {
           }
         >
           {/* 0. Time Bank — Microlives */}
-          {data.totalMicrolives > 0 ? (
+          {data ? (
             <View style={styles.card}>
               <Text style={styles.cardHeader}>Time Bank</Text>
               <View style={styles.counterBlock}>
@@ -175,8 +175,7 @@ export default function ImpactDashboardScreen() {
                   +{formatMicrolivesAsTime(data.totalMicrolives)} of life earned
                 </Text>
               </View>
-              {data.totalCommunitySeconds > 0 ? (
-                <View style={styles.counterBlock}>
+              <View style={styles.counterBlock}>
                   <AnimatedCounter
                     targetValue={data.totalCommunitySeconds}
                     suffix=" sec"
@@ -188,7 +187,6 @@ export default function ImpactDashboardScreen() {
                     {formatCommunitySeconds(data.totalCommunitySeconds)} donated to your city
                   </Text>
                 </View>
-              ) : null}
             </View>
           ) : null}
 
