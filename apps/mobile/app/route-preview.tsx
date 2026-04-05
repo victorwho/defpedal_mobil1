@@ -405,6 +405,15 @@ export default function RoutePreviewScreen() {
                   : '—'}
               </Text>
             </View>
+
+            <Text style={styles.statDivider}>·</Text>
+
+            <View style={styles.stat}>
+              <Text style={[styles.statValue, { color: '#F2C30F' }]}>
+                +{Math.round(selectedRoute.distanceMeters / 1000 * 0.4 * 30)}min
+              </Text>
+              <Text style={styles.statUnit}>life</Text>
+            </View>
           </View>
         </View>
       ) : null}

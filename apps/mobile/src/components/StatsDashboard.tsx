@@ -415,6 +415,18 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
           label={t('history.hazards')}
           value={String(hazardsReported)}
         />
+        <SummaryCard
+          icon="heart-outline"
+          iconColor="#F2C30F"
+          label={t('microlives.lifeEarned')}
+          value={`${Math.round(dashboard.totals.totalDistanceMeters / 1000 * 0.4 * 30)}m`}
+        />
+        <SummaryCard
+          icon="people-outline"
+          iconColor="#60A5FA"
+          label={t('microlives.donatedToCity')}
+          value={`${Math.round(dashboard.totals.totalDistanceMeters / 1000 * 4.5)}s`}
+        />
       </View>
 
       <StreakDisplay

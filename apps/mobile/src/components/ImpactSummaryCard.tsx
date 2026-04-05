@@ -97,17 +97,15 @@ export const ImpactSummaryCard = ({
     <Text style={styles.sectionTitle}>This ride's impact</Text>
 
     <View style={styles.countersColumn}>
-      {rideImpact.personalMicrolives > 0 ? (
-        <StaggeredCounter
-          targetValue={rideImpact.personalMicrolives}
-          decimals={1}
-          label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
-          equivalentText={rideImpact.communitySeconds > 0 ? `+${Math.round(rideImpact.communitySeconds)}s donated to city` : null}
-          color="#F2C30F"
-          delayMs={0}
-          suffix=" ML"
-        />
-      ) : null}
+      <StaggeredCounter
+        targetValue={rideImpact.personalMicrolives}
+        decimals={1}
+        label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
+        equivalentText={rideImpact.communitySeconds > 0 ? `+${Math.round(rideImpact.communitySeconds)}s donated to city` : null}
+        color="#F2C30F"
+        delayMs={0}
+        suffix=" ML"
+      />
       <StaggeredCounter
         targetValue={rideImpact.co2SavedKg}
         suffix=" kg"
@@ -115,7 +113,7 @@ export const ImpactSummaryCard = ({
         label="CO2 saved"
         equivalentText={rideImpact.equivalentText}
         color={safetyColors.safe}
-        delayMs={rideImpact.personalMicrolives > 0 ? staggerDelayMs : 0}
+        delayMs={staggerDelayMs}
       />
       <StaggeredCounter
         targetValue={rideImpact.moneySavedEur}
@@ -124,7 +122,7 @@ export const ImpactSummaryCard = ({
         label="Money saved"
         equivalentText={null}
         color={brandColors.accent}
-        delayMs={rideImpact.personalMicrolives > 0 ? staggerDelayMs * 2 : staggerDelayMs}
+        delayMs={staggerDelayMs * 2}
       />
     </View>
 
