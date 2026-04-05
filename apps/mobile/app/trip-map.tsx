@@ -16,7 +16,7 @@ import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 export default function TripMapScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
-  const { coordinate, refreshLocation } = useCurrentLocation();
+  const { location: coordinate, refreshLocation } = useCurrentLocation();
 
   const { data: trips } = useQuery({
     queryKey: ['trip-history'],

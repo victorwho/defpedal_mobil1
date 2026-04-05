@@ -94,9 +94,7 @@ export default function TripsScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <Button variant="secondary" size="sm" onPress={() => router.replace('/history')}>
-              ← {t('tripsScreen.title')}
-            </Button>
+            <View />
             <View style={styles.headerActions}>
               {(trips?.length ?? 0) >= 1 && !compareMode ? (
                 <Pressable style={styles.compareButton} onPress={() => router.push('/trip-map')}>
