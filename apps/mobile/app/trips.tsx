@@ -97,12 +97,20 @@ export default function TripsScreen() {
             <Button variant="secondary" size="sm" onPress={() => router.replace('/history')}>
               ← {t('tripsScreen.title')}
             </Button>
-            {(trips?.length ?? 0) >= 2 && !compareMode ? (
-              <Pressable style={styles.compareButton} onPress={() => setCompareMode(true)}>
-                <Ionicons name="git-compare-outline" size={16} color={brandColors.accent} />
-                <Text style={styles.compareButtonText}>{t('compare.select')}</Text>
-              </Pressable>
-            ) : null}
+            <View style={styles.headerActions}>
+              {(trips?.length ?? 0) >= 1 && !compareMode ? (
+                <Pressable style={styles.compareButton} onPress={() => router.push('/trip-map')}>
+                  <Ionicons name="map-outline" size={16} color={brandColors.accent} />
+                  <Text style={styles.compareButtonText}>Map</Text>
+                </Pressable>
+              ) : null}
+              {(trips?.length ?? 0) >= 2 && !compareMode ? (
+                <Pressable style={styles.compareButton} onPress={() => setCompareMode(true)}>
+                  <Ionicons name="git-compare-outline" size={16} color={brandColors.accent} />
+                  <Text style={styles.compareButtonText}>{t('compare.select')}</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           <Text style={styles.eyebrow}>{t('history.eyebrow').toUpperCase()}</Text>
           <Text style={styles.title}>{t('tripsScreen.subtitle')}</Text>
@@ -221,6 +229,10 @@ const styles = StyleSheet.create({
     ...textBase,
     color: brandColors.textSecondary,
     textAlign: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: space[2],
   },
   compareButton: {
     flexDirection: 'row',

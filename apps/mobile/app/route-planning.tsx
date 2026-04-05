@@ -126,8 +126,6 @@ export default function RoutePlanningScreen() {
   const uiOpacity = useRef(new Animated.Value(1)).current;
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
-  const showHistoryOverlay = useAppStore((state) => state.showHistoryOverlay);
-  const setShowHistoryOverlay = useAppStore((state) => state.setShowHistoryOverlay);
   const { user } = useAuthSession();
   const t = useT();
 
@@ -138,24 +136,6 @@ export default function RoutePlanningScreen() {
     enabled: Boolean(user),
     staleTime: 300_000,
   });
-
-  // History overlay — past ride GPS trails on the map
-  const historyQuery = useQuery({
-    queryKey: ['trip-history'],
-    queryFn: () => mobileApi.getTripHistory(),
-    enabled: Boolean(user) && showHistoryOverlay,
-    staleTime: 300_000,
-  });
-
-  const historyTrails = useMemo(() => {
-    if (!showHistoryOverlay || !historyQuery.data) return undefined;
-    return historyQuery.data
-      .filter((trip) => trip.gpsBreadcrumbs.length >= 2)
-      .map((trip) => ({
-        coordinates: trip.gpsBreadcrumbs.map((b) => [b.lon, b.lat] as [number, number]),
-        mode: trip.routingMode,
-      }));
-  }, [showHistoryOverlay, historyQuery.data]);
 
   // Saved routes — show when destination is empty and user is signed in
   const savedRoutesQuery = useQuery({
@@ -513,7 +493,6 @@ export default function RoutePlanningScreen() {
           onMapLongPress={handleMapLongPress}
           hazardPlacementMode={hazardPlacementMode}
           onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
-          historyTrails={historyTrails}
         />
       }
       topOverlay={
@@ -866,16 +845,6 @@ export default function RoutePlanningScreen() {
           >
             <Ionicons name="locate" size={22} color={gray[700]} />
           </Pressable>
-          {user ? (
-            <Pressable
-              style={[styles.fabButton, showHistoryOverlay && { backgroundColor: darkTheme.accent }]}
-              onPress={() => setShowHistoryOverlay(!showHistoryOverlay)}
-              accessibilityLabel="Toggle ride history overlay"
-              accessibilityRole="button"
-            >
-              <Ionicons name="trail-sign" size={22} color={showHistoryOverlay ? '#000' : gray[700]} />
-            </Pressable>
-          ) : null}
           {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
             <Pressable
               style={styles.fabButton}
