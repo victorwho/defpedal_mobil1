@@ -578,6 +578,43 @@ export const reverseGeocodeLocality = async (
   }
 };
 
+/**
+ * Reverse geocode a coordinate to a human-readable address label.
+ * Used for long-press to set destination on the map.
+ */
+export const reverseGeocodeAddress = async (
+  lat: number,
+  lon: number,
+): Promise<{ label: string; primaryText: string } | null> => {
+  const token = ensureMapboxToken();
+  const params = new URLSearchParams({
+    longitude: String(lon),
+    latitude: String(lat),
+    access_token: token,
+    types: 'address,poi,place',
+    limit: '1',
+  });
+
+  const url = `${MAPBOX_GEOCODING_BASE}/reverse?${params.toString()}`;
+
+  try {
+    const response = await fetchWithTimeout(url);
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const feature = data.features?.[0];
+    if (!feature) return null;
+
+    const name = feature.properties.name ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    const fullAddress = feature.properties.full_address ?? feature.properties.place_formatted ?? name;
+    const cleaned = stripAddressNoise(fullAddress, feature.properties.context);
+
+    return { primaryText: name, label: cleaned };
+  } catch {
+    return null;
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Coverage Check
 // ---------------------------------------------------------------------------

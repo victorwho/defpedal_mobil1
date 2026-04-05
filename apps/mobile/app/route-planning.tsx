@@ -182,9 +182,30 @@ export default function RoutePlanningScreen() {
     }).start();
   }, [hazardPlacementMode, uiCollapsed, uiOpacity]);
 
-  const handleMapLongPress = (coordinate: Coordinate) => {
-    setPendingHazardCoordinate(coordinate);
-    setHazardPickerOpen(true);
+  const handleMapLongPress = async (coordinate: Coordinate) => {
+    // If hazard placement FAB is active, open hazard picker
+    if (hazardPlacementMode) {
+      setPendingHazardCoordinate(coordinate);
+      setHazardPickerOpen(true);
+      return;
+    }
+
+    // Otherwise, set as destination
+    setRouteRequest({ destination: coordinate });
+    setDestinationQuery(`${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`);
+    setDestinationHydrated(true);
+    setActiveField(null);
+
+    // Reverse geocode to get a readable address (non-blocking)
+    try {
+      const { reverseGeocodeAddress } = await import('../src/lib/mapbox-search');
+      const result = await reverseGeocodeAddress(coordinate.lat, coordinate.lon);
+      if (result) {
+        setDestinationQuery(result.label);
+      }
+    } catch {
+      // Keep coordinate label as fallback
+    }
   };
 
   const handleHazardTypeSelect = (hazardType: HazardType) => {
