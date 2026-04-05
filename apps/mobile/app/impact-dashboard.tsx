@@ -15,6 +15,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 
 import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
+import { BackButton } from '../src/design-system/atoms/BackButton';
 import { Button } from '../src/design-system/atoms/Button';
 import { brandColors, darkTheme, safetyColors } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
@@ -122,16 +123,9 @@ export default function ImpactDashboardScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="chevron-back" size={24} color={darkTheme.textPrimary} />
-        </Pressable>
+        <BackButton />
         <Text style={styles.headerTitle}>Your Impact</Text>
-        <View style={styles.backButton} />
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Loading */}

@@ -1,25 +1,22 @@
-import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../src/components/map';
-import { Button } from '../src/design-system/atoms/Button';
+import { BackButton } from '../src/design-system/atoms/BackButton';
 import { brandColors, gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
-import { useT } from '../src/hooks/useTranslation';
 
 export default function TripMapScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
-  const t = useT();
-  const { coordinate } = useCurrentLocation();
+  const { coordinate, refreshLocation } = useCurrentLocation();
 
   const { data: trips } = useQuery({
     queryKey: ['trip-history'],
@@ -39,11 +36,16 @@ export default function TripMapScreen() {
   }, [trips]);
 
   const trailCount = historyTrails?.length ?? 0;
-  const [recenterKey, setRecenterKey] = useState(coordinate ? 1 : 0);
+  const [recenterKey, setRecenterKey] = useState(1);
+
+  const handleRecenter = useCallback(() => {
+    void refreshLocation();
+    setRecenterKey((k) => k + 1);
+  }, [refreshLocation]);
 
   return (
     <View style={styles.root}>
-      {/* Map fills screen with bottom safe area */}
+      {/* Map with bottom safe area */}
       <View style={[styles.mapContainer, { paddingBottom: insets.bottom }]}>
         <RouteMap
           origin={coordinate ?? undefined}
@@ -56,27 +58,27 @@ export default function TripMapScreen() {
         />
       </View>
 
-      {/* Floating header overlay */}
-      <View style={[styles.headerOverlay, { paddingTop: insets.top + space[2] }]}>
-        <View style={styles.headerRow}>
-          <Button variant="secondary" size="sm" onPress={() => router.back()}>
-            ← {t('common.back')}
-          </Button>
-          <Text style={styles.badge}>
-            {trailCount} {trailCount === 1 ? 'ride' : 'rides'}
-          </Text>
-        </View>
+      {/* Floating back button — bottom left */}
+      <View style={[styles.bottomLeft, { bottom: insets.bottom + space[4] }]}>
+        <BackButton />
       </View>
 
-      {/* Recenter button */}
+      {/* Floating recenter button — bottom right */}
       <Pressable
         style={[styles.recenterButton, { bottom: insets.bottom + space[4] }]}
-        onPress={() => setRecenterKey((k) => k + 1)}
+        onPress={handleRecenter}
         accessibilityLabel="Center on my location"
         accessibilityRole="button"
       >
         <Ionicons name="locate" size={20} color={gray[700]} />
       </Pressable>
+
+      {/* Ride count badge — top right */}
+      <View style={[styles.badgeContainer, { top: insets.top + space[2] }]}>
+        <Text style={styles.badge}>
+          {trailCount} {trailCount === 1 ? 'ride' : 'rides'}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -86,29 +88,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brandColors.bgDeep,
   },
-  headerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: space[4],
-    paddingBottom: space[2],
-    zIndex: 10,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   mapContainer: {
     flex: 1,
+  },
+  bottomLeft: {
+    position: 'absolute',
+    left: space[4],
   },
   recenterButton: {
     position: 'absolute',
     right: space[4],
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -117,6 +109,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  badgeContainer: {
+    position: 'absolute',
+    right: space[4],
   },
   badge: {
     ...textSm,

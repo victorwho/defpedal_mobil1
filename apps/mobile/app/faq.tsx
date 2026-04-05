@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { BackButton } from '../src/design-system/atoms/BackButton';
 import { darkTheme, gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -125,16 +126,9 @@ export default function FaqScreen() {
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="arrow-back" size={24} color={darkTheme.textPrimary} />
-        </Pressable>
+        <BackButton />
         <Text style={styles.headerTitle}>FAQ</Text>
-        <View style={styles.backButton} />
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Content */}

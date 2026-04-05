@@ -13,6 +13,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RouteMap } from '../src/components/map';
+import { BackButton } from '../src/design-system/atoms/BackButton';
 import { Button } from '../src/design-system/atoms/Button';
 import { brandColors, gray, safetyColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXl, textXs, text2xl } from '../src/design-system/tokens/typography';
@@ -118,9 +119,7 @@ export default function TripCompareScreen() {
     <View style={styles.root}>
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[8] }]}>
         <View style={styles.header}>
-          <Button variant="secondary" size="sm" onPress={() => router.back()}>
-            ← {t('common.back')}
-          </Button>
+          <BackButton />
           <Text style={styles.title}>{t('compare.title')}</Text>
         </View>
 
