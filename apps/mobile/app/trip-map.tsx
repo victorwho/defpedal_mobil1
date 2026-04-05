@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../src/components/map';
 import { Button } from '../src/design-system/atoms/Button';
@@ -38,6 +39,7 @@ export default function TripMapScreen() {
   }, [trips]);
 
   const trailCount = historyTrails?.length ?? 0;
+  const [recenterKey, setRecenterKey] = useState(coordinate ? 1 : 0);
 
   return (
     <View style={styles.root}>
@@ -48,7 +50,7 @@ export default function TripMapScreen() {
         followUser={false}
         historyTrails={historyTrails}
         showRouteOverlay={false}
-        recenterKey={coordinate ? 1 : 0}
+        recenterKey={recenterKey}
         fullBleed
       />
 
@@ -63,6 +65,16 @@ export default function TripMapScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Recenter button */}
+      <Pressable
+        style={styles.recenterButton}
+        onPress={() => setRecenterKey((k) => k + 1)}
+        accessibilityLabel="Center on my location"
+        accessibilityRole="button"
+      >
+        <Ionicons name="locate" size={20} color={gray[700]} />
+      </Pressable>
     </View>
   );
 }
@@ -85,6 +97,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  recenterButton: {
+    position: 'absolute',
+    bottom: space[6],
+    right: space[4],
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   badge: {
     ...textSm,
