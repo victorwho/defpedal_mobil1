@@ -47,6 +47,8 @@ export default function TripMapScreen() {
         userLocation={coordinate}
         followUser={false}
         historyTrails={historyTrails}
+        showRouteOverlay={false}
+        recenterKey={coordinate ? 1 : 0}
         fullBleed
       />
 
