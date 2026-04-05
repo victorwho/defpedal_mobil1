@@ -136,16 +136,16 @@ export default function HistoryScreen() {
                     <Text style={styles.impactLabel}>{t('history.eurSaved')}</Text>
                   </View>
                   <View style={styles.impactStat}>
+                    <Text style={[styles.impactValue, { color: '#60A5FA' }]}>
+                      {dashboard ? `${Math.round(dashboard.totalCommunitySeconds)}s` : '—'}
+                    </Text>
+                    <Text style={styles.impactLabel}>{t('microlives.donatedToCity')}</Text>
+                  </View>
+                  <View style={styles.impactStat}>
                     <Text style={[styles.impactValue, { color: safetyColors.caution }]}>
                       {dashboard ? String(dashboard.totalHazardsReported) : '—'}
                     </Text>
                     <Text style={styles.impactLabel}>{t('history.hazards')}</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: safetyColors.info }]}>
-                      {dashboard ? String(dashboard.totalRidersProtected) : '—'}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('history.protected')}</Text>
                   </View>
                 </View>
               </>

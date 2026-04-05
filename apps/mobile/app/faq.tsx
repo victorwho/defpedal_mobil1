@@ -59,6 +59,21 @@ const FAQ_ITEMS: { question: string; answer: string }[] = [
     answer:
       'Your location is only used locally for navigation and route planning. We do not store or share your GPS tracks. Hazard reports are anonymised.',
   },
+  {
+    question: 'What are Microlives?',
+    answer:
+      'Microlives are a science-based measure of life expectancy. 1 Microlife = 30 minutes of adult life expectancy. Every ride you take earns Microlives based on distance cycled, bike type, and air quality. The formula: 0.4 × distance (km) × vehicle modifier × AQI modifier. Acoustic bikes earn more than e-bikes because of the higher physical effort.',
+  },
+  {
+    question: 'How are community seconds calculated?',
+    answer:
+      'Every kilometre you cycle instead of driving prevents air pollution that would shorten the lives of people around you. We calculate this as 4.5 seconds of community life expectancy donated per km. These are aggregated city-wide to show collective impact.',
+  },
+  {
+    question: 'What does the Time Bank show?',
+    answer:
+      'The Time Bank is your cumulative life expectancy earned from all your rides. It shows the total extra minutes, hours, or days of life you have gained through cycling. This number only goes up — every ride adds to it.',
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -124,6 +124,11 @@ export const CommunityStatsCard = ({
           unit="kg"
           label={t('communityStats.co2Saved')}
         />
+        <StatTile
+          value={String(Math.round(stats.totalDistanceMeters / 1000 * 4.5))}
+          unit="sec"
+          label={t('microlives.donatedToCity')}
+        />
       </View>
 
       <View style={styles.riderRow}>
