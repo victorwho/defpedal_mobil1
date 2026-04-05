@@ -15,9 +15,7 @@
 - [ ] NOT STARTED — Safety Guide mentorship system (100+ rides)
 - [ ] NOT STARTED — City Safety Report (auto-generated monthly)
 - [x] DONE — Microlives Phase 0-3: calculation engine, DB schema, server integration, post-ride UI, TimeBankWidget, history + dashboard (2026-04-04)
-- [ ] NOT STARTED — Microlives Phase 4: Progression system (5 tiers, 30 levels, S-curve)
 - [ ] NOT STARTED — Microlives Phase 5: Anti-cheat (GPS kinematic validation)
-- [ ] NOT STARTED — Microlives Phase 6: Microlife-aware badges
 - [ ] NOT STARTED — Microlives Phase 7: City Heartbeat community dashboard
 - [ ] NOT STARTED — Unlockable feature tiers (Night Ride at 5, Weather Safety at 15, Analytics at 30)
 - [ ] NOT STARTED — Tomorrow's route safety preview (needs saved commute routes)
