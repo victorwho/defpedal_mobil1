@@ -32,6 +32,26 @@ Update it at the end of each implementation slice.
   - **Fix: Stale Navigation Metrics**: Navigation distance/ETA/climb no longer freeze after off-route or reroute. Root causes: appState reset during reroute, frozen step index when off-route, missing lastPreAnnouncementStepId reset. 5 diagnostic tests
   - **Tech Debt**: Deduplicated qualifyStreakAsync into shared lib/streaks.ts
   - **EAS Build**: Set up Expo EAS project, preview build profile, Mapbox download token hook, internal distribution APK pipeline
+- Session 5 continued (2026-04-04 to 2026-04-05): features, push notifications, trip comparison, microlives:
+  - **Multi-stop Reroute**: Strips already-passed waypoints from reroute request based on rider position on polyline. 4 tests.
+  - **Push Notifications**: expo-notifications installed, NotificationProvider wired with tap-to-navigate, push token registration on sign-in
+  - **Trip Comparison**: Select 2 trips from history, side-by-side stats (distance, duration, speed, CO2, mode) + map with GPS trail
+  - **Personal Safety Map Overlay**: FAB toggle shows past ride GPS trails on planning map (safe=green, fast=blue, 40% opacity)
+  - **Hazard Alert Sharing**: Share button on hazard report toast opens native share sheet with location
+  - **Microlives Phase 0-3**: Complete gamification engine:
+    - Core calculation module (`microlives.ts`): personal microlives (0.4 ML/km × vehicle × AQI), community seconds (4.5s/km × vehicle). 25 unit tests.
+    - Database: `ride_microlives` table, `community_seconds_daily`, profiles extended with `total_microlives`/`total_community_seconds`/`microlife_tier`
+    - RPC: `record_ride_microlives` (compute, store, accumulate, community upsert)
+    - Server: ride impact endpoint calls microlives RPC, impact dashboard returns totals
+    - Post-ride: microlives + community seconds in ImpactSummaryCard (single merged card)
+    - Home screen: TimeBankWidget (compact one-row, matching weather font)
+    - History: microlives row in impact card + community seconds stat
+    - Impact dashboard: Time Bank section with animated counters
+    - Stats dashboard: life earned (min) and donated to city (sec) summary cards
+    - Route preview: estimated life earned in summary row (gold accent)
+    - Community stats: donated to city tile
+    - FAQ: 3 entries explaining Microlives, community seconds, Time Bank
+    - Cloud Run redeployed with microlives API
 
 ## Phase Status
 

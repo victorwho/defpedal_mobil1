@@ -62,7 +62,7 @@ const FAQ_ITEMS: { question: string; answer: string }[] = [
   {
     question: 'What are Microlives?',
     answer:
-      'Microlives are a science-based measure of life expectancy. 1 Microlife = 30 minutes of adult life expectancy. Every ride you take earns Microlives based on distance cycled, bike type, and air quality. The formula: 0.4 × distance (km) × vehicle modifier × AQI modifier. Acoustic bikes earn more than e-bikes because of the higher physical effort.',
+      'Microlives are a science-based measure of life expectancy. 1 Microlife = 30 minutes of adult life expectancy. Every ride you take earns Microlives based on distance cycled, bike type, and air quality. The formula: 0.4 × distance (km) × vehicle modifier × AQI modifier. Regular bikes earn more than e-bikes because of the higher physical effort.',
   },
   {
     question: 'How are community seconds calculated?',
