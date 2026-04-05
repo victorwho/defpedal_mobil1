@@ -1,6 +1,7 @@
 import type {
   AutocompleteRequest,
   AutocompleteResponse,
+  BadgeResponse,
   CommunityStats,
   Coordinate,
   CoverageResponse,
@@ -429,14 +430,29 @@ export const mobileApi = {
     return response.json();
   },
 
-  recordRideImpact: (tripId: string, distanceMeters: number) =>
+  recordRideImpact: (
+    tripId: string,
+    distanceMeters: number,
+    meta?: {
+      elevationGainM?: number;
+      weatherCondition?: string;
+      windSpeedKmh?: number;
+      temperatureC?: number;
+      aqiLevel?: string;
+      rideStartHour?: number;
+      durationMinutes?: number;
+    },
+  ) =>
     requestJson<RideImpact>(`/v1/rides/${tripId}/impact`, {
       method: 'POST',
-      body: JSON.stringify({ distanceMeters }),
+      body: JSON.stringify({ distanceMeters, ...meta }),
     }),
 
   fetchRideImpact: (tripId: string) =>
     requestJson<RideImpact>(`/v1/rides/${tripId}/impact`),
+
+  fetchBadges: () =>
+    requestJson<BadgeResponse>('/v1/badges'),
 
   fetchImpactDashboard: (timeZone?: string) => {
     const params = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : '';

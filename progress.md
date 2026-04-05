@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -52,6 +52,15 @@ Update it at the end of each implementation slice.
     - Community stats: donated to city tile
     - FAQ: 3 entries explaining Microlives, community seconds, Time Bank
     - Cloud Run redeployed with microlives API
+- Badge System Phase 2 (2026-04-05): evaluation engine + API endpoint, server-side only:
+    - Migration `202604050004_badge_evaluation.sql`: Updated `record_ride_impact` RPC to accept 7 new optional ride-context fields (elevation_gain_m, weather_condition, wind_speed_kmh, temperature_c, aqi_level, ride_start_hour, duration_minutes); uses ON CONFLICT upsert to stay idempotent while still accumulating profile totals only on genuine inserts
+    - `check_and_award_badges(p_user_id UUID)` RPC: evaluates all ~140 badge criteria in a single call — loads profile, streak, ride aggregates, social counts, quiz stats, hazard specialisation, seasonal counts upfront, then PL/pgSQL conditionals for each badge family; inserts into user_badges (ON CONFLICT DO NOTHING); returns JSONB array of newly awarded badge definitions
+    - Coverage: Firsts, Distance/Time/Ride count (cumulative), Streak, Early Bird / Night Owl / Monthly, CO2/Money/Microlives/Community Seconds, Hazards/Validators/Specialists, Quiz (with perfect-day and 3-consecutive perfect-day detection), Climbing, Athletic one-timers, Weather/AQI, Social, Seasonal, Annual events, Hidden badges (mirror_distance, round_number, same_origin_dest_7, five_am, friday_13, pi_day, leap_day)
+    - POST /v1/rides/:tripId/impact: extended body schema with optional metadata fields; calls updated RPC; calls `check_and_award_badges` after recording (non-fatal); returns `newBadges` in response
+    - GET /v1/badges: returns badge definitions catalog + user's earned badges + progress toward unearthed badges (computable locally from ride/profile aggregates); no new RPC needed
+    - contracts.ts: `RideImpact` extended with `newBadges: readonly BadgeUnlockEvent[]`; added `BadgeResponse` type
+    - api.ts: `recordRideImpact` extended with optional `meta` object; `fetchBadges()` added
+    - All TypeScript checks pass clean (API + mobile)
 
 ## Phase Status
 

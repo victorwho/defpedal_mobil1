@@ -550,6 +550,13 @@ export interface RideImpact {
   readonly equivalentText: string | null;
   readonly personalMicrolives: number;
   readonly communitySeconds: number;
+  readonly newBadges: readonly BadgeUnlockEvent[];
+}
+
+export interface BadgeResponse {
+  readonly definitions: readonly BadgeDefinition[];
+  readonly earned: readonly UserBadge[];
+  readonly progress: readonly BadgeProgress[];
 }
 
 export interface StreakState {
@@ -595,7 +602,46 @@ export interface QuizAnswer {
 export interface UserBadge {
   readonly badgeKey: string;
   readonly earnedAt: string;
+  readonly isNew?: boolean;
   readonly metadata: Record<string, unknown>;
+}
+
+// ── Badge System ──
+
+export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
+export type BadgeDisplayTab = 'firsts' | 'riding' | 'consistency' | 'impact' | 'safety' | 'community' | 'explore' | 'events';
+
+export interface BadgeDefinition {
+  readonly badgeKey: string;
+  readonly category: BadgeDisplayTab;
+  readonly displayTab: BadgeDisplayTab;
+  readonly name: string;
+  readonly flavorText: string;
+  readonly criteriaText: string;
+  readonly criteriaUnit: string | null;
+  readonly tier: number;           // 0 = one-time, 1-5 = tier level
+  readonly tierFamily: string | null;
+  readonly isHidden: boolean;
+  readonly isSeasonal: boolean;
+  readonly sortOrder: number;
+  readonly iconKey: string;
+}
+
+export interface BadgeProgress {
+  readonly badgeKey: string;
+  readonly current: number;
+  readonly target: number;
+  /** 0-1 fractional progress */
+  readonly progress: number;
+}
+
+export interface BadgeUnlockEvent {
+  readonly badgeKey: string;
+  readonly tier: BadgeTier | null;
+  readonly name: string;
+  readonly flavorText: string;
+  readonly iconKey: string;
+  readonly earnedAt: string;
 }
 
 export interface NeighborhoodSafetyScore {

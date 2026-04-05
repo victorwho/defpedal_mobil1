@@ -307,6 +307,7 @@ export default function FeedbackScreen() {
         : null,
       personalMicrolives: calculatePersonalMicrolives(distKm, vehicle, null),
       communitySeconds: calculateCommunitySeconds(distKm, vehicle),
+      newBadges: [],
     };
   }, []);
 

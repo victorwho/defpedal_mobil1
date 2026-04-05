@@ -1,5 +1,6 @@
 import type {
   AutocompleteResponse,
+  BadgeResponse,
   CoverageResponse,
   ErrorResponse,
   GeoJsonLineString,
@@ -1434,10 +1435,19 @@ export const buildV1Routes = (
       },
     );
 
-    // POST /v1/rides/:tripId/impact — record ride impact and return with random equivalent
+    // POST /v1/rides/:tripId/impact — record ride impact and return with random equivalent + new badges
     app.post<{
       Params: { tripId: string };
-      Body: { distanceMeters: number };
+      Body: {
+        distanceMeters: number;
+        elevationGainM?: number;
+        weatherCondition?: string;
+        windSpeedKmh?: number;
+        temperatureC?: number;
+        aqiLevel?: string;
+        rideStartHour?: number;
+        durationMinutes?: number;
+      };
       Reply: RideImpact | ErrorResponse;
     }>(
       '/rides/:tripId/impact',
@@ -1453,14 +1463,21 @@ export const buildV1Routes = (
             additionalProperties: false,
             required: ['distanceMeters'],
             properties: {
-              distanceMeters: { type: 'number', minimum: 0 },
+              distanceMeters:   { type: 'number', minimum: 0 },
+              elevationGainM:   { type: 'number', minimum: 0 },
+              weatherCondition: { type: 'string', maxLength: 64 },
+              windSpeedKmh:     { type: 'number', minimum: 0 },
+              temperatureC:     { type: 'number' },
+              aqiLevel:         { type: 'string', maxLength: 32 },
+              rideStartHour:    { type: 'integer', minimum: 0, maximum: 23 },
+              durationMinutes:  { type: 'number', minimum: 0 },
             },
           },
           response: {
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1470,6 +1487,22 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
+                newBadges: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['badgeKey', 'name', 'flavorText', 'iconKey', 'earnedAt'],
+                    properties: {
+                      badgeKey:   { type: 'string' },
+                      tier:       { type: ['string', 'null'] },
+                      name:       { type: 'string' },
+                      flavorText: { type: 'string' },
+                      iconKey:    { type: 'string' },
+                      earnedAt:   { type: 'string' },
+                    },
+                  },
+                },
               },
             },
             401: errorResponseSchema,
@@ -1487,13 +1520,29 @@ export const buildV1Routes = (
         }
 
         const { tripId } = request.params;
-        const { distanceMeters } = request.body;
+        const {
+          distanceMeters,
+          elevationGainM,
+          weatherCondition,
+          windSpeedKmh,
+          temperatureC,
+          aqiLevel,
+          rideStartHour,
+          durationMinutes,
+        } = request.body;
 
-        // Call record_ride_impact RPC
+        // Call record_ride_impact RPC with full ride metadata
         const { data, error } = await supabaseAdmin.rpc('record_ride_impact', {
           p_trip_id: tripId,
           p_user_id: user.id,
           p_distance_meters: distanceMeters,
+          p_elevation_gain_m:  elevationGainM  ?? 0,
+          p_weather_condition: weatherCondition ?? null,
+          p_wind_speed_kmh:    windSpeedKmh    ?? null,
+          p_temperature_c:     temperatureC    ?? null,
+          p_aqi_level:         aqiLevel        ?? null,
+          p_ride_start_hour:   rideStartHour   ?? null,
+          p_duration_minutes:  durationMinutes  ?? 0,
         });
 
         if (error) {
@@ -1560,6 +1609,26 @@ export const buildV1Routes = (
           // Microlives recording failure is non-fatal
         }
 
+        // Check and award badges (non-fatal)
+        let newBadges: RideImpact['newBadges'] = [];
+        try {
+          const { data: badgeData } = await supabaseAdmin.rpc('check_and_award_badges', {
+            p_user_id: user.id,
+          });
+          if (Array.isArray(badgeData)) {
+            newBadges = badgeData.map((b: Record<string, unknown>) => ({
+              badgeKey:   String(b.badge_key ?? ''),
+              tier:       null,
+              name:       String(b.name ?? ''),
+              flavorText: String(b.flavor_text ?? ''),
+              iconKey:    String(b.icon_key ?? ''),
+              earnedAt:   String(b.earned_at ?? new Date().toISOString()),
+            }));
+          }
+        } catch {
+          // Badge check failure is non-fatal
+        }
+
         return {
           tripId,
           co2SavedKg,
@@ -1569,6 +1638,7 @@ export const buildV1Routes = (
           equivalentText,
           personalMicrolives,
           communitySeconds,
+          newBadges,
         };
       },
     );
@@ -1590,7 +1660,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1600,6 +1670,7 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
+                newBadges: { type: 'array', items: { type: 'object' } },
               },
             },
             401: errorResponseSchema,
@@ -1700,6 +1771,7 @@ export const buildV1Routes = (
           equivalentText,
           personalMicrolives,
           communitySeconds,
+          newBadges: [],
         };
       },
     );
@@ -2210,6 +2282,224 @@ export const buildV1Routes = (
         }
 
         return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    // GET /v1/badges — badge catalog + user progress
+    app.get(
+      '/badges',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['definitions', 'earned', 'progress'],
+              properties: {
+                definitions: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['badgeKey', 'category', 'displayTab', 'name', 'flavorText', 'criteriaText', 'tier', 'isHidden', 'isSeasonal', 'sortOrder', 'iconKey'],
+                    properties: {
+                      badgeKey:     { type: 'string' },
+                      category:     { type: 'string' },
+                      displayTab:   { type: 'string' },
+                      name:         { type: 'string' },
+                      flavorText:   { type: 'string' },
+                      criteriaText: { type: 'string' },
+                      criteriaUnit: { type: ['string', 'null'] },
+                      tier:         { type: 'integer' },
+                      tierFamily:   { type: ['string', 'null'] },
+                      isHidden:     { type: 'boolean' },
+                      isSeasonal:   { type: 'boolean' },
+                      sortOrder:    { type: 'integer' },
+                      iconKey:      { type: 'string' },
+                    },
+                  },
+                },
+                earned: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['badgeKey', 'earnedAt', 'metadata'],
+                    properties: {
+                      badgeKey: { type: 'string' },
+                      earnedAt: { type: 'string' },
+                      metadata: { type: 'object' },
+                    },
+                  },
+                },
+                progress: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['badgeKey', 'current', 'target', 'progress'],
+                    properties: {
+                      badgeKey: { type: 'string' },
+                      current:  { type: 'number' },
+                      target:   { type: 'number' },
+                      progress: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        // Fetch all badge definitions, user's earned badges, and aggregate stats in parallel
+        const [defsResult, earnedResult, profileResult, rideAggResult] = await Promise.all([
+          supabaseAdmin
+            .from('badge_definitions')
+            .select('badge_key, category, display_tab, name, flavor_text, criteria_text, criteria_unit, tier, tier_family, is_hidden, is_seasonal, sort_order, icon_key')
+            .order('sort_order'),
+          supabaseAdmin
+            .from('user_badges')
+            .select('badge_key, earned_at, metadata')
+            .eq('user_id', user.id)
+            .order('earned_at', { ascending: false }),
+          supabaseAdmin
+            .from('profiles')
+            .select('total_co2_saved_kg, total_money_saved_eur, total_hazards_reported, total_riders_protected, total_microlives, total_community_seconds')
+            .eq('id', user.id)
+            .single(),
+          supabaseAdmin
+            .from('ride_impacts')
+            .select('distance_meters, duration_minutes, elevation_gain_m')
+            .eq('user_id', user.id),
+        ]);
+
+        if (defsResult.error) {
+          throw new HttpError('Failed to load badge definitions.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const defs = (defsResult.data ?? []) as Array<Record<string, unknown>>;
+        const earnedRows = (earnedResult.data ?? []) as Array<Record<string, unknown>>;
+        const profile = (profileResult.data ?? {}) as Record<string, unknown>;
+        const rides = (rideAggResult.data ?? []) as Array<Record<string, unknown>>;
+        const earnedKeys = new Set(earnedRows.map((r) => r.badge_key as string));
+
+        // Compute aggregates for progress
+        const totalDistanceM = rides.reduce((s, r) => s + Number(r.distance_meters ?? 0), 0);
+        const totalDurationMin = rides.reduce((s, r) => s + Number(r.duration_minutes ?? 0), 0);
+        const totalElevationM = rides.reduce((s, r) => s + Number(r.elevation_gain_m ?? 0), 0);
+        const maxSingleDistanceM = rides.reduce((m, r) => Math.max(m, Number(r.distance_meters ?? 0)), 0);
+        const maxSingleElevM = rides.reduce((m, r) => Math.max(m, Number(r.elevation_gain_m ?? 0)), 0);
+        const totalCo2 = Number(profile.total_co2_saved_kg ?? 0);
+        const totalMoney = Number(profile.total_money_saved_eur ?? 0);
+        const totalHazards = Number(profile.total_hazards_reported ?? 0);
+        const totalRiders = Number(profile.total_riders_protected ?? 0);
+        const totalMicrolives = Number(profile.total_microlives ?? 0);
+        const totalCommSecs = Number(profile.total_community_seconds ?? 0);
+        const rideCount = rides.length;
+
+        // Map badge key → { current, target } for unearthed tiered badges
+        const progressMap: Record<string, { current: number; target: number }> = {
+          distance_50km:    { current: totalDistanceM / 1000,     target: 50 },
+          distance_150km:   { current: totalDistanceM / 1000,     target: 150 },
+          distance_500km:   { current: totalDistanceM / 1000,     target: 500 },
+          distance_1500km:  { current: totalDistanceM / 1000,     target: 1500 },
+          distance_5000km:  { current: totalDistanceM / 1000,     target: 5000 },
+          single_10km:      { current: maxSingleDistanceM / 1000, target: 10 },
+          single_25km:      { current: maxSingleDistanceM / 1000, target: 25 },
+          single_50km:      { current: maxSingleDistanceM / 1000, target: 50 },
+          single_100km:     { current: maxSingleDistanceM / 1000, target: 100 },
+          single_200km:     { current: maxSingleDistanceM / 1000, target: 200 },
+          time_5h:          { current: totalDurationMin / 60,     target: 5 },
+          time_15h:         { current: totalDurationMin / 60,     target: 15 },
+          time_50h:         { current: totalDurationMin / 60,     target: 50 },
+          time_150h:        { current: totalDurationMin / 60,     target: 150 },
+          time_500h:        { current: totalDurationMin / 60,     target: 500 },
+          rides_10:         { current: rideCount,                  target: 10 },
+          rides_30:         { current: rideCount,                  target: 30 },
+          rides_100:        { current: rideCount,                  target: 100 },
+          rides_300:        { current: rideCount,                  target: 300 },
+          rides_1000:       { current: rideCount,                  target: 1000 },
+          co2_5kg:          { current: totalCo2,                   target: 5 },
+          co2_15kg:         { current: totalCo2,                   target: 15 },
+          co2_50kg:         { current: totalCo2,                   target: 50 },
+          co2_150kg:        { current: totalCo2,                   target: 150 },
+          co2_500kg:        { current: totalCo2,                   target: 500 },
+          money_10:         { current: totalMoney,                  target: 10 },
+          money_50:         { current: totalMoney,                  target: 50 },
+          money_200:        { current: totalMoney,                  target: 200 },
+          money_500:        { current: totalMoney,                  target: 500 },
+          money_2000:       { current: totalMoney,                  target: 2000 },
+          ml_2:             { current: totalMicrolives,             target: 2 },
+          ml_8:             { current: totalMicrolives,             target: 8 },
+          ml_48:            { current: totalMicrolives,             target: 48 },
+          ml_336:           { current: totalMicrolives,             target: 336 },
+          ml_1440:          { current: totalMicrolives,             target: 1440 },
+          community_60s:    { current: totalCommSecs,               target: 60 },
+          community_300s:   { current: totalCommSecs,               target: 300 },
+          community_1800s:  { current: totalCommSecs,               target: 1800 },
+          community_3600s:  { current: totalCommSecs,               target: 3600 },
+          hazard_5:         { current: totalHazards,                target: 5 },
+          hazard_15:        { current: totalHazards,                target: 15 },
+          hazard_50:        { current: totalHazards,                target: 50 },
+          hazard_100:       { current: totalHazards,                target: 100 },
+          hazard_250:       { current: totalHazards,                target: 250 },
+          total_climb_1km:  { current: totalElevationM / 1000,     target: 1 },
+          total_climb_5km:  { current: totalElevationM / 1000,     target: 5 },
+          total_climb_10km: { current: totalElevationM / 1000,     target: 10 },
+          total_climb_25km: { current: totalElevationM / 1000,     target: 25 },
+          climb_100m:       { current: maxSingleElevM,             target: 100 },
+          climb_300m:       { current: maxSingleElevM,             target: 300 },
+          climb_500m:       { current: maxSingleElevM,             target: 500 },
+          climb_1000m:      { current: maxSingleElevM,             target: 1000 },
+          protected_5:      { current: totalRiders,                target: 5 },
+          protected_25:     { current: totalRiders,                target: 25 },
+          protected_100:    { current: totalRiders,                target: 100 },
+        };
+
+        const definitions = defs.map((d) => ({
+          badgeKey:     d.badge_key as string,
+          category:     d.category as string,
+          displayTab:   d.display_tab as string,
+          name:         d.name as string,
+          flavorText:   d.flavor_text as string,
+          criteriaText: d.criteria_text as string,
+          criteriaUnit: (d.criteria_unit as string | null) ?? null,
+          tier:         Number(d.tier ?? 0),
+          tierFamily:   (d.tier_family as string | null) ?? null,
+          isHidden:     Boolean(d.is_hidden),
+          isSeasonal:   Boolean(d.is_seasonal),
+          sortOrder:    Number(d.sort_order ?? 0),
+          iconKey:      d.icon_key as string,
+        }));
+
+        const earned = earnedRows.map((r) => ({
+          badgeKey: r.badge_key as string,
+          earnedAt: r.earned_at as string,
+          metadata: (r.metadata as Record<string, unknown>) ?? {},
+        }));
+
+        // Build progress list for unearthed badges that have computable progress
+        const progress = Object.entries(progressMap)
+          .filter(([key]) => !earnedKeys.has(key))
+          .map(([key, { current, target }]) => ({
+            badgeKey: key,
+            current:  Math.min(current, target),
+            target,
+            progress: Math.min(1, current / target),
+          }))
+          .filter(({ progress: p }) => p > 0);
+
+        return { definitions, earned, progress };
       },
     );
 
