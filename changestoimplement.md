@@ -42,6 +42,7 @@
 - [x] DONE — Saved routes / favorite routes (2026-04-04)
 - [x] DONE — Cleaner address display (strip postal code, country, county from destination/stop labels) (2026-04-04)
 - [x] DONE — Collapsible UI: tap map to toggle FABs, weather widget, and bottom nav with fade animation (2026-04-04)
+- [ ] NOT STARTED — Long-press on map to set destination (drop pin on route planning screen)
 
 ## Navigation
 - [x] DONE — Speed indicator in footer card (2026-04-03)
