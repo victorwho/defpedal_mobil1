@@ -53,8 +53,8 @@ export const HistoryLayers = React.memo(({
           id="history-overlay-layer"
           style={{
             lineColor: ['get', 'color'],
-            lineWidth: 3,
-            lineOpacity: 0.4,
+            lineWidth: 5,
+            lineOpacity: 0.8,
             lineJoin: 'round',
             lineCap: 'round',
             lineEmissiveStrength: 1,
