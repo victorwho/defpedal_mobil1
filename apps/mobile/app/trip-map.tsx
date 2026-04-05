@@ -43,16 +43,18 @@ export default function TripMapScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Map fills screen */}
-      <RouteMap
-        origin={coordinate ?? undefined}
-        userLocation={coordinate}
-        followUser={false}
-        historyTrails={historyTrails}
-        showRouteOverlay={false}
-        recenterKey={recenterKey}
-        fullBleed
-      />
+      {/* Map fills screen with bottom safe area */}
+      <View style={[styles.mapContainer, { paddingBottom: insets.bottom }]}>
+        <RouteMap
+          origin={coordinate ?? undefined}
+          userLocation={coordinate}
+          followUser={false}
+          historyTrails={historyTrails}
+          showRouteOverlay={false}
+          recenterKey={recenterKey}
+          fullBleed
+        />
+      </View>
 
       {/* Floating header overlay */}
       <View style={[styles.headerOverlay, { paddingTop: insets.top + space[2] }]}>
@@ -68,7 +70,7 @@ export default function TripMapScreen() {
 
       {/* Recenter button */}
       <Pressable
-        style={styles.recenterButton}
+        style={[styles.recenterButton, { bottom: insets.bottom + space[4] }]}
         onPress={() => setRecenterKey((k) => k + 1)}
         accessibilityLabel="Center on my location"
         accessibilityRole="button"
@@ -98,9 +100,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  mapContainer: {
+    flex: 1,
+  },
   recenterButton: {
     position: 'absolute',
-    bottom: space[6],
     right: space[4],
     width: 44,
     height: 44,

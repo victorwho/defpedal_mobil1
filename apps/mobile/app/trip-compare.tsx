@@ -7,6 +7,7 @@ import {
   formatSpeed,
 } from '@defensivepedal/core';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -69,6 +70,7 @@ const StatRow = ({ label, value1, value2, highlight }: StatRowProps) => (
 
 export default function TripCompareScreen() {
   const { trip1: trip1Id, trip2: trip2Id } = useLocalSearchParams<{ trip1: string; trip2: string }>();
+  const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
   const t = useT();
 
@@ -114,7 +116,7 @@ export default function TripCompareScreen() {
 
   return (
     <View style={styles.root}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[8] }]}>
         <View style={styles.header}>
           <Button variant="secondary" size="sm" onPress={() => router.back()}>
             ← {t('common.back')}
@@ -186,7 +188,7 @@ export default function TripCompareScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  scroll: { paddingBottom: space[8] },
+  scroll: {},
   header: {
     paddingHorizontal: space[5],
     paddingTop: space[10],
