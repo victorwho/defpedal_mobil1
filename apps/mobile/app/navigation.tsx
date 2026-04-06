@@ -355,7 +355,7 @@ export default function NavigationScreen() {
     Speech.speak(message, {
       language: routeRequest.locale,
     });
-  }, [navigationSession, voiceGuidanceEnabled, routeRequest.locale]);
+  }, [navigationSession?.isMuted, voiceGuidanceEnabled, routeRequest.locale]);
 
   const toggleVoiceGuidance = () => {
     const nextEnabled = !voiceGuidanceEnabled;
@@ -569,19 +569,23 @@ export default function NavigationScreen() {
     return () => clearInterval(interval);
   }, [navigationSession?.sessionId, voiceGuidanceEnabled, navigationSession?.isMuted, speak]);
 
+  const rerouteMutateRef = useRef(rerouteMutation.mutate);
+  rerouteMutateRef.current = rerouteMutation.mutate;
+  const isReroutePending = rerouteMutation.isPending;
+
   useEffect(() => {
     if (
       !navigationSession ||
       !selectedRoute ||
       !locationState.sample ||
-      rerouteMutation.isPending ||
+      isReroutePending ||
       !shouldTriggerAutomaticReroute(navigationSession)
     ) {
       return;
     }
 
-    rerouteMutation.mutate(locationState.sample.coordinate);
-  }, [locationState.sample, navigationSession, rerouteMutation, selectedRoute]);
+    rerouteMutateRef.current(locationState.sample.coordinate);
+  }, [locationState.sample, navigationSession, isReroutePending, selectedRoute]);
 
   if (!selectedRoute || !navigationSession) {
     return (
