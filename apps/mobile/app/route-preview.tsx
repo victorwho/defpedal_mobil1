@@ -299,6 +299,25 @@ export default function RoutePreviewScreen() {
     />
     <MapStageScreen
       useBottomSheet
+      peekContent={selectedRoute ? (
+        <View style={styles.peekStrip}>
+          <Badge
+            variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
+            size="md"
+          >
+            {routePreview?.selectedMode === 'safe' ? 'Safe' : 'Fast'}
+          </Badge>
+          <Text style={styles.peekStat}>
+            {(selectedRoute.distanceMeters / 1000).toFixed(1)} km
+          </Text>
+          <Text style={styles.peekDivider}>·</Text>
+          <Text style={styles.peekStat}>
+            {formatDuration(selectedRoute.adjustedDurationSeconds)}
+          </Text>
+          <View style={styles.peekSpacer} />
+          <Text style={styles.peekHint}>Swipe up</Text>
+        </View>
+      ) : null}
       map={
         <RouteMap
           routes={routePreview?.routes}
@@ -770,5 +789,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontFamily.body.medium,
     color: darkTheme.textPrimary,
+  },
+  peekStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+  },
+  peekStat: {
+    ...textDataSm,
+    fontSize: 16,
+    color: darkTheme.textPrimary,
+    fontFamily: fontFamily.mono.bold,
+  },
+  peekDivider: {
+    ...textSm,
+    color: darkTheme.textMuted,
+  },
+  peekSpacer: {
+    flex: 1,
+  },
+  peekHint: {
+    ...textXs,
+    color: darkTheme.textMuted,
+    fontFamily: fontFamily.body.regular,
   },
 });

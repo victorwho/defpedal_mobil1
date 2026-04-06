@@ -18,7 +18,8 @@ import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-const COLLAPSED_HEIGHT = 48; // just handle + peek
+const HANDLE_HEIGHT = 48; // drag handle row
+const PEEK_CONTENT_HEIGHT = 60; // always-visible summary row when collapsed
 const EXPANDED_RATIO = 0.65; // 65% of screen
 const EXPANDED_HEIGHT = SCREEN_HEIGHT * EXPANDED_RATIO;
 const SNAP_THRESHOLD = 80; // drag distance to trigger snap
@@ -30,20 +31,29 @@ type MapStageScreenProps = PropsWithChildren<{
   footer?: ReactNode;
   /** When true, renders children inside a bottom sheet. When false (default), children are ignored. */
   useBottomSheet?: boolean;
+  /**
+   * Content shown in the sheet handle area even when collapsed.
+   * Intended for a one-line summary (e.g. distance + ETA on route preview).
+   * Height is fixed at PEEK_CONTENT_HEIGHT (60px).
+   */
+  peekContent?: ReactNode;
 }>;
 
 const CollapsibleSheet = ({
   children,
   footer,
   bottomInset,
+  peekContent,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   bottomInset: number;
+  peekContent?: ReactNode;
 }) => {
+  const collapsedHeight = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
   const [expanded, setExpanded] = useState(true);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
-  const effectiveCollapsed = COLLAPSED_HEIGHT;
+  const effectiveCollapsed = collapsedHeight;
   const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
   const expandedRef = useRef(true);
 
@@ -95,6 +105,10 @@ const CollapsibleSheet = ({
             <View style={styles.handle} />
           </Pressable>
         </View>
+        {/* Peek row — only visible when collapsed, shows a summary strip */}
+        {peekContent && !expanded ? (
+          <View style={styles.peekRow}>{peekContent}</View>
+        ) : null}
         {expanded ? (
           <ScrollView
             contentContainerStyle={styles.content}
@@ -122,6 +136,7 @@ export const MapStageScreen = ({
   footer,
   children,
   useBottomSheet = false,
+  peekContent,
 }: MapStageScreenProps) => {
   const insets = useSafeAreaInsets();
 
@@ -134,7 +149,7 @@ export const MapStageScreen = ({
         <View style={styles.flexSpacer} pointerEvents="box-none" />
 
         {useBottomSheet ? (
-          <CollapsibleSheet footer={footer} bottomInset={insets.bottom}>{children}</CollapsibleSheet>
+          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent}>{children}</CollapsibleSheet>
         ) : footer ? (
           <View style={[styles.bottomFooter, { paddingBottom: space[2] }]} pointerEvents="box-none">
             {footer}
@@ -182,6 +197,13 @@ const styles = StyleSheet.create({
   handleTouchArea: {
     alignItems: 'center',
     paddingVertical: space[3],
+  },
+  peekRow: {
+    height: PEEK_CONTENT_HEIGHT,
+    paddingHorizontal: space[4] + space[0.5],
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148, 163, 184, 0.12)',
+    justifyContent: 'center',
   },
   handle: {
     width: 54,

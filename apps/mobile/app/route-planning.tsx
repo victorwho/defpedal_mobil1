@@ -124,6 +124,13 @@ export default function RoutePlanningScreen() {
   const [uiCollapsed, setUiCollapsed] = useState(false);
   const uiOpacity = useRef(new Animated.Value(1)).current;
 
+  // Long-press discoverability hint — show briefly on first render, auto-dismiss
+  const [showLongPressHint, setShowLongPressHint] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowLongPressHint(false), 4000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
   const t = useT();
@@ -182,6 +189,7 @@ export default function RoutePlanningScreen() {
     }
 
     // Otherwise, set as destination
+    setShowLongPressHint(false);
     setRouteRequest({ destination: coordinate });
     setDestinationQuery(`${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`);
     setDestinationHydrated(true);
@@ -485,27 +493,35 @@ export default function RoutePlanningScreen() {
     <View style={styles.rootWrapper}>
     <MapStageScreen
       map={
-        <RouteMap
-          origin={mapUserLocation ?? undefined}
-          destination={hasValidDestination ? routeRequest.destination : undefined}
-          waypoints={waypoints.length > 0 ? waypoints : undefined}
-          userLocation={mapUserLocation}
-          followUser={false}
-          fullBleed
-          showRouteOverlay={false}
-          bicycleParkingLocations={parkingLocations}
-          bicycleRentalLocations={rentalLocations}
-          bikeShopLocations={bikeShopLocations}
-          searchedPois={searchedPois}
-          showBicycleLanes={showBikeLanes}
-          poiVisibility={poiVisibility}
-          nearbyHazards={nearbyHazards}
-          recenterKey={recenterKey}
-          onMapTap={handleMapTap}
-          onMapLongPress={handleMapLongPress}
-          hazardPlacementMode={hazardPlacementMode}
-          onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
-        />
+        <View style={{ flex: 1 }}>
+          <RouteMap
+            origin={mapUserLocation ?? undefined}
+            destination={hasValidDestination ? routeRequest.destination : undefined}
+            waypoints={waypoints.length > 0 ? waypoints : undefined}
+            userLocation={mapUserLocation}
+            followUser={false}
+            fullBleed
+            showRouteOverlay={false}
+            bicycleParkingLocations={parkingLocations}
+            bicycleRentalLocations={rentalLocations}
+            bikeShopLocations={bikeShopLocations}
+            searchedPois={searchedPois}
+            showBicycleLanes={showBikeLanes}
+            poiVisibility={poiVisibility}
+            nearbyHazards={nearbyHazards}
+            recenterKey={recenterKey}
+            onMapTap={handleMapTap}
+            onMapLongPress={handleMapLongPress}
+            hazardPlacementMode={hazardPlacementMode}
+            onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
+          />
+          {showLongPressHint ? (
+            <View style={styles.longPressHint} pointerEvents="none">
+              <Ionicons name="hand-left-outline" size={14} color="white" />
+              <Text style={styles.longPressHintText}>Long-press map to drop a pin</Text>
+            </View>
+          ) : null}
+        </View>
       }
       topOverlay={
         <View style={styles.topContainer}>
@@ -1325,5 +1341,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontFamily.body.medium,
     color: darkTheme.textMuted,
+  },
+  longPressHint: {
+    position: 'absolute',
+    bottom: 120,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    borderRadius: radii.full,
+    paddingVertical: space[2],
+    paddingHorizontal: space[4],
+  },
+  longPressHintText: {
+    ...textXs,
+    color: 'white',
+    fontFamily: fontFamily.body.medium,
   },
 });

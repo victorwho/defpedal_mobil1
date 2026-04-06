@@ -10,6 +10,7 @@
 import React from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
 import { formatDistance } from '@defensivepedal/core';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { space } from '../tokens/spacing';
@@ -43,16 +44,22 @@ export interface NavigationHUDProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const getManeuverArrow = (step: NavigationStep | null): string => {
-  if (!step) return '↑';
+type ManeuverIconName = React.ComponentProps<typeof Ionicons>['name'];
+
+const getManeuverIcon = (step: NavigationStep | null): ManeuverIconName => {
+  if (!step) return 'arrow-up';
   const mod = step.maneuver.modifier?.toLowerCase() ?? '';
   const type = step.maneuver.type?.toLowerCase() ?? '';
-  if (mod.includes('slight left')) return '↖';
-  if (mod.includes('slight right')) return '↗';
-  if (mod.includes('left')) return '←';
-  if (mod.includes('right')) return '→';
-  if (type === 'arrive') return '◎';
-  return '↑';
+  if (type === 'arrive') return 'location';
+  if (type === 'roundabout' || type === 'rotary') return 'return-up-forward';
+  if (mod.includes('uturn')) return 'return-down-back';
+  if (mod.includes('sharp left')) return 'arrow-back';
+  if (mod.includes('sharp right')) return 'arrow-forward';
+  if (mod.includes('slight left')) return 'arrow-up-outline'; // angled left — use up as fallback
+  if (mod.includes('slight right')) return 'arrow-up-outline';
+  if (mod.includes('left')) return 'arrow-back';
+  if (mod.includes('right')) return 'arrow-forward';
+  return 'arrow-up';
 };
 
 const getManeuverDescription = (step: NavigationStep | null): string => {
@@ -100,7 +107,7 @@ export const ManeuverCard: React.FC<{
   distanceToManeuverMeters: number | null;
   onPress?: () => void;
 }> = ({ currentStep, distanceToManeuverMeters, onPress }) => {
-  const arrow = getManeuverArrow(currentStep);
+  const iconName = getManeuverIcon(currentStep);
   const description = getManeuverDescription(currentStep);
   const distance =
     distanceToManeuverMeters !== null
@@ -120,7 +127,7 @@ export const ManeuverCard: React.FC<{
       accessibilityLiveRegion="polite"
       accessibilityHint={onPress ? 'Tap to hear instruction again' : undefined}
     >
-      <Text style={styles.arrow}>{arrow}</Text>
+      <Ionicons name={iconName} size={32} color={darkTheme.accent} />
       <Text style={styles.maneuverDesc} numberOfLines={1}>
         {description}
       </Text>
@@ -139,7 +146,7 @@ export const ThenStrip: React.FC<{
 }> = ({ nextStep }) => {
   if (!nextStep) return null;
 
-  const nextArrow = getManeuverArrow(nextStep);
+  const nextIconName = getManeuverIcon(nextStep);
   const nextDist = formatDistance(Math.round(nextStep.distanceMeters));
   const nextDesc = getManeuverDescription(nextStep);
 
@@ -149,7 +156,7 @@ export const ThenStrip: React.FC<{
       accessibilityLabel={`Then ${nextDesc} in ${nextDist}`}
     >
       <Text style={styles.thenPrefix}>Then</Text>
-      <Text style={styles.thenArrow}>{nextArrow}</Text>
+      <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
       <Text style={[textSm, styles.thenText]} numberOfLines={1}>
         {nextDesc}
       </Text>
@@ -179,7 +186,7 @@ export const FooterCard: React.FC<{
   isClimbLive = false,
   speedKmh,
 }) => {
-  const nextArrow = nextStep ? getManeuverArrow(nextStep) : null;
+  const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
   const nextDist = nextStep
     ? formatDistance(Math.round(nextStep.distanceMeters))
     : null;
@@ -188,10 +195,10 @@ export const FooterCard: React.FC<{
   return (
     <View style={[styles.footerCard, shadows.md]}>
       {/* "Then" strip */}
-      {nextStep ? (
+      {nextStep && nextIconName ? (
         <View style={styles.thenStripInline}>
           <Text style={styles.thenPrefix}>Then</Text>
-          <Text style={styles.thenArrow}>{nextArrow}</Text>
+          <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
           <Text style={[textSm, styles.thenText]} numberOfLines={1}>
             {nextDesc}
           </Text>
@@ -288,11 +295,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[4],
     paddingVertical: space[3],
   },
-  arrow: {
-    fontFamily: fontFamily.heading.extraBold,
-    fontSize: 28,
-    color: darkTheme.accent,
-  },
   maneuverDesc: {
     flex: 1,
     fontFamily: fontFamily.heading.extraBold,
@@ -344,11 +346,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1,
     color: gray[400],
-  },
-  thenArrow: {
-    fontFamily: fontFamily.heading.extraBold,
-    fontSize: 16,
-    color: darkTheme.accent,
   },
   thenText: {
     flex: 1,

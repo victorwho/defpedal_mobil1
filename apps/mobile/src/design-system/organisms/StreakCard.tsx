@@ -5,6 +5,7 @@
  * abbreviated 7-day chain preview, longest streak, and freeze status.
  */
 import type { StreakState } from '@defensivepedal/core';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, darkTheme, gray } from '../tokens/colors';
@@ -39,7 +40,7 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
       {/* Top row: flame + streak number + label */}
       <View style={styles.topRow}>
         <View style={styles.streakNumberSection}>
-          <Text style={styles.flameIcon}>~</Text>
+          <Ionicons name="flame" size={24} color={brandColors.accent} />
           <Text style={styles.streakNumber}>{streakState.currentStreak}</Text>
           <Text style={styles.streakUnit}>{t('streak.dayStreak', { count: streakState.currentStreak })}</Text>
         </View>
@@ -102,11 +103,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: space[2],
-  },
-  flameIcon: {
-    fontFamily: fontFamily.body.bold,
-    fontSize: 24,
-    color: brandColors.accent,
   },
   streakNumber: {
     ...textDataLg,
