@@ -446,9 +446,11 @@ export const buildFeedRoutes = (
         await requireUser(request, dependencies);
         const db = ensureSupabase();
 
-        const { data, error } = await db
+        // Step 1: fetch comments (no embedded join — feed_comments.user_id references
+        // auth.users, not profiles, so PostgREST can't resolve the relationship automatically)
+        const { data: rows, error } = await db
           .from('feed_comments')
-          .select('id, user_id, body, created_at, profiles(display_name, username, avatar_url)')
+          .select('id, user_id, body, created_at')
           .eq('trip_share_id', request.params.id)
           .order('created_at', { ascending: true });
 
@@ -460,16 +462,36 @@ export const buildFeedRoutes = (
           });
         }
 
-        const comments: FeedComment[] = (data ?? []).map((row: Record<string, unknown>) => {
-          const profile = row.profiles as Record<string, unknown> | null;
-          const commentUsername = profile?.username as string | null;
+        const commentRows = rows ?? [];
+
+        // Step 2: batch-fetch profiles for all unique commenter user IDs
+        const userIds = [...new Set(commentRows.map((r) => r.user_id as string))];
+        const profileMap = new Map<string, { display_name: string; username: string | null; avatar_url: string | null }>();
+
+        if (userIds.length > 0) {
+          const { data: profileRows } = await db
+            .from('profiles')
+            .select('id, display_name, username, avatar_url')
+            .in('id', userIds);
+
+          for (const p of profileRows ?? []) {
+            profileMap.set(p.id as string, {
+              display_name: p.display_name as string,
+              username: (p.username as string) ?? null,
+              avatar_url: (p.avatar_url as string) ?? null,
+            });
+          }
+        }
+
+        const comments: FeedComment[] = commentRows.map((row) => {
+          const profile = profileMap.get(row.user_id as string) ?? null;
           return {
             id: row.id as string,
             user: {
               id: row.user_id as string,
-              displayName: commentUsername ? `@${commentUsername}` : (profile?.display_name as string) ?? 'Rider',
-              avatarUrl: (profile?.avatar_url as string) ?? null,
-                    },
+              displayName: profile?.username ? `@${profile.username}` : (profile?.display_name ?? 'Rider'),
+              avatarUrl: profile?.avatar_url ?? null,
+            },
             body: row.body as string,
             createdAt: row.created_at as string,
           };
