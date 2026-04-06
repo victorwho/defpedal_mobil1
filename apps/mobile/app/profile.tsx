@@ -239,7 +239,6 @@ export default function ProfileScreen() {
       <View style={styles.content}>
         <Screen
           title={t('profile.title')}
-          eyebrow={t('profile.eyebrow')}
           subtitle={t('profile.subtitle')}
           contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
         >

@@ -22,7 +22,7 @@ export default function CommunityScreen() {
   return (
     <View style={styles.root}>
       <View style={styles.content}>
-        <Screen title={t('communityScreen.title')} eyebrow={t('common.appName')} subtitle={t('communityScreen.subtitle')}>
+        <Screen title={t('communityScreen.title')} subtitle={t('communityScreen.subtitle')}>
           <CommunityStatsCard stats={stats} isLoading={isLoading} error={error} />
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>{t('communityScreen.feedTitle')}</Text>

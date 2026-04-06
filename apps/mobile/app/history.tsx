@@ -52,7 +52,7 @@ export default function HistoryScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.bgDeep }]}>
       <View style={styles.content}>
-        <Screen title={t('history.title')} eyebrow={t('history.eyebrow')} subtitle={t('history.subtitle')}>
+        <Screen title={t('history.title')} subtitle={t('history.subtitle')}>
 
           {/* 1. Your Impact */}
           {user ? (
