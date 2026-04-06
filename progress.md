@@ -125,6 +125,17 @@ Update it at the end of each implementation slice.
     - **Settings route TS error**: `href="/onboarding/index"` → `href="/onboarding"`. Pre-existing TS compilation error resolved.
     - Deployed Cloud Run revisions 00032 through 00035. All tests pass (276 core + 205 API). TypeScript fully clean (0 errors). Bundle ✅.
 
+- UX Design Plan Implementation (2026-04-06):
+    - **Phase 1.4 Accessibility**: `textMuted` contrast improved `#6B7280` → `#8B9198` for WCAG AA. Added `accessibilityRole`/`accessibilityLabel` to 27+ Pressable elements across 6 screens (route-planning, route-preview, navigation, history, profile, community)
+    - **Phase 1.1 Legacy theme migration**: Migrated 6 remaining `mobileTheme` consumers (FeedCard, SafetyBadge, SafetyTagChips, NavigationChrome, StatusCard, PlaceSearchField) to design system tokens. Deleted `apps/mobile/src/lib/theme.ts` — zero `mobileTheme` references remain in codebase
+    - **Phase 1.2 Semantic colors**: Replaced hardcoded hex (`#F2C30F`, `#22C55E`, `#F59E0B`, `#ca8a04`) with token references (`colors.accent`, `colors.safe`, `colors.caution`, `safetyColors.caution`) in route-preview and SafetyBadge
+    - **Phase 1.3 Diagnostics purge**: Removed Coverage + Sync status badges from route-preview topOverlay. Removed dead diagnostic chip variables (GPS, Sync, Step counter, BG status) from navigation.tsx
+    - **Phase 1.5 Interaction quality**: Created `FadeSlideIn` animation atom (opacity + translateY, 200ms, respects reduced motion). Created `useReducedMotion` hook (re-export). Created `haptics.ts` utility with lazy NativeModules guard
+    - **Phase 2 Calm route planning**: Progressive disclosure — origin card + routing toggles hidden until destination set. FABs reduced from 6 to 3 (Locate, Hazard, Saved Routes). EDIT text → pencil icon. Weather widget conditional (destination set OR severe conditions)
+    - **Phase 3 Profile restructure**: Settings grouped into 3 sections (Cycling Preferences, Display, Account) with SectionTitle atoms. Added i18n keys for en + ro
+    - **Phase 4 Systems polish**: Rating skip counter — auto-suppresses rating step after 3 skips (persisted in Zustand). Route comparison card: now always shows when toggle ON — handles small differences ("Slightly safer", "Similar safety") instead of rounding to 0% and hiding
+    - Bundle ✅. TypeScript clean (0 new errors). Phone-tested on Samsung S23 Ultra
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation

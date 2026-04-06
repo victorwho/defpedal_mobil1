@@ -243,8 +243,11 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - Dark/light theme support via `ThemeProvider` + `useTheme()` hook. All 30 screens use `createThemedStyles(colors)` factory pattern
 - Forces dark theme during NAVIGATING state (glare reduction, battery, safety contrast)
 - Tokens: `colors.ts`, `spacing.ts`, `typography.ts`, `radii.ts`, `shadows.ts`, `tints.ts` (opacity + rgba tints), `iconSize.ts` (xs-3xl), `zIndex.ts` (semantic layers), `motion.ts`
-- Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
+- Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle, FadeSlideIn) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
 - Map overlay cards (origin, destination, search, FABs) intentionally use `#FFFFFF` — they sit on the dark map regardless of theme
+- Legacy `mobileTheme` bridge deleted — all components use design system tokens directly
+- `FadeSlideIn` atom: entry animation (opacity + translateY, 200ms) with `useReducedMotion` support
+- `haptics.ts` utility: lazy NativeModules guard for expo-haptics (same pattern as push-notifications)
 - Analysis: `design-work/design-system-analysis.md` (SWOT, scores, component inventory, migration status)
 
 ### 3D Navigation Camera
@@ -338,8 +341,8 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 ### Working Features
 - Route planning with destination autocomplete (Google Maps-style UX)
 - Safe routing (OSRM) and fast routing (Mapbox Directions)
-- Route preview with risk distribution card, elevation chart, weather warnings
-- Safe vs fast route comparison with "Switch to safe route" button
+- Route preview with risk distribution card, elevation chart, weather warnings (progressive disclosure — details in expanded sheet)
+- Safe vs fast route comparison with "Switch to safe route" button (shows "Slightly safer" / "Similar safety" for small differences)
 - Turn-by-turn navigation with 3D follow camera
 - Remaining climb tracker (decreasing during navigation)
 - Elevation progress card (toggleable during navigation)
@@ -354,7 +357,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - POI layers from Mapbox vector tiles (hydration, repair, restroom, transit, supplies)
 - Bike lane overlay from Mapbox vector tiles
 - Shield Mode basemap with auto day/night lighting
-- Profile with bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles
+- Profile with 3-section layout (Cycling Preferences / Display / Account), bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles
 - Sign in (Google OAuth) / sign out
 - Offline mutation queue (trips, hazards, feedback sync when online)
 - CO2 savings per trip (actual GPS distance, EU avg 120g/km) on trip history cards, community feed, and "Your Impact" stats card in History tab
