@@ -50,10 +50,12 @@ const CollapsibleSheet = ({
   bottomInset: number;
   peekContent?: ReactNode;
 }) => {
-  const collapsedHeight = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
   const [expanded, setExpanded] = useState(true);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
-  const effectiveCollapsed = collapsedHeight;
+  // Use a ref so panResponder closures always read the current collapsed height,
+  // even if peekContent changes after the first render (e.g. route loads async).
+  const effectiveCollapsedRef = useRef(HANDLE_HEIGHT);
+  effectiveCollapsedRef.current = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
   const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
   const expandedRef = useRef(true);
 
@@ -61,7 +63,7 @@ const CollapsibleSheet = ({
     expandedRef.current = expand;
     setExpanded(expand);
     Animated.spring(sheetHeight, {
-      toValue: expand ? effectiveExpanded : effectiveCollapsed,
+      toValue: expand ? effectiveExpanded : effectiveCollapsedRef.current,
       useNativeDriver: false,
       tension: 50,
       friction: 10,
@@ -73,9 +75,9 @@ const CollapsibleSheet = ({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
       onPanResponderMove: (_, gesture) => {
-        const startHeight = expandedRef.current ? effectiveExpanded : effectiveCollapsed;
+        const startHeight = expandedRef.current ? effectiveExpanded : effectiveCollapsedRef.current;
         const newHeight = Math.max(
-          effectiveCollapsed,
+          effectiveCollapsedRef.current,
           Math.min(effectiveExpanded, startHeight - gesture.dy),
         );
         sheetHeight.setValue(newHeight);

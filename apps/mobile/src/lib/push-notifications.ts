@@ -5,10 +5,17 @@ import { router } from 'expo-router';
 
 import { mobileApi } from './api';
 
-// Lazy require at call-time — try/catch handles the case where the
-// native module isn't compiled in (local dev without native rebuild).
+// Guard: expo-notifications requires ExpoPushTokenManager native module.
+// In dev builds without a native rebuild the JS module loads fine but any
+// call throws "Cannot find native module 'ExpoPushTokenManager'". Check the
+// native module presence first, before requiring the JS module at all.
+const hasNotificationsNative = Boolean(
+  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotifications,
+);
+
 let _notifications: typeof import('expo-notifications') | null | undefined;
 const getNotifications = () => {
+  if (!hasNotificationsNative) return null;
   if (_notifications !== undefined) return _notifications;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
