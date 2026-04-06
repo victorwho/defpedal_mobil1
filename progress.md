@@ -89,6 +89,9 @@ Update it at the end of each implementation slice.
     - **Streak flame icon**: Replaced "~" placeholder in `StreakCard` with `Ionicons name="flame"` (yellow, 24px)
     - **Bottom sheet peek state**: `MapStageScreen` now accepts a `peekContent` prop (max 60px height). When the CollapsibleSheet is collapsed, the peek row renders below the drag handle so key info stays visible. `route-preview.tsx` passes a compact strip: mode badge + distance + duration + "Swipe up" hint
     - **Long-press discoverability hint**: Route planning screen shows a 4-second auto-dismiss pill "Long-press map to drop a pin" on mount. Dismisses immediately when user long-presses. Non-interactive (`pointerEvents="none"`)
+- Bug fixes (same session, post phone test):
+    - **Peek state stale closure**: `CollapsibleSheet` panResponder captured `effectiveCollapsed = 48` on first render (before route loaded, `peekContent` was null). Fixed by replacing the local variable with a ref (`effectiveCollapsedRef.current`) so panResponder closures always read the current value
+    - **ExpoPushTokenManager noise**: Added `NativeModules.ExpoPushTokenManager` guard in `push-notifications.ts` and `NotificationProvider.tsx` before the lazy `require()`. The JS module loads fine in dev builds without a native rebuild, but any call throws — the NativeModules check prevents the require entirely
 
 ## Phase Status
 

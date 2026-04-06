@@ -14,6 +14,11 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** Use lazy `require()` inside a try/catch at call-time, not top-level imports. Wrap in setTimeout for initialization delay.
 **Occurrences:** expo-notifications in NotificationProvider
 
+### 2b. `require()` guard alone is not enough for native modules
+**Pattern:** Wrapping `require('expo-notifications')` in try/catch silences import errors, but the JS module itself may load fine while the native bridge is absent. Any subsequent call (e.g. `N.setNotificationHandler()`) then throws "Cannot find native module 'ExpoPushTokenManager'" — outside the try/catch, logged visibly in dev overlay.
+**Fix:** Check `NativeModules.ExpoPushTokenManager` (or `NativeModules.ExpoNotifications`) BEFORE calling `require()`. If absent, return null immediately. The try/catch is a secondary safety net.
+**Occurrences:** push-notifications.ts + NotificationProvider.tsx on dev builds without native rebuild (2026-04-06)
+
 ### 3. Debug APK overwritten by release APK
 **Pattern:** Installing a release APK with the same package name (`com.defensivepedal.mobile.dev`) overwrites the debug build. The release build ignores Metro and uses embedded JS — code changes via hot reload stop working. No dev menu appears on shake.
 **Fix:** Check with `adb shell input keyevent 82` (dev menu test). If no menu, rebuild and reinstall debug APK.
@@ -101,6 +106,11 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Pattern:** `gcloud builds submit` builds and pushes a new Docker image, but Cloud Run keeps serving the old revision. The new endpoints return 404.
 **Fix:** After `gcloud builds submit`, you MUST also run `gcloud run deploy defpedal-api --image <image-url> --region europe-central2 --platform managed --allow-unauthenticated` to create a new revision. Verify with `gcloud run revisions list --service defpedal-api --region europe-central2`.
 **Occurrences:** CO2 stats endpoint deployment (2026-04-02)
+
+### 20. Stale closures in `useRef(PanResponder.create(...))`
+**Pattern:** `PanResponder.create({...})` is passed to `useRef()`, so it runs once on mount. Any variables captured in the `onPanResponderMove` / `onPanResponderRelease` closures reflect the *first render* values only, even if those variables change on later renders (e.g. a height derived from an async prop like `peekContent`).
+**Fix:** For values that change after mount, use a ref (`const myRef = useRef(initialValue); myRef.current = currentValue`) and read `myRef.current` inside the PanResponder callbacks instead of the captured variable.
+**Occurrences:** MapStageScreen `CollapsibleSheet` peek state — `effectiveCollapsed` was 48 on first render (before route loaded), panResponder captured that value, so swiping down ignored the peek height after route data arrived (2026-04-06)
 
 ### 19. Dev app points to production API, not localhost
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
