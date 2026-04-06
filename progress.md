@@ -7,7 +7,7 @@ Update it at the end of each implementation slice.
 
 ## Snapshot
 
-- Overall progress: roughly 87-92 percent of product migration, 80-85 percent of production hardening
+- Overall progress: roughly 87-92 percent of product migration, 85-90 percent of production hardening
 - Current milestone: physical Android validation confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded design system
 - Primary risk: iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
@@ -105,6 +105,15 @@ Update it at the end of each implementation slice.
     - **Safety score returns 100 for no-data areas**: When no road risk segments exist in the area, score was `100 - 0 = 100` (falsely "perfectly safe"). Fixed: return `score: 0` when `totalSegments === 0`.
     - **Pre-existing test failures fixed**: riskDistribution label ("Safe" → "Very safe"), safety-score field names (safestCount → safeCount), safety-score score formula (100 − avg_score), record_ride_impact RPC params (7 new optional fields), impact-dashboard guardian tier assertions (tier removed in Phase 3).
     - All tests now pass: packages/core 276/276, services/mobile-api 205/205. Bundle check ✅. TypeScript clean.
+
+- Bug hunt round 2 + comments fix (2026-04-06):
+    - **Comments broken (critical)**: `GET /feed/:id/comments` used Supabase embedded join `profiles(...)` but `feed_comments.user_id` references `auth.users`, not `profiles` — no FK exists. PostgREST failed silently → 502 → "No comments yet". Fixed: two-step query (fetch comments, batch-fetch profiles by user IDs, merge). Added `in` to Supabase test mock chain.
+    - **Impact dashboard stripped microlives**: `additionalProperties: false` in response schema was missing `totalMicrolives` and `totalCommunitySeconds` properties → Fastify silently dropped them. Client never received microlives data.
+    - **thisWeek.hazardsReported hardcoded to 0**: Handler ignored RPC data, returned literal `0`. Fixed to read `thisWeek?.hazardsReported`.
+    - **Dismissed hazard IDs persist across nav sessions**: `dismissedHazardIdsRef` was never cleared. After finishing a ride and starting a new one, hazards dismissed on the first ride were still suppressed. Fixed: clear the ref on component unmount.
+    - **Comment count stale in feed after posting**: `usePostComment` invalidated queries but didn't update the cached `commentCount` on the feed item. Going back to feed showed old count. Fixed: optimistic increment via `setQueriesData`.
+    - **Settings route TS error**: `href="/onboarding/index"` → `href="/onboarding"`. Pre-existing TS compilation error resolved.
+    - Deployed Cloud Run revisions 00032 through 00035. All tests pass (276 core + 205 API). TypeScript fully clean (0 errors). Bundle ✅.
 
 ## Phase Status
 

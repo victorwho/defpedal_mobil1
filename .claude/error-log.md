@@ -112,6 +112,21 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** For values that change after mount, use a ref (`const myRef = useRef(initialValue); myRef.current = currentValue`) and read `myRef.current` inside the PanResponder callbacks instead of the captured variable.
 **Occurrences:** MapStageScreen `CollapsibleSheet` peek state — `effectiveCollapsed` was 48 on first render (before route loaded), panResponder captured that value, so swiping down ignored the peek height after route data arrived (2026-04-06)
 
+### 21. Supabase embedded joins require direct FK
+**Pattern:** Using PostgREST embedded resource syntax `profiles(display_name, avatar_url)` in a Supabase select requires a direct FK from the source table to the target. If both tables reference `auth.users` independently (e.g., `feed_comments.user_id → auth.users` and `profiles.id → auth.users`), there's no direct FK between them — the join silently fails or returns a 502.
+**Fix:** Use two separate queries instead: (1) fetch the source rows, (2) batch-fetch profiles by user IDs with `.in('id', userIds)`, (3) merge in application code.
+**Occurrences:** GET /feed/:id/comments returned 502 — comments never visible (2026-04-06)
+
+### 22. Fastify response schema strips undeclared fields silently
+**Pattern:** When a Fastify route has `additionalProperties: false` in its response schema, any fields returned by the handler that aren't listed in `properties` are silently removed from the response. The client receives the response with missing fields and no error.
+**Fix:** When adding new fields to a handler response, ALWAYS add them to the JSON Schema `required` array and `properties` object too. Check all response schemas after modifying handler return values.
+**Occurrences:** Impact dashboard missing totalMicrolives + totalCommunitySeconds (2026-04-06); guardian tier removal broke GET /profile (2026-04-05)
+
+### 23. useRef values used across renders must be cleared on unmount
+**Pattern:** A `useRef<Set<string>>` or similar mutable ref that accumulates state during a session (e.g., dismissed hazard IDs) persists its contents even after the component unmounts and remounts. Starting a new navigation session reuses the old ref contents, suppressing alerts that should fire.
+**Fix:** Clear ref contents in a useEffect cleanup: `useEffect(() => { return () => { myRef.current.clear(); }; }, []);`
+**Occurrences:** dismissedHazardIdsRef in navigation.tsx persisted across rides (2026-04-06)
+
 ### 19. Dev app points to production API, not localhost
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
 **Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).
