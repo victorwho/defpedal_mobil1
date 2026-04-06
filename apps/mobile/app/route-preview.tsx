@@ -272,24 +272,14 @@ export default function RoutePreviewScreen() {
   }, [saveRouteName, routeRequest, queryClient]);
 
   const topOverlay = (
-    <>
-      <View style={styles.metaRow}>
-        <Badge variant="neutral" size="md">
-          {routePreview?.coverage.status
-            ? `Coverage: ${routePreview.coverage.status}`
-            : 'Coverage pending'}
-        </Badge>
-        <Badge
-          variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
-          size="md"
-        >
-          {routePreview?.selectedMode === 'safe' ? 'Safe routing' : 'Fast routing'}
-        </Badge>
-        <Badge variant={user ? 'accent' : 'neutral'} size="md">
-          {user ? 'Sync on' : 'Anonymous'}
-        </Badge>
-      </View>
-    </>
+    <View style={styles.metaRow}>
+      <Badge
+        variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
+        size="md"
+      >
+        {routePreview?.selectedMode === 'safe' ? 'Safe routing' : 'Fast routing'}
+      </Badge>
+    </View>
   );
 
   if (!guardPassed) return null;
@@ -432,7 +422,7 @@ export default function RoutePreviewScreen() {
             <Text style={styles.statDivider}>·</Text>
 
             <View style={styles.stat}>
-              <Text style={[styles.statValue, { color: '#F2C30F' }]}>
+              <Text style={[styles.statValue, { color: colors.accent }]}>
                 +{Math.round(selectedRoute.distanceMeters / 1000 * 0.4 * 30)}min
               </Text>
               <Text style={styles.statUnit}>life</Text>
@@ -454,7 +444,7 @@ export default function RoutePreviewScreen() {
             <Ionicons
               name={routePreview.comparisonLabel.includes('less safe') ? 'warning' : 'shield-checkmark'}
               size={18}
-              color={routePreview.comparisonLabel.includes('less safe') ? '#F59E0B' : '#22C55E'}
+              color={routePreview.comparisonLabel.includes('less safe') ? colors.caution : colors.safe}
             />
             <Text style={[
               styles.comparisonText,
@@ -472,6 +462,9 @@ export default function RoutePreviewScreen() {
                 setRoutingMode('safe');
               }}
               disabled={switchingToSafe}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Switch to safe route"
             >
               {switchingToSafe ? (
                 <>
@@ -480,7 +473,7 @@ export default function RoutePreviewScreen() {
                 </>
               ) : (
                 <>
-                  <Ionicons name="shield-checkmark" size={16} color="#22C55E" />
+                  <Ionicons name="shield-checkmark" size={16} color={colors.safe} />
                   <Text style={styles.switchToSafeText}>Switch to safe route</Text>
                 </>
               )}
@@ -518,8 +511,14 @@ export default function RoutePreviewScreen() {
 
     {/* Save route modal */}
     {saveModalVisible ? (
-      <Pressable style={styles.modalOverlay} onPress={() => setSaveModalVisible(false)}>
-        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+      style={styles.modalOverlay}
+      onPress={() => setSaveModalVisible(false)}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel="Dismiss save route dialog"
+    >
+        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()} accessible={false}>
           <Text style={styles.modalTitle}>Save Route</Text>
           <TextInput
             style={styles.modalInput}

@@ -1,15 +1,16 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { safetyColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
 
 type SafetyBadgeProps = {
   rating: number | null;
 };
 
 const getBadgeColor = (rating: number): string => {
-  if (rating >= 4) return mobileTheme.colors.success;
-  if (rating >= 3) return '#ca8a04'; // amber-600
-  return mobileTheme.colors.danger;
+  if (rating >= 4) return safetyColors.safe;
+  if (rating >= 3) return safetyColors.caution;
+  return safetyColors.danger;
 };
 
 export const SafetyBadge = ({ rating }: SafetyBadgeProps) => {
@@ -27,12 +28,12 @@ export const SafetyBadge = ({ rating }: SafetyBadgeProps) => {
 const styles = StyleSheet.create({
   badge: {
     alignSelf: 'flex-start',
-    borderRadius: 12,
+    borderRadius: radii.lg,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   label: {
-    color: '#ffffff',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',

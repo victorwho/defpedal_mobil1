@@ -546,8 +546,8 @@ export default function RoutePlanningScreen() {
       }
       topOverlay={
         <View style={styles.topContainer}>
-          {/* Origin card — full width, aligned with destination */}
-          {activeField === 'startOverride' ? (
+          {/* Origin card — shown only after destination is set (progressive disclosure) */}
+          {(hasValidDestination || activeField === 'startOverride') && (activeField === 'startOverride' ? (
             /* Start override search (expanded) */
             <View style={styles.originCard}>
               <SearchBar
@@ -604,11 +604,12 @@ export default function RoutePlanningScreen() {
                 onPress={() => setActiveField('startOverride')}
                 accessibilityLabel="Edit start point"
                 accessibilityRole="button"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Text style={styles.editButtonLabel}>EDIT</Text>
+                <Ionicons name="pencil-outline" size={16} color={gray[500]} />
               </Pressable>
             </View>
-          )}
+          ))}
 
           {/* Destination search bar */}
           <View style={styles.destinationCard}>
@@ -778,13 +779,13 @@ export default function RoutePlanningScreen() {
             </Pressable>
           ) : null}
 
-          {/* Weather widget — hidden while typing or when UI collapsed */}
-          {!activeField && !uiCollapsed ? (
+          {/* Weather widget — shown when destination set, or when weather is severe (rain >30% or wind >25km/h) */}
+          {!activeField && !uiCollapsed && (hasValidDestination || (weather && (weather.precipitationProbability > 30 || weather.windSpeed > 25))) ? (
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast routing toggle */}
-          <View style={styles.modeToggleRow}>
+          {/* Safe / Fast routing toggle — shown only after destination set */}
+          {hasValidDestination ? <View style={styles.modeToggleRow}>
             <Pressable
               style={[
                 styles.modeTogglePill,
@@ -833,38 +834,18 @@ export default function RoutePlanningScreen() {
                 {t('planning.fast')}
               </Text>
             </Pressable>
-          </View>
+          </View> : null}
         </View>
       }
       rightOverlay={
         <Animated.View style={[styles.fabColumn, { opacity: uiOpacity }]} pointerEvents={uiCollapsed ? 'none' : 'auto'}>
           <Pressable
             style={styles.fabButton}
-            onPress={() => router.push('/settings')}
-            accessibilityLabel="Menu"
+            onPress={() => { void refreshLocation(); setRecenterKey((k) => k + 1); }}
+            accessibilityLabel="Center on current location"
             accessibilityRole="button"
           >
-            <Ionicons name="menu" size={22} color={gray[700]} />
-          </Pressable>
-          <Pressable
-            style={styles.fabButton}
-            onPress={toggleVoiceGuidance}
-            accessibilityLabel={voiceGuidanceEnabled ? 'Disable voice guidance' : 'Enable voice guidance'}
-            accessibilityRole="button"
-          >
-            <Ionicons
-              name={voiceGuidanceEnabled ? 'volume-high' : 'volume-mute'}
-              size={22}
-              color={gray[700]}
-            />
-          </Pressable>
-          <Pressable
-            style={styles.fabButton}
-            onPress={() => router.push('/faq')}
-            accessibilityLabel="Frequently asked questions"
-            accessibilityRole="button"
-          >
-            <Ionicons name="help-circle-outline" size={22} color={gray[700]} />
+            <Ionicons name="locate" size={22} color={gray[700]} />
           </Pressable>
           <Pressable
             style={[styles.fabButton, hazardPlacementMode && { backgroundColor: colors.accent }]}
@@ -877,14 +858,6 @@ export default function RoutePlanningScreen() {
               size={22}
               color={hazardPlacementMode ? '#000' : colors.accent}
             />
-          </Pressable>
-          <Pressable
-            style={styles.fabButton}
-            onPress={() => { void refreshLocation(); setRecenterKey((k) => k + 1); }}
-            accessibilityLabel="Center on current location"
-            accessibilityRole="button"
-          >
-            <Ionicons name="locate" size={22} color={gray[700]} />
           </Pressable>
           {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
             <Pressable
@@ -941,8 +914,11 @@ export default function RoutePlanningScreen() {
       <Pressable
         style={styles.hazardGridOverlay}
         onPress={() => setHazardPickerOpen(false)}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss hazard picker"
       >
-        <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()} accessible={false}>
           <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
           <View style={styles.hazardGrid}>
             {([
@@ -971,6 +947,9 @@ export default function RoutePlanningScreen() {
           <Pressable
             style={styles.hazardGridCancel}
             onPress={() => setHazardPickerOpen(false)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel hazard report"
           >
             <Text style={styles.hazardGridCancelText}>Cancel</Text>
           </Pressable>
@@ -996,6 +975,9 @@ export default function RoutePlanningScreen() {
                 message: `⚠️ Cycling hazard reported: ${label} near ${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}. Stay safe! — Defensive Pedal`,
               });
             }}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Share hazard alert"
           >
             <Ionicons name="share-social-outline" size={16} color={colors.accent} />
             <Text style={styles.shareHazardText}>{t('communityScreen.shareRide').replace('ride', 'alert')}</Text>
@@ -1006,8 +988,14 @@ export default function RoutePlanningScreen() {
 
     {/* Saved routes modal */}
     {savedRoutesOpen ? (
-      <Pressable style={styles.savedRoutesOverlay} onPress={() => setSavedRoutesOpen(false)}>
-        <Pressable style={styles.savedRoutesModal} onPress={(e) => e.stopPropagation()}>
+      <Pressable
+        style={styles.savedRoutesOverlay}
+        onPress={() => setSavedRoutesOpen(false)}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss saved routes"
+      >
+        <Pressable style={styles.savedRoutesModal} onPress={(e) => e.stopPropagation()} accessible={false}>
           <Text style={styles.savedRoutesTitle}>Saved Routes</Text>
           {(savedRoutesQuery.data ?? []).map((route) => (
             <Pressable
@@ -1031,7 +1019,13 @@ export default function RoutePlanningScreen() {
               <Ionicons name="chevron-forward" size={16} color={gray[500]} />
             </Pressable>
           ))}
-          <Pressable style={styles.savedRoutesCancel} onPress={() => setSavedRoutesOpen(false)}>
+          <Pressable
+            style={styles.savedRoutesCancel}
+            onPress={() => setSavedRoutesOpen(false)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
             <Text style={styles.savedRoutesCancelText}>Cancel</Text>
           </Pressable>
         </Pressable>

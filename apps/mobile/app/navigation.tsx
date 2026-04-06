@@ -630,13 +630,7 @@ export default function NavigationScreen() {
     );
   }
 
-  const gpsChipLabel =
-    locationState.permissionStatus === 'granted'
-      ? t('nav.gpsLive')
-      : `GPS ${locationState.permissionStatus}`;
-  const syncChipLabel = user ? `${t('nav.syncOn')} \u00b7 ${pendingQueueCount}` : t('nav.anonymousRide');
-  const progressChipLabel = t('nav.step', { current: navigationSession.currentStepIndex + 1, total: Math.max(totalSteps, 1) });
-  const bgChipLabel = `BG ${backgroundSnapshot.status.status}`;
+  // Diagnostic chip labels removed from user UI — available in diagnostics.tsx
 
   const warningMessage = locationState.error
     ? locationState.error
@@ -891,8 +885,11 @@ export default function NavigationScreen() {
         <Pressable
           style={styles.hazardGridOverlay}
           onPress={() => setHazardPickerOpen(false)}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss hazard picker"
         >
-          <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()} accessible={false}>
             <Text style={styles.hazardGridTitle}>Report hazard</Text>
             <View style={styles.hazardGrid}>
               {([
@@ -921,6 +918,9 @@ export default function NavigationScreen() {
             <Pressable
               style={styles.hazardGridCancel}
               onPress={() => setHazardPickerOpen(false)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel hazard report"
             >
               <Text style={styles.hazardGridCancelText}>Cancel</Text>
             </Pressable>

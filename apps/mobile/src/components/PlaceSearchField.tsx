@@ -1,7 +1,8 @@
 import type { AutocompleteSuggestion } from '@defensivepedal/core';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors, safetyColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
 
 type PlaceSearchFieldProps = {
   label: string;
@@ -49,7 +50,12 @@ export const PlaceSearchField = ({
           autoCapitalize="words"
         />
         {value ? (
-          <Pressable style={styles.clearButton} onPress={onClear}>
+          <Pressable
+            style={styles.clearButton}
+            onPress={onClear}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
             <Text style={styles.clearButtonLabel}>Clear</Text>
           </Pressable>
         ) : null}
@@ -71,6 +77,8 @@ export const PlaceSearchField = ({
                 key={suggestion.id}
                 style={styles.suggestionButton}
                 onPress={() => onSelectSuggestion(suggestion)}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${suggestion.primaryText}`}
               >
                 <Text style={styles.suggestionTitle}>{suggestion.primaryText}</Text>
                 <Text style={styles.suggestionSubtitle}>{suggestion.label}</Text>
@@ -87,7 +95,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   label: {
-    color: mobileTheme.colors.textMuted,
+    color: brandColors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -100,62 +108,62 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderRadius: mobileTheme.radii.md,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.surfaceMuted,
+    borderColor: 'rgba(148, 163, 184, 0.24)',
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 16,
     paddingVertical: 15,
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 15,
   },
   clearButton: {
-    borderRadius: mobileTheme.radii.pill,
-    backgroundColor: mobileTheme.colors.surfaceAccent,
+    borderRadius: radii.full,
+    backgroundColor: brandColors.textInverse,
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
   clearButtonLabel: {
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
     fontWeight: '700',
   },
   statusText: {
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
   suggestionSheet: {
-    borderRadius: mobileTheme.radii.md,
+    borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
+    borderColor: 'rgba(148, 163, 184, 0.24)',
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     padding: 10,
     gap: 8,
   },
   helperText: {
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },
   errorText: {
-    color: mobileTheme.colors.danger,
+    color: safetyColors.danger,
     fontSize: 13,
     lineHeight: 18,
   },
   suggestionButton: {
     borderRadius: 16,
-    backgroundColor: mobileTheme.colors.surfaceMuted,
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 2,
   },
   suggestionTitle: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 15,
     fontWeight: '800',
   },
   suggestionSubtitle: {
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
   },

@@ -30,3 +30,6 @@ export type { CardProps } from './Card';
 
 export { SectionTitle } from './SectionTitle';
 export type { SectionTitleProps } from './SectionTitle';
+
+export { FadeSlideIn } from './FadeSlideIn';
+export type { FadeSlideInProps } from './FadeSlideIn';

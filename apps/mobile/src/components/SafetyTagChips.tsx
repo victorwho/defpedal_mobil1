@@ -2,7 +2,8 @@ import { SAFETY_TAG_OPTIONS } from '@defensivepedal/core';
 import type { SafetyTag } from '@defensivepedal/core';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors } from '../design-system/tokens/colors';
+import { brandTints } from '../design-system/tokens/tints';
 
 type SafetyTagChipsProps = {
   tags: SafetyTag[];
@@ -37,13 +38,13 @@ const styles = StyleSheet.create({
   chip: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.borderStrong,
-    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    borderColor: brandColors.borderStrong,
+    backgroundColor: brandTints.accentSubtle,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   chipText: {
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
     fontSize: 11,
     fontWeight: '700',
   },

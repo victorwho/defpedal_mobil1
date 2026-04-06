@@ -323,6 +323,9 @@ export default function FeedbackScreen() {
     };
   }, []);
 
+  const ratingSkipCount = useAppStore((s) => s.ratingSkipCount);
+  const incrementRatingSkipCount = useAppStore((s) => s.incrementRatingSkipCount);
+  const autoSuppressRating = ratingSkipCount >= 3;
   const [step, setStep] = useState<FeedbackStep>('impact');
   const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
@@ -451,11 +454,19 @@ export default function FeedbackScreen() {
           <ImpactStep
             rideImpact={rideImpact}
             dashboard={dashboard}
-            onContinue={() => setStep('rating')}
+            onContinue={autoSuppressRating ? handleDone : () => setStep('rating')}
             styles={styles}
           />
         ) : (
-          <RatingStep onDone={handleDone} onCancel={handleCancel} styles={styles} colors={colors} />
+          <RatingStep
+            onDone={handleDone}
+            onCancel={() => {
+              incrementRatingSkipCount();
+              handleCancel();
+            }}
+            styles={styles}
+            colors={colors}
+          />
         )}
       </SafeAreaView>
 

@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, safetyColors } from '../design-system/tokens/colors';
-import { mobileTheme } from '../lib/theme';
+import { radii } from '../design-system/tokens/radii';
+import { surfaceTints } from '../design-system/tokens/tints';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
 import { SafetyBadge } from './SafetyBadge';
@@ -170,12 +171,15 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
   );
 };
 
+/** Muted text for dark background — slightly lighter than textSecondary for readability */
+const TEXT_ON_DARK_MUTED = '#cbd5e1';
+
 const styles = StyleSheet.create({
   card: {
-    borderRadius: mobileTheme.radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.backgroundPanel,
+    borderColor: brandColors.borderDefault,
+    backgroundColor: brandColors.bgSecondary,
     padding: 16,
     gap: 10,
   },
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: mobileTheme.colors.accent,
+    backgroundColor: brandColors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -207,37 +211,37 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   displayName: {
-    color: mobileTheme.colors.textOnDark,
+    color: brandColors.textPrimary,
     fontSize: 15,
     fontWeight: '800',
     flexShrink: 1,
   },
   timestamp: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: TEXT_ON_DARK_MUTED,
     fontSize: 12,
   },
   title: {
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: -0.3,
   },
   mapContainer: {
-    borderRadius: mobileTheme.radii.md,
+    borderRadius: radii.md,
     overflow: 'hidden',
   },
   mapInner: {
     aspectRatio: 16 / 9,
     maxHeight: 200,
-    borderRadius: mobileTheme.radii.md,
+    borderRadius: radii.md,
   },
   mapPlaceholder: {
-    backgroundColor: mobileTheme.colors.backgroundPanelSoft,
+    backgroundColor: brandColors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: TEXT_ON_DARK_MUTED,
     fontSize: 13,
   },
   statsRow: {
@@ -247,30 +251,30 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     borderRadius: 14,
-    backgroundColor: `rgba(17, 24, 39, 0.12)`, // gray[900] (#111827) at 12% opacity
+    backgroundColor: surfaceTints.overlaySubtle,
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 2,
   },
   statLabel: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: TEXT_ON_DARK_MUTED,
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   statValue: {
-    color: mobileTheme.colors.textOnDark,
+    color: brandColors.textPrimary,
     fontSize: 15,
     fontWeight: '900',
   },
   note: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: TEXT_ON_DARK_MUTED,
     fontSize: 14,
     lineHeight: 20,
   },
   readMore: {
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
@@ -280,7 +284,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: mobileTheme.colors.border,
+    borderTopColor: brandColors.borderDefault,
     paddingTop: 8,
   },
   commentButton: {
@@ -296,6 +300,6 @@ const styles = StyleSheet.create({
   commentCount: {
     fontSize: 14,
     fontWeight: '700',
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: TEXT_ON_DARK_MUTED,
   },
 });

@@ -134,7 +134,13 @@ export default function HistoryScreen() {
 
           {/* 5. Daily Safety Quiz */}
           {user ? (
-            <Pressable style={styles.quizCard} onPress={() => router.push('/daily-quiz')}>
+            <Pressable
+              style={styles.quizCard}
+              onPress={() => router.push('/daily-quiz')}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('history.dailyQuiz')}
+            >
               <View style={styles.quizCardLeft}>
                 <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
                 <View>

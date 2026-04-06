@@ -401,15 +401,30 @@ export const directPreviewRoute = async (
         const currentAvg = avgRisk(currentSegments);
         const comparisonAvg = avgRisk(comparisonSegments);
 
-        if (mode === 'safe' && comparisonAvg > 0 && currentAvg < comparisonAvg) {
-          const saferPercent = Math.round((1 - currentAvg / comparisonAvg) * 100);
-          if (saferPercent > 0) {
-            comparisonLabel = `${saferPercent}% safer than fast route`;
+        const diffPercent = comparisonAvg > 0
+          ? Math.round(Math.abs(1 - currentAvg / comparisonAvg) * 100)
+          : 0;
+
+        if (mode === 'safe') {
+          if (currentAvg < comparisonAvg) {
+            comparisonLabel = diffPercent >= 1
+              ? `${diffPercent}% safer than fast route`
+              : 'Slightly safer than fast route';
+          } else if (currentAvg > comparisonAvg) {
+            // Edge case: safe route scored worse — still inform the user
+            comparisonLabel = 'Similar safety to fast route';
+          } else {
+            comparisonLabel = 'Same safety as fast route';
           }
-        } else if (mode === 'fast' && comparisonAvg > 0 && currentAvg > comparisonAvg) {
-          const lessPercent = Math.round((1 - comparisonAvg / currentAvg) * 100);
-          if (lessPercent > 0) {
-            comparisonLabel = `${lessPercent}% less safe than safe route`;
+        } else if (mode === 'fast') {
+          if (currentAvg > comparisonAvg) {
+            comparisonLabel = diffPercent >= 1
+              ? `${diffPercent}% less safe than safe route`
+              : 'Slightly less safe than safe route';
+          } else if (currentAvg < comparisonAvg) {
+            comparisonLabel = 'Similar safety to safe route';
+          } else {
+            comparisonLabel = 'Same safety as safe route';
           }
         }
       }

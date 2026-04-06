@@ -1,7 +1,9 @@
 import type { PropsWithChildren } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors, safetyColors } from '../design-system/tokens/colors';
+import { radii } from '../design-system/tokens/radii';
+import { shadows } from '../design-system/tokens/shadows';
 
 type StatusCardProps = PropsWithChildren<{
   title: string;
@@ -35,41 +37,34 @@ export const StatusCard = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: mobileTheme.radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
+    borderColor: 'rgba(148, 163, 184, 0.24)',
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
     padding: 18,
     gap: 10,
-    shadowColor: '#000000',
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    elevation: 5,
+    ...shadows.lg,
   },
   cardAccent: {
-    borderColor: mobileTheme.colors.borderStrong,
-    backgroundColor: mobileTheme.colors.surfaceAccent,
+    borderColor: brandColors.borderStrong,
+    backgroundColor: brandColors.textInverse,
   },
   cardWarning: {
     borderColor: 'rgba(234, 179, 8, 0.35)',
-    backgroundColor: mobileTheme.colors.surfaceWarning,
+    backgroundColor: safetyColors.cautionTint,
   },
   title: {
     fontSize: 13,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
-    color: mobileTheme.colors.textMuted,
+    color: brandColors.textMuted,
   },
   titleAccent: {
-    color: mobileTheme.colors.brand,
+    color: brandColors.accent,
   },
   titleWarning: {
-    color: mobileTheme.colors.textWarning,
+    color: safetyColors.cautionText,
   },
   body: {
     gap: 8,

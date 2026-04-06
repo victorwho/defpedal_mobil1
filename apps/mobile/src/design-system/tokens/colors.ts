@@ -24,7 +24,7 @@ export const brandColors = {
   /** Text on dark backgrounds */
   textPrimary: '#FFFFFF',
   textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
+  textMuted: '#8B9198',
   textInverse: '#111827',
 
   /** Borders */

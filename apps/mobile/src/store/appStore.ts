@@ -107,6 +107,7 @@ type AppStore = {
     totalHazardsWarned: number;
   } | null;
   locale: 'en' | 'ro';
+  ratingSkipCount: number;
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
@@ -116,6 +117,7 @@ type AppStore = {
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
   clearBadgeUnlocks: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
+  incrementRatingSkipCount: () => void;
   setShowHistoryOverlay: (show: boolean) => void;
   setOnboardingCompleted: (completed: boolean) => void;
   incrementAnonymousOpenCount: () => void;
@@ -221,6 +223,7 @@ export const useAppStore = create<AppStore>()(
       cachedStreak: null,
       cachedImpact: null,
       locale: 'en',
+      ratingSkipCount: 0,
       showHistoryOverlay: false,
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
@@ -239,6 +242,8 @@ export const useAppStore = create<AppStore>()(
       },
       clearBadgeUnlocks: () => set(() => ({ pendingBadgeUnlocks: [] })),
       setLocale: (locale) => set(() => ({ locale })),
+      incrementRatingSkipCount: () =>
+        set((state) => ({ ratingSkipCount: state.ratingSkipCount + 1 })),
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
@@ -737,6 +742,7 @@ export const useAppStore = create<AppStore>()(
         cachedStreak: state.cachedStreak,
         cachedImpact: state.cachedImpact,
         notificationPermissionAsked: state.notificationPermissionAsked,
+        ratingSkipCount: state.ratingSkipCount,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,

@@ -2,7 +2,8 @@ import type { NavigationStep } from '@defensivepedal/core';
 import { formatDistance, formatSpeed } from '@defensivepedal/core';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { mobileTheme } from '../lib/theme';
+import { brandColors } from '../design-system/tokens/colors';
+import { shadows } from '../design-system/tokens/shadows';
 
 const getManeuverBadgeLabel = (step: NavigationStep | null) => {
   if (!step) {
@@ -154,14 +155,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    elevation: 7,
+    ...shadows.xl,
   },
   cardRow: {
     flexDirection: 'row',
@@ -175,10 +169,10 @@ const styles = StyleSheet.create({
     borderRadius: 29,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: mobileTheme.colors.brand,
+    backgroundColor: brandColors.accent,
   },
   badgeLabel: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 0.3,
@@ -188,19 +182,19 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   distanceLabel: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 30,
     fontWeight: '900',
     letterSpacing: -0.9,
   },
   instructionLabel: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 18,
     fontWeight: '800',
     lineHeight: 24,
   },
   streetLabel: {
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 14,
     lineHeight: 18,
   },
@@ -210,12 +204,12 @@ const styles = StyleSheet.create({
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(15, 23, 42, 0.08)',
-    backgroundColor: mobileTheme.colors.surfaceMuted,
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
   thenPrefix: {
-    color: mobileTheme.colors.textMuted,
+    color: brandColors.textMuted,
     fontSize: 12,
     fontWeight: '900',
     textTransform: 'uppercase',
@@ -223,12 +217,12 @@ const styles = StyleSheet.create({
   },
   thenText: {
     flex: 1,
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
   },
   thenDistance: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 12,
     fontWeight: '800',
   },
@@ -238,14 +232,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    elevation: 7,
+    ...shadows.xl,
   },
   metricRow: {
     flexDirection: 'row',
@@ -260,26 +247,26 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   metricLabel: {
-    color: mobileTheme.colors.textMuted,
+    color: brandColors.textMuted,
     fontSize: 11,
     fontWeight: '900',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   metricValue: {
-    color: mobileTheme.colors.textPrimary,
+    color: brandColors.textInverse,
     fontSize: 17,
     fontWeight: '900',
   },
   statusStrip: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(15, 23, 42, 0.08)',
-    backgroundColor: mobileTheme.colors.surfaceMuted,
+    backgroundColor: '#f8fafc',
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   statusText: {
-    color: mobileTheme.colors.textSecondary,
+    color: brandColors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
     lineHeight: 18,
