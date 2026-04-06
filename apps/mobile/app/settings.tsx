@@ -106,7 +106,7 @@ export default function SettingsScreen() {
             />
           </Pressable>
         </Link>
-        <Link href="/onboarding/index" asChild>
+        <Link href="/onboarding" asChild>
           <Pressable>
             <MenuItem
               icon="book-outline"

@@ -417,6 +417,7 @@ export default function NavigationScreen() {
       if (hazardBannerTimeoutRef.current) {
         clearTimeout(hazardBannerTimeoutRef.current);
       }
+      dismissedHazardIdsRef.current.clear();
       void Speech.stop();
     };
   }, []);

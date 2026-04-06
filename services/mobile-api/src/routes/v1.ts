@@ -1822,7 +1822,7 @@ export const buildV1Routes = (
               required: [
                 'streak', 'totalCo2SavedKg', 'totalMoneySavedEur',
                 'totalHazardsReported', 'totalRidersProtected',
-                'thisWeek',
+                'thisWeek', 'totalMicrolives', 'totalCommunitySeconds',
               ],
               properties: {
                 streak: {
@@ -1841,6 +1841,8 @@ export const buildV1Routes = (
                 totalMoneySavedEur: { type: 'number' },
                 totalHazardsReported: { type: 'integer' },
                 totalRidersProtected: { type: 'integer' },
+                totalMicrolives: { type: 'number' },
+                totalCommunitySeconds: { type: 'number' },
                 thisWeek: {
                   type: 'object',
                   additionalProperties: false,
@@ -1913,7 +1915,7 @@ export const buildV1Routes = (
             rides: Number(thisWeek?.rides ?? 0),
             co2SavedKg: Number(thisWeek?.co2SavedKg ?? 0),
             moneySavedEur: Number(thisWeek?.moneySavedEur ?? 0),
-            hazardsReported: 0,
+            hazardsReported: Number(thisWeek?.hazardsReported ?? 0),
           },
           totalMicrolives: Number(totals?.totalMicrolives ?? 0),
           totalCommunitySeconds: Number(totals?.totalCommunitySeconds ?? 0),

@@ -197,7 +197,25 @@ export const usePostComment = () => {
       void queryClient.invalidateQueries({
         queryKey: [COMMENTS_KEY, vars.tripShareId],
       });
-      void queryClient.invalidateQueries({ queryKey: [FEED_KEY] });
+      // Optimistically increment commentCount in the feed cache so the feed
+      // card shows the updated count without waiting for a full refetch.
+      queryClient.setQueriesData<{ pages: FeedResponse[]; pageParams: unknown[] }>(
+        { queryKey: [FEED_KEY] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === vars.tripShareId
+                  ? { ...item, commentCount: item.commentCount + 1 }
+                  : item,
+              ),
+            })),
+          };
+        },
+      );
     },
   });
 };
