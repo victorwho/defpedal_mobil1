@@ -21,15 +21,15 @@ export const BackButton = ({ onPress }: BackButtonProps) => (
     accessibilityRole="button"
     hitSlop={8}
   >
-    <Ionicons name="chevron-back" size={22} color="#000" />
+    <Ionicons name="chevron-back" size={22} color={brandColors.textInverse} />
   </Pressable>
 );
 
 const styles = StyleSheet.create({
   button: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: brandColors.accent,
     alignItems: 'center',
     justifyContent: 'center',

@@ -138,41 +138,40 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
   );
 
   useEffect(() => {
-    // T+0ms: Background dims
-    Animated.timing(bgOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-    // T+100ms: Shield scales in with spring
-    setTimeout(() => {
-      shieldOpacity.setValue(1);
-      Animated.spring(shieldScale, {
+    const animation = Animated.sequence([
+      // T+0ms: Background dims
+      Animated.timing(bgOpacity, {
         toValue: 1,
-        damping: badgeAnimations.unlockSpring.damping,
-        stiffness: badgeAnimations.unlockSpring.stiffness,
-        mass: badgeAnimations.unlockSpring.mass,
+        duration: 200,
         useNativeDriver: true,
-      }).start();
-    }, 100);
-
-    // T+200ms: Particle burst
-    setTimeout(() => {
-      animateParticles(particles);
-    }, 200);
-
-    // T+400ms: Icon fade in
-    setTimeout(() => {
+      }),
+      // T+200ms: Shield + particles (parallel)
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(shieldOpacity, { toValue: 1, duration: 0, useNativeDriver: true }),
+          Animated.spring(shieldScale, {
+            toValue: 1,
+            damping: badgeAnimations.unlockSpring.damping,
+            stiffness: badgeAnimations.unlockSpring.stiffness,
+            mass: badgeAnimations.unlockSpring.mass,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.delay(100),
+          // Particle burst runs outside sequence (side-effect only)
+          Animated.timing(iconOpacity, { toValue: 0, duration: 0, useNativeDriver: true }),
+        ]),
+      ]),
+      // T+400ms: Icon fade in
       Animated.timing(iconOpacity, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
-      }).start();
-    }, 400);
-
-    // T+800ms: Badge name slides up
-    setTimeout(() => {
+      }),
+      // T+600ms: Pause before text
+      Animated.delay(200),
+      // T+800ms: Badge name slides up
       Animated.parallel([
         Animated.timing(nameOpacity, {
           toValue: 1,
@@ -184,35 +183,35 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start();
-    }, 800);
-
-    // T+1000ms: Tier label fades in
-    setTimeout(() => {
+      ]),
+      // T+1100ms: Tier label fades in
       Animated.timing(tierOpacity, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
-      }).start();
-    }, 1000);
-
-    // T+1200ms: Flavor text fades in
-    setTimeout(() => {
+      }),
+      // T+1300ms: Flavor text fades in
       Animated.timing(flavorOpacity, {
         toValue: 1,
         duration: 200,
         useNativeDriver: true,
-      }).start();
-    }, 1200);
-
-    // T+1500ms: Dismiss hint fades in
-    setTimeout(() => {
+      }),
+      // T+1500ms: Dismiss hint fades in
       Animated.timing(dismissOpacity, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
-      }).start();
-    }, 1500);
+      }),
+    ]);
+
+    animation.start();
+    // Fire particles as side-effect (stagger doesn't compose well with sequence)
+    const particleTimer = setTimeout(() => animateParticles(particles), 200);
+
+    return () => {
+      animation.stop();
+      clearTimeout(particleTimer);
+    };
   }, []);
 
   return (

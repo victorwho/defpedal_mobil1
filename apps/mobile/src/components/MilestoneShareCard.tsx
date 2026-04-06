@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
 import { BrandLogo } from './BrandLogo';
 import { brandColors, darkTheme } from '../design-system/tokens/colors';
@@ -122,9 +122,11 @@ export const getMilestoneShareText = (milestoneKey: MilestoneKey): string => {
 // Styles
 // ---------------------------------------------------------------------------
 
+const CARD_WIDTH = Math.min(320, Dimensions.get('window').width - 32);
+
 const styles = StyleSheet.create({
   card: {
-    width: 320,
+    width: CARD_WIDTH,
     backgroundColor: darkTheme.bgDeep,
     borderRadius: radii['2xl'],
     borderWidth: 2,

@@ -28,6 +28,7 @@ export const BrandLogo = ({ size = 52 }: BrandLogoProps) => (
         height: size * 0.72,
       }}
       resizeMode="contain"
+      accessibilityLabel="Defensive Pedal logo"
     />
     <View pointerEvents="none" style={styles.ring} />
     <Text style={styles.fallback}>DP</Text>

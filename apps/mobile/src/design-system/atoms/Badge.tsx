@@ -37,6 +37,19 @@ export interface BadgeProps {
 }
 
 // ---------------------------------------------------------------------------
+// Accessibility labels — non-color safety indicators (WCAG 1.4.1)
+// ---------------------------------------------------------------------------
+
+const variantLabel: Record<BadgeVariant, string> = {
+  'risk-safe': 'Safe',
+  'risk-caution': 'Caution',
+  'risk-danger': 'Danger',
+  info: 'Info',
+  neutral: '',
+  accent: '',
+};
+
+// ---------------------------------------------------------------------------
 // Variant colors
 // ---------------------------------------------------------------------------
 
@@ -86,8 +99,20 @@ export const Badge: React.FC<BadgeProps> = ({
     color: v.text,
   };
 
+  const label = variantLabel[variant];
+  const childText = typeof children === 'string' ? children : undefined;
+  const a11yLabel = label
+    ? childText
+      ? `${label}: ${childText}`
+      : label
+    : childText;
+
   return (
-    <View style={containerStyle}>
+    <View
+      style={containerStyle}
+      accessibilityRole="text"
+      accessibilityLabel={a11yLabel}
+    >
       {icon}
       {typeof children === 'string' ? (
         <Text style={textStyle}>{children}</Text>

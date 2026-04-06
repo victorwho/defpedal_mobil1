@@ -126,6 +126,45 @@ export const RouteMap = ({
   const handlePoiPress = usePoiCardHandler(mapViewRef, selectedPoi, setSelectedPoi);
 
   const dismissPoi = useCallback(() => setSelectedPoi(null), []);
+  const dismissHazard = useCallback(() => setSelectedHazard(null), []);
+
+  const handleCameraChanged = useCallback(
+    (state: any) => {
+      const center = state?.properties?.center;
+      if (Array.isArray(center) && center.length >= 2) {
+        onCenterChange?.({ lat: center[1], lon: center[0] });
+      }
+    },
+    [onCenterChange],
+  );
+
+  const handleMapTap = useCallback(
+    (event: any) => {
+      const coords = event?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        onMapTap?.({ lat: coords[1], lon: coords[0] });
+      }
+    },
+    [onMapTap],
+  );
+
+  const handleMapLongPress = useCallback(
+    (event: any) => {
+      const coords = event?.geometry?.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        onMapLongPress?.({ lat: coords[1], lon: coords[0] });
+      }
+    },
+    [onMapLongPress],
+  );
+
+  const handleHazardPress = useCallback(
+    (props: { id: string; type: string; confirmCount: number; denyCount: number }) => {
+      setSelectedHazard(props);
+      setSelectedPoi(null);
+    },
+    [],
+  );
 
   const parkingVisible = poiVisibility?.bikeParking ?? false;
   const rentalVisible = poiVisibility?.bikeRental ?? false;
@@ -155,24 +194,9 @@ export const RouteMap = ({
         ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
         styleURL={STANDARD_STYLE_URL}
-        onCameraChanged={onCenterChange ? (state: any) => {
-          const center = state?.properties?.center;
-          if (Array.isArray(center) && center.length >= 2) {
-            onCenterChange({ lat: center[1], lon: center[0] });
-          }
-        } : undefined}
-        onPress={onMapTap ? (event: any) => {
-          const coords = event?.geometry?.coordinates;
-          if (Array.isArray(coords) && coords.length >= 2) {
-            onMapTap({ lat: coords[1], lon: coords[0] });
-          }
-        } : undefined}
-        onLongPress={onMapLongPress ? (event: any) => {
-          const coords = event?.geometry?.coordinates;
-          if (Array.isArray(coords) && coords.length >= 2) {
-            onMapLongPress({ lat: coords[1], lon: coords[0] });
-          }
-        } : undefined}
+        onCameraChanged={onCenterChange ? handleCameraChanged : undefined}
+        onPress={onMapTap ? handleMapTap : undefined}
+        onLongPress={onMapLongPress ? handleMapLongPress : undefined}
       >
         <Mapbox.StyleImport id="basemap" existing config={shieldModeConfig} />
 
@@ -227,14 +251,14 @@ export const RouteMap = ({
                   'interpolate',
                   ['linear'],
                   ['get', 'riskScore'],
-                  0, '#4CAF50',               // Very safe = green
-                  33, '#4CAF50',
-                  43.5, '#8BC34A',            // Safe = light green
-                  51.8, '#FFEB3B',            // Average = yellow
-                  57.6, '#FF9800',            // Elevated = orange
-                  69, '#FF5722',              // Risky = deep orange
-                  101.8, '#F44336',           // Very risky = red
-                  120, '#000000',             // Extreme = black
+                  0, safetyColors.safe,       // Very safe — safetyColors.safe
+                  33, safetyColors.safe,
+                  43.5, '#8BC34A',            // Safe = light green (gradient intermediate)
+                  51.8, safetyColors.caution,  // Average — safetyColors.caution
+                  57.6, '#FF9800',            // Elevated = orange (gradient intermediate)
+                  69, '#FF5722',              // Risky = deep orange (gradient intermediate)
+                  101.8, safetyColors.danger,  // Very risky — safetyColors.danger
+                  120, brandColors.bgDeep,     // Extreme — brandColors.bgDeep
                 ],
                 lineOpacity: 0.8,
                 lineCap: 'round',
@@ -267,7 +291,7 @@ export const RouteMap = ({
         <HazardLayers
           hazardZoneFeatureCollection={hazardZoneFeatureCollection}
           hazardFeatureCollection={hazardFeatureCollection}
-          onHazardPress={(props) => { setSelectedHazard(props); setSelectedPoi(null); }}
+          onHazardPress={handleHazardPress}
         />
 
         <MarkerLayers
@@ -285,20 +309,22 @@ export const RouteMap = ({
       {selectedHazard ? (
         <Pressable
           style={styles.hazardCardOverlay}
-          onPress={() => setSelectedHazard(null)}
+          onPress={dismissHazard}
+          accessibilityRole="button"
+          accessibilityLabel={`${HAZARD_LABELS[selectedHazard.type] ?? selectedHazard.type}, ${selectedHazard.confirmCount} confirmed, ${selectedHazard.denyCount} denied. Tap to dismiss.`}
         >
           <View style={styles.hazardCard}>
             <View style={styles.hazardCardRow}>
-              <Ionicons name="warning" size={20} color="#FF6B00" />
+              <Ionicons name="warning" size={20} color={safetyColors.caution} />
               <Text style={styles.hazardCardType}>
                 {HAZARD_LABELS[selectedHazard.type] ?? selectedHazard.type}
               </Text>
             </View>
             <View style={styles.hazardCardRow}>
               <Ionicons name="thumbs-up-outline" size={16} color={safetyColors.safe} />
-              <Text style={styles.hazardCardCount}>{selectedHazard.confirmCount}</Text>
+              <Text style={styles.hazardCardCount}>{selectedHazard.confirmCount} confirmed</Text>
               <Ionicons name="thumbs-down-outline" size={16} color={safetyColors.danger} style={{ marginLeft: 12 }} />
-              <Text style={styles.hazardCardCount}>{selectedHazard.denyCount}</Text>
+              <Text style={styles.hazardCardCount}>{selectedHazard.denyCount} denied</Text>
             </View>
           </View>
         </Pressable>
@@ -382,12 +408,12 @@ const styles = StyleSheet.create({
   hazardCardType: {
     fontFamily: fontFamily.body.semiBold,
     fontSize: 15,
-    color: '#FFFFFF',
+    color: brandColors.textPrimary,
   },
   hazardCardCount: {
     fontFamily: fontFamily.mono.bold,
     fontSize: 14,
-    color: '#FFFFFF',
+    color: brandColors.textPrimary,
   },
   hazardCardHint: {
     fontSize: 11,

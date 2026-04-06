@@ -19,8 +19,12 @@ import { useTheme } from '../ThemeContext';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily } from '../tokens/typography';
-import { darkTheme, safetyColors } from '../tokens/colors';
+import { brandColors, darkTheme, safetyColors } from '../tokens/colors';
 import { useHaptics } from '../hooks/useHaptics';
+
+// Pressed-state variants (darker shades of safety colors, not in main token set)
+const DANGER_PRESSED = '#DC2626';
+const SAFE_PRESSED = '#16A34A';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,7 +71,7 @@ const variantStyles: Record<
   },
   secondary: {
     bg: darkTheme.bgSecondary,
-    text: '#FFFFFF',
+    text: brandColors.textPrimary,
     pressedBg: darkTheme.bgTertiary,
   },
   ghost: {
@@ -77,13 +81,13 @@ const variantStyles: Record<
   },
   danger: {
     bg: safetyColors.danger,
-    text: '#FFFFFF',
-    pressedBg: '#DC2626',
+    text: brandColors.textPrimary,
+    pressedBg: DANGER_PRESSED,
   },
   safe: {
     bg: safetyColors.safe,
-    text: '#FFFFFF',
-    pressedBg: '#16A34A',
+    text: brandColors.textPrimary,
+    pressedBg: SAFE_PRESSED,
   },
 };
 

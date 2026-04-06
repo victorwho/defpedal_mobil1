@@ -1,5 +1,7 @@
 import Mapbox from '@rnmapbox/maps';
-import React from 'react';
+import React, { useCallback } from 'react';
+
+import { brandColors, safetyColors } from '../../../design-system/tokens/colors';
 
 type HazardLayersProps = {
   hazardZoneFeatureCollection: any;
@@ -16,14 +18,30 @@ export const HazardLayers = React.memo(({
   hazardZoneFeatureCollection,
   hazardFeatureCollection,
   onHazardPress,
-}: HazardLayersProps) => (
+}: HazardLayersProps) => {
+  const handlePress = useCallback(
+    (event: any) => {
+      const feature = event?.features?.[0];
+      if (feature?.properties && onHazardPress) {
+        onHazardPress({
+          id: feature.properties.id ?? '',
+          type: feature.properties.type ?? 'other',
+          confirmCount: Number(feature.properties.confirmCount ?? 0),
+          denyCount: Number(feature.properties.denyCount ?? 0),
+        });
+      }
+    },
+    [onHazardPress],
+  );
+
+  return (
   <>
     {hazardZoneFeatureCollection.features.length > 0 ? (
       <Mapbox.ShapeSource id="hazard-zones" shape={hazardZoneFeatureCollection}>
         <Mapbox.LineLayer
           id="hazard-zone-base"
           style={{
-            lineColor: '#7F1D1D',
+            lineColor: safetyColors.dangerText, // #991B1B — safetyColors.dangerText
             lineWidth: 7,
             lineOpacity: 0.55,
             lineCap: 'round',
@@ -34,7 +52,7 @@ export const HazardLayers = React.memo(({
         <Mapbox.LineLayer
           id="hazard-zone-stripe"
           style={{
-            lineColor: '#EF4444',
+            lineColor: safetyColors.danger, // #EF4444 — safetyColors.danger
             lineWidth: 5,
             lineDasharray: [1, 2],
             lineOpacity: 0.7,
@@ -50,25 +68,15 @@ export const HazardLayers = React.memo(({
       <Mapbox.ShapeSource
         id="hazards"
         shape={hazardFeatureCollection}
-        onPress={onHazardPress ? (event: any) => {
-          const feature = event?.features?.[0];
-          if (feature?.properties) {
-            onHazardPress({
-              id: feature.properties.id ?? '',
-              type: feature.properties.type ?? 'other',
-              confirmCount: Number(feature.properties.confirmCount ?? 0),
-              denyCount: Number(feature.properties.denyCount ?? 0),
-            });
-          }
-        } : undefined}
-        hitbox={{ width: 30, height: 30 }}
+        onPress={onHazardPress ? handlePress : undefined}
+        hitbox={{ width: 44, height: 44 }}
       >
         <Mapbox.CircleLayer
           id="hazards-bg"
           style={{
-            circleColor: '#FF6B00',
+            circleColor: safetyColors.caution, // safetyColors.caution — hazard marker
             circleRadius: 9,
-            circleStrokeColor: '#FFFFFF',
+            circleStrokeColor: brandColors.textPrimary,
             circleStrokeWidth: 2,
             circleOpacity: 0.9,
             circleEmissiveStrength: 1,
@@ -79,7 +87,7 @@ export const HazardLayers = React.memo(({
           style={{
             textField: '!',
             textSize: 13,
-            textColor: '#FFFFFF',
+            textColor: brandColors.textPrimary,
             textAllowOverlap: true,
             textIgnorePlacement: true,
             textEmissiveStrength: 1,
@@ -88,6 +96,7 @@ export const HazardLayers = React.memo(({
       </Mapbox.ShapeSource>
     ) : null}
   </>
-));
+  );
+});
 
 HazardLayers.displayName = 'HazardLayers';

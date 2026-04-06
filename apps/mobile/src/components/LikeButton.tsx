@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { brandColors, gray } from '../design-system/tokens/colors';
+import { brandColors, gray, safetyColors } from '../design-system/tokens/colors';
 
 type ReactionButtonProps = {
   active: boolean;
@@ -16,8 +16,15 @@ const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionB
     ? (icon === 'thumbs-up' ? 'thumbs-up' : 'heart')
     : (icon === 'thumbs-up' ? 'thumbs-up-outline' : 'heart-outline');
 
+  const label = icon === 'thumbs-up' ? 'Like' : 'Love';
   return (
-    <Pressable style={[styles.button, active && styles.buttonActive]} onPress={onPress}>
+    <Pressable
+      style={[styles.button, active && styles.buttonActive]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${count}`}
+      accessibilityState={{ selected: active }}
+    >
       <Ionicons name={iconName} size={20} color={active ? activeColor : gray[400]} />
       <Text style={[styles.count, active && { color: activeColor }]}>{count}</Text>
     </Pressable>
@@ -52,7 +59,7 @@ export const LoveButton = ({ loved, count, onPress }: LoveButtonProps) => (
     count={count}
     onPress={onPress}
     icon="heart"
-    activeColor="#EF4444"
+    activeColor={safetyColors.danger}
   />
 );
 
@@ -80,7 +87,12 @@ export const ReactionBar = ({
   <View style={styles.bar}>
     <LikeButton liked={likedByMe} count={likeCount} onPress={onLike} />
     <LoveButton loved={lovedByMe} count={loveCount} onPress={onLove} />
-    <Pressable style={styles.button} onPress={onComment}>
+    <Pressable
+      style={styles.button}
+      onPress={onComment}
+      accessibilityRole="button"
+      accessibilityLabel={`Comments, ${commentCount}`}
+    >
       <Ionicons name="chatbubble-outline" size={18} color={gray[400]} />
       <Text style={styles.count}>{commentCount}</Text>
     </Pressable>

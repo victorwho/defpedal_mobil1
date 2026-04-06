@@ -38,7 +38,7 @@ export const PoiCard = React.memo(({ selectedPoi, onDismiss }: PoiCardProps) => 
       <View style={styles.poiCardContent}>
         <View style={styles.poiCardHeader}>
           <Text style={styles.poiCardType}>{selectedPoi.type}</Text>
-          <Pressable onPress={onDismiss} hitSlop={8}>
+          <Pressable onPress={onDismiss} hitSlop={16}>
             <Ionicons name="close" size={12} color={gray[400]} />
           </Pressable>
         </View>

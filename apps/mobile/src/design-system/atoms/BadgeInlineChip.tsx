@@ -26,7 +26,7 @@ const containerStyle: ViewStyle = {
   alignItems: 'center',
   backgroundColor: brandColors.bgSecondary,
   borderRadius: radii.full,
-  height: 32,
+  minHeight: 44,
   paddingVertical: space[1],
   paddingLeft: space[2],
   paddingRight: space[3],
@@ -58,7 +58,11 @@ export const BadgeInlineChip: React.FC<BadgeInlineChipProps> = ({
 
   if (onPress) {
     return (
-      <Pressable onPress={onPress} accessibilityRole="button">
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${name} badge`}
+      >
         {content}
       </Pressable>
     );

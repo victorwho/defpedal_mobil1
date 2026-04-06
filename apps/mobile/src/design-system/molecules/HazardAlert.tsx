@@ -59,10 +59,20 @@ export const HazardAlert = ({
       <View style={styles.promptRow}>
         <Text style={styles.promptText}>{t('hazard.stillThere')}</Text>
         <View style={styles.buttons}>
-          <Pressable style={styles.yesButton} onPress={onConfirm}>
+          <Pressable
+            style={styles.yesButton}
+            onPress={onConfirm}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.yes') + ' — ' + label + ' ' + t('hazard.stillThere')}
+          >
             <Text style={styles.yesText}>{t('common.yes')}</Text>
           </Pressable>
-          <Pressable style={styles.noButton} onPress={onDeny}>
+          <Pressable
+            style={styles.noButton}
+            onPress={onDeny}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.no') + ' — ' + label + ' ' + t('hazard.stillThere')}
+          >
             <Text style={styles.noText}>{t('common.no')}</Text>
           </Pressable>
         </View>
@@ -100,7 +110,7 @@ const styles = StyleSheet.create({
   title: {
     ...textBase,
     fontFamily: fontFamily.heading.bold,
-    color: '#FDD700',
+    color: brandColors.accent,
     fontSize: 15,
   },
   distance: {
@@ -131,7 +141,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: safetyColors.danger,
     paddingHorizontal: space[4],
     paddingVertical: space[2],
     borderRadius: radii.lg,
@@ -141,12 +151,12 @@ const styles = StyleSheet.create({
   yesText: {
     ...textSm,
     fontFamily: fontFamily.heading.bold,
-    color: '#000000',
+    color: brandColors.textInverse,
   },
   noText: {
     ...textSm,
     fontFamily: fontFamily.heading.bold,
-    color: '#FFFFFF',
+    color: brandColors.textPrimary,
   },
   confirmCount: {
     ...textXs,

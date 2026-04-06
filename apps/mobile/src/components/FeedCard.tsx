@@ -3,6 +3,7 @@ import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { brandColors, safetyColors } from '../design-system/tokens/colors';
 import { mobileTheme } from '../lib/theme';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
@@ -60,6 +61,8 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
   const handlePress = useCallback(() => onPress(item.id), [item.id, onPress]);
   const handleLike = useCallback(() => onLike(item.id, item.likedByMe), [item.id, item.likedByMe, onLike]);
   const handleLove = useCallback(() => onLove(item.id, item.lovedByMe ?? false), [item.id, item.lovedByMe, onLove]);
+  const handleUserPress = useCallback(() => onUserPress?.(item.user.id), [item.user.id, onUserPress]);
+  const handleToggleExpanded = useCallback(() => setExpanded((prev) => !prev), []);
 
   return (
     <Pressable style={styles.card} onPress={handlePress}>
@@ -70,7 +73,12 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
         </View>
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
-            <Pressable onPress={onUserPress ? () => onUserPress(item.user.id) : undefined} disabled={!onUserPress}>
+            <Pressable
+              onPress={onUserPress ? handleUserPress : undefined}
+              disabled={!onUserPress}
+              accessibilityRole={onUserPress ? 'button' : undefined}
+              accessibilityLabel={onUserPress ? `View ${item.user.displayName}'s profile` : undefined}
+            >
               <Text style={styles.displayName} numberOfLines={1}>
                 {item.user.displayName}
               </Text>
@@ -124,14 +132,18 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
         {item.co2SavedKg != null && item.co2SavedKg > 0 ? (
           <View style={styles.stat}>
             <Text style={styles.statLabel}>CO2 Saved</Text>
-            <Text style={[styles.statValue, { color: '#4ADE80' }]}>{formatCo2Saved(item.co2SavedKg)}</Text>
+            <Text style={[styles.statValue, { color: safetyColors.safe }]}>{formatCo2Saved(item.co2SavedKg)}</Text>
           </View>
         ) : null}
       </View>
 
       {/* Note */}
       {item.note ? (
-        <Pressable onPress={() => setExpanded(!expanded)}>
+        <Pressable
+          onPress={handleToggleExpanded}
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? 'Collapse note' : 'Expand note'}
+        >
           <Text style={styles.note} numberOfLines={expanded ? undefined : 2}>
             {item.note}
           </Text>
@@ -181,7 +193,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#ffffff',
+    color: brandColors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -215,7 +227,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mapInner: {
-    height: 180,
+    aspectRatio: 16 / 9,
+    maxHeight: 200,
     borderRadius: mobileTheme.radii.md,
   },
   mapPlaceholder: {
@@ -234,7 +247,7 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     borderRadius: 14,
-    backgroundColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: `rgba(17, 24, 39, 0.12)`, // gray[900] (#111827) at 12% opacity
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 2,

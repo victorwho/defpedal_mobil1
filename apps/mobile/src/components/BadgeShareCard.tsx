@@ -5,7 +5,7 @@
  * 320px width, bgDeep background, accent border, centered badge icon.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
 import type { BadgeDefinition } from '@defensivepedal/core';
 
@@ -100,9 +100,11 @@ export const getBadgeShareText = (badge: BadgeDefinition, tier: BadgeTier): stri
   return `I just earned the "${badge.name}" badge (${tierLabel}) on Defensive Pedal! ${badge.flavorText} #DefensivePedal #SaferCycling`;
 };
 
+const CARD_WIDTH = Math.min(320, Dimensions.get('window').width - 32);
+
 const styles = StyleSheet.create({
   card: {
-    width: 320,
+    width: CARD_WIDTH,
     backgroundColor: darkTheme.bgDeep,
     borderRadius: radii['2xl'],
     borderWidth: 2,

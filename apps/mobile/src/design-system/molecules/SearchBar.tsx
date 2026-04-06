@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
@@ -210,7 +210,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             {
               backgroundColor: colors.bgSecondary,
               borderColor: colors.borderDefault,
-              maxHeight: 280,
+              maxHeight: Math.min(280, Dimensions.get('window').height * 0.35),
             },
             shadows.md,
           ]}

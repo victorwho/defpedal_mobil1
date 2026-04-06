@@ -124,7 +124,7 @@ export const ManeuverCard: React.FC<{
       style={[styles.maneuverCard, shadows.lg]}
       accessibilityRole="summary"
       accessibilityLabel={`${description}, in ${distance}`}
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion="assertive"
       accessibilityHint={onPress ? 'Tap to hear instruction again' : undefined}
     >
       <Ionicons name={iconName} size={32} color={darkTheme.accent} />
