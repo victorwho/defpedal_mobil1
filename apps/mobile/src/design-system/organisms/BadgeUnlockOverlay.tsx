@@ -26,6 +26,7 @@ import {
 import { brandColors } from '../tokens/colors';
 import { space } from '../tokens/spacing';
 import { fontFamily, textXl, textSm, textBase, textXs } from '../tokens/typography';
+import { zIndex } from '../tokens/zIndex';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -336,7 +337,7 @@ import { useAppStore } from '../../store/appStore';
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 9999,
+    zIndex: zIndex.supreme,
     alignItems: 'center',
     justifyContent: 'center',
   },

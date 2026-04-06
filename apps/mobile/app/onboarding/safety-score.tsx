@@ -1,12 +1,13 @@
 import type { NeighborhoodSafetyScore } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
-import { brandColors, darkTheme, safetyColors } from '../../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../../src/design-system';
+import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
@@ -41,6 +42,8 @@ const ANIMATION_DURATION_MS = 1500;
 
 export default function OnboardingSafetyScoreScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { location } = useCurrentLocation();
 
   const [scoreData, setScoreData] = useState<NeighborhoodSafetyScore | null>(null);
@@ -163,7 +166,7 @@ export default function OnboardingSafetyScoreScreen() {
       {/* Loading indicator */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={brandColors.accent} size="large" />
+          <ActivityIndicator color={colors.accent} size="large" />
           <Text style={styles.loadingText}>Analyzing your neighborhood...</Text>
         </View>
       ) : null}
@@ -209,7 +212,7 @@ export default function OnboardingSafetyScoreScreen() {
 
             <View style={styles.continueRow}>
               <Text style={styles.tapHint}>Continue</Text>
-              <Ionicons name="chevron-forward" size={16} color={brandColors.accent} />
+              <Ionicons name="chevron-forward" size={16} color={colors.accent} />
             </View>
           </Pressable>
         </Animated.View>
@@ -222,11 +225,12 @@ export default function OnboardingSafetyScoreScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-  },
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
   mapContainer: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -252,7 +256,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...textSm,
-    color: darkTheme.textSecondary,
+    color: colors.textSecondary,
   },
   cardContainer: {
     position: 'absolute',
@@ -264,7 +268,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(31, 41, 55, 0.92)',
     borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
+    borderColor: colors.borderDefault,
     paddingHorizontal: space[4],
     paddingVertical: space[3],
     gap: space[2],
@@ -278,7 +282,7 @@ const styles = StyleSheet.create({
   cardEyebrow: {
     ...textSm,
     fontFamily: fontFamily.heading.extraBold,
-    color: brandColors.accent,
+    color: colors.accent,
   },
   scoreRow: {
     flexDirection: 'row',
@@ -293,7 +297,7 @@ const styles = StyleSheet.create({
   scoreLabel: {
     ...textSm,
     fontFamily: fontFamily.body.medium,
-    color: darkTheme.textSecondary,
+    color: colors.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
@@ -312,12 +316,12 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 9,
-    color: darkTheme.textSecondary,
+    color: colors.textSecondary,
   },
   statDivider: {
     width: 1,
     height: 14,
-    backgroundColor: darkTheme.borderDefault,
+    backgroundColor: colors.borderDefault,
   },
   continueRow: {
     flexDirection: 'row',
@@ -328,7 +332,7 @@ const styles = StyleSheet.create({
   tapHint: {
     ...textSm,
     fontFamily: fontFamily.body.semiBold,
-    color: brandColors.accent,
+    color: colors.accent,
     paddingTop: space[2],
   },
 });

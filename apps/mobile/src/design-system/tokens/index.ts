@@ -11,3 +11,6 @@ export { space, layout } from './spacing';
 export { radii } from './radii';
 export { shadows, safetyGlows } from './shadows';
 export { duration, easing } from './motion';
+export { tints, opacity, brandTints, safetyTints, surfaceTints } from './tints';
+export { iconSize } from './iconSize';
+export { zIndex } from './zIndex';

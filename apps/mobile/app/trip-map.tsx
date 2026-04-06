@@ -6,7 +6,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../src/components/map';
 import { BackButton } from '../src/design-system/atoms/BackButton';
-import { brandColors, gray } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
@@ -17,6 +18,8 @@ export default function TripMapScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
   const { location: coordinate, refreshLocation } = useCurrentLocation();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
 
   const { data: trips } = useQuery({
     queryKey: ['trip-history'],
@@ -83,45 +86,46 @@ export default function TripMapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: brandColors.bgDeep,
-  },
-  mapContainer: {
-    flex: 1,
-  },
-  bottomLeft: {
-    position: 'absolute',
-    left: space[4],
-  },
-  recenterButton: {
-    position: 'absolute',
-    right: space[4],
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  badgeContainer: {
-    position: 'absolute',
-    right: space[4],
-  },
-  badge: {
-    ...textSm,
-    fontFamily: fontFamily.body.bold,
-    color: brandColors.textPrimary,
-    backgroundColor: 'rgba(17, 24, 39, 0.8)',
-    paddingHorizontal: space[3],
-    paddingVertical: space[1],
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    mapContainer: {
+      flex: 1,
+    },
+    bottomLeft: {
+      position: 'absolute',
+      left: space[4],
+    },
+    recenterButton: {
+      position: 'absolute',
+      right: space[4],
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+    },
+    badgeContainer: {
+      position: 'absolute',
+      right: space[4],
+    },
+    badge: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.textPrimary,
+      backgroundColor: 'rgba(17, 24, 39, 0.8)',
+      paddingHorizontal: space[3],
+      paddingVertical: space[1],
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
+  });

@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { CommunityStatsCard } from '../src/design-system/organisms/CommunityStatsCard';
 import { Button } from '../src/design-system/atoms/Button';
-import { brandColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { fontFamily, textBase } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { useCommunityStats } from '../src/hooks/useCommunityStats';
@@ -14,6 +15,8 @@ import { useT } from '../src/hooks/useTranslation';
 
 export default function CommunityScreen() {
   const t = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { stats, isLoading, error } = useCommunityStats();
 
   return (
@@ -41,25 +44,26 @@ export default function CommunityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  content: { flex: 1 },
-  placeholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: space[10],
-    gap: space[4],
-  },
-  placeholderText: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 18,
-  },
-  placeholderSub: {
-    ...textBase,
-    color: brandColors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: space[6],
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    content: { flex: 1 },
+    placeholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: space[10],
+      gap: space[4],
+    },
+    placeholderText: {
+      ...textBase,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      fontSize: 18,
+    },
+    placeholderSub: {
+      ...textBase,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      paddingHorizontal: space[6],
+    },
+  });

@@ -13,6 +13,7 @@ import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
 import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
+import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 
 // Keep splash screen visible while fonts load
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    zIndex: 20,
+    zIndex: zIndex.popover,
     borderRadius: 12,
     backgroundColor: 'rgba(11, 16, 32, 0.94)',
     paddingHorizontal: 10,

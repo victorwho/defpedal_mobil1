@@ -5,6 +5,7 @@ import { brandColors, gray } from '../../../design-system/tokens/colors';
 import { radii } from '../../../design-system/tokens/radii';
 import { space } from '../../../design-system/tokens/spacing';
 import { fontFamily } from '../../../design-system/tokens/typography';
+import { zIndex } from '../../../design-system/tokens/zIndex';
 import type { SelectedPoiState } from '../types';
 import { MAKI_TO_TYPE } from '../constants';
 
@@ -109,7 +110,7 @@ export const usePoiCardHandler = (
 const styles = StyleSheet.create({
   poiCard: {
     position: 'absolute',
-    zIndex: 25,
+    zIndex: zIndex.popover,
   },
   poiCardContent: {
     backgroundColor: 'rgba(11, 16, 32, 0.93)',

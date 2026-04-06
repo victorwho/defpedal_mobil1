@@ -24,3 +24,9 @@ export type { DividerProps } from './Divider';
 
 export { Skeleton } from './Skeleton';
 export type { SkeletonProps } from './Skeleton';
+
+export { Card } from './Card';
+export type { CardProps } from './Card';
+
+export { SectionTitle } from './SectionTitle';
+export type { SectionTitleProps } from './SectionTitle';

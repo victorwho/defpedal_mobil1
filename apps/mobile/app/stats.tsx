@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -5,11 +6,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../src/components/Screen';
 import { StatsDashboard } from '../src/components/StatsDashboard';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { brandColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { space } from '../src/design-system/tokens/spacing';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function StatsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
+
   return (
     <View style={styles.root}>
       <View style={styles.content}>
@@ -19,7 +23,7 @@ export default function StatsScreen() {
           subtitle="Your riding insights"
           aside={
             <Pressable onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back" size={20} color={brandColors.textSecondary} />
+              <Ionicons name="arrow-back" size={20} color={colors.textSecondary} />
             </Pressable>
           }
         >
@@ -31,10 +35,11 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  content: { flex: 1 },
-  backButton: {
-    padding: space[2],
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    content: { flex: 1 },
+    backButton: {
+      padding: space[2],
+    },
+  });

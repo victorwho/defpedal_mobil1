@@ -1,6 +1,7 @@
 import type { ImpactDashboard } from '@defensivepedal/core';
 import { formatCo2Saved, calculateEquivalentTreeDays, formatMicrolivesAsTime } from '@defensivepedal/core';
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
@@ -8,13 +9,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Screen } from '../src/components/Screen';
 import { StatsDashboard } from '../src/components/StatsDashboard';
 import { Button } from '../src/design-system/atoms/Button';
+import { Card } from '../src/design-system/atoms/Card';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
-import { brandColors, darkTheme, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
+import { safetyTints } from '../src/design-system/tokens/tints';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
@@ -26,6 +29,8 @@ import { useT } from '../src/hooks/useTranslation';
 
 export default function HistoryScreen() {
   const { user } = useAuthSession();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -45,7 +50,7 @@ export default function HistoryScreen() {
 
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bgDeep }]}>
       <View style={styles.content}>
         <Screen title={t('history.title')} eyebrow={t('history.eyebrow')} subtitle={t('history.subtitle')}>
 
@@ -53,16 +58,16 @@ export default function HistoryScreen() {
           {user ? (
             <View style={styles.impactCard}>
               <View style={styles.impactHeader}>
-                <Ionicons name="leaf-outline" size={20} color={safetyColors.safe} />
+                <Ionicons name="leaf-outline" size={20} color={colors.safe} />
                 <Text style={styles.impactTitle}>{t('history.yourImpact')}</Text>
               </View>
               {statsLoading ? (
-                <ActivityIndicator size="small" color={safetyColors.safe} />
+                <ActivityIndicator size="small" color={colors.safe} />
               ) : stats ? (
                 <>
                 {dashboard ? (
                   <View style={styles.microlivesRow}>
-                    <Ionicons name="heart" size={16} color="#F2C30F" />
+                    <Ionicons name="heart" size={16} color={colors.accent} />
                     <Text style={styles.microlivesValue}>
                       +{formatMicrolivesAsTime(dashboard.totalMicrolives)}
                     </Text>
@@ -81,7 +86,7 @@ export default function HistoryScreen() {
                     <Text style={styles.impactLabel}>{t('history.cycled')}</Text>
                   </View>
                   <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: safetyColors.safe }]}>
+                    <Text style={[styles.impactValue, { color: colors.safe }]}>
                       {formatCo2Saved(stats.totalCo2SavedKg)}
                     </Text>
                     <Text style={styles.impactLabel}>{t('history.co2Saved')}</Text>
@@ -89,19 +94,19 @@ export default function HistoryScreen() {
                 </View>
                 <View style={styles.impactRow}>
                   <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: brandColors.accent }]}>
+                    <Text style={[styles.impactValue, { color: colors.accent }]}>
                       {stats ? `€${(stats.totalDistanceMeters / 1000 * 0.35).toFixed(0)}` : '—'}
                     </Text>
                     <Text style={styles.impactLabel}>{t('history.eurSaved')}</Text>
                   </View>
                   <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: '#60A5FA' }]}>
+                    <Text style={[styles.impactValue, { color: colors.info }]}>
                       {dashboard ? `${Math.round(dashboard.totalCommunitySeconds)}s` : '—'}
                     </Text>
                     <Text style={styles.impactLabel}>{t('microlives.donatedToCity')}</Text>
                   </View>
                   <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: safetyColors.caution }]}>
+                    <Text style={[styles.impactValue, { color: colors.caution }]}>
                       {dashboard ? String(dashboard.totalHazardsReported) : '—'}
                     </Text>
                     <Text style={styles.impactLabel}>{t('history.hazards')}</Text>
@@ -121,7 +126,7 @@ export default function HistoryScreen() {
           {dashboard ? (
             <StreakCard streakState={dashboard.streak} />
           ) : dashboardLoading && user ? (
-            <ActivityIndicator size="small" color={brandColors.accent} style={{ paddingVertical: space[3] }} />
+            <ActivityIndicator size="small" color={colors.accent} style={{ paddingVertical: space[3] }} />
           ) : null}
 
           {/* 3. Stats Dashboard (Week / Month / All Time, Ride Frequency, Mode Split) */}
@@ -131,13 +136,13 @@ export default function HistoryScreen() {
           {user ? (
             <Pressable style={styles.quizCard} onPress={() => router.push('/daily-quiz')}>
               <View style={styles.quizCardLeft}>
-                <Ionicons name="help-circle-outline" size={22} color={brandColors.accent} />
+                <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
                 <View>
                   <Text style={styles.quizCardTitle}>{t('history.dailyQuiz')}</Text>
                   <Text style={styles.quizCardSubtitle}>{t('history.dailyQuizSub')}</Text>
                 </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={darkTheme.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </Pressable>
           ) : null}
 
@@ -154,121 +159,105 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  content: { flex: 1 },
-  impactCard: {
-    padding: space[4],
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: 'rgba(74, 222, 128, 0.2)',
-    backgroundColor: 'rgba(74, 222, 128, 0.05)',
-    gap: space[3],
-  },
-  impactHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  impactTitle: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: safetyColors.safe,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  microlivesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    paddingBottom: space[2],
-    marginBottom: space[2],
-    borderBottomWidth: 1,
-    borderBottomColor: brandColors.borderDefault,
-  },
-  microlivesValue: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: '#F2C30F',
-  },
-  microlivesLabel: {
-    ...textXs,
-    color: darkTheme.textMuted,
-  },
-  impactRow: {
-    flexDirection: 'row',
-    gap: space[3],
-  },
-  impactStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  impactValue: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 18,
-  },
-  impactLabel: {
-    ...textXs,
-    color: brandColors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  impactTreeNote: {
-    ...textXs,
-    color: brandColors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  card: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[4],
-    gap: space[3],
-    ...shadows.md,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  cardHeaderText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: darkTheme.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  quizCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[4],
-    ...shadows.md,
-  },
-  quizCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  quizCardTitle: {
-    ...textSm,
-    fontFamily: fontFamily.body.semiBold,
-    color: darkTheme.textPrimary,
-  },
-  quizCardSubtitle: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-  },
-  section: {
-    paddingVertical: space[2],
-  },
-});
+// ---------------------------------------------------------------------------
+// Themed style factory — colors come from useTheme(), layout stays static
+// ---------------------------------------------------------------------------
+
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1 },
+    content: { flex: 1 },
+    impactCard: {
+      padding: space[4],
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: safetyTints.safeBorder,
+      backgroundColor: safetyTints.safeSubtle,
+      gap: space[3],
+    },
+    impactHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    impactTitle: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.safe,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+    },
+    microlivesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingBottom: space[2],
+      marginBottom: space[2],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderDefault,
+    },
+    microlivesValue: {
+      ...textBase,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.accent,
+    },
+    microlivesLabel: {
+      ...textXs,
+      color: colors.textMuted,
+    },
+    impactRow: {
+      flexDirection: 'row',
+      gap: space[3],
+    },
+    impactStat: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 2,
+    },
+    impactValue: {
+      ...textBase,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      fontSize: 18,
+    },
+    impactLabel: {
+      ...textXs,
+      color: colors.textSecondary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+    },
+    impactTreeNote: {
+      ...textXs,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      fontStyle: 'italic',
+    },
+    quizCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[4],
+      ...shadows.md,
+    },
+    quizCardLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    quizCardTitle: {
+      ...textSm,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textPrimary,
+    },
+    quizCardSubtitle: {
+      ...textXs,
+      color: colors.textSecondary,
+    },
+    section: {
+      paddingVertical: space[2],
+    },
+  });

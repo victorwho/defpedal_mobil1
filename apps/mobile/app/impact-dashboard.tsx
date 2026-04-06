@@ -1,6 +1,7 @@
 import type { ImpactDashboard } from '@defensivepedal/core';
 import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -19,7 +20,7 @@ import { BadgeIcon } from '../src/design-system/atoms/BadgeIcon';
 import { BackButton } from '../src/design-system/atoms/BackButton';
 import { Button } from '../src/design-system/atoms/Button';
 import { useBadges } from '../src/hooks/useBadges';
-import { brandColors, darkTheme, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
@@ -34,6 +35,7 @@ import {
 } from '../src/design-system/tokens/typography';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
 import { mobileApi } from '../src/lib/api';
+import { brandTints } from '../src/design-system/tokens/tints';
 
 // ---------------------------------------------------------------------------
 // Stat tile (reused pattern from CommunityStatsCard)
@@ -43,9 +45,10 @@ type StatTileProps = {
   readonly value: string;
   readonly unit: string;
   readonly label: string;
+  readonly styles: ReturnType<typeof createThemedStyles>;
 };
 
-const StatTile = ({ value, unit, label }: StatTileProps) => (
+const StatTile = ({ value, unit, label, styles }: StatTileProps) => (
   <View style={styles.statTile}>
     <View style={styles.statTileValueRow}>
       <Text style={styles.statTileValue}>{value}</Text>
@@ -69,7 +72,7 @@ const TIER_FROM_LEVEL: Record<number, 'bronze' | 'silver' | 'gold' | 'platinum' 
   1: 'bronze', 2: 'silver', 3: 'gold', 4: 'platinum', 5: 'diamond',
 };
 
-const RecentBadgesSection = () => {
+const RecentBadgesSection = ({ styles }: { readonly styles: ReturnType<typeof createThemedStyles> }) => {
   const { data } = useBadges();
   if (!data || data.earned.length === 0) return null;
 
@@ -112,6 +115,8 @@ const DASHBOARD_KEY = 'impact-dashboard';
 
 export default function ImpactDashboardScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery<ImpactDashboard>({
@@ -134,7 +139,7 @@ export default function ImpactDashboardScreen() {
       {/* Loading */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={brandColors.accent} size="large" />
+          <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -151,8 +156,8 @@ export default function ImpactDashboardScreen() {
             <RefreshControl
               refreshing={isRefetching}
               onRefresh={() => void refetch()}
-              tintColor={brandColors.accent}
-              colors={[brandColors.accent]}
+              tintColor={colors.accent}
+              colors={[colors.accent]}
             />
           }
         >
@@ -166,7 +171,7 @@ export default function ImpactDashboardScreen() {
                   suffix=" ML"
                   decimals={1}
                   duration={1500}
-                  style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: '#F2C30F' }}
+                  style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.accent }}
                 />
                 <Text style={styles.counterLabel}>
                   +{formatMicrolivesAsTime(data.totalMicrolives)} of life earned
@@ -178,7 +183,7 @@ export default function ImpactDashboardScreen() {
                     suffix=" sec"
                     decimals={0}
                     duration={1500}
-                    style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: '#60A5FA' }}
+                    style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.info }}
                   />
                   <Text style={styles.counterLabel}>
                     {formatCommunitySeconds(data.totalCommunitySeconds)} donated to your city
@@ -191,7 +196,7 @@ export default function ImpactDashboardScreen() {
           <StreakCard streakState={data.streak} />
 
           {/* 1.5 Recent Badges */}
-          <RecentBadgesSection />
+          <RecentBadgesSection styles={styles} />
 
           {/* 2. Big counters */}
           <View style={styles.card}>
@@ -203,7 +208,7 @@ export default function ImpactDashboardScreen() {
                 suffix=" kg"
                 decimals={1}
                 duration={1500}
-                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: safetyColors.safe }}
+                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.safe }}
               />
               <Text style={styles.counterLabel}>CO2 saved</Text>
               <Text style={styles.counterSubtext}>
@@ -217,7 +222,7 @@ export default function ImpactDashboardScreen() {
                 prefix="EUR "
                 decimals={0}
                 duration={1500}
-                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: brandColors.accent }}
+                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.accent }}
               />
               <Text style={styles.counterLabel}>Money saved</Text>
             </View>
@@ -227,7 +232,7 @@ export default function ImpactDashboardScreen() {
                 targetValue={data.totalRidersProtected}
                 decimals={0}
                 duration={1500}
-                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: safetyColors.info }}
+                style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.info }}
               />
               <Text style={styles.counterLabel}>Riders protected</Text>
               <Text style={styles.counterSubtext}>
@@ -244,21 +249,25 @@ export default function ImpactDashboardScreen() {
                 value={String(data.thisWeek.rides)}
                 unit="rides"
                 label="Completed"
+                styles={styles}
               />
               <StatTile
                 value={data.thisWeek.co2SavedKg.toFixed(1)}
                 unit="kg"
                 label="CO2 saved"
+                styles={styles}
               />
               <StatTile
                 value={data.thisWeek.moneySavedEur.toFixed(0)}
                 unit="EUR"
                 label="Saved"
+                styles={styles}
               />
               <StatTile
                 value={String(data.thisWeek.hazardsReported)}
                 unit=""
                 label="Hazards reported"
+                styles={styles}
               />
             </View>
           </View>
@@ -271,13 +280,13 @@ export default function ImpactDashboardScreen() {
             accessibilityLabel="Take today's daily quiz"
           >
             <View style={styles.quizIconWrap}>
-              <Ionicons name="school-outline" size={24} color={brandColors.accent} />
+              <Ionicons name="school-outline" size={24} color={colors.accent} />
             </View>
             <View style={styles.quizTextCol}>
               <Text style={styles.quizTitle}>Daily Safety Quiz</Text>
               <Text style={styles.quizSubtext}>Answer to maintain your streak</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={darkTheme.textMuted} />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Pressable>
         </ScrollView>
       ) : null}
@@ -289,180 +298,181 @@ export default function ImpactDashboardScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[4],
-    paddingHorizontal: space[5],
-  },
-  errorText: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-  },
-  scrollContent: {
-    paddingHorizontal: space[5],
-    gap: space[4],
-    paddingTop: space[2],
-  },
-  // Cards
-  card: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[5],
-    gap: space[4],
-    ...shadows.md,
-  },
-  cardHeader: {
-    ...textSm,
-    fontFamily: fontFamily.heading.semiBold,
-    color: darkTheme.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 11,
-  },
-  // Counters
-  counterBlock: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  counterLabel: {
-    ...textBase,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textSecondary,
-  },
-  counterSubtext: {
-    ...textXs,
-    color: darkTheme.textMuted,
-    fontStyle: 'italic',
-    textAlign: 'center',
-  },
-  // This week grid
-  weekGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-  },
-  statTile: {
-    flex: 1,
-    minWidth: '45%' as unknown as number,
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.lg,
-    paddingHorizontal: space[3],
-    paddingVertical: space[2],
-    gap: 2,
-  },
-  statTileValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  statTileValue: {
-    ...textDataMd,
-    fontFamily: fontFamily.mono.bold,
-    color: darkTheme.textPrimary,
-  },
-  statTileUnit: {
-    ...textXs,
-    fontFamily: fontFamily.mono.medium,
-    color: darkTheme.textMuted,
-  },
-  statTileLabel: {
-    ...textXs,
-    fontFamily: fontFamily.body.regular,
-    color: darkTheme.textSecondary,
-  },
-  // Recent badges
-  recentBadgesRow: {
-    flexDirection: 'row',
-    gap: space[3],
-    paddingVertical: space[1],
-  },
-  recentBadgeItem: {
-    alignItems: 'center',
-    width: 80,
-    gap: 4,
-  },
-  recentBadgeName: {
-    ...textXs,
-    fontFamily: fontFamily.body.semiBold,
-    color: darkTheme.textPrimary,
-    textAlign: 'center',
-  },
-  viewAllBadgesLink: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.accent,
-    textAlign: 'right',
-  },
-  // Quiz card
-  quizCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[4],
-    ...shadows.md,
-  },
-  quizCardPressed: {
-    backgroundColor: darkTheme.bgSecondary,
-    borderColor: brandColors.accent,
-  },
-  quizIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.lg,
-    backgroundColor: 'rgba(250, 204, 21, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quizTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  quizTitle: {
-    ...textSm,
-    fontFamily: fontFamily.body.semiBold,
-    color: darkTheme.textPrimary,
-    fontSize: 15,
-  },
-  quizSubtext: {
-    ...textXs,
-    color: darkTheme.textMuted,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    errorContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[4],
+      paddingHorizontal: space[5],
+    },
+    errorText: {
+      ...textBase,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    scrollContent: {
+      paddingHorizontal: space[5],
+      gap: space[4],
+      paddingTop: space[2],
+    },
+    // Cards
+    card: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii['2xl'],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[5],
+      gap: space[4],
+      ...shadows.md,
+    },
+    cardHeader: {
+      ...textSm,
+      fontFamily: fontFamily.heading.semiBold,
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      fontSize: 11,
+    },
+    // Counters
+    counterBlock: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    counterLabel: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textSecondary,
+    },
+    counterSubtext: {
+      ...textXs,
+      color: colors.textMuted,
+      fontStyle: 'italic',
+      textAlign: 'center',
+    },
+    // This week grid
+    weekGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: space[2],
+    },
+    statTile: {
+      flex: 1,
+      minWidth: '45%' as unknown as number,
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.lg,
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      gap: 2,
+    },
+    statTileValueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 4,
+    },
+    statTileValue: {
+      ...textDataMd,
+      fontFamily: fontFamily.mono.bold,
+      color: colors.textPrimary,
+    },
+    statTileUnit: {
+      ...textXs,
+      fontFamily: fontFamily.mono.medium,
+      color: colors.textMuted,
+    },
+    statTileLabel: {
+      ...textXs,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textSecondary,
+    },
+    // Recent badges
+    recentBadgesRow: {
+      flexDirection: 'row',
+      gap: space[3],
+      paddingVertical: space[1],
+    },
+    recentBadgeItem: {
+      alignItems: 'center',
+      width: 80,
+      gap: 4,
+    },
+    recentBadgeName: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    viewAllBadgesLink: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.accent,
+      textAlign: 'right',
+    },
+    // Quiz card
+    quizCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[4],
+      ...shadows.md,
+    },
+    quizCardPressed: {
+      backgroundColor: colors.bgSecondary,
+      borderColor: colors.accent,
+    },
+    quizIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: radii.lg,
+      backgroundColor: brandTints.accentLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quizTextCol: {
+      flex: 1,
+      gap: 2,
+    },
+    quizTitle: {
+      ...textSm,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textPrimary,
+      fontSize: 15,
+    },
+    quizSubtext: {
+      ...textXs,
+      color: colors.textMuted,
+    },
+  });

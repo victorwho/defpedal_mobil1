@@ -1,15 +1,17 @@
 import type { Coordinate, RoutePreviewResponse } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
 import { Button } from '../../src/design-system/atoms';
-import { brandColors, darkTheme, safetyColors } from '../../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../../src/design-system';
+import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
+import { zIndex } from '../../src/design-system/tokens/zIndex';
 import { space } from '../../src/design-system/tokens/spacing';
 import {
   fontFamily,
@@ -92,32 +94,13 @@ const computeSafetyScore = (
 };
 
 // ---------------------------------------------------------------------------
-// Impact tile
-// ---------------------------------------------------------------------------
-
-type ImpactTileProps = {
-  readonly value: string;
-  readonly unit: string;
-  readonly label: string;
-  readonly color: string;
-};
-
-const ImpactTile = ({ value, unit, label, color }: ImpactTileProps) => (
-  <View style={styles.impactTile}>
-    <View style={styles.impactValueRow}>
-      <Text style={[styles.impactValue, { color }]}>{value}</Text>
-      <Text style={styles.impactUnit}>{unit}</Text>
-    </View>
-    <Text style={styles.impactLabel}>{label}</Text>
-  </View>
-);
-
-// ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export default function OnboardingFirstRouteScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { location } = useCurrentLocation();
   const cyclingGoal = useAppStore((s) => s.cyclingGoal);
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
@@ -224,12 +207,22 @@ export default function OnboardingFirstRouteScreen() {
 
   const scoreColor = safetyScore != null
     ? safetyScore >= 70 ? safetyColors.safe : safetyScore >= 40 ? safetyColors.caution : safetyColors.danger
-    : darkTheme.textSecondary;
+    : colors.textSecondary;
+
+  const ImpactTile = ({ value, unit, label, color }: { readonly value: string; readonly unit: string; readonly label: string; readonly color: string }) => (
+    <View style={styles.impactTile}>
+      <View style={styles.impactValueRow}>
+        <Text style={[styles.impactValue, { color }]}>{value}</Text>
+        <Text style={styles.impactUnit}>{unit}</Text>
+      </View>
+      <Text style={styles.impactLabel}>{label}</Text>
+    </View>
+  );
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-        <Ionicons name="chevron-back" size={24} color={darkTheme.textPrimary} />
+        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
       </Pressable>
 
       <View style={styles.headerSection}>
@@ -248,7 +241,7 @@ export default function OnboardingFirstRouteScreen() {
       <View style={styles.mapArea}>
         {isLoading ? (
           <View style={styles.mapLoadingOverlay}>
-            <ActivityIndicator color={brandColors.accent} size="large" />
+            <ActivityIndicator color={colors.accent} size="large" />
             <Text style={styles.mapLoadingText}>Finding a safe route nearby...</Text>
           </View>
         ) : null}
@@ -298,7 +291,7 @@ export default function OnboardingFirstRouteScreen() {
       {/* Impact counters */}
       <View style={styles.impactRow}>
         <ImpactTile value={String(co2Kg)} unit="kg" label="CO2 saved" color={safetyColors.safe} />
-        <ImpactTile value={String(moneyEur)} unit="EUR" label="Money saved" color={brandColors.accent} />
+        <ImpactTile value={String(moneyEur)} unit="EUR" label="Money saved" color={colors.accent} />
         <ImpactTile
           value={selectedRoute ? String(selectedRoute.riskSegments.filter((s) => s.riskScore >= 60).length) : '—'}
           unit=""
@@ -321,140 +314,141 @@ export default function OnboardingFirstRouteScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-    paddingHorizontal: space[5],
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  headerSection: {
-    gap: space[2],
-  },
-  eyebrow: {
-    ...textXs,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: brandColors.accent,
-  },
-  title: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    lineHeight: 22,
-  },
-  mapArea: {
-    flex: 1,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    overflow: 'hidden',
-    marginVertical: space[3],
-    backgroundColor: '#0d1a2d',
-  },
-  mapLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(17, 24, 39, 0.7)',
-    gap: space[2],
-  },
-  mapLoadingText: {
-    ...textSm,
-    color: darkTheme.textSecondary,
-  },
-  mapFallback: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: space[4],
-  },
-  mapFallbackText: {
-    ...textSm,
-    color: darkTheme.textMuted,
-    textAlign: 'center',
-  },
-  routeCard: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[4],
-    ...shadows.md,
-  },
-  routeStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeStat: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  routeStatValue: {
-    ...textDataMd,
-    fontFamily: fontFamily.mono.bold,
-    color: darkTheme.textPrimary,
-  },
-  routeStatLabel: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-  },
-  routeStatDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: darkTheme.borderDefault,
-  },
-  impactRow: {
-    flexDirection: 'row',
-    gap: space[2],
-    paddingTop: space[3],
-  },
-  impactTile: {
-    flex: 1,
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.lg,
-    paddingHorizontal: space[2],
-    paddingVertical: space[2],
-    alignItems: 'center',
-    gap: 2,
-  },
-  impactValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  impactValue: {
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 18,
-    lineHeight: 22,
-  },
-  impactUnit: {
-    ...textXs,
-    fontFamily: fontFamily.mono.medium,
-    color: darkTheme.textMuted,
-  },
-  impactLabel: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-  },
-  footer: {
-    gap: space[2],
-    alignItems: 'center',
-    paddingTop: space[3],
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+      paddingHorizontal: space[5],
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'flex-start',
+    },
+    headerSection: {
+      gap: space[2],
+    },
+    eyebrow: {
+      ...textXs,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.4,
+      color: colors.accent,
+    },
+    title: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      ...textBase,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+    mapArea: {
+      flex: 1,
+      borderRadius: radii['2xl'],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      overflow: 'hidden',
+      marginVertical: space[3],
+      backgroundColor: '#0d1a2d',
+    },
+    mapLoadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: zIndex.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(17, 24, 39, 0.7)',
+      gap: space[2],
+    },
+    mapLoadingText: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+    mapFallback: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: space[4],
+    },
+    mapFallbackText: {
+      ...textSm,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    routeCard: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[4],
+      ...shadows.md,
+    },
+    routeStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    routeStat: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 2,
+    },
+    routeStatValue: {
+      ...textDataMd,
+      fontFamily: fontFamily.mono.bold,
+      color: colors.textPrimary,
+    },
+    routeStatLabel: {
+      ...textXs,
+      color: colors.textSecondary,
+    },
+    routeStatDivider: {
+      width: 1,
+      height: 28,
+      backgroundColor: colors.borderDefault,
+    },
+    impactRow: {
+      flexDirection: 'row',
+      gap: space[2],
+      paddingTop: space[3],
+    },
+    impactTile: {
+      flex: 1,
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.lg,
+      paddingHorizontal: space[2],
+      paddingVertical: space[2],
+      alignItems: 'center',
+      gap: 2,
+    },
+    impactValueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 3,
+    },
+    impactValue: {
+      fontFamily: fontFamily.mono.bold,
+      fontSize: 18,
+      lineHeight: 22,
+    },
+    impactUnit: {
+      ...textXs,
+      fontFamily: fontFamily.mono.medium,
+      color: colors.textMuted,
+    },
+    impactLabel: {
+      ...textXs,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    footer: {
+      gap: space[2],
+      alignItems: 'center',
+      paddingTop: space[3],
+    },
+  });

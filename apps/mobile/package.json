@@ -42,7 +42,12 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
     "@types/react": "^19.2.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^29.0.1",
+    "react-native-web": "^0.21.2",
+    "react-test-renderer": "^19.2.1",
     "typescript": "~5.8.2"
   }
 }

@@ -15,3 +15,6 @@ export type { MenuItemProps } from './MenuItem';
 
 export { Toast } from './Toast';
 export type { ToastProps } from './Toast';
+
+export { SettingRow } from './SettingRow';
+export type { SettingRowProps } from './SettingRow';

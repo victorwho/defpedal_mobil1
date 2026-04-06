@@ -15,7 +15,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { RouteMap } from '../src/components/map';
 import { BackButton } from '../src/design-system/atoms/BackButton';
 import { Button } from '../src/design-system/atoms/Button';
-import { brandColors, gray, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
+import { surfaceTints } from '../src/design-system/tokens/tints';
 import { fontFamily, textBase, textSm, textXl, textXs, text2xl } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -48,23 +50,26 @@ const formatDate = (iso: string) => {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+type ThemedStyles = ReturnType<typeof createThemedStyles>;
+
 type StatRowProps = {
   label: string;
   value1: string;
   value2: string;
   highlight?: 1 | 2 | null;
+  ss: ThemedStyles;
 };
 
-const StatRow = ({ label, value1, value2, highlight }: StatRowProps) => (
-  <View style={statStyles.row}>
-    <View style={statStyles.cell}>
-      <Text style={[statStyles.value, highlight === 1 && statStyles.valueBetter]}>{value1}</Text>
+const StatRow = ({ label, value1, value2, highlight, ss }: StatRowProps) => (
+  <View style={ss.statRow}>
+    <View style={ss.statCell}>
+      <Text style={[ss.statValue, highlight === 1 && ss.statValueBetter]}>{value1}</Text>
     </View>
-    <View style={statStyles.labelCell}>
-      <Text style={statStyles.label}>{label}</Text>
+    <View style={ss.statLabelCell}>
+      <Text style={ss.statLabel}>{label}</Text>
     </View>
-    <View style={statStyles.cell}>
-      <Text style={[statStyles.value, highlight === 2 && statStyles.valueBetter]}>{value2}</Text>
+    <View style={ss.statCell}>
+      <Text style={[ss.statValue, highlight === 2 && ss.statValueBetter]}>{value2}</Text>
     </View>
   </View>
 );
@@ -74,6 +79,8 @@ export default function TripCompareScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
   const t = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
 
   const { data: trips } = useQuery({
     queryKey: ['trip-history'],
@@ -138,43 +145,48 @@ export default function TripCompareScreen() {
         {/* Stats comparison table */}
         <View style={[styles.card, shadows.md]}>
           {/* Column headers */}
-          <View style={statStyles.row}>
-            <View style={statStyles.cell}>
-              <Text style={statStyles.headerText}>{t('compare.trip1')}</Text>
-              <Text style={statStyles.dateText}>{formatDate(tripA.startedAt)}</Text>
+          <View style={styles.statRow}>
+            <View style={styles.statCell}>
+              <Text style={styles.statHeaderText}>{t('compare.trip1')}</Text>
+              <Text style={styles.statDateText}>{formatDate(tripA.startedAt)}</Text>
             </View>
-            <View style={statStyles.labelCell} />
-            <View style={statStyles.cell}>
-              <Text style={statStyles.headerText}>{t('compare.trip2')}</Text>
-              <Text style={statStyles.dateText}>{formatDate(tripB.startedAt)}</Text>
+            <View style={styles.statLabelCell} />
+            <View style={styles.statCell}>
+              <Text style={styles.statHeaderText}>{t('compare.trip2')}</Text>
+              <Text style={styles.statDateText}>{formatDate(tripB.startedAt)}</Text>
             </View>
           </View>
 
-          <View style={statStyles.divider} />
+          <View style={styles.statDivider} />
 
           <StatRow
+            ss={styles}
             label={t('compare.distance')}
             value1={formatDistance(Math.round(metricsA.distanceMeters))}
             value2={formatDistance(Math.round(metricsB.distanceMeters))}
             highlight={longerTrip}
           />
           <StatRow
+            ss={styles}
             label={t('compare.duration')}
             value1={formatDuration(Math.round(metricsA.durationSeconds))}
             value2={formatDuration(Math.round(metricsB.durationSeconds))}
           />
           <StatRow
+            ss={styles}
             label={t('compare.avgSpeed')}
             value1={formatSpeed(metricsA.avgSpeedMps) ?? '—'}
             value2={formatSpeed(metricsB.avgSpeedMps) ?? '—'}
             highlight={fasterTrip}
           />
           <StatRow
+            ss={styles}
             label={t('compare.co2Saved')}
             value1={`${metricsA.co2Kg.toFixed(2)} kg`}
             value2={`${metricsB.co2Kg.toFixed(2)} kg`}
           />
           <StatRow
+            ss={styles}
             label={t('compare.mode')}
             value1={tripA.routingMode === 'safe' ? t('planning.safe') : t('planning.fast')}
             value2={tripB.routingMode === 'safe' ? t('planning.safe') : t('planning.fast')}
@@ -185,89 +197,88 @@ export default function TripCompareScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  scroll: {},
-  header: {
-    paddingHorizontal: space[5],
-    paddingTop: space[10],
-    paddingBottom: space[3],
-    gap: space[2],
-  },
-  title: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: brandColors.textPrimary,
-  },
-  mapContainer: {
-    height: 280,
-    marginHorizontal: space[4],
-    borderRadius: radii.xl,
-    overflow: 'hidden',
-    marginBottom: space[3],
-  },
-  card: {
-    marginHorizontal: space[4],
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
-    borderRadius: radii.xl,
-    padding: space[4],
-    gap: space[2],
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    ...textBase,
-    color: gray[500],
-  },
-});
-
-const statStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: space[2],
-  },
-  cell: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  labelCell: {
-    width: 90,
-    alignItems: 'center',
-  },
-  label: {
-    ...textXs,
-    fontFamily: fontFamily.body.medium,
-    color: gray[400],
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  value: {
-    ...textSm,
-    fontFamily: fontFamily.mono.medium,
-    color: brandColors.textPrimary,
-  },
-  valueBetter: {
-    color: safetyColors.safe,
-    fontFamily: fontFamily.mono.bold,
-  },
-  headerText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-  },
-  dateText: {
-    ...textXs,
-    color: gray[500],
-  },
-  divider: {
-    height: 1,
-    backgroundColor: brandColors.borderDefault,
-    marginVertical: space[1],
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    scroll: {},
+    header: {
+      paddingHorizontal: space[5],
+      paddingTop: space[10],
+      paddingBottom: space[3],
+      gap: space[2],
+    },
+    title: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+    },
+    mapContainer: {
+      height: 280,
+      marginHorizontal: space[4],
+      borderRadius: radii.xl,
+      overflow: 'hidden',
+      marginBottom: space[3],
+    },
+    card: {
+      marginHorizontal: space[4],
+      backgroundColor: surfaceTints.glass,
+      borderRadius: radii.xl,
+      padding: space[4],
+      gap: space[2],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyText: {
+      ...textBase,
+      color: gray[500],
+    },
+    // Stat table styles
+    statRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: space[2],
+    },
+    statCell: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statLabelCell: {
+      width: 90,
+      alignItems: 'center',
+    },
+    statLabel: {
+      ...textXs,
+      fontFamily: fontFamily.body.medium,
+      color: gray[400],
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+    },
+    statValue: {
+      ...textSm,
+      fontFamily: fontFamily.mono.medium,
+      color: colors.textPrimary,
+    },
+    statValueBetter: {
+      color: colors.safe,
+      fontFamily: fontFamily.mono.bold,
+    },
+    statHeaderText: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    statDateText: {
+      ...textXs,
+      color: gray[500],
+    },
+    statDivider: {
+      height: 1,
+      backgroundColor: colors.borderDefault,
+      marginVertical: space[1],
+    },
+  });

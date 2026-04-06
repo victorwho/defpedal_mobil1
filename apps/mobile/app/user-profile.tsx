@@ -1,13 +1,16 @@
 import type { UserPublicProfile } from '@defensivepedal/core';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { BackButton } from '../src/design-system/atoms/BackButton';
+import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { Button } from '../src/design-system/atoms/Button';
-import { brandColors, darkTheme, gray, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
@@ -16,6 +19,8 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
 export default function UserProfileScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthSession();
@@ -86,7 +91,7 @@ export default function UserProfileScreen() {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={brandColors.accent} size="large" />
+          <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : error || !profile ? (
         <View style={styles.loadingContainer}>
@@ -150,13 +155,13 @@ export default function UserProfileScreen() {
                 <Text style={styles.statLabel}>Cycled</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: safetyColors.safe }]}>
+                <Text style={[styles.statValue, { color: colors.safe }]}>
                   {profile.totalCo2SavedKg.toFixed(1)} kg
                 </Text>
                 <Text style={styles.statLabel}>CO2 Saved</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: safetyColors.caution }]}>
+                <Text style={[styles.statValue, { color: colors.caution }]}>
                   {profile.totalHazardsReported}
                 </Text>
                 <Text style={styles.statLabel}>Hazards</Text>
@@ -165,7 +170,7 @@ export default function UserProfileScreen() {
           </View>
 
           {/* Recent trips */}
-          <Text style={styles.sectionTitle}>Recent Trips</Text>
+          <SectionTitle variant="muted">Recent Trips</SectionTitle>
           {profile.recentTrips.length === 0 ? (
             <Text style={styles.emptyText}>No shared trips yet.</Text>
           ) : (
@@ -205,51 +210,51 @@ export default function UserProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: darkTheme.bgDeep },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: space[4], paddingVertical: space[3],
-  },
-  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { ...textBase, fontFamily: fontFamily.heading.bold, color: darkTheme.textPrimary },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space[3] },
-  errorText: { ...textBase, color: darkTheme.textSecondary },
-  scrollContent: { paddingHorizontal: space[4], gap: space[4] },
-  userCard: {
-    alignItems: 'center', gap: space[3],
-    backgroundColor: darkTheme.bgPrimary, borderRadius: radii['2xl'], borderWidth: 1,
-    borderColor: darkTheme.borderDefault, padding: space[5], ...shadows.md,
-  },
-  avatar: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: brandColors.accent,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { fontFamily: fontFamily.heading.bold, fontSize: 24, color: '#000' },
-  displayName: { ...text2xl, fontFamily: fontFamily.heading.bold, color: darkTheme.textPrimary },
-  followRow: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
-  followStat: { alignItems: 'center', gap: 2 },
-  followCount: { fontFamily: fontFamily.mono.bold, fontSize: 18, color: darkTheme.textPrimary },
-  followLabel: { ...textXs, color: darkTheme.textSecondary },
-  followDivider: { width: 1, height: 24, backgroundColor: darkTheme.borderDefault },
-  statsCard: {
-    backgroundColor: darkTheme.bgPrimary, borderRadius: radii.xl, borderWidth: 1,
-    borderColor: darkTheme.borderDefault, padding: space[4], ...shadows.md,
-  },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  statItem: { alignItems: 'center', gap: 2 },
-  statValue: { fontFamily: fontFamily.mono.bold, fontSize: 16, color: darkTheme.textPrimary },
-  statLabel: { ...textXs, color: darkTheme.textSecondary },
-  sectionTitle: { ...textSm, fontFamily: fontFamily.heading.bold, color: darkTheme.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
-  emptyText: { ...textSm, color: darkTheme.textMuted, textAlign: 'center', paddingVertical: space[4] },
-  tripCard: {
-    backgroundColor: darkTheme.bgPrimary, borderRadius: radii.lg, borderWidth: 1,
-    borderColor: darkTheme.borderDefault, padding: space[3], gap: space[1],
-  },
-  tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tripTitle: { ...textSm, fontFamily: fontFamily.body.semiBold, color: darkTheme.textPrimary, flex: 1 },
-  tripDate: { ...textXs, color: darkTheme.textMuted },
-  tripStats: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  tripStat: { ...textXs, fontFamily: fontFamily.mono.medium, color: darkTheme.textSecondary },
-  tripStatDivider: { ...textXs, color: gray[600] },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: space[4], paddingVertical: space[3],
+    },
+    backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { ...textBase, fontFamily: fontFamily.heading.bold, color: colors.textPrimary },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space[3] },
+    errorText: { ...textBase, color: colors.textSecondary },
+    scrollContent: { paddingHorizontal: space[4], gap: space[4] },
+    userCard: {
+      alignItems: 'center', gap: space[3],
+      backgroundColor: colors.bgPrimary, borderRadius: radii['2xl'], borderWidth: 1,
+      borderColor: colors.borderDefault, padding: space[5], ...shadows.md,
+    },
+    avatar: {
+      width: 64, height: 64, borderRadius: 32, backgroundColor: colors.accent,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    avatarText: { fontFamily: fontFamily.heading.bold, fontSize: 24, color: colors.textInverse },
+    displayName: { ...text2xl, fontFamily: fontFamily.heading.bold, color: colors.textPrimary },
+    followRow: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
+    followStat: { alignItems: 'center', gap: 2 },
+    followCount: { fontFamily: fontFamily.mono.bold, fontSize: 18, color: colors.textPrimary },
+    followLabel: { ...textXs, color: colors.textSecondary },
+    followDivider: { width: 1, height: 24, backgroundColor: colors.borderDefault },
+    statsCard: {
+      backgroundColor: colors.bgPrimary, borderRadius: radii.xl, borderWidth: 1,
+      borderColor: colors.borderDefault, padding: space[4], ...shadows.md,
+    },
+    statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
+    statItem: { alignItems: 'center', gap: 2 },
+    statValue: { fontFamily: fontFamily.mono.bold, fontSize: 16, color: colors.textPrimary },
+    statLabel: { ...textXs, color: colors.textSecondary },
+    emptyText: { ...textSm, color: colors.textMuted, textAlign: 'center', paddingVertical: space[4] },
+    tripCard: {
+      backgroundColor: colors.bgPrimary, borderRadius: radii.lg, borderWidth: 1,
+      borderColor: colors.borderDefault, padding: space[3], gap: space[1],
+    },
+    tripHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    tripTitle: { ...textSm, fontFamily: fontFamily.body.semiBold, color: colors.textPrimary, flex: 1 },
+    tripDate: { ...textXs, color: colors.textMuted },
+    tripStats: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+    tripStat: { ...textXs, fontFamily: fontFamily.mono.medium, color: colors.textSecondary },
+    tripStatDivider: { ...textXs, color: gray[600] },
+  });

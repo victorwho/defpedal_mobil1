@@ -1,6 +1,6 @@
 import type { FeedItem } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,14 +17,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FeedCard } from '../src/components/FeedCard';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useFeedQuery, useLikeToggle, useLoveToggle } from '../src/hooks/useFeed';
-import { mobileTheme } from '../src/lib/theme';
 import { useT } from '../src/hooks/useTranslation';
 
 export default function CommunityFeedScreen() {
   const t = useT();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const {
     location: currentLocation,
     permissionStatus,
@@ -114,7 +116,7 @@ export default function CommunityFeedScreen() {
         <View style={styles.centered}>
           {hasError ? (
             <>
-              <Ionicons name="location-outline" size={48} color={mobileTheme.colors.brand} />
+              <Ionicons name="location-outline" size={48} color={colors.accent} />
               <Text style={styles.emptyTitle}>
                 {isDenied ? t('communityScreen.locationNeeded') : t('communityScreen.locationFailed')}
               </Text>
@@ -131,7 +133,7 @@ export default function CommunityFeedScreen() {
             </>
           ) : (
             <>
-              <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
+              <ActivityIndicator size="large" color={colors.accent} />
               <Text style={styles.loadingText}>{t('communityScreen.gettingLocation')}</Text>
             </>
           )}
@@ -161,13 +163,13 @@ export default function CommunityFeedScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={() => void refetch()}
-            tintColor={mobileTheme.colors.brand}
+            tintColor={colors.accent}
           />
         }
         ListEmptyComponent={
           isLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={mobileTheme.colors.brand} />
+              <ActivityIndicator size="large" color={colors.accent} />
             </View>
           ) : (
             <View style={styles.emptyState}>
@@ -181,7 +183,7 @@ export default function CommunityFeedScreen() {
         ListFooterComponent={
           isFetchingNextPage ? (
             <View style={styles.footer}>
-              <ActivityIndicator size="small" color={mobileTheme.colors.brand} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }
@@ -191,77 +193,78 @@ export default function CommunityFeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: mobileTheme.colors.background,
-  },
-  headerBar: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 10,
-    gap: 2,
-  },
-  headerEyebrow: {
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: mobileTheme.colors.brand,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '900',
-    color: mobileTheme.colors.textOnDark,
-    letterSpacing: -0.6,
-  },
-  list: {
-    padding: 16,
-    gap: 16,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    gap: 12,
-  },
-  loadingText: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 15,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 32,
-    gap: 8,
-  },
-  emptyTitle: {
-    color: mobileTheme.colors.textOnDark,
-    fontSize: 20,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    color: mobileTheme.colors.textOnDarkMuted,
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  footer: {
-    paddingVertical: 24,
-    alignItems: 'center',
-  },
-  retryButton: {
-    marginTop: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: mobileTheme.colors.brand,
-  },
-  retryButtonText: {
-    color: '#000',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    headerBar: {
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 10,
+      gap: 2,
+    },
+    headerEyebrow: {
+      fontSize: 12,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1.4,
+      color: colors.accent,
+    },
+    headerTitle: {
+      fontSize: 28,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      letterSpacing: -0.6,
+    },
+    list: {
+      padding: 16,
+      gap: 16,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 80,
+      gap: 12,
+    },
+    loadingText: {
+      color: colors.textSecondary,
+      fontSize: 15,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 80,
+      paddingHorizontal: 32,
+      gap: 8,
+    },
+    emptyTitle: {
+      color: colors.textPrimary,
+      fontSize: 20,
+      fontWeight: '900',
+      textAlign: 'center',
+    },
+    emptySubtitle: {
+      color: colors.textSecondary,
+      fontSize: 15,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    footer: {
+      paddingVertical: 24,
+      alignItems: 'center',
+    },
+    retryButton: {
+      marginTop: 8,
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.accent,
+    },
+    retryButtonText: {
+      color: colors.textInverse,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+  });

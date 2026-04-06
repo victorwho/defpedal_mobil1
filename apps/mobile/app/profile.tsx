@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Alert, Image, NativeModules } from 'react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 // expo-image-picker is a native module — lazy require to avoid crash if not in APK
@@ -11,7 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { brandColors, darkTheme, gray, safetyColors } from '../src/design-system/tokens/colors';
+import { SettingRow } from '../src/design-system/molecules/SettingRow';
+import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -22,6 +25,7 @@ import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 import { useBadges } from '../src/hooks/useBadges';
+import { brandTints, safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 
 const BIKE_TYPE_KEYS = [
   'profile.bikeRoad', 'profile.bikeCity', 'profile.bikeMountain',
@@ -35,98 +39,9 @@ const CYCLING_FREQUENCY_KEYS = [
 
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
-type DropdownPickerProps = {
-  label: string;
-  value: string | null;
-  options: readonly string[];
-  onSelect: (value: string) => void;
-  placeholder?: string;
-};
-
-const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select...' }: DropdownPickerProps) => {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <Pressable style={styles.settingRow} onPress={() => setOpen(true)}>
-        <View style={styles.settingTextCol}>
-          <Text style={styles.settingLabel}>{label}</Text>
-          <Text style={styles.settingDescription}>{value ?? placeholder}</Text>
-        </View>
-        <Ionicons name="chevron-down" size={18} color={gray[400]} />
-      </Pressable>
-
-      <Modal
-        visible={open}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpen(false)}
-      >
-        <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>{label}</Text>
-            <ScrollView style={styles.optionsList} bounces={false}>
-              {options.map((option) => (
-                <Pressable
-                  key={option}
-                  style={[styles.optionRow, value === option && styles.optionRowSelected]}
-                  onPress={() => {
-                    onSelect(option);
-                    setOpen(false);
-                  }}
-                >
-                  <Text style={[styles.optionText, value === option && styles.optionTextSelected]}>
-                    {option}
-                  </Text>
-                  {value === option ? (
-                    <Ionicons name="checkmark" size={20} color={brandColors.accent} />
-                  ) : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
-    </>
-  );
-};
-
-
-const AchievementsRow = () => {
-  const { data } = useBadges();
-  const earned = data?.earned.length ?? 0;
-  const total = data?.definitions.length ?? 0;
-
-  return (
-    <Pressable
-      style={styles.section}
-      onPress={() => router.push('/achievements' as any)}
-    >
-      <Text style={styles.sectionTitle}>Achievements</Text>
-      <View style={styles.achievementsCard}>
-        <View style={styles.achievementsRow}>
-          <Ionicons name="trophy-outline" size={24} color={brandColors.accent} />
-          <View style={styles.achievementsTextCol}>
-            <Text style={styles.achievementsCount}>
-              {earned} / {total} badges earned
-            </Text>
-            <View style={styles.achievementsBarTrack}>
-              <View
-                style={[
-                  styles.achievementsBarFill,
-                  { width: total > 0 ? `${Math.round((earned / total) * 100)}%` : '0%' },
-                ]}
-              />
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={gray[400]} />
-        </View>
-      </View>
-    </Pressable>
-  );
-};
-
 export default function ProfileScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { user, signOut, signInAnonymously } = useAuthSession();
   const [editingUsername, setEditingUsername] = useState(false);
@@ -229,6 +144,96 @@ export default function ProfileScreen() {
     { key: 'supplies' as const, label: t('profile.poiSupplies'), description: t('profile.poiSuppliesDesc') },
   ];
 
+  // -- Inner components (need access to themed `styles` and `colors`) --------
+
+  const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select...' }: {
+    label: string;
+    value: string | null;
+    options: readonly string[];
+    onSelect: (value: string) => void;
+    placeholder?: string;
+  }) => {
+    const [open, setOpen] = useState(false);
+
+    return (
+      <>
+        <Pressable style={styles.settingRow} onPress={() => setOpen(true)}>
+          <View style={styles.settingTextCol}>
+            <Text style={styles.settingLabel}>{label}</Text>
+            <Text style={styles.settingDescription}>{value ?? placeholder}</Text>
+          </View>
+          <Ionicons name="chevron-down" size={18} color={gray[400]} />
+        </Pressable>
+
+        <Modal
+          visible={open}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpen(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{label}</Text>
+              <ScrollView style={styles.optionsList} bounces={false}>
+                {options.map((option) => (
+                  <Pressable
+                    key={option}
+                    style={[styles.optionRow, value === option && styles.optionRowSelected]}
+                    onPress={() => {
+                      onSelect(option);
+                      setOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.optionText, value === option && styles.optionTextSelected]}>
+                      {option}
+                    </Text>
+                    {value === option ? (
+                      <Ionicons name="checkmark" size={20} color={colors.accent} />
+                    ) : null}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
+      </>
+    );
+  };
+
+  const AchievementsRow = () => {
+    const { data } = useBadges();
+    const earned = data?.earned.length ?? 0;
+    const total = data?.definitions.length ?? 0;
+
+    return (
+      <Pressable
+        style={styles.section}
+        onPress={() => router.push('/achievements' as any)}
+      >
+        <SectionTitle>Achievements</SectionTitle>
+        <View style={styles.achievementsCard}>
+          <View style={styles.achievementsRow}>
+            <Ionicons name="trophy-outline" size={24} color={colors.accent} />
+            <View style={styles.achievementsTextCol}>
+              <Text style={styles.achievementsCount}>
+                {earned} / {total} badges earned
+              </Text>
+              <View style={styles.achievementsBarTrack}>
+                <View
+                  style={[
+                    styles.achievementsBarFill,
+                    { width: total > 0 ? `${Math.round((earned / total) * 100)}%` : '0%' },
+                  ]}
+                />
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.root}>
       <View style={styles.content}>
@@ -243,7 +248,7 @@ export default function ProfileScreen() {
               <Pressable onPress={handleAvatarPick} style={styles.avatarWrapper}>
                 {avatarUploading ? (
                   <View style={styles.avatarPlaceholder}>
-                    <ActivityIndicator color={brandColors.accent} />
+                    <ActivityIndicator color={colors.accent} />
                   </View>
                 ) : profile?.avatarUrl ? (
                   <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
@@ -322,14 +327,14 @@ export default function ProfileScreen() {
                 <Text style={styles.userName}>{t('common.guest')}</Text>
                 <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
               </View>
-              <Ionicons name="log-in-outline" size={24} color={brandColors.accent} />
+              <Ionicons name="log-in-outline" size={24} color={colors.accent} />
             </Pressable>
           )}
 
           <AchievementsRow />
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.language')}</Text>
+            <SectionTitle>{t('profile.language')}</SectionTitle>
             <View style={styles.languageRow}>
               {(['en', 'ro'] as const).map((loc) => (
                 <Pressable
@@ -346,7 +351,7 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.aboutYou')}</Text>
+            <SectionTitle>{t('profile.aboutYou')}</SectionTitle>
 
             <DropdownPicker
               label={t('profile.bikeType')}
@@ -366,118 +371,67 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.routingPreferences')}</Text>
+            <SectionTitle>{t('profile.routingPreferences')}</SectionTitle>
 
-            <Pressable
-              style={styles.settingRow}
-              onPress={() => setAvoidUnpaved(!avoidUnpaved)}
-            >
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.avoidUnpaved')}</Text>
-                <Text style={styles.settingDescription}>
-                  {avoidUnpaved
-                    ? t('profile.avoidUnpavedOn')
-                    : t('profile.avoidUnpavedOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, avoidUnpaved && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, avoidUnpaved && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.avoidUnpaved')}
+              description={avoidUnpaved ? t('profile.avoidUnpavedOn') : t('profile.avoidUnpavedOff')}
+              checked={avoidUnpaved}
+              onChange={setAvoidUnpaved}
+            />
 
-            <Pressable
-              style={styles.settingRow}
-              onPress={() => setShowRouteComparison(!showRouteComparison)}
-            >
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.compareRoutes')}</Text>
-                <Text style={styles.settingDescription}>
-                  {showRouteComparison
-                    ? t('profile.compareRoutesOn')
-                    : t('profile.compareRoutesOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, showRouteComparison && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, showRouteComparison && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.compareRoutes')}
+              description={showRouteComparison ? t('profile.compareRoutesOn') : t('profile.compareRoutesOff')}
+              checked={showRouteComparison}
+              onChange={setShowRouteComparison}
+            />
 
-            <Pressable
-              style={styles.settingRow}
-              onPress={() => setShowBicycleLanes(!showBicycleLanes)}
-            >
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.showBikeLanes')}</Text>
-                <Text style={styles.settingDescription}>
-                  {showBicycleLanes
-                    ? t('profile.showBikeLanesOn')
-                    : t('profile.showBikeLanesOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, showBicycleLanes && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, showBicycleLanes && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.showBikeLanes')}
+              description={showBicycleLanes ? t('profile.showBikeLanesOn') : t('profile.showBikeLanesOff')}
+              checked={showBicycleLanes}
+              onChange={setShowBicycleLanes}
+            />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.pointsOfInterest')}</Text>
+            <SectionTitle>{t('profile.pointsOfInterest')}</SectionTitle>
 
             {poiCategories.map((cat) => (
-              <Pressable
+              <SettingRow
                 key={cat.key}
-                style={styles.settingRow}
-                onPress={() => setPoiVisibility(cat.key, !poiVisibility[cat.key])}
-              >
-                <View style={styles.settingTextCol}>
-                  <Text style={styles.settingLabel}>{cat.label}</Text>
-                  <Text style={styles.settingDescription}>{cat.description}</Text>
-                </View>
-                <View style={[styles.toggle, poiVisibility[cat.key] && styles.toggleOn]}>
-                  <View style={[styles.toggleThumb, poiVisibility[cat.key] && styles.toggleThumbOn]} />
-                </View>
-              </Pressable>
+                label={cat.label}
+                description={cat.description}
+                checked={poiVisibility[cat.key]}
+                onChange={(checked) => setPoiVisibility(cat.key, checked)}
+              />
             ))}
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.notifications')}</Text>
+            <SectionTitle>{t('profile.notifications')}</SectionTitle>
 
-            <Pressable style={styles.settingRow} onPress={() => setNotifyWeather(!notifyWeather)}>
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.dailyWeather')}</Text>
-                <Text style={styles.settingDescription}>
-                  {notifyWeather ? t('profile.dailyWeatherOn') : t('profile.dailyWeatherOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, notifyWeather && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, notifyWeather && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.dailyWeather')}
+              description={notifyWeather ? t('profile.dailyWeatherOn') : t('profile.dailyWeatherOff')}
+              checked={notifyWeather}
+              onChange={setNotifyWeather}
+            />
 
-            <Pressable style={styles.settingRow} onPress={() => setNotifyHazard(!notifyHazard)}>
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.hazardAlerts')}</Text>
-                <Text style={styles.settingDescription}>
-                  {notifyHazard ? t('profile.hazardAlertsOn') : t('profile.hazardAlertsOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, notifyHazard && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, notifyHazard && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.hazardAlerts')}
+              description={notifyHazard ? t('profile.hazardAlertsOn') : t('profile.hazardAlertsOff')}
+              checked={notifyHazard}
+              onChange={setNotifyHazard}
+            />
 
-            <Pressable style={styles.settingRow} onPress={() => setNotifyCommunity(!notifyCommunity)}>
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.community')}</Text>
-                <Text style={styles.settingDescription}>
-                  {notifyCommunity ? t('profile.communityOn') : t('profile.communityOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, notifyCommunity && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, notifyCommunity && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.community')}
+              description={notifyCommunity ? t('profile.communityOn') : t('profile.communityOff')}
+              checked={notifyCommunity}
+              onChange={setNotifyCommunity}
+            />
 
             <View style={styles.settingRow}>
               <View style={styles.settingTextCol}>
@@ -491,24 +445,14 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('profile.privacy')}</Text>
+            <SectionTitle>{t('profile.privacy')}</SectionTitle>
 
-            <Pressable
-              style={styles.settingRow}
-              onPress={() => setShareTripsPublicly(!shareTripsPublicly)}
-            >
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingLabel}>{t('profile.shareTrips')}</Text>
-                <Text style={styles.settingDescription}>
-                  {shareTripsPublicly
-                    ? t('profile.shareTripsOn')
-                    : t('profile.shareTripsOff')}
-                </Text>
-              </View>
-              <View style={[styles.toggle, shareTripsPublicly && styles.toggleOn]}>
-                <View style={[styles.toggleThumb, shareTripsPublicly && styles.toggleThumbOn]} />
-              </View>
-            </Pressable>
+            <SettingRow
+              label={t('profile.shareTrips')}
+              description={shareTripsPublicly ? t('profile.shareTripsOn') : t('profile.shareTripsOff')}
+              checked={shareTripsPublicly}
+              onChange={setShareTripsPublicly}
+            />
           </View>
 
           {user ? (
@@ -532,7 +476,7 @@ export default function ProfileScreen() {
                 ]);
               }}
             >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+              <Ionicons name="log-out-outline" size={20} color={colors.danger} />
               <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
             </Pressable>
           ) : null}
@@ -543,260 +487,238 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brandColors.bgDeep },
-  content: { flex: 1 },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[4],
-    padding: space[4],
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
-  },
-  avatarWrapper: {
-    position: 'relative',
-  },
-  avatarImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: brandColors.accent,
-  },
-  avatarPlaceholder: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 1.5,
-    borderColor: gray[600],
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  userInfo: { flex: 1, gap: space[1] },
-  userName: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 16,
-  },
-  userSub: {
-    ...textSm,
-    color: brandColors.textSecondary,
-  },
-  editUsernameLink: {
-    ...textXs,
-    color: brandColors.accent,
-    fontFamily: fontFamily.body.medium,
-    marginTop: 2,
-  },
-  usernameEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: space[1],
-  },
-  usernameAt: {
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 14,
-    color: brandColors.accent,
-  },
-  usernameInput: {
-    flex: 1,
-    fontFamily: fontFamily.mono.medium,
-    fontSize: 14,
-    color: darkTheme.textPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: brandColors.accent,
-    paddingVertical: 2,
-  },
-  usernameSaveBtn: {
-    paddingHorizontal: space[2],
-    paddingVertical: space[1],
-    backgroundColor: brandColors.accent,
-    borderRadius: radii.sm,
-  },
-  usernameSaveText: {
-    fontFamily: fontFamily.body.bold,
-    fontSize: 12,
-    color: '#000',
-  },
-  usernameError: {
-    ...textXs,
-    color: safetyColors.danger,
-    marginTop: 2,
-  },
-  section: {
-    gap: space[3],
-  },
-  sectionTitle: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  languageRow: {
-    flexDirection: 'row',
-    gap: space[2],
-  },
-  languagePill: {
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: gray[600],
-  },
-  languagePillActive: {
-    backgroundColor: brandColors.accent,
-    borderColor: brandColors.accent,
-  },
-  languagePillText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: gray[400],
-  },
-  languagePillTextActive: {
-    color: '#000',
-    fontFamily: fontFamily.body.bold,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: space[4],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
-  },
-  settingTextCol: { flex: 1, gap: space[1], marginRight: space[3] },
-  settingLabel: {
-    ...textBase,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.textPrimary,
-  },
-  settingDescription: {
-    ...textSm,
-    color: brandColors.textSecondary,
-  },
-  toggle: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: gray[600],
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleOn: {
-    backgroundColor: brandColors.accent,
-  },
-  toggleThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  toggleThumbOn: {
-    alignSelf: 'flex-end',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: space[6],
-  },
-  modalContent: {
-    width: '100%',
-    maxHeight: '70%',
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: brandColors.bgDeep,
-    padding: space[5],
-    gap: space[4],
-  },
-  modalTitle: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  optionsList: {
-    maxHeight: 300,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: space[3] + space[0.5],
-    paddingHorizontal: space[4],
-    borderRadius: radii.lg,
-  },
-  optionRowSelected: {
-    backgroundColor: 'rgba(250, 204, 21, 0.1)',
-  },
-  optionText: {
-    ...textBase,
-    fontFamily: fontFamily.body.regular,
-    color: brandColors.textPrimary,
-  },
-  optionTextSelected: {
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.accent,
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-    paddingVertical: space[4],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-    backgroundColor: 'rgba(239, 68, 68, 0.08)',
-  },
-  signOutText: {
-    ...textBase,
-    fontFamily: fontFamily.body.medium,
-    color: '#EF4444',
-  },
-  achievementsCard: {
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    padding: space[4],
-  },
-  achievementsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  achievementsTextCol: {
-    flex: 1,
-    gap: space[2],
-  },
-  achievementsCount: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.textPrimary,
-  },
-  achievementsBarTrack: {
-    height: 4,
-    borderRadius: radii.sm,
-    backgroundColor: brandColors.bgTertiary,
-    overflow: 'hidden',
-  },
-  achievementsBarFill: {
-    height: 4,
-    borderRadius: radii.sm,
-    backgroundColor: brandColors.accent,
-  },
-});
+// ---------------------------------------------------------------------------
+// Themed style factory — colors come from useTheme(), layout stays static
+// ---------------------------------------------------------------------------
+
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    content: { flex: 1 },
+    userCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[4],
+      padding: space[4],
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: surfaceTints.glass,
+    },
+    avatarWrapper: {
+      position: 'relative',
+    },
+    avatarImage: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      borderWidth: 2,
+      borderColor: colors.accent,
+    },
+    avatarPlaceholder: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      borderWidth: 1.5,
+      borderColor: gray[600],
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: surfaceTints.whiteSubtle,
+    },
+    userInfo: { flex: 1, gap: space[1] },
+    userName: {
+      ...textBase,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      fontSize: 16,
+    },
+    userSub: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+    editUsernameLink: {
+      ...textXs,
+      color: colors.accent,
+      fontFamily: fontFamily.body.medium,
+      marginTop: 2,
+    },
+    usernameEditRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: space[1],
+    },
+    usernameAt: {
+      fontFamily: fontFamily.mono.bold,
+      fontSize: 14,
+      color: colors.accent,
+    },
+    usernameInput: {
+      flex: 1,
+      fontFamily: fontFamily.mono.medium,
+      fontSize: 14,
+      color: colors.textPrimary,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.accent,
+      paddingVertical: 2,
+    },
+    usernameSaveBtn: {
+      paddingHorizontal: space[2],
+      paddingVertical: space[1],
+      backgroundColor: colors.accent,
+      borderRadius: radii.sm,
+    },
+    usernameSaveText: {
+      fontFamily: fontFamily.body.bold,
+      fontSize: 12,
+      color: colors.textInverse,
+    },
+    usernameError: {
+      ...textXs,
+      color: colors.danger,
+      marginTop: 2,
+    },
+    section: {
+      gap: space[3],
+    },
+    languageRow: {
+      flexDirection: 'row',
+      gap: space[2],
+    },
+    languagePill: {
+      paddingHorizontal: space[4],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: gray[600],
+    },
+    languagePillActive: {
+      backgroundColor: colors.accent,
+      borderColor: colors.accent,
+    },
+    languagePillText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: gray[400],
+    },
+    languagePillTextActive: {
+      color: colors.textInverse,
+      fontFamily: fontFamily.body.bold,
+    },
+    settingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: space[4],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: surfaceTints.glass,
+    },
+    settingTextCol: { flex: 1, gap: space[1], marginRight: space[3] },
+    settingLabel: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    settingDescription: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: surfaceTints.scrim,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: space[6],
+    },
+    modalContent: {
+      width: '100%',
+      maxHeight: '70%',
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgDeep,
+      padding: space[5],
+      gap: space[4],
+    },
+    modalTitle: {
+      ...textBase,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      fontSize: 18,
+      textAlign: 'center',
+    },
+    optionsList: {
+      maxHeight: 300,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: space[3] + space[0.5],
+      paddingHorizontal: space[4],
+      borderRadius: radii.lg,
+    },
+    optionRowSelected: {
+      backgroundColor: brandTints.accentLight,
+    },
+    optionText: {
+      ...textBase,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textPrimary,
+    },
+    optionTextSelected: {
+      fontFamily: fontFamily.body.medium,
+      color: colors.accent,
+    },
+    signOutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[2],
+      paddingVertical: space[4],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: safetyTints.dangerBorder,
+      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    },
+    signOutText: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      color: colors.danger,
+    },
+    achievementsCard: {
+      backgroundColor: surfaceTints.glass,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[4],
+    },
+    achievementsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    achievementsTextCol: {
+      flex: 1,
+      gap: space[2],
+    },
+    achievementsCount: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    achievementsBarTrack: {
+      height: 4,
+      borderRadius: radii.sm,
+      backgroundColor: colors.bgTertiary,
+      overflow: 'hidden',
+    },
+    achievementsBarFill: {
+      height: 4,
+      borderRadius: radii.sm,
+      backgroundColor: colors.accent,
+    },
+  });

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { brandColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
+import { zIndex } from '../design-system/tokens/zIndex';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const HANDLE_HEIGHT = 48; // drag handle row
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '50%',
     right: space[3],
-    zIndex: 3,
+    zIndex: zIndex.base,
     gap: space[2],
   },
   flexSpacer: {

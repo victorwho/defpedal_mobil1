@@ -30,7 +30,9 @@ import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarni
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
-import { darkTheme, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { surfaceTints } from '../src/design-system/tokens/tints';
+import { zIndex } from '../src/design-system/tokens/zIndex';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -52,6 +54,8 @@ const formatDuration = (seconds: number): string => {
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 export default function RoutePreviewScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { user } = useAuthSession();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
   // (brief transitional state while router.push('/navigation') is in flight).
@@ -359,7 +363,7 @@ export default function RoutePreviewScreen() {
                 accessibilityLabel="Save this route"
                 accessibilityRole="button"
               >
-                <Ionicons name="bookmark-outline" size={18} color={darkTheme.accent} />
+                <Ionicons name="bookmark-outline" size={18} color={colors.accent} />
                 <Text style={styles.saveRouteLabel}>Save</Text>
               </Pressable>
             ) : null}
@@ -522,7 +526,7 @@ export default function RoutePreviewScreen() {
             value={saveRouteName}
             onChangeText={setSaveRouteName}
             placeholder="Route name (e.g. Morning commute)"
-            placeholderTextColor={darkTheme.textMuted}
+            placeholderTextColor={colors.textMuted}
             autoFocus
             maxLength={100}
           />
@@ -547,7 +551,7 @@ export default function RoutePreviewScreen() {
     {saveToast ? (
       <View style={styles.toastContainer}>
         <View style={styles.toastPill}>
-          <Ionicons name="checkmark-circle" size={16} color={darkTheme.accent} />
+          <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
           <Text style={styles.toastText}>{saveToast}</Text>
         </View>
       </View>
@@ -556,261 +560,262 @@ export default function RoutePreviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  brandCluster: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  brandCopy: {
-    flex: 1,
-    gap: space[0.5],
-  },
-  topEyebrow: {
-    ...textXs,
-    color: darkTheme.accent,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  topTitle: {
-    ...text2xl,
-    color: darkTheme.textPrimary,
-  },
-  topSubtitle: {
-    ...textSm,
-    color: darkTheme.textSecondary,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-  },
-  sheetHero: {
-    gap: space[1],
-  },
-  sheetEyebrow: {
-    ...textXs,
-    color: darkTheme.accent,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  sheetTitle: {
-    ...text2xl,
-    fontSize: 26,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.7,
-  },
-  sheetSubtitle: {
-    ...textSm,
-    color: darkTheme.textSecondary,
-    lineHeight: 20,
-  },
-  summaryStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    borderRadius: radii['2xl'],
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    ...shadows.sm,
-  },
-  statGroup: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: space[2],
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  statValue: {
-    ...textDataSm,
-    fontSize: 17,
-    color: darkTheme.textPrimary,
-    fontFamily: fontFamily.mono.bold,
-  },
-  statUnit: {
-    ...textXs,
-    color: darkTheme.textMuted,
-    fontFamily: fontFamily.mono.medium,
-  },
-  statDivider: {
-    ...textSm,
-    color: darkTheme.textMuted,
-  },
-  comparisonBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.3)',
-    backgroundColor: 'rgba(34, 197, 94, 0.08)',
-  },
-  comparisonText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: '#22C55E',
-  },
-  comparisonBadgeWarning: {
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-  },
-  comparisonTextWarning: {
-    color: '#F59E0B',
-  },
-  switchToSafeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-    marginTop: space[2],
-    paddingVertical: space[3],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(34, 197, 94, 0.4)',
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-  },
-  switchToSafeText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: '#22C55E',
-  },
-  warningPanel: {
-    borderRadius: radii['2xl'],
-    backgroundColor: safetyColors.cautionTint + '28', // ~16% opacity tint
-    padding: space[3],
-    gap: 6,
-  },
-  warningTitle: {
-    ...textXs,
-    color: safetyColors.caution,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.1,
-  },
-  warningBody: {
-    ...textSm,
-    fontSize: 13,
-    color: darkTheme.textPrimary,
-    lineHeight: 18,
-  },
-  footerSecondaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  footerSecondaryButton: {
-    flex: 1,
-  },
-  saveRouteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[1],
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-  },
-  saveRouteLabel: {
-    fontSize: 14,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.accent,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  modalCard: {
-    width: '85%',
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.xl,
-    padding: space[5],
-    gap: space[3],
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: fontFamily.heading.bold,
-    color: darkTheme.textPrimary,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    borderRadius: radii.md,
-    paddingVertical: space[2],
-    paddingHorizontal: space[3],
-    fontSize: 15,
-    fontFamily: fontFamily.body.regular,
-    color: darkTheme.textPrimary,
-  },
-  modalButtonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: space[2],
-  },
-  toastContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 200,
-  },
-  toastPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.full,
-    paddingVertical: space[2],
-    paddingHorizontal: space[4],
-    ...shadows.md,
-  },
-  toastText: {
-    fontSize: 14,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textPrimary,
-  },
-  peekStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  peekStat: {
-    ...textDataSm,
-    fontSize: 16,
-    color: darkTheme.textPrimary,
-    fontFamily: fontFamily.mono.bold,
-  },
-  peekDivider: {
-    ...textSm,
-    color: darkTheme.textMuted,
-  },
-  peekSpacer: {
-    flex: 1,
-  },
-  peekHint: {
-    ...textXs,
-    color: darkTheme.textMuted,
-    fontFamily: fontFamily.body.regular,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    brandCluster: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    brandCopy: {
+      flex: 1,
+      gap: space[0.5],
+    },
+    topEyebrow: {
+      ...textXs,
+      color: colors.accent,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+    },
+    topTitle: {
+      ...text2xl,
+      color: colors.textPrimary,
+    },
+    topSubtitle: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: space[2],
+    },
+    sheetHero: {
+      gap: space[1],
+    },
+    sheetEyebrow: {
+      ...textXs,
+      color: colors.accent,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+    },
+    sheetTitle: {
+      ...text2xl,
+      fontSize: 26,
+      color: colors.textPrimary,
+      letterSpacing: -0.7,
+    },
+    sheetSubtitle: {
+      ...textSm,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    summaryStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      borderRadius: radii['2xl'],
+      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      ...shadows.sm,
+    },
+    statGroup: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: space[2],
+    },
+    stat: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 3,
+    },
+    statValue: {
+      ...textDataSm,
+      fontSize: 17,
+      color: colors.textPrimary,
+      fontFamily: fontFamily.mono.bold,
+    },
+    statUnit: {
+      ...textXs,
+      color: colors.textMuted,
+      fontFamily: fontFamily.mono.medium,
+    },
+    statDivider: {
+      ...textSm,
+      color: colors.textMuted,
+    },
+    comparisonBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.3)',
+      backgroundColor: 'rgba(34, 197, 94, 0.08)',
+    },
+    comparisonText: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: '#22C55E',
+    },
+    comparisonBadgeWarning: {
+      borderColor: 'rgba(245, 158, 11, 0.3)',
+      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    },
+    comparisonTextWarning: {
+      color: '#F59E0B',
+    },
+    switchToSafeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[2],
+      marginTop: space[2],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: 'rgba(34, 197, 94, 0.4)',
+      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    },
+    switchToSafeText: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: '#22C55E',
+    },
+    warningPanel: {
+      borderRadius: radii['2xl'],
+      backgroundColor: colors.cautionTint + '28', // ~16% opacity tint
+      padding: space[3],
+      gap: 6,
+    },
+    warningTitle: {
+      ...textXs,
+      color: colors.caution,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.1,
+    },
+    warningBody: {
+      ...textSm,
+      fontSize: 13,
+      color: colors.textPrimary,
+      lineHeight: 18,
+    },
+    footerSecondaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    footerSecondaryButton: {
+      flex: 1,
+    },
+    saveRouteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[1],
+      paddingVertical: space[2],
+      paddingHorizontal: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+    },
+    saveRouteLabel: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.medium,
+      color: colors.accent,
+    },
+    modalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: surfaceTints.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: zIndex.modal,
+    },
+    modalCard: {
+      width: '85%',
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.xl,
+      padding: space[5],
+      gap: space[3],
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    modalInput: {
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      borderRadius: radii.md,
+      paddingVertical: space[2],
+      paddingHorizontal: space[3],
+      fontSize: 15,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textPrimary,
+    },
+    modalButtonRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: space[2],
+    },
+    toastContainer: {
+      position: 'absolute',
+      bottom: 100,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: zIndex.toast,
+    },
+    toastPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.full,
+      paddingVertical: space[2],
+      paddingHorizontal: space[4],
+      ...shadows.md,
+    },
+    toastText: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    peekStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    peekStat: {
+      ...textDataSm,
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontFamily: fontFamily.mono.bold,
+    },
+    peekDivider: {
+      ...textSm,
+      color: colors.textMuted,
+    },
+    peekSpacer: {
+      flex: 1,
+    },
+    peekHint: {
+      ...textXs,
+      color: colors.textMuted,
+      fontFamily: fontFamily.body.regular,
+    },
+  });

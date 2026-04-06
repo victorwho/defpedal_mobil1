@@ -53,13 +53,18 @@ import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { brandColors, darkTheme, safetyColors, gray } from '../src/design-system/tokens/colors';
+import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
+import { surfaceTints } from '../src/design-system/tokens/tints';
+import { zIndex } from '../src/design-system/tokens/zIndex';
+import { useTheme, type ThemeColors } from '../src/design-system';
 
 export default function NavigationScreen() {
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { user } = useAuthSession();
   const guardPassed = useRouteGuard({
     requiredStates: ['NAVIGATING'],
@@ -598,16 +603,16 @@ export default function NavigationScreen() {
           style={{
             borderRadius: radii.xl,
             borderWidth: 1,
-            borderColor: `${safetyColors.caution}59`,
-            backgroundColor: `${safetyColors.cautionTint}18`,
+            borderColor: `${colors.caution}59`,
+            backgroundColor: `${colors.cautionTint}18`,
             padding: space[4],
             gap: space[2],
           }}
         >
-          <Text style={[textXs, { color: safetyColors.cautionText, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fontFamily.body.bold }]}>
+          <Text style={[textXs, { color: colors.cautionText, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fontFamily.body.bold }]}>
             No active navigation
           </Text>
-          <Text style={[textBase, { color: darkTheme.textSecondary }]}>
+          <Text style={[textBase, { color: colors.textSecondary }]}>
             Start a route preview first so the navigation session has a selected route and steps.
           </Text>
         </View>
@@ -716,7 +721,7 @@ export default function NavigationScreen() {
                 <Ionicons
                   name={navigationSession.isFollowing ? 'navigate' : 'navigate-outline'}
                   size={22}
-                  color={navigationSession.isFollowing ? darkTheme.accent : gray[300]}
+                  color={navigationSession.isFollowing ? colors.accent : gray[300]}
                 />
               }
               onPress={() => {
@@ -737,7 +742,7 @@ export default function NavigationScreen() {
 
           <View style={styles.hazardFab}>
             <IconButton
-              icon={<Ionicons name="warning" size={26} color={darkTheme.textInverse} />}
+              icon={<Ionicons name="warning" size={26} color={colors.textInverse} />}
               onPress={openHazardPicker}
               accessibilityLabel="Report hazard"
               variant="accent"
@@ -748,7 +753,7 @@ export default function NavigationScreen() {
           {selectedRoute?.elevationProfile?.length ? (
             <View style={styles.roundButton}>
               <IconButton
-                icon={<Ionicons name={showElevationProgress ? 'analytics' : 'analytics-outline'} size={22} color={showElevationProgress ? brandColors.accent : gray[300]} />}
+                icon={<Ionicons name={showElevationProgress ? 'analytics' : 'analytics-outline'} size={22} color={showElevationProgress ? colors.accent : gray[300]} />}
                 onPress={() => setShowElevationProgress((prev) => !prev)}
                 accessibilityLabel={showElevationProgress ? 'Hide elevation' : 'Show elevation'}
                 variant="secondary"
@@ -908,7 +913,7 @@ export default function NavigationScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Report ${item.label}`}
                 >
-                  <Ionicons name={item.icon} size={24} color={brandColors.accent} />
+                  <Ionicons name={item.icon} size={24} color={colors.accent} />
                   <Text style={styles.hazardGridLabel}>{item.label}</Text>
                 </Pressable>
               ))}
@@ -927,121 +932,122 @@ export default function NavigationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-  },
-  overlayRoot: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingTop: space[2],
-    paddingBottom: space[4],
-  },
-  topCluster: {
-    gap: space[3],
-  },
-  bottomCluster: {
-    gap: space[3],
-  },
-  warningBanner: {
-    borderRadius: radii.xl,
-    backgroundColor: 'rgba(245, 158, 11, 0.18)',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    gap: space[3],
-  },
-  warningBannerText: {
-    color: darkTheme.textPrimary,
-    fontFamily: fontFamily.body.bold,
-  },
-  floatingControlRail: {
-    position: 'absolute',
-    right: space[3],
-    top: '38%',
-    transform: [{ translateY: -120 }],
-    width: 80,
-    gap: space[2],
-    alignItems: 'center',
-  },
-  toastContainer: {
-    position: 'absolute',
-    bottom: space[8],
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  hazardGridOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: space[4],
-    paddingBottom: space[8],
-    zIndex: 50,
-  },
-  hazardGridCard: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
-    padding: space[4],
-    gap: space[3],
-    ...shadows.lg,
-  },
-  hazardGridTitle: {
-    ...textSm,
-    fontFamily: fontFamily.heading.semiBold,
-    color: darkTheme.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  hazardGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-  },
-  hazardGridItem: {
-    width: '31%' as unknown as number,
-    alignItems: 'center',
-    gap: space[1],
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.lg,
-    paddingVertical: space[3],
-    paddingHorizontal: space[1],
-  },
-  hazardGridItemPressed: {
-    backgroundColor: darkTheme.bgTertiary,
-  },
-  hazardGridLabel: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-  },
-  hazardGridCancel: {
-    alignItems: 'center',
-    paddingVertical: space[2],
-  },
-  hazardGridCancelText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textMuted,
-  },
-  hazardFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: brandColors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-  },
-  roundButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: gray[800],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    overlayRoot: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingTop: space[2],
+      paddingBottom: space[4],
+    },
+    topCluster: {
+      gap: space[3],
+    },
+    bottomCluster: {
+      gap: space[3],
+    },
+    warningBanner: {
+      borderRadius: radii.xl,
+      backgroundColor: 'rgba(245, 158, 11, 0.18)',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      gap: space[3],
+    },
+    warningBannerText: {
+      color: colors.textPrimary,
+      fontFamily: fontFamily.body.bold,
+    },
+    floatingControlRail: {
+      position: 'absolute',
+      right: space[3],
+      top: '38%',
+      transform: [{ translateY: -120 }],
+      width: 80,
+      gap: space[2],
+      alignItems: 'center',
+    },
+    toastContainer: {
+      position: 'absolute',
+      bottom: space[8],
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+    },
+    hazardGridOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: surfaceTints.overlay,
+      justifyContent: 'flex-end',
+      paddingHorizontal: space[4],
+      paddingBottom: space[8],
+      zIndex: zIndex.sticky,
+    },
+    hazardGridCard: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii['2xl'],
+      padding: space[4],
+      gap: space[3],
+      ...shadows.lg,
+    },
+    hazardGridTitle: {
+      ...textSm,
+      fontFamily: fontFamily.heading.semiBold,
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      fontSize: 11,
+      textAlign: 'center',
+    },
+    hazardGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: space[2],
+    },
+    hazardGridItem: {
+      width: '31%' as unknown as number,
+      alignItems: 'center',
+      gap: space[1],
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.lg,
+      paddingVertical: space[3],
+      paddingHorizontal: space[1],
+    },
+    hazardGridItemPressed: {
+      backgroundColor: colors.bgTertiary,
+    },
+    hazardGridLabel: {
+      ...textXs,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    hazardGridCancel: {
+      alignItems: 'center',
+      paddingVertical: space[2],
+    },
+    hazardGridCancelText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textMuted,
+    },
+    hazardFab: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadows.md,
+    },
+    roundButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: gray[800],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });

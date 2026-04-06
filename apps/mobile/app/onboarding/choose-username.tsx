@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../src/design-system/atoms';
-import { brandColors, darkTheme, gray, safetyColors } from '../../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../../src/design-system';
+import { gray, safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
@@ -22,6 +23,8 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
 export default function ChooseUsernameScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const routePreview = useAppStore((s) => s.routePreview);
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -111,78 +114,79 @@ export default function ChooseUsernameScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-    paddingHorizontal: space[5],
-  },
-  headerSection: {
-    gap: space[2],
-    paddingTop: space[8],
-    paddingBottom: space[4],
-  },
-  eyebrow: {
-    ...textXs,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: brandColors.accent,
-  },
-  title: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    lineHeight: 22,
-  },
-  inputCard: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[4],
-    gap: space[2],
-    ...shadows.md,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[1],
-  },
-  atSign: {
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 20,
-    color: brandColors.accent,
-  },
-  input: {
-    flex: 1,
-    fontFamily: fontFamily.mono.medium,
-    fontSize: 18,
-    color: darkTheme.textPrimary,
-    paddingVertical: space[2],
-  },
-  hintText: {
-    ...textXs,
-    color: darkTheme.textMuted,
-  },
-  errorText: {
-    ...textSm,
-    color: safetyColors.danger,
-  },
-  footer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    gap: space[3],
-    alignItems: 'center',
-  },
-  skipText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textMuted,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+      paddingHorizontal: space[5],
+    },
+    headerSection: {
+      gap: space[2],
+      paddingTop: space[8],
+      paddingBottom: space[4],
+    },
+    eyebrow: {
+      ...textXs,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.4,
+      color: colors.accent,
+    },
+    title: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      ...textBase,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+    inputCard: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[4],
+      gap: space[2],
+      ...shadows.md,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[1],
+    },
+    atSign: {
+      fontFamily: fontFamily.mono.bold,
+      fontSize: 20,
+      color: colors.accent,
+    },
+    input: {
+      flex: 1,
+      fontFamily: fontFamily.mono.medium,
+      fontSize: 18,
+      color: colors.textPrimary,
+      paddingVertical: space[2],
+    },
+    hintText: {
+      ...textXs,
+      color: colors.textMuted,
+    },
+    errorText: {
+      ...textSm,
+      color: safetyColors.danger,
+    },
+    footer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      gap: space[3],
+      alignItems: 'center',
+    },
+    skipText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textMuted,
+    },
+  });

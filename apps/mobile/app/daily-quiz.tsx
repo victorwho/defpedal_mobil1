@@ -1,6 +1,6 @@
 import type { QuizAnswer, QuizQuestion } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '../src/design-system/atoms/Button';
 import { Toast } from '../src/design-system/molecules/Toast';
-import { brandColors, darkTheme, safetyColors } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
@@ -29,6 +29,7 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
+import { brandTints, safetyTints } from '../src/design-system/tokens/tints';
 
 // ---------------------------------------------------------------------------
 // Option button
@@ -42,32 +43,34 @@ type OptionButtonProps = {
   readonly state: OptionState;
   readonly disabled: boolean;
   readonly onPress: () => void;
+  readonly colors: ThemeColors;
+  readonly styles: ReturnType<typeof createThemedStyles>;
 };
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
 
-const getOptionColors = (state: OptionState) => {
+const getOptionColors = (state: OptionState, colors: ThemeColors) => {
   switch (state) {
     case 'correct':
-      return { bg: 'rgba(34, 197, 94, 0.15)', border: safetyColors.safe, text: safetyColors.safe };
+      return { bg: safetyTints.safeMedium, border: colors.safe, text: colors.safe };
     case 'wrong':
-      return { bg: 'rgba(239, 68, 68, 0.15)', border: safetyColors.danger, text: safetyColors.danger };
+      return { bg: safetyTints.dangerMedium, border: colors.danger, text: colors.danger };
     case 'selected':
-      return { bg: 'rgba(250, 204, 21, 0.1)', border: brandColors.accent, text: brandColors.accent };
+      return { bg: brandTints.accentLight, border: colors.accent, text: colors.accent };
     default:
-      return { bg: darkTheme.bgSecondary, border: darkTheme.borderDefault, text: darkTheme.textPrimary };
+      return { bg: colors.bgSecondary, border: colors.borderDefault, text: colors.textPrimary };
   }
 };
 
-const OptionButton = ({ label, index, state, disabled, onPress }: OptionButtonProps) => {
-  const colors = getOptionColors(state);
+const OptionButton = ({ label, index, state, disabled, onPress, colors, styles }: OptionButtonProps) => {
+  const optColors = getOptionColors(state, colors);
   const letter = OPTION_LETTERS[index] ?? String(index + 1);
 
   return (
     <Pressable
       style={({ pressed }) => [
         styles.optionButton,
-        { backgroundColor: colors.bg, borderColor: colors.border },
+        { backgroundColor: optColors.bg, borderColor: optColors.border },
         pressed && !disabled && styles.optionPressed,
         disabled && state === 'default' && styles.optionDisabled,
       ]}
@@ -76,14 +79,14 @@ const OptionButton = ({ label, index, state, disabled, onPress }: OptionButtonPr
       accessibilityRole="button"
       accessibilityLabel={`Option ${letter}: ${label}`}
     >
-      <View style={[styles.optionLetter, { borderColor: colors.border }]}>
-        <Text style={[styles.optionLetterText, { color: colors.text }]}>{letter}</Text>
+      <View style={[styles.optionLetter, { borderColor: optColors.border }]}>
+        <Text style={[styles.optionLetterText, { color: optColors.text }]}>{letter}</Text>
       </View>
-      <Text style={[styles.optionLabel, { color: colors.text }]}>{label}</Text>
+      <Text style={[styles.optionLabel, { color: optColors.text }]}>{label}</Text>
       {state === 'correct' ? (
-        <Ionicons name="checkmark-circle" size={22} color={safetyColors.safe} />
+        <Ionicons name="checkmark-circle" size={22} color={colors.safe} />
       ) : state === 'wrong' ? (
-        <Ionicons name="close-circle" size={22} color={safetyColors.danger} />
+        <Ionicons name="close-circle" size={22} color={colors.danger} />
       ) : null}
     </Pressable>
   );
@@ -97,6 +100,8 @@ const QUIZ_KEY = 'daily-quiz';
 
 export default function DailyQuizScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const queryClient = useQueryClient();
 
   const { data: question, isLoading, error, refetch } = useQuery<QuizQuestion>({
@@ -171,7 +176,7 @@ export default function DailyQuizScreen() {
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Ionicons name="close" size={24} color={darkTheme.textPrimary} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.headerTitle}>Daily Quiz</Text>
         <View style={styles.backButton} />
@@ -180,7 +185,7 @@ export default function DailyQuizScreen() {
       {/* Loading */}
       {isLoading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator color={brandColors.accent} size="large" />
+          <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
@@ -209,6 +214,8 @@ export default function DailyQuizScreen() {
                 state={getOptionState(index)}
                 disabled={answer != null || isSubmitting}
                 onPress={() => void handleSelectOption(index)}
+                colors={colors}
+                styles={styles}
               />
             ))}
           </View>
@@ -220,12 +227,12 @@ export default function DailyQuizScreen() {
                 <Ionicons
                   name={answer.isCorrect ? 'checkmark-circle' : 'information-circle'}
                   size={22}
-                  color={answer.isCorrect ? safetyColors.safe : safetyColors.caution}
+                  color={answer.isCorrect ? colors.safe : colors.caution}
                 />
                 <Text
                   style={[
                     styles.feedbackTitle,
-                    { color: answer.isCorrect ? safetyColors.safe : safetyColors.caution },
+                    { color: answer.isCorrect ? colors.safe : colors.caution },
                   ]}
                 >
                   {answer.isCorrect ? 'Correct!' : 'Not quite'}
@@ -259,135 +266,136 @@ export default function DailyQuizScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-  },
-  rootContent: {
-    flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...textLg,
-    fontFamily: fontFamily.heading.bold,
-    color: darkTheme.textPrimary,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[4],
-    paddingHorizontal: space[5],
-  },
-  errorText: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: space[5],
-    gap: space[4],
-  },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(250, 204, 21, 0.1)',
-    borderRadius: radii.full,
-    paddingHorizontal: space[3],
-    paddingVertical: space[1],
-  },
-  categoryText: {
-    ...textXs,
-    fontFamily: fontFamily.heading.semiBold,
-    color: brandColors.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  questionText: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.bold,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.3,
-    lineHeight: 32,
-  },
-  optionsList: {
-    gap: space[3],
-    paddingTop: space[2],
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    borderWidth: 1,
-    borderRadius: radii.xl,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3] + 2,
-  },
-  optionPressed: {
-    opacity: 0.8,
-    transform: [{ scale: 0.98 }],
-  },
-  optionDisabled: {
-    opacity: 0.5,
-  },
-  optionLetter: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionLetterText: {
-    ...textSm,
-    fontFamily: fontFamily.body.bold,
-    fontSize: 13,
-  },
-  optionLabel: {
-    ...textBase,
-    fontFamily: fontFamily.body.medium,
-    flex: 1,
-  },
-  feedbackCard: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[5],
-    gap: space[3],
-    ...shadows.md,
-  },
-  feedbackHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  feedbackTitle: {
-    ...textLg,
-    fontFamily: fontFamily.heading.bold,
-  },
-  feedbackExplanation: {
-    ...textSm,
-    color: darkTheme.textSecondary,
-    lineHeight: 20,
-  },
-  toastContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: space[5],
-    right: space[5],
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    rootContent: {
+      flexGrow: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      ...textLg,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    centerContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[4],
+      paddingHorizontal: space[5],
+    },
+    errorText: {
+      ...textBase,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: space[5],
+      gap: space[4],
+    },
+    categoryBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: brandTints.accentLight,
+      borderRadius: radii.full,
+      paddingHorizontal: space[3],
+      paddingVertical: space[1],
+    },
+    categoryText: {
+      ...textXs,
+      fontFamily: fontFamily.heading.semiBold,
+      color: colors.accent,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    questionText: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      letterSpacing: -0.3,
+      lineHeight: 32,
+    },
+    optionsList: {
+      gap: space[3],
+      paddingTop: space[2],
+    },
+    optionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      borderWidth: 1,
+      borderRadius: radii.xl,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3] + 2,
+    },
+    optionPressed: {
+      opacity: 0.8,
+      transform: [{ scale: 0.98 }],
+    },
+    optionDisabled: {
+      opacity: 0.5,
+    },
+    optionLetter: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    optionLetterText: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      fontSize: 13,
+    },
+    optionLabel: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      flex: 1,
+    },
+    feedbackCard: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii['2xl'],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[5],
+      gap: space[3],
+      ...shadows.md,
+    },
+    feedbackHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    feedbackTitle: {
+      ...textLg,
+      fontFamily: fontFamily.heading.bold,
+    },
+    feedbackExplanation: {
+      ...textSm,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    toastContainer: {
+      position: 'absolute',
+      bottom: 100,
+      left: space[5],
+      right: space[5],
+    },
+  });

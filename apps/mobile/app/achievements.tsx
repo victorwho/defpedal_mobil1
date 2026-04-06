@@ -33,8 +33,7 @@ import { TrophyCaseHeader } from '../src/design-system/organisms/TrophyCaseHeade
 import { CategoryTabBar } from '../src/design-system/organisms/CategoryTabBar';
 import { BadgeDetailModal } from '../src/design-system/organisms/BadgeDetailModal';
 import { type BadgeTier, type BadgeCategory, badgeSpace } from '../src/design-system/tokens/badgeColors';
-import { brandColors } from '../src/design-system/tokens/colors';
-import { radii } from '../src/design-system/tokens/radii';
+import { useTheme, type ThemeColors } from '../src/design-system';
 import { space, layout } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { useBadges } from '../src/hooks/useBadges';
@@ -146,6 +145,8 @@ function buildSortedBadges(
 
 export default function AchievementsScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { data, isLoading } = useBadges();
 
   const [selectedTab, setSelectedTab] = useState<BadgeCategory | 'all'>('all');
@@ -281,7 +282,7 @@ export default function AchievementsScreen() {
           style={styles.backButton}
           hitSlop={8}
         >
-          <Ionicons name="chevron-back" size={22} color={brandColors.textPrimary} />
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={styles.screenTitle}>Achievements</Text>
         <View style={{ width: 36 }} />
@@ -289,7 +290,7 @@ export default function AchievementsScreen() {
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator color={brandColors.accent} size="large" />
+          <ActivityIndicator color={colors.accent} size="large" />
         </View>
       ) : (
         <FlatList
@@ -350,63 +351,64 @@ export default function AchievementsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: brandColors.bgDeep,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: brandColors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  screenTitle: {
-    fontFamily: fontFamily.heading.bold,
-    fontSize: 18,
-    color: brandColors.textPrimary,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerSection: {
-    gap: space[4],
-    marginBottom: space[4],
-  },
-  listContent: {
-    paddingHorizontal: layout.screenHorizontalPadding,
-  },
-  columnWrapper: {
-    gap: badgeSpace.gridGap,
-  },
-  showMoreBtn: {
-    alignItems: 'center',
-    paddingVertical: space[4],
-    marginTop: space[2],
-  },
-  showMoreText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.accent,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: space[10],
-  },
-  emptyText: {
-    ...textSm,
-    color: brandColors.textMuted,
-    textAlign: 'center',
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    screenTitle: {
+      fontFamily: fontFamily.heading.bold,
+      fontSize: 18,
+      color: colors.textPrimary,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerSection: {
+      gap: space[4],
+      marginBottom: space[4],
+    },
+    listContent: {
+      paddingHorizontal: layout.screenHorizontalPadding,
+    },
+    columnWrapper: {
+      gap: badgeSpace.gridGap,
+    },
+    showMoreBtn: {
+      alignItems: 'center',
+      paddingVertical: space[4],
+      marginTop: space[2],
+    },
+    showMoreText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.accent,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingVertical: space[10],
+    },
+    emptyText: {
+      ...textSm,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+  });

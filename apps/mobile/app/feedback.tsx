@@ -32,7 +32,8 @@ import {
 } from '../src/components/MilestoneShareCard';
 import { Button } from '../src/design-system/atoms';
 import { Modal } from '../src/design-system/organisms/Modal';
-import { brandColors, darkTheme } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
@@ -48,18 +49,23 @@ import { useT } from '../src/hooks/useTranslation';
 // ---------------------------------------------------------------------------
 
 const STAR_SIZE = 40;
-const STAR_COLOR_ACTIVE = '#FACC15';
-const STAR_COLOR_INACTIVE = '#D1D5DB';
+const STAR_COLOR_INACTIVE = gray[300];
 
 const formatCoordinateLabel = (lat: number, lon: number) =>
   `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
+type ThemedStyles = ReturnType<typeof createThemedStyles>;
+
 function StarRow({
   rating,
   onSelect,
+  styles,
+  accentColor,
 }: {
   rating: number;
   onSelect: (value: number) => void;
+  styles: ThemedStyles;
+  accentColor: string;
 }) {
   return (
     <View style={styles.starRow}>
@@ -74,7 +80,7 @@ function StarRow({
           <Text
             style={[
               styles.starIcon,
-              { color: rating >= value ? STAR_COLOR_ACTIVE : STAR_COLOR_INACTIVE },
+              { color: rating >= value ? accentColor : STAR_COLOR_INACTIVE },
             ]}
           >
             ★
@@ -93,9 +99,10 @@ type ImpactStepProps = {
   readonly rideImpact: RideImpact;
   readonly dashboard: ImpactDashboard | null;
   readonly onContinue: () => void;
+  readonly styles: ThemedStyles;
 };
 
-const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, dashboard, onContinue, styles }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -125,9 +132,11 @@ const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => {
 type RatingStepProps = {
   readonly onDone: () => void;
   readonly onCancel: () => void;
+  readonly styles: ThemedStyles;
+  readonly colors: ThemeColors;
 };
 
-const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
+const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
   const t = useT();
   const { user } = useAuthSession();
   const [rating, setRating] = useState(0);
@@ -215,7 +224,7 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
           </Text>
 
           <Text style={styles.sectionLabel}>{t('feedback.perceivedSafety')}</Text>
-          <StarRow rating={rating} onSelect={setRating} />
+          <StarRow rating={rating} onSelect={setRating} styles={styles} accentColor={colors.accent} />
 
           <Text style={styles.sectionLabel}>{t('feedback.commentsOptional')}</Text>
           <TextInput
@@ -269,6 +278,8 @@ const RatingStep = ({ onDone, onCancel }: RatingStepProps) => {
 type FeedbackStep = 'impact' | 'rating';
 
 export default function FeedbackScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const guardPassed = useRouteGuard({
     requiredStates: ['AWAITING_FEEDBACK'],
   });
@@ -441,9 +452,10 @@ export default function FeedbackScreen() {
             rideImpact={rideImpact}
             dashboard={dashboard}
             onContinue={() => setStep('rating')}
+            styles={styles}
           />
         ) : (
-          <RatingStep onDone={handleDone} onCancel={handleCancel} />
+          <RatingStep onDone={handleDone} onCancel={handleCancel} styles={styles} colors={colors} />
         )}
       </SafeAreaView>
 
@@ -518,181 +530,182 @@ export default function FeedbackScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: brandColors.bgDeep,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Impact step
-  impactScrollContent: {
-    paddingHorizontal: space[5],
-    paddingVertical: space[6],
-    gap: space[4],
-  },
-  impactHeadline: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: darkTheme.textPrimary,
-    textAlign: 'center',
-  },
-  impactSubtext: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-    marginTop: -space[2],
-  },
-  impactActions: {
-    gap: space[3],
-    paddingTop: space[2],
-  },
-  // Rating step (preserved)
-  keyboardView: {
-    flex: 1,
-  },
-  cardContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: space[5],
-  },
-  card: {
-    backgroundColor: '#FFFDF5',
-    borderRadius: radii.xl,
-    padding: space[6],
-    gap: space[4],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  title: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: '#111827',
-    textAlign: 'center',
-  },
-  subtitle: {
-    ...textBase,
-    color: '#6B7280',
-    textAlign: 'center',
-    marginTop: -space[2],
-  },
-  sectionLabel: {
-    ...textSm,
-    fontFamily: fontFamily.body.bold,
-    color: '#374151',
-    textAlign: 'center',
-  },
-  starRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: space[3],
-  },
-  starIcon: {
-    fontSize: STAR_SIZE,
-    lineHeight: STAR_SIZE + 8,
-  },
-  commentInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    padding: space[3],
-    minHeight: 100,
-    fontSize: 15,
-    color: '#111827',
-    fontFamily: fontFamily.body.regular,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: space[3],
-    marginTop: space[2],
-  },
-  button: {
-    flex: 1,
-    paddingVertical: space[4],
-    borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#D1D5DB',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontFamily: fontFamily.body.bold,
-    color: '#374151',
-  },
-  submitButton: {
-    backgroundColor: '#6B7280',
-  },
-  submitButtonDisabled: {
-    opacity: 0.5,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontFamily: fontFamily.body.bold,
-    color: '#FFFFFF',
-  },
-  submitButtonTextDisabled: {
-    color: '#D1D5DB',
-  },
-  doneButton: {
-    backgroundColor: '#FDD700',
-    marginTop: space[2],
-    paddingVertical: space[4],
-    minHeight: 52,
-  },
-  doneButtonText: {
-    fontSize: 16,
-    fontFamily: fontFamily.body.bold,
-    color: '#111827',
-  },
-  milestoneFooter: {
-    gap: space[2],
-    alignItems: 'center',
-  },
-  signupPromptFooter: {
-    gap: space[3],
-    alignItems: 'center',
-  },
-  signupGoogleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    height: 52,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    backgroundColor: darkTheme.bgSecondary,
-    gap: space[3],
-  },
-  signupGoogleIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  signupGoogleG: {
-    fontFamily: fontFamily.body.bold,
-    fontSize: 14,
-    color: '#4285F4',
-    marginTop: -1,
-  },
-  signupGoogleLabel: {
-    ...textSm,
-    fontFamily: fontFamily.body.bold,
-    color: darkTheme.textPrimary,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // Impact step
+    impactScrollContent: {
+      paddingHorizontal: space[5],
+      paddingVertical: space[6],
+      gap: space[4],
+    },
+    impactHeadline: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    impactSubtext: {
+      ...textBase,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: -space[2],
+    },
+    impactActions: {
+      gap: space[3],
+      paddingTop: space[2],
+    },
+    // Rating step (preserved — light-themed card hex values intentionally kept)
+    keyboardView: {
+      flex: 1,
+    },
+    cardContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: space[5],
+    },
+    card: {
+      backgroundColor: '#FFFDF5',
+      borderRadius: radii.xl,
+      padding: space[6],
+      gap: space[4],
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    title: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: '#111827',
+      textAlign: 'center',
+    },
+    subtitle: {
+      ...textBase,
+      color: '#6B7280',
+      textAlign: 'center',
+      marginTop: -space[2],
+    },
+    sectionLabel: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: '#374151',
+      textAlign: 'center',
+    },
+    starRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: space[3],
+    },
+    starIcon: {
+      fontSize: STAR_SIZE,
+      lineHeight: STAR_SIZE + 8,
+    },
+    commentInput: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+      padding: space[3],
+      minHeight: 100,
+      fontSize: 15,
+      color: '#111827',
+      fontFamily: fontFamily.body.regular,
+    },
+    buttonRow: {
+      flexDirection: 'row',
+      gap: space[3],
+      marginTop: space[2],
+    },
+    button: {
+      flex: 1,
+      paddingVertical: space[4],
+      borderRadius: radii.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButton: {
+      backgroundColor: '#D1D5DB',
+    },
+    cancelButtonText: {
+      fontSize: 16,
+      fontFamily: fontFamily.body.bold,
+      color: '#374151',
+    },
+    submitButton: {
+      backgroundColor: '#6B7280',
+    },
+    submitButtonDisabled: {
+      opacity: 0.5,
+    },
+    submitButtonText: {
+      fontSize: 16,
+      fontFamily: fontFamily.body.bold,
+      color: '#FFFFFF',
+    },
+    submitButtonTextDisabled: {
+      color: '#D1D5DB',
+    },
+    doneButton: {
+      backgroundColor: '#FDD700',
+      marginTop: space[2],
+      paddingVertical: space[4],
+      minHeight: 52,
+    },
+    doneButtonText: {
+      fontSize: 16,
+      fontFamily: fontFamily.body.bold,
+      color: '#111827',
+    },
+    milestoneFooter: {
+      gap: space[2],
+      alignItems: 'center',
+    },
+    signupPromptFooter: {
+      gap: space[3],
+      alignItems: 'center',
+    },
+    signupGoogleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      height: 52,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
+      gap: space[3],
+    },
+    signupGoogleIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    signupGoogleG: {
+      fontFamily: fontFamily.body.bold,
+      fontSize: 14,
+      color: '#4285F4',
+      marginTop: -1,
+    },
+    signupGoogleLabel: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.textPrimary,
+    },
+  });

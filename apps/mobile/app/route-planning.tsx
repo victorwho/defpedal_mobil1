@@ -31,12 +31,15 @@ import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Toast } from '../src/design-system/molecules/Toast';
-import { brandColors, darkTheme, gray } from '../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily, textXs } from '../src/design-system/tokens/typography';
 import { duration, easing } from '../src/design-system/tokens/motion';
+import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
+import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
@@ -50,6 +53,8 @@ const coordinatesMatch = (left: Coordinate, right: Coordinate, precision = 0.000
   Math.abs(left.lat - right.lat) <= precision && Math.abs(left.lon - right.lon) <= precision;
 
 export default function RoutePlanningScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
@@ -793,7 +798,7 @@ export default function RoutePlanningScreen() {
               <Ionicons
                 name="shield-checkmark-outline"
                 size={14}
-                color={routeRequest.mode === 'safe' ? '#3B82F6' : gray[400]}
+                color={routeRequest.mode === 'safe' ? colors.info : gray[400]}
               />
               <Text
                 style={[
@@ -817,7 +822,7 @@ export default function RoutePlanningScreen() {
               <Ionicons
                 name="flash-outline"
                 size={14}
-                color={routeRequest.mode === 'fast' ? '#3B82F6' : gray[400]}
+                color={routeRequest.mode === 'fast' ? colors.info : gray[400]}
               />
               <Text
                 style={[
@@ -862,7 +867,7 @@ export default function RoutePlanningScreen() {
             <Ionicons name="help-circle-outline" size={22} color={gray[700]} />
           </Pressable>
           <Pressable
-            style={[styles.fabButton, hazardPlacementMode && { backgroundColor: darkTheme.accent }]}
+            style={[styles.fabButton, hazardPlacementMode && { backgroundColor: colors.accent }]}
             onPress={toggleHazardMode}
             accessibilityLabel={hazardPlacementMode ? 'Cancel hazard report' : 'Report hazard'}
             accessibilityRole="button"
@@ -870,7 +875,7 @@ export default function RoutePlanningScreen() {
             <Ionicons
               name={hazardPlacementMode ? 'close' : 'warning'}
               size={22}
-              color={hazardPlacementMode ? '#000' : darkTheme.accent}
+              color={hazardPlacementMode ? '#000' : colors.accent}
             />
           </Pressable>
           <Pressable
@@ -888,7 +893,7 @@ export default function RoutePlanningScreen() {
               accessibilityLabel="Saved routes"
               accessibilityRole="button"
             >
-              <Ionicons name="bookmark" size={22} color={brandColors.accent} />
+              <Ionicons name="bookmark" size={22} color={colors.accent} />
             </Pressable>
           ) : null}
         </Animated.View>
@@ -958,7 +963,7 @@ export default function RoutePlanningScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Report ${item.label}`}
               >
-                <Ionicons name={item.icon} size={24} color={brandColors.accent} />
+                <Ionicons name={item.icon} size={24} color={colors.accent} />
                 <Text style={styles.hazardGridLabel}>{item.label}</Text>
               </Pressable>
             ))}
@@ -992,7 +997,7 @@ export default function RoutePlanningScreen() {
               });
             }}
           >
-            <Ionicons name="share-social-outline" size={16} color={brandColors.accent} />
+            <Ionicons name="share-social-outline" size={16} color={colors.accent} />
             <Text style={styles.shareHazardText}>{t('communityScreen.shareRide').replace('ride', 'alert')}</Text>
           </Pressable>
         ) : null}
@@ -1015,7 +1020,7 @@ export default function RoutePlanningScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Load saved route: ${route.name}`}
             >
-              <Ionicons name="bookmark" size={16} color={brandColors.accent} />
+              <Ionicons name="bookmark" size={16} color={colors.accent} />
               <View style={styles.savedRouteTextWrap}>
                 <Text style={styles.savedRouteName} numberOfLines={1}>{route.name}</Text>
                 <Text style={styles.savedRouteMode}>
@@ -1037,342 +1042,343 @@ export default function RoutePlanningScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Styles
+// Themed style factory — colors come from useTheme(), layout stays static
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  rootWrapper: {
-    flex: 1,
-  },
-  topContainer: {
-    gap: space[2],
-  },
-  originCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.xl,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    ...shadows.md,
-  },
-  originContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    minHeight: 48,
-    paddingRight: 44,
-  },
-  originTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  originDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#3B82F6',
-  },
-  originTitle: {
-    color: gray[800],
-    fontFamily: fontFamily.body.bold,
-    fontSize: 15,
-  },
-  originSubtitle: {
-    color: gray[500],
-    fontSize: 13,
-  },
-  editButton: {
-    paddingHorizontal: space[2],
-    paddingVertical: space[1],
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    top: space[1],
-    right: space[1],
-  },
-  editButtonLabel: {
-    color: gray[500],
-    fontFamily: fontFamily.body.bold,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  cancelButton: {
-    alignSelf: 'flex-end',
-    paddingHorizontal: space[3],
-    paddingVertical: space[2],
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  cancelButtonLabel: {
-    color: gray[500],
-    fontFamily: fontFamily.body.bold,
-    fontSize: 13,
-  },
-  destinationCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.xl,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    ...shadows.md,
-  },
-  modeToggleRow: {
-    flexDirection: 'row',
-    alignSelf: 'flex-start',
-    gap: space[1],
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: radii.full,
-    padding: 3,
-    ...shadows.sm,
-  },
-  modeTogglePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: space[3],
-    paddingVertical: 6,
-    borderRadius: radii.full,
-  },
-  modeTogglePillActive: {
-    backgroundColor: 'rgba(59, 130, 246, 0.10)',
-  },
-  modeToggleLabel: {
-    fontSize: 12,
-    fontFamily: fontFamily.body.bold,
-    color: gray[400],
-  },
-  modeToggleLabelActive: {
-    color: '#3B82F6',
-  },
-  searchOverlay: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.xl,
-    padding: space[3],
-    ...shadows.md,
-  },
-  fabColumn: {
-    gap: space[2],
-  },
-  fabButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadows.md,
-  },
-  hazardOptionList: {
-    gap: space[2],
-  },
-  footerCollapsed: {
-    marginBottom: layout.bottomNavHeight,
-  },
-  hazardPlacementFooter: {
-    gap: space[2],
-    alignItems: 'center',
-  },
-  hazardToastContainer: {
-    position: 'absolute',
-    bottom: '20%',
-    left: space[4],
-    right: space[4],
-    zIndex: 200,
-  },
-  shareHazardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[1],
-    paddingVertical: space[2],
-    marginTop: space[1],
-  },
-  shareHazardText: {
-    ...textXs,
-    fontFamily: fontFamily.body.bold,
-    color: brandColors.accent,
-  },
-  hazardGridOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-    paddingHorizontal: space[4],
-    paddingBottom: space[6],
-    zIndex: 100,
-  },
-  hazardGridCard: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
-    padding: space[4],
-    gap: space[3],
-    ...shadows.lg,
-  },
-  hazardGridTitle: {
-    fontFamily: fontFamily.heading.semiBold,
-    fontSize: 14,
-    color: darkTheme.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  hazardGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: space[2],
-  },
-  hazardGridItem: {
-    width: '31%' as unknown as number,
-    alignItems: 'center',
-    gap: space[1],
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.lg,
-    paddingVertical: space[3],
-    paddingHorizontal: space[1],
-  },
-  hazardGridItemPressed: {
-    backgroundColor: darkTheme.bgTertiary,
-  },
-  hazardGridLabel: {
-    fontSize: 11,
-    color: darkTheme.textSecondary,
-    textAlign: 'center',
-  },
-  hazardGridCancel: {
-    alignItems: 'center',
-    paddingVertical: space[2],
-  },
-  hazardGridCancelText: {
-    fontFamily: fontFamily.body.medium,
-    fontSize: 14,
-    color: darkTheme.textMuted,
-  },
-  // Waypoint styles
-  waypointRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    paddingLeft: space[1],
-  },
-  waypointDot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: gray[600],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waypointDotText: {
-    fontSize: 11,
-    fontFamily: fontFamily.mono.bold,
-    color: '#FFFFFF',
-  },
-  waypointSearchWrap: {
-    flex: 1,
-  },
-  waypointLabel: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radii.lg,
-    paddingHorizontal: space[3],
-    paddingVertical: space[2],
-    ...shadows.sm,
-  },
-  waypointLabelText: {
-    fontSize: 14,
-    fontFamily: fontFamily.body.medium,
-    color: gray[800],
-  },
-  waypointReorder: {
-    padding: 2,
-  },
-  waypointRemove: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addStopButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[1],
-    alignSelf: 'flex-start',
-    paddingVertical: space[1],
-    paddingHorizontal: space[2],
-  },
-  addStopText: {
-    fontSize: 13,
-    fontFamily: fontFamily.body.medium,
-    color: gray[400],
-  },
-  savedRoutesOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  savedRoutesModal: {
-    width: '85%',
-    maxHeight: '70%',
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    padding: space[4],
-    gap: space[2],
-  },
-  savedRoutesTitle: {
-    fontSize: 18,
-    fontFamily: fontFamily.heading.bold,
-    color: darkTheme.textPrimary,
-    marginBottom: space[1],
-  },
-  savedRouteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    paddingVertical: space[2],
-    paddingHorizontal: space[2],
-    backgroundColor: darkTheme.bgSecondary,
-    borderRadius: radii.md,
-  },
-  savedRouteTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  savedRouteName: {
-    fontSize: 14,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textPrimary,
-  },
-  savedRouteMode: {
-    fontSize: 12,
-    fontFamily: fontFamily.body.regular,
-    color: gray[400],
-  },
-  savedRoutesCancel: {
-    alignItems: 'center',
-    paddingVertical: space[2],
-    marginTop: space[1],
-  },
-  savedRoutesCancelText: {
-    fontSize: 14,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textMuted,
-  },
-  longPressHint: {
-    position: 'absolute',
-    bottom: 120,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
-    borderRadius: radii.full,
-    paddingVertical: space[2],
-    paddingHorizontal: space[4],
-  },
-  longPressHintText: {
-    ...textXs,
-    color: 'white',
-    fontFamily: fontFamily.body.medium,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    rootWrapper: {
+      flex: 1,
+    },
+    topContainer: {
+      gap: space[2],
+    },
+    originCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.xl,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      ...shadows.md,
+    },
+    originContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      minHeight: 48,
+      paddingRight: 44,
+    },
+    originTextWrap: {
+      flex: 1,
+      gap: 2,
+    },
+    originDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.info,
+    },
+    originTitle: {
+      color: gray[800],
+      fontFamily: fontFamily.body.bold,
+      fontSize: 15,
+    },
+    originSubtitle: {
+      color: gray[500],
+      fontSize: 13,
+    },
+    editButton: {
+      paddingHorizontal: space[2],
+      paddingVertical: space[1],
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'absolute',
+      top: space[1],
+      right: space[1],
+    },
+    editButtonLabel: {
+      color: gray[500],
+      fontFamily: fontFamily.body.bold,
+      fontSize: 13,
+      letterSpacing: 0.5,
+    },
+    cancelButton: {
+      alignSelf: 'flex-end',
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      minHeight: 36,
+      justifyContent: 'center',
+    },
+    cancelButtonLabel: {
+      color: gray[500],
+      fontFamily: fontFamily.body.bold,
+      fontSize: 13,
+    },
+    destinationCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.xl,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      ...shadows.md,
+    },
+    modeToggleRow: {
+      flexDirection: 'row',
+      alignSelf: 'flex-start',
+      gap: space[1],
+      backgroundColor: surfaceTints.glassLight,
+      borderRadius: radii.full,
+      padding: 3,
+      ...shadows.sm,
+    },
+    modeTogglePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: space[3],
+      paddingVertical: 6,
+      borderRadius: radii.full,
+    },
+    modeTogglePillActive: {
+      backgroundColor: safetyTints.infoLight,
+    },
+    modeToggleLabel: {
+      fontSize: 12,
+      fontFamily: fontFamily.body.bold,
+      color: gray[400],
+    },
+    modeToggleLabelActive: {
+      color: colors.info,
+    },
+    searchOverlay: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.xl,
+      padding: space[3],
+      ...shadows.md,
+    },
+    fabColumn: {
+      gap: space[2],
+    },
+    fabButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadows.md,
+    },
+    hazardOptionList: {
+      gap: space[2],
+    },
+    footerCollapsed: {
+      marginBottom: layout.bottomNavHeight,
+    },
+    hazardPlacementFooter: {
+      gap: space[2],
+      alignItems: 'center',
+    },
+    hazardToastContainer: {
+      position: 'absolute',
+      bottom: '20%',
+      left: space[4],
+      right: space[4],
+      zIndex: zIndex.toast,
+    },
+    shareHazardButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[1],
+      paddingVertical: space[2],
+      marginTop: space[1],
+    },
+    shareHazardText: {
+      ...textXs,
+      fontFamily: fontFamily.body.bold,
+      color: colors.accent,
+    },
+    hazardGridOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: surfaceTints.overlaySubtle,
+      justifyContent: 'flex-end',
+      paddingHorizontal: space[4],
+      paddingBottom: space[6],
+      zIndex: zIndex.modal,
+    },
+    hazardGridCard: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii['2xl'],
+      padding: space[4],
+      gap: space[3],
+      ...shadows.lg,
+    },
+    hazardGridTitle: {
+      fontFamily: fontFamily.heading.semiBold,
+      fontSize: 14,
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      textAlign: 'center',
+    },
+    hazardGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: space[2],
+    },
+    hazardGridItem: {
+      width: '31%' as unknown as number,
+      alignItems: 'center',
+      gap: space[1],
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.lg,
+      paddingVertical: space[3],
+      paddingHorizontal: space[1],
+    },
+    hazardGridItemPressed: {
+      backgroundColor: colors.bgTertiary,
+    },
+    hazardGridLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    hazardGridCancel: {
+      alignItems: 'center',
+      paddingVertical: space[2],
+    },
+    hazardGridCancelText: {
+      fontFamily: fontFamily.body.medium,
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    // Waypoint styles
+    waypointRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingLeft: space[1],
+    },
+    waypointDot: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: gray[600],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    waypointDotText: {
+      fontSize: 11,
+      fontFamily: fontFamily.mono.bold,
+      color: '#FFFFFF',
+    },
+    waypointSearchWrap: {
+      flex: 1,
+    },
+    waypointLabel: {
+      flex: 1,
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.lg,
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      ...shadows.sm,
+    },
+    waypointLabelText: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.medium,
+      color: gray[800],
+    },
+    waypointReorder: {
+      padding: 2,
+    },
+    waypointRemove: {
+      width: 28,
+      height: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addStopButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[1],
+      alignSelf: 'flex-start',
+      paddingVertical: space[1],
+      paddingHorizontal: space[2],
+    },
+    addStopText: {
+      fontSize: 13,
+      fontFamily: fontFamily.body.medium,
+      color: gray[400],
+    },
+    savedRoutesOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: surfaceTints.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: zIndex.modal,
+    },
+    savedRoutesModal: {
+      width: '85%',
+      maxHeight: '70%',
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      padding: space[4],
+      gap: space[2],
+    },
+    savedRoutesTitle: {
+      fontSize: 18,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+      marginBottom: space[1],
+    },
+    savedRouteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingVertical: space[2],
+      paddingHorizontal: space[2],
+      backgroundColor: colors.bgSecondary,
+      borderRadius: radii.md,
+    },
+    savedRouteTextWrap: {
+      flex: 1,
+      gap: 2,
+    },
+    savedRouteName: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    savedRouteMode: {
+      fontSize: 12,
+      fontFamily: fontFamily.body.regular,
+      color: gray[400],
+    },
+    savedRoutesCancel: {
+      alignItems: 'center',
+      paddingVertical: space[2],
+      marginTop: space[1],
+    },
+    savedRoutesCancelText: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textMuted,
+    },
+    longPressHint: {
+      position: 'absolute',
+      bottom: 120,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      backgroundColor: 'rgba(0, 0, 0, 0.62)',
+      borderRadius: radii.full,
+      paddingVertical: space[2],
+      paddingHorizontal: space[4],
+    },
+    longPressHintText: {
+      ...textXs,
+      color: 'white',
+      fontFamily: fontFamily.body.medium,
+    },
+  });

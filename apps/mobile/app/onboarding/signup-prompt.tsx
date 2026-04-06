@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Button } from '../../src/design-system/atoms';
-import { brandColors, darkTheme, gray } from '../../src/design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../../src/design-system';
+import { gray } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
@@ -40,6 +41,8 @@ const PROGRESS_PERCENT = Math.round((COMPLETED_COUNT / PROGRESS_STEPS.length) * 
 
 export default function OnboardingSignupPromptScreen() {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const authCtx = useAuthSessionOptional();
   const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
   const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
@@ -92,7 +95,7 @@ export default function OnboardingSignupPromptScreen() {
 
       {!isMandatory ? (
         <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-          <Ionicons name="chevron-back" size={24} color={darkTheme.textPrimary} />
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </Pressable>
       ) : <View style={styles.backButton} />}
 
@@ -119,7 +122,7 @@ export default function OnboardingSignupPromptScreen() {
               <Ionicons
                 name={step.completed ? 'checkmark-circle' : 'ellipse-outline'}
                 size={18}
-                color={step.completed ? brandColors.accent : darkTheme.textMuted}
+                color={step.completed ? colors.accent : colors.textMuted}
               />
               <Text
                 style={[
@@ -183,154 +186,155 @@ export default function OnboardingSignupPromptScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: darkTheme.bgDeep,
-    paddingHorizontal: space[5],
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'flex-start',
-  },
-  glowTop: {
-    position: 'absolute',
-    top: -80,
-    right: -20,
-    width: 220,
-    height: 220,
-    borderRadius: 9999,
-    backgroundColor: 'rgba(250, 204, 21, 0.14)',
-    opacity: 0.6,
-  },
-  headerSection: {
-    gap: space[2],
-  },
-  eyebrow: {
-    ...textXs,
-    fontFamily: fontFamily.heading.extraBold,
-    textTransform: 'uppercase',
-    letterSpacing: 1.4,
-    color: brandColors.accent,
-  },
-  title: {
-    ...text2xl,
-    fontFamily: fontFamily.heading.extraBold,
-    color: darkTheme.textPrimary,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    ...textBase,
-    color: darkTheme.textSecondary,
-    lineHeight: 22,
-  },
-  progressSection: {
-    gap: space[3],
-    paddingTop: space[4],
-  },
-  progressBarBg: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: darkTheme.bgSecondary,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: brandColors.accent,
-  },
-  progressLabel: {
-    ...textXs,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.accent,
-  },
-  stepList: {
-    gap: space[2],
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-  },
-  stepLabel: {
-    ...textSm,
-    color: darkTheme.textMuted,
-  },
-  stepLabelCompleted: {
-    color: darkTheme.textPrimary,
-  },
-  card: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii['2xl'],
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    padding: space[5],
-    gap: space[4],
-    marginTop: space[4],
-    ...shadows.lg,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    backgroundColor: darkTheme.bgSecondary,
-    gap: space[3],
-  },
-  googleIconWrap: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleG: {
-    fontFamily: fontFamily.body.bold,
-    fontSize: 14,
-    color: '#4285F4',
-    marginTop: -1,
-  },
-  googleLabel: {
-    ...textSm,
-    fontFamily: fontFamily.body.bold,
-    color: darkTheme.textPrimary,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: darkTheme.borderDefault,
-  },
-  dividerText: {
-    ...textXs,
-    color: gray[500],
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  errorText: {
-    ...textSm,
-    color: '#F87171',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  footer: {
-    alignItems: 'center',
-    paddingTop: space[4],
-  },
-  dismissText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textMuted,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+      paddingHorizontal: space[5],
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'flex-start',
+    },
+    glowTop: {
+      position: 'absolute',
+      top: -80,
+      right: -20,
+      width: 220,
+      height: 220,
+      borderRadius: 9999,
+      backgroundColor: 'rgba(250, 204, 21, 0.14)',
+      opacity: 0.6,
+    },
+    headerSection: {
+      gap: space[2],
+    },
+    eyebrow: {
+      ...textXs,
+      fontFamily: fontFamily.heading.extraBold,
+      textTransform: 'uppercase',
+      letterSpacing: 1.4,
+      color: colors.accent,
+    },
+    title: {
+      ...text2xl,
+      fontFamily: fontFamily.heading.extraBold,
+      color: colors.textPrimary,
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      ...textBase,
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+    progressSection: {
+      gap: space[3],
+      paddingTop: space[4],
+    },
+    progressBarBg: {
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.bgSecondary,
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      height: '100%',
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+    },
+    progressLabel: {
+      ...textXs,
+      fontFamily: fontFamily.body.medium,
+      color: colors.accent,
+    },
+    stepList: {
+      gap: space[2],
+    },
+    stepRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    stepLabel: {
+      ...textSm,
+      color: colors.textMuted,
+    },
+    stepLabelCompleted: {
+      color: colors.textPrimary,
+    },
+    card: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii['2xl'],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      padding: space[5],
+      gap: space[4],
+      marginTop: space[4],
+      ...shadows.lg,
+    },
+    googleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 52,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
+      gap: space[3],
+    },
+    googleIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleG: {
+      fontFamily: fontFamily.body.bold,
+      fontSize: 14,
+      color: '#4285F4',
+      marginTop: -1,
+    },
+    googleLabel: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.textPrimary,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.borderDefault,
+    },
+    dividerText: {
+      ...textXs,
+      color: gray[500],
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    errorText: {
+      ...textSm,
+      color: '#F87171',
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    footer: {
+      alignItems: 'center',
+      paddingTop: space[4],
+    },
+    dismissText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textMuted,
+    },
+  });

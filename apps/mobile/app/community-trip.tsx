@@ -28,10 +28,13 @@ import {
   usePostComment,
 } from '../src/hooks/useFeed';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
-import { mobileTheme } from '../src/lib/theme';
+import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 
 export default function CommunityTripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const [commentText, setCommentText] = useState('');
 
   const location = useCurrentLocation();
@@ -84,6 +87,13 @@ export default function CommunityTripScreen() {
   }, [id, commentText, postComment]);
 
   const insets = useSafeAreaInsets();
+
+  const StatTile = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.statTile}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
 
   if (!item) {
     return (
@@ -188,7 +198,7 @@ export default function CommunityTripScreen() {
         <TextInput
           style={styles.input}
           placeholder="Add a comment..."
-          placeholderTextColor={mobileTheme.colors.textOnDarkMuted}
+          placeholderTextColor={colors.textSecondary}
           value={commentText}
           onChangeText={setCommentText}
           multiline
@@ -207,19 +217,10 @@ export default function CommunityTripScreen() {
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statTile}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
+const createThemedStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: mobileTheme.colors.background,
+    backgroundColor: colors.bgDeep,
   },
   flex: {
     flex: 1,
@@ -230,7 +231,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   loadingText: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 15,
     textAlign: 'center',
     marginTop: 60,
@@ -239,22 +240,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backText: {
-    color: mobileTheme.colors.brand,
+    color: colors.accent,
     fontSize: 15,
     fontWeight: '700',
   },
   map: {
     height: 260,
-    borderRadius: mobileTheme.radii.lg,
+    borderRadius: 28,
   },
   title: {
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   userLine: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 14,
   },
   statsGrid: {
@@ -265,26 +266,26 @@ const styles = StyleSheet.create({
   statTile: {
     minWidth: 100,
     flexGrow: 1,
-    borderRadius: mobileTheme.radii.md,
-    backgroundColor: mobileTheme.colors.backgroundPanelSoft,
+    borderRadius: 20,
+    backgroundColor: colors.bgTertiary,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 2,
   },
   statLabel: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   statValue: {
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 17,
     fontWeight: '900',
   },
   note: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -292,11 +293,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   commentsHeader: {
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 18,
     fontWeight: '900',
     borderTopWidth: 1,
-    borderTopColor: mobileTheme.colors.border,
+    borderTopColor: colors.borderDefault,
     paddingTop: 14,
   },
   commentRow: {
@@ -308,12 +309,12 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: mobileTheme.colors.backgroundPanelSoft,
+    backgroundColor: colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   commentAvatarText: {
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -322,21 +323,21 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   commentUser: {
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
   },
   commentText: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   commentTime: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 11,
   },
   noComments: {
-    color: mobileTheme.colors.textOnDarkMuted,
+    color: colors.textSecondary,
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 24,
@@ -348,8 +349,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.backgroundPanel,
+    borderTopColor: colors.borderDefault,
+    backgroundColor: colors.bgSecondary,
   },
   input: {
     flex: 1,
@@ -357,24 +358,24 @@ const styles = StyleSheet.create({
     maxHeight: 100,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: mobileTheme.colors.border,
-    backgroundColor: mobileTheme.colors.backgroundPanelSoft,
+    borderColor: colors.borderDefault,
+    backgroundColor: colors.bgTertiary,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: mobileTheme.colors.textOnDark,
+    color: colors.textPrimary,
     fontSize: 14,
   },
   sendButton: {
     borderRadius: 20,
-    backgroundColor: mobileTheme.colors.brand,
+    backgroundColor: colors.accent,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   sendButtonDisabled: {
-    backgroundColor: '#8f9bad',
+    backgroundColor: gray[400],
   },
   sendButtonText: {
-    color: mobileTheme.colors.textPrimary,
+    color: colors.textInverse,
     fontSize: 14,
     fontWeight: '800',
   },
