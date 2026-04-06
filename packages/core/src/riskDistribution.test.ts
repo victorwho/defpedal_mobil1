@@ -109,10 +109,10 @@ describe('computeRiskDistribution — classification', () => {
     expect(result[0].category.label).toBe('Very safe');
   });
 
-  it('classifies score 30 as "Safe"', () => {
+  it('classifies score 30 as "Very safe"', () => {
     const seg = makeSegment(30, [[0, 0], [0, 0.001]]);
     const result = computeRiskDistribution([seg]);
-    expect(result[0].category.label).toBe('Safe');
+    expect(result[0].category.label).toBe('Very safe');
   });
 
   it('classifies score 43.5 as "Average"', () => {

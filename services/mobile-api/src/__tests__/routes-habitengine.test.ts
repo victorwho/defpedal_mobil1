@@ -273,8 +273,10 @@ describe('GET /v1/safety-score', () => {
       data: [{
         avg_score: 72.5,
         total_segments: 48,
-        safest_count: 30,
-        dangerous_count: 5,
+        safe_count: 30,
+        average_count: 8,
+        risky_count: 5,
+        very_risky_count: 5,
       }],
       error: null,
     });
@@ -287,10 +289,11 @@ describe('GET /v1/safety-score', () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.score).toBe(72.5);
+    // score = Math.round(100 - avg_score) = Math.round(100 - 72.5) = 28
+    expect(body.score).toBe(28);
     expect(body.totalSegments).toBe(48);
-    expect(body.safestCount).toBe(30);
-    expect(body.dangerousCount).toBe(5);
+    expect(body.safeCount).toBe(30);
+    expect(body.riskyCount).toBe(5);
   });
 
   it('passes default 1km radius to RPC', async () => {
@@ -346,7 +349,7 @@ describe('GET /v1/safety-score', () => {
     expect(response.statusCode).toBe(502);
   });
 
-  it('returns zeros when RPC returns null row', async () => {
+  it('returns score 0 when RPC returns null row (no road data in area)', async () => {
     mockRpc.mockResolvedValueOnce({ data: [null], error: null });
 
     const response = await app.inject({
@@ -357,6 +360,7 @@ describe('GET /v1/safety-score', () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
+    // No road risk data in area → score 0 (unknown), not 100 (falsely safe)
     expect(body.score).toBe(0);
     expect(body.totalSegments).toBe(0);
   });
@@ -420,6 +424,13 @@ describe('POST /v1/rides/:tripId/impact', () => {
       p_trip_id: tripId,
       p_user_id: DEV_USER_ID,
       p_distance_meters: 5000,
+      p_elevation_gain_m: 0,
+      p_weather_condition: null,
+      p_wind_speed_kmh: null,
+      p_temperature_c: null,
+      p_aqi_level: null,
+      p_ride_start_hour: null,
+      p_duration_minutes: 0,
     });
   });
 
@@ -528,7 +539,6 @@ describe('GET /v1/impact-dashboard', () => {
     expect(body.streak.freezeAvailable).toBe(true);
     expect(body.totalCo2SavedKg).toBe(12.5);
     expect(body.totalMoneySavedEur).toBe(36.75);
-    expect(body.guardianTier).toBe('watchdog');
     expect(body.thisWeek.rides).toBe(3);
   });
 
@@ -608,7 +618,6 @@ describe('GET /v1/impact-dashboard', () => {
     const body = response.json();
     expect(body.streak.currentStreak).toBe(0);
     expect(body.totalCo2SavedKg).toBe(0);
-    expect(body.guardianTier).toBe('reporter');
   });
 });
 

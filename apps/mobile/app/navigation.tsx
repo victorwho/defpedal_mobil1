@@ -16,7 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -346,7 +346,7 @@ export default function NavigationScreen() {
     setHazardPickerOpen(true);
   };
 
-  const speak = (message: string) => {
+  const speak = useCallback((message: string) => {
     if (!navigationSession || !voiceGuidanceEnabled || navigationSession.isMuted) {
       return;
     }
@@ -355,7 +355,7 @@ export default function NavigationScreen() {
     Speech.speak(message, {
       language: routeRequest.locale,
     });
-  };
+  }, [navigationSession, voiceGuidanceEnabled, routeRequest.locale]);
 
   const toggleVoiceGuidance = () => {
     const nextEnabled = !voiceGuidanceEnabled;
@@ -482,6 +482,7 @@ export default function NavigationScreen() {
     navigationSession?.isMuted,
     navigationSession?.currentStepIndex,
     selectedRoute?.id,
+    speak,
   ]);
 
   useEffect(() => {
@@ -545,6 +546,7 @@ export default function NavigationScreen() {
     markApproachAnnouncement,
     navigationSession?.sessionId,
     selectedRoute,
+    speak,
     updateNavigationProgress,
   ]);
 
@@ -564,7 +566,7 @@ export default function NavigationScreen() {
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
-  }, [navigationSession?.sessionId, voiceGuidanceEnabled, navigationSession?.isMuted]);
+  }, [navigationSession?.sessionId, voiceGuidanceEnabled, navigationSession?.isMuted, speak]);
 
   useEffect(() => {
     if (

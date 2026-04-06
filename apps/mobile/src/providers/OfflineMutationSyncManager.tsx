@@ -256,6 +256,32 @@ export const OfflineMutationSyncManager = () => {
             if (nextRetryCount >= MAX_RETRY_COUNT) {
               // Mutation has exceeded max retries — mark as dead.
               state.killMutation(mutation.id, errorMessage);
+
+              // If a trip_start dies, cascade-kill dependent trip_end and trip_track
+              // mutations that are waiting on its clientTripId. Without this they stay
+              // permanently pending (skipped every flush but never cleaned up).
+              if (mutation.type === 'trip_start') {
+                const startPayload = mutation.payload as QueuedMutationPayloadByType['trip_start'];
+                const dependentIds = useAppStore.getState().queuedMutations
+                  .filter((m) =>
+                    TRIP_DEPENDENT_TYPES.has(m.type) &&
+                    m.status !== 'dead' &&
+                    (m.payload as { clientTripId?: string }).clientTripId === startPayload.clientTripId,
+                  )
+                  .map((m) => m.id);
+
+                for (const depId of dependentIds) {
+                  useAppStore.getState().killMutation(depId, 'trip_start failed — orphaned');
+                }
+
+                if (dependentIds.length > 0) {
+                  telemetry.capture('offline_sync_cascade_killed', {
+                    client_trip_id: startPayload.clientTripId,
+                    killed_count: dependentIds.length,
+                  });
+                }
+              }
+
               telemetry.capture('offline_sync_dead', {
                 mutation_type: mutation.type,
                 mutation_id: mutation.id,

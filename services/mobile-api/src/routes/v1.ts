@@ -732,6 +732,8 @@ export const buildV1Routes = (
         });
       }
 
+      await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
       const { hazardId } = request.params;
       const { response: validationResponse } = request.body;
 
@@ -1368,11 +1370,16 @@ export const buildV1Routes = (
           });
         }
 
-        const row = Array.isArray(data) ? data[0] : data;
+        const row = (Array.isArray(data) ? data[0] : data) ?? null;
+        const totalSegments = Number(row?.total_segments ?? 0);
 
         return {
-          score: Math.max(0, Math.min(100, Math.round(100 - Number(row?.avg_score ?? 0)))),
-          totalSegments: Number(row?.total_segments ?? 0),
+          // When no road risk segments exist for the area, return score 0 (no data),
+          // not 100 (which would falsely imply a perfectly safe area).
+          score: totalSegments === 0
+            ? 0
+            : Math.max(0, Math.min(100, Math.round(100 - Number(row?.avg_score ?? 0)))),
+          totalSegments,
           safeCount: Number(row?.safe_count ?? 0),
           averageCount: Number(row?.average_count ?? 0),
           riskyCount: Number(row?.risky_count ?? 0),

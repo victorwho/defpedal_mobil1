@@ -11,7 +11,7 @@ import type {
   WriteAckResponse,
 } from '@defensivepedal/core';
 import { calculateCo2SavedKg } from '@defensivepedal/core';
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { requireAuthenticatedUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
@@ -35,6 +35,7 @@ import {
   type TripShareIdParams,
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 const DEFAULT_FEED_LIMIT = 20;
@@ -447,7 +448,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('feed_comments')
-          .select('id, user_id, body, created_at, profiles(display_name, avatar_url)')
+          .select('id, user_id, body, created_at, profiles(display_name, username, avatar_url)')
           .eq('trip_share_id', request.params.id)
           .order('created_at', { ascending: true });
 
@@ -555,12 +556,31 @@ export const buildFeedRoutes = (
           response: {
             200: profileResponseSchema,
             401: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+
+        const rlDecision = await dependencies.rateLimiter.consume({
+          bucket: 'write',
+          key: buildRateLimitIdentity({ userId: user.id }),
+          limit: dependencies.rateLimitPolicies.write.limit,
+          windowMs: dependencies.rateLimitPolicies.write.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rlDecision.limit);
+        reply.header('x-ratelimit-remaining', rlDecision.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rlDecision.resetAt / 1000));
+        if (!rlDecision.allowed) {
+          throw new HttpError('Rate limit exceeded for this endpoint.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rlDecision.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
         const db = ensureSupabase();
 
         const updates: Record<string, unknown> = {};

@@ -108,6 +108,8 @@ export default function RoutePlanningScreen() {
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [destinationHydrated, setDestinationHydrated] = useState(false);
   const syncedOriginKeyRef = useRef<string | null>(null);
+  const hazardToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geocodeNonceRef = useRef(0);
 
   const [recenterKey, setRecenterKey] = useState(0);
 
@@ -129,6 +131,15 @@ export default function RoutePlanningScreen() {
   useEffect(() => {
     const timer = setTimeout(() => setShowLongPressHint(false), 4000);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Cleanup hazard toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hazardToastTimerRef.current) {
+        clearTimeout(hazardToastTimerRef.current);
+      }
+    };
   }, []);
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
@@ -195,11 +206,14 @@ export default function RoutePlanningScreen() {
     setDestinationHydrated(true);
     setActiveField(null);
 
-    // Reverse geocode to get a readable address (non-blocking)
+    // Reverse geocode to get a readable address (non-blocking).
+    // Track a nonce so that a stale geocode result from an earlier long-press
+    // doesn't overwrite the label set by a more recent one.
+    const nonce = ++geocodeNonceRef.current;
     try {
       const { reverseGeocodeAddress } = await import('../src/lib/mapbox-search');
       const result = await reverseGeocodeAddress(coordinate.lat, coordinate.lon);
-      if (result) {
+      if (result && geocodeNonceRef.current === nonce) {
         setDestinationQuery(result.label);
       }
     } catch {
@@ -219,7 +233,8 @@ export default function RoutePlanningScreen() {
       setPendingHazardCoordinate(null);
       setHazardPickerOpen(false);
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: pendingHazardCoordinate, hazardType });
-      setTimeout(() => setHazardToast(null), 5000);
+      if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
+      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
       return;
     }
 
@@ -242,7 +257,8 @@ export default function RoutePlanningScreen() {
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
     setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
-    setTimeout(() => setHazardToast(null), 5000);
+    if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
+    hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
   };
 
   const toggleHazardMode = () => {
