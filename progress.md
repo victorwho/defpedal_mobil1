@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-06
+Last updated: 2026-04-06 (session 7)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -83,6 +83,12 @@ Update it at the end of each implementation slice.
     - **Rate limit fix**: GET /v1/badges changed from `write` to `routePreview` policy to prevent 429s
     - **Schema fix**: Removed `guardianTier` from feedSchemas.ts response schemas (was causing 500 on GET /v1/profile)
     - Deployed to Cloud Run (revisions 24-31) + Supabase migrations applied
+
+- UX Polish session (2026-04-06):
+    - **Maneuver icons**: Replaced Unicode text arrows (↑←→◎) in `NavigationHUD` (ManeuverCard, ThenStrip, FooterCard) with Ionicons directional icons (`arrow-up`, `arrow-back`, `arrow-forward`, `location`, `return-up-forward`) — faster recognition while cycling
+    - **Streak flame icon**: Replaced "~" placeholder in `StreakCard` with `Ionicons name="flame"` (yellow, 24px)
+    - **Bottom sheet peek state**: `MapStageScreen` now accepts a `peekContent` prop (max 60px height). When the CollapsibleSheet is collapsed, the peek row renders below the drag handle so key info stays visible. `route-preview.tsx` passes a compact strip: mode badge + distance + duration + "Swipe up" hint
+    - **Long-press discoverability hint**: Route planning screen shows a 4-second auto-dismiss pill "Long-press map to drop a pin" on mount. Dismisses immediately when user long-presses. Non-interactive (`pointerEvents="none"`)
 
 ## Phase Status
 
