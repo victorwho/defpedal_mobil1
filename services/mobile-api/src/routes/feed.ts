@@ -469,10 +469,18 @@ export const buildFeedRoutes = (
         const profileMap = new Map<string, { display_name: string; username: string | null; avatar_url: string | null }>();
 
         if (userIds.length > 0) {
-          const { data: profileRows } = await db
+          const { data: profileRows, error: profileError } = await db
             .from('profiles')
             .select('id, display_name, username, avatar_url')
             .in('id', userIds);
+
+          if (profileError) {
+            // Non-fatal: comments still load, authors fall back to "Rider"
+            request.log.warn(
+              { event: 'comments_profile_lookup_failed', error: profileError.message },
+              'profile batch lookup failed for comment authors',
+            );
+          }
 
           for (const p of profileRows ?? []) {
             profileMap.set(p.id as string, {

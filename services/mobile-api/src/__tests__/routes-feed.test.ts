@@ -20,7 +20,7 @@ const dequeueResult = () =>
 vi.mock('../lib/supabaseAdmin', () => {
   const makeChain = (): Record<string, unknown> => {
     const chain: Record<string, unknown> = {};
-    const methods = ['from', 'select', 'insert', 'upsert', 'update', 'delete', 'eq', 'gt', 'order', 'limit'];
+    const methods = ['from', 'select', 'insert', 'upsert', 'update', 'delete', 'eq', 'in', 'gt', 'order', 'limit'];
     for (const m of methods) {
       chain[m] = vi.fn().mockReturnValue(chain);
     }
@@ -534,6 +534,7 @@ describe('GET /v1/feed/:id/comments', () => {
   });
 
   it('returns 200 with comments array on success', async () => {
+    // Query 1: fetch comments from feed_comments
     enqueueResult({
       data: [
         {
@@ -541,8 +542,14 @@ describe('GET /v1/feed/:id/comments', () => {
           user_id: 'user-abc',
           body: 'Nice ride!',
           created_at: new Date().toISOString(),
-          profiles: { display_name: 'Alice', avatar_url: null, guardian_tier: 'reporter' },
         },
+      ],
+      error: null,
+    });
+    // Query 2: batch-fetch profiles for commenter user IDs
+    enqueueResult({
+      data: [
+        { id: 'user-abc', display_name: 'Alice', username: null, avatar_url: null },
       ],
       error: null,
     });
@@ -598,7 +605,8 @@ describe('GET /v1/feed/:id/comments', () => {
     await app.close();
   });
 
-  it('falls back displayName to "Rider" when profile is null', async () => {
+  it('falls back displayName to "Rider" when profile not found', async () => {
+    // Query 1: fetch comments
     enqueueResult({
       data: [
         {
@@ -606,11 +614,12 @@ describe('GET /v1/feed/:id/comments', () => {
           user_id: 'user-xyz',
           body: 'Cheers!',
           created_at: new Date().toISOString(),
-          profiles: null,
         },
       ],
       error: null,
     });
+    // Query 2: profiles query returns empty (no profile for this user)
+    enqueueResult({ data: [], error: null });
 
     const app = buildTestApp();
     await app.ready();
