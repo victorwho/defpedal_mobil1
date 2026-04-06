@@ -93,6 +93,19 @@ Update it at the end of each implementation slice.
     - **Peek state stale closure**: `CollapsibleSheet` panResponder captured `effectiveCollapsed = 48` on first render (before route loaded, `peekContent` was null). Fixed by replacing the local variable with a ref (`effectiveCollapsedRef.current`) so panResponder closures always read the current value
     - **ExpoPushTokenManager noise**: Added `NativeModules.ExpoPushTokenManager` guard in `push-notifications.ts` and `NotificationProvider.tsx` before the lazy `require()`. The JS module loads fine in dev builds without a native rebuild, but any call throws — the NativeModules check prevents the require entirely
 
+- Bug hunt session (2026-04-06):
+    - Systematic static analysis (3 parallel agents) across all major screens, API routes, and data flow identified 8 confirmed bugs
+    - **Community comments author**: `GET /comments` Supabase select was missing `username` from profiles join — comments always showed display_name or "Rider" instead of `@username`. Added `username` to select.
+    - **Voice guidance stale closure**: `speak()` was a plain function (not memoized). Multiple useEffects called it without listing it as a dependency — after mute/unmute, active effects used old closure until next GPS tick. Wrapped in `useCallback` and added to all dep arrays.
+    - **Orphaned offline mutations**: When `trip_start` fails and is killed, dependent `trip_end`/`trip_track` mutations were permanently stuck as pending (skipped every 15s flush, never cleaned up). Added cascade-kill logic in `OfflineMutationSyncManager`.
+    - **PATCH /profile not rate-limited**: All other write endpoints call `applyRateLimit`; profile update did not. Added write-bucket rate limit.
+    - **Hazard validate not rate-limited**: `POST /hazards/:id/validate` (confirm/deny) had no rate limit — could spam hazard votes. Added write-bucket rate limit.
+    - **Hazard toast timer leak**: Two `setTimeout` calls for toast auto-dismiss not tracked or cleared on unmount. Added `hazardToastTimerRef` with proper cleanup.
+    - **Reverse geocode race on double long-press**: Rapid successive long-presses could overwrite destination label with stale first-press geocode. Added `geocodeNonceRef` to cancel stale results.
+    - **Safety score returns 100 for no-data areas**: When no road risk segments exist in the area, score was `100 - 0 = 100` (falsely "perfectly safe"). Fixed: return `score: 0` when `totalSegments === 0`.
+    - **Pre-existing test failures fixed**: riskDistribution label ("Safe" → "Very safe"), safety-score field names (safestCount → safeCount), safety-score score formula (100 − avg_score), record_ride_impact RPC params (7 new optional fields), impact-dashboard guardian tier assertions (tier removed in Phase 3).
+    - All tests now pass: packages/core 276/276, services/mobile-api 205/205. Bundle check ✅. TypeScript clean.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation
