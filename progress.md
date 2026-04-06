@@ -84,6 +84,16 @@ Update it at the end of each implementation slice.
     - **Schema fix**: Removed `guardianTier` from feedSchemas.ts response schemas (was causing 500 on GET /v1/profile)
     - Deployed to Cloud Run (revisions 24-31) + Supabase migrations applied
 
+- Design System Overhaul (2026-04-06):
+    - **SWOT analysis**: Full design system audit documented in `design-work/design-system-analysis.md` — token coverage, component inventory, theme adoption, implementation drift scoring (6.2/10 → improved)
+    - **New tokens**: `tints.ts` (opacity scale + 16 brand/safety/surface rgba tints), `iconSize.ts` (7 standardized sizes from xs to 3xl), `zIndex.ts` (7 semantic layers from base to supreme)
+    - **New components**: `Card` atom (solid/glass/outline variants), `SectionTitle` atom (accent/muted variants with a11y header role), `SettingRow` molecule (label + description + animated Toggle with haptics)
+    - **Hardcoded color cleanup**: Replaced 50+ hardcoded hex colors with token references across 9 screens, 20 inline rgba() values with tint tokens across 7 screens, 11 hardcoded z-index values across 8 files
+    - **Profile refactor**: Replaced 9 inline toggle implementations with `SettingRow`, 7 section titles with `SectionTitle`, removed ~30 lines of dead styles
+    - **Full theme migration**: All 30 screens now use `useTheme()` + `createThemedStyles(colors)` factory pattern (was 4/30). Eliminated `brandColors`/`darkTheme` direct imports from all screens except `_layout.tsx` (intentional — renders before ThemeProvider). Removed legacy `mobileTheme` bridge imports
+    - **Testing infrastructure**: Added `vitest.config.ts` + `vitest.setup.ts` for mobile app, `@testing-library/react-native` + `react-test-renderer`. SettingRow has 12 passing unit tests
+    - **Map overlay fix**: Preserved intentional `#FFFFFF` on route-planning map cards (origin, destination, search, FABs, waypoints) — these sit on the dark map and must stay white regardless of theme
+
 - UX Polish session (2026-04-06):
     - **Maneuver icons**: Replaced Unicode text arrows (↑←→◎) in `NavigationHUD` (ManeuverCard, ThenStrip, FooterCard) with Ionicons directional icons (`arrow-up`, `arrow-back`, `arrow-forward`, `location`, `return-up-forward`) — faster recognition while cycling
     - **Streak flame icon**: Replaced "~" placeholder in `StreakCard` with `Ionicons name="flame"` (yellow, 24px)

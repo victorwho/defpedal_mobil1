@@ -122,10 +122,10 @@ C:\dev\defpedal/
 │   │   │   ├── LikeButton.tsx   # Like/Love/ReactionBar components
 │   │   │   ├── BrandLogo.tsx    # App logo
 │   │   │   └── VoiceGuidanceButton.tsx
-│   │   ├── design-system/       # Branded design system
-│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, badgeColors, badgeIcons
-│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, BadgeIcon, BadgeProgressBar, BadgeInlineChip
-│   │   │   ├── molecules/       # SearchBar, Toast, HazardAlert, WeatherWidget, BadgeCard
+│   │   ├── design-system/       # Branded design system (all 30 screens use useTheme())
+│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, tints, iconSize, zIndex, badgeColors, badgeIcons
+│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, Card, SectionTitle, BadgeIcon, BadgeProgressBar, BadgeInlineChip
+│   │   │   ├── molecules/       # SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget, BadgeCard
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
 │   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
 │   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
@@ -240,9 +240,12 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - Right overlay for floating control buttons
 
 ### Design System
-- Dark theme with yellow (#FACC15) accent
-- Tokens: `colors.ts`, `spacing.ts`, `typography.ts`, `radii.ts`, `shadows.ts`
-- Components: atoms (Button, Badge, IconButton) → molecules (SearchBar, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
+- Dark/light theme support via `ThemeProvider` + `useTheme()` hook. All 30 screens use `createThemedStyles(colors)` factory pattern
+- Forces dark theme during NAVIGATING state (glare reduction, battery, safety contrast)
+- Tokens: `colors.ts`, `spacing.ts`, `typography.ts`, `radii.ts`, `shadows.ts`, `tints.ts` (opacity + rgba tints), `iconSize.ts` (xs-3xl), `zIndex.ts` (semantic layers), `motion.ts`
+- Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
+- Map overlay cards (origin, destination, search, FABs) intentionally use `#FFFFFF` — they sit on the dark map regardless of theme
+- Analysis: `design-work/design-system-analysis.md` (SWOT, scores, component inventory, migration status)
 
 ### 3D Navigation Camera
 - `followUserLocation` + `followUserMode: 'course'` + `followPitch: 45` + `followZoomLevel: 16`
