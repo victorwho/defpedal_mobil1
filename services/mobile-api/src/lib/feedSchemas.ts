@@ -103,12 +103,11 @@ export const profileUpdateRequestSchema = {
 const feedProfileSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'guardianTier'],
+  required: ['id', 'displayName', 'avatarUrl'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
     avatarUrl: { type: ['string', 'null'] },
-    guardianTier: { type: ['string', 'null'] },
   },
 } as const;
 
@@ -179,7 +178,7 @@ export const feedCommentsResponseSchema = {
 export const profileResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'guardianTier', 'username'],
+  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'username'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
@@ -188,7 +187,6 @@ export const profileResponseSchema = {
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
-    guardianTier: { type: ['string', 'null'] },
   },
 } as const;
 

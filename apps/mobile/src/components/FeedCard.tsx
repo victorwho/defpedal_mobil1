@@ -1,4 +1,4 @@
-import type { FeedItem, GuardianTier, RouteOption } from '@defensivepedal/core';
+import type { FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,13 +8,6 @@ import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
 import { SafetyBadge } from './SafetyBadge';
 import { SafetyTagChips } from './SafetyTagChips';
-
-const TIER_BADGES: Record<GuardianTier, { label: string; color: string; bg: string }> = {
-  reporter: { label: 'R', color: '#9CA3AF', bg: 'rgba(156, 163, 175, 0.15)' },
-  watchdog: { label: 'W', color: '#60A5FA', bg: 'rgba(96, 165, 250, 0.15)' },
-  sentinel: { label: 'S', color: '#A78BFA', bg: 'rgba(167, 139, 250, 0.15)' },
-  guardian_angel: { label: 'GA', color: '#FACC15', bg: 'rgba(250, 204, 21, 0.15)' },
-};
 
 type FeedCardProps = {
   item: FeedItem;
@@ -82,13 +75,6 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
                 {item.user.displayName}
               </Text>
             </Pressable>
-            {item.user.guardianTier && item.user.guardianTier !== 'reporter' && TIER_BADGES[item.user.guardianTier] ? (
-              <View style={[styles.tierPill, { backgroundColor: TIER_BADGES[item.user.guardianTier].bg }]}>
-                <Text style={[styles.tierPillText, { color: TIER_BADGES[item.user.guardianTier].color }]}>
-                  {TIER_BADGES[item.user.guardianTier].label}
-                </Text>
-              </View>
-            ) : null}
           </View>
           <Text style={styles.timestamp}>{formatRelativeTime(item.sharedAt)}</Text>
         </View>
@@ -213,16 +199,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     flexShrink: 1,
-  },
-  tierPill: {
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  tierPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   timestamp: {
     color: mobileTheme.colors.textOnDarkMuted,

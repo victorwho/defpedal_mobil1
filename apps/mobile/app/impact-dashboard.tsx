@@ -1,4 +1,4 @@
-import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
+import type { ImpactDashboard } from '@defensivepedal/core';
 import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import {
@@ -15,8 +15,10 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 
 import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
+import { BadgeIcon } from '../src/design-system/atoms/BadgeIcon';
 import { BackButton } from '../src/design-system/atoms/BackButton';
 import { Button } from '../src/design-system/atoms/Button';
+import { useBadges } from '../src/hooks/useBadges';
 import { brandColors, darkTheme, safetyColors } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -32,50 +34,6 @@ import {
 } from '../src/design-system/tokens/typography';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
 import { mobileApi } from '../src/lib/api';
-
-// ---------------------------------------------------------------------------
-// Guardian tier config
-// ---------------------------------------------------------------------------
-
-type TierConfig = {
-  readonly label: string;
-  readonly icon: keyof typeof Ionicons.glyphMap;
-  readonly color: string;
-  readonly minHazards: number;
-};
-
-const TIER_CONFIG: Record<GuardianTier, TierConfig> = {
-  reporter: { label: 'Reporter', icon: 'megaphone-outline', color: '#9CA3AF', minHazards: 0 },
-  watchdog: { label: 'Watchdog', icon: 'eye-outline', color: '#60A5FA', minHazards: 5 },
-  sentinel: { label: 'Sentinel', icon: 'shield-outline', color: '#A78BFA', minHazards: 15 },
-  guardian_angel: { label: 'Guardian Angel', icon: 'shield-checkmark', color: brandColors.accent, minHazards: 50 },
-};
-
-const TIER_THRESHOLDS: readonly { tier: GuardianTier; min: number }[] = [
-  { tier: 'reporter', min: 0 },
-  { tier: 'watchdog', min: 5 },
-  { tier: 'sentinel', min: 15 },
-  { tier: 'guardian_angel', min: 50 },
-];
-
-const getTierProgress = (currentTier: GuardianTier, hazardsReported: number): { progress: number; nextLabel: string | null; nextTarget: number } => {
-  const currentIndex = TIER_THRESHOLDS.findIndex((t) => t.tier === currentTier);
-  const nextTier = TIER_THRESHOLDS[currentIndex + 1];
-
-  if (!nextTier) {
-    return { progress: 1, nextLabel: null, nextTarget: 0 };
-  }
-
-  const currentMin = TIER_THRESHOLDS[currentIndex].min;
-  const range = nextTier.min - currentMin;
-  const elapsed = Math.min(hazardsReported - currentMin, range);
-
-  return {
-    progress: range > 0 ? elapsed / range : 1,
-    nextLabel: TIER_CONFIG[nextTier.tier].label,
-    nextTarget: nextTier.min,
-  };
-};
 
 // ---------------------------------------------------------------------------
 // Stat tile (reused pattern from CommunityStatsCard)
@@ -103,6 +61,53 @@ const StatTile = ({ value, unit, label }: StatTileProps) => (
 // Screen
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Recent Badges section
+// ---------------------------------------------------------------------------
+
+const TIER_FROM_LEVEL: Record<number, 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond'> = {
+  1: 'bronze', 2: 'silver', 3: 'gold', 4: 'platinum', 5: 'diamond',
+};
+
+const RecentBadgesSection = () => {
+  const { data } = useBadges();
+  if (!data || data.earned.length === 0) return null;
+
+  // Sort earned by date descending, take first 5
+  const recentEarned = [...data.earned]
+    .sort((a, b) => (b.earnedAt ?? '').localeCompare(a.earnedAt ?? ''))
+    .slice(0, 5);
+
+  // Map to definitions
+  const defMap = new Map(data.definitions.map((d) => [d.badgeKey, d]));
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardHeader}>Recent badges</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.recentBadgesRow}
+      >
+        {recentEarned.map((ub) => {
+          const def = defMap.get(ub.badgeKey);
+          if (!def) return null;
+          const tier = TIER_FROM_LEVEL[def.tier] ?? 'bronze';
+          return (
+            <View key={ub.badgeKey} style={styles.recentBadgeItem}>
+              <BadgeIcon badgeKey={def.badgeKey} tierFamily={def.tierFamily} tier={tier} size="md" />
+              <Text style={styles.recentBadgeName} numberOfLines={2}>{def.name}</Text>
+            </View>
+          );
+        })}
+      </ScrollView>
+      <Pressable onPress={() => router.push('/achievements' as any)}>
+        <Text style={styles.viewAllBadgesLink}>View all &gt;</Text>
+      </Pressable>
+    </View>
+  );
+};
+
 const DASHBOARD_KEY = 'impact-dashboard';
 
 export default function ImpactDashboardScreen() {
@@ -115,8 +120,6 @@ export default function ImpactDashboardScreen() {
     staleTime: 5 * 60_000,
   });
 
-  const tierConfig = data ? TIER_CONFIG[data.guardianTier] : null;
-  const tierProgress = data ? getTierProgress(data.guardianTier, data.totalHazardsReported) : null;
   const treeEquivalent = data ? (data.totalCo2SavedKg / 21).toFixed(1) : '0';
 
   return (
@@ -187,6 +190,9 @@ export default function ImpactDashboardScreen() {
           {/* 1. Streak */}
           <StreakCard streakState={data.streak} />
 
+          {/* 1.5 Recent Badges */}
+          <RecentBadgesSection />
+
           {/* 2. Big counters */}
           <View style={styles.card}>
             <Text style={styles.cardHeader}>Lifetime impact</Text>
@@ -230,47 +236,7 @@ export default function ImpactDashboardScreen() {
             </View>
           </View>
 
-          {/* 3. Guardian tier */}
-          {tierConfig && tierProgress ? (
-            <View style={styles.card}>
-              <Text style={styles.cardHeader}>Guardian tier</Text>
-              <View style={styles.tierRow}>
-                <View style={[styles.tierBadge, { borderColor: tierConfig.color }]}>
-                  <Ionicons name={tierConfig.icon} size={28} color={tierConfig.color} />
-                </View>
-                <View style={styles.tierTextCol}>
-                  <Text style={[styles.tierName, { color: tierConfig.color }]}>
-                    {tierConfig.label}
-                  </Text>
-                  <Text style={styles.tierHazards}>
-                    {data.totalHazardsReported} hazards reported
-                  </Text>
-                </View>
-              </View>
-              {tierProgress.nextLabel ? (
-                <View style={styles.tierProgressSection}>
-                  <View style={styles.tierProgressBarBg}>
-                    <View
-                      style={[
-                        styles.tierProgressBarFill,
-                        {
-                          width: `${Math.round(tierProgress.progress * 100)}%`,
-                          backgroundColor: tierConfig.color,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.tierProgressText}>
-                    {tierProgress.nextTarget - data.totalHazardsReported} more to {tierProgress.nextLabel}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.tierMaxText}>Maximum tier reached!</Text>
-              )}
-            </View>
-          ) : null}
-
-          {/* 4. This Week */}
+          {/* 3. This Week */}
           <View style={styles.card}>
             <Text style={styles.cardHeader}>This week</Text>
             <View style={styles.weekGrid}>
@@ -403,55 +369,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  // Guardian tier
-  tierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[4],
-  },
-  tierBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  tierTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  tierName: {
-    ...textDataMd,
-    fontFamily: fontFamily.heading.bold,
-  },
-  tierHazards: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-  },
-  tierProgressSection: {
-    gap: space[2],
-  },
-  tierProgressBarBg: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: darkTheme.bgSecondary,
-    overflow: 'hidden',
-  },
-  tierProgressBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  tierProgressText: {
-    ...textXs,
-    color: darkTheme.textMuted,
-  },
-  tierMaxText: {
-    ...textXs,
-    color: brandColors.accent,
-    fontStyle: 'italic',
-  },
   // This week grid
   weekGrid: {
     flexDirection: 'row',
@@ -486,6 +403,29 @@ const styles = StyleSheet.create({
     ...textXs,
     fontFamily: fontFamily.body.regular,
     color: darkTheme.textSecondary,
+  },
+  // Recent badges
+  recentBadgesRow: {
+    flexDirection: 'row',
+    gap: space[3],
+    paddingVertical: space[1],
+  },
+  recentBadgeItem: {
+    alignItems: 'center',
+    width: 80,
+    gap: 4,
+  },
+  recentBadgeName: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.textPrimary,
+    textAlign: 'center',
+  },
+  viewAllBadgesLink: {
+    ...textSm,
+    fontFamily: fontFamily.body.medium,
+    color: brandColors.accent,
+    textAlign: 'right',
   },
   // Quiz card
   quizCard: {

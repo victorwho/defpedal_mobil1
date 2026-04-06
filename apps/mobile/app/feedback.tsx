@@ -107,7 +107,7 @@ const ImpactStep = ({ rideImpact, dashboard, onContinue }: ImpactStepProps) => {
         {t('feedback.positiveImpact')}
       </Text>
 
-      <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} />
+      <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} newBadges={rideImpact.newBadges} />
 
       <View style={styles.impactActions}>
         <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
@@ -280,6 +280,7 @@ export default function FeedbackScreen() {
   const tripServerIds = useAppStore((s) => s.tripServerIds);
   const earnedMilestones = useAppStore((s) => s.earnedMilestones);
   const addEarnedMilestone = useAppStore((s) => s.addEarnedMilestone);
+  const enqueueBadgeUnlocks = useAppStore((s) => s.enqueueBadgeUnlocks);
   const resetFlow = useAppStore((s) => s.resetFlow);
 
   // Compute impact synchronously on mount from store data
@@ -329,7 +330,12 @@ export default function FeedbackScreen() {
         // Upgrade with server data if available
         if (tripServerId) {
           const result = await mobileApi.fetchRideImpact(tripServerId);
-          if (!cancelled) setRideImpact(result);
+          if (!cancelled) {
+            setRideImpact(result);
+            if (result.newBadges.length > 0) {
+              enqueueBadgeUnlocks(result.newBadges);
+            }
+          }
         }
         // Fetch dashboard for milestone detection
         const dash = await mobileApi.fetchImpactDashboard(
@@ -354,7 +360,6 @@ export default function FeedbackScreen() {
       totalDistanceKm: (dashboard.totalCo2SavedKg / 0.12), // reverse from CO2 to approximate km
       totalRides: dashboard.thisWeek.rides, // approximate — full total not in dashboard
       totalCo2Kg: dashboard.totalCo2SavedKg,
-      guardianTier: dashboard.guardianTier,
       earnedMilestones,
     });
 

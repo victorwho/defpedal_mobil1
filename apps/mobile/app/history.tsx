@@ -1,4 +1,4 @@
-import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
+import type { ImpactDashboard } from '@defensivepedal/core';
 import { formatCo2Saved, calculateEquivalentTreeDays, formatMicrolivesAsTime } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -19,45 +19,6 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
-
-// ---------------------------------------------------------------------------
-// Guardian tier config
-// ---------------------------------------------------------------------------
-
-type TierConfig = {
-  readonly label: string;
-  readonly icon: keyof typeof Ionicons.glyphMap;
-  readonly color: string;
-  readonly minHazards: number;
-};
-
-const TIER_CONFIG: Record<GuardianTier, TierConfig> = {
-  reporter: { label: 'Reporter', icon: 'megaphone-outline', color: '#9CA3AF', minHazards: 0 },
-  watchdog: { label: 'Watchdog', icon: 'eye-outline', color: '#60A5FA', minHazards: 5 },
-  sentinel: { label: 'Sentinel', icon: 'shield-outline', color: '#A78BFA', minHazards: 15 },
-  guardian_angel: { label: 'Guardian Angel', icon: 'shield-checkmark', color: brandColors.accent, minHazards: 50 },
-};
-
-const TIER_THRESHOLDS: readonly { tier: GuardianTier; min: number }[] = [
-  { tier: 'reporter', min: 0 },
-  { tier: 'watchdog', min: 5 },
-  { tier: 'sentinel', min: 15 },
-  { tier: 'guardian_angel', min: 50 },
-];
-
-const getTierProgress = (currentTier: GuardianTier, hazardsReported: number) => {
-  const currentIndex = TIER_THRESHOLDS.findIndex((t) => t.tier === currentTier);
-  const nextTier = TIER_THRESHOLDS[currentIndex + 1];
-  if (!nextTier) return { progress: 1, nextLabel: null as string | null, nextTarget: 0 };
-  const currentMin = TIER_THRESHOLDS[currentIndex].min;
-  const range = nextTier.min - currentMin;
-  const elapsed = Math.min(hazardsReported - currentMin, range);
-  return {
-    progress: range > 0 ? elapsed / range : 1,
-    nextLabel: TIER_CONFIG[nextTier.tier].label,
-    nextTarget: nextTier.min,
-  };
-};
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -82,8 +43,6 @@ export default function HistoryScreen() {
     staleTime: 5 * 60_000,
   });
 
-  const tierConfig = dashboard ? TIER_CONFIG[dashboard.guardianTier] : null;
-  const tierProgress = dashboard ? getTierProgress(dashboard.guardianTier, dashboard.totalHazardsReported) : null;
 
   return (
     <View style={styles.root}>
@@ -165,47 +124,7 @@ export default function HistoryScreen() {
             <ActivityIndicator size="small" color={brandColors.accent} style={{ paddingVertical: space[3] }} />
           ) : null}
 
-          {/* 3. Guardian Tier */}
-          {tierConfig && tierProgress && dashboard ? (
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Ionicons name="shield-half-outline" size={18} color={tierConfig.color} />
-                <Text style={styles.cardHeaderText}>Guardian Tier</Text>
-              </View>
-              <View style={styles.tierRow}>
-                <View style={[styles.tierBadge, { borderColor: tierConfig.color }]}>
-                  <Ionicons name={tierConfig.icon} size={24} color={tierConfig.color} />
-                </View>
-                <View style={styles.tierTextCol}>
-                  <Text style={[styles.tierName, { color: tierConfig.color }]}>
-                    {tierConfig.label}
-                  </Text>
-                  <Text style={styles.tierHazards}>
-                    {dashboard.totalHazardsReported} hazards reported
-                  </Text>
-                </View>
-              </View>
-              {tierProgress.nextLabel ? (
-                <View style={styles.tierProgressSection}>
-                  <View style={styles.tierProgressBarBg}>
-                    <View
-                      style={[
-                        styles.tierProgressBarFill,
-                        { width: `${Math.round(tierProgress.progress * 100)}%`, backgroundColor: tierConfig.color },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.tierProgressText}>
-                    {tierProgress.nextTarget - dashboard.totalHazardsReported} more to {tierProgress.nextLabel}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={styles.tierMaxText}>Maximum tier reached!</Text>
-              )}
-            </View>
-          ) : null}
-
-          {/* 4. Stats Dashboard (Week / Month / All Time, Ride Frequency, Mode Split) */}
+          {/* 3. Stats Dashboard (Week / Month / All Time, Ride Frequency, Mode Split) */}
           {user ? <StatsDashboard hazardsReported={dashboard?.totalHazardsReported ?? 0} /> : null}
 
           {/* 5. Daily Safety Quiz */}
@@ -323,54 +242,6 @@ const styles = StyleSheet.create({
     color: darkTheme.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
-  },
-  tierRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-  },
-  tierBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.lg,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: darkTheme.bgSecondary,
-  },
-  tierTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  tierName: {
-    fontFamily: fontFamily.heading.bold,
-    fontSize: 18,
-  },
-  tierHazards: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-  },
-  tierProgressSection: {
-    gap: space[1],
-  },
-  tierProgressBarBg: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: darkTheme.bgTertiary,
-    overflow: 'hidden',
-  },
-  tierProgressBarFill: {
-    height: 6,
-    borderRadius: 3,
-  },
-  tierProgressText: {
-    ...textXs,
-    color: darkTheme.textSecondary,
-  },
-  tierMaxText: {
-    ...textXs,
-    color: brandColors.accent,
-    fontFamily: fontFamily.body.semiBold,
   },
   quizCard: {
     flexDirection: 'row',

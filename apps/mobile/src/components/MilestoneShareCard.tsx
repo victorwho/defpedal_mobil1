@@ -26,10 +26,7 @@ export type MilestoneKey =
   | 'rides_10'
   | 'rides_50'
   | 'co2_10kg'
-  | 'co2_50kg'
-  | 'tier_watchdog'
-  | 'tier_sentinel'
-  | 'tier_guardian_angel';
+  | 'co2_50kg';
 
 type MilestoneConfig = {
   readonly title: string;
@@ -48,9 +45,6 @@ export const MILESTONE_CONFIGS: Record<MilestoneKey, MilestoneConfig> = {
   rides_50: { title: '50 Rides', subtitle: 'Fifty rides safer. Keep going!', statLabel: '50 rides', icon: 'R' },
   co2_10kg: { title: '10 kg CO2 Saved', subtitle: 'Like planting half a tree!', statLabel: '10 kg', icon: 'C' },
   co2_50kg: { title: '50 kg CO2 Saved', subtitle: 'That is 2 trees worth of carbon!', statLabel: '50 kg', icon: 'C' },
-  tier_watchdog: { title: 'Watchdog Tier', subtitle: 'Your reports are keeping cyclists safe.', statLabel: 'Watchdog', icon: 'T' },
-  tier_sentinel: { title: 'Sentinel Tier', subtitle: 'A true guardian of the streets.', statLabel: 'Sentinel', icon: 'T' },
-  tier_guardian_angel: { title: 'Guardian Angel', subtitle: 'The highest honor. Thank you.', statLabel: 'Guardian Angel', icon: 'T' },
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +56,6 @@ type MilestoneCheckInput = {
   readonly totalDistanceKm: number;
   readonly totalRides: number;
   readonly totalCo2Kg: number;
-  readonly guardianTier: string;
   readonly earnedMilestones: readonly string[];
 };
 
@@ -77,9 +70,6 @@ export const detectNewMilestones = (input: MilestoneCheckInput): MilestoneKey[] 
     { key: 'rides_50', condition: input.totalRides >= 50 },
     { key: 'co2_10kg', condition: input.totalCo2Kg >= 10 },
     { key: 'co2_50kg', condition: input.totalCo2Kg >= 50 },
-    { key: 'tier_watchdog', condition: input.guardianTier === 'watchdog' || input.guardianTier === 'sentinel' || input.guardianTier === 'guardian_angel' },
-    { key: 'tier_sentinel', condition: input.guardianTier === 'sentinel' || input.guardianTier === 'guardian_angel' },
-    { key: 'tier_guardian_angel', condition: input.guardianTier === 'guardian_angel' },
   ];
 
   return checks

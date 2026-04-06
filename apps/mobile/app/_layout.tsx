@@ -13,6 +13,7 @@ import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
 import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
+import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -121,6 +122,7 @@ const RootLayoutInner = () => {
           },
         }}
       />
+      <BadgeUnlockOverlayManager />
     </>
   );
 };

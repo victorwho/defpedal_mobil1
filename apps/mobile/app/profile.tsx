@@ -1,4 +1,3 @@
-import type { GuardianTier, ImpactDashboard } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { Alert, Image, NativeModules } from 'react-native';
 import { useState } from 'react';
@@ -22,13 +21,7 @@ import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
-
-const GUARDIAN_TIER_CONFIG: Record<GuardianTier, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string; min: number }> = {
-  reporter: { label: 'Reporter', icon: 'clipboard-outline', color: '#9CA3AF', min: 0 },
-  watchdog: { label: 'Watchdog', icon: 'eye-outline', color: '#60A5FA', min: 5 },
-  sentinel: { label: 'Sentinel', icon: 'shield-outline', color: '#A78BFA', min: 15 },
-  guardian_angel: { label: 'Guardian Angel', icon: 'shield-checkmark', color: '#FACC15', min: 50 },
-};
+import { useBadges } from '../src/hooks/useBadges';
 
 const BIKE_TYPE_KEYS = [
   'profile.bikeRoad', 'profile.bikeCity', 'profile.bikeMountain',
@@ -98,46 +91,38 @@ const DropdownPicker = ({ label, value, options, onSelect, placeholder = 'Select
   );
 };
 
-const GuardianSection = () => {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { data } = useQuery<ImpactDashboard>({
-    queryKey: ['impact-dashboard-profile'],
-    queryFn: () => mobileApi.fetchImpactDashboard(tz),
-    staleTime: 5 * 60_000,
-  });
 
-  if (!data) return null;
-
-  const tier = GUARDIAN_TIER_CONFIG[data.guardianTier];
-  const tiers = Object.entries(GUARDIAN_TIER_CONFIG) as [GuardianTier, typeof tier][];
-  const currentIdx = tiers.findIndex(([t]) => t === data.guardianTier);
-  const nextTier = tiers[currentIdx + 1];
-  const remaining = nextTier ? nextTier[1].min - data.totalHazardsReported : 0;
+const AchievementsRow = () => {
+  const { data } = useBadges();
+  const earned = data?.earned.length ?? 0;
+  const total = data?.definitions.length ?? 0;
 
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Guardian tier</Text>
-      <View style={styles.guardianCard}>
-        <View style={styles.guardianRow}>
-          <View style={[styles.guardianBadge, { borderColor: tier.color }]}>
-            <Ionicons name={tier.icon} size={24} color={tier.color} />
+    <Pressable
+      style={styles.section}
+      onPress={() => router.push('/achievements' as any)}
+    >
+      <Text style={styles.sectionTitle}>Achievements</Text>
+      <View style={styles.achievementsCard}>
+        <View style={styles.achievementsRow}>
+          <Ionicons name="trophy-outline" size={24} color={brandColors.accent} />
+          <View style={styles.achievementsTextCol}>
+            <Text style={styles.achievementsCount}>
+              {earned} / {total} badges earned
+            </Text>
+            <View style={styles.achievementsBarTrack}>
+              <View
+                style={[
+                  styles.achievementsBarFill,
+                  { width: total > 0 ? `${Math.round((earned / total) * 100)}%` : '0%' },
+                ]}
+              />
+            </View>
           </View>
-          <View style={styles.guardianTextCol}>
-            <Text style={[styles.guardianTierName, { color: tier.color }]}>{tier.label}</Text>
-            <Text style={styles.guardianHazards}>{data.totalHazardsReported} hazards reported</Text>
-          </View>
+          <Ionicons name="chevron-forward" size={18} color={gray[400]} />
         </View>
-        {nextTier ? (
-          <Text style={styles.guardianProgress}>
-            {remaining} more report{remaining !== 1 ? 's' : ''} to reach {nextTier[1].label}
-          </Text>
-        ) : (
-          <Text style={[styles.guardianProgress, { color: brandColors.accent }]}>
-            Maximum tier reached!
-          </Text>
-        )}
       </View>
-    </View>
+    </Pressable>
   );
 };
 
@@ -341,7 +326,7 @@ export default function ProfileScreen() {
             </Pressable>
           )}
 
-          <GuardianSection />
+          <AchievementsRow />
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t('profile.language')}</Text>
@@ -782,42 +767,36 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body.medium,
     color: '#EF4444',
   },
-  guardianCard: {
+  achievementsCard: {
     backgroundColor: 'rgba(17, 24, 39, 0.86)',
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: brandColors.borderDefault,
     padding: space[4],
-    gap: space[3],
   },
-  guardianRow: {
+  achievementsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space[3],
   },
-  guardianBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  guardianTextCol: {
+  achievementsTextCol: {
     flex: 1,
-    gap: 2,
+    gap: space[2],
   },
-  guardianTierName: {
-    ...textBase,
-    fontFamily: fontFamily.heading.bold,
+  achievementsCount: {
+    ...textSm,
+    fontFamily: fontFamily.body.medium,
+    color: brandColors.textPrimary,
   },
-  guardianHazards: {
-    ...textXs,
-    color: gray[400],
+  achievementsBarTrack: {
+    height: 4,
+    borderRadius: radii.sm,
+    backgroundColor: brandColors.bgTertiary,
+    overflow: 'hidden',
   },
-  guardianProgress: {
-    ...textXs,
-    color: gray[400],
+  achievementsBarFill: {
+    height: 4,
+    borderRadius: radii.sm,
+    backgroundColor: brandColors.accent,
   },
 });

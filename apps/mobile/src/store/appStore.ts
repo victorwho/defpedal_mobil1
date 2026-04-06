@@ -111,6 +111,10 @@ type AppStore = {
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
   earnedMilestones: readonly string[];
+  pendingBadgeUnlocks: readonly import('@defensivepedal/core').BadgeUnlockEvent[];
+  enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
+  shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
+  clearBadgeUnlocks: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
   setShowHistoryOverlay: (show: boolean) => void;
   setOnboardingCompleted: (completed: boolean) => void;
@@ -221,6 +225,19 @@ export const useAppStore = create<AppStore>()(
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
       earnedMilestones: [],
+      pendingBadgeUnlocks: [],
+      enqueueBadgeUnlocks: (badges) =>
+        set((state) => ({
+          pendingBadgeUnlocks: [...state.pendingBadgeUnlocks, ...badges],
+        })),
+      shiftBadgeUnlock: () => {
+        const current = get().pendingBadgeUnlocks;
+        if (current.length === 0) return undefined;
+        const [first, ...rest] = current;
+        set(() => ({ pendingBadgeUnlocks: rest }));
+        return first;
+      },
+      clearBadgeUnlocks: () => set(() => ({ pendingBadgeUnlocks: [] })),
       setLocale: (locale) => set(() => ({ locale })),
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
@@ -722,6 +739,7 @@ export const useAppStore = create<AppStore>()(
         notificationPermissionAsked: state.notificationPermissionAsked,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
+        pendingBadgeUnlocks: state.pendingBadgeUnlocks,
       }),
     },
   ),

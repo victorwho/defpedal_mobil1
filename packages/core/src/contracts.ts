@@ -392,7 +392,6 @@ export interface FeedProfile {
   id: string;
   displayName: string;
   avatarUrl: string | null;
-  guardianTier: GuardianTier | null;
 }
 
 export interface UserPublicProfile {
@@ -400,7 +399,6 @@ export interface UserPublicProfile {
   readonly displayName: string;
   readonly username: string | null;
   readonly avatarUrl: string | null;
-  readonly guardianTier: GuardianTier;
   readonly totalTrips: number;
   readonly totalDistanceMeters: number;
   readonly totalCo2SavedKg: number;
@@ -532,14 +530,11 @@ export interface ProfileResponse {
   autoShareRides: boolean;
   trimRouteEndpoints: boolean;
   cyclingGoal: CyclingGoal | null;
-  guardianTier: GuardianTier | null;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────
 
 export type CyclingGoal = 'commute' | 'explore' | 'beginner';
-
-export type GuardianTier = 'reporter' | 'watchdog' | 'sentinel' | 'guardian_angel';
 
 export interface RideImpact {
   readonly tripId: string;
@@ -573,7 +568,6 @@ export interface ImpactDashboard {
   readonly totalMoneySavedEur: number;
   readonly totalHazardsReported: number;
   readonly totalRidersProtected: number;
-  readonly guardianTier: GuardianTier;
   readonly thisWeek: {
     readonly rides: number;
     readonly co2SavedKg: number;

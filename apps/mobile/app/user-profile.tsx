@@ -1,4 +1,4 @@
-import type { GuardianTier, UserPublicProfile } from '@defensivepedal/core';
+import type { UserPublicProfile } from '@defensivepedal/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,13 +14,6 @@ import { space } from '../src/design-system/tokens/spacing';
 import { fontFamily, text2xl, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
-
-const TIER_CONFIG: Record<GuardianTier, { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  reporter: { label: 'Reporter', color: '#9CA3AF', icon: 'megaphone-outline' },
-  watchdog: { label: 'Watchdog', color: '#60A5FA', icon: 'eye-outline' },
-  sentinel: { label: 'Sentinel', color: '#A78BFA', icon: 'shield-outline' },
-  guardian_angel: { label: 'Guardian Angel', color: brandColors.accent, icon: 'shield-checkmark' },
-};
 
 export default function UserProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -82,8 +75,6 @@ export default function UserProfileScreen() {
   });
 
   const isOwnProfile = user?.id === id;
-  const tier = profile ? TIER_CONFIG[profile.guardianTier] : null;
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -114,12 +105,6 @@ export default function UserProfileScreen() {
             <Text style={styles.displayName}>
               {profile.username ? `@${profile.username}` : profile.displayName}
             </Text>
-            {tier ? (
-              <View style={[styles.tierPill, { borderColor: tier.color }]}>
-                <Ionicons name={tier.icon} size={14} color={tier.color} />
-                <Text style={[styles.tierLabel, { color: tier.color }]}>{tier.label}</Text>
-              </View>
-            ) : null}
 
             {/* Follow counts */}
             <View style={styles.followRow}>
@@ -242,11 +227,6 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontFamily: fontFamily.heading.bold, fontSize: 24, color: '#000' },
   displayName: { ...text2xl, fontFamily: fontFamily.heading.bold, color: darkTheme.textPrimary },
-  tierPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderRadius: radii.full, paddingHorizontal: space[2], paddingVertical: 2,
-  },
-  tierLabel: { fontFamily: fontFamily.body.semiBold, fontSize: 12 },
   followRow: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
   followStat: { alignItems: 'center', gap: 2 },
   followCount: { fontFamily: fontFamily.mono.bold, fontSize: 18, color: darkTheme.textPrimary },

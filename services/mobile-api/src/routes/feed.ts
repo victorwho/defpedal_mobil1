@@ -5,7 +5,6 @@ import type {
   FeedComment,
   FeedItem,
   FeedResponse,
-  GuardianTier,
   ProfileResponse,
   SafetyTag,
   ShareTripRequest,
@@ -74,7 +73,6 @@ const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
       id: row.user_id as string,
       displayName: username ? `@${username}` : (profile?.display_name as string) ?? 'Rider',
       avatarUrl: (profile?.avatar_url as string) ?? null,
-      guardianTier: (profile?.guardian_tier as GuardianTier) ?? null,
     },
     title: (row.title as string) ?? '',
     startLocationText: (row.start_location_text as string) ?? '',
@@ -449,7 +447,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('feed_comments')
-          .select('id, user_id, body, created_at, profiles(display_name, avatar_url, guardian_tier)')
+          .select('id, user_id, body, created_at, profiles(display_name, avatar_url)')
           .eq('trip_share_id', request.params.id)
           .order('created_at', { ascending: true });
 
@@ -470,8 +468,7 @@ export const buildFeedRoutes = (
               id: row.user_id as string,
               displayName: commentUsername ? `@${commentUsername}` : (profile?.display_name as string) ?? 'Rider',
               avatarUrl: (profile?.avatar_url as string) ?? null,
-              guardianTier: (profile?.guardian_tier as GuardianTier) ?? null,
-            },
+                    },
             body: row.body as string,
             createdAt: row.created_at as string,
           };
@@ -598,7 +595,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
           .eq('id', user.id)
           .single();
 
@@ -618,7 +615,6 @@ export const buildFeedRoutes = (
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
-          guardianTier: (data.guardian_tier as GuardianTier) ?? null,
         };
       },
     );
@@ -641,7 +637,7 @@ export const buildFeedRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
           .eq('id', user.id)
           .single();
 
@@ -652,7 +648,7 @@ export const buildFeedRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, guardian_tier')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
             .single();
 
           if (createError || !created) {
@@ -671,7 +667,6 @@ export const buildFeedRoutes = (
             autoShareRides: Boolean(created.auto_share_rides),
             trimRouteEndpoints: Boolean(created.trim_route_endpoints),
             cyclingGoal: (created.cycling_goal as CyclingGoal) ?? null,
-            guardianTier: (created.guardian_tier as GuardianTier) ?? null,
           };
         }
 
@@ -683,7 +678,6 @@ export const buildFeedRoutes = (
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
-          guardianTier: (data.guardian_tier as GuardianTier) ?? null,
         };
       },
     );

@@ -1,9 +1,11 @@
-import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
+import type { BadgeUnlockEvent, ImpactDashboard, RideImpact } from '@defensivepedal/core';
 import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
+import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedCounter } from '../design-system/atoms/AnimatedCounter';
+import { BadgeIcon } from '../design-system/atoms/BadgeIcon';
 import { brandColors, darkTheme, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { shadows } from '../design-system/tokens/shadows';
@@ -24,6 +26,7 @@ type ImpactSummaryCardProps = {
   readonly rideImpact: RideImpact;
   readonly dashboard: ImpactDashboard | null;
   readonly staggerDelayMs?: number;
+  readonly newBadges?: readonly BadgeUnlockEvent[];
 };
 
 // ---------------------------------------------------------------------------
@@ -87,12 +90,79 @@ const StaggeredCounter = ({
 // Component
 // ---------------------------------------------------------------------------
 
+// Badge row with stagger animation
+const StaggeredBadge = ({
+  badge,
+  delayMs,
+}: {
+  badge: BadgeUnlockEvent;
+  delayMs: number;
+}) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delayMs);
+
+    return () => clearTimeout(timer);
+  }, [opacity, translateY, delayMs]);
+
+  const tier = badge.tier ?? 'bronze';
+
+  return (
+    <Animated.View
+      style={[
+        styles.badgeItem,
+        { opacity, transform: [{ translateY }] },
+      ]}
+    >
+      <BadgeIcon badgeKey={badge.badgeKey} tier={tier} size="md" />
+      <Text style={styles.badgeName} numberOfLines={2}>
+        {badge.name}
+      </Text>
+    </Animated.View>
+  );
+};
+
 export const ImpactSummaryCard = ({
   rideImpact,
   dashboard,
   staggerDelayMs = 800,
+  newBadges,
 }: ImpactSummaryCardProps) => (
   <View style={styles.card}>
+    {/* Badges earned this ride */}
+    {newBadges && newBadges.length > 0 ? (
+      <View style={styles.badgesSection}>
+        <Text style={styles.sectionTitle}>Badges earned</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.badgesRow}
+        >
+          {newBadges.map((b, i) => (
+            <StaggeredBadge key={b.badgeKey} badge={b} delayMs={i * 400} />
+          ))}
+        </ScrollView>
+        <Pressable onPress={() => router.push('/achievements' as any)}>
+          <Text style={styles.viewAllLink}>View all achievements &gt;</Text>
+        </Pressable>
+      </View>
+    ) : null}
+
     {/* This ride's impact — microlives first, then CO2/money/hazards */}
     <Text style={styles.sectionTitle}>This ride's impact</Text>
 
@@ -196,6 +266,35 @@ const styles = StyleSheet.create({
     color: darkTheme.textMuted,
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  badgesSection: {
+    gap: space[3],
+    borderBottomWidth: 1,
+    borderBottomColor: darkTheme.borderDefault,
+    paddingBottom: space[4],
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: space[3],
+    paddingVertical: space[1],
+  },
+  badgeItem: {
+    alignItems: 'center',
+    width: 80,
+    gap: 4,
+  },
+  badgeName: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.textPrimary,
+    textAlign: 'center',
+  },
+  viewAllLink: {
+    ...textSm,
+    fontFamily: fontFamily.body.medium,
+    color: brandColors.accent,
+    textAlign: 'center',
+    marginTop: space[1],
   },
   totalsSection: {
     borderTopWidth: 1,

@@ -18,7 +18,6 @@ import type {
   NeighborhoodSafetyScore,
   RideImpact,
   ImpactDashboard,
-  GuardianTier,
   QuizQuestion,
   QuizAnswer,
   SavedRoute,
@@ -1680,12 +1679,14 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
+        const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
         if (!supabaseAdmin) {
           throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
         }
+
+        let newBadgesFromCheck: RideImpact['newBadges'] = [];
 
         const { data, error } = await supabaseAdmin
           .from('ride_impacts')
@@ -1731,6 +1732,23 @@ export const buildV1Routes = (
               distance_meters: distMeters,
             };
           }
+
+          // Check and award badges after auto-creating impact (non-fatal)
+          try {
+            const { data: badgeData } = await supabaseAdmin.rpc('check_and_award_badges', {
+              p_user_id: user.id,
+            });
+            if (Array.isArray(badgeData)) {
+              newBadgesFromCheck = badgeData.map((b: Record<string, unknown>) => ({
+                badgeKey:   String(b.badge_key ?? ''),
+                tier:       null,
+                name:       String(b.name ?? ''),
+                flavorText: String(b.flavor_text ?? ''),
+                iconKey:    String(b.icon_key ?? ''),
+                earnedAt:   String(b.earned_at ?? new Date().toISOString()),
+              }));
+            }
+          } catch { /* badge check is non-fatal */ }
         }
 
         // Pick a random reward equivalent
@@ -1771,7 +1789,7 @@ export const buildV1Routes = (
           equivalentText,
           personalMicrolives,
           communitySeconds,
-          newBadges: [],
+          newBadges: newBadgesFromCheck,
         };
       },
     );
@@ -1797,7 +1815,7 @@ export const buildV1Routes = (
               required: [
                 'streak', 'totalCo2SavedKg', 'totalMoneySavedEur',
                 'totalHazardsReported', 'totalRidersProtected',
-                'guardianTier', 'thisWeek',
+                'thisWeek',
               ],
               properties: {
                 streak: {
@@ -1816,7 +1834,6 @@ export const buildV1Routes = (
                 totalMoneySavedEur: { type: 'number' },
                 totalHazardsReported: { type: 'integer' },
                 totalRidersProtected: { type: 'integer' },
-                guardianTier: { type: 'string' },
                 thisWeek: {
                   type: 'object',
                   additionalProperties: false,
@@ -1836,8 +1853,8 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
-        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+        const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
 
         if (!supabaseAdmin) {
           throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
@@ -1845,10 +1862,18 @@ export const buildV1Routes = (
 
         const tz = request.query.tz ?? 'UTC';
 
-        const { data, error } = await supabaseAdmin.rpc('get_impact_dashboard', {
-          p_user_id: user.id,
-          p_time_zone: tz,
-        });
+        // Run badge check in parallel with dashboard fetch (non-fatal)
+        const [dashResult] = await Promise.all([
+          supabaseAdmin.rpc('get_impact_dashboard', {
+            p_user_id: user.id,
+            p_time_zone: tz,
+          }),
+          supabaseAdmin.rpc('check_and_award_badges', {
+            p_user_id: user.id,
+          }).then(() => null, () => null),
+        ]);
+
+        const { data, error } = dashResult;
 
         if (error) {
           request.log.error({ event: 'impact_dashboard_error', error: error.message }, 'impact dashboard query failed');
@@ -1877,7 +1902,6 @@ export const buildV1Routes = (
           totalMoneySavedEur: Number(totals?.totalMoneySavedEur ?? 0),
           totalHazardsReported: Number(totals?.totalHazardsReported ?? 0),
           totalRidersProtected: Number(totals?.totalRidersProtected ?? 0),
-          guardianTier: ((d.guardianTier as string) ?? 'reporter') as GuardianTier,
           thisWeek: {
             rides: Number(thisWeek?.rides ?? 0),
             co2SavedKg: Number(thisWeek?.co2SavedKg ?? 0),
@@ -2354,12 +2378,17 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
-        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+        const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
 
         if (!supabaseAdmin) {
           throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
         }
+
+        // Run badge evaluation first so newly earned badges appear immediately
+        try {
+          await supabaseAdmin.rpc('check_and_award_badges', { p_user_id: user.id });
+        } catch { /* non-fatal */ }
 
         // Fetch all badge definitions, user's earned badges, and aggregate stats in parallel
         const [defsResult, earnedResult, profileResult, rideAggResult] = await Promise.all([
@@ -2403,8 +2432,6 @@ export const buildV1Routes = (
         const totalMoney = Number(profile.total_money_saved_eur ?? 0);
         const totalHazards = Number(profile.total_hazards_reported ?? 0);
         const totalRiders = Number(profile.total_riders_protected ?? 0);
-        const totalMicrolives = Number(profile.total_microlives ?? 0);
-        const totalCommSecs = Number(profile.total_community_seconds ?? 0);
         const rideCount = rides.length;
 
         // Map badge key → { current, target } for unearthed tiered badges
@@ -2439,15 +2466,6 @@ export const buildV1Routes = (
           money_200:        { current: totalMoney,                  target: 200 },
           money_500:        { current: totalMoney,                  target: 500 },
           money_2000:       { current: totalMoney,                  target: 2000 },
-          ml_2:             { current: totalMicrolives,             target: 2 },
-          ml_8:             { current: totalMicrolives,             target: 8 },
-          ml_48:            { current: totalMicrolives,             target: 48 },
-          ml_336:           { current: totalMicrolives,             target: 336 },
-          ml_1440:          { current: totalMicrolives,             target: 1440 },
-          community_60s:    { current: totalCommSecs,               target: 60 },
-          community_300s:   { current: totalCommSecs,               target: 300 },
-          community_1800s:  { current: totalCommSecs,               target: 1800 },
-          community_3600s:  { current: totalCommSecs,               target: 3600 },
           hazard_5:         { current: totalHazards,                target: 5 },
           hazard_15:        { current: totalHazards,                target: 15 },
           hazard_50:        { current: totalHazards,                target: 50 },

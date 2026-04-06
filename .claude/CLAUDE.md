@@ -123,11 +123,12 @@ C:\dev\defpedal/
 │   │   │   ├── BrandLogo.tsx    # App logo
 │   │   │   └── VoiceGuidanceButton.tsx
 │   │   ├── design-system/       # Branded design system
-│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows
-│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, etc.
-│   │   │   ├── molecules/       # SearchBar, Toast, HazardAlert, WeatherWidget
+│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, badgeColors, badgeIcons
+│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, BadgeIcon, BadgeProgressBar, BadgeInlineChip
+│   │   │   ├── molecules/       # SearchBar, Toast, HazardAlert, WeatherWidget, BadgeCard
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
-│   │   │                        # ElevationChart, ElevationProgressCard, TripCard
+│   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
+│   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
 │   │   ├── hooks/               # Custom React hooks
 │   │   │   ├── useBicycleParking.ts   # Overpass API for parking
 │   │   │   ├── useBicycleRental.ts    # Overpass API for rentals
@@ -329,7 +330,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-04-02)
+## Current State (as of 2026-04-06)
 
 ### Working Features
 - Route planning with destination autocomplete (Google Maps-style UX)
@@ -361,24 +362,38 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - 5-screen onboarding flow (location → safety score → cycling goal → circuit route → signup)
   - Post-ride impact summary (animated CO2/money/hazards counters with variable equivalents)
   - Streak engine (4AM cutoff, 5 qualifying actions, freeze mechanic, weekly reset)
-  - Impact Dashboard (streak chain, lifetime counters, guardian tier, weekly summary)
+  - Impact Dashboard (streak chain, lifetime counters, weekly summary)
   - Daily safety quiz (50+ questions, streak qualifier)
   - Enhanced hazard reporting (2-tap FAB during navigation, armchair long-press, confirm/deny counts)
-  - Guardian tier system (reporter → watchdog → sentinel → guardian angel, auto-promotion)
   - Milestone share cards with detection and deduplication
   - Scheduled notifications (streak protection, weekly impact, social digest)
+- **Badge System (137 badges across 8 categories):**
+  - Trophy Case screen (`achievements.tsx`): 3-column grid, category tabs, badge detail modal
+  - Badge unlock overlay: full-screen celebration with spring animation + particle burst, max 2/session
+  - Post-ride: "BADGES EARNED" section in impact summary with staggered icons
+  - Impact Dashboard: "Recent Badges" horizontal scroll
+  - Profile: "Achievements" row with badge count + progress bar
+  - `check_and_award_badges` RPC evaluates all criteria on: Trophy Case visit, post-ride dashboard, ride impact fetch
+  - Share: native Share API from badge detail modal
+  - Design system: BadgeIcon (3 sizes), BadgeCard, BadgeInlineChip, BadgeProgressBar, TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
 
 ### Known Incomplete
 - Push notifications (needs EAS project ID + native rebuild for actual delivery)
 - iPhone validation (no macOS hardware available)
 - Redis-backed production caching/rate-limiting
 - Quiet hours not enforced in notification triggers
+- Badge unlock overlay not yet tested on phone (needs APK rebuild)
 - Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
 
 ### Known Issues
 - Off-route detection can still trigger in dense urban areas with poor GPS
 - Community feed radius search requires GPS permission on first visit
 - Profile section expands beyond system navigation bar on some devices
+
+### Removed Features
+- Guardian Tier system (reporter→watchdog→sentinel→guardian_angel) — replaced by badge system
+- Microlives badges (Time Banker, Community Giver) — conflicted with badge system; microlives display retained in impact summary/dashboard
+- TimeBankWidget on route planning screen — removed to declutter main screen
 
 ## External Services & Config
 

@@ -194,20 +194,6 @@ const impact = {
     'M9 11 L15 11',  // euro line 1
     'M9 13 L15 13',  // euro line 2
   ),
-  /** Time Banker — hourglass */
-  time_banker: multi(
-    'M5 3 L19 3',   // top bar
-    'M5 21 L19 21', // bottom bar
-    'M6 3 L6 8 L12 12 L18 8 L18 3', // top glass
-    'M6 21 L6 16 L12 12 L18 16 L18 21', // bottom glass
-  ),
-  /** Community Giver — handshake / giving hands */
-  community_giver: multi(
-    'M2 14 L6 10 L10 14 L14 10',                     // wave 1
-    'M10 14 L14 10 L18 14 L22 10',                   // wave 2
-    'M12 14 L12 20',                                   // stem
-    'M8 20 L16 20',                                    // base
-  ),
 } as const;
 
 // ---------------------------------------------------------------------------

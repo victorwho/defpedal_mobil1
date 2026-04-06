@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-05
+Last updated: 2026-04-06
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -61,6 +61,28 @@ Update it at the end of each implementation slice.
     - contracts.ts: `RideImpact` extended with `newBadges: readonly BadgeUnlockEvent[]`; added `BadgeResponse` type
     - api.ts: `recordRideImpact` extended with optional `meta` object; `fetchBadges()` added
     - All TypeScript checks pass clean (API + mobile)
+- Badge System Phase 3 — Trophy Case UI + celebration + cleanup (2026-04-05 to 2026-04-06):
+    - **Trophy Case screen** (`app/achievements.tsx`): 3-column FlatList grid with category tab filtering (All + 8 categories), sort order (earned+new → in-progress → locked first 6 → secret ???), badge detail modal on tap
+    - **Design system components**: BadgeCard molecule (grid cell), BadgeInlineChip atom (compact pill), TrophyCaseHeader organism (earned/total + progress bar + recent unlock), CategoryTabBar organism (9 horizontal scrollable tabs with counts), BadgeDetailModal organism (bottom sheet with lg icon, tier, flavor text, criteria, progress bar, rarity, share)
+    - **BadgeUnlockOverlay**: Full-screen celebration with spring shield animation, 14-particle tier-colored burst, staggered text fade-in, tap-to-dismiss. BadgeUnlockOverlayManager in root layout reads from appStore queue, max 2 per session, suppressed during NAVIGATING
+    - **BadgeShareCard**: Capturable 320px share card (bgDeep, accent border, brand logo, lg badge icon). Share via native Share API from detail modal
+    - **Post-ride integration**: ImpactSummaryCard shows "BADGES EARNED" section with staggered badge icons + "View all achievements >" link. Feedback screen enqueues newBadges into appStore for overlay manager
+    - **Impact Dashboard integration**: "Recent Badges" horizontal scroll section with 5 most recently earned badges + "View all >" link
+    - **Profile integration**: "Achievements" row below user card with trophy icon, badge count, progress bar, tap navigates to Trophy Case
+    - **appStore**: Added `pendingBadgeUnlocks` (persisted) with `enqueueBadgeUnlocks()`, `shiftBadgeUnlock()`, `clearBadgeUnlocks()`
+    - **useBadges hook**: TanStack Query hook for GET /v1/badges with 5min stale time
+    - **Guardian Tier removal**: Removed the entire guardian_tier system (reporter→watchdog→sentinel→guardian_angel) from contracts.ts, profile.tsx, impact-dashboard.tsx, history.tsx, user-profile.tsx, FeedCard.tsx, MilestoneShareCard.tsx, feedSchemas.ts, feed.ts, v1.ts. Tier milestones removed from milestone detection
+    - **Microlives badges removal**: Removed 9 badge definitions (Time Banker I-V, Community Giver I-IV), dropped microlife_tier column, removed icons from badgeIcons.ts. Badge count: 146→137
+    - **TimeBankWidget removal**: Removed microlives widget from route planning screen + its dashboard query
+    - **Badge evaluation fixes**:
+        - `check_and_award_badges` now counts from `trips` table (GREATEST with ride_impacts) so first_ride triggers even before ride_impacts row exists
+        - Created missing `quiz_answers` table that was crashing the function
+        - Fixed PL/pgSQL array concatenation (`|| ARRAY['x']` instead of `|| 'x'`)
+        - Badge check runs on: GET /v1/badges (Trophy Case visit), GET /v1/impact-dashboard (post-ride), GET /v1/rides/:tripId/impact (auto-create path)
+    - **Auth fixes**: GET /v1/badges and GET /v1/impact-dashboard changed from `requireWriteUser` to `requireAuthenticatedUser` to support anonymous Supabase users
+    - **Rate limit fix**: GET /v1/badges changed from `write` to `routePreview` policy to prevent 429s
+    - **Schema fix**: Removed `guardianTier` from feedSchemas.ts response schemas (was causing 500 on GET /v1/profile)
+    - Deployed to Cloud Run (revisions 24-31) + Supabase migrations applied
 
 ## Phase Status
 
