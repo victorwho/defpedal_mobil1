@@ -421,17 +421,19 @@ export default function RoutePreviewScreen() {
               </Text>
             </View>
 
-            <Text style={styles.statDivider}>·</Text>
-
-            <View style={styles.stat}>
-              <Text style={[styles.statValue, { color: colors.accent }]}>
-                +{Math.round(selectedRoute.distanceMeters / 1000 * 0.4 * 30)}min
-              </Text>
-              <Text style={styles.statUnit}>life</Text>
-            </View>
           </View>
         </View>
         </FadeSlideIn>
+      ) : null}
+
+      {selectedRoute ? (
+        <View style={styles.lifeRow}>
+          <Ionicons name="heart-outline" size={14} color={colors.accent} />
+          <Text style={[styles.statValue, { color: colors.accent }]}>
+            +{Math.round(selectedRoute.distanceMeters / 1000 * 0.4 * 30)} min
+          </Text>
+          <Text style={styles.lifeLabel}>life earned</Text>
+        </View>
       ) : null}
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
@@ -657,6 +659,19 @@ const createThemedStyles = (colors: ThemeColors) =>
     statDivider: {
       ...textSm,
       color: colors.textMuted,
+    },
+    lifeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingVertical: space[2],
+      paddingHorizontal: space[3],
+      borderRadius: radii.lg,
+      backgroundColor: colors.bgSecondary,
+    },
+    lifeLabel: {
+      ...textSm,
+      color: colors.textSecondary,
     },
     comparisonBadge: {
       flexDirection: 'row',
