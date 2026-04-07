@@ -120,6 +120,7 @@ export const Button: React.FC<ButtonProps> = ({
     height: s.height,
     paddingHorizontal: s.px,
     borderRadius: radii.full,
+    borderCurve: 'continuous', // Smooth squircle corners on iOS
     backgroundColor: v.bg,
     flexDirection: 'row',
     alignItems: 'center',

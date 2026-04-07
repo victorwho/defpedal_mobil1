@@ -144,6 +144,7 @@ const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     card: {
       borderRadius: radii.xl,
+      borderCurve: 'continuous', // Smooth squircle corners on iOS
       borderWidth: 1,
       borderColor: colors.borderDefault,
       backgroundColor: colors.bgPrimary,

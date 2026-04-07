@@ -22,6 +22,7 @@ import { mobileApi } from '../src/lib/api';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
+import { useShallow } from 'zustand/shallow';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 import { useBadges } from '../src/hooks/useBadges';
@@ -109,33 +110,54 @@ export default function ProfileScreen() {
   });
 
   const t = useT();
-  const locale = useAppStore((state) => state.locale);
-  const setLocale = useAppStore((state) => state.setLocale);
-  const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
-  const setShareTripsPublicly = useAppStore((state) => state.setShareTripsPublicly);
-  const bikeType = useAppStore((state) => state.bikeType);
-  const setBikeType = useAppStore((state) => state.setBikeType);
-  const cyclingFrequency = useAppStore((state) => state.cyclingFrequency);
-  const setCyclingFrequency = useAppStore((state) => state.setCyclingFrequency);
-  const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
-  const setAvoidUnpaved = useAppStore((state) => state.setAvoidUnpaved);
-  const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const setShowRouteComparison = useAppStore((state) => state.setShowRouteComparison);
-  const notifyWeather = useAppStore((state) => state.notifyWeather);
-  const setNotifyWeather = useAppStore((state) => state.setNotifyWeather);
-  const notifyHazard = useAppStore((state) => state.notifyHazard);
-  const setNotifyHazard = useAppStore((state) => state.setNotifyHazard);
-  const notifyCommunity = useAppStore((state) => state.notifyCommunity);
-  const setNotifyCommunity = useAppStore((state) => state.setNotifyCommunity);
-  const quietHoursStart = useAppStore((state) => state.quietHoursStart);
-  const quietHoursEnd = useAppStore((state) => state.quietHoursEnd);
-  const setQuietHours = useAppStore((state) => state.setQuietHours);
-  const themePreference = useAppStore((state) => state.themePreference);
-  const setThemePreference = useAppStore((state) => state.setThemePreference);
-  const showBicycleLanes = useAppStore((state) => state.showBicycleLanes);
-  const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
-  const poiVisibility = useAppStore((state) => state.poiVisibility);
-  const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
+
+  // ---------------------------------------------------------------------------
+  // Consolidated store selectors (batched for performance)
+  // ---------------------------------------------------------------------------
+
+  // State values - grouped by section with shallow comparison
+  const {
+    locale, bikeType, cyclingFrequency, avoidUnpaved, showRouteComparison,
+    shareTripsPublicly, themePreference, showBicycleLanes, poiVisibility,
+    notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
+  } = useAppStore(useShallow((state) => ({
+    locale: state.locale,
+    bikeType: state.bikeType,
+    cyclingFrequency: state.cyclingFrequency,
+    avoidUnpaved: state.avoidUnpaved,
+    showRouteComparison: state.showRouteComparison,
+    shareTripsPublicly: state.shareTripsPublicly,
+    themePreference: state.themePreference,
+    showBicycleLanes: state.showBicycleLanes,
+    poiVisibility: state.poiVisibility,
+    notifyWeather: state.notifyWeather,
+    notifyHazard: state.notifyHazard,
+    notifyCommunity: state.notifyCommunity,
+    quietHoursStart: state.quietHoursStart,
+    quietHoursEnd: state.quietHoursEnd,
+  })));
+
+  // Actions - stable references, single selector with shallow comparison
+  const {
+    setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved,
+    setShowRouteComparison, setShareTripsPublicly, setThemePreference,
+    setShowBicycleLanes, setPoiVisibility, setNotifyWeather,
+    setNotifyHazard, setNotifyCommunity, setQuietHours,
+  } = useAppStore(useShallow((state) => ({
+    setLocale: state.setLocale,
+    setBikeType: state.setBikeType,
+    setCyclingFrequency: state.setCyclingFrequency,
+    setAvoidUnpaved: state.setAvoidUnpaved,
+    setShowRouteComparison: state.setShowRouteComparison,
+    setShareTripsPublicly: state.setShareTripsPublicly,
+    setThemePreference: state.setThemePreference,
+    setShowBicycleLanes: state.setShowBicycleLanes,
+    setPoiVisibility: state.setPoiVisibility,
+    setNotifyWeather: state.setNotifyWeather,
+    setNotifyHazard: state.setNotifyHazard,
+    setNotifyCommunity: state.setNotifyCommunity,
+    setQuietHours: state.setQuietHours,
+  })));
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },

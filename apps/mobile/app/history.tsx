@@ -128,7 +128,7 @@ export default function HistoryScreen() {
   const currentStreak = dashboard?.streak.currentStreak ?? 0;
   const co2Display = stats ? formatCo2Saved(stats.totalCo2SavedKg) : '0 g';
 
-  // ── List header: screen header + compact stats + trip section title ──
+  // ── List header: screen header + compact stats + quiz + stats dashboard + trip section title ──
   const listHeader = useMemo(
     () => (
       <View style={styles.listHeaderContainer}>
@@ -183,27 +183,6 @@ export default function HistoryScreen() {
           </View>
         ) : null}
 
-        {/* Trip list section title */}
-        <View style={styles.sectionTitleRow}>
-          <Text style={styles.sectionTitle}>{t('history.allTrips')}</Text>
-          {(trips?.length ?? 0) > 0 ? (
-            <Pressable onPress={() => router.push('/trips')}>
-              <Text style={styles.seeAllLink}>{t('history.seeAll')}</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-    ),
-    [
-      styles, user, statsLoading, colors, totalRides, totalKm,
-      currentStreak, co2Display, trips, t,
-    ],
-  );
-
-  // ── List footer: quiz card + stats dashboard ──
-  const listFooter = useMemo(
-    () => (
-      <View style={styles.listFooterContainer}>
         {/* Daily Safety Quiz */}
         {user ? (
           <Pressable
@@ -224,13 +203,32 @@ export default function HistoryScreen() {
           </Pressable>
         ) : null}
 
-        {/* Stats Dashboard (moved below trips) */}
+        {/* Stats Dashboard (route mode split, etc.) */}
         {user ? (
           <StatsDashboard hazardsReported={dashboard?.totalHazardsReported ?? 0} />
         ) : null}
+
+        {/* Trip list section title - now at the end before trips */}
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>{t('history.allTrips')}</Text>
+          {(trips?.length ?? 0) > 0 ? (
+            <Pressable onPress={() => router.push('/trips')}>
+              <Text style={styles.seeAllLink}>{t('history.seeAll')}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     ),
-    [styles, user, colors, dashboard, t],
+    [
+      styles, user, statsLoading, colors, totalRides, totalKm,
+      currentStreak, co2Display, trips, dashboard, t,
+    ],
+  );
+
+  // ── List footer: empty (trips are now at the end) ──
+  const listFooter = useMemo(
+    () => <View style={styles.listFooterSpacer} />,
+    [styles],
   );
 
   // ── Empty / loading / error states for trip list ──
@@ -392,9 +390,8 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
 
     // ── List footer ──
-    listFooterContainer: {
-      gap: space[4],
-      paddingTop: space[4],
+    listFooterSpacer: {
+      height: space[4],
     },
 
     // ── Quiz card ──

@@ -38,13 +38,13 @@ export const BadgeProgressBar: React.FC<BadgeProgressBarProps> = ({
   height = badgeSpace.progressHeight,
 }) => {
   const fraction = target > 0 ? Math.min(current / target, 1) : 0;
-  const animatedWidth = useRef(new Animated.Value(0)).current;
+  const animatedScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(animatedWidth, {
+    Animated.timing(animatedScale, {
       toValue: fraction,
       duration: 600,
-      useNativeDriver: false,
+      useNativeDriver: true, // GPU-accelerated with transform
     }).start();
   }, [fraction]);
 
@@ -55,18 +55,24 @@ export const BadgeProgressBar: React.FC<BadgeProgressBarProps> = ({
     overflow: 'hidden',
   };
 
+  // Fill bar: full width, scaled from left edge via transform
+  const fillStyle: ViewStyle = {
+    height,
+    width: '100%',
+    borderRadius: radii.sm,
+    backgroundColor: tierColor,
+  };
+
   return (
     <View style={trackStyle}>
       <Animated.View
-        style={{
-          height,
-          borderRadius: radii.sm,
-          backgroundColor: tierColor,
-          width: animatedWidth.interpolate({
-            inputRange: [0, 1],
-            outputRange: ['0%', '100%'],
-          }),
-        }}
+        style={[
+          fillStyle,
+          {
+            transform: [{ scaleX: animatedScale }],
+            transformOrigin: 'left',
+          },
+        ]}
       />
     </View>
   );

@@ -62,7 +62,11 @@ export default function CommunityFeedScreen() {
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 20 }).current;
 
-  const items = data?.pages.flatMap((page) => page.items) ?? [];
+  // Memoize flattened items to prevent array recreation on every render
+  const items = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data?.pages],
+  );
 
   const handleLike = useCallback(
     (id: string, liked: boolean) => {

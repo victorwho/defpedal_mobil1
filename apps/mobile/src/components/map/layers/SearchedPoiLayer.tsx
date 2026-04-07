@@ -1,6 +1,32 @@
 import Mapbox from '@rnmapbox/maps';
 import React from 'react';
 
+// ---------------------------------------------------------------------------
+// Hoisted styles for Mapbox layer performance (avoid recreation on every render)
+// ---------------------------------------------------------------------------
+
+const searchedPoiBgStyle = {
+  circleColor: '#D4A843',
+  circleRadius: 10,
+  circleStrokeColor: '#FFFFFF',
+  circleStrokeWidth: 1.5,
+  circleOpacity: 0.9,
+  circleEmissiveStrength: 1,
+};
+
+const searchedPoiLabelStyle = {
+  textField: ['get', 'label'] as any,
+  textSize: 11,
+  textColor: '#1A1A1A',
+  textAllowOverlap: true,
+  textIgnorePlacement: true,
+  textEmissiveStrength: 1,
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 type SearchedPoiLayerProps = {
   searchedPoiFeatureCollection: any;
   onPoiPress: (event: any) => void;
@@ -23,30 +49,8 @@ export const SearchedPoiLayer = React.memo(({
       shape={searchedPoiFeatureCollection}
       onPress={onPoiPress}
     >
-      <Mapbox.CircleLayer
-        id="searched-poi-bg"
-        minZoomLevel={11}
-        style={{
-          circleColor: '#D4A843',
-          circleRadius: 10,
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 1.5,
-          circleOpacity: 0.9,
-          circleEmissiveStrength: 1,
-        }}
-      />
-      <Mapbox.SymbolLayer
-        id="searched-poi-label"
-        minZoomLevel={11}
-        style={{
-          textField: ['get', 'label'],
-          textSize: 11,
-          textColor: '#1A1A1A',
-          textAllowOverlap: true,
-          textIgnorePlacement: true,
-          textEmissiveStrength: 1,
-        }}
-      />
+      <Mapbox.CircleLayer id="searched-poi-bg" minZoomLevel={11} style={searchedPoiBgStyle} />
+      <Mapbox.SymbolLayer id="searched-poi-label" minZoomLevel={11} style={searchedPoiLabelStyle} />
     </Mapbox.ShapeSource>
   );
 });

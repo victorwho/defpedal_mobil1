@@ -23,6 +23,14 @@ export const ro: TranslationKeys = {
     confirmed_other: '{{count}} persoane au confirmat',
   },
 
+  // ── Error Boundary ──
+  errorBoundary: {
+    title: 'Ceva nu a mers bine',
+    description: 'Aplicația a întâmpinat o eroare neașteptată. Poți încerca din nou sau reporni aplicația.',
+    tryAgain: 'Încearcă din nou',
+    restartApp: 'Repornește aplicația',
+  },
+
   // ── Tabs ──
   tabs: {
     map: 'Hartă',
@@ -69,6 +77,8 @@ export const ro: TranslationKeys = {
     minutesRemaining_one: 'Aproximativ 1 minut rămas.',
     minutesRemaining_other: 'Aproximativ {{count}} minute rămase.',
     endRide: 'Termină cursa',
+    endRideConfirmTitle: 'Termină cursa?',
+    endRideConfirmMessage: 'Ești sigur că vrei să termini cursa? Progresul va fi salvat.',
     recenter: 'Recentrează',
     offRoute: 'Ești în afara traseului',
     offRouteCountdown: 'În afara traseului. Redirecționare automată în {{seconds}}s.',

@@ -1,4 +1,4 @@
-import type { FeedItem, RouteOption } from '@defensivepedal/core';
+import type { FeedComment, FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatDistance, formatDuration, formatSpeed } from '@defensivepedal/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -30,6 +30,23 @@ import {
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
+
+// ---------------------------------------------------------------------------
+// Extracted components for list memoization
+// ---------------------------------------------------------------------------
+
+interface StatTileProps {
+  label: string;
+  value: string;
+  styles: ReturnType<typeof createThemedStyles>;
+}
+
+const StatTile = ({ label, value, styles }: StatTileProps) => (
+  <View style={styles.statTile}>
+    <Text style={styles.statLabel}>{label}</Text>
+    <Text style={styles.statValue}>{value}</Text>
+  </View>
+);
 
 export default function CommunityTripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -88,11 +105,25 @@ export default function CommunityTripScreen() {
 
   const insets = useSafeAreaInsets();
 
-  const StatTile = ({ label, value }: { label: string; value: string }) => (
-    <View style={styles.statTile}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
+  // Memoized renderItem for FlatList - prevents recreation on every render
+  const renderCommentItem = useCallback(
+    ({ item: comment }: { item: FeedComment }) => (
+      <View style={styles.commentRow}>
+        <View style={styles.commentAvatar}>
+          <Text style={styles.commentAvatarText}>
+            {comment.user.displayName.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+        <View style={styles.commentBody}>
+          <Text style={styles.commentUser}>{comment.user.displayName}</Text>
+          <Text style={styles.commentText}>{comment.body}</Text>
+          <Text style={styles.commentTime}>
+            {new Date(comment.createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+    ),
+    [styles],
   );
 
   if (!item) {
@@ -146,13 +177,13 @@ export default function CommunityTripScreen() {
 
             {/* Stats grid */}
             <View style={styles.statsGrid}>
-              <StatTile label="Distance" value={formatDistance(item.distanceMeters)} />
-              <StatTile label="Duration" value={formatDuration(item.durationSeconds)} />
+              <StatTile label="Distance" value={formatDistance(item.distanceMeters)} styles={styles} />
+              <StatTile label="Duration" value={formatDuration(item.durationSeconds)} styles={styles} />
               {item.elevationGainMeters != null ? (
-                <StatTile label="Climb" value={`${Math.round(item.elevationGainMeters)} m`} />
+                <StatTile label="Climb" value={`${Math.round(item.elevationGainMeters)} m`} styles={styles} />
               ) : null}
               {item.averageSpeedMps != null ? (
-                <StatTile label="Avg speed" value={formatSpeed(item.averageSpeedMps) ?? '-'} />
+                <StatTile label="Avg speed" value={formatSpeed(item.averageSpeedMps) ?? '-'} styles={styles} />
               ) : null}
             </View>
 
@@ -170,22 +201,7 @@ export default function CommunityTripScreen() {
             </Text>
           </>
         }
-        renderItem={({ item: comment }) => (
-          <View style={styles.commentRow}>
-            <View style={styles.commentAvatar}>
-              <Text style={styles.commentAvatarText}>
-                {comment.user.displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.commentBody}>
-              <Text style={styles.commentUser}>{comment.user.displayName}</Text>
-              <Text style={styles.commentText}>{comment.body}</Text>
-              <Text style={styles.commentTime}>
-                {new Date(comment.createdAt).toLocaleDateString()}
-              </Text>
-            </View>
-          </View>
-        )}
+        renderItem={renderCommentItem}
         ListEmptyComponent={
           <Text style={styles.noComments}>
             {commentsQuery.isLoading ? 'Loading comments...' : 'No comments yet. Be the first!'}

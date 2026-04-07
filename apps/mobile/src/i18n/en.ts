@@ -21,6 +21,14 @@ export const en = {
     confirmed_other: '{{count}} people confirmed',
   },
 
+  // ── Error Boundary ──
+  errorBoundary: {
+    title: 'Something went wrong',
+    description: 'The app encountered an unexpected error. You can try again or restart the app.',
+    tryAgain: 'Try Again',
+    restartApp: 'Restart App',
+  },
+
   // ── Tabs ──
   tabs: {
     map: 'Map',
@@ -67,6 +75,8 @@ export const en = {
     minutesRemaining_one: 'About 1 minute remaining.',
     minutesRemaining_other: 'About {{count}} minutes remaining.',
     endRide: 'End ride',
+    endRideConfirmTitle: 'End ride?',
+    endRideConfirmMessage: 'Are you sure you want to end your ride? Your progress will be saved.',
     recenter: 'Recenter',
     offRoute: 'You are off route',
     offRouteCountdown: 'Off route. Automatic reroute will fire in {{seconds}}s.',

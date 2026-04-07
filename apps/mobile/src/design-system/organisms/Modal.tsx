@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 380,
     borderRadius: radii.xl,
+    borderCurve: 'continuous', // Smooth squircle corners on iOS
     overflow: 'hidden',
   },
   header: {

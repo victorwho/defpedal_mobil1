@@ -15,6 +15,7 @@ import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
+import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -142,11 +143,13 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={styles.root} onLayout={onLayoutRootView}>
-      <AppProviders>
-        <RootLayoutInner />
-      </AppProviders>
-    </View>
+    <ErrorBoundary>
+      <View style={styles.root} onLayout={onLayoutRootView}>
+        <AppProviders>
+          <RootLayoutInner />
+        </AppProviders>
+      </View>
+    </ErrorBoundary>
   );
 }
 
