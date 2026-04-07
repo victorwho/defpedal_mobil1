@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-07 (session 8)
+Last updated: 2026-04-07 (session 9)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -158,6 +158,11 @@ Update it at the end of each implementation slice.
     - **Require cycle fixes**: Fixed barrel import cycles in `Toggle.tsx` and `SettingRow.tsx` — now import `useTheme` directly from `ThemeContext.tsx` instead of design-system barrel.
     - **Benefits**: Zero external API calls for elevation (just Mapbox tiles which are CDN-cached), single source of truth, fewer network round trips.
     - Deployed to Cloud Run. Bundle ✅. Phone-tested.
+
+- Bug fixes + voice guidance (2026-04-07):
+    - **Post-ride impact screen showing 0 values**: Impact summary (microlives, CO2, EUR) displayed 0 for rides with actual movement. Two fixes: (1) trail distance computation now falls back to planned route distance when `calculateTrailDistanceMeters` returns 0 despite having breadcrumbs; (2) server enhancement effect no longer overwrites non-zero local impact values with zeros from unsynced trip data — keeps local computation but still accepts badges and equivalentText from server.
+    - **Voice guidance step completion simplified**: On completing a turn, voice previously announced the completed step instruction + next step with distance (e.g. "Turn left, then in 200 meters turn right"). Now only announces the next step with distance (e.g. "In 200 meters, turn right") — the completed instruction is redundant since the rider already made the turn. No announcement for the final step before arrival (handled by arrival announcement).
+    - Bundle ✅. Preview APK built and installed on Samsung S23 Ultra.
 
 ## Phase Status
 
