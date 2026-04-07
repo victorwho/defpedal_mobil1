@@ -104,7 +104,7 @@ const RootLayoutInner = () => {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="auto" />
       <RouteTelemetryObserver />
       <OnboardingGuard />
       {showValidationOverlay ? (

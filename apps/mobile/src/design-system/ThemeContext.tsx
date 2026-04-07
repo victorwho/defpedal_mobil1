@@ -49,6 +49,7 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ forcedMode, children }) => {
   const systemScheme = useColorScheme();
   const appState = useAppStore((s) => s.appState);
+  const themePreference = useAppStore((s) => s.themePreference);
 
   const value = useMemo<ThemeContextValue>(() => {
     // Rule from spec: during active navigation, force dark theme
@@ -64,13 +65,19 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ forcedMode, childr
       };
     }
 
-    // Default to dark if system preference is not available
-    const resolvedMode: ThemeMode = systemScheme === 'light' ? 'light' : 'dark';
+    // Resolve based on user preference (default: 'dark')
+    let resolvedMode: ThemeMode;
+    if (themePreference === 'system') {
+      resolvedMode = systemScheme === 'light' ? 'light' : 'dark';
+    } else {
+      resolvedMode = themePreference ?? 'dark';
+    }
+
     return {
       mode: resolvedMode,
       colors: resolvedMode === 'dark' ? darkTheme : lightTheme,
     };
-  }, [systemScheme, appState, forcedMode]);
+  }, [systemScheme, appState, forcedMode, themePreference]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };

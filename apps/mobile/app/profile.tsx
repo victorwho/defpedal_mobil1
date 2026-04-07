@@ -130,6 +130,8 @@ export default function ProfileScreen() {
   const quietHoursStart = useAppStore((state) => state.quietHoursStart);
   const quietHoursEnd = useAppStore((state) => state.quietHoursEnd);
   const setQuietHours = useAppStore((state) => state.setQuietHours);
+  const themePreference = useAppStore((state) => state.themePreference);
+  const setThemePreference = useAppStore((state) => state.setThemePreference);
   const showBicycleLanes = useAppStore((state) => state.showBicycleLanes);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
@@ -314,6 +316,25 @@ export default function ProfileScreen() {
                 >
                   <Text style={[styles.languagePillText, locale === loc && styles.languagePillTextActive]}>
                     {loc === 'en' ? 'English' : 'Română'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Theme picker */}
+            <View style={styles.languageRow}>
+              {(['dark', 'light', 'system'] as const).map((pref) => (
+                <Pressable
+                  key={pref}
+                  style={[styles.languagePill, themePreference === pref && styles.languagePillActive]}
+                  onPress={() => setThemePreference(pref)}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${pref} theme`}
+                  accessibilityState={{ selected: themePreference === pref }}
+                >
+                  <Text style={[styles.languagePillText, themePreference === pref && styles.languagePillTextActive]}>
+                    {pref === 'dark' ? t('profile.themeDark') : pref === 'light' ? t('profile.themeLight') : t('profile.themeSystem')}
                   </Text>
                 </Pressable>
               ))}
