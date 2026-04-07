@@ -352,7 +352,13 @@ export default function NavigationScreen() {
   };
 
   const speak = useCallback((message: string) => {
-    if (!navigationSession || !voiceGuidanceEnabled || navigationSession.isMuted) {
+    const currentAppState = useAppStore.getState().appState;
+    if (
+      !navigationSession ||
+      !voiceGuidanceEnabled ||
+      navigationSession.isMuted ||
+      currentAppState !== 'NAVIGATING'
+    ) {
       return;
     }
 
@@ -517,16 +523,22 @@ export default function NavigationScreen() {
     if (progress.shouldPreAnnounce && activeStep) {
       markPreAnnouncement(activeStep.id);
       const dist = Math.round(progress.distanceToManeuverMeters ?? 200);
-      speak(`In ${dist} meters, ${activeStep.instruction}`);
+      speak(t('nav.inMeters', { distance: dist, instruction: activeStep.instruction }));
     }
 
     if (progress.shouldAnnounceApproach && activeStep) {
       markApproachAnnouncement(activeStep.id);
-      speak(`In 50 meters, ${activeStep.instruction}`);
+      speak(t('nav.inMeters', { distance: 50, instruction: activeStep.instruction }));
     }
 
     if (progress.shouldAdvanceStep && activeStep) {
-      speak(activeStep.instruction);
+      const nextStep = selectedRoute.steps[progress.currentStepIndex + 1];
+      if (nextStep) {
+        const nextDist = Math.round(nextStep.distanceMeters);
+        speak(activeStep.instruction + t('nav.thenInMeters', { distance: nextDist, instruction: nextStep.instruction }));
+      } else {
+        speak(activeStep.instruction);
+      }
       advanceNavigation(selectedRoute.steps.length);
     }
 
@@ -682,7 +694,12 @@ export default function NavigationScreen() {
           <ManeuverCard
             currentStep={currentStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
-            onPress={() => { if (currentStep) speak(currentStep.instruction); }}
+            onPress={() => {
+              if (currentStep) {
+                const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);
+                speak(t('nav.inMeters', { distance: dist, instruction: currentStep.instruction }));
+              }
+            }}
           />
 
           {warningMessage ? (
