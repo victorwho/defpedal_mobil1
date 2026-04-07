@@ -4,9 +4,10 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useTheme, type ThemeColors } from '..';
 import { Co2Badge } from '../atoms/Co2Badge';
 import { RouteMap } from '../../components/map';
-import { brandColors, safetyColors, gray } from '../tokens/colors';
+import { safetyColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textSm, textXs } from '../tokens/typography';
@@ -28,13 +29,12 @@ const formatDate = (iso: string): string => {
 
 const formatTime = (iso: string): string => {
   const d = new Date(iso);
-  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-const formatDuration = (startedAt: string, endedAt: string | null): string => {
-  if (!endedAt) return '—';
-  const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
-  const totalMin = Math.round(ms / 60_000);
+const formatDuration = (start: string, end: string | null): string => {
+  if (!end) return '—';
+  const totalMin = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60_000);
   if (totalMin < 60) return `${totalMin}m`;
   const hours = Math.floor(totalMin / 60);
   const mins = totalMin % 60;
@@ -60,6 +60,8 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
 };
 
 export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
   const hasGpsTrail = trip.gpsBreadcrumbs.length > 0;
 
@@ -118,7 +120,7 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={18}
-          color={gray[500]}
+          color={colors.textMuted}
         />
       </Pressable>
 
@@ -138,72 +140,73 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    gap: space[3],
-  },
-  dateCol: {
-    flex: 1,
-    gap: 2,
-  },
-  dateText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
-  },
-  timeText: {
-    ...textXs,
-    color: gray[500],
-  },
-  metricsCol: {
-    gap: 4,
-    alignItems: 'flex-end',
-  },
-  metric: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metricText: {
-    ...textXs,
-    color: brandColors.textSecondary,
-    fontFamily: fontFamily.body.medium,
-  },
-  badgeCol: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  modeBadge: {
-    paddingHorizontal: space[2],
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  modeBadgeText: {
-    ...textXs,
-    color: '#FFFFFF',
-    fontFamily: fontFamily.heading.bold,
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  mapContainer: {
-    height: 200,
-    borderTopWidth: 1,
-    borderTopColor: brandColors.borderDefault,
-  },
-  mapInner: {
-    flex: 1,
-    borderRadius: 0,
-    borderWidth: 0,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    card: {
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+      overflow: 'hidden',
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      gap: space[3],
+    },
+    dateCol: {
+      flex: 1,
+      gap: 2,
+    },
+    dateText: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    timeText: {
+      ...textXs,
+      color: colors.textMuted,
+    },
+    metricsCol: {
+      gap: 4,
+      alignItems: 'flex-end',
+    },
+    metric: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metricText: {
+      ...textXs,
+      color: colors.textSecondary,
+      fontFamily: fontFamily.body.medium,
+    },
+    badgeCol: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    modeBadge: {
+      paddingHorizontal: space[2],
+      paddingVertical: 2,
+      borderRadius: radii.full,
+    },
+    modeBadgeText: {
+      ...textXs,
+      color: '#FFFFFF',
+      fontFamily: fontFamily.heading.bold,
+      fontSize: 10,
+      textTransform: 'uppercase',
+    },
+    mapContainer: {
+      height: 200,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDefault,
+    },
+    mapInner: {
+      flex: 1,
+      borderRadius: 0,
+      borderWidth: 0,
+    },
+  });

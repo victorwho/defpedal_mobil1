@@ -1,9 +1,10 @@
 import type { FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { brandColors, safetyColors } from '../design-system/tokens/colors';
+import { useTheme, type ThemeColors } from '../design-system';
+import { safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
@@ -53,6 +54,8 @@ const getSafetyColor = (rating: number): string => {
 };
 
 export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const syntheticRoute = buildSyntheticRoute(item);
   const initials = item.user.displayName
@@ -162,140 +165,138 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
   );
 };
 
-/** Muted text for dark background — slightly lighter than textSecondary for readability */
-const TEXT_ON_DARK_MUTED = '#cbd5e1';
-
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: brandColors.bgSecondary,
-    padding: 16,
-    gap: 10,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: brandColors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: brandColors.textPrimary,
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  headerText: {
-    flex: 1,
-    gap: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  displayName: {
-    color: brandColors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
-    flexShrink: 1,
-  },
-  timestamp: {
-    color: TEXT_ON_DARK_MUTED,
-    fontSize: 12,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    flex: 1,
-    color: brandColors.accent,
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.3,
-  },
-  safetyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: radii.lg,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  safetyDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  safetyPillText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  summaryLine: {
-    color: TEXT_ON_DARK_MUTED,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  mapContainer: {
-    borderRadius: radii.md,
-    overflow: 'hidden',
-  },
-  mapInner: {
-    aspectRatio: 16 / 9,
-    maxHeight: 200,
-    borderRadius: radii.md,
-  },
-  mapPlaceholder: {
-    backgroundColor: brandColors.bgTertiary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    color: TEXT_ON_DARK_MUTED,
-    fontSize: 13,
-  },
-  note: {
-    color: TEXT_ON_DARK_MUTED,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  readMore: {
-    color: brandColors.accent,
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  actionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderTopWidth: 1,
-    borderTopColor: brandColors.borderDefault,
-    paddingTop: 8,
-  },
-  commentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  commentIcon: {
-    fontSize: 18,
-  },
-  commentCount: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: TEXT_ON_DARK_MUTED,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    card: {
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
+      padding: 16,
+      gap: 10,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    avatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+    },
+    headerText: {
+      flex: 1,
+      gap: 1,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    displayName: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      fontWeight: '800',
+      flexShrink: 1,
+    },
+    timestamp: {
+      color: colors.textSecondary,
+      fontSize: 12,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    title: {
+      flex: 1,
+      color: colors.accent,
+      fontSize: 16,
+      fontWeight: '900',
+      letterSpacing: -0.3,
+    },
+    safetyPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderRadius: radii.lg,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    safetyDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    safetyPillText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '800',
+    },
+    summaryLine: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    mapContainer: {
+      borderRadius: radii.md,
+      overflow: 'hidden',
+    },
+    mapInner: {
+      aspectRatio: 16 / 9,
+      maxHeight: 200,
+      borderRadius: radii.md,
+    },
+    mapPlaceholder: {
+      backgroundColor: colors.bgTertiary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    placeholderText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    note: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    readMore: {
+      color: colors.accent,
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 2,
+    },
+    actionBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDefault,
+      paddingTop: 8,
+    },
+    commentButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    commentIcon: {
+      fontSize: 18,
+    },
+    commentCount: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+  });

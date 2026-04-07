@@ -11,7 +11,8 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 
 import { radii } from '../tokens/radii';
 import { duration, easing } from '../tokens/motion';
-import { darkTheme, gray } from '../tokens/colors';
+import { gray } from '../tokens/colors';
+import { useTheme } from '..';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -45,6 +46,7 @@ export const Toggle: React.FC<ToggleProps> = ({
   disabled = false,
   accessibilityLabel,
 }) => {
+  const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const haptics = useHaptics();
   const anim = useRef(new Animated.Value(checked ? 1 : 0)).current;
@@ -68,12 +70,12 @@ export const Toggle: React.FC<ToggleProps> = ({
 
   const trackColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [gray[600], darkTheme.accent],
+    outputRange: [gray[600], colors.accent],
   });
 
   const thumbColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#FFFFFF', darkTheme.textInverse],
+    outputRange: ['#FFFFFF', colors.textInverse],
   });
 
   return (

@@ -5,15 +5,14 @@
  * Used for boolean settings throughout the app.
  * Combines settingRow pattern from profile.tsx with Toggle atom.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useTheme, type ThemeColors } from '..';
 import { Toggle } from '../atoms/Toggle';
-import { brandColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm } from '../tokens/typography';
-import { surfaceTints } from '../tokens/tints';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +45,9 @@ export const SettingRow: React.FC<SettingRowProps> = ({
   disabled = false,
   accessibilityLabel,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
+
   return (
     <Pressable
       style={[styles.container, disabled && styles.containerDisabled]}
@@ -69,35 +71,36 @@ export const SettingRow: React.FC<SettingRowProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// Styles
+// Themed styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: space[4],
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: surfaceTints.glass,
-  },
-  containerDisabled: {
-    opacity: 0.5,
-  },
-  textColumn: {
-    flex: 1,
-    gap: space[1],
-    marginRight: space[3],
-  },
-  label: {
-    ...textBase,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.textPrimary,
-  },
-  description: {
-    ...textSm,
-    color: brandColors.textSecondary,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: space[4],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+    },
+    containerDisabled: {
+      opacity: 0.5,
+    },
+    textColumn: {
+      flex: 1,
+      gap: space[1],
+      marginRight: space[3],
+    },
+    label: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    description: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+  });
