@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FeedCard } from '../src/components/FeedCard';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { handleTabPress } from '../src/lib/navigation-helpers';
@@ -88,15 +89,17 @@ export default function CommunityFeedScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
-    ({ item }: { item: FeedItem }) => (
-      <FeedCard
-        item={item}
-        isVisible={visibleIds.has(item.id)}
-        onLike={handleLike}
-        onLove={handleLove}
-        onPress={handlePress}
-        onUserPress={(userId) => router.push(`/user-profile?id=${userId}`)}
-      />
+    ({ item, index }: { item: FeedItem; index: number }) => (
+      <FadeSlideIn delay={Math.min(index * 50, 300)}>
+        <FeedCard
+          item={item}
+          isVisible={visibleIds.has(item.id)}
+          onLike={handleLike}
+          onLove={handleLove}
+          onPress={handlePress}
+          onUserPress={(userId) => router.push(`/user-profile?id=${userId}`)}
+        />
+      </FadeSlideIn>
     ),
     [visibleIds, handleLike, handleLove, handlePress, router],
   );

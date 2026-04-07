@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import { StatsDashboard } from '../src/components/StatsDashboard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { TripCard } from '../src/design-system/organisms/TripCard';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -109,12 +110,14 @@ export default function HistoryScreen() {
   }, []);
 
   const renderTripItem = useCallback(
-    ({ item }: { item: TripHistoryItem }) => (
-      <TripCard
-        trip={item}
-        expanded={expandedId === item.id}
-        onToggle={() => handleToggle(item.id)}
-      />
+    ({ item, index }: { item: TripHistoryItem; index: number }) => (
+      <FadeSlideIn delay={Math.min(index * 50, 300)}>
+        <TripCard
+          trip={item}
+          expanded={expandedId === item.id}
+          onToggle={() => handleToggle(item.id)}
+        />
+      </FadeSlideIn>
     ),
     [expandedId, handleToggle],
   );

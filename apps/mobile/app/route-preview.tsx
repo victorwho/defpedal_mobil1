@@ -30,6 +30,7 @@ import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarni
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -385,6 +386,7 @@ export default function RoutePreviewScreen() {
       ) : null}
 
       {selectedRoute ? (
+        <FadeSlideIn>
         <View style={styles.summaryStrip}>
           <Badge
             variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
@@ -429,6 +431,7 @@ export default function RoutePreviewScreen() {
             </View>
           </View>
         </View>
+        </FadeSlideIn>
       ) : null}
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
