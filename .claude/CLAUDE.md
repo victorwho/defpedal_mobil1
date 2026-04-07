@@ -240,7 +240,8 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - Right overlay for floating control buttons
 
 ### Design System
-- Dark/light theme support via `ThemeProvider` + `useTheme()` hook. All 30 screens use `createThemedStyles(colors)` factory pattern
+- Dark/light/system theme via `ThemeProvider` + `useTheme()` hook. User picks in Profile > Display (3-pill picker: Dark / Light / System). Persisted in Zustand as `themePreference`
+- All 30 screens + key components (Screen, MapStageScreen, SettingRow, Toggle, TripCard, FeedCard, CommunityStatsCard, ElevationChart) use `createThemedStyles(colors)` factory pattern
 - Forces dark theme during NAVIGATING state (glare reduction, battery, safety contrast)
 - Tokens: `colors.ts`, `spacing.ts`, `typography.ts`, `radii.ts`, `shadows.ts`, `tints.ts` (opacity + rgba tints), `iconSize.ts` (xs-3xl), `zIndex.ts` (semantic layers), `motion.ts`
 - Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle, FadeSlideIn) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
@@ -357,6 +358,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - POI layers from Mapbox vector tiles (hydration, repair, restroom, transit, supplies)
 - Bike lane overlay from Mapbox vector tiles
 - Shield Mode basemap with auto day/night lighting
+- Light/dark/system theme picker in Profile (persisted, navigation forces dark)
 - Profile with 3-section layout (Cycling Preferences / Display / Account), bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles
 - Sign in (Google OAuth) / sign out
 - Offline mutation queue (trips, hazards, feedback sync when online)

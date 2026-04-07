@@ -140,6 +140,18 @@ Update it at the end of each implementation slice.
     - **Phase 3 — History restructure**: Replaced large Impact card + StreakCard with compact 4-stat header (rides, km, streak, CO2). Trip list inlined via FlatList (was behind "View My Trips" button). Quiz + StatsDashboard moved to footer.
     - **Phase 3 — Visual softening**: Badge glow opacity 0.4→0.2, MilestoneShareCard border 2px→1px.
 
+- Light/Dark Theme Support (2026-04-07):
+    - **Theme picker**: Added `themePreference` ('system' | 'dark' | 'light') to Zustand store (persisted). Three-pill picker in Profile > Display section. Navigation always forces dark per spec rule (glare/battery/safety).
+    - **Screen.tsx**: Converted from static `brandColors` to `useTheme()`. Header shell, background, text all adapt. Glass effect switches dark/light. Glow orbs dimmed in light mode.
+    - **MapStageScreen.tsx**: Bottom sheet, handle, fixed footer all theme-aware. Dark glass vs white glass.
+    - **Components migrated to useTheme()**: SettingRow, Toggle, TripCard, FeedCard, CommunityStatsCard, ElevationChart. All converted from hardcoded `darkTheme`/`brandColors` to `createThemedStyles(colors)` pattern.
+    - **Profile fixes**: Replaced `surfaceTints.glass` (hardcoded dark rgba) with `colors.bgPrimary` on achievementsCard, userCard, settingRow, DropdownPicker. Language/theme pill borders use themed colors.
+    - **Route preview**: Summary strip cleaned up (removed border/shadow, uses `bgSecondary`). Life-earned stat moved to its own row with heart icon.
+    - **StatusBar**: Changed from `style="light"` to `style="auto"` to adapt.
+    - **Elevation chart**: Converted card container to themed styles. SVG graph (blue line + gradient) works on both backgrounds.
+    - **Known issue**: Open-Meteo elevation API intermittently rate-limits (HTTP 429) during heavy testing — not a code bug, recovers on its own.
+    - Bundle ✅. Phone-tested on Samsung S23 Ultra in both light and dark modes.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation
