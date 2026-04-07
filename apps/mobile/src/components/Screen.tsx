@@ -2,7 +2,7 @@ import type { PropsWithChildren, ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { brandColors } from '../design-system/tokens/colors';
+import { useTheme } from '../design-system';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 import {
@@ -11,6 +11,7 @@ import {
   textBase,
   textXs,
 } from '../design-system/tokens/typography';
+import { surfaceTints } from '../design-system/tokens/tints';
 import { BrandLogo } from './BrandLogo';
 
 type ScreenProps = PropsWithChildren<{
@@ -22,45 +23,53 @@ type ScreenProps = PropsWithChildren<{
   contentBottomPadding?: number;
 }>;
 
-export const Screen = ({ title, eyebrow, subtitle, aside, children, contentBottomPadding }: ScreenProps) => (
-  <SafeAreaView style={styles.safeArea}>
-    <View style={styles.canvas}>
-      <View style={[styles.glow, styles.glowTop]} />
-      <View style={[styles.glow, styles.glowBottom]} />
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          contentBottomPadding != null && { paddingBottom: contentBottomPadding },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.headerShell}>
-          <View style={styles.headerRow}>
-            <View style={styles.brandRow}>
-              <BrandLogo />
-              <View style={styles.titleWrap}>
-                {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-                <Text style={styles.title}>{title}</Text>
-                {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-              </View>
-            </View>
-            {aside ? <View style={styles.asideWrap}>{aside}</View> : null}
-          </View>
-        </View>
-        {children}
-      </ScrollView>
-    </View>
-  </SafeAreaView>
-);
+export const Screen = ({ title, eyebrow, subtitle, aside, children, contentBottomPadding }: ScreenProps) => {
+  const { colors, mode } = useTheme();
 
-const styles = StyleSheet.create({
+  const headerBg = mode === 'dark'
+    ? surfaceTints.glass          // rgba(17, 24, 39, 0.86)
+    : surfaceTints.glassLight;    // rgba(255, 255, 255, 0.85)
+
+  const glowOpacity = mode === 'dark' ? 0.55 : 0.15;
+
+  return (
+    <SafeAreaView style={[staticStyles.safeArea, { backgroundColor: colors.bgDeep }]}>
+      <View style={[staticStyles.canvas, { backgroundColor: colors.bgDeep }]}>
+        <View style={[staticStyles.glow, staticStyles.glowTop, { opacity: glowOpacity }]} />
+        <View style={[staticStyles.glow, staticStyles.glowBottom, { opacity: glowOpacity }]} />
+        <ScrollView
+          contentContainerStyle={[
+            staticStyles.content,
+            contentBottomPadding != null && { paddingBottom: contentBottomPadding },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[staticStyles.headerShell, { borderColor: colors.borderDefault, backgroundColor: headerBg }]}>
+            <View style={staticStyles.headerRow}>
+              <View style={staticStyles.brandRow}>
+                <BrandLogo />
+                <View style={staticStyles.titleWrap}>
+                  {eyebrow ? <Text style={[staticStyles.eyebrow, { color: colors.accent }]}>{eyebrow}</Text> : null}
+                  <Text style={[staticStyles.title, { color: colors.textPrimary }]}>{title}</Text>
+                  {subtitle ? <Text style={[staticStyles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text> : null}
+                </View>
+              </View>
+              {aside ? <View style={staticStyles.asideWrap}>{aside}</View> : null}
+            </View>
+          </View>
+          {children}
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const staticStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: brandColors.bgDeep,
   },
   canvas: {
     flex: 1,
-    backgroundColor: brandColors.bgDeep,
   },
   content: {
     paddingTop: space[3] + space[0.5],
@@ -71,8 +80,6 @@ const styles = StyleSheet.create({
   headerShell: {
     borderRadius: radii['2xl'] + space[1],
     borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: 'rgba(17, 24, 39, 0.86)',
     padding: space[4] + space[0.5],
     overflow: 'hidden',
   },
@@ -96,18 +103,15 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.heading.extraBold,
     textTransform: 'uppercase',
     letterSpacing: 1.4,
-    color: brandColors.accent,
   },
   title: {
     ...text3xl,
     fontFamily: fontFamily.heading.extraBold,
     fontSize: 32,
-    color: brandColors.textPrimary,
     letterSpacing: -0.8,
   },
   subtitle: {
     ...textBase,
-    color: brandColors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -118,7 +122,6 @@ const styles = StyleSheet.create({
   glow: {
     position: 'absolute',
     borderRadius: radii.full,
-    opacity: 0.55,
   },
   glowTop: {
     top: -90,

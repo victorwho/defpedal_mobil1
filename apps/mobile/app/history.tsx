@@ -303,7 +303,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii['2xl'] + space[1],
       borderWidth: 1,
       borderColor: colors.borderDefault,
-      backgroundColor: 'rgba(17, 24, 39, 0.86)',
+      backgroundColor: colors.bgPrimary,
       padding: space[4] + space[0.5],
       overflow: 'hidden',
     },
