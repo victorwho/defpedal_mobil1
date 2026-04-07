@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Line, Text as SvgText } from 'react-native-svg';
 
-import { darkTheme } from '../tokens/colors';
+import { useTheme, type ThemeColors } from '..';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
@@ -59,6 +59,8 @@ export const ElevationChart = ({
   elevationProfile,
   distanceMeters,
 }: ElevationChartProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const chartData = useMemo(() => {
     if (elevationProfile.length < 2) return null;
 
@@ -201,27 +203,28 @@ export const ElevationChart = ({
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: darkTheme.bgPrimary,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    gap: space[2],
-    ...shadows.md,
-  },
-  header: {
-    ...textXs,
-    fontFamily: fontFamily.body.semiBold,
-    color: darkTheme.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    fontSize: 11,
-  },
-  chartContainer: {
-    overflow: 'hidden',
-    borderRadius: radii.md,
-  },
-});
+const createThemedStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      gap: space[2],
+      ...shadows.md,
+    },
+    header: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      fontSize: 11,
+    },
+    chartContainer: {
+      overflow: 'hidden',
+      borderRadius: radii.md,
+    },
+  });
