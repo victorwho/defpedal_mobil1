@@ -508,3 +508,18 @@ For normal day-to-day feature work, we also recognize a softer milestone:
   - Added global ErrorBoundary for crash recovery (ErrorBoundary.tsx wraps entire app in _layout.tsx)
 - Translations: Added en/ro strings for End Ride confirmation and error boundary
 - Evidence: All changes verified on phone via Metro hot reload
+
+### Search UX Improvements (2026-04-07)
+
+- Status: Done
+- Changes:
+  - **Recent Destinations**: Last 10 selected destinations shown when focusing empty destination search field
+    - `RecentDestination` type in `packages/core/src/contracts.ts` (extends AutocompleteSuggestion with selectedAt)
+    - `recentDestinations` state + `addRecentDestination` action in Zustand store (persisted)
+    - De-duplicates by coordinates (most recent wins), max 10 items
+    - Display with clock icon and "Recent" header in SearchBar dropdown
+    - Wired to destination SearchBar in route-planning.tsx
+  - **No Results Message**: Shows "No matches yet. Keep typing or try a nearby landmark." when search returns empty (previously dropdown was hidden)
+    - Fixed `showSuggestions` logic to include `hasSearchedWithNoResults` condition
+- Translations: Added `search.recent` key in en.ts ("Recent") and ro.ts ("Recente")
+- Evidence: Verified on phone via Metro hot reload

@@ -338,10 +338,10 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-04-06)
+## Current State (as of 2026-04-07)
 
 ### Working Features
-- Route planning with destination autocomplete (Google Maps-style UX)
+- Route planning with destination autocomplete and recent destinations (Google Maps-style UX)
 - Safe routing (OSRM) and fast routing (Mapbox Directions)
 - Route preview with risk distribution card, elevation chart, weather warnings (progressive disclosure — details in expanded sheet)
 - Safe vs fast route comparison with "Switch to safe route" button (shows "Slightly safer" / "Similar safety" for small differences)
@@ -388,6 +388,8 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - **Stability & UX:**
   - Global ErrorBoundary with crash recovery (Try Again / Restart App buttons)
   - End Ride confirmation dialog (prevents accidental trip cancellation)
+  - Recent destinations: last 10 selected destinations shown when focusing empty search field
+  - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
 
 ### Known Incomplete
