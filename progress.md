@@ -135,6 +135,10 @@ Update it at the end of each implementation slice.
     - **Phase 3 Profile restructure**: Settings grouped into 3 sections (Cycling Preferences, Display, Account) with SectionTitle atoms. Added i18n keys for en + ro
     - **Phase 4 Systems polish**: Rating skip counter — auto-suppresses rating step after 3 skips (persisted in Zustand). Route comparison card: now always shows when toggle ON — handles small differences ("Slightly safer", "Similar safety") instead of rounding to 0% and hiding
     - Bundle ✅. TypeScript clean (0 new errors). Phone-tested on Samsung S23 Ultra
+    - **Phase 2 continued**: "Show nearby" quick-pick sheet — NearbySheet organism with 7 toggleable POI category chips (Parking, Rental, Water, Repair, Restroom, Supplies, Bike lanes). Layers FAB on route planning screen. Syncs with existing poiVisibility store.
+    - **Phase 3 — FeedCard simplification**: Removed SafetyTagChips and 4-column stats grid. Merged title + inline safety pill. Compact summary line (distance · duration · CO2).
+    - **Phase 3 — History restructure**: Replaced large Impact card + StreakCard with compact 4-stat header (rides, km, streak, CO2). Trip list inlined via FlatList (was behind "View My Trips" button). Quiz + StatsDashboard moved to footer.
+    - **Phase 3 — Visual softening**: Badge glow opacity 0.4→0.2, MilestoneShareCard border 2px→1px.
 
 ## Phase Status
 
