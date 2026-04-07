@@ -173,8 +173,8 @@ export const BadgeIcon: React.FC<BadgeIconProps> = ({
           ios: {
             shadowColor: style.glowColor,
             shadowOffset: { width: 0, height: 0 },
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
+            shadowOpacity: 0.2,
+            shadowRadius: 6,
           },
           default: { elevation: 4 },
         })

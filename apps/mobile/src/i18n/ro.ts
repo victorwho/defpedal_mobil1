@@ -210,6 +210,16 @@ export const ro: TranslationKeys = {
     viewTrips: 'Vezi cursele mele',
     dailyQuiz: 'Quiz zilnic de siguranță',
     dailyQuizSub: 'Testează-ți cunoștințele de ciclism',
+    rides: 'Curse',
+    km: 'km',
+    streak: 'Serie',
+    co2: 'CO2',
+    noRidesYet: 'Nicio cursă încă',
+    noRidesSub: 'Completează prima cursă și va apărea aici.',
+    loadingTrips: 'Se încarcă cursele\u2026',
+    loadTripsFailed: 'Încărcarea curselor a eșuat.',
+    allTrips: 'Toate cursele',
+    seeAll: 'Vezi tot',
   },
 
   // ── Trips ──

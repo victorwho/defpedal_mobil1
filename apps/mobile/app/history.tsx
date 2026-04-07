@@ -1,27 +1,75 @@
-import type { ImpactDashboard } from '@defensivepedal/core';
-import { formatCo2Saved, calculateEquivalentTreeDays, formatMicrolivesAsTime } from '@defensivepedal/core';
+import type { ImpactDashboard, TripHistoryItem } from '@defensivepedal/core';
+import { formatCo2Saved } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
-import { Screen } from '../src/components/Screen';
 import { StatsDashboard } from '../src/components/StatsDashboard';
-import { Button } from '../src/design-system/atoms/Button';
-import { Card } from '../src/design-system/atoms/Card';
+import { BrandLogo } from '../src/components/BrandLogo';
+import { TripCard } from '../src/design-system/organisms/TripCard';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
-import { StreakCard } from '../src/design-system/organisms/StreakCard';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
-import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
-import { safetyTints } from '../src/design-system/tokens/tints';
+import { fontFamily, text3xl, textBase, textSm, textXs, textXl } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
+
+// ---------------------------------------------------------------------------
+// Compact stat item
+// ---------------------------------------------------------------------------
+
+type CompactStatProps = {
+  readonly icon: keyof typeof Ionicons.glyphMap;
+  readonly iconColor: string;
+  readonly value: string;
+  readonly label: string;
+  readonly colors: ThemeColors;
+};
+
+function CompactStat({ icon, iconColor, value, label, colors }: CompactStatProps) {
+  return (
+    <View style={compactStatStyles.wrapper}>
+      <Ionicons name={icon} size={14} color={iconColor} />
+      <Text
+        style={[compactStatStyles.value, { color: colors.textPrimary }]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+      <Text
+        style={[compactStatStyles.label, { color: colors.textSecondary }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const compactStatStyles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  value: {
+    fontFamily: fontFamily.heading.bold,
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  label: {
+    ...textXs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -33,6 +81,7 @@ export default function HistoryScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['user-stats'],
@@ -41,203 +90,311 @@ export default function HistoryScreen() {
     staleTime: 120_000,
   });
 
-  const { data: dashboard, isLoading: dashboardLoading } = useQuery<ImpactDashboard>({
+  const { data: dashboard } = useQuery<ImpactDashboard>({
     queryKey: ['impact-dashboard'],
     queryFn: () => mobileApi.fetchImpactDashboard(tz),
     enabled: Boolean(user),
     staleTime: 5 * 60_000,
   });
 
+  const { data: trips, isLoading: tripsLoading, error: tripsError } = useQuery({
+    queryKey: ['trip-history'],
+    queryFn: () => mobileApi.getTripHistory(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
 
-  return (
-    <View style={[styles.root, { backgroundColor: colors.bgDeep }]}>
-      <View style={styles.content}>
-        <Screen title={t('history.title')} subtitle={t('history.subtitle')}>
+  const handleToggle = useCallback((tripId: string) => {
+    setExpandedId((prev) => (prev === tripId ? null : tripId));
+  }, []);
 
-          {/* 1. Your Impact */}
-          {user ? (
-            <View style={styles.impactCard}>
-              <View style={styles.impactHeader}>
-                <Ionicons name="leaf-outline" size={20} color={colors.safe} />
-                <Text style={styles.impactTitle}>{t('history.yourImpact')}</Text>
-              </View>
-              {statsLoading ? (
-                <ActivityIndicator size="small" color={colors.safe} />
-              ) : stats ? (
-                <>
-                {dashboard ? (
-                  <View style={styles.microlivesRow}>
-                    <Ionicons name="heart" size={16} color={colors.accent} />
-                    <Text style={styles.microlivesValue}>
-                      +{formatMicrolivesAsTime(dashboard.totalMicrolives)}
-                    </Text>
-                    <Text style={styles.microlivesLabel}>{t('microlives.lifeEarned')}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.impactRow}>
-                  <View style={styles.impactStat}>
-                    <Text style={styles.impactValue}>{stats.totalTrips}</Text>
-                    <Text style={styles.impactLabel}>{t('history.trips')}</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={styles.impactValue}>
-                      {(stats.totalDistanceMeters / 1000).toFixed(0)} {t('common.km')}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('history.cycled')}</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: colors.safe }]}>
-                      {formatCo2Saved(stats.totalCo2SavedKg)}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('history.co2Saved')}</Text>
-                  </View>
-                </View>
-                <View style={styles.impactRow}>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: colors.accent }]}>
-                      {stats ? `€${(stats.totalDistanceMeters / 1000 * 0.35).toFixed(0)}` : '—'}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('history.eurSaved')}</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: colors.info }]}>
-                      {dashboard ? `${Math.round(dashboard.totalCommunitySeconds)}s` : '—'}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('microlives.donatedToCity')}</Text>
-                  </View>
-                  <View style={styles.impactStat}>
-                    <Text style={[styles.impactValue, { color: colors.caution }]}>
-                      {dashboard ? String(dashboard.totalHazardsReported) : '—'}
-                    </Text>
-                    <Text style={styles.impactLabel}>{t('history.hazards')}</Text>
-                  </View>
-                </View>
-              </>
-              ) : null}
-              {stats && stats.totalCo2SavedKg > 0 ? (
-                <Text style={styles.impactTreeNote}>
-                  Equivalent to {calculateEquivalentTreeDays(stats.totalCo2SavedKg)} days of a tree absorbing CO2
-                </Text>
-              ) : null}
+  const renderTripItem = useCallback(
+    ({ item }: { item: TripHistoryItem }) => (
+      <TripCard
+        trip={item}
+        expanded={expandedId === item.id}
+        onToggle={() => handleToggle(item.id)}
+      />
+    ),
+    [expandedId, handleToggle],
+  );
+
+  // ── Derived stat values ──
+  const totalRides = stats?.totalTrips ?? 0;
+  const totalKm = stats ? (stats.totalDistanceMeters / 1000).toFixed(0) : '0';
+  const currentStreak = dashboard?.streak.currentStreak ?? 0;
+  const co2Display = stats ? formatCo2Saved(stats.totalCo2SavedKg) : '0 g';
+
+  // ── List header: screen header + compact stats + trip section title ──
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.listHeaderContainer}>
+        {/* Screen header (brand logo + title) */}
+        <View style={styles.headerShell}>
+          <View style={styles.brandRow}>
+            <BrandLogo />
+            <View style={styles.titleWrap}>
+              <Text style={styles.title}>{t('history.title')}</Text>
+              <Text style={styles.subtitle}>{t('history.subtitle')}</Text>
             </View>
-          ) : null}
+          </View>
+        </View>
 
-          {/* 2. Streak */}
-          {dashboard ? (
-            <StreakCard streakState={dashboard.streak} />
-          ) : dashboardLoading && user ? (
-            <ActivityIndicator size="small" color={colors.accent} style={{ paddingVertical: space[3] }} />
-          ) : null}
-
-          {/* 3. Stats Dashboard (Week / Month / All Time, Ride Frequency, Mode Split) */}
-          {user ? <StatsDashboard hazardsReported={dashboard?.totalHazardsReported ?? 0} /> : null}
-
-          {/* 5. Daily Safety Quiz */}
-          {user ? (
-            <Pressable
-              style={styles.quizCard}
-              onPress={() => router.push('/daily-quiz')}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={t('history.dailyQuiz')}
-            >
-              <View style={styles.quizCardLeft}>
-                <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
-                <View>
-                  <Text style={styles.quizCardTitle}>{t('history.dailyQuiz')}</Text>
-                  <Text style={styles.quizCardSubtitle}>{t('history.dailyQuizSub')}</Text>
-                </View>
+        {/* Compact stats row */}
+        {user ? (
+          <View style={styles.compactStatsCard}>
+            {statsLoading ? (
+              <ActivityIndicator size="small" color={colors.accent} />
+            ) : (
+              <View style={styles.compactStatsRow}>
+                <CompactStat
+                  icon="bicycle-outline"
+                  iconColor={colors.accent}
+                  value={String(totalRides)}
+                  label={t('history.rides')}
+                  colors={colors}
+                />
+                <CompactStat
+                  icon="speedometer-outline"
+                  iconColor={colors.info}
+                  value={`${totalKm}`}
+                  label={t('history.km')}
+                  colors={colors}
+                />
+                <CompactStat
+                  icon="flame-outline"
+                  iconColor={colors.caution}
+                  value={String(currentStreak)}
+                  label={t('history.streak')}
+                  colors={colors}
+                />
+                <CompactStat
+                  icon="leaf-outline"
+                  iconColor={colors.safe}
+                  value={co2Display}
+                  label={t('history.co2')}
+                  colors={colors}
+                />
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            )}
+          </View>
+        ) : null}
+
+        {/* Trip list section title */}
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>{t('history.allTrips')}</Text>
+          {(trips?.length ?? 0) > 0 ? (
+            <Pressable onPress={() => router.push('/trips')}>
+              <Text style={styles.seeAllLink}>{t('history.seeAll')}</Text>
             </Pressable>
           ) : null}
-
-          {/* 6. View My Trips */}
-          <View style={styles.section}>
-            <Button variant="primary" size="md" fullWidth onPress={() => router.push('/trips')}>
-              {t('history.viewTrips')}
-            </Button>
-          </View>
-        </Screen>
+        </View>
       </View>
+    ),
+    [
+      styles, user, statsLoading, colors, totalRides, totalKm,
+      currentStreak, co2Display, trips, t,
+    ],
+  );
+
+  // ── List footer: quiz card + stats dashboard ──
+  const listFooter = useMemo(
+    () => (
+      <View style={styles.listFooterContainer}>
+        {/* Daily Safety Quiz */}
+        {user ? (
+          <Pressable
+            style={styles.quizCard}
+            onPress={() => router.push('/daily-quiz')}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={t('history.dailyQuiz')}
+          >
+            <View style={styles.quizCardLeft}>
+              <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
+              <View>
+                <Text style={styles.quizCardTitle}>{t('history.dailyQuiz')}</Text>
+                <Text style={styles.quizCardSubtitle}>{t('history.dailyQuizSub')}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+
+        {/* Stats Dashboard (moved below trips) */}
+        {user ? (
+          <StatsDashboard hazardsReported={dashboard?.totalHazardsReported ?? 0} />
+        ) : null}
+      </View>
+    ),
+    [styles, user, colors, dashboard, t],
+  );
+
+  // ── Empty / loading / error states for trip list ──
+  const listEmpty = useMemo(() => {
+    if (tripsLoading) {
+      return (
+        <View style={styles.emptyCenter}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.emptyText}>{t('history.loadingTrips')}</Text>
+        </View>
+      );
+    }
+    if (tripsError) {
+      return (
+        <View style={styles.emptyCenter}>
+          <Text style={styles.errorText}>{t('history.loadTripsFailed')}</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyCenter}>
+        <Ionicons name="bicycle-outline" size={40} color={colors.textMuted} />
+        <Text style={styles.emptyTitle}>{t('history.noRidesYet')}</Text>
+        <Text style={styles.emptyText}>{t('history.noRidesSub')}</Text>
+      </View>
+    );
+  }, [tripsLoading, tripsError, styles, colors, t]);
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea}>
+        <FlatList
+          data={trips ?? []}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTripItem}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          ListEmptyComponent={listEmpty}
+          contentContainerStyle={styles.flatListContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          showsVerticalScrollIndicator={false}
+        />
+      </SafeAreaView>
       <BottomNav activeTab="history" onTabPress={handleTabPress} />
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Themed style factory — colors come from useTheme(), layout stays static
+// Themed style factory
 // ---------------------------------------------------------------------------
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    root: { flex: 1 },
-    content: { flex: 1 },
-    impactCard: {
-      padding: space[4],
+    root: { flex: 1, backgroundColor: colors.bgDeep },
+    safeArea: { flex: 1 },
+
+    flatListContent: {
+      paddingHorizontal: space[5],
+      paddingTop: space[3] + space[0.5],
+      paddingBottom: space[10] + space[1],
+    },
+
+    // ── List header ──
+    listHeaderContainer: {
+      gap: space[4],
+      paddingBottom: space[3],
+    },
+    headerShell: {
+      borderRadius: radii['2xl'] + space[1],
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: 'rgba(17, 24, 39, 0.86)',
+      padding: space[4] + space[0.5],
+      overflow: 'hidden',
+    },
+    brandRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: space[3] + space[0.5],
+    },
+    titleWrap: {
+      flex: 1,
+      gap: space[1] + space[0.5],
+    },
+    title: {
+      ...text3xl,
+      fontFamily: fontFamily.heading.extraBold,
+      fontSize: 32,
+      color: colors.textPrimary,
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      ...textBase,
+      color: colors.textSecondary,
+      fontSize: 15,
+      lineHeight: 22,
+    },
+
+    // ── Compact stats card ──
+    compactStatsCard: {
       borderRadius: radii.xl,
       borderWidth: 1,
-      borderColor: safetyTints.safeBorder,
-      backgroundColor: safetyTints.safeSubtle,
-      gap: space[3],
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+      paddingVertical: space[3],
+      paddingHorizontal: space[2],
     },
-    impactHeader: {
+    compactStatsRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: space[2],
+      justifyContent: 'space-between',
     },
-    impactTitle: {
+
+    // ── Section title row ──
+    sectionTitleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sectionTitle: {
+      ...textXl,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    seeAllLink: {
       ...textSm,
-      fontFamily: fontFamily.heading.bold,
-      color: colors.safe,
-      textTransform: 'uppercase',
-      letterSpacing: 1.2,
-    },
-    microlivesRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: space[2],
-      paddingBottom: space[2],
-      marginBottom: space[2],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderDefault,
-    },
-    microlivesValue: {
-      ...textBase,
-      fontFamily: fontFamily.heading.bold,
+      fontFamily: fontFamily.body.semiBold,
       color: colors.accent,
     },
-    microlivesLabel: {
-      ...textXs,
-      color: colors.textMuted,
+
+    // ── Trip list ──
+    separator: {
+      height: space[3],
     },
-    impactRow: {
-      flexDirection: 'row',
-      gap: space[3],
-    },
-    impactStat: {
-      flex: 1,
+
+    // ── Empty / loading states ──
+    emptyCenter: {
       alignItems: 'center',
-      gap: 2,
+      justifyContent: 'center',
+      paddingVertical: space[10],
+      paddingHorizontal: space[8],
+      gap: space[2],
     },
-    impactValue: {
+    emptyTitle: {
       ...textBase,
       fontFamily: fontFamily.heading.bold,
       color: colors.textPrimary,
       fontSize: 18,
     },
-    impactLabel: {
-      ...textXs,
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-    },
-    impactTreeNote: {
-      ...textXs,
+    emptyText: {
+      ...textBase,
       color: colors.textSecondary,
       textAlign: 'center',
-      fontStyle: 'italic',
     },
+    errorText: {
+      ...textBase,
+      color: colors.danger,
+      textAlign: 'center',
+    },
+
+    // ── List footer ──
+    listFooterContainer: {
+      gap: space[4],
+      paddingTop: space[4],
+    },
+
+    // ── Quiz card ──
     quizCard: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -262,8 +419,5 @@ const createThemedStyles = (colors: ThemeColors) =>
     quizCardSubtitle: {
       ...textXs,
       color: colors.textSecondary,
-    },
-    section: {
-      paddingVertical: space[2],
     },
   });

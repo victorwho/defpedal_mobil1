@@ -208,6 +208,16 @@ export const en = {
     viewTrips: 'View My Trips',
     dailyQuiz: 'Daily Safety Quiz',
     dailyQuizSub: 'Test your cycling knowledge',
+    rides: 'Rides',
+    km: 'km',
+    streak: 'Streak',
+    co2: 'CO2',
+    noRidesYet: 'No rides yet',
+    noRidesSub: 'Complete your first ride and it will appear here.',
+    loadingTrips: 'Loading rides\u2026',
+    loadTripsFailed: 'Failed to load trips.',
+    allTrips: 'All Trips',
+    seeAll: 'See all',
   },
 
   // ── Trips ──

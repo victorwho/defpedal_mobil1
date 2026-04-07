@@ -5,11 +5,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
-import { surfaceTints } from '../design-system/tokens/tints';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
-import { SafetyBadge } from './SafetyBadge';
-import { SafetyTagChips } from './SafetyTagChips';
 
 type FeedCardProps = {
   item: FeedItem;
@@ -48,6 +45,12 @@ const buildSyntheticRoute = (item: FeedItem): RouteOption => ({
   riskSegments: [],
   warnings: [],
 });
+
+const getSafetyColor = (rating: number): string => {
+  if (rating >= 4) return safetyColors.safe;
+  if (rating >= 3) return safetyColors.caution;
+  return safetyColors.danger;
+};
 
 export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
   const [expanded, setExpanded] = useState(false);
@@ -89,11 +92,6 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
         </View>
       </View>
 
-      {/* Title */}
-      <Text style={styles.title} numberOfLines={2}>
-        {item.title}
-      </Text>
-
       {/* Map (lazy-loaded) */}
       <View style={styles.mapContainer}>
         {isVisible ? (
@@ -110,33 +108,26 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
         )}
       </View>
 
-      {/* Safety badge + tags */}
-      <SafetyBadge rating={item.safetyRating} />
-      <SafetyTagChips tags={item.safetyTags} />
-
-      {/* Stats row */}
-      <View style={styles.statsRow}>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Distance</Text>
-          <Text style={styles.statValue}>{formatDistance(item.distanceMeters)}</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statLabel}>Duration</Text>
-          <Text style={styles.statValue}>{formatDuration(item.durationSeconds)}</Text>
-        </View>
-        {item.elevationGainMeters != null ? (
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>Climb</Text>
-            <Text style={styles.statValue}>{Math.round(item.elevationGainMeters)} m</Text>
-          </View>
-        ) : null}
-        {item.co2SavedKg != null && item.co2SavedKg > 0 ? (
-          <View style={styles.stat}>
-            <Text style={styles.statLabel}>CO2 Saved</Text>
-            <Text style={[styles.statValue, { color: safetyColors.safe }]}>{formatCo2Saved(item.co2SavedKg)}</Text>
+      {/* Title + inline safety pill */}
+      <View style={styles.titleRow}>
+        <Text style={styles.title} numberOfLines={1}>
+          {item.title}
+        </Text>
+        {item.safetyRating != null ? (
+          <View style={[styles.safetyPill, { backgroundColor: getSafetyColor(item.safetyRating) }]}>
+            <View style={[styles.safetyDot, { backgroundColor: '#FFFFFF' }]} />
+            <Text style={styles.safetyPillText}>{item.safetyRating}/5</Text>
           </View>
         ) : null}
       </View>
+
+      {/* Compact summary line */}
+      <Text style={styles.summaryLine}>
+        {formatDistance(item.distanceMeters)} · {formatDuration(item.durationSeconds)}
+        {item.co2SavedKg != null && item.co2SavedKg > 0
+          ? ` · ${formatCo2Saved(item.co2SavedKg)} CO2`
+          : ''}
+      </Text>
 
       {/* Note */}
       {item.note ? (
@@ -220,11 +211,40 @@ const styles = StyleSheet.create({
     color: TEXT_ON_DARK_MUTED,
     fontSize: 12,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   title: {
+    flex: 1,
     color: brandColors.accent,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: -0.3,
+  },
+  safetyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: radii.lg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  safetyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  safetyPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  summaryLine: {
+    color: TEXT_ON_DARK_MUTED,
+    fontSize: 13,
+    fontWeight: '600',
   },
   mapContainer: {
     borderRadius: radii.md,
@@ -243,30 +263,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: TEXT_ON_DARK_MUTED,
     fontSize: 13,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  stat: {
-    flex: 1,
-    borderRadius: 14,
-    backgroundColor: surfaceTints.overlaySubtle,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 2,
-  },
-  statLabel: {
-    color: TEXT_ON_DARK_MUTED,
-    fontSize: 10,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  statValue: {
-    color: brandColors.textPrimary,
-    fontSize: 15,
-    fontWeight: '900',
   },
   note: {
     color: TEXT_ON_DARK_MUTED,
