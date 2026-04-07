@@ -28,6 +28,7 @@ import { useAppStore } from '../src/store/appStore';
 import { SearchBar } from '../src/design-system/molecules';
 import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
 import { Button } from '../src/design-system/atoms/Button';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -66,6 +67,8 @@ export default function RoutePlanningScreen() {
   const customStartEnabled = hasStartOverride(routeRequest);
   const waypoints = routeRequest.waypoints ?? [];
   const poiVisibility = useAppStore((state) => state.poiVisibility);
+  const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
+  const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
   const {
@@ -126,6 +129,7 @@ export default function RoutePlanningScreen() {
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string; coordinate?: Coordinate; hazardType?: string } | null>(null);
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
+  const [nearbySheetOpen, setNearbySheetOpen] = useState(false);
 
   // Collapsible UI — tap map to toggle FABs, weather, bottom nav
   const [uiCollapsed, setUiCollapsed] = useState(false);
@@ -859,6 +863,14 @@ export default function RoutePlanningScreen() {
               color={hazardPlacementMode ? '#000' : colors.accent}
             />
           </Pressable>
+          <Pressable
+            style={styles.fabButton}
+            onPress={() => setNearbySheetOpen(true)}
+            accessibilityLabel="Show nearby places"
+            accessibilityRole="button"
+          >
+            <Ionicons name="layers-outline" size={22} color={gray[700]} />
+          </Pressable>
           {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
             <Pressable
               style={styles.fabButton}
@@ -908,6 +920,16 @@ export default function RoutePlanningScreen() {
       }
     />
     <BottomNav activeTab="map" onTabPress={handleTabPress} hidden={uiCollapsed} />
+
+    {/* "Show nearby" quick-pick sheet */}
+    <NearbySheet
+      visible={nearbySheetOpen}
+      onDismiss={() => setNearbySheetOpen(false)}
+      poiVisibility={poiVisibility}
+      showBicycleLanes={showBikeLanes}
+      onTogglePoi={setPoiVisibility}
+      onToggleBikeLanes={setShowBicycleLanes}
+    />
 
     {/* Hazard quick-pick grid overlay (same style as navigation) */}
     {hazardPickerOpen ? (
