@@ -385,13 +385,16 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - `check_and_award_badges` RPC evaluates all criteria on: Trophy Case visit, post-ride dashboard, ride impact fetch
   - Share: native Share API from badge detail modal
   - Design system: BadgeIcon (3 sizes), BadgeCard, BadgeInlineChip, BadgeProgressBar, TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
+- **Stability & UX:**
+  - Global ErrorBoundary with crash recovery (Try Again / Restart App buttons)
+  - End Ride confirmation dialog (prevents accidental trip cancellation)
+  - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
 
 ### Known Incomplete
 - Push notifications (needs EAS project ID + native rebuild for actual delivery)
 - iPhone validation (no macOS hardware available)
 - Redis-backed production caching/rate-limiting
 - Quiet hours not enforced in notification triggers
-- Badge unlock overlay not yet tested on phone (needs APK rebuild)
 - Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
 
 ### Known Issues

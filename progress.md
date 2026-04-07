@@ -485,3 +485,20 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Exit criteria:
   - completed for feature work: stable feature-development baseline is explicitly declared
   - remaining for release hardening: Redis-backed staging evidence and iPhone validation
+
+### React Native Performance Optimizations (2026-04-07)
+
+- Status: Done
+- Changes:
+  - Hoisted Mapbox layer styles to module scope (7 layer files: RouteLayers, HazardLayers, MarkerLayers, SearchedPoiLayer, VectorTileLayers, HistoryLayers, OverpassPoiLayers)
+  - Used `useShallow` for batched Zustand selectors in profile.tsx (consolidated 27 selectors into 2)
+  - Wrapped `data?.pages.flatMap()` in useMemo for stable array references (community-feed.tsx)
+  - Extracted renderItem to useCallback, moved StatTile outside component (community-trip.tsx)
+  - GPU-accelerated scaleX animation with useNativeDriver:true (BadgeProgressBar.tsx)
+  - Added `borderCurve: 'continuous'` for iOS squircle corners (Card, Button, TripCard, FeedCard, Modal)
+- UX improvements:
+  - Moved trip list below stats dashboard in History screen (better information hierarchy)
+  - Added confirmation dialog to "End Ride" button (prevents accidental trip cancellation)
+  - Added global ErrorBoundary for crash recovery (ErrorBoundary.tsx wraps entire app in _layout.tsx)
+- Translations: Added en/ro strings for End Ride confirmation and error boundary
+- Evidence: All changes verified on phone via Metro hot reload
