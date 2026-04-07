@@ -5,6 +5,7 @@ import type {
   NavigationLocationSample,
   QueuedMutation,
   QueuedMutationType,
+  RecentDestination,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
@@ -113,6 +114,8 @@ type AppStore = {
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
   earnedMilestones: readonly string[];
+  recentDestinations: readonly RecentDestination[];
+  addRecentDestination: (destination: RecentDestination) => void;
   pendingBadgeUnlocks: readonly import('@defensivepedal/core').BadgeUnlockEvent[];
   enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
@@ -231,6 +234,21 @@ export const useAppStore = create<AppStore>()(
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
       earnedMilestones: [],
+      recentDestinations: [],
+      addRecentDestination: (destination) =>
+        set((state) => {
+          const MAX_RECENT = 10;
+          // Remove existing entry with same coordinates (de-duplicate)
+          const filtered = state.recentDestinations.filter(
+            (d) =>
+              d.coordinates.lat !== destination.coordinates.lat ||
+              d.coordinates.lon !== destination.coordinates.lon,
+          );
+          // Add new destination at front, limit to MAX_RECENT
+          return {
+            recentDestinations: [destination, ...filtered].slice(0, MAX_RECENT),
+          };
+        }),
       pendingBadgeUnlocks: [],
       enqueueBadgeUnlocks: (badges) =>
         set((state) => ({
@@ -750,6 +768,7 @@ export const useAppStore = create<AppStore>()(
         themePreference: state.themePreference,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
+        recentDestinations: state.recentDestinations,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
       }),
     },

@@ -72,6 +72,7 @@ export const en = {
   nav: {
     arrived: 'You have arrived at your destination.',
     inMeters: 'In {{distance}} meters, {{instruction}}',
+    thenInMeters: ', then in {{distance}} meters, {{instruction}}',
     minutesRemaining_one: 'About 1 minute remaining.',
     minutesRemaining_other: 'About {{count}} minutes remaining.',
     endRide: 'End ride',
@@ -311,6 +312,7 @@ export const en = {
   search: {
     searching: 'Searching places\u2026',
     noMatches: 'No matches yet. Keep typing or try a nearby landmark.',
+    recent: 'Recent',
   },
 
   // ── Weather ──

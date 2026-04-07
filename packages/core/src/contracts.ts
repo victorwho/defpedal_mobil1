@@ -142,6 +142,12 @@ export interface AutocompleteSuggestion {
   maki?: string;
 }
 
+/** A recent destination stored for quick re-selection */
+export interface RecentDestination extends AutocompleteSuggestion {
+  /** ISO timestamp when this destination was last selected */
+  selectedAt: string;
+}
+
 export interface AutocompleteResponse {
   suggestions: AutocompleteSuggestion[];
   generatedAt: string;

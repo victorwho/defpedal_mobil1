@@ -69,6 +69,8 @@ export default function RoutePlanningScreen() {
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
+  const recentDestinations = useAppStore((state) => state.recentDestinations);
+  const addRecentDestination = useAppStore((state) => state.addRecentDestination);
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
   const {
@@ -424,6 +426,11 @@ export default function RoutePlanningScreen() {
     setDestinationQuery(suggestion.label);
     setDestinationHydrated(true);
     setActiveField(null);
+    // Save to recent destinations
+    addRecentDestination({
+      ...suggestion,
+      selectedAt: new Date().toISOString(),
+    });
   };
 
   const clearStartOverride = () => {
@@ -629,6 +636,7 @@ export default function RoutePlanningScreen() {
                   : null
               }
               suggestions={destinationAutocompleteQuery.data?.suggestions ?? []}
+              recentDestinations={recentDestinations}
               onFocus={() => setActiveField('destination')}
               onChangeText={(value) => {
                 setDestinationQuery(value);

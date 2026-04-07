@@ -8,7 +8,7 @@
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, RecentDestination, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
 import { TextInput } from '../atoms/TextInput';
@@ -33,6 +33,8 @@ export interface SearchBarProps {
   errorMessage?: string | null;
   statusText?: string;
   suggestions?: AutocompleteSuggestion[];
+  /** Recent destinations to show when field is focused but empty */
+  recentDestinations?: readonly RecentDestination[];
   onChangeText: (value: string) => void;
   onFocus: () => void;
   onClear: () => void;
@@ -136,6 +138,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   errorMessage,
   statusText,
   suggestions = [],
+  recentDestinations = [],
   onChangeText,
   onFocus,
   onClear,
@@ -143,8 +146,14 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 }) => {
   const { colors } = useTheme();
   const t = useT();
+
+  // Show recent destinations when field is active but user hasn't typed anything
+  const showRecents = active && value.length === 0 && recentDestinations.length > 0;
+
+  // Show dropdown when: loading, error, has suggestions, OR no results after searching (value >= 2 chars)
+  const hasSearchedWithNoResults = !isLoading && !errorMessage && value.length >= 2 && suggestions.length === 0;
   const showSuggestions =
-    active && (isLoading || Boolean(errorMessage) || suggestions.length > 0);
+    active && (isLoading || Boolean(errorMessage) || suggestions.length > 0 || hasSearchedWithNoResults);
 
   return (
     <View style={styles.wrap}>
@@ -200,6 +209,92 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         >
           {statusText}
         </Text>
+      ) : null}
+
+      {/* Recent destinations (shown when field is focused but empty) */}
+      {showRecents ? (
+        <ScrollView
+          style={[
+            styles.suggestionSheet,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.borderDefault,
+              maxHeight: Math.min(280, Dimensions.get('window').height * 0.35),
+            },
+            shadows.md,
+          ]}
+        >
+          <Text
+            style={[
+              textXs,
+              {
+                color: colors.textMuted,
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+                paddingHorizontal: space[2],
+                paddingBottom: space[1],
+              },
+            ]}
+          >
+            {t('search.recent')}
+          </Text>
+          {recentDestinations.map((recent) => {
+            const iconName = getSuggestionIcon(
+              recent.featureType,
+              recent.category,
+              recent.maki,
+            );
+
+            return (
+              <Pressable
+                key={`recent-${recent.id}-${recent.selectedAt}`}
+                style={({ pressed }) => [
+                  styles.suggestionButton,
+                  { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+                ]}
+                onPress={() => onSelectSuggestion(recent)}
+                accessibilityRole="button"
+                accessibilityLabel={`Select recent ${recent.primaryText}`}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={20}
+                  color={colors.textMuted}
+                  style={styles.suggestionIcon}
+                />
+                <View style={styles.suggestionText}>
+                  <Text
+                    style={[
+                      textBase,
+                      {
+                        color: colors.textPrimary,
+                        fontFamily: fontFamily.body.semiBold,
+                      },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {recent.primaryText}
+                  </Text>
+                  {recent.secondaryText ? (
+                    <Text
+                      style={[textSm, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {recent.secondaryText}
+                    </Text>
+                  ) : recent.label ? (
+                    <Text
+                      style={[textSm, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {recent.label}
+                    </Text>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       ) : null}
 
       {/* Suggestions dropdown */}

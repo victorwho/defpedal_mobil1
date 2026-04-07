@@ -74,6 +74,7 @@ export const ro: TranslationKeys = {
   nav: {
     arrived: 'Ați ajuns la destinație.',
     inMeters: 'Peste {{distance}} metri, {{instruction}}',
+    thenInMeters: ', apoi peste {{distance}} metri, {{instruction}}',
     minutesRemaining_one: 'Aproximativ 1 minut rămas.',
     minutesRemaining_other: 'Aproximativ {{count}} minute rămase.',
     endRide: 'Termină cursa',
@@ -313,6 +314,7 @@ export const ro: TranslationKeys = {
   search: {
     searching: 'Se caută locuri\u2026',
     noMatches: 'Niciun rezultat încă. Continuă să tastezi sau încearcă un reper din apropiere.',
+    recent: 'Recente',
   },
 
   // ── Weather ──
