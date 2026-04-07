@@ -19,7 +19,6 @@ import type {
 import { encodePolyline } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
-import { getElevationGain } from './elevation';
 import { mobileEnv } from './env';
 import { getAccessToken } from './supabase';
 
@@ -229,53 +228,54 @@ const computeAdjustedDuration = (
 };
 
 /**
- * Enrich a route with elevation data. Fetches the elevation profile
- * from the route geometry coordinates and computes totalClimbMeters
- * and adjustedDurationSeconds. Fails gracefully — returns unchanged
- * route if elevation fetch fails.
+ * Server response from /v1/elevation-profile (Mapbox Terrain-RGB).
+ */
+interface ElevationResponse {
+  elevationProfile: number[];
+  elevationGain: number;
+  elevationLoss: number;
+}
+
+/**
+ * Enrich a route with elevation data. Fetches elevation profile, gain, and loss
+ * from the server using Mapbox Terrain-RGB tiles. Computes totalClimbMeters
+ * and adjustedDurationSeconds. Fails gracefully — returns unchanged route
+ * if elevation fetch fails.
  */
 const enrichRouteWithElevation = async (
   route: RouteOption,
   coordinates: [number, number][],
 ): Promise<RouteOption> => {
-  const result = await getElevationGain(coordinates);
-
-  if (result === null) return route;
-
-  const adjustedDurationSeconds = computeAdjustedDuration(
-    route.durationSeconds,
-    result.elevationGain,
-    route.distanceMeters,
-  );
-
-  // Fetch full elevation profile from server in parallel (non-blocking)
-  let elevationProfile: number[] | undefined;
+  if (!mobileEnv.mobileApiUrl) return route;
 
   try {
-    if (mobileEnv.mobileApiUrl) {
-      const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/elevation-profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinates }),
-      });
+    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/elevation-profile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates }),
+    });
 
-      if (response.ok) {
-        const data = (await response.json()) as { elevationProfile: number[] };
-        if (data.elevationProfile?.length > 0) {
-          elevationProfile = data.elevationProfile;
-        }
-      }
-    }
+    if (!response.ok) return route;
+
+    const data = (await response.json()) as ElevationResponse;
+
+    const elevationGain = data.elevationGain ?? 0;
+    const adjustedDurationSeconds = computeAdjustedDuration(
+      route.durationSeconds,
+      elevationGain,
+      route.distanceMeters,
+    );
+
+    return {
+      ...route,
+      totalClimbMeters: Math.round(elevationGain),
+      adjustedDurationSeconds: Math.round(adjustedDurationSeconds),
+      elevationProfile: data.elevationProfile?.length > 0 ? data.elevationProfile : undefined,
+    };
   } catch {
-    // Elevation profile is optional — degrade gracefully
+    // Elevation data is optional — degrade gracefully
+    return route;
   }
-
-  return {
-    ...route,
-    totalClimbMeters: Math.round(result.elevationGain),
-    adjustedDurationSeconds: Math.round(adjustedDurationSeconds),
-    elevationProfile,
-  };
 };
 
 // ---------------------------------------------------------------------------

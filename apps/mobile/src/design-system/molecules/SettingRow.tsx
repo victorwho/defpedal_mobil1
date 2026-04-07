@@ -8,7 +8,7 @@
 import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useTheme, type ThemeColors } from '..';
+import { useTheme, type ThemeColors } from '../ThemeContext';
 import { Toggle } from '../atoms/Toggle';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';

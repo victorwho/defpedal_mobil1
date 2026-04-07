@@ -104,6 +104,7 @@ const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) =>
       forwardGeocode: vi.fn().mockResolvedValue([]),
       reverseGeocode: vi.fn().mockResolvedValue({ coordinate: { lat: 0, lon: 0 }, label: null }),
       getElevationProfile: vi.fn().mockResolvedValue([]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 0, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       normalizeRoutePreviewResponse: vi.fn().mockReturnValue({
         routes: [],

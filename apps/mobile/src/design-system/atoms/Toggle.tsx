@@ -12,7 +12,7 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { radii } from '../tokens/radii';
 import { duration, easing } from '../tokens/motion';
 import { gray } from '../tokens/colors';
-import { useTheme } from '..';
+import { useTheme } from '../ThemeContext';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useHaptics } from '../hooks/useHaptics';
 

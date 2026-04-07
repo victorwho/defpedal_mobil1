@@ -91,6 +91,7 @@ const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) => {
         label: 'Bucharest, Romania',
       }),
       getElevationProfile: vi.fn().mockResolvedValue([10, 12, 15]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 5, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       normalizeRoutePreviewResponse: vi.fn().mockReturnValue(mockRoutePreviewResponse),
       submitHazardReport: vi.fn().mockResolvedValue({
@@ -907,7 +908,7 @@ describe('POST /v1/feedback', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /v1/elevation-profile', () => {
-  it('returns 200 with elevation array', async () => {
+  it('returns 200 with elevation profile, gain, and loss', async () => {
     const app = buildTestApp();
     await app.ready();
 
@@ -917,7 +918,11 @@ describe('POST /v1/elevation-profile', () => {
       payload: { coordinates: [[26.1, 44.4], [26.2, 44.5]] },
     });
     expect(response.statusCode).toBe(200);
-    expect(Array.isArray(response.json().elevationProfile)).toBe(true);
+
+    const body = response.json();
+    expect(Array.isArray(body.elevationProfile)).toBe(true);
+    expect(typeof body.elevationGain).toBe('number');
+    expect(typeof body.elevationLoss).toBe('number');
 
     await app.close();
   });

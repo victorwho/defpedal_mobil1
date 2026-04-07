@@ -3,9 +3,9 @@ import { PNG } from 'pngjs';
 
 import { config } from '../config';
 
-const OPEN_METEO_API_URL = 'https://api.open-meteo.com/v1/elevation';
 const MAX_POINTS_PER_REQUEST = 50;
 const TARGET_POINTS_FOR_PROFILE = 400;
+const TARGET_POINTS_FOR_GAIN = 200;
 const MAPBOX_TERRAIN_ZOOM = 14;
 
 const interpolate = (source: number[], newLength: number): number[] => {
@@ -135,37 +135,10 @@ const fetchTerrainRgbElevations = async (
   });
 };
 
-const fetchOpenMeteoElevations = async (
-  coordinates: Coordinate[],
-): Promise<number[]> => {
-  const latitudes = coordinates.map((coordinate) => coordinate.lat).join(',');
-  const longitudes = coordinates.map((coordinate) => coordinate.lon).join(',');
-  const url = `${OPEN_METEO_API_URL}?latitude=${latitudes}&longitude=${longitudes}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Open-Meteo request failed with ${response.status}`);
-  }
-
-  const data = (await response.json()) as {
-    elevation?: number[];
-  };
-
-  if (!Array.isArray(data.elevation)) {
-    throw new Error('Open-Meteo response did not include elevation data.');
-  }
-
-  return data.elevation;
-};
-
 const fetchCoordinateChunkElevations = async (
   coordinates: Coordinate[],
 ): Promise<number[]> => {
-  try {
-    return await fetchTerrainRgbElevations(coordinates);
-  } catch {
-    return fetchOpenMeteoElevations(coordinates);
-  }
+  return fetchTerrainRgbElevations(coordinates);
 };
 
 export const getElevationProfile = async (
@@ -200,4 +173,64 @@ export const getElevationProfile = async (
   }
 
   return needsInterpolation ? interpolate(elevations, originalLength) : elevations;
+};
+
+/**
+ * Computes elevation gain and loss from an array of elevation values.
+ */
+const computeGainLoss = (
+  elevations: number[],
+): { elevationGain: number; elevationLoss: number } => {
+  let elevationGain = 0;
+  let elevationLoss = 0;
+
+  for (let i = 1; i < elevations.length; i++) {
+    const diff = elevations[i] - elevations[i - 1];
+    if (diff > 0) {
+      elevationGain += diff;
+    } else if (diff < 0) {
+      elevationLoss += Math.abs(diff);
+    }
+  }
+
+  return { elevationGain, elevationLoss };
+};
+
+/**
+ * Fetches elevation gain and loss for a route using Mapbox Terrain-RGB tiles.
+ * Downsamples long routes for performance.
+ *
+ * @param coordinates Array of [longitude, latitude] pairs (GeoJSON order).
+ * @returns Elevation gain and loss in meters.
+ */
+export const getElevationGain = async (
+  coordinates: [number, number][],
+): Promise<{ elevationGain: number; elevationLoss: number }> => {
+  if (coordinates.length < 2) {
+    return { elevationGain: 0, elevationLoss: 0 };
+  }
+
+  // Downsample to TARGET_POINTS_FOR_GAIN for performance
+  let sampled = coordinates;
+  if (coordinates.length > TARGET_POINTS_FOR_GAIN) {
+    const step = Math.ceil(coordinates.length / TARGET_POINTS_FOR_GAIN);
+    sampled = coordinates.filter((_, i) => i % step === 0);
+
+    // Always include the last point
+    const lastCoord = coordinates[coordinates.length - 1];
+    if (sampled[sampled.length - 1] !== lastCoord) {
+      sampled.push(lastCoord);
+    }
+  }
+
+  const elevations: number[] = [];
+
+  for (let index = 0; index < sampled.length; index += MAX_POINTS_PER_REQUEST) {
+    const chunk = sampled.slice(index, index + MAX_POINTS_PER_REQUEST);
+    const chunkCoordinates = chunk.map(([lon, lat]) => ({ lat, lon }));
+    const chunkElevations = await fetchCoordinateChunkElevations(chunkCoordinates);
+    elevations.push(...chunkElevations);
+  }
+
+  return computeGainLoss(elevations);
 };

@@ -804,13 +804,24 @@ export const buildV1Routes = (
 
     app.post<{
       Body: { coordinates: number[][] };
-      Reply: { elevationProfile: number[] } | ErrorResponse;
+      Reply: {
+        elevationProfile: number[];
+        elevationGain: number;
+        elevationLoss: number;
+      } | ErrorResponse;
     }>(
       '/elevation-profile',
       {
         schema: {
           response: {
-            200: { type: 'object' as const, properties: { elevationProfile: { type: 'array' as const } } },
+            200: {
+              type: 'object' as const,
+              properties: {
+                elevationProfile: { type: 'array' as const },
+                elevationGain: { type: 'number' as const },
+                elevationLoss: { type: 'number' as const },
+              },
+            },
             400: errorResponseSchema,
             429: errorResponseSchema,
             500: errorResponseSchema,
@@ -830,10 +841,19 @@ export const buildV1Routes = (
         }
 
         try {
-          const elevationProfile = await dependencies.getElevationProfile(
-            coordinates as [number, number][],
-          );
-          return { elevationProfile: elevationProfile ?? [] };
+          const typedCoords = coordinates as [number, number][];
+
+          // Fetch profile and gain/loss in parallel
+          const [elevationProfile, gainLoss] = await Promise.all([
+            dependencies.getElevationProfile(typedCoords),
+            dependencies.getElevationGain(typedCoords),
+          ]);
+
+          return {
+            elevationProfile: elevationProfile ?? [],
+            elevationGain: Math.round(gainLoss.elevationGain),
+            elevationLoss: Math.round(gainLoss.elevationLoss),
+          };
         } catch (error) {
           throw new HttpError('Elevation profile fetch failed.', {
             statusCode: 500,

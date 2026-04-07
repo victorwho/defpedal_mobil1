@@ -4,7 +4,7 @@ import { fetchSafeRoutes } from './clients/customOsrm';
 import { fetchFastRoutes, forwardGeocode, reverseGeocode } from './clients/mapbox';
 import { config } from '../config';
 import { buildCoverageResponse, resolveCoverage } from './coverage';
-import { getElevationProfile } from './elevation';
+import { getElevationGain, getElevationProfile } from './elevation';
 import { normalizeRoutePreviewResponse } from './normalize';
 import {
   createMemoryRateLimiter,
@@ -33,6 +33,7 @@ export type MobileApiDependencies = {
   forwardGeocode: typeof forwardGeocode;
   reverseGeocode: typeof reverseGeocode;
   getElevationProfile: typeof getElevationProfile;
+  getElevationGain: typeof getElevationGain;
   fetchRiskSegments: typeof fetchRiskSegments;
   normalizeRoutePreviewResponse: typeof normalizeRoutePreviewResponse;
   submitHazardReport: typeof submitHazardReport;
@@ -79,6 +80,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     forwardGeocode,
     reverseGeocode,
     getElevationProfile,
+    getElevationGain,
     fetchRiskSegments,
     normalizeRoutePreviewResponse,
     submitHazardReport,

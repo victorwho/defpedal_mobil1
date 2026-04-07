@@ -130,6 +130,7 @@ beforeAll(async () => {
         label: 'Bucharest',
       }),
       getElevationProfile: vi.fn().mockResolvedValue([10, 12, 15]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 5, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       normalizeRoutePreviewResponse: vi.fn().mockReturnValue(mockRoutePreviewResponse),
       submitHazardReport: vi.fn().mockResolvedValue({

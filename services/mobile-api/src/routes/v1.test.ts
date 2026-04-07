@@ -231,6 +231,7 @@ describe('mobile-api v1 routes', () => {
     const app = createApp({
       fetchFastRoutes,
       getElevationProfile: vi.fn().mockResolvedValue([80, 96, 108]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 28, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
     });
 
@@ -283,6 +284,7 @@ describe('mobile-api v1 routes', () => {
     const app = createApp({
       fetchSafeRoutes,
       getElevationProfile: vi.fn().mockResolvedValue([80, 96, 108]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 28, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       routeResponseCacheTtlMs: {
         preview: 60000,
@@ -331,6 +333,7 @@ describe('mobile-api v1 routes', () => {
     const app = createApp({
       fetchSafeRoutes,
       getElevationProfile: vi.fn().mockResolvedValue([80, 96, 108]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 28, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
     });
 
@@ -377,6 +380,7 @@ describe('mobile-api v1 routes', () => {
     const app = createApp({
       fetchSafeRoutes: vi.fn().mockResolvedValue(sampleRouteResponse),
       getElevationProfile: vi.fn().mockResolvedValue([80, 96, 108]),
+      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 28, elevationLoss: 0 }),
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       rateLimitPolicies: {
         routePreview: {
