@@ -5,7 +5,7 @@
  * Uses monospace font (RobotoMono) and data-md typography.
  * Respects OS "Reduce Motion" setting.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Text, type TextStyle } from 'react-native';
 
 import { textDataMd } from '../tokens/typography';
@@ -38,21 +38,18 @@ export const AnimatedCounter = ({
 }: AnimatedCounterProps) => {
   const reducedMotion = useReducedMotion();
   const animatedValue = useRef(new Animated.Value(0)).current;
-  const displayRef = useRef(targetValue.toFixed(decimals));
-  const textRef = useRef<Text>(null);
+  const [displayText, setDisplayText] = useState(
+    reducedMotion ? targetValue.toFixed(decimals) : (0).toFixed(decimals),
+  );
 
   useEffect(() => {
     if (reducedMotion) {
-      // Skip animation — show final value immediately
-      animatedValue.setValue(targetValue);
-      displayRef.current = targetValue.toFixed(decimals);
-      textRef.current?.setNativeProps({
-        text: `${prefix}${displayRef.current}${suffix}`,
-      });
+      setDisplayText(targetValue.toFixed(decimals));
       return;
     }
 
     animatedValue.setValue(0);
+    setDisplayText((0).toFixed(decimals));
 
     const animation = Animated.timing(animatedValue, {
       toValue: targetValue,
@@ -61,10 +58,7 @@ export const AnimatedCounter = ({
     });
 
     const listenerId = animatedValue.addListener(({ value }) => {
-      displayRef.current = value.toFixed(decimals);
-      textRef.current?.setNativeProps({
-        text: `${prefix}${displayRef.current}${suffix}`,
-      });
+      setDisplayText(value.toFixed(decimals));
     });
 
     animation.start();
@@ -73,7 +67,7 @@ export const AnimatedCounter = ({
       animation.stop();
       animatedValue.removeListener(listenerId);
     };
-  }, [targetValue, duration, decimals, prefix, suffix, reducedMotion, animatedValue]);
+  }, [targetValue, duration, decimals, reducedMotion, animatedValue]);
 
   const mergedStyle: TextStyle = {
     ...textDataMd,
@@ -81,8 +75,8 @@ export const AnimatedCounter = ({
   };
 
   return (
-    <Text ref={textRef} style={mergedStyle}>
-      {prefix}{reducedMotion ? targetValue.toFixed(decimals) : '0'.padStart(1, '0')}{suffix}
+    <Text style={mergedStyle}>
+      {prefix}{displayText}{suffix}
     </Text>
   );
 };
