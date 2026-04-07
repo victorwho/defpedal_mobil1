@@ -182,7 +182,7 @@ C:\dev\defpedal/
 │       ├── lib/
 │       │   ├── auth.ts          # JWT + dev-bypass auth middleware
 │       │   ├── risk.ts          # Road risk segment fetching (Supabase RPC)
-│       │   ├── elevation.ts     # Elevation profile (Mapbox Tilequery)
+│       │   ├── elevation.ts     # Elevation profile + gain/loss (Mapbox Terrain-RGB tiles)
 │       │   ├── submissions.ts   # Trip/hazard/feedback DB writes
 │       │   ├── normalize.ts     # Route response normalization
 │       │   ├── feedSchemas.ts   # JSON Schema for feed endpoints
@@ -271,6 +271,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **`C:\dpb` for release builds** | Even `C:\dev\defpedal` can fail for release builds (node_modules resolves to long paths). Full copy to `C:\dpb` with fresh `npm install` is the reliable path |
 | **Off-route threshold 100m + GPS accuracy buffer** | Original 50m triggered too easily on sidewalks/near buildings. 100m base + up to 50m GPS accuracy buffer = effective 120-150m threshold |
 | **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app |
+| **Mapbox Terrain-RGB for elevation** (not Open-Meteo) | Open-Meteo rate-limits (HTTP 429) during heavy usage. Terrain-RGB tiles decode elevation from PNG pixels, are CDN-cached, zero external API calls |
 
 ## Code Conventions
 

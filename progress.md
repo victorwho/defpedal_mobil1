@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-06 (session 7)
+Last updated: 2026-04-07 (session 8)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -149,8 +149,15 @@ Update it at the end of each implementation slice.
     - **Route preview**: Summary strip cleaned up (removed border/shadow, uses `bgSecondary`). Life-earned stat moved to its own row with heart icon.
     - **StatusBar**: Changed from `style="light"` to `style="auto"` to adapt.
     - **Elevation chart**: Converted card container to themed styles. SVG graph (blue line + gradient) works on both backgrounds.
-    - **Known issue**: Open-Meteo elevation API intermittently rate-limits (HTTP 429) during heavy testing — not a code bug, recovers on its own.
     - Bundle ✅. Phone-tested on Samsung S23 Ultra in both light and dark modes.
+
+- Elevation Data Refactor (2026-04-07):
+    - **Replaced Open-Meteo with Mapbox Terrain-RGB**: All elevation data now comes from Mapbox terrain tiles, eliminating Open-Meteo API rate limit issues (HTTP 429).
+    - **Server consolidation**: Removed Open-Meteo fallback from server. Added `getElevationGain()` using existing Terrain-RGB tile decoder. `/v1/elevation-profile` endpoint now returns `{ elevationProfile, elevationGain, elevationLoss }` in single response.
+    - **Client simplification**: Deleted client-side `elevation.ts` (was calling Open-Meteo). `mapbox-routing.ts` now makes single server call for all elevation data.
+    - **Require cycle fixes**: Fixed barrel import cycles in `Toggle.tsx` and `SettingRow.tsx` — now import `useTheme` directly from `ThemeContext.tsx` instead of design-system barrel.
+    - **Benefits**: Zero external API calls for elevation (just Mapbox tiles which are CDN-cached), single source of truth, fewer network round trips.
+    - Deployed to Cloud Run. Bundle ✅. Phone-tested.
 
 ## Phase Status
 
@@ -172,7 +179,7 @@ Update it at the end of each implementation slice.
   - `apps/mobile/src/components/Screen.tsx`
   - `apps/mobile/src/components/StatusCard.tsx`
   - `apps/mobile/src/lib/theme.ts`
-  - `apps/mobile/src/lib/elevation.ts` — client-side elevation sampling via Mapbox Tilequery
+  - elevation data fetched from server `/v1/elevation-profile` endpoint (Mapbox Terrain-RGB tiles)
   - route preview now shows a compact single-row summary with routing mode, ETA, distance, and total climb
   - client-side routing via direct Mapbox Directions (fast) and custom OSRM (safe) replaces backend dependency for route fetching
 
