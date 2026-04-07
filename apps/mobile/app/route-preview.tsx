@@ -627,12 +627,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: space[3],
       borderRadius: radii['2xl'],
-      backgroundColor: 'rgba(255, 255, 255, 0.07)',
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
       paddingHorizontal: space[4],
       paddingVertical: space[3],
-      ...shadows.sm,
     },
     statGroup: {
       flex: 1,
