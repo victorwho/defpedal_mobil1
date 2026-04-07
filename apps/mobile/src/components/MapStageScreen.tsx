@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { brandColors } from '../design-system/tokens/colors';
+import { useTheme } from '../design-system';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
+import { surfaceTints } from '../design-system/tokens/tints';
 import { zIndex } from '../design-system/tokens/zIndex';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -45,11 +46,17 @@ const CollapsibleSheet = ({
   footer,
   bottomInset,
   peekContent,
+  sheetBg,
+  handleColor,
+  borderColor,
 }: {
   children: ReactNode;
   footer?: ReactNode;
   bottomInset: number;
   peekContent?: ReactNode;
+  sheetBg: string;
+  handleColor: string;
+  borderColor: string;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
@@ -102,10 +109,10 @@ const CollapsibleSheet = ({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={styles.bottomDock}
     >
-      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight }]}>
+      <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, backgroundColor: sheetBg, borderColor }]}>
         <View {...panResponder.panHandlers}>
           <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
-            <View style={styles.handle} />
+            <View style={[styles.handle, { backgroundColor: handleColor }]} />
           </Pressable>
         </View>
         {/* Peek row — only visible when collapsed, shows a summary strip */}
@@ -124,7 +131,7 @@ const CollapsibleSheet = ({
         ) : null}
       </Animated.View>
       {footer ? (
-        <View style={[styles.fixedFooter, { paddingBottom: bottomInset + space[2] }]}>
+        <View style={[styles.fixedFooter, { paddingBottom: bottomInset + space[2], backgroundColor: sheetBg }]}>
           {footer}
         </View>
       ) : null}
@@ -142,9 +149,17 @@ export const MapStageScreen = ({
   peekContent,
 }: MapStageScreenProps) => {
   const insets = useSafeAreaInsets();
+  const { colors, mode } = useTheme();
+
+  const sheetBg = mode === 'dark'
+    ? 'rgba(11, 16, 32, 0.96)'
+    : 'rgba(255, 255, 255, 0.96)';
+  const handleColor = mode === 'dark'
+    ? 'rgba(255, 255, 255, 0.18)'
+    : 'rgba(0, 0, 0, 0.15)';
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: colors.bgDeep }]}>
       <View style={StyleSheet.absoluteFill}>{map}</View>
       <View style={[styles.safeArea, { paddingTop: insets.top }]} pointerEvents="box-none">
         {topOverlay ? <View style={styles.topOverlay} pointerEvents="box-none">{topOverlay}</View> : null}
@@ -152,7 +167,7 @@ export const MapStageScreen = ({
         <View style={styles.flexSpacer} pointerEvents="box-none" />
 
         {useBottomSheet ? (
-          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent}>{children}</CollapsibleSheet>
+          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent} sheetBg={sheetBg} handleColor={handleColor} borderColor={colors.borderDefault}>{children}</CollapsibleSheet>
         ) : footer ? (
           <View style={[styles.bottomFooter, { paddingBottom: space[2] }]} pointerEvents="box-none">
             {footer}
@@ -166,7 +181,6 @@ export const MapStageScreen = ({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: brandColors.bgDeep,
   },
   safeArea: {
     flex: 1,
@@ -193,8 +207,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radii['2xl'] + space[2],
     borderTopRightRadius: radii['2xl'] + space[2],
     borderWidth: 1,
-    borderColor: brandColors.borderDefault,
-    backgroundColor: 'rgba(11, 16, 32, 0.96)',
     overflow: 'hidden',
   },
   handleTouchArea: {
@@ -212,7 +224,6 @@ const styles = StyleSheet.create({
     width: 54,
     height: 6,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
   content: {
     paddingHorizontal: space[4] + space[0.5],
@@ -230,7 +241,6 @@ const styles = StyleSheet.create({
     gap: space[2] + space[0.5],
   },
   fixedFooter: {
-    backgroundColor: 'rgba(11, 16, 32, 0.96)',
     paddingHorizontal: space[4] + space[0.5],
     paddingTop: space[3],
     gap: space[2] + space[0.5],
