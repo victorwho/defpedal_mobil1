@@ -564,7 +564,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.xl,
       borderWidth: 1,
       borderColor: colors.borderDefault,
-      backgroundColor: surfaceTints.glass,
+      backgroundColor: colors.bgPrimary,
     },
     avatarWrapper: {
       position: 'relative',
@@ -652,7 +652,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingVertical: space[2],
       borderRadius: radii.full,
       borderWidth: 1,
-      borderColor: gray[600],
+      borderColor: colors.borderDefault,
     },
     languagePillActive: {
       backgroundColor: colors.accent,
@@ -661,7 +661,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     languagePillText: {
       ...textSm,
       fontFamily: fontFamily.body.medium,
-      color: gray[400],
+      color: colors.textSecondary,
     },
     languagePillTextActive: {
       color: colors.textInverse,
@@ -675,7 +675,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.borderDefault,
-      backgroundColor: surfaceTints.glass,
+      backgroundColor: colors.bgPrimary,
     },
     settingTextCol: { flex: 1, gap: space[1], marginRight: space[3] },
     settingLabel: {
@@ -751,7 +751,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.danger,
     },
     achievementsCard: {
-      backgroundColor: surfaceTints.glass,
+      backgroundColor: colors.bgPrimary,
       borderRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.borderDefault,
