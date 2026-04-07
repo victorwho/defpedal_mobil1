@@ -301,9 +301,12 @@ export default function FeedbackScreen() {
     const preview = store.routePreview;
     const route = preview?.routes.find((r) => r.id === store.selectedRouteId) ?? preview?.routes[0] ?? null;
     const breadcrumbs = session?.gpsBreadcrumbs ?? [];
-    const distMeters = breadcrumbs.length >= 2
+    const trailDist = breadcrumbs.length >= 2
       ? calculateTrailDistanceMeters(breadcrumbs)
-      : route?.distanceMeters ?? 0;
+      : 0;
+    const routeDist = route?.distanceMeters ?? 0;
+    // Use GPS trail distance when available, fall back to planned route distance
+    const distMeters = trailDist > 0 ? trailDist : routeDist;
     const distKm = distMeters / 1000;
     const co2 = distKm * 0.12;
     const money = distKm * 0.35;
@@ -345,7 +348,18 @@ export default function FeedbackScreen() {
         if (tripServerId) {
           const result = await mobileApi.fetchRideImpact(tripServerId);
           if (!cancelled) {
-            setRideImpact(result);
+            // Only overwrite local values if server returns positive distance;
+            // otherwise keep local computation but still accept badges
+            setRideImpact((prev) => {
+              if (result.distanceMeters > 0 || prev.distanceMeters === 0) {
+                return result;
+              }
+              return {
+                ...prev,
+                newBadges: result.newBadges.length > 0 ? result.newBadges : prev.newBadges,
+                equivalentText: result.equivalentText ?? prev.equivalentText,
+              };
+            });
             if (result.newBadges.length > 0) {
               enqueueBadgeUnlocks(result.newBadges);
             }
