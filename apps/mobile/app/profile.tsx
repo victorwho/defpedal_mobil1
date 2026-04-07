@@ -259,6 +259,9 @@ export default function ProfileScreen() {
           subtitle={t('profile.subtitle')}
           contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
         >
+          {/* ── Badges (top of profile) ──────────────────────────── */}
+          <AchievementsRow />
+
           {/* ── Section 1: Cycling Preferences ─────────────────────── */}
           <View style={styles.section}>
             <SectionTitle variant="accent">{t('profile.sectionCycling')}</SectionTitle>
@@ -480,8 +483,6 @@ export default function ProfileScreen() {
                 <Ionicons name="log-in-outline" size={24} color={colors.accent} />
               </Pressable>
             )}
-
-            <AchievementsRow />
 
             <SettingRow
               label={t('profile.shareTrips')}

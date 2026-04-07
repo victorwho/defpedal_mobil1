@@ -85,6 +85,7 @@
 - [x] DONE — Deduplicate qualifyStreakAsync helper (extracted to lib/streaks.ts) (2026-04-04)
 - [x] DONE — Add `source` field to hazard reporting API (in_ride/manual/armchair) (2026-04-04)
 - [ ] NOT STARTED — Social digest notification subquery needs manual DB validation
+- [ ] NOT STARTED — Notification budget: strict 1-notification-per-day limit. Prioritize streak-protection over weather, batch social updates into weekly summary. Requires quiet hours enforcement first.
 - [!] BLOCKED — iPhone validation (no macOS hardware available)
 - [ ] NOT STARTED — Redis-backed production caching/rate-limiting
 - [x] DONE — Merge feature/habitengine branch to main (2026-04-03)
