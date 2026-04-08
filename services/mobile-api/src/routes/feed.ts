@@ -1,10 +1,12 @@
 import type {
+  CityHeartbeat,
   CommunityStats,
   CyclingGoal,
   ErrorResponse,
   FeedComment,
   FeedItem,
   FeedResponse,
+  HazardType,
   ProfileResponse,
   SafetyTag,
   ShareTripRequest,
@@ -23,6 +25,8 @@ import {
   feedCommentsResponseSchema,
   feedQuerystringSchema,
   feedResponseSchema,
+  heartbeatQuerystringSchema,
+  heartbeatResponseSchema,
   normalizeShareTripRequest,
   profileResponseSchema,
   profileUpdateRequestSchema,
@@ -30,6 +34,7 @@ import {
   type CommunityStatsQuerystring,
   type FeedCommentBody,
   type FeedQuerystring,
+  type HeartbeatQuerystring,
   type ProfileUpdateBody,
   type ShareTripBody,
   type TripShareIdParams,
@@ -201,6 +206,90 @@ export const buildFeedRoutes = (
           totalCo2SavedKg: calculateCo2SavedKg(totalDistanceMeters),
           uniqueRiders: Number(row?.unique_riders ?? 0),
         };
+      },
+    );
+
+    // GET /community/heartbeat — city pulse dashboard
+    app.get<{ Querystring: HeartbeatQuerystring; Reply: CityHeartbeat | ErrorResponse }>(
+      '/community/heartbeat',
+      {
+        schema: {
+          querystring: heartbeatQuerystringSchema,
+          response: {
+            200: heartbeatResponseSchema,
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        await requireUser(request, dependencies);
+        const db = ensureSupabase();
+
+        const { lat, lon, radiusKm: rawRadius, days: rawDays } = request.query;
+        const radiusMeters = (rawRadius ?? DEFAULT_RADIUS_KM) * 1000;
+        const days = rawDays ?? 7;
+
+        const { data, error } = await db.rpc('get_city_heartbeat', {
+          user_lat: lat,
+          user_lon: lon,
+          radius_meters: radiusMeters,
+          p_days: days,
+        });
+
+        if (error) {
+          request.log.error({ event: 'heartbeat_error', error: error.message }, 'heartbeat query failed');
+          throw new HttpError('Heartbeat query failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const result = (typeof data === 'string' ? JSON.parse(data) : data) as Record<string, unknown>;
+        const today = result.today as Record<string, unknown>;
+        const totals = result.totals as Record<string, unknown>;
+
+        const response: CityHeartbeat = {
+          localityName: null,
+          today: {
+            rides: Number(today?.rides ?? 0),
+            distanceMeters: Number(today?.distanceMeters ?? 0),
+            co2SavedKg: Number(today?.co2SavedKg ?? 0),
+            communitySeconds: Number(today?.communitySeconds ?? 0),
+            activeRiders: Number(today?.activeRiders ?? 0),
+          },
+          daily: ((result.daily as Record<string, unknown>[]) ?? []).map((d) => ({
+            day: String(d.day),
+            rides: Number(d.rides ?? 0),
+            distanceMeters: Number(d.distanceMeters ?? 0),
+            co2SavedKg: Number(d.co2SavedKg ?? 0),
+            communitySeconds: Number(d.communitySeconds ?? 0),
+          })),
+          totals: {
+            rides: Number(totals?.rides ?? 0),
+            distanceMeters: Number(totals?.distanceMeters ?? 0),
+            durationSeconds: Number(totals?.durationSeconds ?? 0),
+            co2SavedKg: Number(totals?.co2SavedKg ?? 0),
+            communitySeconds: Number(totals?.communitySeconds ?? 0),
+            uniqueRiders: Number(totals?.uniqueRiders ?? 0),
+          },
+          hazardHotspots: ((result.hazardHotspots as Record<string, unknown>[]) ?? []).map((h) => ({
+            hazardType: (String(h.hazardType ?? 'other')) as HazardType,
+            count: Number(h.count ?? 0),
+            lat: Number(h.lat ?? 0),
+            lon: Number(h.lon ?? 0),
+          })),
+          topContributors: ((result.topContributors as Record<string, unknown>[]) ?? []).map((c) => ({
+            displayName: String(c.displayName ?? 'Rider'),
+            avatarUrl: (c.avatarUrl as string) ?? null,
+            rideCount: Number(c.rideCount ?? 0),
+            distanceKm: Number(c.distanceKm ?? 0),
+          })),
+        };
+
+        return response;
       },
     );
 

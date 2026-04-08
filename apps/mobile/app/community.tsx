@@ -1,13 +1,16 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { CommunityStatsCard } from '../src/design-system/organisms/CommunityStatsCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { useTheme, type ThemeColors } from '../src/design-system';
-import { fontFamily, textBase } from '../src/design-system/tokens/typography';
+import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
+import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { useCommunityStats } from '../src/hooks/useCommunityStats';
 import { handleTabPress } from '../src/lib/navigation-helpers';
@@ -24,6 +27,26 @@ export default function CommunityScreen() {
       <View style={styles.content}>
         <Screen title={t('communityScreen.title')} subtitle={t('communityScreen.subtitle')}>
           <CommunityStatsCard stats={stats} isLoading={isLoading} error={error} />
+
+          {/* City Heartbeat card */}
+          <Pressable
+            style={styles.heartbeatCard}
+            onPress={() => router.push('/city-heartbeat')}
+            accessibilityRole="button"
+            accessibilityLabel="Open City Heartbeat dashboard"
+          >
+            <View style={styles.heartbeatIcon}>
+              <Ionicons name="pulse" size={22} color={colors.accent} />
+            </View>
+            <View style={styles.heartbeatText}>
+              <Text style={styles.heartbeatTitle}>City Heartbeat</Text>
+              <Text style={styles.heartbeatSub}>
+                Live activity, trends, hazards & top riders
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>{t('communityScreen.feedTitle')}</Text>
             <Text style={styles.placeholderSub}>
@@ -48,6 +71,38 @@ const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDeep },
     content: { flex: 1 },
+    heartbeatCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.borderAccent,
+      padding: space[4],
+      gap: space[3],
+      ...shadows.md,
+    },
+    heartbeatIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.bgSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heartbeatText: {
+      flex: 1,
+      gap: 2,
+    },
+    heartbeatTitle: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textPrimary,
+    },
+    heartbeatSub: {
+      ...textXs,
+      color: colors.textSecondary,
+    },
     placeholder: {
       alignItems: 'center',
       justifyContent: 'center',

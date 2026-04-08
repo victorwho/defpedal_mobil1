@@ -15,3 +15,6 @@ export type { ModalProps } from './Modal';
 
 export { BottomNav } from './BottomNav';
 export type { BottomNavProps, TabKey } from './BottomNav';
+
+export { ActivityChart } from './ActivityChart';
+export { PulseHeader } from './PulseHeader';

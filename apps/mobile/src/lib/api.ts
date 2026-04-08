@@ -2,6 +2,7 @@ import type {
   AutocompleteRequest,
   AutocompleteResponse,
   BadgeResponse,
+  CityHeartbeat,
   CommunityStats,
   Coordinate,
   CoverageResponse,
@@ -399,6 +400,16 @@ export const mobileApi = {
 
   reverseGeocodeLocality: (lat: number, lon: number) =>
     reverseGeocodeLocality(lat, lon),
+
+  getCityHeartbeat: (lat: number, lon: number, radiusKm = 15, days = 7) => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      radiusKm: String(radiusKm),
+      days: String(days),
+    });
+    return requestJson<CityHeartbeat>(`/v1/community/heartbeat?${params.toString()}`);
+  },
 
   // ── Habit Engine ──
 

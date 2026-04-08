@@ -287,6 +287,28 @@ export const ro: TranslationKeys = {
     activeRider_other: 'cicliști activi',
   },
 
+  // ── City Heartbeat ──
+  cityHeartbeat: {
+    title: 'Pulsul orașului',
+    cardTitle: 'Pulsul orașului',
+    cardSub: 'Activitate live, tendințe, pericole și top cicliști',
+    todayPulse: 'PULSUL DE AZI',
+    allTime: 'TOTAL',
+    rides: 'Curse',
+    distance: 'Distanță',
+    co2Saved: 'CO2 economisit',
+    donated: 'Donat',
+    totalRides: 'Total curse',
+    riders: 'Cicliști',
+    hazardHotspots: 'ZONE PERICULOASE',
+    hazardHotspotsSub: 'Cele mai raportate în ultimele 7 zile',
+    topContributors: 'TOP CONTRIBUITORI',
+    loading: 'Se încarcă pulsul...',
+    noData: 'Nu sunt date disponibile',
+    riderToday_one: 'ciclist activ azi',
+    riderToday_other: 'cicliști activi azi',
+  },
+
   // ── Feed Card ──
   feedCard: {
     now: 'acum',

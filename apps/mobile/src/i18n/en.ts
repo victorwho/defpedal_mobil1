@@ -285,6 +285,28 @@ export const en = {
     activeRider_other: 'active riders',
   },
 
+  // ── City Heartbeat ──
+  cityHeartbeat: {
+    title: 'City Heartbeat',
+    cardTitle: 'City Heartbeat',
+    cardSub: 'Live activity, trends, hazards & top riders',
+    todayPulse: "TODAY'S PULSE",
+    allTime: 'ALL TIME',
+    rides: 'Rides',
+    distance: 'Distance',
+    co2Saved: 'CO2 saved',
+    donated: 'Donated',
+    totalRides: 'Total rides',
+    riders: 'Riders',
+    hazardHotspots: 'HAZARD HOTSPOTS',
+    hazardHotspotsSub: 'Most reported in the last 7 days',
+    topContributors: 'TOP CONTRIBUTORS',
+    loading: 'Loading heartbeat...',
+    noData: 'No data available',
+    riderToday_one: 'rider active today',
+    riderToday_other: 'riders active today',
+  },
+
   // ── Feed Card ──
   feedCard: {
     now: 'now',

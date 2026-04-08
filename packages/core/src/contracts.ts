@@ -660,6 +660,52 @@ export interface RewardEquivalent {
   readonly unit: string;
 }
 
+// ── City Heartbeat ──
+
+export interface DailyActivity {
+  readonly day: string;
+  readonly rides: number;
+  readonly distanceMeters: number;
+  readonly co2SavedKg: number;
+  readonly communitySeconds: number;
+}
+
+export interface HazardHotspot {
+  readonly hazardType: HazardType;
+  readonly count: number;
+  readonly lat: number;
+  readonly lon: number;
+}
+
+export interface TopContributor {
+  readonly displayName: string;
+  readonly avatarUrl: string | null;
+  readonly rideCount: number;
+  readonly distanceKm: number;
+}
+
+export interface CityHeartbeat {
+  readonly localityName: string | null;
+  readonly today: {
+    readonly rides: number;
+    readonly distanceMeters: number;
+    readonly co2SavedKg: number;
+    readonly communitySeconds: number;
+    readonly activeRiders: number;
+  };
+  readonly daily: readonly DailyActivity[];
+  readonly totals: {
+    readonly rides: number;
+    readonly distanceMeters: number;
+    readonly durationSeconds: number;
+    readonly co2SavedKg: number;
+    readonly communitySeconds: number;
+    readonly uniqueRiders: number;
+  };
+  readonly hazardHotspots: readonly HazardHotspot[];
+  readonly topContributors: readonly TopContributor[];
+}
+
 // ── Saved Routes ──
 
 export interface SavedRoute {

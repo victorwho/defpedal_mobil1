@@ -223,6 +223,103 @@ export const communityStatsResponseSchema = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// City Heartbeat schemas
+// ---------------------------------------------------------------------------
+
+export const heartbeatQuerystringSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['lat', 'lon'],
+  properties: {
+    lat: { type: 'number', minimum: -90, maximum: 90 },
+    lon: { type: 'number', minimum: -180, maximum: 180 },
+    radiusKm: { type: 'number', minimum: 1, maximum: 100 },
+    days: { type: 'integer', minimum: 1, maximum: 30 },
+  },
+} as const;
+
+const dailyActivitySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['day', 'rides', 'distanceMeters', 'co2SavedKg', 'communitySeconds'],
+  properties: {
+    day: { type: 'string' },
+    rides: { type: 'integer' },
+    distanceMeters: { type: 'number' },
+    co2SavedKg: { type: 'number' },
+    communitySeconds: { type: 'number' },
+  },
+} as const;
+
+const hazardHotspotSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['hazardType', 'count', 'lat', 'lon'],
+  properties: {
+    hazardType: { type: 'string' },
+    count: { type: 'integer' },
+    lat: { type: 'number' },
+    lon: { type: 'number' },
+  },
+} as const;
+
+const topContributorSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['displayName', 'avatarUrl', 'rideCount', 'distanceKm'],
+  properties: {
+    displayName: { type: 'string' },
+    avatarUrl: { type: ['string', 'null'] },
+    rideCount: { type: 'integer' },
+    distanceKm: { type: 'number' },
+  },
+} as const;
+
+export const heartbeatResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['localityName', 'today', 'daily', 'totals', 'hazardHotspots', 'topContributors'],
+  properties: {
+    localityName: { type: ['string', 'null'] },
+    today: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['rides', 'distanceMeters', 'co2SavedKg', 'communitySeconds', 'activeRiders'],
+      properties: {
+        rides: { type: 'integer' },
+        distanceMeters: { type: 'number' },
+        co2SavedKg: { type: 'number' },
+        communitySeconds: { type: 'number' },
+        activeRiders: { type: 'integer' },
+      },
+    },
+    daily: { type: 'array', items: dailyActivitySchema },
+    totals: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['rides', 'distanceMeters', 'durationSeconds', 'co2SavedKg', 'communitySeconds', 'uniqueRiders'],
+      properties: {
+        rides: { type: 'integer' },
+        distanceMeters: { type: 'number' },
+        durationSeconds: { type: 'number' },
+        co2SavedKg: { type: 'number' },
+        communitySeconds: { type: 'number' },
+        uniqueRiders: { type: 'integer' },
+      },
+    },
+    hazardHotspots: { type: 'array', items: hazardHotspotSchema },
+    topContributors: { type: 'array', items: topContributorSchema },
+  },
+} as const;
+
+export type HeartbeatQuerystring = {
+  lat: number;
+  lon: number;
+  radiusKm?: number;
+  days?: number;
+};
+
+// ---------------------------------------------------------------------------
 // Body types for Fastify generics
 // ---------------------------------------------------------------------------
 
