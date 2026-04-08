@@ -17,11 +17,12 @@ import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
+import { useConfirmation } from '../src/hooks/useConfirmation';
 import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
@@ -94,6 +95,7 @@ export default function NavigationScreen() {
   const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
 
   const t = useT();
+  const confirm = useConfirmation();
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
@@ -818,26 +820,20 @@ export default function NavigationScreen() {
             <IconButton
               icon={<Ionicons name="close" size={22} color={gray[300]} />}
               onPress={() => {
-                Alert.alert(
-                  t('nav.endRideConfirmTitle'),
-                  t('nav.endRideConfirmMessage'),
-                  [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                      text: t('nav.endRide'),
-                      style: 'destructive',
-                      onPress: () => {
-                        queueTripEnd('stopped');
-                        telemetry.capture('navigation_stopped', {
-                          route_id: selectedRoute.id,
-                          session_id: navigationSession.sessionId,
-                        });
-                        finishNavigation();
-                        router.push('/feedback');
-                      },
-                    },
-                  ],
-                );
+                confirm({
+                  title: t('nav.endRideConfirmTitle'),
+                  message: t('nav.endRideConfirmMessage'),
+                  confirmLabel: t('nav.endRide'),
+                  onConfirm: () => {
+                    queueTripEnd('stopped');
+                    telemetry.capture('navigation_stopped', {
+                      route_id: selectedRoute.id,
+                      session_id: navigationSession.sessionId,
+                    });
+                    finishNavigation();
+                    router.push('/feedback');
+                  },
+                });
               }}
               accessibilityLabel={t('nav.endRide')}
               variant="secondary"

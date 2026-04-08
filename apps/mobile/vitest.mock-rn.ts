@@ -8,6 +8,10 @@
  */
 import React from 'react';
 
+export const Alert = {
+  alert: (() => {}) as (title: string, message?: string, buttons?: unknown[]) => void,
+};
+
 export const StyleSheet = {
   create: <T extends Record<string, unknown>>(styles: T): T => styles,
   flatten: (style: unknown) => style,

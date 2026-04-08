@@ -113,6 +113,9 @@ export const en = {
     saveProgress: 'Save your progress',
     signUpKeepStreak: 'Sign up to keep your streak and track your impact.',
     continueGoogle: 'Continue with Google',
+    skipConfirmTitle: 'Skip feedback?',
+    skipConfirmMessage: 'Your feedback helps improve route safety for all cyclists.',
+    skipConfirmButton: 'Skip',
   },
 
   // ── Profile ──

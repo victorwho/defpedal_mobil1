@@ -25,6 +25,7 @@ import { useAppStore } from '../src/store/appStore';
 import { useShallow } from 'zustand/shallow';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
+import { useConfirmation } from '../src/hooks/useConfirmation';
 import { useBadges } from '../src/hooks/useBadges';
 import { brandTints, safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 
@@ -45,6 +46,7 @@ export default function ProfileScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const { user, signOut, signInAnonymously } = useAuthSession();
+  const confirm = useConfirmation();
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -542,19 +544,17 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('profile.signOut')}
                 onPress={() => {
-                  Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
-                    { text: t('common.cancel'), style: 'cancel' },
-                    {
-                      text: t('profile.signOut'),
-                      style: 'destructive',
-                      onPress: async () => {
-                        useAppStore.getState().setOnboardingCompleted(false);
-                        await signOut();
-                        await signInAnonymously();
-                        router.replace('/onboarding' as any);
-                      },
+                  confirm({
+                    title: t('profile.signOut'),
+                    message: t('profile.signOutConfirm'),
+                    confirmLabel: t('profile.signOut'),
+                    onConfirm: async () => {
+                      useAppStore.getState().setOnboardingCompleted(false);
+                      await signOut();
+                      await signInAnonymously();
+                      router.replace('/onboarding' as any);
                     },
-                  ]);
+                  });
                 }}
               >
                 <Ionicons name="log-out-outline" size={20} color={colors.danger} />

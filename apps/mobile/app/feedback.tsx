@@ -43,6 +43,7 @@ import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 import { useT } from '../src/hooks/useTranslation';
+import { useConfirmation } from '../src/hooks/useConfirmation';
 
 // ---------------------------------------------------------------------------
 // Star rating (preserved from original)
@@ -286,6 +287,7 @@ export default function FeedbackScreen() {
   const authCtx = useAuthSessionOptional();
 
   const t = useT();
+  const confirm = useConfirmation();
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
   const activeTripClientId = useAppStore((s) => s.activeTripClientId);
   const tripServerIds = useAppStore((s) => s.tripServerIds);
@@ -326,9 +328,7 @@ export default function FeedbackScreen() {
     };
   }, []);
 
-  const ratingSkipCount = useAppStore((s) => s.ratingSkipCount);
   const incrementRatingSkipCount = useAppStore((s) => s.incrementRatingSkipCount);
-  const autoSuppressRating = ratingSkipCount >= 3;
   const [step, setStep] = useState<FeedbackStep>('impact');
   const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
@@ -468,15 +468,22 @@ export default function FeedbackScreen() {
           <ImpactStep
             rideImpact={rideImpact}
             dashboard={dashboard}
-            onContinue={autoSuppressRating ? handleDone : () => setStep('rating')}
+            onContinue={() => setStep('rating')}
             styles={styles}
           />
         ) : (
           <RatingStep
             onDone={handleDone}
             onCancel={() => {
-              incrementRatingSkipCount();
-              handleCancel();
+              confirm({
+                title: t('feedback.skipConfirmTitle'),
+                message: t('feedback.skipConfirmMessage'),
+                confirmLabel: t('feedback.skipConfirmButton'),
+                onConfirm: () => {
+                  incrementRatingSkipCount();
+                  handleCancel();
+                },
+              });
             }}
             styles={styles}
             colors={colors}

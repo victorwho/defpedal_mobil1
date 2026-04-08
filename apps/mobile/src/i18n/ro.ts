@@ -115,6 +115,9 @@ export const ro: TranslationKeys = {
     saveProgress: 'Salvează progresul',
     signUpKeepStreak: 'Creează cont pentru a-ți păstra seria și a-ți urmări impactul.',
     continueGoogle: 'Continuă cu Google',
+    skipConfirmTitle: 'Sari peste feedback?',
+    skipConfirmMessage: 'Feedback-ul tău ajută la îmbunătățirea siguranței traseelor pentru toți cicliștii.',
+    skipConfirmButton: 'Sari peste',
   },
 
   // ── Profile ──
