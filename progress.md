@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-07 (session 9)
+Last updated: 2026-04-08 (session 10)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -164,6 +164,16 @@ Update it at the end of each implementation slice.
     - **Voice guidance step completion simplified**: On completing a turn, voice previously announced the completed step instruction + next step with distance (e.g. "Turn left, then in 200 meters turn right"). Now only announces the next step with distance (e.g. "In 200 meters, turn right") — the completed instruction is redundant since the rider already made the turn. No announcement for the final step before arrival (handled by arrival announcement).
     - **AnimatedCounter broken `setNativeProps`**: Post-ride impact counters (ML, CO2, EUR) showed "0" permanently despite correct subtitle text (e.g. "+13 minutes of life earned"). Root cause: `setNativeProps({ text: ... })` does not work on RN `Text` components — only on `TextInput`. The animation listener fired correctly but display never updated. Fix: replaced `setNativeProps` + ref approach with `useState` + `setDisplayText` in the animation listener. Counters now animate from 0 to actual values.
     - Bundle ✅. Preview APK built and installed on Samsung S23 Ultra.
+
+- Comprehensive Test Coverage (2026-04-08):
+    - **Mobile app tests expanded from 65 to 467** (total across all packages: 949). Fixed 5 pre-existing test failures and wrote 35 new test files.
+    - **Hooks tests (9 files, 63 tests)**: useCurrentLocation, useBicycleParking, useBicycleRental, useBikeShops, useNearbyHazards, useWeather, usePoiSearch, useFeed, useBadges — covers permission handling, API mocking, error states, TanStack Query integration
+    - **Lib tests (12 files, 151 tests)**: api (40 tests for all endpoints), weather (19 tests incl. WMO codes + AQI), mapbox-routing (15 tests for safe/fast/waypoints/enrichment), poi-search (13 tests for 6 POI categories), bicycle-parking/rental/shops (28 tests for Overpass parsing), offlineQueue (10 tests for all 6 mutation types), navigation-helpers (7 tests for tab routing), push-notifications (11 tests for NativeModule guard branches), daily-weather-notification (4 tests), env (4 tests)
+    - **Design system tests (14 files, 120 tests)**: Atoms — Button (12), Badge (10), IconButton (7), Toggle (8), Card (5), SectionTitle (6), FadeSlideIn (7), BadgeIcon (12), BadgeProgressBar (9), BadgeInlineChip (6). Molecules — SearchBar (12), Toast (12), WeatherWidget (8), BadgeCard (7)
+    - **Store tests expanded (8 → 76 tests)**: route lifecycle, waypoints, navigation session, offline queue, preferences, badge unlock queue, recent destinations, milestones, immutability checks, reset flow
+    - **Pre-existing test fixes**: devAuth (isAnonymous field), mapbox-search (rewrote for Search Box API v1), useRouteGuard/index/AuthSessionProvider (happy-dom environment + mocks)
+    - **Infrastructure**: added happy-dom, @testing-library/react, @testing-library/dom devDeps; extended vitest.setup.ts (ScrollView, ActivityIndicator, AccessibilityInfo, Dimensions, NativeModules mocks); pinned react-dom@19.2.1
+    - All 949 tests pass. Bundle ✅. Phone-tested on Samsung S23 Ultra.
 
 ## Phase Status
 

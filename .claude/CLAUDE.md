@@ -339,7 +339,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-04-07)
+## Current State (as of 2026-04-08)
 
 ### Working Features
 - Route planning with destination autocomplete and recent destinations (Google Maps-style UX)
@@ -392,6 +392,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - Recent destinations: last 10 selected destinations shown when focusing empty search field
   - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
+  - **949 tests across 3 packages** (core: 277, mobile-api: 205, mobile: 467). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - Push notifications (needs EAS project ID + native rebuild for actual delivery)
