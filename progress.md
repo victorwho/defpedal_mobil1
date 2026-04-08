@@ -175,6 +175,23 @@ Update it at the end of each implementation slice.
     - **Infrastructure**: added happy-dom, @testing-library/react, @testing-library/dom devDeps; extended vitest.setup.ts (ScrollView, ActivityIndicator, AccessibilityInfo, Dimensions, NativeModules mocks); pinned react-dom@19.2.1
     - All 949 tests pass. Bundle ✅. Phone-tested on Samsung S23 Ultra.
 
+- Codebase Review + Phase 1 Stability Fixes (2026-04-08):
+    - **Full 8-category audit**: Security, Errors & Crashes, Data Integrity, Performance, API Contracts, UX & Accessibility, Infrastructure, Code Quality. Overall score 6/10 with 5 P0, 33 P1, 37 P2, 24 P3 findings. Reports saved to `review-report-2026-04-08.md` and `action-plan-2026-04-08.md`.
+    - **Phase 1 — Data Integrity & Stability (9 fixes)**:
+        - `locale` added to Zustand persist whitelist — language no longer resets on cold start
+        - Queue eviction second pass now protects `TRIP_CRITICAL_TYPES` — `trip_start` can no longer be dropped
+        - `finishNavigation` guarded — only transitions to `AWAITING_FEEDBACK` when `navigationSession` is non-null
+        - `queueTripEnd` wrapped in `useCallback` with proper deps — eliminates stale closure that could enqueue wrong trip data
+        - `OfflineMutationSyncManager` interval no longer re-registers on every queue change — stable 15s flush cycle
+        - `AuthSessionProvider` reduced from double auth subscription to single — eliminates race condition
+        - `reorderWaypoints` uses immutable `slice`-based reorder instead of `.splice()` mutation
+        - Navigation `speak` reads fresh `navigationSession` from store instead of stale closure
+        - `fetchRiskMap` routed through `requestJson` — gets timeout, auth headers, and error handling
+    - **Bonus fixes**: Removed `console.warn` in `AuthSessionProvider` (prod code)
+    - **Test infrastructure fix**: `react-native/index.js` contains Flow syntax (`import typeof`) that Vite/Rollup cannot parse. Created `vitest.mock-rn.ts` shim and `resolve.alias` in `vitest.config.ts` — all 44 mobile test files now pass (was 28/44). Removed redundant 150-line `vi.mock('react-native')` from `vitest.setup.ts`.
+    - **Worktree cleanup**: Pruned 5 stale worktrees + deleted 18 orphaned branches
+    - All 949 tests pass (core 277, API 205, mobile 467). Bundle ✅. Phone-tested.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation

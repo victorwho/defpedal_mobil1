@@ -370,16 +370,17 @@ export const useAppStore = create<AppStore>()(
         })),
       reorderWaypoints: (fromIndex, toIndex) =>
         set((state) => {
-          const current = [...(state.routeRequest.waypoints ?? [])];
+          const current = state.routeRequest.waypoints ?? [];
           if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) {
             return state;
           }
-          const [moved] = current.splice(fromIndex, 1);
-          current.splice(toIndex, 0, moved);
+          const moved = current[fromIndex];
+          const without = [...current.slice(0, fromIndex), ...current.slice(fromIndex + 1)];
+          const reordered = [...without.slice(0, toIndex), moved, ...without.slice(toIndex)];
           return {
             routeRequest: {
               ...state.routeRequest,
-              waypoints: current,
+              waypoints: reordered,
             },
           };
         }),
@@ -491,7 +492,7 @@ export const useAppStore = create<AppStore>()(
           navigationSession: state.navigationSession
             ? completeNavigationSession(state.navigationSession)
             : state.navigationSession,
-          appState: 'AWAITING_FEEDBACK',
+          appState: state.navigationSession ? 'AWAITING_FEEDBACK' : state.appState,
         })),
       setMuted: (isMuted) =>
         set((state) => ({
@@ -603,6 +604,7 @@ export const useAppStore = create<AppStore>()(
                 if (secondPassDropped >= remainingOverage) return true;
                 if (item.status === 'syncing') return true;
                 if (item.id === mutation.id) return true; // Keep the new mutation
+                if (TRIP_CRITICAL_TYPES.has(item.type)) return true;
                 secondPassDropped++;
                 return false;
               });
@@ -770,6 +772,7 @@ export const useAppStore = create<AppStore>()(
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
+        locale: state.locale,
       }),
     },
   ),

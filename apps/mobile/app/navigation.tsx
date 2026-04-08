@@ -258,30 +258,36 @@ export default function NavigationScreen() {
     }, 3000);
   };
 
-  const queueTripEnd = (reason: 'completed' | 'stopped') => {
-    if (!activeTripClientId || hasQueuedTripEnd) {
+  const queueTripEnd = useCallback((reason: 'completed' | 'stopped') => {
+    const store = useAppStore.getState();
+    const currentActiveTripClientId = store.activeTripClientId;
+    const currentSession = store.navigationSession;
+    const currentSharePublicly = store.shareTripsPublicly;
+    const currentRouteRequest = store.routeRequest;
+    const currentRoutePreview = store.routePreview;
+
+    if (!currentActiveTripClientId || hasQueuedTripEnd) {
       return;
     }
 
     const endedAt = new Date().toISOString();
 
     enqueueMutation('trip_end', {
-      clientTripId: activeTripClientId,
+      clientTripId: currentActiveTripClientId,
       endedAt,
       reason,
     });
 
     // Queue GPS trail + route recording
-    if (navigationSession && selectedRoute) {
-      const store = useAppStore.getState();
+    if (currentSession && selectedRoute) {
       enqueueMutation('trip_track', {
-        clientTripId: activeTripClientId,
-        routingMode: (routePreview?.selectedMode as 'safe' | 'fast') ?? 'fast',
+        clientTripId: currentActiveTripClientId,
+        routingMode: (currentRoutePreview?.selectedMode as 'safe' | 'fast') ?? 'fast',
         plannedRoutePolyline6: selectedRoute.geometryPolyline6,
         plannedRouteDistanceMeters: selectedRoute.distanceMeters,
-        gpsBreadcrumbs: navigationSession.gpsBreadcrumbs,
+        gpsBreadcrumbs: currentSession.gpsBreadcrumbs,
         endReason: reason,
-        startedAt: navigationSession.startedAt,
+        startedAt: currentSession.startedAt,
         endedAt,
         bikeType: store.bikeType ?? undefined,
         aqiAtStart: null, // TODO: capture AQI at navigation start
@@ -289,31 +295,31 @@ export default function NavigationScreen() {
     }
 
     // Auto-share to community feed if enabled
-    if (shareTripsPublicly && navigationSession && selectedRoute) {
+    if (currentSharePublicly && currentSession && selectedRoute) {
       const durationSeconds = Math.round(
-        (new Date(endedAt).getTime() - new Date(navigationSession.startedAt).getTime()) / 1000,
+        (new Date(endedAt).getTime() - new Date(currentSession.startedAt).getTime()) / 1000,
       );
-      const actualDistance = navigationSession.gpsBreadcrumbs.length >= 2
-        ? calculateTrailDistanceMeters(navigationSession.gpsBreadcrumbs)
+      const actualDistance = currentSession.gpsBreadcrumbs.length >= 2
+        ? calculateTrailDistanceMeters(currentSession.gpsBreadcrumbs)
         : selectedRoute.distanceMeters;
       enqueueMutation('trip_share', {
-        startLocationText: routeRequest.origin.lat.toFixed(4) + ', ' + routeRequest.origin.lon.toFixed(4),
-        destinationText: routeRequest.destination.lat.toFixed(4) + ', ' + routeRequest.destination.lon.toFixed(4),
+        startLocationText: currentRouteRequest.origin.lat.toFixed(4) + ', ' + currentRouteRequest.origin.lon.toFixed(4),
+        destinationText: currentRouteRequest.destination.lat.toFixed(4) + ', ' + currentRouteRequest.destination.lon.toFixed(4),
         distanceMeters: actualDistance,
         durationSeconds,
         elevationGainMeters: selectedRoute.totalClimbMeters,
         geometryPolyline6: selectedRoute.geometryPolyline6,
         safetyTags: [],
-        startCoordinate: { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon },
+        startCoordinate: { lat: currentRouteRequest.origin.lat, lon: currentRouteRequest.origin.lon },
       });
     }
 
     telemetry.capture('trip_end_queued', {
       reason,
       signed_in: Boolean(user),
-      breadcrumbs: navigationSession?.gpsBreadcrumbs.length ?? 0,
+      breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
     });
-  };
+  }, [enqueueMutation, hasQueuedTripEnd, selectedRoute, user]);
 
   const queueHazardReport = (hazardType: HazardType) => {
     if (!mapUserCoordinate) {
@@ -352,12 +358,13 @@ export default function NavigationScreen() {
   };
 
   const speak = useCallback((message: string) => {
-    const currentAppState = useAppStore.getState().appState;
+    const currentState = useAppStore.getState();
+    const session = currentState.navigationSession;
     if (
-      !navigationSession ||
+      !session ||
       !voiceGuidanceEnabled ||
-      navigationSession.isMuted ||
-      currentAppState !== 'NAVIGATING'
+      session.isMuted ||
+      currentState.appState !== 'NAVIGATING'
     ) {
       return;
     }
@@ -366,7 +373,7 @@ export default function NavigationScreen() {
     Speech.speak(message, {
       language: routeRequest.locale,
     });
-  }, [navigationSession?.isMuted, voiceGuidanceEnabled, routeRequest.locale]);
+  }, [voiceGuidanceEnabled, routeRequest.locale]);
 
   const toggleVoiceGuidance = () => {
     const nextEnabled = !voiceGuidanceEnabled;
@@ -551,16 +558,14 @@ export default function NavigationScreen() {
       router.replace('/feedback');
     }
   }, [
-    activeTripClientId,
     advanceNavigation,
     appendGpsBreadcrumb,
-    enqueueMutation,
     finishNavigation,
-    hasQueuedTripEnd,
     locationState.sample,
     markPreAnnouncement,
     markApproachAnnouncement,
     navigationSession?.sessionId,
+    queueTripEnd,
     selectedRoute,
     speak,
     updateNavigationProgress,

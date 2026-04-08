@@ -67,18 +67,17 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     // Initial mount: allow anonymous sign-in
     void syncCurrentSession(true);
 
-    // Auth state changes: only sync, never trigger anonymous sign-in
+    // Auth state changes: only sync, never trigger anonymous sign-in.
+    // Use a single subscription to avoid racing concurrent syncCurrentSession calls.
+    // subscribeToAuthSessionChanges covers developer bypass + all explicit auth ops.
+    // Supabase token refresh is handled transparently by getSession() on next API call.
     const unsubscribe = subscribeToAuthSessionChanges(() => {
       void syncCurrentSession(false);
     });
-    const subscription = supabaseClient?.auth.onAuthStateChange(() => {
-      void syncCurrentSession(false);
-    }).data.subscription;
 
     return () => {
       isMounted = false;
       unsubscribe();
-      subscription?.unsubscribe();
     };
   }, []);
 
@@ -116,7 +115,6 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         setAuthError(`Sign-in failed: ${message}`);
-        console.warn('OAuth cold-start callback error:', err);
       }
     };
 

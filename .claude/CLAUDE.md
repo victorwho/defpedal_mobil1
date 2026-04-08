@@ -207,7 +207,7 @@ C:\dev\defpedal/
 
 ### State Management (Zustand)
 - Single `appStore.ts` with `zustand/persist` → AsyncStorage
-- Persisted: `appState`, `routeRequest`, `routePreview`, `navigationSession`, `queuedMutations`, user preferences (bike type, avoid unpaved, POI visibility, etc.)
+- Persisted: `appState`, `routeRequest`, `routePreview`, `navigationSession`, `queuedMutations`, `locale`, user preferences (bike type, avoid unpaved, POI visibility, etc.)
 - NOT persisted: UI state (showMenu, showElevationProgress, etc.)
 
 ### Navigation (Expo Router)

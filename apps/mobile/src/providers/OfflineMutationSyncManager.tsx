@@ -170,8 +170,6 @@ const withMutationTimeout = async <TResponse,>(
   });
 
 export const OfflineMutationSyncManager = () => {
-  const queuedMutations = useAppStore((state) => state.queuedMutations);
-  const tripServerIds = useAppStore((state) => state.tripServerIds);
   const flushingRef = useRef(false);
 
   useEffect(() => {
@@ -312,6 +310,9 @@ export const OfflineMutationSyncManager = () => {
       }
     };
 
+    // Flush immediately on mount, then on a stable 15s interval.
+    // The flush function reads fresh state via useAppStore.getState()
+    // so it always sees the latest queue without needing reactive deps.
     void flushQueue();
     const intervalHandle = setInterval(() => {
       void flushQueue();
@@ -321,7 +322,7 @@ export const OfflineMutationSyncManager = () => {
       cancelled = true;
       clearInterval(intervalHandle);
     };
-  }, [queuedMutations, tripServerIds]);
+  }, []);
 
   return null;
 };
