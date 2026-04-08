@@ -541,11 +541,6 @@ export default function NavigationScreen() {
     }
 
     if (progress.shouldAdvanceStep && activeStep) {
-      const nextStep = selectedRoute.steps[progress.currentStepIndex + 1];
-      if (nextStep) {
-        const nextDist = Math.round(nextStep.distanceMeters);
-        speak(t('nav.inMeters', { distance: nextDist, instruction: nextStep.instruction }));
-      }
       advanceNavigation(selectedRoute.steps.length);
     }
 
