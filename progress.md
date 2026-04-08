@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-08 (session 10)
+Last updated: 2026-04-08 (session 11)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -191,6 +191,21 @@ Update it at the end of each implementation slice.
     - **Test infrastructure fix**: `react-native/index.js` contains Flow syntax (`import typeof`) that Vite/Rollup cannot parse. Created `vitest.mock-rn.ts` shim and `resolve.alias` in `vitest.config.ts` — all 44 mobile test files now pass (was 28/44). Removed redundant 150-line `vi.mock('react-native')` from `vitest.setup.ts`.
     - **Worktree cleanup**: Pruned 5 stale worktrees + deleted 18 orphaned branches
     - All 949 tests pass (core 277, API 205, mobile 467). Bundle ✅. Phone-tested.
+
+- City Heartbeat Community Dashboard (2026-04-08):
+    - **Full-stack feature**: Community pulse dashboard showing real-time cycling activity, 7-day trends, hazard hotspots, and top contributors within a geographic radius
+    - **Supabase RPC** `get_city_heartbeat`: spatial + temporal aggregation using PostGIS ST_DWithin on trip_shares + hazards. Returns today's pulse (rides, distance, CO2, community seconds, active riders), daily activity for chart (bucketed by day), cumulative totals, top 5 hazard types by count, top 5 contributors (public profiles)
+    - **API endpoint** `GET /v1/community/heartbeat`: Fastify route with lat/lon/radiusKm/days params, full JSON Schema validation (heartbeatQuerystringSchema + heartbeatResponseSchema)
+    - **Types**: `CityHeartbeat`, `DailyActivity`, `HazardHotspot`, `TopContributor` in contracts.ts
+    - **PulseHeader organism**: Animated dual-ring heartbeat (Animated.Value loop, 2s period, staggered), city name, today's ride count in accent orb, active riders count. Respects `useReducedMotion`
+    - **ActivityChart organism**: 7-day SVG bar chart (rides as yellow gradient bars) with community seconds blue line overlay. Fills missing days with zeros. Legend, grid lines, y-axis labels, x-axis day names. Follows ElevationChart coordinate-transform pattern
+    - **city-heartbeat.tsx screen**: ScrollView with pull-to-refresh. Sections: PulseHeader → today's stats (4 AnimatedCounters in 2x2 grid) → ActivityChart → all-time totals → hazard hotspots (red count badges) → top contributors (rank badge + avatar + stats). All cards use FadeSlideIn with staggered delays
+    - **Community navigation**: Pressable card on community.tsx with Ionicons pulse icon + accent border, navigates to /city-heartbeat
+    - **useCityHeartbeat hook**: TanStack Query (5min stale) with location + locality name, same pattern as useCommunityStats
+    - **i18n**: 20 keys for en + ro (cityHeartbeat namespace)
+    - **Bug fix**: require cycle in PulseHeader/ActivityChart — imported useTheme from barrel `..` (index.ts) which re-exports organisms. Fixed: import directly from `../ThemeContext`
+    - **PostgreSQL fix**: `round(double precision, integer)` doesn't exist — cast to `::numeric` before round with precision
+    - Deployed to Cloud Run revision 00037. Supabase migration applied. All 949 tests pass. Bundle ✅. Phone-tested on Samsung S23 Ultra.
 
 ## Phase Status
 

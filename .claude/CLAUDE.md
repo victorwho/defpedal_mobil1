@@ -108,6 +108,7 @@ C:\dev\defpedal/
 │   │   ├── community.tsx        # Community section landing
 │   │   ├── community-feed.tsx   # Community trip feed (like/love/comment)
 │   │   ├── community-trip.tsx   # Single shared trip detail
+│   │   ├── city-heartbeat.tsx   # City Heartbeat community pulse dashboard
 │   │   ├── profile.tsx          # User preferences, toggles, sign-out
 │   │   ├── auth.tsx             # Sign in (Google OAuth)
 │   │   ├── settings.tsx         # App settings
@@ -128,7 +129,8 @@ C:\dev\defpedal/
 │   │   │   ├── molecules/       # SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget, BadgeCard
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
 │   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
-│   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
+│   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay,
+│   │   │                        # ActivityChart, PulseHeader
 │   │   ├── hooks/               # Custom React hooks
 │   │   │   ├── useBicycleParking.ts   # Overpass API for parking
 │   │   │   ├── useBicycleRental.ts    # Overpass API for rentals
@@ -138,7 +140,8 @@ C:\dev\defpedal/
 │   │   │   ├── usePoiSearch.ts        # Mapbox Search Box POI search
 │   │   │   ├── useFeed.ts             # Community feed queries + mutations
 │   │   │   ├── useRouteGuard.ts       # Screen access control
-│   │   │   └── useCurrentLocation.ts  # GPS location
+│   │   │   ├── useCurrentLocation.ts  # GPS location
+│   │   │   └── useCityHeartbeat.ts    # City Heartbeat dashboard data
 │   │   ├── lib/                 # Utility libraries
 │   │   │   ├── mapbox-routing.ts      # Client-side route fetching (Mapbox + OSRM)
 │   │   │   ├── mapbox-search.ts       # Autocomplete/geocoding
@@ -366,6 +369,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Offline mutation queue (trips, hazards, feedback sync when online)
 - CO2 savings per trip (actual GPS distance, EU avg 120g/km) on trip history cards, community feed, and "Your Impact" stats card in History tab
 - Community stats by locality (total trips, km, time, CO2 for nearby cyclists)
+- **City Heartbeat dashboard**: community pulse with live activity (today's rides/distance/CO2/community seconds), 7-day activity chart (SVG bars + line overlay), hazard hotspots, top contributors, animated PulseHeader with dual-ring heartbeat
 - Multi-stop routes (up to 3 intermediate waypoints with autocomplete search, yellow map markers)
 - **Habit Engine:**
   - Anonymous auth (Supabase) — app works without account, merges data on signup
@@ -392,7 +396,8 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - Recent destinations: last 10 selected destinations shown when focusing empty search field
   - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
-  - **949 tests across 3 packages** (core: 277, mobile-api: 205, mobile: 467). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
+  - City Heartbeat community dashboard (spatial aggregation, 7-day chart, hazard hotspots, top contributors)
+- **949 tests across 3 packages** (core: 277, mobile-api: 205, mobile: 467). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - Push notifications (needs EAS project ID + native rebuild for actual delivery)
