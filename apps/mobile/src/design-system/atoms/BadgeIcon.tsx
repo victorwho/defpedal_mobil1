@@ -97,8 +97,11 @@ function renderIconPaths(
   color: string,
   opacity: number,
   iconAreaSize: number,
+  bgColor: string,
 ) {
-  // Scale from 24x24 icon viewBox into the iconArea
+  // Scale from 24x24 icon viewBox into the iconArea.
+  // Duotone rendering: fills = primary mass, paths = accent detail strokes.
+  const hasFills = iconDef.fills && iconDef.fills.length > 0;
   return (
     <Svg
       width={iconAreaSize}
@@ -106,24 +109,26 @@ function renderIconPaths(
       viewBox="0 0 24 24"
       fill="none"
     >
-      {iconDef.paths.map((d, i) => (
-        <Path
-          key={`p${i}`}
-          d={d}
-          stroke={color}
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-          opacity={opacity}
-        />
-      ))}
+      {/* Layer 1: Filled shapes (primary visual mass) */}
       {iconDef.fills?.map((d, i) => (
         <Path
           key={`f${i}`}
           d={d}
           fill={color}
           opacity={opacity}
+        />
+      ))}
+      {/* Layer 2: Stroked paths — accent details when fills exist, primary when no fills */}
+      {iconDef.paths.map((d, i) => (
+        <Path
+          key={`p${i}`}
+          d={d}
+          stroke={color}
+          strokeWidth={hasFills ? 1.5 : 2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          opacity={hasFills ? opacity * 0.5 : opacity}
         />
       ))}
     </Svg>
@@ -244,7 +249,7 @@ export const BadgeIcon: React.FC<BadgeIconProps> = ({
             ?
           </Text>
         ) : iconDef ? (
-          renderIconPaths(iconDef, iconColor, iconOpacity, dims.iconArea)
+          renderIconPaths(iconDef, iconColor, iconOpacity, dims.iconArea, style.fillColor)
         ) : null}
       </View>
 
