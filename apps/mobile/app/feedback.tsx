@@ -348,14 +348,19 @@ export default function FeedbackScreen() {
         if (tripServerId) {
           const result = await mobileApi.fetchRideImpact(tripServerId);
           if (!cancelled) {
-            // Only overwrite local values if server returns positive distance;
-            // otherwise keep local computation but still accept badges
+            // Merge server data with local values, preserving whichever
+            // source has richer data (e.g. local microlives vs server CO2)
             setRideImpact((prev) => {
-              if (result.distanceMeters > 0 || prev.distanceMeters === 0) {
-                return result;
-              }
+              const useServerCore = result.distanceMeters > 0 || prev.distanceMeters === 0;
               return {
-                ...prev,
+                ...(useServerCore ? result : prev),
+                // Prefer whichever source has non-zero microlives/communitySeconds
+                personalMicrolives: result.personalMicrolives > 0
+                  ? result.personalMicrolives
+                  : prev.personalMicrolives,
+                communitySeconds: result.communitySeconds > 0
+                  ? result.communitySeconds
+                  : prev.communitySeconds,
                 newBadges: result.newBadges.length > 0 ? result.newBadges : prev.newBadges,
                 equivalentText: result.equivalentText ?? prev.equivalentText,
               };
