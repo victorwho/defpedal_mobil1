@@ -1,11 +1,21 @@
+// @vitest-environment happy-dom
+(globalThis as Record<string, unknown>).__DEV__ = false;
+
 import { renderHook } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+// Mock expo-modules-core to prevent __DEV__ reference error
+vi.mock('expo-modules-core', () => ({}));
 
 // Mock all external dependencies before importing the module under test.
 vi.mock('expo-linking', () => ({
   getInitialURL: vi.fn().mockResolvedValue(null),
   addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+}));
+
+vi.mock('../lib/push-notifications', () => ({
+  registerForPushNotifications: vi.fn(),
 }));
 
 vi.mock('../lib/supabase', () => ({
@@ -19,6 +29,7 @@ vi.mock('../lib/supabase', () => ({
   signInWithEmail: vi.fn(),
   signUpWithEmail: vi.fn(),
   signInWithGoogle: vi.fn(),
+  signInAnonymously: vi.fn(),
   signOut: vi.fn(),
   activateDeveloperBypassSession: vi.fn(),
 }));

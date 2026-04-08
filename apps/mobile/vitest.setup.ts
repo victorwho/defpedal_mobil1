@@ -94,15 +94,42 @@ vi.mock('react-native', async () => {
     }
   }
 
+  const createAnimationResult = () => ({
+    start: (callback?: () => void) => callback?.(),
+    stop: () => {},
+  });
+
   const Animated = {
     View: View,
     Value: AnimatedValue,
-    timing: (_value: AnimatedValue, _config: unknown) => ({
-      start: (callback?: () => void) => callback?.(),
+    timing: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
+    spring: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
+    parallel: (animations: { start: (cb?: () => void) => void }[]) => ({
+      start: (callback?: () => void) => {
+        animations.forEach((a) => a.start());
+        callback?.();
+      },
+      stop: () => {},
     }),
-    spring: (_value: AnimatedValue, _config: unknown) => ({
-      start: (callback?: () => void) => callback?.(),
-    }),
+  };
+
+  const ScrollView = React.forwardRef(
+    (
+      { children, style, testID, ...props }: { children?: React.ReactNode; style?: unknown; testID?: string },
+      ref,
+    ) => React.createElement('div', { ref, 'data-testid': testID, role: 'scrollview', ...props }, children),
+  );
+
+  const ActivityIndicator = ({ accessibilityLabel, color, size, ...props }: { accessibilityLabel?: string; color?: string; size?: string | number }) =>
+    React.createElement('span', { role: 'progressbar', 'aria-label': accessibilityLabel, ...props }, 'Loading');
+
+  const AccessibilityInfo = {
+    isReduceMotionEnabled: () => Promise.resolve(false),
+    addEventListener: () => ({ remove: () => {} }),
+  };
+
+  const Dimensions = {
+    get: () => ({ width: 375, height: 812 }),
   };
 
   return {
@@ -111,6 +138,11 @@ vi.mock('react-native', async () => {
     View,
     Text,
     Animated,
+    ScrollView,
+    ActivityIndicator,
+    AccessibilityInfo,
+    Dimensions,
+    NativeModules: {},
     Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
     Easing: {
       bezier: () => (t: number) => t,

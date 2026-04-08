@@ -16,7 +16,88 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const createMapboxFeature = (overrides: {
+/**
+ * Create a Search Box API **suggest** response item.
+ * The suggest endpoint returns `{ suggestions: [...] }` — not GeoJSON.
+ */
+const createSuggestItem = (overrides: {
+  mapboxId?: string;
+  name?: string;
+  fullAddress?: string;
+  placeFormatted?: string;
+  featureType?: string;
+  maki?: string;
+  poiCategory?: string[];
+  countryCode?: string;
+}) => ({
+  mapbox_id: overrides.mapboxId ?? 'feature.1',
+  name: overrides.name ?? 'Test Place',
+  full_address: overrides.fullAddress ?? '123 Test St, Test City',
+  place_formatted: overrides.placeFormatted ?? 'Test City, Brazil',
+  feature_type: overrides.featureType ?? 'poi',
+  maki: overrides.maki,
+  poi_category: overrides.poiCategory,
+  context: {
+    country: {
+      country_code: overrides.countryCode ?? 'BR',
+    },
+  },
+});
+
+/**
+ * Create a Search Box API **retrieve** response (GeoJSON FeatureCollection).
+ * The retrieve endpoint returns `{ type: 'FeatureCollection', features: [...] }`.
+ */
+const createRetrieveResponse = (overrides: {
+  mapboxId?: string;
+  name?: string;
+  fullAddress?: string;
+  placeFormatted?: string;
+  lon?: number;
+  lat?: number;
+  featureType?: string;
+  maki?: string;
+  poiCategory?: string[];
+  countryCode?: string;
+  hasGeometry?: boolean;
+}) => ({
+  type: 'FeatureCollection',
+  features: overrides.hasGeometry === false
+    ? []
+    : [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [
+              overrides.lon ?? -46.6333,
+              overrides.lat ?? -23.5505,
+            ],
+          },
+          properties: {
+            mapbox_id: overrides.mapboxId ?? 'feature.1',
+            name: overrides.name ?? 'Test Place',
+            full_address:
+              overrides.fullAddress ?? '123 Test St, Test City',
+            place_formatted:
+              overrides.placeFormatted ?? 'Test City, Brazil',
+            feature_type: overrides.featureType,
+            maki: overrides.maki,
+            poi_category: overrides.poiCategory,
+            context: {
+              country: {
+                country_code: overrides.countryCode ?? 'BR',
+              },
+            },
+          },
+        },
+      ],
+});
+
+/**
+ * Create a Geocoding API v6 response feature (for reverse geocode / coverage).
+ */
+const createGeocodeFeature = (overrides: {
   id?: string;
   name?: string;
   fullAddress?: string;
@@ -25,14 +106,15 @@ const createMapboxFeature = (overrides: {
   lat?: number;
   countryCode?: string;
   featureType?: string;
-  maki?: string;
-  poiCategory?: string[];
 }) => ({
   id: overrides.id ?? 'feature.1',
   type: 'Feature' as const,
   geometry: {
     type: 'Point' as const,
-    coordinates: [overrides.lon ?? -46.6333, overrides.lat ?? -23.5505] as [number, number],
+    coordinates: [
+      overrides.lon ?? -46.6333,
+      overrides.lat ?? -23.5505,
+    ] as [number, number],
   },
   properties: {
     mapbox_id: overrides.id ?? 'feature.1',
@@ -40,8 +122,6 @@ const createMapboxFeature = (overrides: {
     full_address: overrides.fullAddress ?? '123 Test St, Test City',
     place_formatted: overrides.placeFormatted ?? 'Test City, Brazil',
     feature_type: overrides.featureType,
-    maki: overrides.maki,
-    poi_category: overrides.poiCategory,
     context: {
       country: {
         country_code: overrides.countryCode ?? 'BR',
@@ -57,6 +137,33 @@ const mockFetchResponse = (data: unknown, ok = true, status = 200) => {
     json: async () => data,
     text: async () => JSON.stringify(data),
   } as Response);
+};
+
+/**
+ * Mock a full autocomplete flow: one suggest call + N retrieve calls.
+ * Each suggest item gets its own retrieve response.
+ */
+const mockAutocompleteFlow = (
+  suggestItems: ReturnType<typeof createSuggestItem>[],
+  retrieveResponses: ReturnType<typeof createRetrieveResponse>[],
+) => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  // First call: suggest
+  fetchSpy.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => ({ suggestions: suggestItems }),
+    text: async () => JSON.stringify({ suggestions: suggestItems }),
+  } as Response);
+  // Subsequent calls: retrieve for each suggestion
+  for (const resp of retrieveResponses) {
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => resp,
+      text: async () => JSON.stringify(resp),
+    } as Response);
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -77,7 +184,6 @@ describe('mapboxAutocomplete', () => {
 
     expect(result.suggestions).toEqual([]);
     expect(result.generatedAt).toBeDefined();
-    expect(globalThis.fetch).not.toBeDefined;
   });
 
   it('returns empty suggestions for empty query', async () => {
@@ -87,15 +193,21 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('maps Mapbox features to AutocompleteSuggestion', async () => {
-    const feature = createMapboxFeature({
-      id: 'poi.123',
+    const suggestItem = createSuggestItem({
+      mapboxId: 'poi.123',
+      name: 'Paulista Avenue',
+      fullAddress: 'Paulista Avenue, Sao Paulo, Brazil',
+    });
+
+    const retrieveResp = createRetrieveResponse({
+      mapboxId: 'poi.123',
       name: 'Paulista Avenue',
       fullAddress: 'Paulista Avenue, Sao Paulo, Brazil',
       lat: -23.5614,
       lon: -46.6558,
     });
 
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    mockAutocompleteFlow([suggestItem], [retrieveResp]);
 
     const result = await mapboxAutocomplete({
       query: 'Paulista',
@@ -109,16 +221,20 @@ describe('mapboxAutocomplete', () => {
       expect.objectContaining({
         id: 'poi.123',
         primaryText: 'Paulista Avenue',
-        label: 'Paulista Avenue, Sao Paulo, Brazil',
         coordinates: { lat: -23.5614, lon: -46.6558 },
-        featureType: 'unknown',
+        featureType: 'poi',
       }),
     );
   });
 
   it('includes distanceMeters when proximity is provided', async () => {
-    const feature = createMapboxFeature({ lat: -23.5614, lon: -46.6558 });
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    const suggestItem = createSuggestItem({});
+    const retrieveResp = createRetrieveResponse({
+      lat: -23.5614,
+      lon: -46.6558,
+    });
+
+    mockAutocompleteFlow([suggestItem], [retrieveResp]);
 
     const result = await mapboxAutocomplete({
       query: 'Paulista',
@@ -131,7 +247,8 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('constructs correct URL with all parameters', async () => {
-    mockFetchResponse({ type: 'FeatureCollection', features: [] });
+    // Mock suggest returning empty to avoid needing retrieve mocks
+    mockFetchResponse({ suggestions: [] });
 
     await mapboxAutocomplete({
       query: 'test place',
@@ -155,17 +272,20 @@ describe('mapboxAutocomplete', () => {
 
     await expect(
       mapboxAutocomplete({ query: 'test' }),
-    ).rejects.toThrow('Mapbox geocoding failed (401)');
+    ).rejects.toThrow('Mapbox search failed (401)');
   });
 
-  it('skips features without geometry', async () => {
-    const goodFeature = createMapboxFeature({ id: 'good' });
-    const badFeature = { ...createMapboxFeature({ id: 'bad' }), geometry: undefined };
+  it('skips suggestions where retrieve has no geometry', async () => {
+    const goodItem = createSuggestItem({ mapboxId: 'good' });
+    const badItem = createSuggestItem({ mapboxId: 'bad' });
 
-    mockFetchResponse({
-      type: 'FeatureCollection',
-      features: [goodFeature, badFeature],
+    const goodRetrieve = createRetrieveResponse({ mapboxId: 'good' });
+    const badRetrieve = createRetrieveResponse({
+      mapboxId: 'bad',
+      hasGeometry: false,
     });
+
+    mockAutocompleteFlow([goodItem, badItem], [goodRetrieve, badRetrieve]);
 
     const result = await mapboxAutocomplete({ query: 'test' });
     expect(result.suggestions).toHaveLength(1);
@@ -173,14 +293,27 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('maps feature_type to featureType field', async () => {
-    const poiFeature = createMapboxFeature({ id: 'poi.1', featureType: 'poi' });
-    const addressFeature = createMapboxFeature({ id: 'addr.1', featureType: 'address' });
-    const placeFeature = createMapboxFeature({ id: 'place.1', featureType: 'place' });
-
-    mockFetchResponse({
-      type: 'FeatureCollection',
-      features: [poiFeature, addressFeature, placeFeature],
+    const poiItem = createSuggestItem({
+      mapboxId: 'poi.1',
+      featureType: 'poi',
     });
+    const addressItem = createSuggestItem({
+      mapboxId: 'addr.1',
+      featureType: 'address',
+    });
+    const placeItem = createSuggestItem({
+      mapboxId: 'place.1',
+      featureType: 'place',
+    });
+
+    const poiRetrieve = createRetrieveResponse({ mapboxId: 'poi.1' });
+    const addressRetrieve = createRetrieveResponse({ mapboxId: 'addr.1' });
+    const placeRetrieve = createRetrieveResponse({ mapboxId: 'place.1' });
+
+    mockAutocompleteFlow(
+      [poiItem, addressItem, placeItem],
+      [poiRetrieve, addressRetrieve, placeRetrieve],
+    );
 
     const result = await mapboxAutocomplete({ query: 'test' });
 
@@ -190,8 +323,10 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('returns "unknown" for unrecognized feature types', async () => {
-    const feature = createMapboxFeature({ featureType: 'some_new_type' });
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    const item = createSuggestItem({ featureType: 'some_new_type' });
+    const retrieve = createRetrieveResponse({});
+
+    mockAutocompleteFlow([item], [retrieve]);
 
     const result = await mapboxAutocomplete({ query: 'test' });
 
@@ -199,11 +334,13 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('extracts category from poi_category array', async () => {
-    const feature = createMapboxFeature({
+    const item = createSuggestItem({
       featureType: 'poi',
       poiCategory: ['restaurant', 'food'],
     });
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    const retrieve = createRetrieveResponse({});
+
+    mockAutocompleteFlow([item], [retrieve]);
 
     const result = await mapboxAutocomplete({ query: 'pizza' });
 
@@ -212,11 +349,13 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('falls back to maki for category when poi_category is absent', async () => {
-    const feature = createMapboxFeature({
+    const item = createSuggestItem({
       featureType: 'poi',
       maki: 'cafe',
     });
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    const retrieve = createRetrieveResponse({});
+
+    mockAutocompleteFlow([item], [retrieve]);
 
     const result = await mapboxAutocomplete({ query: 'coffee' });
 
@@ -224,8 +363,10 @@ describe('mapboxAutocomplete', () => {
   });
 
   it('omits category when no POI metadata is present', async () => {
-    const feature = createMapboxFeature({ featureType: 'address' });
-    mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
+    const item = createSuggestItem({ featureType: 'address' });
+    const retrieve = createRetrieveResponse({});
+
+    mockAutocompleteFlow([item], [retrieve]);
 
     const result = await mapboxAutocomplete({ query: 'main street' });
 
@@ -236,7 +377,7 @@ describe('mapboxAutocomplete', () => {
 
 describe('mapboxReverseGeocode', () => {
   it('returns label from first feature', async () => {
-    const feature = createMapboxFeature({
+    const feature = createGeocodeFeature({
       fullAddress: 'Rua Augusta 100, Sao Paulo',
     });
     mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
@@ -311,7 +452,7 @@ describe('mapboxGetCoverage', () => {
   });
 
   it('falls back to reverse geocode when no hint provided', async () => {
-    const feature = createMapboxFeature({ countryCode: 'BR' });
+    const feature = createGeocodeFeature({ countryCode: 'BR' });
     mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
 
     const result = await mapboxGetCoverage(-23.55, -46.63);

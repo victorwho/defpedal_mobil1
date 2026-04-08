@@ -26,6 +26,7 @@ describe('developer auth bypass helpers', () => {
       }),
     ).toEqual({
       accessToken: 'dev-token',
+      isAnonymous: false,
       provider: 'dev-bypass',
       user: {
         id: 'dev-user',
