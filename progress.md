@@ -509,6 +509,26 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Translations: Added en/ro strings for End Ride confirmation and error boundary
 - Evidence: All changes verified on phone via Metro hot reload
 
+### Unified ScreenHeader Atom (2026-04-08)
+
+- Status: Done
+- Changes:
+  - **ScreenHeader atom** (`apps/mobile/src/design-system/atoms/ScreenHeader.tsx`): 4 variants — `back` (yellow circle chevron), `close` (X button), `brand-logo` (logo + title/subtitle card), `title-only` (centered text)
+  - **Screen wrapper** updated with `headerVariant` prop (defaults to `brand-logo`); nav-style headers fixed above scroll, brand-logo scrolls with content
+  - **7 screens migrated** from ad-hoc inline headers to unified ScreenHeader:
+    - `faq.tsx` → Screen + `back`
+    - `daily-quiz.tsx` → Screen + `close`
+    - `achievements.tsx` → SafeAreaView + ScreenHeader `back`
+    - `impact-dashboard.tsx` → SafeAreaView + ScreenHeader `back`
+    - `user-profile.tsx` → SafeAreaView + ScreenHeader `back`
+    - `trip-compare.tsx` → SafeAreaView + ScreenHeader `back`
+    - `auth.tsx` → SafeAreaView + ScreenHeader `close`
+  - **Profile layout**: user card (sign-in/avatar) moved above badges, sign-out button moved to bottom of Account section
+  - Map screens excluded (route-planning, route-preview, navigation) — use MapStageScreen
+  - BackButton atom retained for floating map buttons (trip-map.tsx)
+  - Exported from `atoms/index.ts` barrel
+- Evidence: Bundle check passing, verified on phone via Metro hot reload
+
 ### Search UX Improvements (2026-04-07)
 
 - Status: Done
