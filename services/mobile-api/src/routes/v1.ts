@@ -1723,12 +1723,14 @@ export const buildV1Routes = (
           .single();
 
         let impactRow = data;
+        let personalMicrolives = 0;
+        let communitySeconds = 0;
 
         // Auto-compute impact if not found — look up distance from trip_tracks
         if (error || !impactRow) {
           const { data: track } = await supabaseAdmin
             .from('trip_tracks')
-            .select('actual_distance_meters, planned_route_distance_meters')
+            .select('actual_distance_meters, planned_route_distance_meters, bike_type, aqi_at_start')
             .eq('trip_id', request.params.tripId)
             .eq('user_id', user.id)
             .single();
@@ -1759,6 +1761,24 @@ export const buildV1Routes = (
               distance_meters: distMeters,
             };
           }
+
+          // Auto-record microlives alongside impact (non-fatal)
+          try {
+            const { data: mlData } = await supabaseAdmin.rpc('record_ride_microlives', {
+              p_trip_id: request.params.tripId,
+              p_user_id: user.id,
+              p_distance_meters: distMeters,
+              p_bike_type: (track.bike_type as string) ?? 'acoustic',
+              p_european_aqi: (track.aqi_at_start as number) ?? null,
+              p_validated: true,
+            });
+            // Store so we can skip the lookup below
+            if (mlData) {
+              const ml = typeof mlData === 'object' ? mlData : {};
+              personalMicrolives = Number((ml as Record<string, unknown>).personalMicrolives ?? 0);
+              communitySeconds = Number((ml as Record<string, unknown>).communitySeconds ?? 0);
+            }
+          } catch { /* microlives recording is non-fatal */ }
 
           // Check and award badges after auto-creating impact (non-fatal)
           try {
@@ -1794,17 +1814,17 @@ export const buildV1Routes = (
           equivalentText = (equivalents[randomIndex] as Record<string, unknown>).equivalent_text as string;
         }
 
-        // Fetch microlives for this trip if available
-        let personalMicrolives = 0;
-        let communitySeconds = 0;
-        const { data: mlRow } = await supabaseAdmin
-          .from('ride_microlives')
-          .select('personal_microlives, community_seconds')
-          .eq('trip_id', impactRow.trip_id)
-          .maybeSingle();
-        if (mlRow) {
-          personalMicrolives = Number((mlRow as Record<string, unknown>).personal_microlives ?? 0);
-          communitySeconds = Number((mlRow as Record<string, unknown>).community_seconds ?? 0);
+        // Fetch microlives for this trip if not already computed above
+        if (personalMicrolives === 0 && communitySeconds === 0) {
+          const { data: mlRow } = await supabaseAdmin
+            .from('ride_microlives')
+            .select('personal_microlives, community_seconds')
+            .eq('trip_id', impactRow.trip_id)
+            .maybeSingle();
+          if (mlRow) {
+            personalMicrolives = Number((mlRow as Record<string, unknown>).personal_microlives ?? 0);
+            communitySeconds = Number((mlRow as Record<string, unknown>).community_seconds ?? 0);
+          }
         }
 
         return {

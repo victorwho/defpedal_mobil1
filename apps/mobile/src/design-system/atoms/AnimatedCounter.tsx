@@ -5,8 +5,8 @@
  * Uses monospace font (RobotoMono) and data-md typography.
  * Respects OS "Reduce Motion" setting.
  */
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Text, type TextStyle } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Text, type TextStyle } from 'react-native';
 
 import { textDataMd } from '../tokens/typography';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -37,37 +37,47 @@ export const AnimatedCounter = ({
   style,
 }: AnimatedCounterProps) => {
   const reducedMotion = useReducedMotion();
-  const animatedValue = useRef(new Animated.Value(0)).current;
   const [displayText, setDisplayText] = useState(
     reducedMotion ? targetValue.toFixed(decimals) : (0).toFixed(decimals),
   );
 
+  const rafRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  const animate = useCallback(
+    (startTs: number) => {
+      const elapsed = startTs - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic for a pleasant deceleration
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = targetValue * eased;
+      setDisplayText(current.toFixed(decimals));
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    },
+    [targetValue, duration, decimals],
+  );
+
   useEffect(() => {
-    if (reducedMotion) {
+    if (reducedMotion || targetValue === 0) {
       setDisplayText(targetValue.toFixed(decimals));
       return;
     }
 
-    animatedValue.setValue(0);
+    // Reset and start fresh animation
     setDisplayText((0).toFixed(decimals));
-
-    const animation = Animated.timing(animatedValue, {
-      toValue: targetValue,
-      duration,
-      useNativeDriver: false,
-    });
-
-    const listenerId = animatedValue.addListener(({ value }) => {
-      setDisplayText(value.toFixed(decimals));
-    });
-
-    animation.start();
+    startTimeRef.current = performance.now();
+    rafRef.current = requestAnimationFrame(animate);
 
     return () => {
-      animation.stop();
-      animatedValue.removeListener(listenerId);
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, [targetValue, duration, decimals, reducedMotion, animatedValue]);
+  }, [targetValue, duration, decimals, reducedMotion, animate]);
 
   const mergedStyle: TextStyle = {
     ...textDataMd,
