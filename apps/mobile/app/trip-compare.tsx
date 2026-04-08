@@ -6,19 +6,18 @@ import {
   formatDuration,
   formatSpeed,
 } from '@defensivepedal/core';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RouteMap } from '../src/components/map';
-import { BackButton } from '../src/design-system/atoms/BackButton';
-import { Button } from '../src/design-system/atoms/Button';
+import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { surfaceTints } from '../src/design-system/tokens/tints';
-import { fontFamily, textBase, textSm, textXl, textXs, text2xl } from '../src/design-system/tokens/typography';
+import { fontFamily, textBase, textSm, textXl, textXs } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -123,12 +122,9 @@ export default function TripCompareScreen() {
   const longerTrip = metricsA.distanceMeters > metricsB.distanceMeters ? 1 : metricsB.distanceMeters > metricsA.distanceMeters ? 2 : null;
 
   return (
-    <View style={styles.root}>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenHeader variant="back" title={t('compare.title')} />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + space[8] }]}>
-        <View style={styles.header}>
-          <BackButton />
-          <Text style={styles.title}>{t('compare.title')}</Text>
-        </View>
 
         {/* Map with Trip 1 GPS trail */}
         {mapCenter && trailA.length >= 2 ? (
@@ -193,24 +189,15 @@ export default function TripCompareScreen() {
           />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDeep },
-    scroll: {},
-    header: {
-      paddingHorizontal: space[5],
-      paddingTop: space[10],
-      paddingBottom: space[3],
-      gap: space[2],
-    },
-    title: {
-      ...text2xl,
-      fontFamily: fontFamily.heading.extraBold,
-      color: colors.textPrimary,
+    scroll: {
+      paddingTop: space[2],
     },
     mapContainer: {
       height: 280,

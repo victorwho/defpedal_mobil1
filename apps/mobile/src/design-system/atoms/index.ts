@@ -33,3 +33,6 @@ export type { SectionTitleProps } from './SectionTitle';
 
 export { FadeSlideIn } from './FadeSlideIn';
 export type { FadeSlideInProps } from './FadeSlideIn';
+
+export { ScreenHeader } from './ScreenHeader';
+export type { ScreenHeaderProps, ScreenHeaderVariant } from './ScreenHeader';

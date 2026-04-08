@@ -17,9 +17,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type {
   BadgeDefinition,
@@ -32,6 +30,7 @@ import { BadgeCard } from '../src/design-system/molecules/BadgeCard';
 import { TrophyCaseHeader } from '../src/design-system/organisms/TrophyCaseHeader';
 import { CategoryTabBar } from '../src/design-system/organisms/CategoryTabBar';
 import { BadgeDetailModal } from '../src/design-system/organisms/BadgeDetailModal';
+import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { type BadgeTier, type BadgeCategory, badgeSpace } from '../src/design-system/tokens/badgeColors';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { space, layout } from '../src/design-system/tokens/spacing';
@@ -274,19 +273,8 @@ export default function AchievementsScreen() {
   }, [hiddenLockedCount, showAllLocked]);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Back button */}
-      <View style={styles.topBar}>
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backButton}
-          hitSlop={8}
-        >
-          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.screenTitle}>Achievements</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenHeader variant="back" title="Achievements" />
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -347,7 +335,7 @@ export default function AchievementsScreen() {
           onClose={() => setSelectedBadge(null)}
         />
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -356,26 +344,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     root: {
       flex: 1,
       backgroundColor: colors.bgDeep,
-    },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: space[4],
-      paddingVertical: space[3],
-    },
-    backButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    screenTitle: {
-      fontFamily: fontFamily.heading.bold,
-      fontSize: 18,
-      color: colors.textPrimary,
     },
     loadingContainer: {
       flex: 1,

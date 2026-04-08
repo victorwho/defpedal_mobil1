@@ -1,14 +1,12 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { BackButton } from '../src/design-system/atoms/BackButton';
+import { Screen } from '../src/components/Screen';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { fontFamily, text2xl, textSm, textBase } from '../src/design-system/tokens/typography';
+import { fontFamily, textSm, textBase } from '../src/design-system/tokens/typography';
 
 // ---------------------------------------------------------------------------
 // FAQ Data
@@ -129,40 +127,27 @@ export default function FaqScreen() {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.headerTitle}>FAQ</Text>
-        <View style={{ width: 40 }} />
+    <Screen title="FAQ" headerVariant="back">
+      <Text style={styles.subtitle}>
+        Frequently asked questions about Defensive Pedal.
+      </Text>
+
+      <View style={styles.faqList}>
+        {FAQ_ITEMS.map((item, index) => (
+          <FaqItem
+            key={index}
+            question={item.question}
+            answer={item.answer}
+            expanded={expandedIndex === index}
+            onToggle={() =>
+              setExpandedIndex(expandedIndex === index ? null : index)
+            }
+            styles={styles}
+            colors={colors}
+          />
+        ))}
       </View>
-
-      {/* Content */}
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.subtitle}>
-          Frequently asked questions about Defensive Pedal.
-        </Text>
-
-        <View style={styles.faqList}>
-          {FAQ_ITEMS.map((item, index) => (
-            <FaqItem
-              key={index}
-              question={item.question}
-              answer={item.answer}
-              expanded={expandedIndex === index}
-              onToggle={() =>
-                setExpandedIndex(expandedIndex === index ? null : index)
-              }
-              styles={styles}
-              colors={colors}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -172,33 +157,6 @@ export default function FaqScreen() {
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.bgPrimary,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: space[4],
-      paddingVertical: space[3],
-    },
-    backButton: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      ...text2xl,
-      color: colors.textPrimary,
-      letterSpacing: -0.5,
-    },
-    content: {
-      paddingHorizontal: space[4],
-      paddingBottom: space[8],
-      gap: space[4],
-    },
     subtitle: {
       ...textSm,
       color: colors.textSecondary,

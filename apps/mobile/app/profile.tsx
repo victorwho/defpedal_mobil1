@@ -283,7 +283,120 @@ export default function ProfileScreen() {
           subtitle={t('profile.subtitle')}
           contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
         >
-          {/* ── Badges (top of profile) ──────────────────────────── */}
+          {/* ── User card (signed-in or guest prompt) ──────────── */}
+          {user ? (
+            <View style={styles.userCard}>
+              <Pressable
+                onPress={handleAvatarPick}
+                style={styles.avatarWrapper}
+                accessible={true}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Change profile photo"
+              >
+                {avatarUploading ? (
+                  <View style={styles.avatarPlaceholder}>
+                    <ActivityIndicator color={colors.accent} />
+                  </View>
+                ) : profile?.avatarUrl ? (
+                  <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="camera-outline" size={22} color={gray[400]} />
+                  </View>
+                )}
+              </Pressable>
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>
+                  {profile?.username ? `@${profile.username}` : user.email ?? t('profile.rider')}
+                </Text>
+                <Text style={styles.userSub}>
+                  {profile?.username ? user.email ?? t('common.signedIn') : t('common.signedIn')}
+                </Text>
+                {!editingUsername ? (
+                  <Pressable
+                    onPress={() => {
+                      setEditingUsername(true);
+                      setUsernameInput(profile?.username ?? '');
+                      setUsernameError(null);
+                    }}
+                    hitSlop={8}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={profile?.username ? t('profile.changeUsername') : t('profile.setUsername')}
+                  >
+                    <Text style={styles.editUsernameLink}>
+                      {profile?.username ? t('profile.changeUsername') : t('profile.setUsername')}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.usernameEditRow}>
+                    <Text style={styles.usernameAt}>@</Text>
+                    <TextInput
+                      style={styles.usernameInput}
+                      value={usernameInput}
+                      onChangeText={(t) => { setUsernameInput(t.replace(/[^a-zA-Z0-9_]/g, '')); setUsernameError(null); }}
+                      placeholder="username"
+                      placeholderTextColor={gray[500]}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      maxLength={30}
+                      autoFocus
+                    />
+                    <Pressable
+                      onPress={async () => {
+                        if (usernameInput.length < 3) { setUsernameError('Min 3 characters'); return; }
+                        setUsernameSaving(true);
+                        try {
+                          await mobileApi.updateProfile({ username: usernameInput.toLowerCase() });
+                          setEditingUsername(false);
+                          void refetchProfile();
+                        } catch (err: unknown) {
+                          const msg = err instanceof Error ? err.message : 'Failed';
+                          setUsernameError(msg.includes('taken') || msg.includes('409') ? 'Username taken' : msg);
+                        } finally {
+                          setUsernameSaving(false);
+                        }
+                      }}
+                      style={styles.usernameSaveBtn}
+                      disabled={usernameSaving}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel="Save username"
+                    >
+                      <Text style={styles.usernameSaveText}>{usernameSaving ? '...' : 'Save'}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setEditingUsername(false)}
+                      hitSlop={8}
+                      accessible={true}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel username edit"
+                    >
+                      <Ionicons name="close" size={18} color={gray[400]} />
+                    </Pressable>
+                  </View>
+                )}
+                {usernameError ? <Text style={styles.usernameError}>{usernameError}</Text> : null}
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.userCard}
+              onPress={() => router.push('/auth')}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('profile.tapToSignIn')}
+            >
+              <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{t('common.guest')}</Text>
+                <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
+              </View>
+              <Ionicons name="log-in-outline" size={24} color={colors.accent} />
+            </Pressable>
+          )}
+
+          {/* ── Badges ─────────────────────────────────────────────── */}
           <AchievementsRow />
 
           {/* ── Section 1: Cycling Preferences ─────────────────────── */}
@@ -415,118 +528,6 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <SectionTitle variant="accent">{t('profile.sectionAccount')}</SectionTitle>
 
-            {user ? (
-              <View style={styles.userCard}>
-                <Pressable
-                  onPress={handleAvatarPick}
-                  style={styles.avatarWrapper}
-                  accessible={true}
-                  accessibilityRole="imagebutton"
-                  accessibilityLabel="Change profile photo"
-                >
-                  {avatarUploading ? (
-                    <View style={styles.avatarPlaceholder}>
-                      <ActivityIndicator color={colors.accent} />
-                    </View>
-                  ) : profile?.avatarUrl ? (
-                    <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
-                  ) : (
-                    <View style={styles.avatarPlaceholder}>
-                      <Ionicons name="camera-outline" size={22} color={gray[400]} />
-                    </View>
-                  )}
-                </Pressable>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>
-                    {profile?.username ? `@${profile.username}` : user.email ?? t('profile.rider')}
-                  </Text>
-                  <Text style={styles.userSub}>
-                    {profile?.username ? user.email ?? t('common.signedIn') : t('common.signedIn')}
-                  </Text>
-                  {!editingUsername ? (
-                    <Pressable
-                      onPress={() => {
-                        setEditingUsername(true);
-                        setUsernameInput(profile?.username ?? '');
-                        setUsernameError(null);
-                      }}
-                      hitSlop={8}
-                      accessible={true}
-                      accessibilityRole="button"
-                      accessibilityLabel={profile?.username ? t('profile.changeUsername') : t('profile.setUsername')}
-                    >
-                      <Text style={styles.editUsernameLink}>
-                        {profile?.username ? t('profile.changeUsername') : t('profile.setUsername')}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <View style={styles.usernameEditRow}>
-                      <Text style={styles.usernameAt}>@</Text>
-                      <TextInput
-                        style={styles.usernameInput}
-                        value={usernameInput}
-                        onChangeText={(t) => { setUsernameInput(t.replace(/[^a-zA-Z0-9_]/g, '')); setUsernameError(null); }}
-                        placeholder="username"
-                        placeholderTextColor={gray[500]}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        maxLength={30}
-                        autoFocus
-                      />
-                      <Pressable
-                        onPress={async () => {
-                          if (usernameInput.length < 3) { setUsernameError('Min 3 characters'); return; }
-                          setUsernameSaving(true);
-                          try {
-                            await mobileApi.updateProfile({ username: usernameInput.toLowerCase() });
-                            setEditingUsername(false);
-                            void refetchProfile();
-                          } catch (err: unknown) {
-                            const msg = err instanceof Error ? err.message : 'Failed';
-                            setUsernameError(msg.includes('taken') || msg.includes('409') ? 'Username taken' : msg);
-                          } finally {
-                            setUsernameSaving(false);
-                          }
-                        }}
-                        style={styles.usernameSaveBtn}
-                        disabled={usernameSaving}
-                        accessible={true}
-                        accessibilityRole="button"
-                        accessibilityLabel="Save username"
-                      >
-                        <Text style={styles.usernameSaveText}>{usernameSaving ? '...' : 'Save'}</Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => setEditingUsername(false)}
-                        hitSlop={8}
-                        accessible={true}
-                        accessibilityRole="button"
-                        accessibilityLabel="Cancel username edit"
-                      >
-                        <Ionicons name="close" size={18} color={gray[400]} />
-                      </Pressable>
-                    </View>
-                  )}
-                  {usernameError ? <Text style={styles.usernameError}>{usernameError}</Text> : null}
-                </View>
-              </View>
-            ) : (
-              <Pressable
-                style={styles.userCard}
-                onPress={() => router.push('/auth')}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel={t('profile.tapToSignIn')}
-              >
-                <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>{t('common.guest')}</Text>
-                  <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
-                </View>
-                <Ionicons name="log-in-outline" size={24} color={colors.accent} />
-              </Pressable>
-            )}
-
             <SettingRow
               label={t('profile.shareTrips')}
               description={shareTripsPublicly ? t('profile.shareTripsOn') : t('profile.shareTripsOff')}
@@ -547,8 +548,6 @@ export default function ProfileScreen() {
                       text: t('profile.signOut'),
                       style: 'destructive',
                       onPress: async () => {
-                        // Reset onboarding and create anonymous session,
-                        // then navigate directly to onboarding
                         useAppStore.getState().setOnboardingCompleted(false);
                         await signOut();
                         await signInAnonymously();

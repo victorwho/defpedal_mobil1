@@ -5,15 +5,14 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { Screen } from '../src/components/Screen';
 import { Button } from '../src/design-system/atoms/Button';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -99,7 +98,6 @@ const OptionButton = ({ label, index, state, disabled, onPress, colors, styles }
 const QUIZ_KEY = 'daily-quiz';
 
 export default function DailyQuizScreen() {
-  const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const queryClient = useQueryClient();
@@ -162,26 +160,7 @@ export default function DailyQuizScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.root, { paddingTop: insets.top }]}
-      contentContainerStyle={[styles.rootContent, { paddingBottom: insets.bottom + space[6] }]}
-      showsVerticalScrollIndicator={false}
-      bounces={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="close" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Daily Quiz</Text>
-        <View style={styles.backButton} />
-      </View>
-
+    <Screen title="Daily Quiz" headerVariant="close">
       {/* Loading */}
       {isLoading ? (
         <View style={styles.centerContainer}>
@@ -258,7 +237,7 @@ export default function DailyQuizScreen() {
           />
         </View>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -268,31 +247,6 @@ export default function DailyQuizScreen() {
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.bgDeep,
-    },
-    rootContent: {
-      flexGrow: 1,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: space[4],
-      paddingVertical: space[3],
-    },
-    backButton: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      ...textLg,
-      fontFamily: fontFamily.heading.bold,
-      color: colors.textPrimary,
-    },
     centerContainer: {
       flex: 1,
       alignItems: 'center',

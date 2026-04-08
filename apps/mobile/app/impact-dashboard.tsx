@@ -11,13 +11,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 
 import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
 import { BadgeIcon } from '../src/design-system/atoms/BadgeIcon';
-import { BackButton } from '../src/design-system/atoms/BackButton';
+import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { Button } from '../src/design-system/atoms/Button';
 import { useBadges } from '../src/hooks/useBadges';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -26,7 +26,6 @@ import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
 import {
   fontFamily,
-  text2xl,
   textBase,
   textDataLg,
   textDataMd,
@@ -128,13 +127,8 @@ export default function ImpactDashboardScreen() {
   const treeEquivalent = data ? (data.totalCo2SavedKg / 21).toFixed(1) : '0';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.headerTitle}>Your Impact</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenHeader variant="back" title="Your Impact" />
 
       {/* Loading */}
       {isLoading ? (
@@ -290,7 +284,7 @@ export default function ImpactDashboardScreen() {
           </Pressable>
         </ScrollView>
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -303,25 +297,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     root: {
       flex: 1,
       backgroundColor: colors.bgDeep,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: space[4],
-      paddingVertical: space[3],
-    },
-    backButton: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      ...text2xl,
-      fontFamily: fontFamily.heading.extraBold,
-      color: colors.textPrimary,
-      letterSpacing: -0.5,
     },
     loadingContainer: {
       flex: 1,

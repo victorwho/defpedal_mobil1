@@ -1,12 +1,11 @@
 import type { UserPublicProfile } from '@defensivepedal/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { BackButton } from '../src/design-system/atoms/BackButton';
+import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { Button } from '../src/design-system/atoms/Button';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -81,13 +80,8 @@ export default function UserProfileScreen() {
 
   const isOwnProfile = user?.id === id;
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <BackButton />
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScreenHeader variant="back" title="Profile" />
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -206,19 +200,13 @@ export default function UserProfileScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDeep },
-    header: {
-      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      paddingHorizontal: space[4], paddingVertical: space[3],
-    },
-    backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-    headerTitle: { ...textBase, fontFamily: fontFamily.heading.bold, color: colors.textPrimary },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space[3] },
     errorText: { ...textBase, color: colors.textSecondary },
     scrollContent: { paddingHorizontal: space[4], gap: space[4] },

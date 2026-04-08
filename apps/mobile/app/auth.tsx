@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Pressable,
@@ -11,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { Button, TextInput } from '../src/design-system/atoms';
+import { Button, TextInput, ScreenHeader } from '../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -141,19 +140,7 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          accessibilityLabel="Go back"
-          accessibilityRole="button"
-        >
-          <Ionicons name="close" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('settings.account')}</Text>
-        <View style={styles.backButton} />
-      </View>
+      <ScreenHeader variant="close" title={t('settings.account')} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -401,24 +388,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     root: {
       flex: 1,
       backgroundColor: colors.bgDeep,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: space[4],
-      paddingVertical: space[3],
-    },
-    backButton: {
-      width: 44,
-      height: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      ...text2xl,
-      color: colors.textPrimary,
-      letterSpacing: -0.5,
     },
     content: {
       paddingHorizontal: space[5],
