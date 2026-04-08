@@ -76,6 +76,7 @@
 - [x] DONE — Tighten right-hand FAB buttons (reduced sizes + gaps on nav/planning/MapStage) (2026-04-04)
 - [x] DONE — Change fonts: Montserrat for headings, Roboto for body text (replaced DM Sans) (2026-04-04)
 - [x] DONE — Push Notifications — expo-notifications installed, NotificationProvider wired, push token registration on auth, tap-to-navigate (2026-04-04)
+- [x] DONE — Save route modal KeyboardAvoidingView (keyboard no longer covers text input on Android) (2026-04-08)
 
 ## Internationalization
 - [x] DONE — Romanian language: i18n framework + en/ro translation files + language picker in profile (2026-04-04)

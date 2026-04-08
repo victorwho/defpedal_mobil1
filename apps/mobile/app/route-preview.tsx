@@ -3,7 +3,7 @@ import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Speech from 'expo-speech';
 
@@ -523,6 +523,7 @@ export default function RoutePreviewScreen() {
       accessibilityRole="button"
       accessibilityLabel="Dismiss save route dialog"
     >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalAvoidingView}>
         <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()} accessible={false}>
           <Text style={styles.modalTitle}>Save Route</Text>
           <TextInput
@@ -548,6 +549,7 @@ export default function RoutePreviewScreen() {
             </Button>
           </View>
         </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     ) : null}
 
@@ -758,6 +760,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: zIndex.modal,
+    },
+    modalAvoidingView: {
+      width: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     modalCard: {
       width: '85%',

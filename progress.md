@@ -207,6 +207,9 @@ Update it at the end of each implementation slice.
     - **PostgreSQL fix**: `round(double precision, integer)` doesn't exist — cast to `::numeric` before round with precision
     - Deployed to Cloud Run revision 00037. Supabase migration applied. All 949 tests pass. Bundle ✅. Phone-tested on Samsung S23 Ultra.
 
+- UX fix (2026-04-08):
+    - **Save route modal KeyboardAvoidingView**: Wrapped save route modal content in `KeyboardAvoidingView` (`behavior="height"` on Android, `"padding"` on iOS) so the keyboard doesn't cover the route name text input. Added `modalAvoidingView` style for centering.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation
