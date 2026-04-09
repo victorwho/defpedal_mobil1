@@ -237,7 +237,7 @@ export const useAppStore = create<AppStore>()(
       recentDestinations: [],
       addRecentDestination: (destination) =>
         set((state) => {
-          const MAX_RECENT = 10;
+          const MAX_RECENT = 3;
           // Remove existing entry with same coordinates (de-duplicate)
           const filtered = state.recentDestinations.filter(
             (d) =>

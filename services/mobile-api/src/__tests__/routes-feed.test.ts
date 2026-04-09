@@ -806,6 +806,61 @@ describe('PATCH /v1/profile', () => {
 
     await app.close();
   });
+
+  it('accepts notification preference fields', async () => {
+    // upsert result
+    enqueueResult({ data: null, error: null });
+    // select .single() result
+    enqueueResult({
+      data: {
+        id: DEV_USER_ID,
+        display_name: 'Alice',
+        username: 'alice',
+        avatar_url: null,
+        auto_share_rides: false,
+        trim_route_endpoints: false,
+        cycling_goal: null,
+      },
+      error: null,
+    });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/v1/profile',
+      headers: authHeaders,
+      payload: {
+        notifyWeather: false,
+        notifyHazard: true,
+        notifyCommunity: false,
+        quietHoursStart: '23:00',
+        quietHoursEnd: '08:00',
+        quietHoursTimezone: 'Europe/Bucharest',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it('rejects invalid quiet hours format', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: '/v1/profile',
+      headers: authHeaders,
+      payload: {
+        quietHoursStart: '9pm',
+      },
+    });
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
 });
 
 // ---------------------------------------------------------------------------

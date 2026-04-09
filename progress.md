@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-08 (session 11)
+Last updated: 2026-04-09 (session 12)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -209,6 +209,18 @@ Update it at the end of each implementation slice.
 
 - UX fix (2026-04-08):
     - **Save route modal KeyboardAvoidingView**: Wrapped save route modal content in `KeyboardAvoidingView` (`behavior="height"` on Android, `"padding"` on iOS) so the keyboard doesn't cover the route name text input. Added `modalAvoidingView` style for centering.
+
+- Session 12 — Quiet hours, notification budget, recent destinations, voice nav fix (2026-04-09):
+    - **Post-ride impact tests**: 7 new tests — AnimatedCounter (3: reduced motion, prefix/suffix, zero) + ImpactSummaryCard (4: ride counters, dashboard totals, null dashboard, badges earned)
+    - **Quiet hours enforcement**: PATCH /profile extended with 8 notification preference fields (notifyWeather/Hazard/Community/Streak/ImpactSummary, quietHoursStart/End/Timezone). Profile screen syncs toggles + device timezone to backend on change and on first load. Server dispatchNotification already reads from DB.
+    - **Notification budget**: 1-per-24h rolling limit in dispatchNotification (isUnderDailyBudget checks notification_log). Streak reminders bypass as high priority. Social digest merged into weekly impact summary body (validation + like counts from past 7 days). Daily social cron retired (returns early with log).
+    - **DB validation**: Social digest subqueries verified against all migration schemas — all column names, FKs, and timestamp types match. No mismatches.
+    - **Redis caching/rate-limiting**: Already fully implemented in redisStore.ts. Activation is deployment-only (set REDIS_URL on Cloud Run).
+    - **Server-backed recent ride destinations**: GET /v1/recent-destinations endpoint derives 3 most recent distinct destinations from trips table (PostGIS point parsing, deduplication by label). useRecentRideDestinations hook (TanStack Query, 5min stale, falls back to local store for anonymous). SearchBar shows server recents when empty + prepends matching recents to Mapbox autocomplete. Local store MAX_RECENT reduced from 10 to 3.
+    - **AnimatedCounter fix**: Replaced requestAnimationFrame (doesn't fire in Hermes bytecode) with setInterval + Date.now(). Counters now animate correctly in preview/release builds.
+    - **Voice navigation fix (2 bugs)**: (1) hasPassedCurrentManeuver in navigation.ts now requires distanceToRouteMeters < 30m — prevents lateral GPS offset from prematurely jumping currentStepIndex to the next step. (2) Removed currentStepIndex from intro announcement effect deps in navigation.tsx — prevents re-announcing every step advance. Step completion now correctly speaks the current turn instruction.
+    - **Notification tests**: 5 new tests — isInQuietHours (3: overnight true, daytime false, null false) + PATCH /profile notification fields (2: accepts prefs, rejects invalid format)
+    - All 969 tests pass (core 277, API 210, mobile 482). Phone-tested on Samsung S23 Ultra (preview APK).
 
 ## Phase Status
 

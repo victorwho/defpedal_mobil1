@@ -24,6 +24,7 @@ import type {
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
   RideImpact,
+  RideRecentDestination,
   SavedRoute,
   SavedRouteCreateRequest,
   ShareTripRequest,
@@ -386,6 +387,12 @@ export const mobileApi = {
       method: 'DELETE',
       body: JSON.stringify({ deviceId }),
     }),
+
+  // ── Recent Destinations (from rides) ──
+
+  getRecentDestinations: () =>
+    requestJson<{ destinations: RideRecentDestination[] }>('/v1/recent-destinations')
+      .then((res) => res.destinations),
 
   // ── Community Stats ──
 

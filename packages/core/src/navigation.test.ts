@@ -118,6 +118,102 @@ describe('navigation helpers', () => {
     expect(progress.remainingDistanceMeters).toBeGreaterThanOrEqual(0);
   });
 
+  it('does not advance step when rider is laterally offset >30m from route (prevents false maneuver-passed)', () => {
+    // Scenario: Rider is on a parallel street ~50m north of the route.
+    // closestPointIndex may snap past the maneuver, but the lateral offset
+    // (>30m) means the rider hasn't actually reached the turn — don't advance.
+    const geometryPolyline6 = encodePolyline([
+      [26.1000, 44.4300], // Start (depart)
+      [26.1010, 44.4300], // ~80m east
+      [26.1020, 44.4300], // ~160m east - turn point (step-2)
+      [26.1020, 44.4310], // After turn, heading north
+      [26.1020, 44.4320], // End (arrive)
+    ]);
+    const route = {
+      id: 'parallel-street-test',
+      source: 'custom_osrm' as const,
+      routingEngineVersion: 'safe-osrm-v1',
+      routingProfileVersion: 'safety-profile-v1',
+      mapDataVersion: 'osm-europe-current',
+      riskModelVersion: 'risk-model-v1',
+      geometryPolyline6,
+      distanceMeters: 400,
+      durationSeconds: 120,
+      adjustedDurationSeconds: 120,
+      totalClimbMeters: 0,
+      riskSegments: [],
+      warnings: [],
+      steps: [
+        {
+          id: 'step-1',
+          instruction: 'Head east',
+          streetName: 'Main Street',
+          distanceMeters: 160,
+          durationSeconds: 40,
+          maneuver: {
+            bearing_after: 90,
+            bearing_before: 0,
+            location: [26.1000, 44.4300] as [number, number],
+            type: 'depart',
+          },
+          mode: 'cycling',
+        },
+        {
+          id: 'step-2',
+          instruction: 'Turn left onto North Street',
+          streetName: 'North Street',
+          distanceMeters: 120,
+          durationSeconds: 40,
+          maneuver: {
+            bearing_after: 0,
+            bearing_before: 90,
+            location: [26.1020, 44.4300] as [number, number], // Turn at lon 26.1020
+            type: 'turn',
+            modifier: 'left',
+          },
+          mode: 'cycling',
+        },
+        {
+          id: 'step-3',
+          instruction: 'Arrive at destination',
+          streetName: 'North Street',
+          distanceMeters: 120,
+          durationSeconds: 40,
+          maneuver: {
+            bearing_after: 0,
+            bearing_before: 0,
+            location: [26.1020, 44.4320] as [number, number],
+            type: 'arrive',
+          },
+          mode: 'cycling',
+        },
+      ],
+    };
+
+    // Session is at step-1 (heading east, about to turn left at step-2)
+    const session = {
+      ...createNavigationSession(route.id),
+      currentStepIndex: 0,
+    };
+
+    // Rider is on a parallel street ~50m north of the main route,
+    // and has passed the turn point (lon 26.1025 > turn at 26.1020).
+    // At lat 44.4300, 0.0005 degrees lon ≈ 40m, so rider at 44.43045 is ~50m north
+    // They're within 100m of the route so not "off-route", but have passed the maneuver.
+    const riderLocation = {
+      lat: 44.43045, // ~50m north of route (parallel street)
+      lon: 26.1025, // Past the turn point at 26.1020
+    };
+
+    const progress = getNavigationProgress(route, session, riderLocation);
+
+    // Step should NOT advance — rider is ~50m off the route laterally.
+    // The 30m guard prevents hasPassedCurrentManeuver from firing on lateral GPS offset.
+    expect(progress.currentStepIndex).toBe(0);
+    // Should not be marked as off-route since within 100m
+    expect(progress.isOffRoute).toBe(false);
+  });
+
   it('marks off-route time and reroute cooldown in the shared session state', () => {
     const session = createNavigationSession('route-1');
     const updated = updateNavigationSessionProgress(

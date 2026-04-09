@@ -42,6 +42,7 @@ import { duration, easing } from '../src/design-system/tokens/motion';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
+import { useRecentRideDestinations } from '../src/hooks/useRecentRideDestinations';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -69,8 +70,8 @@ export default function RoutePlanningScreen() {
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
-  const recentDestinations = useAppStore((state) => state.recentDestinations);
   const addRecentDestination = useAppStore((state) => state.addRecentDestination);
+  const recentRideDestinations = useRecentRideDestinations();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
   const {
@@ -371,6 +372,33 @@ export default function RoutePlanningScreen() {
       deferredDestinationQuery.length >= 2,
   });
 
+  // Merge matching recent ride destinations into autocomplete results.
+  // When user has typed >= 2 chars, matching recents appear first (clock icon),
+  // then Mapbox results (deduplicated by proximity to recent coordinates).
+  const mergedDestinationSuggestions = useMemo(() => {
+    const mapboxResults = destinationAutocompleteQuery.data?.suggestions ?? [];
+    const query = deferredDestinationQuery.toLowerCase();
+    if (query.length < 2) return mapboxResults;
+
+    // Find recents whose label contains the query
+    const matchingRecents = recentRideDestinations.filter((r) =>
+      r.label.toLowerCase().includes(query),
+    );
+    if (matchingRecents.length === 0) return mapboxResults;
+
+    // Deduplicate: drop Mapbox results within 200m of a matching recent
+    const isNearRecent = (s: AutocompleteSuggestion) =>
+      matchingRecents.some((r) => {
+        const dlat = s.coordinates.lat - r.coordinates.lat;
+        const dlon = s.coordinates.lon - r.coordinates.lon;
+        // ~200m threshold (rough degree approximation)
+        return Math.abs(dlat) < 0.002 && Math.abs(dlon) < 0.003;
+      });
+
+    const dedupedMapbox = mapboxResults.filter((s) => !isNearRecent(s));
+    return [...matchingRecents, ...dedupedMapbox];
+  }, [destinationAutocompleteQuery.data, deferredDestinationQuery, recentRideDestinations]);
+
   // Waypoint autocomplete (shared query for whichever waypoint field is active)
   const waypointAutocompleteQuery = useQuery({
     queryKey: [
@@ -635,8 +663,8 @@ export default function RoutePlanningScreen() {
                   ? destinationAutocompleteQuery.error.message
                   : null
               }
-              suggestions={destinationAutocompleteQuery.data?.suggestions ?? []}
-              recentDestinations={recentDestinations}
+              suggestions={mergedDestinationSuggestions}
+              recentDestinations={recentRideDestinations}
               onFocus={() => setActiveField('destination')}
               onChangeText={(value) => {
                 setDestinationQuery(value);

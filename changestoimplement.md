@@ -4,7 +4,7 @@
 
 ### Phase 5: Notifications
 - [x] DONE — Push notification delivery (EAS project configured, token registration on sign-in, server dispatch) (2026-04-04)
-- [!] BLOCKED — Quiet hours enforcement in notification triggers (server code exists but doesn't check quiet_hours before sending)
+- [x] DONE — Quiet hours enforcement in notification triggers (PATCH /profile extended with notification prefs, profile.tsx syncs toggles + device timezone to backend, server dispatchNotification reads from DB) (2026-04-09)
 - [x] DONE — Push notification registration on sign-in (permission prompt + token sent to server) (2026-04-04)
 
 ### Phase 7: Endgame (Deferred)
@@ -82,11 +82,11 @@
 - [x] DONE — Romanian language: i18n framework + en/ro translation files + language picker in profile (2026-04-04)
 
 ## Technical Debt
-- [ ] NOT STARTED — Install @testing-library/react for hook tests (tests written but can't run)
+- [x] DONE — Install @testing-library/react for hook tests (installed in session 10, 2026-04-08)
 - [x] DONE — Deduplicate qualifyStreakAsync helper (extracted to lib/streaks.ts) (2026-04-04)
 - [x] DONE — Add `source` field to hazard reporting API (in_ride/manual/armchair) (2026-04-04)
-- [ ] NOT STARTED — Social digest notification subquery needs manual DB validation
-- [ ] NOT STARTED — Notification budget: strict 1-notification-per-day limit. Prioritize streak-protection over weather, batch social updates into weekly summary. Requires quiet hours enforcement first.
+- [x] DONE — Social digest notification subquery DB validation: all column names, FKs, and timestamp types verified against migrations (hazards, hazard_validations, trip_shares, feed_likes, notification_log) — no mismatches (2026-04-09)
+- [x] DONE — Notification budget: 1-per-24h rolling limit in dispatchNotification, streak reminders bypass as high priority, social digest merged into weekly impact summary, daily social cron retired (2026-04-09)
 - [!] BLOCKED — iPhone validation (no macOS hardware available)
-- [ ] NOT STARTED — Redis-backed production caching/rate-limiting
+- [x] DONE — Redis-backed production caching/rate-limiting: code complete (redisStore.ts with atomic INCR rate limiter + JSON cache, auto-selected via REDIS_URL env var). Activation is deployment-only: provision GCP Memorystore + set REDIS_URL on Cloud Run (2026-04-09)
 - [x] DONE — Merge feature/habitengine branch to main (2026-04-03)

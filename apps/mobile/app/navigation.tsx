@@ -501,7 +501,6 @@ export default function NavigationScreen() {
   }, [
     navigationSession?.sessionId,
     navigationSession?.isMuted,
-    navigationSession?.currentStepIndex,
     selectedRoute?.id,
     speak,
   ]);
@@ -541,6 +540,7 @@ export default function NavigationScreen() {
     }
 
     if (progress.shouldAdvanceStep && activeStep) {
+      speak(activeStep.instruction);
       advanceNavigation(selectedRoute.steps.length);
     }
 

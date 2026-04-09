@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Alert, Image, NativeModules } from 'react-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 // expo-image-picker is a native module — lazy require to avoid crash if not in APK
@@ -160,6 +160,39 @@ export default function ProfileScreen() {
     setNotifyCommunity: state.setNotifyCommunity,
     setQuietHours: state.setQuietHours,
   })));
+
+  // Sync a single notification preference to the backend (fire-and-forget).
+  // Always includes the device timezone so quiet hours are enforced in the
+  // correct zone.
+  const syncNotifPref = useCallback(
+    (fields: Record<string, unknown>) => {
+      if (!user) return;
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      mobileApi
+        .updateProfile({ ...fields, quietHoursTimezone: tz } as Parameters<typeof mobileApi.updateProfile>[0])
+        .catch(() => {/* best-effort sync */});
+    },
+    [user],
+  );
+
+  // On first load, push local notification prefs + device timezone to the
+  // server so quiet hours enforcement uses the correct values.
+  const initialSyncDone = useRef(false);
+  useEffect(() => {
+    if (!user || initialSyncDone.current) return;
+    initialSyncDone.current = true;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    mobileApi
+      .updateProfile({
+        notifyWeather,
+        notifyHazard,
+        notifyCommunity,
+        quietHoursStart,
+        quietHoursEnd,
+        quietHoursTimezone: tz,
+      })
+      .catch(() => {/* best-effort */});
+  }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd]);
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
@@ -498,21 +531,21 @@ export default function ProfileScreen() {
               label={t('profile.dailyWeather')}
               description={notifyWeather ? t('profile.dailyWeatherOn') : t('profile.dailyWeatherOff')}
               checked={notifyWeather}
-              onChange={setNotifyWeather}
+              onChange={(checked) => { setNotifyWeather(checked); syncNotifPref({ notifyWeather: checked }); }}
             />
 
             <SettingRow
               label={t('profile.hazardAlerts')}
               description={notifyHazard ? t('profile.hazardAlertsOn') : t('profile.hazardAlertsOff')}
               checked={notifyHazard}
-              onChange={setNotifyHazard}
+              onChange={(checked) => { setNotifyHazard(checked); syncNotifPref({ notifyHazard: checked }); }}
             />
 
             <SettingRow
               label={t('profile.community')}
               description={notifyCommunity ? t('profile.communityOn') : t('profile.communityOff')}
               checked={notifyCommunity}
-              onChange={setNotifyCommunity}
+              onChange={(checked) => { setNotifyCommunity(checked); syncNotifPref({ notifyCommunity: checked }); }}
             />
 
             <View style={styles.settingRow}>

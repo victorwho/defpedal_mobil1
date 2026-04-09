@@ -295,11 +295,26 @@ export const getNavigationProgress = (
     findClosestPointIndex([step.maneuver.location[1], step.maneuver.location[0]], routeCoordinates),
   );
 
-  // Always recalculate the step index from the rider's position when
-  // off-route or returning to the route after being off-route.  Using
-  // the stale clampedStepIndex caused metrics to freeze.
+  // Detect if rider has passed the current maneuver on the polyline
+  // (e.g., on a parallel street within 100m but past the turn point).
+  // This handles the "missed turn" scenario where the rider never got
+  // within 25m of the maneuver but has clearly passed it.
+  // Guard: only trigger when the rider is close to the route (<30m).
+  // When laterally offset (30-100m), closestPointIndex can snap past
+  // the maneuver's index even though the rider hasn't reached it yet.
+  const PASSED_MANEUVER_MAX_OFFSET_METERS = 30;
+  const currentManeuverIndex = maneuverIndices[clampedStepIndex] ?? 0;
+  const hasPassedCurrentManeuver =
+    closestPointIndex > currentManeuverIndex &&
+    distanceToRouteMeters < PASSED_MANEUVER_MAX_OFFSET_METERS;
+
+  // Recalculate step index when:
+  // 1. Off-route (>100m from route)
+  // 2. Just returned from being off-route
+  // 3. Reroute eligible
+  // 4. Rider has passed the current maneuver on the polyline (missed turn)
   const shouldRecalcStep =
-    offRoute || session.offRouteSince != null || session.rerouteEligible;
+    offRoute || session.offRouteSince != null || session.rerouteEligible || hasPassedCurrentManeuver;
   const currentStepIndex = shouldRecalcStep
     ? getUpcomingStepIndex(maneuverIndices, closestPointIndex, totalSteps)
     : clampedStepIndex;

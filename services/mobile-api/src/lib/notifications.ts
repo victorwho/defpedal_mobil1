@@ -9,7 +9,7 @@ interface NotificationPayload {
   readonly data?: Record<string, unknown>;
 }
 
-interface UserPrefs {
+export interface UserPrefs {
   notify_weather: boolean;
   notify_hazard: boolean;
   notify_community: boolean;
@@ -36,7 +36,7 @@ const categoryToField: Record<NotificationCategory, keyof UserPrefs | null> = {
 /**
  * Check if the current time falls within the user's quiet hours.
  */
-const isInQuietHours = (prefs: UserPrefs): boolean => {
+export const isInQuietHours = (prefs: UserPrefs): boolean => {
   const start = prefs.quiet_hours_start;
   const end = prefs.quiet_hours_end;
   if (!start || !end) return false;
@@ -84,16 +84,44 @@ const logNotification = async (
   }
 };
 
+export type NotificationPriority = 'high' | 'normal';
+
+/**
+ * Check whether the user has already received a notification in the last 24 h.
+ * Uses a rolling window so the limit is timezone-agnostic.
+ */
+export const isUnderDailyBudget = async (
+  userId: string,
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+): Promise<boolean> => {
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const { count, error } = await supabase
+    .from('notification_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'sent')
+    .gte('created_at', twentyFourHoursAgo);
+
+  if (error) return true; // fail open — don't block on logging errors
+  return (count ?? 0) < 1;
+};
+
 /**
  * Send a push notification to a specific user, respecting their
- * category preferences and quiet hours.
+ * category preferences, quiet hours, and daily budget.
+ *
+ * `priority: 'high'` bypasses the daily budget (used for streak
+ * protection — the most time-sensitive notification).
  */
 export const dispatchNotification = async (
   userId: string,
   category: NotificationCategory,
   payload: NotificationPayload,
+  options?: { priority?: NotificationPriority },
 ): Promise<void> => {
   const supabase = getSupabaseAdmin();
+  const priority = options?.priority ?? 'normal';
 
   // Load user preferences
   const { data: prefs } = await supabase
@@ -115,6 +143,12 @@ export const dispatchNotification = async (
       await logNotification(supabase, userId, category, payload, 'suppressed', 'quiet_hours');
       return;
     }
+  }
+
+  // Daily budget: strict 1 notification per 24 h (high priority bypasses)
+  if (priority !== 'high' && !(await isUnderDailyBudget(userId, supabase))) {
+    await logNotification(supabase, userId, category, payload, 'suppressed', 'daily_budget');
+    return;
   }
 
   // Load push tokens

@@ -93,6 +93,14 @@ export const profileUpdateRequestSchema = {
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
+    notifyWeather: { type: 'boolean' },
+    notifyHazard: { type: 'boolean' },
+    notifyCommunity: { type: 'boolean' },
+    notifyStreak: { type: 'boolean' },
+    notifyImpactSummary: { type: 'boolean' },
+    quietHoursStart: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
+    quietHoursEnd: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
+    quietHoursTimezone: { type: ['string', 'null'] },
   },
 } as const;
 

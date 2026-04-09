@@ -91,7 +91,7 @@ export const sendStreakProtectionReminders = async (
         title: `${streak.current_streak}-day streak at risk!`,
         body: 'Take a quick ride to keep your streak alive.',
         data: { type: 'streak_reminder', screen: 'route-planning' },
-      });
+      }, { priority: 'high' });
 
       sent++;
     } catch (err) {
@@ -156,9 +156,54 @@ export const sendWeeklyImpactSummary = async (
       const weekCo2 = (weekData ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + Number(r.co2_saved_kg ?? 0), 0);
       const weekMoney = (weekData ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + Number(r.money_saved_eur ?? 0), 0);
 
+      // Merge social interaction data (validations + likes from past 7 days)
+      let socialSuffix = '';
+      try {
+        const { data: userHazards } = await supabaseAdmin
+          .from('hazards')
+          .select('id')
+          .eq('user_id', user.id);
+        const hazardIds = (userHazards ?? []).map((h: Record<string, unknown>) => h.id as string);
+
+        let validationCount = 0;
+        if (hazardIds.length > 0) {
+          const { count: vc } = await supabaseAdmin
+            .from('hazard_validations')
+            .select('id', { count: 'exact', head: true })
+            .in('hazard_id', hazardIds)
+            .neq('user_id', user.id)
+            .gte('responded_at', weekAgo);
+          validationCount = vc ?? 0;
+        }
+
+        const { data: userShares } = await supabaseAdmin
+          .from('trip_shares')
+          .select('id')
+          .eq('user_id', user.id);
+        const shareIds = (userShares ?? []).map((s: Record<string, unknown>) => s.id as string);
+
+        let likeCount = 0;
+        if (shareIds.length > 0) {
+          const { count: lc } = await supabaseAdmin
+            .from('feed_likes')
+            .select('id', { count: 'exact', head: true })
+            .in('trip_share_id', shareIds)
+            .neq('user_id', user.id)
+            .gte('created_at', weekAgo);
+          likeCount = lc ?? 0;
+        }
+
+        const socialParts: string[] = [];
+        if (validationCount > 0) socialParts.push(`${validationCount} hazard validation${validationCount > 1 ? 's' : ''}`);
+        if (likeCount > 0) socialParts.push(`${likeCount} reaction${likeCount > 1 ? 's' : ''}`);
+        if (socialParts.length > 0) socialSuffix = ` Community: ${socialParts.join(' and ')}.`;
+      } catch {
+        // Social data is optional — don't fail the notification
+      }
+
       await dispatchNotification(user.id, 'system', {
         title: 'Your weekly cycling impact',
-        body: `This week: ${weekCo2.toFixed(1)} kg CO2 saved, ${weekMoney.toFixed(2)} EUR saved in ${count} rides.`,
+        body: `This week: ${weekCo2.toFixed(1)} kg CO2 saved, ${weekMoney.toFixed(2)} EUR saved in ${count} rides.${socialSuffix}`,
         data: { type: 'weekly_summary', screen: 'impact-dashboard' },
       });
 
@@ -174,12 +219,20 @@ export const sendWeeklyImpactSummary = async (
 };
 
 /**
- * Social Impact Digest (7 PM daily)
- * Sent to users who received new hazard validations or community interactions.
+ * Social Impact Digest — RETIRED
+ *
+ * Social interaction data (hazard validations, likes) is now merged into the
+ * weekly impact summary to respect the 1-notification-per-day budget.
+ * This function is kept as a no-op so existing cron configurations don't break.
  */
 export const sendSocialImpactDigest = async (
   logger: FastifyBaseLogger,
 ): Promise<{ sent: number; skipped: number }> => {
+  logger.info({ event: 'social_digest_retired' }, 'social digest merged into weekly impact summary — skipping');
+  return { sent: 0, skipped: 0 };
+
+  // ---------- Original implementation (retained for reference) ----------
+  // eslint-disable-next-line no-unreachable
   if (!supabaseAdmin) return { sent: 0, skipped: 0 };
 
   const { data: users, error } = await supabaseAdmin

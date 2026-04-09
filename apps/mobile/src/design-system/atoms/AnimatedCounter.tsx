@@ -4,8 +4,11 @@
  * Animated number count-up from 0 to target value.
  * Uses monospace font (RobotoMono) and data-md typography.
  * Respects OS "Reduce Motion" setting.
+ *
+ * Uses setInterval + Date.now() instead of requestAnimationFrame because
+ * rAF callbacks don't fire reliably in Hermes bytecode (preview/release builds).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Text, type TextStyle } from 'react-native';
 
 import { textDataMd } from '../tokens/typography';
@@ -40,25 +43,7 @@ export const AnimatedCounter = ({
   const [displayText, setDisplayText] = useState(
     reducedMotion ? targetValue.toFixed(decimals) : (0).toFixed(decimals),
   );
-
-  const rafRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
-
-  const animate = useCallback(
-    (startTs: number) => {
-      const elapsed = startTs - startTimeRef.current;
-      const progress = Math.min(elapsed / duration, 1);
-      // Ease-out cubic for a pleasant deceleration
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const current = targetValue * eased;
-      setDisplayText(current.toFixed(decimals));
-
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      }
-    },
-    [targetValue, duration, decimals],
-  );
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (reducedMotion || targetValue === 0) {
@@ -66,18 +51,33 @@ export const AnimatedCounter = ({
       return;
     }
 
-    // Reset and start fresh animation
+    // Reset and start fresh animation via setInterval (~60 fps).
+    // setInterval + Date.now() works reliably in Hermes bytecode
+    // where requestAnimationFrame callbacks may not fire.
     setDisplayText((0).toFixed(decimals));
-    startTimeRef.current = performance.now();
-    rafRef.current = requestAnimationFrame(animate);
+    const startTime = Date.now();
+
+    intervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease-out cubic for a pleasant deceleration
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = targetValue * eased;
+      setDisplayText(current.toFixed(decimals));
+
+      if (progress >= 1 && intervalRef.current != null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }, 16);
 
     return () => {
-      if (rafRef.current != null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+      if (intervalRef.current != null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [targetValue, duration, decimals, reducedMotion, animate]);
+  }, [targetValue, duration, decimals, reducedMotion]);
 
   const mergedStyle: TextStyle = {
     ...textDataMd,

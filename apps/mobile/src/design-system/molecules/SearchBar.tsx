@@ -8,7 +8,7 @@
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { AutocompleteSuggestion, RecentDestination, SuggestionFeatureType } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
 import { TextInput } from '../atoms/TextInput';
@@ -34,7 +34,7 @@ export interface SearchBarProps {
   statusText?: string;
   suggestions?: AutocompleteSuggestion[];
   /** Recent destinations to show when field is focused but empty */
-  recentDestinations?: readonly RecentDestination[];
+  recentDestinations?: readonly AutocompleteSuggestion[];
   onChangeText: (value: string) => void;
   onFocus: () => void;
   onClear: () => void;
@@ -247,7 +247,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
             return (
               <Pressable
-                key={`recent-${recent.id}-${recent.selectedAt}`}
+                key={`recent-${recent.id}`}
                 style={({ pressed }) => [
                   styles.suggestionButton,
                   { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },

@@ -814,13 +814,13 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().recentDestinations[0].id).toBe('2');
     });
 
-    it('limits to 10 destinations', () => {
-      for (let i = 0; i < 12; i++) {
+    it('limits to 3 destinations', () => {
+      for (let i = 0; i < 5; i++) {
         useAppStore.getState().addRecentDestination(
           createDestination(`${i}`, 44 + i * 0.01, 26),
         );
       }
-      expect(useAppStore.getState().recentDestinations).toHaveLength(10);
+      expect(useAppStore.getState().recentDestinations).toHaveLength(3);
     });
 
     it('most recent destination is at index 0', () => {

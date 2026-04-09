@@ -148,6 +148,13 @@ export interface RecentDestination extends AutocompleteSuggestion {
   selectedAt: string;
 }
 
+/** A ride destination derived from the trips table (server-backed) */
+export interface RideRecentDestination {
+  readonly label: string;
+  readonly coordinates: Coordinate;
+  readonly rodeAt: string;
+}
+
 export interface AutocompleteResponse {
   suggestions: AutocompleteSuggestion[];
   generatedAt: string;
@@ -526,6 +533,14 @@ export interface ProfileUpdateRequest {
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
   cyclingGoal?: CyclingGoal | null;
+  notifyWeather?: boolean;
+  notifyHazard?: boolean;
+  notifyCommunity?: boolean;
+  notifyStreak?: boolean;
+  notifyImpactSummary?: boolean;
+  quietHoursStart?: string | null;
+  quietHoursEnd?: string | null;
+  quietHoursTimezone?: string | null;
 }
 
 export interface ProfileResponse {
