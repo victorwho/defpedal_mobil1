@@ -151,6 +151,7 @@ export default function NavigationScreen() {
     hazardRadius,
   );
   const introAnnouncementKeyRef = useRef<string | null>(null);
+  const offRouteAnnouncedRef = useRef(false);
   const dismissedHazardIdsRef = useRef<Set<string>>(new Set());
   const [activeHazardAlert, setActiveHazardAlert] = useState<{
     hazard: import('@defensivepedal/core').NearbyHazard;
@@ -542,6 +543,14 @@ export default function NavigationScreen() {
     if (progress.shouldAdvanceStep && activeStep) {
       speak(activeStep.instruction);
       advanceNavigation(selectedRoute.steps.length);
+    }
+
+    // Announce off-route once when transitioning from on-route to off-route
+    if (progress.isOffRoute && !offRouteAnnouncedRef.current) {
+      offRouteAnnouncedRef.current = true;
+      speak(t('nav.offRoute'));
+    } else if (!progress.isOffRoute) {
+      offRouteAnnouncedRef.current = false;
     }
 
     if (progress.shouldCompleteNavigation) {
