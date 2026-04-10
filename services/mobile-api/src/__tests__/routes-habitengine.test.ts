@@ -627,19 +627,9 @@ describe('GET /v1/impact-dashboard', () => {
 // ===========================================================================
 
 describe('GET /v1/quiz/daily', () => {
-  it('returns 200 with a random question', async () => {
-    // Mock recent answers query (user_quiz_history)
+  it('returns 200 with a question from the static pool', async () => {
+    // Mock recent answers query (user_quiz_history) — no recent answers
     mockFrom.mockReturnValueOnce(chainResult([]));
-    // Mock quiz_questions query
-    mockFrom.mockReturnValueOnce(chainResult([
-      {
-        id: 'q-001',
-        question_text: 'What does a sharrow marking mean?',
-        options: ['Shared lane', 'No bikes', 'Turn right'],
-        category: 'road_safety',
-        difficulty: 1,
-      },
-    ]));
 
     const response = await app.inject({
       method: 'GET',
@@ -649,11 +639,11 @@ describe('GET /v1/quiz/daily', () => {
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
-    expect(body.id).toBe('q-001');
-    expect(body.questionText).toBe('What does a sharrow marking mean?');
-    expect(body.options).toHaveLength(3);
-    expect(body.category).toBe('road_safety');
-    expect(body.difficulty).toBe(1);
+    expect(body.id).toBeTruthy();
+    expect(body.questionText).toBeTruthy();
+    expect(body.options.length).toBeGreaterThanOrEqual(3);
+    expect(body.category).toBeTruthy();
+    expect(typeof body.difficulty).toBe('number');
   });
 
   it('returns 401 without auth', async () => {
@@ -665,9 +655,11 @@ describe('GET /v1/quiz/daily', () => {
     expect(response.statusCode).toBe(401);
   });
 
-  it('returns 404 when no questions available', async () => {
-    mockFrom.mockReturnValueOnce(chainResult([]));
-    mockFrom.mockReturnValueOnce(chainResult([]));
+  it('excludes recently answered questions', async () => {
+    // Mock user_quiz_history — pretend ALL static questions were answered recently
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const allIds = QUIZ_QUESTIONS.map((q) => ({ question_id: q.id }));
+    mockFrom.mockReturnValueOnce(chainResult(allIds));
 
     const response = await app.inject({
       method: 'GET',
@@ -685,14 +677,28 @@ describe('GET /v1/quiz/daily', () => {
 // ===========================================================================
 
 describe('POST /v1/quiz/answer', () => {
-  const questionId = '00000000-0000-0000-0000-000000000010';
+  // Use a real question from the static pool (first road_safety question, correctIndex=2)
+  const questionId = 'b723794c-7ecb-4aaf-a4f0-32dcdc55161e';
 
   it('returns 200 with correct answer result', async () => {
-    // Mock question lookup
-    mockFrom.mockReturnValueOnce(chainResult({
-      correct_index: 0,
-      explanation: 'A sharrow means cyclists share the lane with cars.',
-    }));
+    // Mock upsert (answer recording)
+    mockFrom.mockReturnValueOnce(chainResult(null));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: { questionId, selectedIndex: 2 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.questionId).toBe(questionId);
+    expect(body.isCorrect).toBe(true);
+    expect(body.explanation).toBeTruthy();
+  });
+
+  it('returns isCorrect=false for wrong answer', async () => {
     // Mock upsert (answer recording)
     mockFrom.mockReturnValueOnce(chainResult(null));
 
@@ -704,42 +710,18 @@ describe('POST /v1/quiz/answer', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json();
-    expect(body.questionId).toBe(questionId);
-    expect(body.isCorrect).toBe(true);
-    expect(body.explanation).toBeTruthy();
-  });
-
-  it('returns isCorrect=false for wrong answer', async () => {
-    mockFrom.mockReturnValueOnce(chainResult({
-      correct_index: 0,
-      explanation: 'Correct answer is shared lane.',
-    }));
-    mockFrom.mockReturnValueOnce(chainResult(null));
-
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/quiz/answer',
-      headers: authHeaders,
-      payload: { questionId, selectedIndex: 2 },
-    });
-
-    expect(response.statusCode).toBe(200);
     expect(response.json().isCorrect).toBe(false);
   });
 
   it('triggers streak qualification after answering', async () => {
-    mockFrom.mockReturnValueOnce(chainResult({
-      correct_index: 1,
-      explanation: 'explanation',
-    }));
+    // Mock upsert (answer recording)
     mockFrom.mockReturnValueOnce(chainResult(null));
 
     await app.inject({
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: { ...authHeaders, 'x-timezone': 'Europe/Bucharest' },
-      payload: { questionId, selectedIndex: 1 },
+      payload: { questionId, selectedIndex: 2 },
     });
 
     // qualifyStreakAsync calls rpc('qualify_streak_action')
@@ -754,13 +736,11 @@ describe('POST /v1/quiz/answer', () => {
   });
 
   it('returns 404 when question not found', async () => {
-    mockFrom.mockReturnValueOnce(chainResult(null, { message: 'not found' }));
-
     const response = await app.inject({
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: authHeaders,
-      payload: { questionId, selectedIndex: 0 },
+      payload: { questionId: '00000000-0000-0000-0000-000000000099', selectedIndex: 0 },
     });
 
     expect(response.statusCode).toBe(404);

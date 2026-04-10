@@ -90,6 +90,7 @@ type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
 
 // Streak helpers (shared with feed.ts)
 import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
+import { QUIZ_QUESTIONS, findQuizQuestion } from '../data/quiz-questions';
 
 const buildEmptyRouteResponse = (
   mode: RoutePreviewBody['mode'],
@@ -2251,40 +2252,25 @@ export const buildV1Routes = (
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
-        if (!supabaseAdmin) {
-          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        // Get question IDs answered in the last 30 days from user_quiz_history
+        let excludeIds: string[] = [];
+        if (supabaseAdmin) {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+          const { data: recentAnswers } = await supabaseAdmin
+            .from('user_quiz_history')
+            .select('question_id')
+            .eq('user_id', user.id)
+            .gte('answered_at', thirtyDaysAgo);
+
+          excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
         }
 
-        // Get question IDs answered in the last 30 days
-        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-        const { data: recentAnswers } = await supabaseAdmin
-          .from('user_quiz_history')
-          .select('question_id')
-          .eq('user_id', user.id)
-          .gte('answered_at', thirtyDaysAgo);
+        // Filter static question pool, excluding recently answered
+        const available = excludeIds.length > 0
+          ? QUIZ_QUESTIONS.filter((q) => !excludeIds.includes(q.id))
+          : QUIZ_QUESTIONS;
 
-        const excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
-
-        // Fetch all questions, exclude recently answered
-        let query = supabaseAdmin
-          .from('quiz_questions')
-          .select('id, question_text, options, category, difficulty');
-
-        if (excludeIds.length > 0) {
-          query = query.not('id', 'in', `(${excludeIds.join(',')})`);
-        }
-
-        const { data: questions, error } = await query;
-
-        if (error) {
-          throw new HttpError('Quiz query failed.', {
-            statusCode: 502,
-            code: 'UPSTREAM_ERROR',
-            details: [error.message],
-          });
-        }
-
-        if (!questions || questions.length === 0) {
+        if (available.length === 0) {
           throw new HttpError('No quiz questions available.', {
             statusCode: 404,
             code: 'BAD_REQUEST',
@@ -2292,15 +2278,14 @@ export const buildV1Routes = (
         }
 
         // Pick a random question
-        const randomIndex = Math.floor(Math.random() * questions.length);
-        const q = questions[randomIndex] as Record<string, unknown>;
+        const q = available[Math.floor(Math.random() * available.length)];
 
         return {
-          id: q.id as string,
-          questionText: q.question_text as string,
+          id: q.id,
+          questionText: q.questionText,
           options: q.options as string[],
-          category: q.category as string,
-          difficulty: Number(q.difficulty),
+          category: q.category,
+          difficulty: q.difficulty,
         };
       },
     );
@@ -2350,21 +2335,17 @@ export const buildV1Routes = (
 
         const { questionId, selectedIndex } = request.body;
 
-        // Fetch the question to check the answer
-        const { data: question, error: qError } = await supabaseAdmin
-          .from('quiz_questions')
-          .select('correct_index, explanation')
-          .eq('id', questionId)
-          .single();
+        // Look up from static question pool
+        const question = findQuizQuestion(questionId);
 
-        if (qError || !question) {
+        if (!question) {
           throw new HttpError('Question not found.', {
             statusCode: 404,
             code: 'BAD_REQUEST',
           });
         }
 
-        const isCorrect = selectedIndex === (question.correct_index as number);
+        const isCorrect = selectedIndex === question.correctIndex;
 
         // Record the answer (upsert — 30-day cooldown means we might re-answer)
         const { error: insertError } = await supabaseAdmin
@@ -2420,7 +2401,7 @@ export const buildV1Routes = (
           questionId,
           selectedIndex,
           isCorrect,
-          explanation: question.explanation as string,
+          explanation: question.explanation,
         };
       },
     );
