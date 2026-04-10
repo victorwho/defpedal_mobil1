@@ -26,6 +26,8 @@
     "typecheck:api": "npm run typecheck --workspace @defensivepedal/mobile-api",
     "typecheck": "npm run typecheck:api && npm run typecheck:mobile",
     "check:bundle": "bash ./scripts/check-bundle.sh",
+    "build:preview": "bash ./scripts/build-preview.sh",
+    "build:preview:install": "bash ./scripts/build-preview.sh install",
     "validate:mobile": "npm run typecheck && npm run build:api",
     "validate": "npm run validate:mobile"
   },

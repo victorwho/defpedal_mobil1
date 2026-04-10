@@ -127,6 +127,16 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** Clear ref contents in a useEffect cleanup: `useEffect(() => { return () => { myRef.current.clear(); }; }, []);`
 **Occurrences:** dismissedHazardIdsRef in navigation.tsx persisted across rides (2026-04-06)
 
+### 24. Gradle build cache produces APK with stale JS bundle
+**Pattern:** After syncing source files to C:\dpb via robocopy, `./gradlew assembleRelease` produces an APK containing the OLD JS bundle. Gradle's file hash cache (`.gradle/`) doesn't detect robocopy changes and marks the bundle task as `UP-TO-DATE`.
+**Fix:** Always delete `app/build/generated/assets/`, `app/build/intermediates/assets/`, and `app/build/outputs/` before building. Use `npm run build:preview:install` which automates this.
+**Occurrences:** Post-ride impact changes not appearing in preview APK (2026-04-10)
+
+### 25. Release APK installs as dev variant
+**Pattern:** `build.gradle` hardcodes `applicationId 'com.defensivepedal.mobile.dev'` with no product flavors. `assembleRelease` produces `com.defensivepedal.mobile.dev` which overwrites the debug dev app. The app.config.ts variant system (development/preview/production) is not reflected in Gradle.
+**Fix:** Open "Defensive Pedal Dev" after installing a release APK from C:\dpb — it has the embedded bundle. The bridgeless dev-client Metro loading issue makes this the reliable testing path.
+**Occurrences:** Preview APK not showing as separate app on phone (2026-04-10)
+
 ### 19. Dev app points to production API, not localhost
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
 **Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).

@@ -20,7 +20,8 @@ npm run check:bundle
 - **Metro:** run from `C:\dev\defpedal\apps/mobile`
 - **API:** run from `C:\dev\defpedal\services/mobile-api`
 - **Debug APK build:** `cd C:\dev\defpedal\apps\mobile\android && ./gradlew installDebug`
-- **Release APK build:** use `C:\dpb` copy (for preview variant, avoids CMake path issues)
+- **Release APK build:** `npm run build:preview:install` (syncs to `C:\dpb`, cleans cache, builds, installs)
+- **Release APK build (no install):** `npm run build:preview`
 
 ## Phone Connection
 
