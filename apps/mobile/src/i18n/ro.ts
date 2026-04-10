@@ -417,6 +417,8 @@ export const ro: TranslationKeys = {
     diagnosticsSub: 'Verifică conectivitatea și starea serviciilor',
     welcomeFlow: 'Flux de bun venit',
     welcomeFlowSub: 'Repornește experiența de introducere',
+    helpFaq: 'Ajutor & FAQ',
+    helpFaqSub: 'Răspunsuri la întrebările frecvente',
     environment: 'Mediu:',
     variant: 'Variantă:',
   },

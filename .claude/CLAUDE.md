@@ -120,6 +120,7 @@ C:\dev\defpedal/
 │   │   ├── profile.tsx          # User preferences, toggles, sign-out
 │   │   ├── auth.tsx             # Sign in (Google OAuth)
 │   │   ├── settings.tsx         # App settings
+│   │   ├── faq.tsx              # FAQ with 4 categorised sections (19 Q&A items)
 │   │   ├── diagnostics.tsx      # Debug/QA diagnostics
 │   │   └── offline-maps.tsx     # Offline map pack management
 │   ├── src/
@@ -407,6 +408,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - RankUpOverlay: full-screen tier promotion celebration (suppressed during NAVIGATING)
   - TierPill atom on feed cards, XpGainToast atom
   - `GET /v1/tiers` endpoint, tier mascot images for all 10 tiers
+- **Help & FAQ**: 19 Q&A items in 4 sections (Safety & Routing, Your Impact, Progression & Rewards, Privacy & Data). Accessible from Settings tile, Profile > Account row, and History tab card
 - **Stability & UX:**
   - Global ErrorBoundary with crash recovery (Try Again / Restart App buttons)
   - End Ride confirmation dialog (prevents accidental trip cancellation)

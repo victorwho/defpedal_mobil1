@@ -588,6 +588,21 @@ export default function ProfileScreen() {
               onChange={setShareTripsPublicly}
             />
 
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => router.push('/faq' as any)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.helpFaq')}
+            >
+              <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>{t('settings.helpFaq')}</Text>
+                <Text style={styles.settingDescription}>{t('settings.helpFaqSub')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
+
             {user ? (
               <Pressable
                 style={styles.signOutButton}
@@ -821,6 +836,16 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textBase,
       fontFamily: fontFamily.body.medium,
       color: colors.danger,
+    },
+    helpFaqRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      padding: space[4],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
     },
     achievementsCard: {
       backgroundColor: colors.bgPrimary,

@@ -4,74 +4,141 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Screen } from '../src/components/Screen';
 import { useTheme, type ThemeColors } from '../src/design-system';
+import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { fontFamily, textSm, textBase } from '../src/design-system/tokens/typography';
+import { fontFamily, textSm } from '../src/design-system/tokens/typography';
+import { useT } from '../src/hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
-// FAQ Data
+// FAQ Data — 4 categorised sections
 // ---------------------------------------------------------------------------
 
-const FAQ_ITEMS: { question: string; answer: string }[] = [
+type FaqSection = {
+  titleKey: string;
+  icon: string;
+  items: { question: string; answer: string }[];
+};
+
+const FAQ_SECTIONS: FaqSection[] = [
   {
-    question: 'What is Defensive Pedal?',
-    answer:
-      'Defensive Pedal is a cycling navigation app that prioritises rider safety. It calculates routes that avoid dangerous roads, busy intersections, and hazardous segments based on real-world risk data.',
+    titleKey: 'Safety & Routing',
+    icon: 'shield-checkmark-outline',
+    items: [
+      {
+        question: 'What is Defensive Pedal?',
+        answer:
+          'Defensive Pedal is a cycling navigation app that prioritises rider safety. It calculates routes that avoid dangerous roads, busy intersections, and hazardous segments based on real-world risk data.',
+      },
+      {
+        question: 'How does "Safe" routing differ from "Fast"?',
+        answer:
+          'Safe mode uses our custom OSRM server with a safety-weighted profile that avoids high-risk road segments. Fast mode uses standard Mapbox cycling directions optimised for shortest travel time.',
+      },
+      {
+        question: 'How accurate is the risk data?',
+        answer:
+          'Risk scores are computed from OpenStreetMap road attributes (surface type, road class, speed limits, cycling infrastructure) combined with historical incident data where available. The model is updated regularly.',
+      },
+      {
+        question: 'Which countries are supported?',
+        answer:
+          'Safe routing is currently available in Romania, Bulgaria, Hungary, and Serbia. Fast routing works worldwide via Mapbox.',
+      },
+      {
+        question: 'What does "Avoid unpaved" do?',
+        answer:
+          'When active, the routing engine penalises gravel, dirt, and unpaved roads so your route stays on paved surfaces wherever possible.',
+      },
+      {
+        question: 'How do I report a hazard?',
+        answer:
+          'During active navigation, tap the hazard report button on the HUD. You can report potholes, construction, flooding, and other obstacles. Reports are shared with other riders. You can also long-press the map from the route planning screen to report hazards before you ride.',
+      },
+      {
+        question: 'Can I use the app offline?',
+        answer:
+          'Offline map tiles can be downloaded from the Offline Maps screen in Settings. Route calculation still requires an internet connection.',
+      },
+      {
+        question: 'How does voice guidance work?',
+        answer:
+          'When enabled, the app reads turn-by-turn instructions aloud during navigation. You can toggle it from the route planning screen or the navigation HUD.',
+      },
+    ],
   },
   {
-    question: 'How does "Safe" routing differ from "Fast"?',
-    answer:
-      'Safe mode uses our custom OSRM server with a safety-weighted profile that avoids high-risk road segments. Fast mode uses standard Mapbox cycling directions optimised for shortest travel time.',
+    titleKey: 'Your Impact',
+    icon: 'leaf-outline',
+    items: [
+      {
+        question: 'What are Microlives?',
+        answer:
+          'Microlives are a science-based measure of life expectancy. 1 Microlife = 30 minutes of adult life expectancy. Every ride you take earns Microlives based on distance cycled, bike type, and air quality. The formula: 0.4 \u00D7 distance (km) \u00D7 vehicle modifier \u00D7 AQI modifier. Regular bikes earn more than e-bikes because of the higher physical effort.',
+      },
+      {
+        question: 'How are community seconds calculated?',
+        answer:
+          'Every kilometre you cycle instead of driving prevents air pollution that would shorten the lives of people around you. We calculate this as 4.5 seconds of community life expectancy donated per km. These are aggregated city-wide to show collective impact.',
+      },
+      {
+        question: 'What does the Time Bank show?',
+        answer:
+          'The Time Bank is your cumulative life expectancy earned from all your rides. It shows the total extra minutes, hours, or days of life you have gained through cycling. This number only goes up \u2014 every ride adds to it.',
+      },
+      {
+        question: 'How is CO2 saved calculated?',
+        answer:
+          'We calculate CO2 savings by comparing your actual GPS cycling distance against the emissions a car would produce for the same trip. The formula uses the EU average of 120 g CO2/km. For example, a 10 km ride saves approximately 1.2 kg of CO2.',
+      },
+      {
+        question: 'What are the equivalents shown after a ride?',
+        answer:
+          'After each ride, the impact summary shows your CO2 savings expressed as real-world equivalents \u2014 such as trees saved, phone charges, or kilometres of driving avoided. These help make abstract numbers tangible and motivating.',
+      },
+    ],
   },
   {
-    question: 'Which countries are supported?',
-    answer:
-      'Safe routing is currently available in Romania, Bulgaria, Hungary, and Serbia. Fast routing works worldwide via Mapbox.',
+    titleKey: 'Progression & Rewards',
+    icon: 'trophy-outline',
+    items: [
+      {
+        question: 'How does the XP system work?',
+        answer:
+          'You earn Experience Points (XP) every time you complete a ride, earn a badge, or maintain a streak day. Ride XP scales with distance and includes multipliers for adverse weather and hazard reporting. XP accumulates towards your rider tier.',
+      },
+      {
+        question: 'What are rider tiers?',
+        answer:
+          'There are 10 rider tiers from Kickstand (beginner) to Legend. Each tier requires more XP to reach. Your current tier is shown on your profile card and community feed posts. Reaching a new tier triggers a celebration overlay.',
+      },
+      {
+        question: 'How do I earn badges?',
+        answer:
+          'Badges are awarded automatically for reaching milestones across 8 categories: distance, streaks, hazard reporting, community engagement, weather riding, time of day, exploration, and special achievements. Visit the Trophy Case in your profile to see all 137 badges and your progress.',
+      },
+      {
+        question: 'How do streaks work?',
+        answer:
+          'Your streak counts consecutive days of qualifying activity. The day resets at 4:00 AM local time. If you miss a day, your streak resets to zero \u2014 unless you have a streak freeze available. Your longest streak is tracked separately.',
+      },
+      {
+        question: 'What counts as a qualifying action for my streak?',
+        answer:
+          'Five actions count toward your daily streak: completing a ride, reporting a hazard, confirming or denying an existing hazard, answering the daily safety quiz, and sharing a ride to the community feed. You only need one per day to keep the streak alive.',
+      },
+    ],
   },
   {
-    question: 'How accurate is the risk data?',
-    answer:
-      'Risk scores are computed from OpenStreetMap road attributes (surface type, road class, speed limits, cycling infrastructure) combined with historical incident data where available. The model is updated regularly.',
-  },
-  {
-    question: 'Can I use the app offline?',
-    answer:
-      'Offline map tiles can be downloaded from the Offline Maps screen in Settings. Route calculation still requires an internet connection.',
-  },
-  {
-    question: 'How does voice guidance work?',
-    answer:
-      'When enabled, the app reads turn-by-turn instructions aloud during navigation. You can toggle it from the route planning screen or the navigation HUD.',
-  },
-  {
-    question: 'What does "Avoid unpaved" do?',
-    answer:
-      'When active, the routing engine penalises gravel, dirt, and unpaved roads so your route stays on paved surfaces wherever possible.',
-  },
-  {
-    question: 'How do I report a hazard?',
-    answer:
-      'During active navigation, tap the hazard report button on the HUD. You can report potholes, construction, flooding, and other obstacles. Reports are shared with other riders.',
-  },
-  {
-    question: 'Is my location data shared?',
-    answer:
-      'Your location is only used locally for navigation and route planning. We do not store or share your GPS tracks. Hazard reports are anonymised.',
-  },
-  {
-    question: 'What are Microlives?',
-    answer:
-      'Microlives are a science-based measure of life expectancy. 1 Microlife = 30 minutes of adult life expectancy. Every ride you take earns Microlives based on distance cycled, bike type, and air quality. The formula: 0.4 × distance (km) × vehicle modifier × AQI modifier. Regular bikes earn more than e-bikes because of the higher physical effort.',
-  },
-  {
-    question: 'How are community seconds calculated?',
-    answer:
-      'Every kilometre you cycle instead of driving prevents air pollution that would shorten the lives of people around you. We calculate this as 4.5 seconds of community life expectancy donated per km. These are aggregated city-wide to show collective impact.',
-  },
-  {
-    question: 'What does the Time Bank show?',
-    answer:
-      'The Time Bank is your cumulative life expectancy earned from all your rides. It shows the total extra minutes, hours, or days of life you have gained through cycling. This number only goes up — every ride adds to it.',
+    titleKey: 'Privacy & Data',
+    icon: 'lock-closed-outline',
+    items: [
+      {
+        question: 'Is my location data shared?',
+        answer:
+          'Your location is only used locally for navigation and route planning. We do not store or share your GPS tracks. Hazard reports are anonymised. If you share a trip to the community feed, only the planned route and summary statistics are visible \u2014 not your raw GPS trail.',
+      },
+    ],
   },
 ];
 
@@ -124,29 +191,42 @@ const FaqItem = ({
 export default function FaqScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const t = useT();
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   return (
-    <Screen title="FAQ" headerVariant="back">
-      <Text style={styles.subtitle}>
-        Frequently asked questions about Defensive Pedal.
-      </Text>
+    <Screen title={t('faq.title')} headerVariant="back">
+      <Text style={styles.subtitle}>{t('faq.subtitle')}</Text>
 
-      <View style={styles.faqList}>
-        {FAQ_ITEMS.map((item, index) => (
-          <FaqItem
-            key={index}
-            question={item.question}
-            answer={item.answer}
-            expanded={expandedIndex === index}
-            onToggle={() =>
-              setExpandedIndex(expandedIndex === index ? null : index)
-            }
-            styles={styles}
-            colors={colors}
-          />
-        ))}
-      </View>
+      {FAQ_SECTIONS.map((section) => (
+        <View key={section.titleKey} style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <Ionicons
+              name={section.icon as any}
+              size={20}
+              color={colors.accent}
+              accessible={false}
+            />
+            <SectionTitle variant="accent">{section.titleKey}</SectionTitle>
+          </View>
+
+          <View style={styles.faqList}>
+            {section.items.map((item) => (
+              <FaqItem
+                key={item.question}
+                question={item.question}
+                answer={item.answer}
+                expanded={expandedKey === item.question}
+                onToggle={() =>
+                  setExpandedKey(expandedKey === item.question ? null : item.question)
+                }
+                styles={styles}
+                colors={colors}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
     </Screen>
   );
 }
@@ -161,6 +241,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       color: colors.textSecondary,
       lineHeight: 20,
+    },
+    sectionBlock: {
+      gap: space[3],
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
     },
     faqList: {
       gap: space[2],

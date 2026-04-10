@@ -415,6 +415,8 @@ export const en = {
     diagnosticsSub: 'Check app wiring and service status',
     welcomeFlow: 'Welcome flow',
     welcomeFlowSub: 'Restart the onboarding experience',
+    helpFaq: 'Help & FAQ',
+    helpFaqSub: 'Answers to common questions',
     environment: 'Environment:',
     variant: 'Variant:',
   },

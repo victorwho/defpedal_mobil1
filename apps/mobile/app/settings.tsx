@@ -120,6 +120,20 @@ export default function SettingsScreen() {
             />
           </Pressable>
         </Link>
+        <Link href="/faq" asChild>
+          <Pressable>
+            <MenuItem
+              icon="help-circle-outline"
+              label={t('settings.helpFaq')}
+              description={t('settings.helpFaqSub')}
+              rightAccessory={
+                <Badge variant="neutral" size="sm">
+                  FAQ
+                </Badge>
+              }
+            />
+          </Pressable>
+        </Link>
       </View>
 
       {/* ── App wiring card ── */}

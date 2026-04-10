@@ -202,6 +202,26 @@ export default function HistoryScreen() {
           </Pressable>
         ) : null}
 
+        {/* Help & FAQ */}
+        {user ? (
+          <Pressable
+            style={styles.quizCard}
+            onPress={() => router.push('/faq')}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.helpFaq')}
+          >
+            <View style={styles.quizCardLeft}>
+              <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
+              <View>
+                <Text style={styles.quizCardTitle}>{t('settings.helpFaq')}</Text>
+                <Text style={styles.quizCardSubtitle}>{t('settings.helpFaqSub')}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+
         {/* Daily Safety Quiz */}
         {user ? (
           <Pressable
