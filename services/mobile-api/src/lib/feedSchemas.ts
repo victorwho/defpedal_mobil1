@@ -116,6 +116,7 @@ const feedProfileSchema = {
     id: { type: 'string' },
     displayName: { type: 'string' },
     avatarUrl: { type: ['string', 'null'] },
+    riderTier: { type: 'string' },
   },
 } as const;
 

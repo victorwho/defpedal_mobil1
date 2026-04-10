@@ -21,7 +21,11 @@ import type {
   QuizQuestion,
   QuizAnswer,
   SavedRoute,
+  XpBreakdownItem,
+  XpAwardResult,
+  TiersResponse,
 } from '@defensivepedal/core';
+import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS } from '../lib/xp';
 import { getPreviewOrigin } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -616,6 +620,15 @@ export const buildV1Routes = (
           // Streak qualification (fire-and-forget)
           if (user?.id) {
             qualifyStreakAsync(user.id, 'hazard_report', getTimezone(request), request.log);
+            // XP award (fire-and-forget)
+            if (supabaseAdmin) {
+              void (async () => {
+                try { await supabaseAdmin.rpc('award_xp', {
+                  p_user_id: user.id, p_action: 'hazard_report',
+                  p_base_xp: XP_VALUES.hazard_report, p_multiplier: 1.0,
+                }); } catch { /* non-fatal */ }
+              })();
+            }
           }
           return result;
         } catch (error) {
@@ -755,6 +768,16 @@ export const buildV1Routes = (
         if (error) throw error;
 
         qualifyStreakAsync(user.id, 'hazard_validate', getTimezone(request), request.log);
+
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try { await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id, p_action: 'hazard_validate',
+              p_base_xp: XP_VALUES.hazard_validate, p_multiplier: 1.0,
+            }); } catch { /* non-fatal */ }
+          })();
+        }
 
         return { acceptedAt: new Date().toISOString() };
       } catch (error) {
@@ -1497,13 +1520,14 @@ export const buildV1Routes = (
               aqiLevel:         { type: 'string', maxLength: 32 },
               rideStartHour:    { type: 'integer', minimum: 0, maximum: 23 },
               durationMinutes:  { type: 'number', minimum: 0 },
+              routeType:        { type: 'string', enum: ['safe', 'fast'] },
             },
           },
           response: {
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1527,6 +1551,41 @@ export const buildV1Routes = (
                       iconKey:    { type: 'string' },
                       earnedAt:   { type: 'string' },
                     },
+                  },
+                },
+                xpBreakdown: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['action', 'label', 'baseXp', 'multiplier', 'finalXp'],
+                    properties: {
+                      action:     { type: 'string' },
+                      label:      { type: 'string' },
+                      baseXp:     { type: 'integer' },
+                      multiplier: { type: 'number' },
+                      finalXp:    { type: 'integer' },
+                      sourceId:   { type: 'string' },
+                    },
+                  },
+                },
+                totalXpEarned: { type: 'integer' },
+                currentTotalXp: { type: 'integer' },
+                riderTier: { type: 'string' },
+                tierPromotion: {
+                  type: ['object', 'null'],
+                  additionalProperties: true,
+                  properties: {
+                    xpAwarded:        { type: 'integer' },
+                    totalXp:          { type: 'integer' },
+                    oldTier:          { type: 'string' },
+                    newTier:          { type: 'string' },
+                    promoted:         { type: 'boolean' },
+                    tierDisplayName:  { type: 'string' },
+                    tierTagline:      { type: 'string' },
+                    tierColor:        { type: 'string' },
+                    tierLevel:        { type: 'integer' },
+                    tierPerk:         { type: 'string' },
                   },
                 },
               },
@@ -1655,6 +1714,131 @@ export const buildV1Routes = (
           // Badge check failure is non-fatal
         }
 
+        // --- XP AWARDING (non-fatal, same pattern as badge check) ---
+        const xpBreakdown: XpBreakdownItem[] = [];
+        let lastAwardResult: XpAwardResult | null = null;
+
+        try {
+          // 1. Determine ride type for XP
+          const routeType = (request.body as Record<string, unknown>).routeType as string | undefined ?? 'safe';
+          const rideAction = routeType === 'fast' ? 'ride_fast' : 'ride_safe';
+          const rideBaseXp = XP_VALUES[rideAction];
+
+          // 2. Check if first ride of the day
+          const { data: todayRides } = await supabaseAdmin
+            .from('xp_events')
+            .select('id')
+            .eq('user_id', user.id)
+            .in('action', ['ride_safe', 'ride_fast'])
+            .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+            .limit(1);
+          const isFirstOfDay = !todayRides || todayRides.length === 0;
+
+          // 3. Get current streak
+          const { data: streakRow } = await supabaseAdmin
+            .from('streak_state')
+            .select('current_streak')
+            .eq('user_id', user.id)
+            .single();
+          const currentStreak = (streakRow?.current_streak as number) ?? 0;
+
+          // 4. Get weather condition from ride_impacts
+          const { data: rideData } = await supabaseAdmin
+            .from('ride_impacts')
+            .select('weather_condition')
+            .eq('trip_id', tripId)
+            .single();
+
+          // 5. Calculate multiplier
+          const multiplier = calculateRideMultiplier({
+            isFirstOfDay,
+            currentStreak,
+            weatherCondition: rideData?.weather_condition as string | null,
+          });
+
+          // 6. Award ride XP
+          const { data: rideXpResult } = await supabaseAdmin.rpc('award_xp', {
+            p_user_id: user.id,
+            p_action: rideAction,
+            p_base_xp: rideBaseXp,
+            p_multiplier: multiplier,
+            p_source_id: tripId,
+          });
+          const rideXp = rideXpResult as XpAwardResult;
+          lastAwardResult = rideXp;
+
+          xpBreakdown.push({
+            action: rideAction,
+            label: XP_ACTION_LABELS[rideAction],
+            baseXp: rideBaseXp,
+            multiplier,
+            finalXp: rideXp.xpAwarded,
+          });
+
+          // 7. Award XP for each new badge earned
+          for (const badge of newBadges) {
+            const { data: badgeDef } = await supabaseAdmin
+              .from('badge_definitions')
+              .select('tier, is_hidden, is_seasonal')
+              .eq('badge_key', badge.badgeKey)
+              .single();
+
+            if (badgeDef) {
+              const badgeAction = badgeTierToXpAction(
+                badgeDef.tier as number,
+                badgeDef.is_hidden as boolean,
+                badgeDef.is_seasonal as boolean,
+              );
+              const badgeXpValue = XP_VALUES[badgeAction];
+
+              const { data: badgeXpResult } = await supabaseAdmin.rpc('award_xp', {
+                p_user_id: user.id,
+                p_action: badgeAction,
+                p_base_xp: badgeXpValue,
+                p_multiplier: 1.0,
+                p_source_id: badge.badgeKey,
+              });
+
+              const bxp = badgeXpResult as XpAwardResult;
+              if (bxp.promoted) lastAwardResult = bxp;
+
+              xpBreakdown.push({
+                action: badgeAction,
+                label: `${XP_ACTION_LABELS[badgeAction]}: ${badge.name}`,
+                baseXp: badgeXpValue,
+                multiplier: 1.0,
+                finalXp: bxp.xpAwarded,
+                sourceId: badge.badgeKey,
+              });
+            }
+          }
+
+          // 8. Award streak day XP
+          if (currentStreak > 0) {
+            const { data: streakXp } = await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id,
+              p_action: 'streak_day',
+              p_base_xp: XP_VALUES.streak_day,
+              p_multiplier: 1.0,
+              p_source_id: `streak_day_${currentStreak}`,
+            });
+            const sxp = streakXp as XpAwardResult;
+            if (sxp.promoted) lastAwardResult = sxp;
+
+            xpBreakdown.push({
+              action: 'streak_day',
+              label: `Streak day (Day ${currentStreak})`,
+              baseXp: XP_VALUES.streak_day,
+              multiplier: 1.0,
+              finalXp: sxp.xpAwarded,
+            });
+          }
+        } catch {
+          // XP awarding failure is non-fatal
+        }
+
+        const totalXpEarned = xpBreakdown.reduce((sum, item) => sum + item.finalXp, 0);
+
         return {
           tripId,
           co2SavedKg,
@@ -1665,6 +1849,11 @@ export const buildV1Routes = (
           personalMicrolives,
           communitySeconds,
           newBadges,
+          xpBreakdown,
+          totalXpEarned,
+          currentTotalXp: lastAwardResult?.totalXp ?? 0,
+          riderTier: (lastAwardResult?.newTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
+          tierPromotion: lastAwardResult?.promoted ? lastAwardResult : null,
         };
       },
     );
@@ -1686,7 +1875,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -1697,6 +1886,11 @@ export const buildV1Routes = (
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
                 newBadges: { type: 'array', items: { type: 'object' } },
+                xpBreakdown: { type: 'array', items: { type: 'object' } },
+                totalXpEarned: { type: 'integer' },
+                currentTotalXp: { type: 'integer' },
+                riderTier: { type: 'string' },
+                tierPromotion: { type: ['object', 'null'] },
               },
             },
             401: errorResponseSchema,
@@ -1827,6 +2021,21 @@ export const buildV1Routes = (
           }
         }
 
+        // Fetch user's current XP/tier for the response
+        let currentTotalXp = 0;
+        let currentRiderTier: import('@defensivepedal/core').RiderTierName = 'kickstand';
+        try {
+          const { data: prof } = await supabaseAdmin
+            .from('profiles')
+            .select('total_xp, rider_tier')
+            .eq('id', user.id)
+            .single();
+          if (prof) {
+            currentTotalXp = (prof.total_xp as number) ?? 0;
+            currentRiderTier = ((prof.rider_tier as string) ?? 'kickstand') as import('@defensivepedal/core').RiderTierName;
+          }
+        } catch { /* non-fatal */ }
+
         return {
           tripId: impactRow.trip_id as string,
           co2SavedKg: Number(impactRow.co2_saved_kg),
@@ -1837,6 +2046,11 @@ export const buildV1Routes = (
           personalMicrolives,
           communitySeconds,
           newBadges: newBadgesFromCheck,
+          xpBreakdown: [],
+          totalXpEarned: 0,
+          currentTotalXp,
+          riderTier: currentRiderTier,
+          tierPromotion: null,
         };
       },
     );
@@ -1863,6 +2077,7 @@ export const buildV1Routes = (
                 'streak', 'totalCo2SavedKg', 'totalMoneySavedEur',
                 'totalHazardsReported', 'totalRidersProtected',
                 'thisWeek', 'totalMicrolives', 'totalCommunitySeconds',
+                'totalXp', 'riderTier',
               ],
               properties: {
                 streak: {
@@ -1883,6 +2098,8 @@ export const buildV1Routes = (
                 totalRidersProtected: { type: 'integer' },
                 totalMicrolives: { type: 'number' },
                 totalCommunitySeconds: { type: 'number' },
+                totalXp: { type: 'integer' },
+                riderTier: { type: 'string' },
                 thisWeek: {
                   type: 'object',
                   additionalProperties: false,
@@ -1959,6 +2176,8 @@ export const buildV1Routes = (
           },
           totalMicrolives: Number(totals?.totalMicrolives ?? 0),
           totalCommunitySeconds: Number(totals?.totalCommunitySeconds ?? 0),
+          totalXp: Number(d.totalXp ?? 0),
+          riderTier: String(d.riderTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
         };
       },
     );
@@ -2131,6 +2350,30 @@ export const buildV1Routes = (
 
         // Qualify streak (fire-and-forget)
         qualifyStreakAsync(user.id, 'quiz', getTimezone(request), request.log);
+
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try {
+              await supabaseAdmin.rpc('award_xp', {
+                p_user_id: user.id,
+                p_action: 'quiz_complete',
+                p_base_xp: XP_VALUES.quiz_complete,
+                p_multiplier: 1.0,
+                p_source_id: questionId,
+              });
+              if (isCorrect) {
+                await supabaseAdmin.rpc('award_xp', {
+                  p_user_id: user.id,
+                  p_action: 'quiz_perfect',
+                  p_base_xp: XP_VALUES.quiz_perfect,
+                  p_multiplier: 1.0,
+                  p_source_id: questionId,
+                });
+              }
+            } catch { /* non-fatal */ }
+          })();
+        }
 
         return {
           questionId,
@@ -2355,6 +2598,106 @@ export const buildV1Routes = (
         }
 
         return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    // GET /v1/tiers — tier definitions + user XP state
+    app.get<{ Reply: TiersResponse | ErrorResponse }>(
+      '/tiers',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['tiers', 'totalXp', 'riderTier', 'recentXp'],
+              properties: {
+                tiers: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: true,
+                    properties: {
+                      tierLevel:       { type: 'integer' },
+                      name:            { type: 'string' },
+                      displayName:     { type: 'string' },
+                      xpRequired:      { type: 'integer' },
+                      tagline:         { type: 'string' },
+                      color:           { type: 'string' },
+                      pillTextColor:   { type: 'string' },
+                      perkDescription: { type: 'string' },
+                    },
+                  },
+                },
+                totalXp: { type: 'integer' },
+                riderTier: { type: 'string' },
+                recentXp: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: true,
+                    properties: {
+                      id:        { type: 'string' },
+                      action:    { type: 'string' },
+                      baseXp:    { type: 'integer' },
+                      multiplier: { type: 'number' },
+                      finalXp:   { type: 'integer' },
+                      sourceId:  { type: ['string', 'null'] },
+                      createdAt: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+
+        if (!supabaseAdmin) {
+          throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+        }
+
+        const [{ data: tiers }, { data: profile }, { data: recentXp }] = await Promise.all([
+          supabaseAdmin.from('rider_tier_definitions').select('*').order('tier_level'),
+          supabaseAdmin.from('profiles').select('total_xp, rider_tier').eq('id', user.id).single(),
+          supabaseAdmin.from('xp_events')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20),
+        ]);
+
+        const mapTier = (t: Record<string, unknown>): import('@defensivepedal/core').RiderTierDefinition => ({
+          tierLevel:       Number(t.tier_level),
+          name:            String(t.name) as import('@defensivepedal/core').RiderTierName,
+          displayName:     String(t.display_name),
+          xpRequired:      Number(t.xp_required),
+          tagline:         String(t.tagline),
+          color:           String(t.color),
+          pillTextColor:   String(t.pill_text_color),
+          perkDescription: String(t.perk_description),
+        });
+
+        const mapXpEvent = (e: Record<string, unknown>) => ({
+          id:         String(e.id),
+          action:     String(e.action),
+          baseXp:     Number(e.base_xp),
+          multiplier: Number(e.multiplier),
+          finalXp:    Number(e.final_xp),
+          sourceId:   e.source_id != null ? String(e.source_id) : null,
+          createdAt:  String(e.created_at),
+        });
+
+        return {
+          tiers: (tiers ?? []).map(mapTier),
+          totalXp: (profile?.total_xp as number) ?? 0,
+          riderTier: ((profile?.rider_tier as string) ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
+          recentXp: (recentXp ?? []).map(mapXpEvent),
+        };
       },
     );
 

@@ -29,6 +29,7 @@ import type {
   SavedRouteCreateRequest,
   ShareTripRequest,
   UserPublicProfile,
+  TiersResponse,
   RerouteRequest,
   TripEndRequest,
   TripEndResponse,
@@ -457,6 +458,7 @@ export const mobileApi = {
       aqiLevel?: string;
       rideStartHour?: number;
       durationMinutes?: number;
+      routeType?: 'safe' | 'fast';
     },
   ) =>
     requestJson<RideImpact>(`/v1/rides/${tripId}/impact`, {
@@ -469,6 +471,9 @@ export const mobileApi = {
 
   fetchBadges: () =>
     requestJson<BadgeResponse>('/v1/badges'),
+
+  fetchTiers: () =>
+    requestJson<TiersResponse>('/v1/tiers'),
 
   fetchImpactDashboard: (timeZone?: string) => {
     const params = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : '';

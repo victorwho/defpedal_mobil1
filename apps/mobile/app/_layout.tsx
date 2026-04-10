@@ -15,6 +15,7 @@ import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
+import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 
 // Keep splash screen visible while fonts load
@@ -125,7 +126,30 @@ const RootLayoutInner = () => {
         }}
       />
       <BadgeUnlockOverlayManager />
+      <RankUpOverlayManager />
     </>
+  );
+};
+
+/** Shows the RankUpOverlay when a tier promotion is queued in appStore. */
+const RankUpOverlayManager = () => {
+  const promotion = useAppStore((s) => s.pendingTierPromotion);
+  const clearPromotion = useAppStore((s) => s.clearTierPromotion);
+  const appState = useAppStore((s) => s.appState);
+
+  // Suppress during navigation (same as badges)
+  if (!promotion || !promotion.promoted || appState === 'NAVIGATING') return null;
+
+  return (
+    <RankUpOverlay
+      oldTier={promotion.oldTier}
+      newTier={promotion.newTier}
+      tierDisplayName={promotion.tierDisplayName ?? promotion.newTier}
+      tagline={promotion.tierTagline ?? ''}
+      tierColor={promotion.tierColor ?? '#F2C30F'}
+      perkDescription={promotion.tierPerk ?? ''}
+      onDismiss={clearPromotion}
+    />
   );
 };
 

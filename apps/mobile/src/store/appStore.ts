@@ -120,6 +120,9 @@ type AppStore = {
   enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
   clearBadgeUnlocks: () => void;
+  pendingTierPromotion: import('@defensivepedal/core').XpAwardResult | null;
+  setTierPromotion: (promotion: import('@defensivepedal/core').XpAwardResult | null) => void;
+  clearTierPromotion: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
   incrementRatingSkipCount: () => void;
@@ -262,6 +265,9 @@ export const useAppStore = create<AppStore>()(
         return first;
       },
       clearBadgeUnlocks: () => set(() => ({ pendingBadgeUnlocks: [] })),
+      pendingTierPromotion: null,
+      setTierPromotion: (promotion) => set(() => ({ pendingTierPromotion: promotion })),
+      clearTierPromotion: () => set(() => ({ pendingTierPromotion: null })),
       setLocale: (locale) => set(() => ({ locale })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
       incrementRatingSkipCount: () =>
@@ -772,6 +778,7 @@ export const useAppStore = create<AppStore>()(
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
+        pendingTierPromotion: state.pendingTierPromotion,
         locale: state.locale,
       }),
     },

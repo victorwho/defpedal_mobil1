@@ -18,3 +18,9 @@ export type { BottomNavProps, TabKey } from './BottomNav';
 
 export { ActivityChart } from './ActivityChart';
 export { PulseHeader } from './PulseHeader';
+
+export { TierRankCard } from './TierRankCard';
+export type { TierRankCardProps } from './TierRankCard';
+
+export { RankUpOverlay } from './RankUpOverlay';
+export type { RankUpOverlayProps } from './RankUpOverlay';

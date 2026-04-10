@@ -1,5 +1,6 @@
-import type { BadgeUnlockEvent, ImpactDashboard, RideImpact } from '@defensivepedal/core';
-import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
+import type { BadgeUnlockEvent, RideImpact } from '@defensivepedal/core';
+import { formatMicrolivesAsTime } from '@defensivepedal/core';
+import { riderTiers, getTierProgress, getNextTier, type RiderTierKey } from '../design-system/tokens/tierColors';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -24,7 +25,6 @@ import {
 
 type ImpactSummaryCardProps = {
   readonly rideImpact: RideImpact;
-  readonly dashboard: ImpactDashboard | null;
   readonly staggerDelayMs?: number;
   readonly newBadges?: readonly BadgeUnlockEvent[];
 };
@@ -139,93 +139,111 @@ const StaggeredBadge = ({
 
 export const ImpactSummaryCard = ({
   rideImpact,
-  dashboard,
   staggerDelayMs = 800,
   newBadges,
-}: ImpactSummaryCardProps) => (
-  <View style={styles.card}>
-    {/* Badges earned this ride */}
-    {newBadges && newBadges.length > 0 ? (
-      <View style={styles.badgesSection}>
-        <Text style={styles.sectionTitle}>Badges earned</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.badgesRow}
-        >
-          {newBadges.map((b, i) => (
-            <StaggeredBadge key={b.badgeKey} badge={b} delayMs={i * 400} />
-          ))}
-        </ScrollView>
-        <Pressable onPress={() => router.push('/achievements' as any)}>
-          <Text style={styles.viewAllLink}>View all achievements &gt;</Text>
-        </Pressable>
-      </View>
-    ) : null}
+}: ImpactSummaryCardProps) => {
+  const tierKey = rideImpact.riderTier as RiderTierKey;
+  const tierDef = riderTiers[tierKey];
+  const progress = tierDef ? getTierProgress(rideImpact.currentTotalXp, tierKey) : 0;
+  const nextKey = tierDef ? getNextTier(tierKey) : null;
+  const nextDef = nextKey ? riderTiers[nextKey] : null;
 
-    {/* This ride's impact — microlives first, then CO2/money/hazards */}
-    <Text style={styles.sectionTitle}>This ride's impact</Text>
-
-    <View style={styles.countersColumn}>
-      <StaggeredCounter
-        targetValue={rideImpact.personalMicrolives}
-        decimals={1}
-        label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
-        equivalentText={rideImpact.communitySeconds > 0 ? `+${Math.round(rideImpact.communitySeconds)}s donated to city` : null}
-        color="#F2C30F"
-        delayMs={0}
-        suffix=" ML"
-      />
-      <StaggeredCounter
-        targetValue={rideImpact.co2SavedKg}
-        suffix=" kg"
-        decimals={2}
-        label="CO2 saved"
-        equivalentText={rideImpact.equivalentText}
-        color={safetyColors.safe}
-        delayMs={staggerDelayMs}
-      />
-      <StaggeredCounter
-        targetValue={rideImpact.moneySavedEur}
-        prefix="EUR "
-        decimals={2}
-        label="Money saved"
-        equivalentText={null}
-        color={brandColors.accent}
-        delayMs={staggerDelayMs * 2}
-      />
-    </View>
-
-    {/* Lifetime totals */}
-    {dashboard ? (
-      <View style={styles.totalsSection}>
-        <Text style={styles.totalsTitle}>Your total impact</Text>
-        <View style={styles.totalsRow}>
-          <View style={styles.totalItem}>
-            <Text style={[styles.totalValue, { color: safetyColors.safe }]}>
-              {dashboard.totalCo2SavedKg.toFixed(1)}
-            </Text>
-            <Text style={styles.totalLabel}>kg CO2</Text>
-          </View>
-          <View style={styles.totalDivider} />
-          <View style={styles.totalItem}>
-            <Text style={[styles.totalValue, { color: brandColors.accent }]}>
-              {dashboard.totalMoneySavedEur.toFixed(0)}
-            </Text>
-            <Text style={styles.totalLabel}>EUR saved</Text>
-          </View>
-          <View style={styles.totalDivider} />
-          <View style={styles.totalItem}>
-            <Text style={[styles.totalValue, { color: safetyColors.caution }]}>
-              {dashboard.totalHazardsReported}
-            </Text>
-            <Text style={styles.totalLabel}>hazards</Text>
-          </View>
+  return (
+    <View style={styles.card}>
+      {/* Badges earned this ride */}
+      {newBadges && newBadges.length > 0 ? (
+        <View style={styles.badgesSection}>
+          <Text style={styles.sectionTitle}>Badges earned</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.badgesRow}
+          >
+            {newBadges.map((b, i) => (
+              <StaggeredBadge key={b.badgeKey} badge={b} delayMs={i * 400} />
+            ))}
+          </ScrollView>
+          <Pressable onPress={() => router.push('/achievements' as any)}>
+            <Text style={styles.viewAllLink}>View all achievements &gt;</Text>
+          </Pressable>
         </View>
+      ) : null}
+
+      {/* XP earned — always visible */}
+      <View style={styles.xpSection}>
+        <Text style={styles.sectionTitle}>XP earned</Text>
+        {rideImpact.xpBreakdown && rideImpact.xpBreakdown.length > 0 ? (
+          <>
+            {rideImpact.xpBreakdown.map((item, i) => (
+              <View key={`${item.action}-${i}`} style={styles.xpRow}>
+                <Text style={styles.xpLabel} numberOfLines={1}>{item.label}</Text>
+                <Text style={styles.xpValue}>
+                  +{item.finalXp}
+                  {item.multiplier > 1 ? (
+                    <Text style={styles.xpMultiplier}>{` (${item.multiplier}x)`}</Text>
+                  ) : null}
+                </Text>
+              </View>
+            ))}
+            <View style={styles.xpDivider} />
+          </>
+        ) : null}
+        <View style={styles.xpRow}>
+          <Text style={[styles.xpLabel, styles.xpTotalLabel]}>Total</Text>
+          <Text style={[styles.xpValue, styles.xpTotalValue]}>+{rideImpact.totalXpEarned} XP</Text>
+        </View>
+        {/* Progress bar to next tier */}
+        {tierDef ? (
+          <View style={styles.xpProgressWrap}>
+            <View style={styles.xpProgressTrack}>
+              <View style={[styles.xpProgressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: tierDef.color }]} />
+            </View>
+            {nextDef ? (
+              <Text style={styles.xpProgressLabel}>
+                {tierDef.displayName} → {nextDef.displayName}  ·  {rideImpact.currentTotalXp.toLocaleString()} / {nextDef.xp.toLocaleString()} XP
+              </Text>
+            ) : (
+              <Text style={styles.xpProgressLabel}>Legend — Maximum rank</Text>
+            )}
+          </View>
+        ) : null}
       </View>
-    ) : null}
-  </View>
-);
+
+      {/* This ride's impact — microlives first, then CO2/money */}
+      <Text style={styles.sectionTitle}>This ride's impact</Text>
+
+      <View style={styles.countersColumn}>
+        <StaggeredCounter
+          targetValue={rideImpact.personalMicrolives}
+          decimals={1}
+          label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
+          equivalentText={rideImpact.communitySeconds > 0 ? `+${Math.round(rideImpact.communitySeconds)}s donated to city` : null}
+          color="#F2C30F"
+          delayMs={0}
+          suffix=" ML"
+        />
+        <StaggeredCounter
+          targetValue={rideImpact.co2SavedKg}
+          suffix=" kg"
+          decimals={2}
+          label="CO2 saved"
+          equivalentText={rideImpact.equivalentText}
+          color={safetyColors.safe}
+          delayMs={staggerDelayMs}
+        />
+        <StaggeredCounter
+          targetValue={rideImpact.moneySavedEur}
+          prefix="EUR "
+          decimals={2}
+          label="Money saved"
+          equivalentText={null}
+          color={brandColors.accent}
+          delayMs={staggerDelayMs * 2}
+        />
+      </View>
+    </View>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -296,41 +314,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: space[1],
   },
-  totalsSection: {
-    borderTopWidth: 1,
-    borderTopColor: darkTheme.borderDefault,
-    paddingTop: space[4],
-    gap: space[3],
+  xpSection: {
+    gap: space[2],
   },
-  totalsTitle: {
-    ...textSm,
-    fontFamily: fontFamily.heading.semiBold,
-    color: darkTheme.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 11,
-  },
-  totalsRow: {
+  xpRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  totalItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  totalValue: {
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 18,
-    lineHeight: 22,
-  },
-  totalLabel: {
-    ...textXs,
+  xpLabel: {
+    ...textSm,
     color: darkTheme.textSecondary,
+    flex: 1,
   },
-  totalDivider: {
-    width: 1,
-    height: 28,
+  xpValue: {
+    fontFamily: fontFamily.mono.medium,
+    fontSize: 13,
+    color: darkTheme.textPrimary,
+  },
+  xpMultiplier: {
+    fontFamily: fontFamily.mono.medium,
+    fontSize: 11,
+    color: darkTheme.textMuted,
+  },
+  xpDivider: {
+    height: 1,
     backgroundColor: darkTheme.borderDefault,
+    marginVertical: space[1],
+  },
+  xpTotalLabel: {
+    fontFamily: fontFamily.body.bold,
+    color: darkTheme.textPrimary,
+  },
+  xpTotalValue: {
+    fontFamily: fontFamily.mono.bold,
+    color: brandColors.accent,
+    fontSize: 15,
+  },
+  xpProgressWrap: {
+    marginTop: space[2],
+    gap: space[1],
+  },
+  xpProgressTrack: {
+    height: 6,
+    borderRadius: radii.sm,
+    backgroundColor: darkTheme.bgTertiary,
+    overflow: 'hidden',
+  },
+  xpProgressFill: {
+    height: '100%',
+    borderRadius: radii.sm,
+  },
+  xpProgressLabel: {
+    ...textXs,
+    color: darkTheme.textMuted,
+    textAlign: 'center',
   },
 });

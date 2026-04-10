@@ -27,6 +27,8 @@ import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 import { useConfirmation } from '../src/hooks/useConfirmation';
 import { useBadges } from '../src/hooks/useBadges';
+import { useTiers } from '../src/hooks/useTiers';
+import { TierRankCard } from '../src/design-system/organisms/TierRankCard';
 import { brandTints, safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 
 const BIKE_TYPE_KEYS = [
@@ -275,6 +277,21 @@ export default function ProfileScreen() {
     );
   };
 
+  const TierRankSection = () => {
+    const { data: tiersData } = useTiers();
+    if (!tiersData) return null;
+
+    return (
+      <View style={{ marginBottom: space[3] }}>
+        <TierRankCard
+          totalXp={tiersData.totalXp}
+          riderTier={tiersData.riderTier as any}
+          showMascot={true}
+        />
+      </View>
+    );
+  };
+
   const AchievementsRow = () => {
     const { data } = useBadges();
     const earned = data?.earned.length ?? 0;
@@ -431,7 +448,8 @@ export default function ProfileScreen() {
             </Pressable>
           )}
 
-          {/* ── Badges ─────────────────────────────────────────────── */}
+          {/* ── Progression ─────────────────────────────────────────── */}
+          <TierRankSection />
           <AchievementsRow />
 
           {/* ── Section 1: Cycling Preferences ─────────────────────── */}

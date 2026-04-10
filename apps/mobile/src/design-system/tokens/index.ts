@@ -14,3 +14,6 @@ export { duration, easing } from './motion';
 export { tints, opacity, brandTints, safetyTints, surfaceTints } from './tints';
 export { iconSize } from './iconSize';
 export { zIndex } from './zIndex';
+export { riderTiers, getNextTier, getTierProgress, getXpToNextTier } from './tierColors';
+export type { RiderTierKey } from './tierColors';
+export { hasTierImage } from './tierImages';

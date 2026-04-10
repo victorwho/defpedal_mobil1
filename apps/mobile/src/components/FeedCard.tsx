@@ -6,6 +6,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme, type ThemeColors } from '../design-system';
 import { safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
+import { TierPill } from '../design-system/atoms/TierPill';
+import { riderTiers, type RiderTierKey } from '../design-system/tokens/tierColors';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
 
@@ -85,10 +87,14 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
               disabled={!onUserPress}
               accessibilityRole={onUserPress ? 'button' : undefined}
               accessibilityLabel={onUserPress ? `View ${item.user.displayName}'s profile` : undefined}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             >
               <Text style={styles.displayName} numberOfLines={1}>
                 {item.user.displayName}
               </Text>
+              {item.user.riderTier && riderTiers[item.user.riderTier as RiderTierKey]?.level >= 3 && (
+                <TierPill tier={item.user.riderTier as any} size="sm" />
+              )}
             </Pressable>
           </View>
           <Text style={styles.timestamp}>{formatRelativeTime(item.sharedAt)}</Text>

@@ -98,12 +98,11 @@ function StarRow({
 
 type ImpactStepProps = {
   readonly rideImpact: RideImpact;
-  readonly dashboard: ImpactDashboard | null;
   readonly onContinue: () => void;
   readonly styles: ThemedStyles;
 };
 
-const ImpactStep = ({ rideImpact, dashboard, onContinue, styles }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, onContinue, styles }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -115,7 +114,7 @@ const ImpactStep = ({ rideImpact, dashboard, onContinue, styles }: ImpactStepPro
         {t('feedback.positiveImpact')}
       </Text>
 
-      <ImpactSummaryCard rideImpact={rideImpact} dashboard={dashboard} newBadges={rideImpact.newBadges} />
+      <ImpactSummaryCard rideImpact={rideImpact} newBadges={rideImpact.newBadges} />
 
       <View style={styles.impactActions}>
         <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
@@ -294,6 +293,7 @@ export default function FeedbackScreen() {
   const earnedMilestones = useAppStore((s) => s.earnedMilestones);
   const addEarnedMilestone = useAppStore((s) => s.addEarnedMilestone);
   const enqueueBadgeUnlocks = useAppStore((s) => s.enqueueBadgeUnlocks);
+  const setTierPromotion = useAppStore((s) => s.setTierPromotion);
   const resetFlow = useAppStore((s) => s.resetFlow);
 
   // Compute impact synchronously on mount from store data
@@ -325,6 +325,11 @@ export default function FeedbackScreen() {
       personalMicrolives: calculatePersonalMicrolives(distKm, vehicle, null),
       communitySeconds: calculateCommunitySeconds(distKm, vehicle),
       newBadges: [],
+      xpBreakdown: [],
+      totalXpEarned: 0,
+      currentTotalXp: 0,
+      riderTier: 'kickstand' as const,
+      tierPromotion: null,
     };
   }, []);
 
@@ -368,13 +373,25 @@ export default function FeedbackScreen() {
             if (result.newBadges.length > 0) {
               enqueueBadgeUnlocks(result.newBadges);
             }
+            // Queue tier promotion overlay (shows after badge overlays)
+            if (result.tierPromotion?.promoted) {
+              setTierPromotion(result.tierPromotion);
+            }
           }
         }
         // Fetch dashboard for milestone detection
         const dash = await mobileApi.fetchImpactDashboard(
           Intl.DateTimeFormat().resolvedOptions().timeZone,
         );
-        if (!cancelled) setDashboard(dash);
+        if (!cancelled) {
+            setDashboard(dash);
+            // Backfill tier info from dashboard when ride-specific XP wasn't computed
+            setRideImpact((prev) => prev.currentTotalXp > 0 ? prev : {
+              ...prev,
+              currentTotalXp: dash.totalXp,
+              riderTier: dash.riderTier ?? prev.riderTier,
+            });
+          }
       } catch { /* server enhancement is optional */ }
     };
 
@@ -472,7 +489,6 @@ export default function FeedbackScreen() {
         {step === 'impact' ? (
           <ImpactStep
             rideImpact={rideImpact}
-            dashboard={dashboard}
             onContinue={() => setStep('rating')}
             styles={styles}
           />

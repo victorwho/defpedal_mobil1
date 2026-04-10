@@ -10,7 +10,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type {
   RideImpact,
-  ImpactDashboard,
   BadgeUnlockEvent,
 } from '@defensivepedal/core';
 
@@ -56,29 +55,11 @@ const makeRideImpact = (overrides?: Partial<RideImpact>): RideImpact => ({
   personalMicrolives: 2.4,
   communitySeconds: 45,
   newBadges: [],
-  ...overrides,
-});
-
-const makeDashboard = (overrides?: Partial<ImpactDashboard>): ImpactDashboard => ({
-  streak: {
-    currentStreak: 5,
-    longestStreak: 12,
-    lastQualifyingDate: '2026-04-08',
-    freezeAvailable: true,
-    freezeUsedDate: null,
-  },
-  totalCo2SavedKg: 15.3,
-  totalMoneySavedEur: 47,
-  totalHazardsReported: 9,
-  totalRidersProtected: 42,
-  thisWeek: {
-    rides: 4,
-    co2SavedKg: 2.1,
-    moneySavedEur: 6.0,
-    hazardsReported: 2,
-  },
-  totalMicrolives: 18.5,
-  totalCommunitySeconds: 320,
+  xpBreakdown: [],
+  totalXpEarned: 0,
+  currentTotalXp: 0,
+  riderTier: 'kickstand',
+  tierPromotion: null,
   ...overrides,
 });
 
@@ -98,7 +79,7 @@ const makeBadge = (key: string, name: string): BadgeUnlockEvent => ({
 describe('ImpactSummaryCard', () => {
   it('renders all three impact counters with correct ride data', () => {
     const impact = makeRideImpact();
-    render(<ImpactSummaryCard rideImpact={impact} dashboard={null} />);
+    render(<ImpactSummaryCard rideImpact={impact} />);
 
     // Section heading
     expect(screen.getByText("This ride's impact")).toBeTruthy();
@@ -118,26 +99,36 @@ describe('ImpactSummaryCard', () => {
     expect(screen.getByText('Money saved')).toBeTruthy();
   });
 
-  it('shows lifetime totals when dashboard is provided', () => {
-    const impact = makeRideImpact();
-    const dashboard = makeDashboard();
-    render(<ImpactSummaryCard rideImpact={impact} dashboard={dashboard} />);
+  it('always renders XP section with total and tier progress', () => {
+    const impact = makeRideImpact({ totalXpEarned: 0, currentTotalXp: 150, riderTier: 'kickstand' });
+    render(<ImpactSummaryCard rideImpact={impact} />);
 
-    // Totals section heading
-    expect(screen.getByText('Your total impact')).toBeTruthy();
-
-    // Formatted dashboard values
-    expect(screen.getByText('15.3')).toBeTruthy(); // totalCo2SavedKg.toFixed(1)
-    expect(screen.getByText('kg CO2')).toBeTruthy();
-    expect(screen.getByText('47')).toBeTruthy(); // totalMoneySavedEur.toFixed(0)
-    expect(screen.getByText('EUR saved')).toBeTruthy();
-    expect(screen.getByText('9')).toBeTruthy(); // totalHazardsReported
-    expect(screen.getByText('hazards')).toBeTruthy();
+    // XP section always present
+    expect(screen.getByText('XP earned')).toBeTruthy();
+    expect(screen.getByText('Total')).toBeTruthy();
+    expect(screen.getByText('+0 XP')).toBeTruthy();
   });
 
-  it('does not show totals section when dashboard is null', () => {
+  it('renders XP breakdown rows when available', () => {
+    const impact = makeRideImpact({
+      xpBreakdown: [
+        { action: 'ride_complete', label: 'Ride completed', baseXp: 50, multiplier: 1, finalXp: 50 },
+        { action: 'badge_earn', label: 'Badge: First Ride', baseXp: 100, multiplier: 2, finalXp: 200 },
+      ],
+      totalXpEarned: 250,
+      currentTotalXp: 250,
+      riderTier: 'kickstand',
+    });
+    render(<ImpactSummaryCard rideImpact={impact} />);
+
+    expect(screen.getByText('Ride completed')).toBeTruthy();
+    expect(screen.getByText('Badge: First Ride')).toBeTruthy();
+    expect(screen.getByText('+250 XP')).toBeTruthy();
+  });
+
+  it('does not show lifetime totals section', () => {
     const impact = makeRideImpact();
-    render(<ImpactSummaryCard rideImpact={impact} dashboard={null} />);
+    render(<ImpactSummaryCard rideImpact={impact} />);
 
     expect(screen.queryByText('Your total impact')).toBeNull();
   });
@@ -151,7 +142,6 @@ describe('ImpactSummaryCard', () => {
     render(
       <ImpactSummaryCard
         rideImpact={impact}
-        dashboard={null}
         newBadges={badges}
       />,
     );

@@ -33,6 +33,7 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
+import { TierRankCard } from '../src/design-system/organisms/TierRankCard';
 import { mobileApi } from '../src/lib/api';
 import { brandTints } from '../src/design-system/tokens/tints';
 
@@ -185,6 +186,15 @@ export default function ImpactDashboardScreen() {
                 </View>
             </View>
           ) : null}
+
+          {/* 0. Tier Rank (compact, no mascot) */}
+          {data.totalXp != null && (
+            <TierRankCard
+              totalXp={data.totalXp}
+              riderTier={data.riderTier as any}
+              showMascot={false}
+            />
+          )}
 
           {/* 1. Streak */}
           <StreakCard streakState={data.streak} />

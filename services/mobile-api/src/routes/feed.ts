@@ -69,6 +69,7 @@ const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
 
 // Streak helpers (shared with v1.ts)
 import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
+import { XP_VALUES } from '../lib/xp';
 
 const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
   const profile = row.profiles as Record<string, unknown> | null;
@@ -79,6 +80,7 @@ const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
       id: row.user_id as string,
       displayName: username ? `@${username}` : (profile?.display_name as string) ?? 'Rider',
       avatarUrl: (profile?.avatar_url as string) ?? null,
+      riderTier: (profile?.rider_tier as import('@defensivepedal/core').RiderTierName | undefined) ?? undefined,
     },
     title: (row.title as string) ?? '',
     startLocationText: (row.start_location_text as string) ?? '',
@@ -354,6 +356,17 @@ export const buildFeedRoutes = (
 
         qualifyStreakAsync(user.id, 'trip_share', getTimezone(request), request.log);
 
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try { await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id, p_action: 'trip_share',
+              p_base_xp: XP_VALUES.trip_share, p_multiplier: 1.0,
+              p_source_id: data.id as string,
+            }); } catch { /* non-fatal */ }
+          })();
+        }
+
         return {
           id: data.id as string,
           sharedAt: data.shared_at as string,
@@ -420,6 +433,17 @@ export const buildFeedRoutes = (
             }
           } catch { /* ignore notification failures */ }
         })();
+
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try { await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id, p_action: 'like',
+              p_base_xp: XP_VALUES.like, p_multiplier: 1.0,
+              p_source_id: request.params.id,
+            }); } catch { /* non-fatal */ }
+          })();
+        }
 
         return { acceptedAt: new Date().toISOString() };
       },
@@ -489,6 +513,18 @@ export const buildFeedRoutes = (
           { onConflict: 'trip_share_id,user_id' },
         );
         if (error) throw new HttpError('Love failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
+
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try { await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id, p_action: 'like',
+              p_base_xp: XP_VALUES.like, p_multiplier: 1.0,
+              p_source_id: request.params.id,
+            }); } catch { /* non-fatal */ }
+          })();
+        }
+
         return { acceptedAt: new Date().toISOString() };
       },
     );
@@ -661,6 +697,17 @@ export const buildFeedRoutes = (
             }
           } catch { /* ignore notification failures */ }
         })();
+
+        // XP award (fire-and-forget)
+        if (supabaseAdmin) {
+          void (async () => {
+            try { await supabaseAdmin.rpc('award_xp', {
+              p_user_id: user.id, p_action: 'comment',
+              p_base_xp: XP_VALUES.comment, p_multiplier: 1.0,
+              p_source_id: request.params.id,
+            }); } catch { /* non-fatal */ }
+          })();
+        }
 
         return { acceptedAt: new Date().toISOString() };
       },

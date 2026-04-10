@@ -36,3 +36,9 @@ export type { FadeSlideInProps } from './FadeSlideIn';
 
 export { ScreenHeader } from './ScreenHeader';
 export type { ScreenHeaderProps, ScreenHeaderVariant } from './ScreenHeader';
+
+export { TierPill } from './TierPill';
+export type { TierPillProps } from './TierPill';
+
+export { XpGainToast } from './XpGainToast';
+export type { XpGainToastProps } from './XpGainToast';

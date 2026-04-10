@@ -405,6 +405,7 @@ export interface FeedProfile {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+  riderTier?: RiderTierName;
 }
 
 export interface UserPublicProfile {
@@ -567,6 +568,11 @@ export interface RideImpact {
   readonly personalMicrolives: number;
   readonly communitySeconds: number;
   readonly newBadges: readonly BadgeUnlockEvent[];
+  readonly xpBreakdown: readonly XpBreakdownItem[];
+  readonly totalXpEarned: number;
+  readonly currentTotalXp: number;
+  readonly riderTier: RiderTierName;
+  readonly tierPromotion: XpAwardResult | null;
 }
 
 export interface BadgeResponse {
@@ -597,6 +603,8 @@ export interface ImpactDashboard {
   };
   readonly totalMicrolives: number;
   readonly totalCommunitySeconds: number;
+  readonly totalXp: number;
+  readonly riderTier: RiderTierName;
 }
 
 export interface QuizQuestion {
@@ -657,6 +665,70 @@ export interface BadgeUnlockEvent {
   readonly flavorText: string;
   readonly iconKey: string;
   readonly earnedAt: string;
+}
+
+// ── Rider Tier System ──
+
+export type RiderTierName =
+  | 'kickstand'
+  | 'spoke'
+  | 'pedaler'
+  | 'street_smart'
+  | 'road_regular'
+  | 'trail_blazer'
+  | 'road_captain'
+  | 'city_guardian'
+  | 'iron_cyclist'
+  | 'legend';
+
+export interface RiderTierDefinition {
+  readonly tierLevel: number;
+  readonly name: RiderTierName;
+  readonly displayName: string;
+  readonly xpRequired: number;
+  readonly tagline: string;
+  readonly color: string;
+  readonly pillTextColor: string;
+  readonly perkDescription: string;
+}
+
+export interface XpAwardResult {
+  readonly xpAwarded: number;
+  readonly totalXp: number;
+  readonly oldTier: RiderTierName;
+  readonly newTier: RiderTierName;
+  readonly promoted: boolean;
+  readonly tierDisplayName?: string;
+  readonly tierTagline?: string;
+  readonly tierColor?: string;
+  readonly tierLevel?: number;
+  readonly tierPerk?: string;
+}
+
+export interface XpBreakdownItem {
+  readonly action: string;
+  readonly label: string;
+  readonly baseXp: number;
+  readonly multiplier: number;
+  readonly finalXp: number;
+  readonly sourceId?: string;
+}
+
+export interface XpEvent {
+  readonly id: string;
+  readonly action: string;
+  readonly baseXp: number;
+  readonly multiplier: number;
+  readonly finalXp: number;
+  readonly sourceId: string | null;
+  readonly createdAt: string;
+}
+
+export interface TiersResponse {
+  readonly tiers: readonly RiderTierDefinition[];
+  readonly totalXp: number;
+  readonly riderTier: RiderTierName;
+  readonly recentXp: readonly XpEvent[];
 }
 
 export interface NeighborhoodSafetyScore {
