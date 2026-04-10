@@ -33,7 +33,7 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
-import { TierRankCard } from '../src/design-system/organisms/TierRankCard';
+import { riderTiers, getTierProgress, getNextTier, getXpToNextTier, type RiderTierKey } from '../src/design-system/tokens/tierColors';
 import { mobileApi } from '../src/lib/api';
 import { brandTints } from '../src/design-system/tokens/tints';
 
@@ -187,14 +187,43 @@ export default function ImpactDashboardScreen() {
             </View>
           ) : null}
 
-          {/* 0. Tier Rank (compact, no mascot) */}
-          {data.totalXp != null && (
-            <TierRankCard
-              totalXp={data.totalXp}
-              riderTier={data.riderTier as any}
-              showMascot={false}
-            />
-          )}
+          {/* 0. XP & Tier Progress */}
+          {data.totalXp != null && (() => {
+            const tierKey = (data.riderTier ?? 'kickstand') as RiderTierKey;
+            const tierDef = riderTiers[tierKey];
+            if (!tierDef) return null;
+            const progress = getTierProgress(data.totalXp, tierKey);
+            const nextKey = getNextTier(tierKey);
+            const nextDef = nextKey ? riderTiers[nextKey] : null;
+            const xpLeft = getXpToNextTier(data.totalXp, tierKey);
+            return (
+              <View style={styles.card}>
+                <Text style={styles.cardHeader}>Experience</Text>
+                <View style={styles.counterBlock}>
+                  <AnimatedCounter
+                    targetValue={data.totalXp}
+                    suffix=" XP"
+                    decimals={0}
+                    duration={1500}
+                    style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: tierDef.color }}
+                  />
+                  <Text style={styles.counterLabel}>{tierDef.displayName}</Text>
+                </View>
+                <View style={styles.xpProgressWrap}>
+                  <View style={styles.xpProgressTrack}>
+                    <View style={[styles.xpProgressFill, { width: `${Math.round(progress * 100)}%`, backgroundColor: tierDef.color }]} />
+                  </View>
+                  {nextDef ? (
+                    <Text style={styles.xpProgressLabel}>
+                      {nextDef.displayName} · {xpLeft?.toLocaleString()} XP to go
+                    </Text>
+                  ) : (
+                    <Text style={[styles.xpProgressLabel, { color: colors.accent }]}>Maximum rank achieved</Text>
+                  )}
+                </View>
+              </View>
+            );
+          })()}
 
           {/* 1. Streak */}
           <StreakCard streakState={data.streak} />
@@ -362,6 +391,25 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: colors.textMuted,
       fontStyle: 'italic',
+      textAlign: 'center',
+    },
+    // XP progress
+    xpProgressWrap: {
+      gap: space[1],
+    },
+    xpProgressTrack: {
+      height: 6,
+      borderRadius: radii.sm,
+      backgroundColor: colors.bgTertiary,
+      overflow: 'hidden',
+    },
+    xpProgressFill: {
+      height: '100%',
+      borderRadius: radii.sm,
+    },
+    xpProgressLabel: {
+      ...textXs,
+      color: colors.textMuted,
       textAlign: 'center',
     },
     // This week grid

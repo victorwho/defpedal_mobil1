@@ -2156,6 +2156,43 @@ export const buildV1Routes = (
         const totals = d.totals as Record<string, unknown> | undefined;
         const thisWeek = d.thisWeek as Record<string, unknown> | undefined;
 
+        let totalCo2 = Number(totals?.totalCo2SavedKg ?? 0);
+        let totalMoney = Number(totals?.totalMoneySavedEur ?? 0);
+        let totalHazards = Number(totals?.totalHazardsReported ?? 0);
+        let totalRiders = Number(totals?.totalRidersProtected ?? 0);
+
+        // Fallback: if profile-based totals are all zero, derive from trips table
+        // (covers rides completed before record_ride_impact was deployed)
+        if (totalCo2 === 0 && totalMoney === 0) {
+          try {
+            const tripStats = await dependencies.getUserStats(user.id);
+            if (tripStats.totalDistanceMeters > 0) {
+              const distKm = tripStats.totalDistanceMeters / 1000;
+              totalCo2 = tripStats.totalCo2SavedKg;
+              totalMoney = distKm * 0.35;
+            }
+          } catch { /* fallback is optional */ }
+        }
+
+        let weekRides = Number(thisWeek?.rides ?? 0);
+        let weekCo2 = Number(thisWeek?.co2SavedKg ?? 0);
+        let weekMoney = Number(thisWeek?.moneySavedEur ?? 0);
+        const weekHazards = Number(thisWeek?.hazardsReported ?? 0);
+
+        // Fallback: if thisWeek from ride_impacts is empty, compute from trips table
+        if (weekRides === 0 && totalCo2 > 0) {
+          try {
+            const dashStats = await dependencies.getTripStatsDashboard(user.id, tz);
+            if (dashStats.totals.totalTrips > 0 && dashStats.weekly.length > 0) {
+              const latestWeek = dashStats.weekly[dashStats.weekly.length - 1];
+              weekRides = latestWeek.trips;
+              const weekDistKm = latestWeek.distanceMeters / 1000;
+              weekCo2 = weekDistKm * 0.12;
+              weekMoney = weekDistKm * 0.35;
+            }
+          } catch { /* fallback is optional */ }
+        }
+
         return {
           streak: {
             currentStreak: Number(streak?.currentStreak ?? 0),
@@ -2164,18 +2201,22 @@ export const buildV1Routes = (
             freezeAvailable: Boolean(streak?.freezeAvailable ?? false),
             freezeUsedDate: null as string | null,
           },
-          totalCo2SavedKg: Number(totals?.totalCo2SavedKg ?? 0),
-          totalMoneySavedEur: Number(totals?.totalMoneySavedEur ?? 0),
-          totalHazardsReported: Number(totals?.totalHazardsReported ?? 0),
-          totalRidersProtected: Number(totals?.totalRidersProtected ?? 0),
+          totalCo2SavedKg: totalCo2,
+          totalMoneySavedEur: totalMoney,
+          totalHazardsReported: totalHazards,
+          totalRidersProtected: totalRiders,
           thisWeek: {
-            rides: Number(thisWeek?.rides ?? 0),
-            co2SavedKg: Number(thisWeek?.co2SavedKg ?? 0),
-            moneySavedEur: Number(thisWeek?.moneySavedEur ?? 0),
-            hazardsReported: Number(thisWeek?.hazardsReported ?? 0),
+            rides: weekRides,
+            co2SavedKg: weekCo2,
+            moneySavedEur: weekMoney,
+            hazardsReported: weekHazards,
           },
-          totalMicrolives: Number(totals?.totalMicrolives ?? 0),
-          totalCommunitySeconds: Number(totals?.totalCommunitySeconds ?? 0),
+          totalMicrolives: Number(totals?.totalMicrolives ?? 0) > 0
+            ? Number(totals?.totalMicrolives ?? 0)
+            : totalCo2 > 0 ? (totalCo2 / 0.12) * 0.4 : 0,  // 0.4 ML/km, CO2 = 0.12 kg/km
+          totalCommunitySeconds: Number(totals?.totalCommunitySeconds ?? 0) > 0
+            ? Number(totals?.totalCommunitySeconds ?? 0)
+            : totalCo2 > 0 ? (totalCo2 / 0.12) * 4.5 : 0,  // 4.5 sec/km
           totalXp: Number(d.totalXp ?? 0),
           riderTier: String(d.riderTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
         };

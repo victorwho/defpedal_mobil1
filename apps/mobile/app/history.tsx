@@ -183,6 +183,25 @@ export default function HistoryScreen() {
           </View>
         ) : null}
 
+        {/* Your Impact link */}
+        {user ? (
+          <Pressable
+            style={styles.impactCard}
+            onPress={() => router.push('/impact-dashboard')}
+            accessibilityRole="button"
+            accessibilityLabel={t('history.yourImpact') ?? 'Your Impact'}
+          >
+            <View style={styles.quizCardLeft}>
+              <Ionicons name="trending-up-outline" size={22} color={colors.accent} />
+              <View>
+                <Text style={styles.quizCardTitle}>{t('history.yourImpact') ?? 'Your Impact'}</Text>
+                <Text style={styles.quizCardSubtitle}>XP, streaks, badges & lifetime stats</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
+
         {/* Daily Safety Quiz */}
         {user ? (
           <Pressable
@@ -394,7 +413,18 @@ const createThemedStyles = (colors: ThemeColors) =>
       height: space[4],
     },
 
-    // ── Quiz card ──
+    // ── Impact + Quiz cards ──
+    impactCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.bgPrimary,
+      borderRadius: radii.xl,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      padding: space[4],
+      ...shadows.md,
+    },
     quizCard: {
       flexDirection: 'row',
       alignItems: 'center',
