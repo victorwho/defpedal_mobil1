@@ -41,11 +41,18 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 
 ## App Variants
 
-| Variant | Package | Name | How it gets JS |
-|---------|---------|------|---------------|
-| development | `com.defensivepedal.mobile.dev` | Defensive Pedal Dev | Metro via USB (hot reload) |
-| preview | `com.defensivepedal.mobile.preview` | Defensive Pedal Preview | Embedded bundle (untethered, Cloud Run API) |
-| production | `com.defensivepedal.mobile` | Defensive Pedal | Embedded bundle |
+| Variant | Package | Name | How it gets JS | New Arch |
+|---------|---------|------|---------------|----------|
+| development | `com.defensivepedal.mobile.dev` | Defensive Pedal Dev | Metro via USB (hot reload) | Off (bridge mode) |
+| preview | `com.defensivepedal.mobile.preview` | Defensive Pedal Preview | Embedded bundle (untethered, Cloud Run API) | On (bridgeless) |
+| production | `com.defensivepedal.mobile` | Defensive Pedal | Embedded bundle | On (bridgeless) |
+
+### Gradle Flavors
+All three variants are defined as Gradle product flavors in `build.gradle`:
+- `./gradlew installDevelopmentDebug` — dev build with Metro hot reload
+- `./gradlew assemblePreviewRelease` — preview APK with embedded bundle
+- `./gradlew assembleProductionRelease` — production APK
+- `npm run build:preview:install` — automated sync + clean + build + install for preview
 
 ## Commit Workflow
 
@@ -270,7 +277,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **Mapbox vector tiles for POI** (not Overpass) | Overpass rate-limits aggressively after multiple queries. Vector tiles are pre-loaded, zero API calls, instant rendering |
 | **Overpass only for parking/rental/shops** | These specific OSM tags aren't in Mapbox's POI layer. Rate limit risk accepted (cached 5-10 min via TanStack Query) |
 | **Filter-based layer hiding** (not conditional mount/unmount) | Mapbox RN caches rendered features. Unmounting a ShapeSource doesn't clear markers. Use `key={vis ? 'on' : 'off'}` or impossible filter to force remount |
-| **`newArchEnabled: false` for release builds** | New Architecture CMake builds fail on Windows due to 260-char path limit. Old arch works. Revert when project path is shorter or when building on CI |
+| **`newArchEnabled` per variant** | Development: off (bridge mode) so Metro bundle loads over USB. Preview/production: on (bridgeless). Controlled in `app.config.ts` + `gradle.properties` |
 | **Local notifications** (not Expo Push) | Push notifications require EAS project ID which isn't configured. Local scheduling via `expo-notifications` works without server infrastructure |
 | **`NativeModules` guard before `require('expo-notifications')`** | `require()` of a missing native module causes uncatchable fatal crash on Android. Checking `NativeModules.ExpoPushTokenManager` first prevents this |
 | **Short path `C:\dev\defpedal`** | Original path `C:\Users\Victor\Documents\1. Projects\...` exceeds Windows 260-char limit for CMake. Junction from old path preserved for file explorer |

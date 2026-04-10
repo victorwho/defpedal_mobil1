@@ -134,7 +134,9 @@ export default () => ({
     version: '0.1.0',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
-    newArchEnabled: true,
+    // Disable new architecture for development — bridgeless mode fails to load
+    // the Metro JS bundle over USB on Windows. Preview/production use new arch.
+    newArchEnabled: appVariant !== 'development',
     experiments: {
       typedRoutes: true,
     },
