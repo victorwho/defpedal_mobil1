@@ -341,9 +341,13 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 
 ### Before committing:
 1. Bundle check passes
-2. Test on phone confirms feature works
-3. Update `progress.md` with what was done
-4. Descriptive commit message
+2. Run `npm run typecheck` — MUST pass with 0 errors (CI runs this on push)
+3. Test on phone confirms feature works
+4. Update `progress.md` with what was done
+5. Descriptive commit message
+
+### Before pushing:
+- A **git pre-push hook** (`.git/hooks/pre-push`) automatically runs `npm run typecheck` before every push. If it fails, the push is blocked. Do NOT skip it with `--no-verify`.
 
 ### Never:
 - Use `SafeAreaView` from `react-native` (use `react-native-safe-area-context`)
