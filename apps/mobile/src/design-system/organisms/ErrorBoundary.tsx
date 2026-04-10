@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     ...textSm,
-    fontFamily: fontFamily.mono,
+    fontFamily: fontFamily.mono.medium,
     color: darkTheme.danger,
   },
   actions: {
