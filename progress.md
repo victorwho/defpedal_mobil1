@@ -232,6 +232,9 @@ Update it at the end of each implementation slice.
     - **Feed integration**: `riderTier` added to feed response schema and FeedCard displays TierPill next to username.
     - **Tests**: Updated ImpactSummaryCard tests — 5 tests covering XP section always visible, breakdown rows, no totals section, badges.
     - Phone-tested on Samsung S23 Ultra (embedded bundle APK).
+    - **Impact Dashboard — XP KPI card**: Replaced compact TierRankCard (no mascot) with full XP KPI card using AnimatedCounter in tier color + progress bar + next tier label. Matches Time Bank card visual style.
+    - **History — "Your Impact" link**: Added pressable card with accent border below compact stats, navigates to `/impact-dashboard`. Was missing after Phase 3 history restructure.
+    - **Impact Dashboard — zero stats fix**: Dashboard read totals from `profiles` columns (populated by `record_ride_impact` RPC). Rides before that feature was deployed showed all zeros. Server now falls back to `trips` table via `getUserStats` + `getTripStatsDashboard` when profile totals are zero. Also backfills microlives (0.4 ML/km) and community seconds (4.5 sec/km) from trip distance. Deployed to Cloud Run revision 00043.
 
 ## Phase Status
 
