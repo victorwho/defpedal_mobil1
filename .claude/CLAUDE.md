@@ -124,13 +124,13 @@ C:\dev\defpedal/
 │   │   │   ├── BrandLogo.tsx    # App logo
 │   │   │   └── VoiceGuidanceButton.tsx
 │   │   ├── design-system/       # Branded design system (all 30 screens use useTheme())
-│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, tints, iconSize, zIndex, badgeColors, badgeIcons
-│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, BadgeIcon, BadgeProgressBar, BadgeInlineChip
+│   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, tints, iconSize, zIndex, badgeColors, badgeIcons, tierColors, tierImages
+│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, BadgeIcon, BadgeProgressBar, BadgeInlineChip, TierPill, XpGainToast
 │   │   │   ├── molecules/       # SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget, BadgeCard
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
 │   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
 │   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay,
-│   │   │                        # ActivityChart, PulseHeader
+│   │   │                        # ActivityChart, PulseHeader, TierRankCard, RankUpOverlay
 │   │   ├── hooks/               # Custom React hooks
 │   │   │   ├── useBicycleParking.ts   # Overpass API for parking
 │   │   │   ├── useBicycleRental.ts    # Overpass API for rentals
@@ -141,7 +141,8 @@ C:\dev\defpedal/
 │   │   │   ├── useFeed.ts             # Community feed queries + mutations
 │   │   │   ├── useRouteGuard.ts       # Screen access control
 │   │   │   ├── useCurrentLocation.ts  # GPS location
-│   │   │   └── useCityHeartbeat.ts    # City Heartbeat dashboard data
+│   │   │   ├── useCityHeartbeat.ts    # City Heartbeat dashboard data
+│   │   │   └── useTiers.ts           # Rider tier + XP data (TanStack Query)
 │   │   ├── lib/                 # Utility libraries
 │   │   │   ├── mapbox-routing.ts      # Client-side route fetching (Mapbox + OSRM)
 │   │   │   ├── mapbox-search.ts       # Autocomplete/geocoding
@@ -342,7 +343,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-04-08)
+## Current State (as of 2026-04-10)
 
 ### Working Features
 - Route planning with destination autocomplete and recent destinations (Google Maps-style UX)
@@ -390,6 +391,14 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - `check_and_award_badges` RPC evaluates all criteria on: Trophy Case visit, post-ride dashboard, ride impact fetch
   - Share: native Share API from badge detail modal
   - Design system: BadgeIcon (3 sizes), BadgeCard, BadgeInlineChip, BadgeProgressBar, TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
+- **Rider Tier XP System (10 tiers: Kickstand → Legend):**
+  - Full-stack: `rider_xp_log` table, `award_ride_xp` RPC, `total_xp`/`rider_tier` on profiles
+  - XP awarded on: ride completion, badge earning, streak days. Multipliers for distance/weather/hazards
+  - Post-ride impact: XP breakdown always visible with total + tier progress bar. Tier backfilled from dashboard
+  - Profile: compact two-column TierRankCard (mascot+name | XP+progress bar)
+  - RankUpOverlay: full-screen tier promotion celebration (suppressed during NAVIGATING)
+  - TierPill atom on feed cards, XpGainToast atom
+  - `GET /v1/tiers` endpoint, tier mascot images for all 10 tiers
 - **Stability & UX:**
   - Global ErrorBoundary with crash recovery (Try Again / Restart App buttons)
   - End Ride confirmation dialog (prevents accidental trip cancellation)
@@ -397,13 +406,11 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
   - City Heartbeat community dashboard (spatial aggregation, 7-day chart, hazard hotspots, top contributors)
-- **949 tests across 3 packages** (core: 277, mobile-api: 205, mobile: 467). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
+- **969 tests across 3 packages** (core: 277, mobile-api: 210, mobile: 482). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
-- Push notifications (needs EAS project ID + native rebuild for actual delivery)
 - iPhone validation (no macOS hardware available)
-- Redis-backed production caching/rate-limiting
-- Quiet hours not enforced in notification triggers
+- Redis activation: code complete (`redisStore.ts`), needs GCP Memorystore + REDIS_URL on Cloud Run
 - Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
 
 ### Known Issues
@@ -415,6 +422,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Guardian Tier system (reporter→watchdog→sentinel→guardian_angel) — replaced by badge system
 - Microlives badges (Time Banker, Community Giver) — conflicted with badge system; microlives display retained in impact summary/dashboard
 - TimeBankWidget on route planning screen — removed to declutter main screen
+- "Your Total Impact" lifetime stats on post-ride impact screen — replaced by XP section with tier progress
 
 ## External Services & Config
 

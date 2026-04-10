@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-09 (session 12)
+Last updated: 2026-04-10 (session 13)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -221,6 +221,17 @@ Update it at the end of each implementation slice.
     - **Voice navigation fix (2 bugs)**: (1) hasPassedCurrentManeuver in navigation.ts now requires distanceToRouteMeters < 30m — prevents lateral GPS offset from prematurely jumping currentStepIndex to the next step. (2) Removed currentStepIndex from intro announcement effect deps in navigation.tsx — prevents re-announcing every step advance. Step completion now correctly speaks the current turn instruction.
     - **Notification tests**: 5 new tests — isInQuietHours (3: overnight true, daytime false, null false) + PATCH /profile notification fields (2: accepts prefs, rejects invalid format)
     - All 969 tests pass (core 277, API 210, mobile 482). Phone-tested on Samsung S23 Ultra (preview APK).
+
+- Session 13 — Rider Tier XP system + post-ride impact rework (2026-04-10):
+    - **Rider Tier XP System (full-stack)**: 10-tier progression (Kickstand → Legend) with XP awarding on ride completion, badge earning, and streak days. Supabase migration: `rider_xp_log` table, `award_ride_xp` RPC with tier promotion detection, `total_xp`/`rider_tier` columns on profiles. Server: XP awarding in `POST /v1/rides/:tripId/impact`, `GET /v1/tiers` endpoint, tier in feed responses. XP multipliers based on ride context (distance, weather, hazards).
+    - **Design system — Tier components**: `TierPill` atom (sm/md/lg sizes, hidden at tiers 1-2 in feed), `TierRankCard` organism (compact two-column: mascot+name | XP+progress bar), `RankUpOverlay` organism (full-screen tier promotion celebration), `XpGainToast` atom. Tier mascot images for all 10 tiers. `tierColors.ts` token file with XP thresholds, `tierImages.ts` with require() mappings.
+    - **Profile tier card**: Compact two-column layout — left column has 56px tier mascot icon + tier name in tier color, right column has XP counter + progress bar + next tier label. No redundant headings or repeated tier names.
+    - **Post-ride impact — XP always visible**: ImpactSummaryCard XP section now always renders (was conditional on `xpBreakdown.length > 0`). Shows breakdown rows when server provides them, total XP line, and tier progress bar. Tier data backfilled from dashboard when ride-specific XP not yet computed (fixes Kickstand default for existing users).
+    - **Post-ride impact — removed "Your Total Impact"**: Removed lifetime totals section (CO2/EUR/hazards) from ImpactSummaryCard. Removed `dashboard` prop. Cleaned up 7 unused styles and 3 unused imports.
+    - **RankUpOverlay in root layout**: `RankUpOverlayManager` in `_layout.tsx` reads `pendingTierPromotion` from appStore, shows celebration overlay after badges, suppressed during NAVIGATING.
+    - **Feed integration**: `riderTier` added to feed response schema and FeedCard displays TierPill next to username.
+    - **Tests**: Updated ImpactSummaryCard tests — 5 tests covering XP section always visible, breakdown rows, no totals section, badges.
+    - Phone-tested on Samsung S23 Ultra (embedded bundle APK).
 
 ## Phase Status
 
