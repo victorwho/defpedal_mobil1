@@ -391,7 +391,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - Post-ride impact summary (animated CO2/money/hazards counters with variable equivalents)
   - Streak engine (4AM cutoff, 5 qualifying actions, freeze mechanic, weekly reset)
   - Impact Dashboard (streak chain, lifetime counters, weekly summary)
-  - Daily safety quiz (50+ questions, streak qualifier)
+  - Daily safety quiz (45 Romania-focused questions in static file, streak qualifier)
   - Enhanced hazard reporting (2-tap FAB during navigation, armchair long-press, confirm/deny counts)
   - Milestone share cards with detection and deduplication
   - Scheduled notifications (streak protection, weekly impact, social digest)
