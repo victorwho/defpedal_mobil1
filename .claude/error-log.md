@@ -142,6 +142,11 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** Call `WebBrowser.dismissBrowser()` in `resolveOAuthCallback()` immediately after the deep link resolves. This programmatically closes the Custom Tab, unblocking `openAuthSessionAsync`.
 **Occurrences:** Google OAuth sign-in on Android (2026-04-11)
 
+### 27. Preview APK uses wrong OAuth scheme (intent goes to dev app)
+**Pattern:** The preview APK's JS bundle used scheme `defensivepedal-dev` instead of `defensivepedal-preview` because `APP_VARIANT=development` in `C:\dpb\apps\mobile\.env`. After Google auth, the edge function's intent URI targeted the dev app. Additionally, the AndroidManifest.xml (from prebuild) only had the `defensivepedal-dev` scheme, so even with the correct JS scheme, the intent filter wouldn't match.
+**Fix:** (1) Build script now sets `APP_VARIANT` to match the Gradle flavor. (2) Build script patches AndroidManifest.xml to add the correct scheme per flavor. (3) Never run `expo prebuild` on C:\dpb — it overwrites source files. Patch the manifest directly instead.
+**Occurrences:** Preview APK Google sign-in showing "item not found" (2026-04-11)
+
 ### 19. Dev app points to production API, not localhost
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
 **Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).

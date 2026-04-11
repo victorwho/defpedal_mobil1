@@ -59,6 +59,33 @@ done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
 cp -f "$SRC/apps/mobile/android/app/build.gradle" "$DST/apps/mobile/android/app/build.gradle" 2>/dev/null || true
 
+echo "── Step 1b: Set APP_VARIANT in .env ──"
+# The JS bundle reads APP_VARIANT to determine the scheme, package name,
+# and API URLs. Must match the Gradle flavor being built.
+if grep -q '^APP_VARIANT=' "$DST/apps/mobile/.env" 2>/dev/null; then
+  sed -i "s/^APP_VARIANT=.*/APP_VARIANT=$FLAVOR/" "$DST/apps/mobile/.env"
+else
+  echo "APP_VARIANT=$FLAVOR" >> "$DST/apps/mobile/.env"
+fi
+echo "  APP_VARIANT=$FLAVOR"
+
+echo "── Step 1c: Ensure deep link scheme in AndroidManifest ──"
+# Each flavor needs its scheme in the manifest for OAuth deep links.
+# The manifest is prebuilt with the dev scheme only. Patch it here
+# instead of running expo prebuild (which breaks source files).
+MANIFEST="$DST/apps/mobile/android/app/src/main/AndroidManifest.xml"
+SCHEME_MAP_dev="defensivepedal-dev"
+SCHEME_MAP_preview="defensivepedal-preview"
+SCHEME_MAP_production="defensivepedal"
+eval "TARGET_SCHEME=\$SCHEME_MAP_${FLAVOR}"
+if [ -n "$TARGET_SCHEME" ] && ! grep -q "android:scheme=\"$TARGET_SCHEME\"" "$MANIFEST" 2>/dev/null; then
+  # Add the scheme after the existing dev scheme line
+  sed -i "s|<data android:scheme=\"defensivepedal-dev\"/>|<data android:scheme=\"defensivepedal-dev\"/>\n        <data android:scheme=\"$TARGET_SCHEME\"/>|" "$MANIFEST"
+  echo "  Added scheme: $TARGET_SCHEME"
+else
+  echo "  Scheme $TARGET_SCHEME already present"
+fi
+
 echo "── Step 2: Clean Gradle bundle cache ──"
 # Forces Gradle to re-run the Metro bundle task instead of reusing stale output.
 rm -rf "$DST/apps/mobile/android/app/build/generated/assets/"
@@ -87,17 +114,22 @@ fi
 
 echo ""
 echo "── Step 4: Verify bundle freshness ──"
-if command -v unzip &>/dev/null; then
-  BUNDLE_CONTENT=$(unzip -p "$APK_PATH" assets/index.android.bundle 2>/dev/null || true)
-  if echo "$BUNDLE_CONTENT" | grep -q "$VERIFY_STRING"; then
-    echo "Bundle verified: contains '$VERIFY_STRING'"
+# Hermes compiles JS to bytecode (.hbc), so plaintext grep won't work.
+# Instead, verify the bundle task actually ran by checking its output timestamp.
+BUNDLE_FILE="$DST/apps/mobile/android/app/build/generated/assets/createBundlePreviewReleaseJsAndAssets/index.android.bundle"
+if [ ! -f "$BUNDLE_FILE" ]; then
+  # Try other flavor paths
+  BUNDLE_FILE=$(find "$DST/apps/mobile/android/app/build/generated/assets/" -name "index.android.bundle" 2>/dev/null | head -1)
+fi
+if [ -n "$BUNDLE_FILE" ] && [ -f "$BUNDLE_FILE" ]; then
+  BUNDLE_AGE=$(( $(date +%s) - $(stat -c %Y "$BUNDLE_FILE" 2>/dev/null || stat -f %m "$BUNDLE_FILE" 2>/dev/null) ))
+  if [ "$BUNDLE_AGE" -lt 300 ]; then
+    echo "Bundle verified: generated ${BUNDLE_AGE}s ago (fresh)"
   else
-    echo "WARNING: Bundle may be stale — '$VERIFY_STRING' not found in APK bundle"
-    echo "  The APK might contain old code. Consider running with a full clean:"
-    echo "  rm -rf $DST/apps/mobile/android/app/build && rerun"
+    echo "WARNING: Bundle is ${BUNDLE_AGE}s old — may be stale"
   fi
 else
-  echo "Skipping bundle verification (unzip not available)"
+  echo "Bundle file not found — skipping freshness check"
 fi
 
 echo ""

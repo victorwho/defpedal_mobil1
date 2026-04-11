@@ -259,10 +259,15 @@ Update it at the end of each implementation slice.
     - **Security audit**: Reviewed all keys and tokens across the codebase. Identified P0: dev auth bypass active on production Cloud Run with trivially guessable token `dev-bypass`.
     - **P0 fix — Disabled dev auth bypass on Cloud Run**: Set `DEV_AUTH_BYPASS_ENABLED=false` via `gcloud run services update`. Revision `defpedal-api-00044-skg` deployed and verified — bypass token now returns 401. No source code change needed (env var only).
     - **Remaining action items** (not yet fixed): rotate Supabase anon key (in git history from initial commit), add IP-based rate limiting to 3 unprotected endpoints (`POST /v1/hazards`, `GET /v1/risk-map`, `GET /v1/hazards/nearby`), gate dev bypass credentials out of preview/production APK builds in `app.config.ts`, activate Redis for persistent rate limiting, configure `CRON_SECRET` on Cloud Run.
-- Session 15 — Google sign-in blank screen fix (2026-04-11):
-    - **Diagnosed**: After selecting Google account, Chrome Custom Tab stayed open showing blank page. Root cause: `oauth-redirect` edge function uses 302→intent URI which launches the app via deep link, but the Custom Tab doesn't auto-close. `signInWithGoogle()` blocks at `await WebBrowser.openAuthSessionAsync()` waiting for tab dismissal, preventing the PKCE code exchange.
-    - **Fixed**: Added `WebBrowser.dismissBrowser()` call in `resolveOAuthCallback()` (`supabase.ts`). When the deep link arrives, the Custom Tab is programmatically closed, unblocking the auth flow.
-    - **Error log**: Added entry #26 documenting the pattern and fix.
+- Session 15 — Google sign-in fix + code review fixes (2026-04-11):
+    - **Google OAuth blank screen (3 layered issues)**:
+      1. Chrome Custom Tab not dismissed after intent redirect — added `WebBrowser.dismissBrowser()` in `resolveOAuthCallback()` (warm path) and cold-start fallback in `AuthSessionProvider`
+      2. Cold-start OAuth path didn't sync session into React state — added `getCurrentSession()` + `setSession()` after `exchangeCodeForSession`
+      3. Added Supabase `onAuthStateChange` listener as safety net for session sync
+    - **Preview APK OAuth "item not found"**: `APP_VARIANT=development` in `C:\dpb\.env` caused JS bundle to use wrong scheme (`defensivepedal-dev` instead of `defensivepedal-preview`). Intent went to dev app. Android manifest also lacked `defensivepedal-preview` scheme.
+    - **Build script hardened**: `build-preview.sh` now (a) sets `APP_VARIANT` to match the Gradle flavor, (b) patches AndroidManifest.xml to add the correct deep link scheme per flavor
+    - **Code review fixes**: `saved_routes` table missing `avoid_hills` column (migration applied to Supabase), `setRouteRequest` now syncs top-level `avoidHills`/`avoidUnpaved` preferences
+    - **Error log**: Added entry #26 (OAuth Custom Tab blank screen) and #27 (preview APK wrong scheme)
 
 ## Phase Status
 
