@@ -147,12 +147,17 @@ let oauthCallbackResolver: ((url: string) => void) | null = null;
 
 /**
  * Called by AuthSessionProvider's deep link handler when an OAuth callback
- * URL arrives. Resolves the Promise that signInWithGoogle() is awaiting.
+ * URL arrives. Resolves the Promise that signInWithGoogle() is awaiting,
+ * then dismisses the browser so openAuthSessionAsync unblocks.
  */
 export const resolveOAuthCallback = (url: string) => {
   if (oauthCallbackResolver) {
     oauthCallbackResolver(url);
     oauthCallbackResolver = null;
+    // Close the Chrome Custom Tab so openAuthSessionAsync resolves.
+    // Without this, the tab stays open showing a blank page after the
+    // intent-URI redirect and the user sees a "stuck" blank screen.
+    void WebBrowser.dismissBrowser();
   }
 };
 

@@ -137,6 +137,11 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** Open "Defensive Pedal Dev" after installing a release APK from C:\dpb — it has the embedded bundle. The bridgeless dev-client Metro loading issue makes this the reliable testing path.
 **Occurrences:** Preview APK not showing as separate app on phone (2026-04-10)
 
+### 26. Google sign-in shows blank screen on Android (Chrome Custom Tab doesn't close)
+**Pattern:** After selecting a Google account, the `oauth-redirect` edge function responds with a 302 to an Android intent URI. The intent successfully launches the app and delivers the deep link, but the Chrome Custom Tab stays open showing a blank white page. `signInWithGoogle()` blocks at `await WebBrowser.openAuthSessionAsync(...)` waiting for the tab to dismiss, so the PKCE code exchange never runs until the user manually swipes the tab away.
+**Fix:** Call `WebBrowser.dismissBrowser()` in `resolveOAuthCallback()` immediately after the deep link resolves. This programmatically closes the Custom Tab, unblocking `openAuthSessionAsync`.
+**Occurrences:** Google OAuth sign-in on Android (2026-04-11)
+
 ### 19. Dev app points to production API, not localhost
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
 **Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).

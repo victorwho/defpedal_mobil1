@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-11 (session 14)
+Last updated: 2026-04-11 (session 15)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -259,6 +259,10 @@ Update it at the end of each implementation slice.
     - **Security audit**: Reviewed all keys and tokens across the codebase. Identified P0: dev auth bypass active on production Cloud Run with trivially guessable token `dev-bypass`.
     - **P0 fix — Disabled dev auth bypass on Cloud Run**: Set `DEV_AUTH_BYPASS_ENABLED=false` via `gcloud run services update`. Revision `defpedal-api-00044-skg` deployed and verified — bypass token now returns 401. No source code change needed (env var only).
     - **Remaining action items** (not yet fixed): rotate Supabase anon key (in git history from initial commit), add IP-based rate limiting to 3 unprotected endpoints (`POST /v1/hazards`, `GET /v1/risk-map`, `GET /v1/hazards/nearby`), gate dev bypass credentials out of preview/production APK builds in `app.config.ts`, activate Redis for persistent rate limiting, configure `CRON_SECRET` on Cloud Run.
+- Session 15 — Google sign-in blank screen fix (2026-04-11):
+    - **Diagnosed**: After selecting Google account, Chrome Custom Tab stayed open showing blank page. Root cause: `oauth-redirect` edge function uses 302→intent URI which launches the app via deep link, but the Custom Tab doesn't auto-close. `signInWithGoogle()` blocks at `await WebBrowser.openAuthSessionAsync()` waiting for tab dismissal, preventing the PKCE code exchange.
+    - **Fixed**: Added `WebBrowser.dismissBrowser()` call in `resolveOAuthCallback()` (`supabase.ts`). When the deep link arrives, the Custom Tab is programmatically closed, unblocking the auth flow.
+    - **Error log**: Added entry #26 documenting the pattern and fix.
 
 ## Phase Status
 
