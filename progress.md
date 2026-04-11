@@ -255,6 +255,11 @@ Update it at the end of each implementation slice.
     - **7 new tests**: 4 routing (flat endpoint, standard endpoint, compose with unpaved, ignored in fast mode) + 3 store (setAvoidHills, default false, independent from avoidUnpaved). All existing tests updated with `avoidHills: false`.
     - All tests pass. TypeScript clean (0 errors). Preview APK built and installed on Samsung S23 Ultra.
 
+- Session 14 continued — Security hardening (2026-04-11):
+    - **Security audit**: Reviewed all keys and tokens across the codebase. Identified P0: dev auth bypass active on production Cloud Run with trivially guessable token `dev-bypass`.
+    - **P0 fix — Disabled dev auth bypass on Cloud Run**: Set `DEV_AUTH_BYPASS_ENABLED=false` via `gcloud run services update`. Revision `defpedal-api-00044-skg` deployed and verified — bypass token now returns 401. No source code change needed (env var only).
+    - **Remaining action items** (not yet fixed): rotate Supabase anon key (in git history from initial commit), add IP-based rate limiting to 3 unprotected endpoints (`POST /v1/hazards`, `GET /v1/risk-map`, `GET /v1/hazards/nearby`), gate dev bypass credentials out of preview/production APK builds in `app.config.ts`, activate Redis for persistent rate limiting, configure `CRON_SECRET` on Cloud Run.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation

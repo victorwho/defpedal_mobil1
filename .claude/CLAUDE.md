@@ -38,6 +38,7 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - Build image: `gcloud builds submit --config cloudbuild.yaml --timeout=600`
 - Deploy new revision: `gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated`
 - **Important:** `gcloud builds submit` only pushes the image. You MUST also run `gcloud run deploy` to create a new revision, otherwise Cloud Run keeps serving the old code.
+- **Security:** `DEV_AUTH_BYPASS_ENABLED=false` on Cloud Run (disabled 2026-04-11, revision 00044). Do NOT re-enable in production.
 
 ## App Variants
 
