@@ -23,6 +23,32 @@ export function haversineDistance(
 }
 
 /**
+ * Computes the along-route distance between two indices on a polyline.
+ * Points are [lon, lat] (GeoJSON order). Returns 0 if fromIndex >= toIndex
+ * or the array has fewer than 2 points.
+ */
+export const polylineSegmentDistance = (
+  points: readonly [number, number][],
+  fromIndex: number,
+  toIndex: number,
+): number => {
+  if (points.length < 2 || fromIndex >= toIndex) return 0;
+
+  const start = Math.max(0, fromIndex);
+  const end = Math.min(points.length - 1, toIndex);
+
+  let distance = 0;
+  for (let i = start; i < end; i++) {
+    distance += haversineDistance(
+      [points[i][1], points[i][0]],
+      [points[i + 1][1], points[i + 1][0]],
+    );
+  }
+
+  return distance;
+};
+
+/**
  * Finds the closest point in an array of [lon, lat] coordinates to a target [lat, lon].
  */
 export const findClosestPointIndex = (

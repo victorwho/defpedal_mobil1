@@ -169,6 +169,10 @@ export default function NavigationScreen() {
   const totalSteps = selectedRoute?.steps.length ?? 0;
 
   const climbData = useMemo(() => {
+    const isOffRoute = navigationSession?.offRouteSince != null;
+    if (isOffRoute) {
+      return { value: null, isLive: false };
+    }
     const profile = selectedRoute?.elevationProfile;
     if (!profile?.length || !selectedRoute || !navigationSession?.remainingDistanceMeters) {
       return { value: selectedRoute?.totalClimbMeters ?? null, isLive: false };
@@ -181,7 +185,7 @@ export default function NavigationScreen() {
       ),
       isLive: true,
     };
-  }, [selectedRoute, navigationSession?.remainingDistanceMeters]);
+  }, [selectedRoute, navigationSession?.remainingDistanceMeters, navigationSession?.offRouteSince]);
 
   const totalDescentMeters = useMemo(() => {
     const profile = selectedRoute?.elevationProfile;

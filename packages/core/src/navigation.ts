@@ -4,7 +4,7 @@ import type {
   NavigationSession,
   RouteOption,
 } from './contracts';
-import { findClosestPointIndex, haversineDistance } from './distance';
+import { findClosestPointIndex, haversineDistance, polylineSegmentDistance } from './distance';
 import { decodePolyline } from './polyline';
 
 export type AppState = 'IDLE' | 'ROUTE_PREVIEW' | 'NAVIGATING' | 'AWAITING_FEEDBACK';
@@ -336,13 +336,11 @@ export const getNavigationProgress = (
     };
   }
 
-  const maneuverCoordinate: [number, number] = [
-    currentStep.maneuver.location[1],
-    currentStep.maneuver.location[0],
-  ];
-  const distanceToManeuverMeters = haversineDistance(
-    [location.lat, location.lon],
-    maneuverCoordinate,
+  const currentManeuverPolylineIndex = maneuverIndices[currentStepIndex] ?? closestPointIndex;
+  const distanceToManeuverMeters = polylineSegmentDistance(
+    routeCoordinates,
+    closestPointIndex,
+    currentManeuverPolylineIndex,
   );
   const futureSteps = route.steps.slice(currentStepIndex + 1);
   const progressThroughStep =

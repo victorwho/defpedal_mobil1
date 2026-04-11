@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findClosestPointIndex, haversineDistance } from './distance';
+import { findClosestPointIndex, haversineDistance, polylineSegmentDistance } from './distance';
 
 // ---------------------------------------------------------------------------
 // haversineDistance
@@ -138,5 +138,80 @@ describe('findClosestPointIndex', () => {
     const copy = points.map((p) => [...p] as [number, number]);
     findClosestPointIndex([44.4268, 26.1025], points);
     expect(points).toEqual(copy);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// polylineSegmentDistance
+// ---------------------------------------------------------------------------
+
+describe('polylineSegmentDistance', () => {
+  // Points are [lon, lat] (GeoJSON order), same as decoded polylines.
+
+  it('returns the haversine distance between two adjacent points', () => {
+    // Two points ~280m apart in Bucharest
+    const points: [number, number][] = [
+      [26.1025, 44.4268], // A
+      [26.1050, 44.4290], // B
+    ];
+    const expected = haversineDistance(
+      [points[0][1], points[0][0]],
+      [points[1][1], points[1][0]],
+    );
+    expect(polylineSegmentDistance(points, 0, 1)).toBeCloseTo(expected, 2);
+  });
+
+  it('sums segment distances on an L-shaped route (longer than haversine)', () => {
+    // Right-angle route: go east 500m, then north 500m
+    // Points: A(0,0) → B(~0.005 lon east, 0) → C(~0.005 lon east, ~0.0045 lat north)
+    const A: [number, number] = [26.1000, 44.4300];
+    const B: [number, number] = [26.1060, 44.4300]; // ~500m east
+    const C: [number, number] = [26.1060, 44.4345]; // ~500m north from B
+    const points = [A, B, C];
+
+    const polyDist = polylineSegmentDistance(points, 0, 2);
+    const straightLine = haversineDistance(
+      [A[1], A[0]],
+      [C[1], C[0]],
+    );
+
+    // Polyline distance (two legs) should be meaningfully longer than the diagonal
+    expect(polyDist).toBeGreaterThan(straightLine * 1.3);
+    // And should approximately equal legAB + legBC
+    const legAB = haversineDistance([A[1], A[0]], [B[1], B[0]]);
+    const legBC = haversineDistance([B[1], B[0]], [C[1], C[0]]);
+    expect(polyDist).toBeCloseTo(legAB + legBC, 0);
+  });
+
+  it('returns ~2x haversine on a U-shaped switchback', () => {
+    // U-turn: go east 400m, hairpin, come back west 400m offset north
+    const A: [number, number] = [26.1000, 44.4300];
+    const B: [number, number] = [26.1050, 44.4300]; // ~400m east
+    const C: [number, number] = [26.1050, 44.4305]; // short connector north
+    const D: [number, number] = [26.1000, 44.4305]; // ~400m west (back)
+    const points = [A, B, C, D];
+
+    const polyDist = polylineSegmentDistance(points, 0, 3);
+    const straightLine = haversineDistance([A[1], A[0]], [D[1], D[0]]);
+
+    // Straight line A→D is only ~55m (just the north offset).
+    // Polyline is ~400m + ~55m + ~400m ≈ 855m. Should be >>10x straight line.
+    expect(polyDist).toBeGreaterThan(straightLine * 5);
+  });
+
+  it('returns 0 when fromIndex >= toIndex', () => {
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+      [26.1100, 44.4300],
+    ];
+    expect(polylineSegmentDistance(points, 2, 1)).toBe(0);
+    expect(polylineSegmentDistance(points, 1, 1)).toBe(0);
+  });
+
+  it('returns 0 for an empty or single-point array', () => {
+    expect(polylineSegmentDistance([], 0, 0)).toBe(0);
+    expect(polylineSegmentDistance([[26.1, 44.4]], 0, 0)).toBe(0);
+    expect(polylineSegmentDistance([[26.1, 44.4]], 0, 1)).toBe(0);
   });
 });

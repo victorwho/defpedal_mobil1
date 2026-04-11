@@ -182,7 +182,7 @@ C:\dev\defpedal/
 │   └── src/
 │       ├── contracts.ts         # All shared types (RouteOption, FeedItem, etc.)
 │       ├── navigation.ts        # Navigation logic (progress, off-route, climb)
-│       ├── distance.ts          # Haversine distance, closest point
+│       ├── distance.ts          # Haversine distance, closest point, along-route polyline distance
 │       ├── polyline.ts          # Polyline6 encode/decode
 │       └── riskDistribution.ts  # Risk category classification
 ├── services/mobile-api/         # Fastify API server
@@ -286,6 +286,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **Off-route threshold 100m + GPS accuracy buffer** | Original 50m triggered too easily on sidewalks/near buildings. 100m base + up to 50m GPS accuracy buffer = effective 120-150m threshold |
 | **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app |
 | **Mapbox Terrain-RGB for elevation** (not Open-Meteo) | Open-Meteo rate-limits (HTTP 429) during heavy usage. Terrain-RGB tiles decode elevation from PNG pixels, are CDN-cached, zero external API calls |
+| **Along-route polyline distance** (not haversine to maneuver) | Haversine underestimates distance on winding roads (switchbacks, curves). `polylineSegmentDistance` sums vertex-to-vertex distances along the decoded polyline — keeps `remainingDistanceMeters` consistent with `step.distanceMeters` and `route.distanceMeters` |
 
 ## Code Conventions
 
@@ -420,7 +421,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
   - City Heartbeat community dashboard (spatial aggregation, 7-day chart, hazard hotspots, top contributors)
-- **969 tests across 3 packages** (core: 277, mobile-api: 210, mobile: 482). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
+- **974 tests across 3 packages** (core: 282, mobile-api: 210, mobile: 482). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)

@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-10 (session 13)
+Last updated: 2026-04-11 (session 14)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -237,6 +237,12 @@ Update it at the end of each implementation slice.
     - **Impact Dashboard — zero stats fix**: Dashboard read totals from `profiles` columns (populated by `record_ride_impact` RPC). Rides before that feature was deployed showed all zeros. Server now falls back to `trips` table via `getUserStats` + `getTripStatsDashboard` when profile totals are zero. Also backfills microlives (0.4 ML/km) and community seconds (4.5 sec/km) from trip distance. Deployed to Cloud Run revision 00043.
     - **FAQ restructure & placement**: Restructured FAQ screen from 12 flat items into 4 categorized sections (Safety & Routing 8 items, Your Impact 5 items, Progression & Rewards 5 items, Privacy & Data 1 item) with section headers and icons. Added 7 new Q&A items covering CO2 calculation, ride equivalents, XP system, rider tiers, badges, streaks, and qualifying actions. Connected FAQ from 3 entry points: Settings tile (5th MenuItem), Profile > Account section row, and History tab (between Your Impact and Daily Quiz cards). Added `settings.helpFaq`/`helpFaqSub` translation keys for en + ro. Phone-tested on Samsung S23 Ultra (preview APK).
     - **Quiz questions: static file + Romania adaptation**: Moved 25 quiz questions from Supabase `quiz_questions` table to static TypeScript file (`services/mobile-api/src/data/quiz-questions.ts`). Questions are now version-controlled and don't require DB seeding. Adapted content for Romania: Codul Rutier references, 112 emergency number, tram track safety, Romanian law on helmets/alcohol/phone/reflective vest. Replaced US-only content (Idaho Stop, sharrow markings). Added 20 new Romania-specific questions (45 total) covering Romanian law (8), local hazards (7), and infrastructure (5). All 210 API tests pass.
+
+- Session 14 — Navigation climb accuracy fixes (2026-04-11):
+    - **P1 fix — Hide stale climb when off-route**: `climbData` useMemo in `navigation.tsx` now returns `null` when `offRouteSince != null`, preventing the FooterCard from showing a misleading remaining-climb value computed against the original route's elevation profile. FooterCard already renders "—" for null climb. After reroute, the new route carries fresh elevation data and climb resumes.
+    - **P3 fix — Along-route distance replaces haversine**: Added `polylineSegmentDistance(points, fromIndex, toIndex)` to `packages/core/src/distance.ts` — walks consecutive polyline vertices summing haversine segments. `getNavigationProgress` in `navigation.ts` now uses this instead of straight-line `haversineDistance(user, maneuver)` for `distanceToManeuverMeters`. This makes `remainingDistanceMeters` fully along-route, fixing inaccuracy on winding roads (switchbacks, curves) where haversine underestimated distance. Also improves ETA accuracy and voice announcement distances.
+    - **5 new tests**: `polylineSegmentDistance` — adjacent points match haversine, L-shaped route > haversine, U-shaped switchback >> haversine, fromIndex >= toIndex returns 0, empty/single-point returns 0.
+    - All 236 core + navigation tests pass. TypeScript clean (0 errors). Preview APK built and installed on Samsung S23 Ultra.
 
 ## Phase Status
 
