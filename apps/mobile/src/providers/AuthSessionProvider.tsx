@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from 'react';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import type { MobileAuthSession, MobileAuthUser } from '../lib/devAuth';
 import { registerForPushNotifications } from '../lib/push-notifications';
@@ -68,16 +69,24 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     void syncCurrentSession(true);
 
     // Auth state changes: only sync, never trigger anonymous sign-in.
-    // Use a single subscription to avoid racing concurrent syncCurrentSession calls.
     // subscribeToAuthSessionChanges covers developer bypass + all explicit auth ops.
-    // Supabase token refresh is handled transparently by getSession() on next API call.
     const unsubscribe = subscribeToAuthSessionChanges(() => {
       void syncCurrentSession(false);
     });
 
+    // Also listen to Supabase's native onAuthStateChange as a safety net.
+    // This catches code exchanges that bypass our custom emitter (e.g. the
+    // cold-start OAuth fallback that calls exchangeCodeForSession directly).
+    const { data: { subscription: supabaseSub } } = supabaseClient?.auth.onAuthStateChange(
+      (_event, _session) => {
+        if (isMounted) void syncCurrentSession(false);
+      },
+    ) ?? { data: { subscription: null } };
+
     return () => {
       isMounted = false;
       unsubscribe();
+      supabaseSub?.unsubscribe();
     };
   }, []);
 
@@ -96,10 +105,13 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
-      // Cold-start fallback: the app was killed after opening the browser.
-      // The PKCE verifier may be lost, but attempt the exchange anyway —
-      // Supabase persists the verifier in secure storage.
+      // Cold-start fallback: the app was killed or the activity restarted
+      // after opening the browser. The PKCE verifier may be lost, but
+      // attempt the exchange anyway — Supabase persists it in secure storage.
       if (!supabaseClient) return;
+
+      // Close the Chrome Custom Tab that's showing a blank page
+      void WebBrowser.dismissBrowser();
 
       try {
         const queryString = url.includes('?') ? url.split('?')[1]?.split('#')[0] : '';
@@ -110,6 +122,11 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
           const { error } = await supabaseClient.auth.exchangeCodeForSession(code);
           if (error) {
             setAuthError(`Sign-in failed: ${error.message}`);
+          } else {
+            // Sync the new session into React state immediately.
+            // onAuthStateChange also fires, but this avoids a visible delay.
+            const newSession = await getCurrentSession();
+            setSession(newSession);
           }
         }
       } catch (err) {

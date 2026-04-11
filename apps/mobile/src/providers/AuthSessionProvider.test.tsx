@@ -14,6 +14,11 @@ vi.mock('expo-linking', () => ({
   addEventListener: vi.fn(() => ({ remove: vi.fn() })),
 }));
 
+vi.mock('expo-web-browser', () => ({
+  dismissBrowser: vi.fn().mockResolvedValue(undefined),
+  openAuthSessionAsync: vi.fn().mockResolvedValue({ type: 'dismiss' }),
+}));
+
 vi.mock('../lib/push-notifications', () => ({
   registerForPushNotifications: vi.fn(),
 }));
