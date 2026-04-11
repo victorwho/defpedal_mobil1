@@ -244,6 +244,17 @@ Update it at the end of each implementation slice.
     - **5 new tests**: `polylineSegmentDistance` — adjacent points match haversine, L-shaped route > haversine, U-shaped switchback >> haversine, fromIndex >= toIndex returns 0, empty/single-point returns 0.
     - All 236 core + navigation tests pass. TypeScript clean (0 errors). Preview APK built and installed on Samsung S23 Ultra.
 
+- Session 14 continued — Flat routing (avoid hills) (2026-04-11):
+    - **Full-stack "Avoid hills" flat routing**: New `avoidHills: boolean` field on `RoutePreviewRequest`, `SavedRoute`, `SavedRouteCreateRequest` in contracts.ts. When enabled in safe mode, routes use a separate OSRM instance (`bicycle-flat` profile, uphill penalty 7.0x vs 1.1x) via nginx proxy on port 5001.
+    - **Client-side routing**: Added `OSRM_FLAT_API_BASE` constant in `mapbox-routing.ts`. `fetchOsrmRoutes` selects flat vs standard endpoint based on `avoidHills`. Composes with `avoidUnpaved` (`&exclude=unpaved` on flat endpoint). Fast mode ignores the flag (Mapbox Directions only).
+    - **Server-side**: `safeOsrmFlatBaseUrl` config in `config.ts` (`SAFE_OSRM_FLAT_BASE_URL` env var), `customOsrm.ts` selects base URL, `http.ts` JSON schemas updated, `v1.ts` passes through to routing + saved routes.
+    - **Zustand store**: `avoidHills` state + `setAvoidHills` setter + persisted. Default `false`. Independent from `avoidUnpaved`.
+    - **Route planning UI — 3-way toggle**: Safe (blue, shield icon) / Fast (blue, flash icon) / Flat (green, trending-down icon) pills. Mutually exclusive — Flat forces safe mode + avoidHills. Tapping Safe or Fast clears avoidHills. Green `safeGreenLight` tint added to `tints.ts`.
+    - **Route preview wiring**: `avoidHills` included in `effectiveRequest` (TanStack Query key) — toggling triggers auto-refetch.
+    - **i18n**: en + ro translations for `planning.flat`, `profile.avoidHills`, toggle descriptions.
+    - **7 new tests**: 4 routing (flat endpoint, standard endpoint, compose with unpaved, ignored in fast mode) + 3 store (setAvoidHills, default false, independent from avoidUnpaved). All existing tests updated with `avoidHills: false`.
+    - All tests pass. TypeScript clean (0 errors). Preview APK built and installed on Samsung S23 Ultra.
+
 ## Phase Status
 
 ### Phase 1: Shared core and backend foundation

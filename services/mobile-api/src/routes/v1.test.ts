@@ -192,6 +192,7 @@ describe('mobile-api v1 routes', () => {
           lon: 26.0946,
         },
         avoidUnpaved: false,
+        avoidHills: false,
       });
 
       const payload = response.json();
@@ -370,6 +371,7 @@ describe('mobile-api v1 routes', () => {
           lon: 26.0946,
         },
         avoidUnpaved: false,
+        avoidHills: false,
       });
     } finally {
       await app.close();

@@ -77,6 +77,7 @@ export default function RoutePreviewScreen() {
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
+  const avoidHills = useAppStore((state) => state.avoidHills);
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
@@ -105,7 +106,7 @@ export default function RoutePreviewScreen() {
   const previewErrorRef = useRef<number>(0);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const effectiveRequest = { ...routeRequest, avoidUnpaved, showRouteComparison };
+  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, showRouteComparison };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -258,6 +259,7 @@ export default function RoutePreviewScreen() {
         waypoints: routeRequest.waypoints ?? [],
         mode: routeRequest.mode,
         avoidUnpaved: routeRequest.avoidUnpaved,
+        avoidHills: routeRequest.avoidHills,
       });
       void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
       setSaveModalVisible(false);

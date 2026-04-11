@@ -50,6 +50,7 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   },
   mode: 'safe',
   avoidUnpaved: false,
+  avoidHills: false,
   locale: 'en',
   countryHint: 'RO',
 };
@@ -85,6 +86,7 @@ type AppStore = {
   bikeType: string | null;
   cyclingFrequency: string | null;
   avoidUnpaved: boolean;
+  avoidHills: boolean;
   showBicycleLanes: boolean;
   poiVisibility: {
     hydration: boolean;
@@ -151,6 +153,7 @@ type AppStore = {
   setBikeType: (type: string | null) => void;
   setCyclingFrequency: (frequency: string | null) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
+  setAvoidHills: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
@@ -221,6 +224,7 @@ export const useAppStore = create<AppStore>()(
       bikeType: null,
       cyclingFrequency: null,
       avoidUnpaved: false,
+      avoidHills: false,
       notifyWeather: true,
       notifyHazard: true,
       notifyCommunity: true,
@@ -332,6 +336,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ cyclingFrequency: frequency })),
       setAvoidUnpaved: (enabled) =>
         set(() => ({ avoidUnpaved: enabled })),
+      setAvoidHills: (enabled) =>
+        set(() => ({ avoidHills: enabled })),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -767,6 +773,7 @@ export const useAppStore = create<AppStore>()(
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,
+        avoidHills: state.avoidHills,
         onboardingCompleted: state.onboardingCompleted,
         cyclingGoal: state.cyclingGoal,
         cachedStreak: state.cachedStreak,

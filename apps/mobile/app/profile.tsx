@@ -121,7 +121,7 @@ export default function ProfileScreen() {
 
   // State values - grouped by section with shallow comparison
   const {
-    locale, bikeType, cyclingFrequency, avoidUnpaved, showRouteComparison,
+    locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
     shareTripsPublicly, themePreference, showBicycleLanes, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
   } = useAppStore(useShallow((state) => ({
@@ -129,6 +129,7 @@ export default function ProfileScreen() {
     bikeType: state.bikeType,
     cyclingFrequency: state.cyclingFrequency,
     avoidUnpaved: state.avoidUnpaved,
+    avoidHills: state.avoidHills,
     showRouteComparison: state.showRouteComparison,
     shareTripsPublicly: state.shareTripsPublicly,
     themePreference: state.themePreference,
@@ -143,7 +144,7 @@ export default function ProfileScreen() {
 
   // Actions - stable references, single selector with shallow comparison
   const {
-    setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved,
+    setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
     setShowRouteComparison, setShareTripsPublicly, setThemePreference,
     setShowBicycleLanes, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
@@ -152,6 +153,7 @@ export default function ProfileScreen() {
     setBikeType: state.setBikeType,
     setCyclingFrequency: state.setCyclingFrequency,
     setAvoidUnpaved: state.setAvoidUnpaved,
+    setAvoidHills: state.setAvoidHills,
     setShowRouteComparison: state.setShowRouteComparison,
     setShareTripsPublicly: state.setShareTripsPublicly,
     setThemePreference: state.setThemePreference,

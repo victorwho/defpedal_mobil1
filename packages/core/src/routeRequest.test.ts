@@ -54,6 +54,7 @@ describe('routeRequest helpers', () => {
           },
           mode: 'safe',
           avoidUnpaved: false,
+          avoidHills: false,
           locale: 'en',
           countryHint: 'RO',
         },
@@ -75,6 +76,7 @@ describe('routeRequest helpers', () => {
       startOverride: undefined,
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
       locale: 'en',
       countryHint: 'RO',
       activeRouteId: 'safe-1',
@@ -115,6 +117,7 @@ describe('multi-stop reroute — waypoint stripping', () => {
     ] as const,
     mode: 'safe' as const,
     avoidUnpaved: false,
+    avoidHills: false,
     locale: 'en',
   };
 

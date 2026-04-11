@@ -480,6 +480,7 @@ describe('mobileApi', () => {
         destination: { lat: 44.44, lon: 26.12 },
         mode: 'safe' as const,
         avoidUnpaved: false,
+        avoidHills: false,
       };
 
       await mobileApi.previewRoute(payload);

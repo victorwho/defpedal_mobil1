@@ -712,6 +712,9 @@ export const routePreviewRequestSchema = {
     avoidUnpaved: {
       type: 'boolean',
     },
+    avoidHills: {
+      type: 'boolean',
+    },
     locale: localeSchema,
     countryHint: countryHintSchema,
     debug: {
@@ -773,6 +776,7 @@ export const savedRouteCreateRequestSchema = {
     },
     mode: { type: 'string', enum: ['safe', 'fast'] },
     avoidUnpaved: { type: 'boolean' },
+    avoidHills: { type: 'boolean' },
   },
 } as const;
 
@@ -786,6 +790,7 @@ export const savedRouteResponseSchema = {
     waypoints: { type: 'array', items: coordinateSchema },
     mode: { type: 'string' },
     avoidUnpaved: { type: 'boolean' },
+    avoidHills: { type: 'boolean' },
     createdAt: { type: 'string' },
     lastUsedAt: { type: 'string' },
   },
@@ -810,6 +815,7 @@ export const normalizeSavedRouteCreateRequest = (
   waypoints: body.waypoints ?? [],
   mode: body.mode,
   avoidUnpaved: body.avoidUnpaved,
+  avoidHills: body.avoidHills,
 });
 
 export class HttpError extends Error {
@@ -922,6 +928,7 @@ export const normalizeRoutePreviewRequest = (
   startOverride: body.startOverride,
   mode: body.mode,
   avoidUnpaved: body.avoidUnpaved ?? false,
+  avoidHills: body.avoidHills ?? false,
   locale: body.locale ?? 'en',
   countryHint: body.countryHint,
   debug: body.debug ?? false,

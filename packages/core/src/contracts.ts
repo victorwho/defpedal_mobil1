@@ -71,6 +71,7 @@ export interface RoutePreviewRequest {
   startOverride?: Coordinate;
   mode: RoutingMode;
   avoidUnpaved: boolean;
+  avoidHills: boolean;
   showRouteComparison?: boolean;
   locale: string;
   countryHint?: string;
@@ -803,6 +804,7 @@ export interface SavedRoute {
   readonly waypoints: readonly Coordinate[];
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
+  readonly avoidHills: boolean;
   readonly createdAt: string;
   readonly lastUsedAt: string;
 }
@@ -814,4 +816,5 @@ export interface SavedRouteCreateRequest {
   readonly waypoints?: readonly Coordinate[];
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
+  readonly avoidHills: boolean;
 }

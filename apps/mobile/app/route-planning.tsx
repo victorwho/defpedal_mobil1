@@ -61,6 +61,8 @@ export default function RoutePlanningScreen() {
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
+  const avoidHills = useAppStore((state) => state.avoidHills);
+  const setAvoidHills = useAppStore((state) => state.setAvoidHills);
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
   const addWaypoint = useAppStore((state) => state.addWaypoint);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
@@ -172,6 +174,7 @@ export default function RoutePlanningScreen() {
       origin: route.origin,
       mode: route.mode,
       avoidUnpaved: route.avoidUnpaved,
+      avoidHills: route.avoidHills,
     });
     if (route.waypoints.length > 0) {
       // Clear then add each waypoint
@@ -824,27 +827,27 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast routing toggle — shown only after destination set */}
+          {/* Safe / Fast / Flat routing toggle — shown only after destination set */}
           {hasValidDestination ? <View style={styles.modeToggleRow}>
             <Pressable
               style={[
                 styles.modeTogglePill,
-                routeRequest.mode === 'safe' && styles.modeTogglePillActive,
+                routeRequest.mode === 'safe' && !avoidHills && styles.modeTogglePillActive,
               ]}
-              onPress={() => setRoutingMode('safe')}
+              onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
               accessibilityLabel="Safe routing"
               accessibilityRole="button"
-              accessibilityState={{ selected: routeRequest.mode === 'safe' }}
+              accessibilityState={{ selected: routeRequest.mode === 'safe' && !avoidHills }}
             >
               <Ionicons
                 name="shield-checkmark-outline"
                 size={14}
-                color={routeRequest.mode === 'safe' ? colors.info : gray[400]}
+                color={routeRequest.mode === 'safe' && !avoidHills ? colors.info : gray[400]}
               />
               <Text
                 style={[
                   styles.modeToggleLabel,
-                  routeRequest.mode === 'safe' && styles.modeToggleLabelActive,
+                  routeRequest.mode === 'safe' && !avoidHills && styles.modeToggleLabelActive,
                 ]}
               >
                 {t('planning.safe')}
@@ -855,7 +858,7 @@ export default function RoutePlanningScreen() {
                 styles.modeTogglePill,
                 routeRequest.mode === 'fast' && styles.modeTogglePillActive,
               ]}
-              onPress={() => setRoutingMode('fast')}
+              onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
               accessibilityLabel="Fast routing"
               accessibilityRole="button"
               accessibilityState={{ selected: routeRequest.mode === 'fast' }}
@@ -872,6 +875,30 @@ export default function RoutePlanningScreen() {
                 ]}
               >
                 {t('planning.fast')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.modeTogglePill,
+                avoidHills && routeRequest.mode === 'safe' && styles.modeTogglePillFlat,
+              ]}
+              onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
+              accessibilityLabel="Flat routing — avoid hills"
+              accessibilityRole="button"
+              accessibilityState={{ selected: avoidHills && routeRequest.mode === 'safe' }}
+            >
+              <Ionicons
+                name="trending-down-outline"
+                size={14}
+                color={avoidHills && routeRequest.mode === 'safe' ? colors.safe : gray[400]}
+              />
+              <Text
+                style={[
+                  styles.modeToggleLabel,
+                  avoidHills && routeRequest.mode === 'safe' && styles.modeToggleLabelFlat,
+                ]}
+              >
+                {t('planning.flat')}
               </Text>
             </Pressable>
           </View> : null}
@@ -1194,6 +1221,9 @@ const createThemedStyles = (colors: ThemeColors) =>
     modeTogglePillActive: {
       backgroundColor: safetyTints.infoLight,
     },
+    modeTogglePillFlat: {
+      backgroundColor: safetyTints.safeGreenLight,
+    },
     modeToggleLabel: {
       fontSize: 12,
       fontFamily: fontFamily.body.bold,
@@ -1201,6 +1231,9 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     modeToggleLabelActive: {
       color: colors.info,
+    },
+    modeToggleLabelFlat: {
+      color: colors.safe,
     },
     searchOverlay: {
       backgroundColor: '#FFFFFF',

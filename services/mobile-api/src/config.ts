@@ -43,6 +43,11 @@ export const config = {
       ['SAFE_OSRM_BASE_URL'],
       'https://osrm.defensivepedal.com/route/v1/bicycle',
     ),
+  safeOsrmFlatBaseUrl:
+    resolveConfigValue(
+      ['SAFE_OSRM_FLAT_BASE_URL'],
+      'https://osrm.defensivepedal.com/route/v1/bicycle-flat',
+    ),
   mapboxAccessToken: resolveConfigValue(
     ['MAPBOX_ACCESS_TOKEN', 'VITE_MAPBOX_ACCESS_TOKEN', 'EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN'],
     '',

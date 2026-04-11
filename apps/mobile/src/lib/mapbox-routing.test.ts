@@ -109,6 +109,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes).toHaveLength(1);
@@ -129,6 +130,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'fast',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes).toHaveLength(1);
@@ -147,6 +149,7 @@ describe('directPreviewRoute', () => {
         destination: { lat: 44.44, lon: 26.12 },
         mode: 'safe',
         avoidUnpaved: false,
+        avoidHills: false,
       }),
     ).rejects.toThrow('OSRM returned no routes');
   });
@@ -162,6 +165,7 @@ describe('directPreviewRoute', () => {
         destination: { lat: 44.44, lon: 26.12 },
         mode: 'fast',
         avoidUnpaved: false,
+        avoidHills: false,
       }),
     ).rejects.toThrow('Mapbox returned no routes');
   });
@@ -177,6 +181,7 @@ describe('directPreviewRoute', () => {
         destination: { lat: 44.44, lon: 26.12 },
         mode: 'safe',
         avoidUnpaved: false,
+        avoidHills: false,
       }),
     ).rejects.toThrow('OSRM routing failed (500)');
   });
@@ -193,6 +198,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes[0].totalClimbMeters).toBe(15);
@@ -211,6 +217,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes[0].riskSegments).toHaveLength(2);
@@ -228,6 +235,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     // Should still return a route, just without elevation
@@ -247,6 +255,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes).toHaveLength(1);
@@ -265,10 +274,91 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: true,
+      avoidHills: false,
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(firstCallUrl).toContain('exclude=unpaved');
+  });
+
+  it('uses flat OSRM endpoint when avoidHills is enabled', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('bicycle-flat');
+    expect(firstCallUrl).not.toContain('/bicycle/');
+  });
+
+  it('uses standard OSRM endpoint when avoidHills is false', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('/route/v1/bicycle/');
+    expect(firstCallUrl).not.toContain('bicycle-flat');
+  });
+
+  it('composes avoidHills and avoidUnpaved correctly', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('bicycle-flat');
+    expect(firstCallUrl).toContain('exclude=unpaved');
+  });
+
+  it('ignores avoidHills in fast mode', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('api.mapbox.com');
+    expect(firstCallUrl).not.toContain('bicycle-flat');
   });
 
   it('includes coverage region in response', async () => {
@@ -283,6 +373,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
       countryHint: 'ro',
     });
 
@@ -306,6 +397,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     const steps = result.routes[0].steps;
@@ -339,6 +431,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     const lastStep = result.routes[0].steps[result.routes[0].steps.length - 1];
@@ -357,6 +450,7 @@ describe('directPreviewRoute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
       waypoints: [{ lat: 44.435, lon: 26.11 }],
     });
 
@@ -383,6 +477,7 @@ describe('directReroute', () => {
       destination: { lat: 44.44, lon: 26.12 },
       mode: 'safe',
       avoidUnpaved: false,
+      avoidHills: false,
     });
 
     expect(result.routes).toHaveLength(1);

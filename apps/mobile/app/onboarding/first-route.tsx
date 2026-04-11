@@ -139,6 +139,7 @@ export default function OnboardingFirstRouteScreen() {
               waypoints: [dest.location],  // Stop at the destination along the way
               mode: 'safe',
               avoidUnpaved: cyclingGoal === 'beginner',
+              avoidHills: false,
               locale: 'en',
             });
             const route = response.routes[0];
@@ -187,6 +188,7 @@ export default function OnboardingFirstRouteScreen() {
         waypoints: [destination],      // Stop at the POI
         mode: 'safe',
         avoidUnpaved: cyclingGoal === 'beginner',
+        avoidHills: false,
         locale: 'en',
       });
       // setRoutePreview automatically sets appState to ROUTE_PREVIEW when routes exist

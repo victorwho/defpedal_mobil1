@@ -27,6 +27,7 @@ import { getAccessToken } from './supabase';
 // ---------------------------------------------------------------------------
 
 const OSRM_API_BASE = 'https://osrm.defensivepedal.com/route/v1/bicycle';
+const OSRM_FLAT_API_BASE = 'https://osrm.defensivepedal.com/route/v1/bicycle-flat';
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -125,12 +126,15 @@ const fetchOsrmRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
   avoidUnpaved: boolean,
+  avoidHills: boolean,
   waypoints?: readonly Coordinate[],
 ): Promise<Route[]> => {
   const coords = buildCoordString(origin, destination, waypoints);
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
-  let url = `${OSRM_API_BASE}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
+  // Use flat-profile endpoint when avoidHills is set (separate OSRM instance)
+  const base = avoidHills ? OSRM_FLAT_API_BASE : OSRM_API_BASE;
+  let url = `${base}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
     url += '&exclude=unpaved';
@@ -345,7 +349,7 @@ export const directPreviewRoute = async (
 
   const rawRoutes =
     mode === 'safe'
-      ? await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, waypoints)
+      ? await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, request.avoidHills, waypoints)
       : await fetchMapboxRoutes(origin, destination, waypoints);
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
@@ -389,7 +393,7 @@ export const directPreviewRoute = async (
         }
       } else {
         // Fetch safe route for comparison
-        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, waypoints);
+        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, request.avoidHills, waypoints);
         if (safeRawRoutes.length > 0) {
           const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0);
           const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);

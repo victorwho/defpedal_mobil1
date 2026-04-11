@@ -10,7 +10,7 @@ const buildCoordinates = (origin: Coordinate, destination: Coordinate) =>
   `${origin.lon},${origin.lat};${destination.lon},${destination.lat}`;
 
 export const fetchSafeRoutes = async (
-  request: Pick<RoutePreviewRequest, 'avoidUnpaved'> & {
+  request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills'> & {
     origin: Coordinate;
     destination: Coordinate;
   },
@@ -27,7 +27,8 @@ export const fetchSafeRoutes = async (
     params.set('exclude', 'unpaved');
   }
 
-  const url = `${config.safeOsrmBaseUrl}/${buildCoordinates(
+  const baseUrl = request.avoidHills ? config.safeOsrmFlatBaseUrl : config.safeOsrmBaseUrl;
+  const url = `${baseUrl}/${buildCoordinates(
     request.origin,
     request.destination,
   )}?${params.toString()}`;

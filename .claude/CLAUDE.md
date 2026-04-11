@@ -285,6 +285,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **`C:\dpb` for release builds** | Even `C:\dev\defpedal` can fail for release builds (node_modules resolves to long paths). Full copy to `C:\dpb` with fresh `npm install` is the reliable path |
 | **Off-route threshold 100m + GPS accuracy buffer** | Original 50m triggered too easily on sidewalks/near buildings. 100m base + up to 50m GPS accuracy buffer = effective 120-150m threshold |
 | **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app |
+| **Flat routing = separate OSRM instance** | `bicycle-flat` profile uses 7.0x uphill penalty (vs 1.1x standard). Runs on port 5001, proxied via nginx at `/route/v1/bicycle-flat/`. Activated by "Flat" pill on route planning (3-way toggle: Safe/Fast/Flat). `avoidHills` flag composes with `avoidUnpaved` |
 | **Mapbox Terrain-RGB for elevation** (not Open-Meteo) | Open-Meteo rate-limits (HTTP 429) during heavy usage. Terrain-RGB tiles decode elevation from PNG pixels, are CDN-cached, zero external API calls |
 | **Along-route polyline distance** (not haversine to maneuver) | Haversine underestimates distance on winding roads (switchbacks, curves). `polylineSegmentDistance` sums vertex-to-vertex distances along the decoded polyline — keeps `remainingDistanceMeters` consistent with `step.distanceMeters` and `route.distanceMeters` |
 
@@ -364,6 +365,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Safe routing (OSRM) and fast routing (Mapbox Directions)
 - Route preview with risk distribution card, elevation chart, weather warnings (progressive disclosure — details in expanded sheet)
 - Safe vs fast route comparison with "Switch to safe route" button (shows "Slightly safer" / "Similar safety" for small differences)
+- Flat routing (avoid hills) — 3-way toggle on route planning (Safe/Fast/Flat), uses separate OSRM instance with 7x uphill penalty
 - Turn-by-turn navigation with 3D follow camera
 - Remaining climb tracker (decreasing during navigation)
 - Elevation progress card (toggleable during navigation)
@@ -421,7 +423,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - "No results found" message when search returns empty
   - React Native performance optimizations (hoisted Mapbox styles, useShallow selectors, GPU animations, iOS squircle corners)
   - City Heartbeat community dashboard (spatial aggregation, 7-day chart, hazard hotspots, top contributors)
-- **974 tests across 3 packages** (core: 282, mobile-api: 210, mobile: 482). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (76 tests). Vitest + happy-dom + @testing-library/react
+- **981 tests across 3 packages** (core: 282, mobile-api: 210, mobile: 489). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)

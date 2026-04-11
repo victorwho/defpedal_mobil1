@@ -45,6 +45,7 @@ afterEach(() => {
     bikeType: null,
     cyclingFrequency: null,
     avoidUnpaved: false,
+    avoidHills: false,
     voiceGuidanceEnabled: false,
     themePreference: 'dark',
     showBicycleLanes: true,
@@ -663,6 +664,26 @@ describe('useAppStore', () => {
 
     it('setAvoidUnpaved updates directly', () => {
       useAppStore.getState().setAvoidUnpaved(true);
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+    });
+
+    it('setAvoidHills updates directly', () => {
+      useAppStore.getState().setAvoidHills(true);
+      expect(useAppStore.getState().avoidHills).toBe(true);
+    });
+
+    it('avoidHills defaults to false', () => {
+      expect(useAppStore.getState().avoidHills).toBe(false);
+    });
+
+    it('avoidHills and avoidUnpaved are independent', () => {
+      useAppStore.getState().setAvoidHills(true);
+      useAppStore.getState().setAvoidUnpaved(true);
+      expect(useAppStore.getState().avoidHills).toBe(true);
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+
+      useAppStore.getState().setAvoidHills(false);
+      expect(useAppStore.getState().avoidHills).toBe(false);
       expect(useAppStore.getState().avoidUnpaved).toBe(true);
     });
 

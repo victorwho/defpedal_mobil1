@@ -228,6 +228,7 @@ const buildRouteResponse = async (
             origin: previewOrigin,
             destination: normalizedRequest.destination,
             avoidUnpaved: normalizedRequest.avoidUnpaved,
+            avoidHills: normalizedRequest.avoidHills,
           })
         : await dependencies.fetchFastRoutes(
             previewOrigin,
@@ -2530,6 +2531,7 @@ export const buildV1Routes = (
           waypoints: (row.waypoints as SavedRoute['waypoints']) ?? [],
           mode: (row.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (row.avoid_unpaved as boolean) ?? false,
+          avoidHills: (row.avoid_hills as boolean) ?? false,
           createdAt: row.created_at as string,
           lastUsedAt: row.last_used_at as string,
         }));
@@ -2575,6 +2577,7 @@ export const buildV1Routes = (
           waypoints: (data.waypoints as SavedRoute['waypoints']) ?? [],
           mode: (data.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (data.avoid_unpaved as boolean) ?? false,
+          avoidHills: (data.avoid_hills as boolean) ?? false,
           createdAt: data.created_at as string,
           lastUsedAt: data.last_used_at as string,
         };
