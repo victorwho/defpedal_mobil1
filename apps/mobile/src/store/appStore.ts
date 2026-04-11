@@ -354,6 +354,9 @@ export const useAppStore = create<AppStore>()(
         })),
       setRouteRequest: (request) =>
         set((state) => ({
+          // Sync top-level preference flags when present in the request
+          ...(request.avoidHills !== undefined ? { avoidHills: request.avoidHills } : {}),
+          ...(request.avoidUnpaved !== undefined ? { avoidUnpaved: request.avoidUnpaved } : {}),
           routeRequest: {
             ...state.routeRequest,
             ...request,
