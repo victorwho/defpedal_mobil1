@@ -416,11 +416,14 @@ export default function RoutePreviewScreen() {
             <Text style={styles.statDivider}>·</Text>
 
             <View style={styles.stat}>
-              <Text style={styles.statValue}>
+              <Text style={styles.statValue} numberOfLines={1}>
                 ↑{selectedRoute.totalClimbMeters !== null
-                  ? `${Math.round(selectedRoute.totalClimbMeters)} m`
+                  ? Math.round(selectedRoute.totalClimbMeters)
                   : '—'}
               </Text>
+              {selectedRoute.totalClimbMeters !== null ? (
+                <Text style={styles.statUnit}>m</Text>
+              ) : null}
             </View>
 
           </View>
@@ -629,14 +632,15 @@ const createThemedStyles = (colors: ThemeColors) =>
     summaryStrip: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: space[3],
+      gap: space[2],
       borderRadius: radii['2xl'],
       backgroundColor: colors.bgSecondary,
-      paddingHorizontal: space[4],
+      paddingHorizontal: space[3],
       paddingVertical: space[3],
     },
     statGroup: {
       flex: 1,
+      flexShrink: 1,
       flexDirection: 'row',
       alignItems: 'baseline',
       gap: space[2],
@@ -644,11 +648,12 @@ const createThemedStyles = (colors: ThemeColors) =>
     stat: {
       flexDirection: 'row',
       alignItems: 'baseline',
-      gap: 3,
+      flexShrink: 1,
+      gap: 2,
     },
     statValue: {
       ...textDataSm,
-      fontSize: 17,
+      fontSize: 15,
       color: colors.textPrimary,
       fontFamily: fontFamily.mono.bold,
     },
