@@ -335,6 +335,7 @@ export const en = {
     other: 'Other',
     reported: 'Reported! Other cyclists will be warned.',
     stillThere: 'Still there?',
+    warning: 'Hazard ahead',
     confirm: 'Confirm',
     deny: 'Gone',
   },

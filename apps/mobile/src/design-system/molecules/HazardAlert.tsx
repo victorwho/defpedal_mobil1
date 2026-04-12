@@ -47,7 +47,13 @@ export const HazardAlert = ({
       : t('common.mAway', { distance: Math.round(distanceMeters) });
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      accessible={true}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      accessibilityLabel={`${t('hazard.warning')}: ${label}, ${distanceText}. ${t('hazard.stillThere')}`}
+    >
       <View style={styles.header}>
         <Ionicons name={iconName as any} size={24} color={safetyColors.caution} />
         <View style={styles.headerText}>

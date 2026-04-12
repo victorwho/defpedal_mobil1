@@ -337,6 +337,7 @@ export const ro: TranslationKeys = {
     other: 'Altele',
     reported: 'Raportat! Alți cicliști vor fi avertizați.',
     stillThere: 'Încă acolo?',
+    warning: 'Pericol în față',
     confirm: 'Confirmă',
     deny: 'Dispărut',
   },

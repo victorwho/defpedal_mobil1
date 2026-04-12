@@ -20,7 +20,15 @@ export const RouteInfoOverlay = React.memo(({
   followUser,
   userLocation,
 }: RouteInfoOverlayProps) => (
-  <View style={styles.overlay}>
+  <View
+    style={styles.overlay}
+    accessibilityRole="summary"
+    accessibilityLabel={
+      selectedRoute
+        ? `Route selected. ${routeCount} alternative${routeCount === 1 ? '' : 's'}, ${selectedRoute.route.riskSegments.length} risk segments. ${followUser && userLocation ? 'Following rider' : 'Manual camera'}.`
+        : 'Preview pending. Load a route to see alternatives.'
+    }
+  >
     <Text style={styles.overlayTitle}>
       {selectedRoute ? `${selectedRoute.route.id} selected` : 'Preview pending'}
     </Text>

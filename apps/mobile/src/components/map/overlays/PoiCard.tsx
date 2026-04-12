@@ -35,17 +35,29 @@ export const PoiCard = React.memo(({ selectedPoi, onDismiss }: PoiCardProps) => 
     <Pressable
       style={[styles.poiCard, { left: cardLeft, top: cardTop, width: cardW }]}
       onPress={onDismiss}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${selectedPoi.type}: ${selectedPoi.name}. Tap to dismiss.`}
     >
       <View style={styles.poiCardContent}>
         <View style={styles.poiCardHeader}>
           <Text style={styles.poiCardType}>{selectedPoi.type}</Text>
-          <Pressable onPress={onDismiss} hitSlop={16}>
+          <Pressable
+            onPress={onDismiss}
+            hitSlop={16}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
             <Ionicons name="close" size={12} color={gray[400]} />
           </Pressable>
         </View>
         <Text style={styles.poiCardName} numberOfLines={1}>{selectedPoi.name}</Text>
         {selectedPoi.website ? (
-          <Pressable onPress={handleWebsite}>
+          <Pressable
+            onPress={handleWebsite}
+            accessibilityRole="link"
+            accessibilityLabel={`Open website for ${selectedPoi.name}`}
+          >
             <Text style={styles.poiCardLink}>website ↗</Text>
           </Pressable>
         ) : null}

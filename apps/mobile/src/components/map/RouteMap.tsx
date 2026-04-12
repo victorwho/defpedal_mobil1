@@ -219,6 +219,8 @@ export const RouteMap = ({
         onCameraChanged={onCenterChange ? handleCameraChanged : undefined}
         onPress={onMapTap ? handleMapTap : undefined}
         onLongPress={onMapLongPress ? handleMapLongPress : undefined}
+        accessibilityLabel="Navigation map"
+        accessibilityHint="Map shows route, hazards, and points of interest. Use overlay controls above and below."
       >
         <Mapbox.StyleImport id="basemap" existing config={shieldModeConfig} />
 
