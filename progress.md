@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-11 (session 15)
+Last updated: 2026-04-12 (session 17)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -268,6 +268,16 @@ Update it at the end of each implementation slice.
     - **Build script hardened**: `build-preview.sh` now (a) sets `APP_VARIANT` to match the Gradle flavor, (b) patches AndroidManifest.xml to add the correct deep link scheme per flavor
     - **Code review fixes**: `saved_routes` table missing `avoid_hills` column (migration applied to Supabase), `setRouteRequest` now syncs top-level `avoidHills`/`avoidUnpaved` preferences
     - **Error log**: Added entry #26 (OAuth Custom Tab blank screen) and #27 (preview APK wrong scheme)
+- Session 16/17 — Codebase review fix sweep + refactors (2026-04-12):
+    - **63→65 of 69 review findings fixed** (score 4/10 → 8.8/10). All P0s, P1s, and nearly all P2/P3s resolved.
+    - **Security**: 3 Supabase migrations (RLS tightening, award_xp auth check, search_path hardening on 8 SECURITY DEFINER functions), avatarUrl URI validation, npm audit in CI
+    - **API hardening**: Response schemas for all endpoints, structured logger, SIGTERM handler, multi-stage Dockerfile (non-root, HEALTHCHECK), JSON.parse safety, push token ErrorResponse contract
+    - **Performance**: useShallow selectors in navigation.tsx, memo() on FeedCard/TripCard, hoisted Mapbox styles, gcTime on POI hooks, retryDelay backoff
+    - **Auth**: 401 token refresh retry in api.ts, stale refresh token recovery in AuthSessionProvider (local signOut + anonymous fallback)
+    - **UX**: WCAG AA contrast fix, community feed error+retry state, waypoint autocomplete error indicators
+    - **Refactors (P2-12/P2-13)**: Extracted `queueSlice.ts` from appStore (823→574 lines). Split feed.ts (1091 lines) into 6 focused modules (feed, feed-helpers, feed-share, feed-reactions, feed-comments, feed-profile)
+    - **Infrastructure**: Cloud Run redeployed (revision 00045), 982 tests passing, 0 type errors
+    - **Remaining (4 items)**: Mapbox screen reader a11y (P1-21), GPS signal loss indicator (P3-11), Supabase anon key rotation (accepted), GCP monitoring (infra)
 
 ## Phase Status
 

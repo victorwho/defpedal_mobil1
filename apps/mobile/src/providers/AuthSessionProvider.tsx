@@ -51,7 +51,21 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     let anonSignInAttempted = false;
 
     const syncCurrentSession = async (allowAnonSignIn: boolean) => {
-      let currentSession = await getCurrentSession();
+      let currentSession: MobileAuthSession | null = null;
+
+      try {
+        currentSession = await getCurrentSession();
+      } catch {
+        // Stale/invalid refresh token — clear only the local session so the
+        // app falls through to anonymous sign-in. Avoid signOut() here because
+        // it calls the server (which fails on an invalid token) and emits
+        // onAuthStateChange events that re-enter this function.
+        try {
+          await supabaseClient?.auth.signOut({ scope: 'local' });
+        } catch {
+          // Ignore — the session may already be gone
+        }
+      }
 
       // Auto-sign-in anonymously on first launch only (not on auth state changes)
       if (!currentSession && allowAnonSignIn && !anonSignInAttempted && isSupabaseConfigured()) {
