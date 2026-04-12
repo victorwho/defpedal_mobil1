@@ -721,6 +721,7 @@ export default function NavigationScreen() {
           <ManeuverCard
             currentStep={currentStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
+            gpsAccuracyMeters={locationState.sample?.accuracyMeters}
             onPress={() => {
               if (currentStep) {
                 const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);

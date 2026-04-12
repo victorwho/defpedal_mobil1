@@ -102,11 +102,28 @@ const formatETA = (remainingSec: number): string => {
  * Top card: arrow + maneuver description + distance to maneuver.
  * Rendered at the top of the navigation screen.
  */
+/** GPS signal quality thresholds (horizontal accuracy in meters). */
+const GPS_STRONG_THRESHOLD = 10;
+const GPS_FAIR_THRESHOLD = 25;
+
+const getGpsSignalColor = (accuracy: number | null | undefined): string => {
+  if (accuracy == null) return gray[500]; // no fix
+  if (accuracy <= GPS_STRONG_THRESHOLD) return '#4CAF50'; // green
+  if (accuracy <= GPS_FAIR_THRESHOLD) return '#FFC107'; // amber
+  return '#F44336'; // red — poor
+};
+
+const getGpsSignalLabel = (accuracy: number | null | undefined): string => {
+  if (accuracy == null) return '—';
+  return `${Math.round(accuracy)}m`;
+};
+
 export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
   distanceToManeuverMeters: number | null;
+  gpsAccuracyMeters?: number | null;
   onPress?: () => void;
-}> = ({ currentStep, distanceToManeuverMeters, onPress }) => {
+}> = ({ currentStep, distanceToManeuverMeters, gpsAccuracyMeters, onPress }) => {
   const iconName = getManeuverIcon(currentStep);
   const description = getManeuverDescription(currentStep);
   const distance =
@@ -115,6 +132,9 @@ export const ManeuverCard: React.FC<{
       : currentStep
         ? formatDistance(Math.round(currentStep.distanceMeters))
         : '—';
+
+  const gpsColor = getGpsSignalColor(gpsAccuracyMeters);
+  const gpsLabel = getGpsSignalLabel(gpsAccuracyMeters);
 
   const Wrapper = onPress ? Pressable : View;
 
@@ -133,6 +153,13 @@ export const ManeuverCard: React.FC<{
       </Text>
       <Text style={styles.maneuverDivider}>·</Text>
       <Text style={styles.maneuverDist}>{distance}</Text>
+      <View
+        style={styles.gpsBadge}
+        accessibilityLabel={`GPS accuracy ${gpsLabel}`}
+      >
+        <View style={[styles.gpsDot, { backgroundColor: gpsColor }]} />
+        <Text style={styles.gpsText}>{gpsLabel}</Text>
+      </View>
     </Wrapper>
   );
 };
@@ -310,6 +337,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: gray[200],
     fontFamily: fontFamily.mono.bold,
+  },
+  gpsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: space[1],
+    paddingHorizontal: space[2],
+    paddingVertical: 2,
+    borderRadius: radii.sm,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  gpsDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  gpsText: {
+    fontFamily: fontFamily.mono.bold,
+    fontSize: 10,
+    color: gray[400],
   },
   // -- Footer card (bottom) --
   footerCard: {
