@@ -232,22 +232,35 @@ export default () => ({
         ['EXPO_PUBLIC_POSTHOG_HOST'],
         'https://eu.i.posthog.com',
       ),
-      devAuthBypassEnabled: resolveExpoExtraValue(
-        ['EXPO_PUBLIC_DEV_AUTH_BYPASS_ENABLED', 'DEV_AUTH_BYPASS_ENABLED'],
-        'false',
-      ),
-      devAuthBypassToken: resolveExpoExtraValue([
-        'EXPO_PUBLIC_DEV_AUTH_BYPASS_TOKEN',
-        'DEV_AUTH_BYPASS_TOKEN',
-      ]),
-      devAuthBypassUserId: resolveExpoExtraValue([
-        'EXPO_PUBLIC_DEV_AUTH_BYPASS_USER_ID',
-        'DEV_AUTH_BYPASS_USER_ID',
-      ]),
-      devAuthBypassEmail: resolveExpoExtraValue([
-        'EXPO_PUBLIC_DEV_AUTH_BYPASS_EMAIL',
-        'DEV_AUTH_BYPASS_EMAIL',
-      ]),
+      // Dev-bypass credentials are ONLY included in development builds.
+      // Preview and production APKs must never ship these — the token would
+      // be extractable by anyone decompiling the bundle.
+      //
+      // Both EXPO_PUBLIC_ and non-prefixed names are checked for backwards compatibility.
+      // Despite the non-EXPO_PUBLIC_ naming, these values ARE shipped in the JS bundle
+      // via Constants.expoConfig.extra — hence the development-only gate above.
+      ...(appVariant === 'development'
+        ? {
+            devAuthBypassEnabled: resolveExpoExtraValue(
+              ['EXPO_PUBLIC_DEV_AUTH_BYPASS_ENABLED', 'DEV_AUTH_BYPASS_ENABLED'],
+              'false',
+            ),
+            devAuthBypassToken: resolveExpoExtraValue([
+              'EXPO_PUBLIC_DEV_AUTH_BYPASS_TOKEN',
+              'DEV_AUTH_BYPASS_TOKEN',
+            ]),
+            devAuthBypassUserId: resolveExpoExtraValue([
+              'EXPO_PUBLIC_DEV_AUTH_BYPASS_USER_ID',
+              'DEV_AUTH_BYPASS_USER_ID',
+            ]),
+            devAuthBypassEmail: resolveExpoExtraValue([
+              'EXPO_PUBLIC_DEV_AUTH_BYPASS_EMAIL',
+              'DEV_AUTH_BYPASS_EMAIL',
+            ]),
+          }
+        : {
+            devAuthBypassEnabled: 'false',
+          }),
       validationBundleId: resolveExpoExtraValue(['EXPO_PUBLIC_VALIDATION_BUNDLE_ID']),
       validationSourceRoot: resolveExpoExtraValue(['EXPO_PUBLIC_VALIDATION_SOURCE_ROOT']),
       validationMetroPort: resolveExpoExtraValue(['EXPO_PUBLIC_VALIDATION_METRO_PORT']),

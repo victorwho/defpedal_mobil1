@@ -7,6 +7,7 @@ import {
 } from '../lib/bicycle-rental';
 
 const STALE_TIME_MS = 5 * 60 * 1000; // 5 minutes
+const GC_TIME_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Fetches bicycle rental locations near the route via the Overpass API.
@@ -29,14 +30,12 @@ export const useBicycleRental = (
       destination?.lat,
       destination?.lon,
     ],
-    queryFn: async () => {
-      // Small delay to avoid Overpass API rate limiting when parking query fires simultaneously
-      await new Promise((r) => setTimeout(r, 1500));
-      return fetchBicycleRentalNearRoute(origin!, destination!);
-    },
+    queryFn: () => fetchBicycleRentalNearRoute(origin!, destination!),
     enabled,
     staleTime: STALE_TIME_MS,
+    gcTime: GC_TIME_MS,
     retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
   return {

@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { fetchPoiSearchResults, type SearchedPoi } from '../lib/poi-search';
 
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes
+const GC_TIME_MS = 15 * 60 * 1000; // 15 minutes
 
 type PoiVisibility = {
   hydration: boolean;
@@ -36,6 +37,7 @@ export const usePoiSearch = (
     queryFn: () => fetchPoiSearchResults('hydration', origin, destination),
     enabled: visibility?.hydration ?? false,
     staleTime: STALE_TIME_MS,
+    gcTime: GC_TIME_MS,
   });
 
   const supplies = useQuery({
@@ -43,6 +45,7 @@ export const usePoiSearch = (
     queryFn: () => fetchPoiSearchResults('supplies', origin, destination),
     enabled: visibility?.supplies ?? false,
     staleTime: STALE_TIME_MS,
+    gcTime: GC_TIME_MS,
   });
 
   const searchedPois = useMemo(

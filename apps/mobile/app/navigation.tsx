@@ -39,6 +39,7 @@ import { mobileEnv } from '../src/lib/env';
 import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+import { useShallow } from 'zustand/shallow';
 
 // Design system imports
 import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
@@ -72,11 +73,28 @@ export default function NavigationScreen() {
     condition: () => Boolean(useAppStore.getState().navigationSession),
   });
 
-  const routeRequest = useAppStore((state) => state.routeRequest);
-  const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
-  const routePreview = useAppStore((state) => state.routePreview);
-  const selectedRouteId = useAppStore((state) => state.selectedRouteId);
-  const navigationSession = useAppStore((state) => state.navigationSession);
+  const {
+    routeRequest,
+    voiceGuidanceEnabled,
+    routePreview,
+    selectedRouteId,
+    navigationSession,
+    poiVisibility,
+    activeTripClientId,
+    queuedMutations,
+    shareTripsPublicly,
+  } = useAppStore(useShallow((state) => ({
+    routeRequest: state.routeRequest,
+    voiceGuidanceEnabled: state.voiceGuidanceEnabled,
+    routePreview: state.routePreview,
+    selectedRouteId: state.selectedRouteId,
+    navigationSession: state.navigationSession,
+    poiVisibility: state.poiVisibility,
+    activeTripClientId: state.activeTripClientId,
+    queuedMutations: state.queuedMutations,
+    shareTripsPublicly: state.shareTripsPublicly,
+  })));
+
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
   const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
   const updateNavigationProgress = useAppStore((state) => state.updateNavigationProgress);
@@ -88,11 +106,7 @@ export default function NavigationScreen() {
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setFollowing = useAppStore((state) => state.setFollowing);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
-  const poiVisibility = useAppStore((state) => state.poiVisibility);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
-  const activeTripClientId = useAppStore((state) => state.activeTripClientId);
-  const queuedMutations = useAppStore((state) => state.queuedMutations);
-  const shareTripsPublicly = useAppStore((state) => state.shareTripsPublicly);
 
   const t = useT();
   const confirm = useConfirmation();

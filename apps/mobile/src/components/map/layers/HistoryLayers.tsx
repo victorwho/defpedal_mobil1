@@ -41,7 +41,7 @@ const plannedRouteBaseStyle = {
 
 type HistoryTrail = {
   coordinates: readonly [number, number][];
-  mode: 'safe' | 'fast';
+  mode: 'safe' | 'fast' | 'flat';
 };
 
 type HistoryLayersProps = {

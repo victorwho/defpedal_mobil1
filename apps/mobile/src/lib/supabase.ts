@@ -303,6 +303,24 @@ export const getAccessToken = async (): Promise<string | null> => {
   return session?.accessToken ?? null;
 };
 
+/**
+ * Force-refresh the Supabase session and return the new access token.
+ * Returns null if the refresh fails or Supabase is not configured.
+ */
+export const refreshAccessToken = async (): Promise<string | null> => {
+  if (!supabaseClient) {
+    return null;
+  }
+
+  const { data, error } = await supabaseClient.auth.refreshSession();
+
+  if (error || !data.session) {
+    return null;
+  }
+
+  return data.session.access_token;
+};
+
 export const subscribeToAuthSessionChanges = (listener: () => void) => {
   authSessionListeners.add(listener);
 

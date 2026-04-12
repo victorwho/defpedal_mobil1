@@ -371,6 +371,8 @@ export const errorResponseSchema = {
       enum: [
         'VALIDATION_ERROR',
         'BAD_REQUEST',
+        'NOT_FOUND',
+        'CONFLICT',
         'RATE_LIMITED',
         'UNAUTHORIZED',
         'UPSTREAM_ERROR',

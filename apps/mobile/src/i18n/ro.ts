@@ -277,6 +277,8 @@ export const ro: TranslationKeys = {
     gettingLocation: 'Se obține locația...',
     grantLocation: 'Acordă acces la locație',
     tryAgain: 'Încearcă din nou',
+    loadFailed: 'Fluxul nu a putut fi încărcat',
+    tryAgainLater: 'Verifică conexiunea și încearcă din nou.',
     noRidesNearby: 'Nicio cursă distribuită în apropiere',
     beFirst: 'Completează o cursă și fii primul care o distribuie!',
   },

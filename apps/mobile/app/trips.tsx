@@ -46,17 +46,17 @@ export default function TripsScreen() {
     setExpandedId((prev) => (prev === tripId ? null : tripId));
   }, [compareMode]);
 
-  const handleCompare = () => {
+  const handleCompare = useCallback(() => {
     if (selectedIds.length !== 2) return;
     router.push(`/trip-compare?trip1=${selectedIds[0]}&trip2=${selectedIds[1]}`);
     setCompareMode(false);
     setSelectedIds([]);
-  };
+  }, [selectedIds]);
 
-  const exitCompareMode = () => {
+  const exitCompareMode = useCallback(() => {
     setCompareMode(false);
     setSelectedIds([]);
-  };
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: TripHistoryItem }) => (

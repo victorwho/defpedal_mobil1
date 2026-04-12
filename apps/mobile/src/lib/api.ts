@@ -45,7 +45,7 @@ import type {
 } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
-import { getAccessToken } from './supabase';
+import { getAccessToken, refreshAccessToken } from './supabase';
 import {
   mapboxAutocomplete,
   mapboxReverseGeocode,
@@ -156,7 +156,13 @@ const requestWithXmlHttpRequest = (
         ok: request.status >= 200 && request.status < 300,
         status: request.status,
         text: async () => responseText,
-        json: async <TResponse>() => JSON.parse(responseText) as TResponse,
+        json: async <TResponse>() => {
+          try {
+            return JSON.parse(responseText) as TResponse;
+          } catch {
+            throw new Error(`Invalid JSON response: ${responseText.slice(0, 200)}`);
+          }
+        },
       });
     };
 
@@ -187,21 +193,14 @@ const requestWithFetch = async (
   }, REQUEST_TIMEOUT_MS);
 
   try {
-    const response = (await Promise.race([
-      fetch(url, {
-        headers: {
-          ...getDefaultRequestHeaders(accessToken),
-          ...(init?.headers ?? {}),
-        },
-        ...init,
-        signal: controller.signal,
-      }),
-      new Promise<Response>((_resolve, reject) => {
-        setTimeout(() => {
-          reject(new Error(timeoutErrorMessage));
-        }, REQUEST_TIMEOUT_MS);
-      }),
-    ])) as Response;
+    const response = await fetch(url, {
+      headers: {
+        ...getDefaultRequestHeaders(accessToken),
+        ...(init?.headers ?? {}),
+      },
+      ...init,
+      signal: controller.signal,
+    });
 
     return {
       ok: response.ok,
@@ -220,12 +219,16 @@ const requestWithFetch = async (
   }
 };
 
-const requestJson = async <TResponse>(
-  path: string,
-  init?: RequestInit,
-): Promise<TResponse> => {
-  const accessToken = await getAccessToken();
-  const url = `${ensureBaseUrl()}${path}`;
+type TransportResult = {
+  response: RequestResponse;
+  lastTransportError: unknown;
+};
+
+const executeTransport = async (
+  url: string,
+  init: RequestInit | undefined,
+  accessToken: string | null,
+): Promise<TransportResult> => {
   let response: RequestResponse;
   let lastTransportError: unknown = null;
 
@@ -250,6 +253,29 @@ const requestJson = async <TResponse>(
     }
   } else {
     throw new Error('No supported network transport is available in this runtime.');
+  }
+
+  return { response: response!, lastTransportError };
+};
+
+const requestJson = async <TResponse>(
+  path: string,
+  init?: RequestInit,
+): Promise<TResponse> => {
+  const accessToken = await getAccessToken();
+  const url = `${ensureBaseUrl()}${path}`;
+
+  let { response, lastTransportError } = await executeTransport(url, init, accessToken);
+
+  // On 401, attempt to refresh the Supabase token and retry once
+  if (response.status === 401) {
+    const refreshedToken = await refreshAccessToken();
+
+    if (refreshedToken) {
+      const retryResult = await executeTransport(url, init, refreshedToken);
+      response = retryResult.response;
+      lastTransportError = retryResult.lastTransportError;
+    }
   }
 
   if (!response.ok) {

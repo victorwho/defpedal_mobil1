@@ -110,8 +110,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 16,
   },
   buttonActive: {

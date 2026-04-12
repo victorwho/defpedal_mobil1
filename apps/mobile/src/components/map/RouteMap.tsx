@@ -44,6 +44,28 @@ if (mobileEnv.mapboxPublicToken) {
   Mapbox.setAccessToken(mobileEnv.mapboxPublicToken);
 }
 
+/** Hoisted Mapbox layer style — avoids re-creating the object on every render. */
+const riskOverlayLineStyle = {
+  lineWidth: 4,
+  lineColor: [
+    'interpolate',
+    ['linear'],
+    ['get', 'riskScore'],
+    0, safetyColors.safe,
+    33, safetyColors.safe,
+    43.5, '#8BC34A',
+    51.8, safetyColors.caution,
+    57.6, '#FF9800',
+    69, '#FF5722',
+    101.8, safetyColors.danger,
+    120, brandColors.bgDeep,
+  ] as any,
+  lineOpacity: 0.8,
+  lineCap: 'round' as const,
+  lineJoin: 'round' as const,
+  lineEmissiveStrength: 1,
+};
+
 export const RouteMap = ({
   routes = [],
   selectedRouteId,
@@ -241,33 +263,16 @@ export const RouteMap = ({
           onPoiPress={handlePoiPress}
         />
 
-        {riskOverlay && riskOverlay.features.length > 0 ? (
-          <Mapbox.ShapeSource id="risk-overlay" shape={riskOverlay}>
-            <Mapbox.LineLayer
-              id="risk-overlay-line"
-              style={{
-                lineWidth: 4,
-                lineColor: [
-                  'interpolate',
-                  ['linear'],
-                  ['get', 'riskScore'],
-                  0, safetyColors.safe,       // Very safe — safetyColors.safe
-                  33, safetyColors.safe,
-                  43.5, '#8BC34A',            // Safe = light green (gradient intermediate)
-                  51.8, safetyColors.caution,  // Average — safetyColors.caution
-                  57.6, '#FF9800',            // Elevated = orange (gradient intermediate)
-                  69, '#FF5722',              // Risky = deep orange (gradient intermediate)
-                  101.8, safetyColors.danger,  // Very risky — safetyColors.danger
-                  120, brandColors.bgDeep,     // Extreme — brandColors.bgDeep
-                ],
-                lineOpacity: 0.8,
-                lineCap: 'round',
-                lineJoin: 'round',
-                lineEmissiveStrength: 1,
-              }}
-            />
-          </Mapbox.ShapeSource>
-        ) : null}
+        <Mapbox.ShapeSource
+          id="risk-overlay"
+          key={riskOverlay && riskOverlay.features.length > 0 ? 'risk-on' : 'risk-off'}
+          shape={riskOverlay ?? { type: 'FeatureCollection', features: [] }}
+        >
+          <Mapbox.LineLayer
+            id="risk-overlay-line"
+            style={riskOverlayLineStyle}
+          />
+        </Mapbox.ShapeSource>
 
         <RouteLayers
           routeFeatureCollection={routeFeatureCollection}

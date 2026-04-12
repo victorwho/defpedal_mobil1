@@ -697,6 +697,11 @@ export default function RoutePlanningScreen() {
                     placeholder="Search for a stop"
                     active
                     isLoading={waypointAutocompleteQuery.isPending}
+                    errorMessage={
+                      waypointAutocompleteQuery.isError
+                        ? waypointAutocompleteQuery.error.message
+                        : null
+                    }
                     suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
                     onFocus={() => setActiveField(`waypoint-${index}` as ActiveField)}
                     onChangeText={(value) => {
@@ -789,6 +794,11 @@ export default function RoutePlanningScreen() {
                   placeholder="Search for a stop"
                   active
                   isLoading={waypointAutocompleteQuery.isPending}
+                  errorMessage={
+                    waypointAutocompleteQuery.isError
+                      ? waypointAutocompleteQuery.error.message
+                      : null
+                  }
                   suggestions={waypointAutocompleteQuery.data?.suggestions ?? []}
                   onFocus={() => setActiveField(`waypoint-${waypoints.length}` as ActiveField)}
                   onChangeText={(value) => {

@@ -1,6 +1,6 @@
 import type { TripHistoryItem } from '@defensivepedal/core';
 import { calculateCo2SavedKg, calculateTrailDistanceMeters, decodePolyline } from '@defensivepedal/core';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -59,7 +59,7 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
   }
 };
 
-export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
+export const TripCard = memo(({ trip, expanded, onToggle }: TripCardProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
@@ -138,7 +138,7 @@ export const TripCard = ({ trip, expanded, onToggle }: TripCardProps) => {
 
     </View>
   );
-};
+});
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({

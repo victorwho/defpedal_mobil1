@@ -52,7 +52,7 @@ export type RouteMapProps = {
   /** Called when map center changes (used for crosshair-based hazard placement) */
   onCenterChange?: (coordinate: Coordinate) => void;
   /** Array of past ride GPS trails for personal safety overlay */
-  historyTrails?: readonly { coordinates: readonly [number, number][]; mode: 'safe' | 'fast' }[];
+  historyTrails?: readonly { coordinates: readonly [number, number][]; mode: 'safe' | 'fast' | 'flat' }[];
   /** GeoJSON FeatureCollection of road risk segments to render as colored overlay */
   riskOverlay?: GeoJSON.FeatureCollection | null;
   containerStyle?: StyleProp<ViewStyle>;

@@ -4,17 +4,11 @@ import type {
   ProfileUpdateRequest,
   ShareTripRequest,
 } from '@defensivepedal/core';
+import { errorResponseSchema } from './http';
+
+export { errorResponseSchema };
 
 const safetyTagValues = SAFETY_TAG_OPTIONS.map((o) => o.value) as string[];
-
-export const errorResponseSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-    code: { type: 'string' as const },
-    details: { type: 'array' as const, items: { type: 'string' as const } },
-  },
-};
 
 const coordinateSchema = {
   type: 'object',
@@ -38,7 +32,7 @@ export const feedQuerystringSchema = {
     lat: { type: 'number', minimum: -90, maximum: 90 },
     lon: { type: 'number', minimum: -180, maximum: 180 },
     radiusKm: { type: 'number', minimum: 1, maximum: 100 },
-    cursor: { type: 'string', maxLength: 50 },
+    cursor: { type: 'string', maxLength: 50, format: 'date-time' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
   },
 } as const;
@@ -64,7 +58,7 @@ export const shareTripRequestSchema = {
     elevationGainMeters: { type: ['number', 'null'] },
     averageSpeedMps: { type: ['number', 'null'] },
     safetyRating: { type: ['integer', 'null'], minimum: 1, maximum: 5 },
-    geometryPolyline6: { type: 'string', minLength: 1 },
+    geometryPolyline6: { type: 'string', minLength: 1, maxLength: 500000 },
     safetyTags: {
       type: 'array',
       items: { type: 'string', enum: safetyTagValues },
@@ -89,7 +83,7 @@ export const profileUpdateRequestSchema = {
   properties: {
     displayName: { type: 'string', minLength: 1, maxLength: 100 },
     username: { type: 'string', minLength: 3, maxLength: 30, pattern: '^[a-zA-Z0-9_]+$' },
-    avatarUrl: { type: ['string', 'null'] },
+    avatarUrl: { type: ['string', 'null'], format: 'uri' },
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },

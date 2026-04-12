@@ -3,8 +3,20 @@ import type {
   GeoJsonLineString,
   RiskSegment,
 } from '@defensivepedal/core';
+import type { BaseLogger } from 'pino';
 
 import { supabaseAdmin } from './supabaseAdmin';
+
+type MinimalLogger = Pick<BaseLogger, 'error' | 'warn'>;
+
+const fallbackLogger: MinimalLogger = {
+  error: (obj: unknown, msg?: string, ...args: unknown[]) => {
+    console.error(msg ?? obj, ...args);
+  },
+  warn: (obj: unknown, msg?: string, ...args: unknown[]) => {
+    console.warn(msg ?? obj, ...args);
+  },
+};
 
 const getRiskColor = (score: number): string => {
   if (score <= 0) return '#3b82f6';
@@ -23,6 +35,7 @@ type RiskFeatureProperties = {
 
 export const fetchRiskSegments = async (
   routeGeometry: GeoJsonLineString,
+  logger: MinimalLogger = fallbackLogger,
 ): Promise<RiskSegment[]> => {
   if (!supabaseAdmin) {
     return [];
@@ -33,12 +46,12 @@ export const fetchRiskSegments = async (
   });
 
   if (error) {
-    console.error('[risk] Supabase RPC error:', error.message, error.code);
+    logger.error({ code: error.code }, '[risk] Supabase RPC error: %s', error.message);
     return [];
   }
 
   if (!data) {
-    console.warn('[risk] Supabase RPC returned null/undefined data');
+    logger.warn('[risk] Supabase RPC returned null/undefined data');
     return [];
   }
 

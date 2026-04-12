@@ -572,6 +572,46 @@ export const buildV1Routes = (
 
     app.get(
       '/trips/history',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  tripId: { type: 'string' },
+                  clientTripId: { type: 'string' },
+                  routingMode: { type: 'string', enum: ['safe', 'fast', 'flat'] },
+                  startedAt: { type: 'string', format: 'date-time' },
+                  endedAt: { type: ['string', 'null'], format: 'date-time' },
+                  endReason: { type: 'string', enum: ['completed', 'stopped', 'app_killed', 'in_progress'] },
+                  plannedRoutePolyline6: { type: ['string', 'null'] },
+                  plannedRouteDistanceMeters: { type: ['number', 'null'] },
+                  distanceMeters: { type: ['number', 'null'] },
+                  gpsBreadcrumbs: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        lat: { type: 'number' },
+                        lon: { type: 'number' },
+                        ts: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
       async (request, reply) => {
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', {
@@ -647,7 +687,47 @@ export const buildV1Routes = (
 
     app.get<{
       Querystring: { lat: string; lon: string; radiusMeters?: string };
-    }>('/hazards/nearby', async (request, reply) => {
+    }>('/hazards/nearby', {
+      schema: {
+        querystring: {
+          type: 'object',
+          required: ['lat', 'lon'],
+          properties: {
+            lat: { type: 'string' },
+            lon: { type: 'string' },
+            radiusMeters: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            required: ['hazards'],
+            properties: {
+              hazards: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    lat: { type: 'number' },
+                    lon: { type: 'number' },
+                    hazardType: { type: 'string' },
+                    createdAt: { type: 'string' },
+                    confirmCount: { type: 'integer' },
+                    denyCount: { type: 'integer' },
+                  },
+                },
+              },
+            },
+          },
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
       const lat = parseFloat(request.query.lat);
       const lon = parseFloat(request.query.lon);
       const radiusMeters = parseFloat(request.query.radiusMeters ?? '1000');
@@ -986,6 +1066,10 @@ export const buildV1Routes = (
         return reply.status(400).send({ error: 'Missing required fields' });
       }
 
+      if (!supabaseAdmin) {
+        throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+      }
+
       const { error } = await supabaseAdmin
         .from('push_tokens')
         .upsert(
@@ -1001,7 +1085,7 @@ export const buildV1Routes = (
 
       if (error) {
         request.log.error({ error }, 'push token upsert failed');
-        return reply.status(500).send({ error: 'Failed to register push token' });
+        return reply.status(500).send({ error: 'Failed to register push token.', code: 'UPSTREAM_ERROR', details: [error.message] });
       }
 
       return reply.send({ acceptedAt: new Date().toISOString() });
@@ -1027,7 +1111,11 @@ export const buildV1Routes = (
 
       const { deviceId } = request.body as { deviceId: string };
       if (!deviceId) {
-        return reply.status(400).send({ error: 'Missing deviceId' });
+        return reply.status(400).send({ error: 'Missing deviceId.', code: 'VALIDATION_ERROR', details: ['deviceId is required.'] });
+      }
+
+      if (!supabaseAdmin) {
+        throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
       }
 
       await supabaseAdmin
@@ -1041,16 +1129,16 @@ export const buildV1Routes = (
   );
 
   // ── Admin notification send ──
-  // NOTE: This endpoint is restricted to the internal admin bypass token only.
-  // Regular Supabase-authenticated users are rejected regardless of their role.
+  // Protected by a dedicated NOTIFICATION_ADMIN_SECRET that must be set as
+  // an env var on the server.  This secret is NEVER shipped in the mobile
+  // APK — it is independent of the dev-auth bypass system.
   app.post(
     '/notifications/send',
     async (request, reply) => {
-      // Only allow the dev-auth bypass user (internal/admin use only).
-      // A real Supabase user JWT must never be able to reach this.
-      if (!config.devAuthBypass.enabled) {
+      const adminSecret = process.env.NOTIFICATION_ADMIN_SECRET ?? '';
+      if (!adminSecret) {
         return reply.status(403).send({
-          error: 'This endpoint is disabled.',
+          error: 'This endpoint is not configured.',
           code: 'UNAUTHORIZED',
         });
       }
@@ -1060,9 +1148,7 @@ export const buildV1Routes = (
         ? authHeader.slice(7).trim()
         : '';
 
-      const { authenticateDeveloperBypassToken } = await import('../lib/auth');
-      const adminUser = authenticateDeveloperBypassToken(accessToken);
-      if (!adminUser) {
+      if (!accessToken || accessToken !== adminSecret) {
         return reply.status(403).send({
           error: 'Admin access required.',
           code: 'UNAUTHORIZED',
@@ -1637,7 +1723,7 @@ export const buildV1Routes = (
           if (error.code === '23505') {
             throw new HttpError('Impact already recorded for this trip.', {
               statusCode: 409,
-              code: 'BAD_REQUEST',
+              code: 'CONFLICT',
               details: [error.message],
             });
           }
@@ -1892,7 +1978,19 @@ export const buildV1Routes = (
                 totalXpEarned: { type: 'integer' },
                 currentTotalXp: { type: 'integer' },
                 riderTier: { type: 'string' },
-                tierPromotion: { type: ['object', 'null'] },
+                tierPromotion: {
+                  type: ['object', 'null'],
+                  additionalProperties: true,
+                  properties: {
+                    xpAwarded:        { type: 'integer' },
+                    totalXp:          { type: 'integer' },
+                    oldTier:          { type: 'string' },
+                    newTier:          { type: 'string' },
+                    promoted:         { type: 'boolean' },
+                    tierDisplayName:  { type: 'string' },
+                    tierTagline:      { type: 'string' },
+                  },
+                },
               },
             },
             401: errorResponseSchema,
@@ -2274,7 +2372,7 @@ export const buildV1Routes = (
         if (available.length === 0) {
           throw new HttpError('No quiz questions available.', {
             statusCode: 404,
-            code: 'BAD_REQUEST',
+            code: 'NOT_FOUND',
           });
         }
 
@@ -2342,7 +2440,7 @@ export const buildV1Routes = (
         if (!question) {
           throw new HttpError('Question not found.', {
             statusCode: 404,
-            code: 'BAD_REQUEST',
+            code: 'NOT_FOUND',
           });
         }
 
@@ -2559,6 +2657,7 @@ export const buildV1Routes = (
             waypoints: payload.waypoints,
             mode: payload.mode,
             avoid_unpaved: payload.avoidUnpaved,
+            avoid_hills: payload.avoidHills,
           })
           .select()
           .single();

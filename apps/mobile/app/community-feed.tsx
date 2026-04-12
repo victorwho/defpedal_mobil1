@@ -42,6 +42,7 @@ export default function CommunityFeedScreen() {
   const {
     data,
     isLoading,
+    isError,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
@@ -177,6 +178,15 @@ export default function CommunityFeedScreen() {
           isLoading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color={colors.accent} />
+            </View>
+          ) : isError ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="cloud-offline-outline" size={48} color={colors.accent} />
+              <Text style={styles.emptyTitle}>{t('communityScreen.loadFailed')}</Text>
+              <Text style={styles.emptySubtitle}>{t('communityScreen.tryAgainLater')}</Text>
+              <Pressable style={styles.retryButton} onPress={() => void refetch()}>
+                <Text style={styles.retryButtonText}>{t('communityScreen.tryAgain')}</Text>
+              </Pressable>
             </View>
           ) : (
             <View style={styles.emptyState}>

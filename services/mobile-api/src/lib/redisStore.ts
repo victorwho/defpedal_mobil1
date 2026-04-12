@@ -1,12 +1,16 @@
+import type { BaseLogger } from 'pino';
 import { createClient } from 'redis';
 
 import type { RouteResponseCache } from './cache';
 import type { RateLimiter } from './rateLimit';
 
+type MinimalLogger = Pick<BaseLogger, 'error'>;
+
 type RedisSharedStoreOptions = {
   url: string;
   keyPrefix: string;
   connectTimeoutMs: number;
+  logger?: MinimalLogger;
 };
 
 type RedisSharedStore = {
@@ -46,9 +50,14 @@ export const createRedisSharedStore = (
     },
   });
   let connectionPromise: Promise<void> | null = null;
+  const log: MinimalLogger = options.logger ?? {
+    error: (obj: unknown, msg?: string, ...args: unknown[]) => {
+      console.error(msg ?? obj, ...args);
+    },
+  };
 
   client.on('error', (error) => {
-    console.error('[mobile-api] Redis client error', error);
+    log.error({ err: error }, '[mobile-api] Redis client error');
   });
 
   const ensureConnected = async () => {

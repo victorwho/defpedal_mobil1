@@ -275,6 +275,8 @@ export const en = {
     gettingLocation: 'Getting your location...',
     grantLocation: 'Grant Location Access',
     tryAgain: 'Try Again',
+    loadFailed: 'Could not load feed',
+    tryAgainLater: 'Check your connection and try again.',
     noRidesNearby: 'No rides shared nearby yet',
     beFirst: 'Complete a ride and be the first to share!',
   },

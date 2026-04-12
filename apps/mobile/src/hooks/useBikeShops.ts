@@ -7,6 +7,7 @@ import {
 } from '../lib/bicycle-shops';
 
 const STALE_TIME_MS = 10 * 60 * 1000; // 10 minutes (shops don't change)
+const GC_TIME_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Fetches bicycle shops/repair from OSM via Overpass API.
@@ -38,6 +39,7 @@ export const useBikeShops = (
     queryFn: () => fetchBikeShopsNearRoute(origin!, destination!),
     enabled: queryEnabled,
     staleTime: STALE_TIME_MS,
+    gcTime: GC_TIME_MS,
   });
 
   return {

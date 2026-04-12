@@ -237,7 +237,7 @@ export const shouldAnnounceApproach = (
 export const hasArrived = (
   distanceToManeuverMeters: number,
   arrivalThresholdMeters = ARRIVAL_THRESHOLD_METERS,
-): boolean => distanceToManeuverMeters < arrivalThresholdMeters;
+): boolean => distanceToManeuverMeters <= arrivalThresholdMeters;
 
 const getClampedStepIndex = (
   session: NavigationSession,
@@ -268,6 +268,26 @@ export const getNavigationProgress = (
   gpsAccuracyMeters = 0,
 ): NavigationProgressSnapshot => {
   const routeCoordinates = decodePolyline(route.geometryPolyline6);
+
+  // Guard: empty polyline means decode failed or route has no geometry.
+  // Return a safe "off-route, no progress" snapshot instead of reporting
+  // the user as on-route with 0 remaining distance.
+  if (routeCoordinates.length === 0) {
+    return {
+      currentStepIndex: session.currentStepIndex,
+      distanceToManeuverMeters: Infinity,
+      distanceToRouteMeters: Infinity,
+      remainingDistanceMeters: route.distanceMeters,
+      remainingDurationSeconds: route.durationSeconds,
+      snappedCoordinate: null,
+      isOffRoute: true,
+      shouldCompleteNavigation: false,
+      shouldAdvanceStep: false,
+      shouldPreAnnounce: false,
+      shouldAnnounceApproach: false,
+    };
+  }
+
   const totalSteps = route.steps.length;
   const clampedStepIndex = getClampedStepIndex(session, totalSteps);
   const closestPointIndex = findClosestPointIndex(

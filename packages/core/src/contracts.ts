@@ -283,7 +283,7 @@ export interface TripTrackRequest {
 export interface TripHistoryItem {
   readonly id: string;
   readonly tripId: string;
-  readonly routingMode: 'safe' | 'fast';
+  readonly routingMode: 'safe' | 'fast' | 'flat';
   readonly plannedRoutePolyline6?: string;
   readonly plannedRouteDistanceMeters?: number;
   readonly gpsBreadcrumbs: ReadonlyArray<{ lat: number; lon: number }>;

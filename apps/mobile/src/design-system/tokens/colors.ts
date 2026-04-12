@@ -23,8 +23,8 @@ export const brandColors = {
 
   /** Text on dark backgrounds */
   textPrimary: '#FFFFFF',
-  textSecondary: '#9CA3AF',
-  textMuted: '#8B9198',
+  textSecondary: '#B0B8C1',
+  textMuted: '#A0A8B0',
   textInverse: '#111827',
 
   /** Borders */
@@ -87,7 +87,7 @@ export const lightTheme = {
   /** Text on light backgrounds */
   textPrimary: '#111827',
   textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
+  textMuted: '#737B85',
   textInverse: '#FFFFFF',
 
   /** Borders */

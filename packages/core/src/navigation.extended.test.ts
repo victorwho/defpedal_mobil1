@@ -439,8 +439,8 @@ describe('hasArrived', () => {
     expect(hasArrived(26)).toBe(false);
   });
 
-  it('returns false at exactly the threshold (boundary — < not <=)', () => {
-    expect(hasArrived(ARRIVAL_THRESHOLD_METERS)).toBe(false);
+  it('returns true at exactly the threshold (boundary — <= inclusive)', () => {
+    expect(hasArrived(ARRIVAL_THRESHOLD_METERS)).toBe(true);
   });
 
   it('returns true at threshold minus 1', () => {
@@ -449,7 +449,7 @@ describe('hasArrived', () => {
 
   it('uses a custom threshold when provided', () => {
     expect(hasArrived(50, 60)).toBe(true);
-    expect(hasArrived(60, 60)).toBe(false);
+    expect(hasArrived(60, 60)).toBe(true);
   });
 });
 

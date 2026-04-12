@@ -35,9 +35,10 @@ import type { QueuedMutationPayloadByType } from '../lib/offlineQueue';
 import { zustandStorage } from '../lib/storage';
 
 const MAX_QUEUE_SIZE = 500;
+const MAX_RECENT_DESTINATIONS = 3;
 
 /** Trip-related mutation types that should not be dropped during queue eviction. */
-const TRIP_CRITICAL_TYPES = new Set(['trip_start', 'trip_end', 'trip_track']);
+const TRIP_CRITICAL_TYPES = new Set(['trip_start', 'trip_end', 'trip_track', 'feedback']);
 
 const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   origin: {
@@ -62,7 +63,7 @@ const createQueuedMutationRecord = <TType extends QueuedMutationType>(
   id:
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? `${type}-${crypto.randomUUID()}`
-      : `${type}-${Date.now()}`,
+      : `${type}-${Date.now()}-${Math.round(Math.random() * 10000)}`,
   type,
   payload,
   createdAt: new Date().toISOString(),
@@ -244,16 +245,15 @@ export const useAppStore = create<AppStore>()(
       recentDestinations: [],
       addRecentDestination: (destination) =>
         set((state) => {
-          const MAX_RECENT = 3;
           // Remove existing entry with same coordinates (de-duplicate)
           const filtered = state.recentDestinations.filter(
             (d) =>
               d.coordinates.lat !== destination.coordinates.lat ||
               d.coordinates.lon !== destination.coordinates.lon,
           );
-          // Add new destination at front, limit to MAX_RECENT
+          // Add new destination at front, limit to MAX_RECENT_DESTINATIONS
           return {
-            recentDestinations: [destination, ...filtered].slice(0, MAX_RECENT),
+            recentDestinations: [destination, ...filtered].slice(0, MAX_RECENT_DESTINATIONS),
           };
         }),
       pendingBadgeUnlocks: [],
@@ -483,32 +483,38 @@ export const useAppStore = create<AppStore>()(
         set((state) => {
           if (!state.navigationSession) return state;
           const crumbs = state.navigationSession.gpsBreadcrumbs;
-          // Cap at 2000 points to bound memory
-          if (crumbs.length >= 2000) return state;
+          const newCrumb = {
+            lat: sample.coordinate.lat,
+            lon: sample.coordinate.lon,
+            ts: sample.timestamp,
+            acc: sample.accuracyMeters ?? null,
+            spd: sample.speedMetersPerSecond ?? null,
+            hdg: sample.heading ?? null,
+          };
+          // Ring-buffer: drop oldest when at capacity so long rides keep recording
+          const MAX_BREADCRUMBS = 2000;
+          const updatedCrumbs =
+            crumbs.length >= MAX_BREADCRUMBS
+              ? [...crumbs.slice(1), newCrumb]
+              : [...crumbs, newCrumb];
           return {
             navigationSession: {
               ...state.navigationSession,
-              gpsBreadcrumbs: [
-                ...crumbs,
-                {
-                  lat: sample.coordinate.lat,
-                  lon: sample.coordinate.lon,
-                  ts: sample.timestamp,
-                  acc: sample.accuracyMeters ?? null,
-                  spd: sample.speedMetersPerSecond ?? null,
-                  hdg: sample.heading ?? null,
-                },
-              ],
+              gpsBreadcrumbs: updatedCrumbs,
             },
           };
         }),
       finishNavigation: () =>
-        set((state) => ({
-          navigationSession: state.navigationSession
-            ? completeNavigationSession(state.navigationSession)
-            : state.navigationSession,
-          appState: state.navigationSession ? 'AWAITING_FEEDBACK' : state.appState,
-        })),
+        set((state) => {
+          const session = state.navigationSession;
+          const isActive = session && session.state === 'navigating';
+          return {
+            navigationSession: isActive
+              ? completeNavigationSession(session)
+              : session,
+            appState: isActive ? 'AWAITING_FEEDBACK' : state.appState,
+          };
+        }),
       setMuted: (isMuted) =>
         set((state) => ({
           navigationSession: state.navigationSession
@@ -741,14 +747,33 @@ export const useAppStore = create<AppStore>()(
           offlineRegions: state.offlineRegions.filter((region) => region.id !== regionId),
         })),
       resetFlow: () =>
-        set(() => ({
-          appState: 'IDLE',
-          routePreview: null,
-          selectedRouteId: null,
-          navigationSession: resetNavigationSession(),
-          routeRequest: DEFAULT_ROUTE_REQUEST,
-          activeTripClientId: null,
-        })),
+        set((state) => {
+          // Prune tripServerIds: keep only entries for mutations still in the queue
+          const activeClientIds = new Set(
+            state.queuedMutations
+              .filter((m) => m.status !== 'dead')
+              .map((m) => {
+                const payload = m.payload as Record<string, unknown>;
+                return (payload.clientTripId as string) ?? '';
+              })
+              .filter(Boolean),
+          );
+          const prunedIds: Record<string, string> = {};
+          for (const [clientId, serverId] of Object.entries(state.tripServerIds)) {
+            if (activeClientIds.has(clientId)) {
+              prunedIds[clientId] = serverId;
+            }
+          }
+          return {
+            appState: 'IDLE',
+            routePreview: null,
+            selectedRouteId: null,
+            navigationSession: resetNavigationSession(),
+            routeRequest: DEFAULT_ROUTE_REQUEST,
+            activeTripClientId: null,
+            tripServerIds: prunedIds,
+          };
+        }),
     }),
     {
       name: 'defensivepedal-app-store',
@@ -783,6 +808,7 @@ export const useAppStore = create<AppStore>()(
         cachedImpact: state.cachedImpact,
         notificationPermissionAsked: state.notificationPermissionAsked,
         ratingSkipCount: state.ratingSkipCount,
+        // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,

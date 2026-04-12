@@ -7,6 +7,7 @@ import {
 } from '../lib/bicycle-parking';
 
 const STALE_TIME_MS = 5 * 60 * 1000; // 5 minutes
+const GC_TIME_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Fetches bicycle parking locations near the route via the Overpass API.
@@ -33,6 +34,7 @@ export const useBicycleParking = (
       fetchBicycleParkingNearRoute(origin!, destination!),
     enabled,
     staleTime: STALE_TIME_MS,
+    gcTime: GC_TIME_MS,
   });
 
   return {

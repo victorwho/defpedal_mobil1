@@ -1,11 +1,13 @@
 import type { FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
-import { useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTheme, type ThemeColors } from '../design-system';
 import { safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
+import { space } from '../design-system/tokens/spacing';
+import { textBase, textLg, textSm, textXs } from '../design-system/tokens/typography';
 import { TierPill } from '../design-system/atoms/TierPill';
 import { riderTiers, type RiderTierKey } from '../design-system/tokens/tierColors';
 import { ReactionBar } from './LikeButton';
@@ -55,11 +57,11 @@ const getSafetyColor = (rating: number): string => {
   return safetyColors.danger;
 };
 
-export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
+export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
-  const syntheticRoute = buildSyntheticRoute(item);
+  const syntheticRoute = useMemo(() => buildSyntheticRoute(item), [item]);
   const initials = item.user.displayName
     .split(' ')
     .map((w) => w[0])
@@ -169,7 +171,7 @@ export const FeedCard = ({ item, isVisible, onLike, onLove, onPress, onUserPress
       </View>
     </Pressable>
   );
-};
+});
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
@@ -179,7 +181,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: colors.borderDefault,
       backgroundColor: colors.bgSecondary,
-      padding: 16,
+      padding: space[4],
       gap: 10,
     },
     header: {
@@ -207,7 +209,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     nameRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: space[1],
     },
     displayName: {
       color: colors.textPrimary,
@@ -217,26 +219,26 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     timestamp: {
       color: colors.textSecondary,
-      fontSize: 12,
+      fontSize: textXs.fontSize,
     },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: space[2],
     },
     title: {
       flex: 1,
       color: colors.accent,
-      fontSize: 16,
+      fontSize: textBase.fontSize,
       fontWeight: '900',
       letterSpacing: -0.3,
     },
     safetyPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: space[1],
       borderRadius: radii.lg,
-      paddingHorizontal: 8,
+      paddingHorizontal: space[2],
       paddingVertical: 3,
     },
     safetyDot: {
@@ -274,7 +276,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     note: {
       color: colors.textSecondary,
-      fontSize: 14,
+      fontSize: textSm.fontSize,
       lineHeight: 20,
     },
     readMore: {
@@ -286,23 +288,23 @@ const createThemedStyles = (colors: ThemeColors) =>
     actionBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: space[2],
       borderTopWidth: 1,
       borderTopColor: colors.borderDefault,
-      paddingTop: 8,
+      paddingTop: space[2],
     },
     commentButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: space[1],
       paddingVertical: 6,
       paddingHorizontal: 10,
     },
     commentIcon: {
-      fontSize: 18,
+      fontSize: textLg.fontSize,
     },
     commentCount: {
-      fontSize: 14,
+      fontSize: textSm.fontSize,
       fontWeight: '700',
       color: colors.textSecondary,
     },

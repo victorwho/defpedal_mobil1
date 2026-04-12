@@ -41,7 +41,9 @@ import {
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
+import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
+import { XP_VALUES } from '../lib/xp';
 
 const DEFAULT_FEED_LIMIT = 20;
 const DEFAULT_RADIUS_KM = 15;
@@ -66,10 +68,6 @@ const ensureSupabase = () => {
 // ---------------------------------------------------------------------------
 
 const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
-
-// Streak helpers (shared with v1.ts)
-import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
-import { XP_VALUES } from '../lib/xp';
 
 const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
   const profile = row.profiles as Record<string, unknown> | null;
@@ -249,7 +247,16 @@ export const buildFeedRoutes = (
           });
         }
 
-        const result = (typeof data === 'string' ? JSON.parse(data) : data) as Record<string, unknown>;
+        let result: Record<string, unknown>;
+        try {
+          result = (typeof data === 'string' ? JSON.parse(data) : data) as Record<string, unknown>;
+        } catch {
+          throw new HttpError('Heartbeat data parsing failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: ['Invalid RPC response format.'],
+          });
+        }
         const today = result.today as Record<string, unknown>;
         const totals = result.totals as Record<string, unknown>;
 
@@ -498,10 +505,20 @@ export const buildFeedRoutes = (
       '/feed/:id/love',
       {
         schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1, format: 'uuid' } } },
+          params: {
+            type: 'object',
+            required: ['id'],
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
+          },
           response: {
-            200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
-            401: errorResponseSchema, 502: errorResponseSchema,
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['acceptedAt'],
+              properties: { acceptedAt: { type: 'string', format: 'date-time' } },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -518,7 +535,7 @@ export const buildFeedRoutes = (
         if (supabaseAdmin) {
           void (async () => {
             try { await supabaseAdmin.rpc('award_xp', {
-              p_user_id: user.id, p_action: 'like',
+              p_user_id: user.id, p_action: 'love',
               p_base_xp: XP_VALUES.like, p_multiplier: 1.0,
               p_source_id: request.params.id,
             }); } catch { /* non-fatal */ }
@@ -534,10 +551,20 @@ export const buildFeedRoutes = (
       '/feed/:id/love',
       {
         schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', minLength: 1, format: 'uuid' } } },
+          params: {
+            type: 'object',
+            required: ['id'],
+            properties: { id: { type: 'string', minLength: 1, format: 'uuid' } },
+          },
           response: {
-            200: { type: 'object', additionalProperties: false, required: ['acceptedAt'], properties: { acceptedAt: { type: 'string', format: 'date-time' } } },
-            401: errorResponseSchema, 502: errorResponseSchema,
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['acceptedAt'],
+              properties: { acceptedAt: { type: 'string', format: 'date-time' } },
+            },
+            401: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
