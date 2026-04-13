@@ -349,9 +349,19 @@ export default function FeedbackScreen() {
 
     const enhance = async () => {
       try {
-        // Upgrade with server data if available
+        // Award XP and fetch server-enriched impact data
         if (tripServerId) {
-          const result = await mobileApi.fetchRideImpact(tripServerId);
+          // POST first to award XP, then use the response
+          let result: RideImpact;
+          try {
+            result = await mobileApi.recordRideImpact(
+              tripServerId,
+              initialImpact.distanceMeters,
+            );
+          } catch {
+            // POST may 409 (already recorded) — fall back to GET
+            result = await mobileApi.fetchRideImpact(tripServerId);
+          }
           if (!cancelled) {
             // Merge server data with local values, preserving whichever
             // source has richer data (e.g. local microlives vs server CO2)
