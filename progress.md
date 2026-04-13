@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-13 (session 17)
+Last updated: 2026-04-13 (session 19)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -699,3 +699,12 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - File: `services/mobile-api/src/routes/v1.ts` (GET `/rides/:tripId/impact` handler)
 - Evidence: 420 API tests passing, 0 type errors
 - Deployed: Cloud Run revision `defpedal-api-00046-lpc` (2026-04-13)
+
+### Fix: Destination Field Shows 0.0000, 0.0000 by Default (2026-04-13)
+
+- Status: Done
+- Bug: Route planning destination search field initialized to `0.0000, 0.0000` (the default sentinel coordinate) instead of being blank.
+- Root cause: `destinationQuery` state initialized via `formatCoordinateLabel(routeRequest.destination)` which formatted the default `{lat: 0, lon: 0}` as `"0.0000, 0.0000"`.
+- Fix: Added `isDefaultCoordinate` helper; destination field initializes to `''` when destination is `{0, 0}`. Also prevents a wasted reverse-geocode API call for default coordinates.
+- File: `apps/mobile/app/route-planning.tsx`
+- Evidence: 1015 tests passing (core: 315, mobile-api: 210, mobile: 490), 0 type errors, verified on phone

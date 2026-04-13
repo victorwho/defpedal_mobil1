@@ -48,6 +48,9 @@ type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null
 
 const MAX_WAYPOINTS = 3;
 
+const isDefaultCoordinate = (coordinate: Coordinate) =>
+  coordinate.lat === 0 && coordinate.lon === 0;
+
 const formatCoordinateLabel = (coordinate: Coordinate) =>
   `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
 
@@ -115,7 +118,7 @@ export default function RoutePlanningScreen() {
 
   const [startOverrideQuery, setStartOverrideQuery] = useState('');
   const [destinationQuery, setDestinationQuery] = useState(
-    formatCoordinateLabel(routeRequest.destination),
+    isDefaultCoordinate(routeRequest.destination) ? '' : formatCoordinateLabel(routeRequest.destination),
   );
   const [waypointQueries, setWaypointQueries] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<ActiveField>(null);
@@ -332,7 +335,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
       }),
-    enabled: Boolean(mobileEnv.mapboxPublicToken) && !destinationHydrated,
+    enabled: Boolean(mobileEnv.mapboxPublicToken) && !destinationHydrated && !isDefaultCoordinate(routeRequest.destination),
     retry: false,
   });
 
