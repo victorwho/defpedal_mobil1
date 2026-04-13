@@ -698,3 +698,4 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Fix: GET handler now queries `xp_events` for rows matching `source_id = tripId`, builds `xpBreakdown` array and sums `totalXpEarned` from the log.
 - File: `services/mobile-api/src/routes/v1.ts` (GET `/rides/:tripId/impact` handler)
 - Evidence: 420 API tests passing, 0 type errors
+- Deployed: Cloud Run revision `defpedal-api-00046-lpc` (2026-04-13)
