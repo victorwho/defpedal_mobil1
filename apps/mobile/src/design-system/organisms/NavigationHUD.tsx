@@ -7,11 +7,11 @@
  *
  * Dark-only (forced during navigation per spec rule).
  */
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
 import { formatDistance } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { space } from '../tokens/spacing';
 import { radii } from '../tokens/radii';
@@ -113,6 +113,31 @@ const getGpsSignalColor = (accuracy: number | null | undefined): string => {
   return '#F44336'; // red — poor
 };
 
+const isGpsPoor = (accuracy: number | null | undefined): boolean =>
+  accuracy == null || accuracy > GPS_FAIR_THRESHOLD;
+
+/** Pulsating GPS icon shown only when signal is poor/lost. */
+const PulsingGpsIcon: React.FC<{ color: string }> = ({ color }) => {
+  const pulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.3, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [pulse]);
+
+  return (
+    <Animated.View style={{ opacity: pulse }}>
+      <Ionicons name="navigate-outline" size={14} color={color} />
+    </Animated.View>
+  );
+};
+
 export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
   distanceToManeuverMeters: number | null;
@@ -129,6 +154,7 @@ export const ManeuverCard: React.FC<{
         : '—';
 
   const gpsColor = getGpsSignalColor(gpsAccuracyMeters);
+  const poor = isGpsPoor(gpsAccuracyMeters);
 
   const Wrapper = onPress ? Pressable : View;
 
@@ -148,9 +174,10 @@ export const ManeuverCard: React.FC<{
       <Text style={styles.maneuverDivider}>·</Text>
       <Text style={styles.maneuverDist}>{distance}</Text>
       <View
-        style={styles.gpsDot}
+        style={styles.gpsIndicator}
         accessibilityLabel={`GPS signal ${gpsAccuracyMeters == null ? 'unavailable' : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD ? 'strong' : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD ? 'fair' : 'poor'}`}
       >
+        {poor ? <PulsingGpsIcon color={gpsColor} /> : null}
         <View style={[styles.gpsDotInner, { backgroundColor: gpsColor }]} />
       </View>
     </Wrapper>
@@ -331,9 +358,11 @@ const styles = StyleSheet.create({
     color: gray[200],
     fontFamily: fontFamily.mono.bold,
   },
-  gpsDot: {
+  gpsIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginLeft: space[1],
-    padding: 2,
   },
   gpsDotInner: {
     width: 8,
