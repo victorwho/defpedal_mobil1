@@ -472,7 +472,14 @@ export default function RoutePlanningScreen() {
 
   const handleAddStop = () => {
     if (waypoints.length >= MAX_WAYPOINTS) return;
-    setWaypointQueries((prev) => [...prev, '']);
+    setWaypointQueries((prev) => {
+      // Pad to match persisted waypoints — waypointQueries resets to []
+      // on screen remount but waypoints survive in Zustand.
+      const aligned = prev.length >= waypoints.length
+        ? prev
+        : [...prev, ...new Array<string>(waypoints.length - prev.length).fill('')];
+      return [...aligned, ''];
+    });
     setActiveField(`waypoint-${waypoints.length}` as ActiveField);
   };
 

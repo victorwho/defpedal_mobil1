@@ -671,3 +671,12 @@ For normal day-to-day feature work, we also recognize a softer milestone:
   - Duration: replaced broken progress ratio with `timeToManeuverSeconds` estimated from the previous step's pace, plus `currentStep.durationSeconds` + future steps
 - Tests: 2 new tests in `navigation.test.ts` — verifies current step inclusion and monotonic decrease across step advance
 - Evidence: 984 tests passing (core: 284), 0 type errors
+
+### Fix: Third Waypoint Search Box Disappearing (2026-04-13)
+
+- Status: Done
+- Bug: After navigating away from route-planning (e.g., to route-preview) and returning, tapping "Add stop" for a new waypoint showed no search box. The pending waypoint search bar never rendered.
+- Root cause: `waypointQueries` is local React state initialized as `[]` on every mount, but `waypoints` persists in Zustand across screen transitions. After remount with 2 persisted waypoints, `handleAddStop` pushed one empty string making `waypointQueries.length = 1`, but the pending search condition `waypointQueries.length > waypoints.length` (i.e., `1 > 2`) was false.
+- Fix: `handleAddStop` now pads `waypointQueries` to match persisted `waypoints.length` before appending the new empty entry.
+- File: `apps/mobile/app/route-planning.tsx`
+- Evidence: 0 type errors
