@@ -269,15 +269,13 @@ export const FooterCard: React.FC<{
         />
         <View style={styles.metricDivider} />
         <MetricCell
-          label={totalDescentMeters != null && totalDescentMeters > (totalClimbMeters ?? 0) ? 'Descent' : 'Climb'}
+          label="Climb"
           value={
-            totalDescentMeters != null && totalDescentMeters > (totalClimbMeters ?? 0)
-              ? `↓${Math.round(totalDescentMeters)} m`
-              : totalClimbMeters !== null
-                ? isClimbLive
-                  ? `↑${Math.round(totalClimbMeters)} m`
-                  : `~↑${Math.round(totalClimbMeters)} m`
-                : '—'
+            totalClimbMeters !== null
+              ? isClimbLive
+                ? `↑${Math.round(totalClimbMeters)} m`
+                : `~↑${Math.round(totalClimbMeters)} m`
+              : '—'
           }
         />
       </View>
