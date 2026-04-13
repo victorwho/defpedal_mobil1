@@ -306,9 +306,9 @@ export default function FeedbackScreen() {
     const trailDist = breadcrumbs.length >= 2
       ? calculateTrailDistanceMeters(breadcrumbs)
       : 0;
-    const routeDist = route?.distanceMeters ?? 0;
-    // Use GPS trail distance when available, fall back to planned route distance
-    const distMeters = trailDist > 0 ? trailDist : routeDist;
+    // Use actual GPS trail distance only — never fall back to planned route
+    // distance, which inflates stats when the rider didn't actually move.
+    const distMeters = trailDist;
     const distKm = distMeters / 1000;
     const co2 = distKm * 0.12;
     const money = distKm * 0.35;
