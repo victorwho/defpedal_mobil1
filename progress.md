@@ -718,3 +718,19 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Integration: `currentGrade` useMemo in `apps/mobile/app/navigation.tsx` — live grade from elevation profile + remaining distance, suppressed when off-route
 - Tests: 15 new tests in `packages/core/src/navigation.extended.test.ts` covering edge cases, threshold detection, segment selection, clamping, precision
 - Evidence: 1030 tests passing (core: 330, mobile-api: 210, mobile: 490), 0 type errors, verified on phone
+
+### Security: Risk Score IP Protection (2026-04-13)
+
+- Status: Done (P0 fixes deployed)
+- Threat: External actors could scrape risk segment scores via unauthenticated API endpoints to reverse-engineer the safety scoring algorithm
+- P0 fixes applied:
+  1. Quantized `riskScore` to 7 bucket midpoints (was raw float — e.g. 54.2 → 55). Client still works; attacker gets only 7 distinct values
+  2. Auth required on `/v1/routes/preview`, `/v1/routes/reroute`, `/v1/risk-segments` (were fully open)
+  3. Auth required + rate limiting always applied on `/v1/risk-map` (was open with zero rate limiting)
+  4. Rate limiting keyed on userId (was IP-only, trivially bypassed with proxies)
+- Files: `services/mobile-api/src/lib/risk.ts`, `services/mobile-api/src/routes/v1.ts`, test files updated
+- Security tests: 22 new tests in `services/mobile-api/src/__tests__/security-risk-ip.test.ts`
+- Evidence: 1052 tests passing (core: 330, mobile-api: 232, mobile: 490), 0 type errors
+- Deployed: Cloud Run revision `defpedal-api-00047-cjs` (2026-04-13)
+- Verified: curl to production returns 401 for unauthenticated `/routes/preview` and `/risk-map`
+- Tracking: `securityfix.md` has full fix list (P0 done, P1/P2 open)
