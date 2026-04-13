@@ -687,4 +687,5 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - P2-1: `!navigationSession?.remainingDistanceMeters` treated `0` as falsy (JS `!0 === true`), causing the climb indicator to briefly fall back to total route climb instead of live `↑0 m` when exactly at a maneuver. Fixed: changed to `== null` check.
 - P2-2: FooterCard compared static total route descent against live remaining climb — as remaining climb decreased during the ride, the label flipped to "Descent ↓(total)m" prematurely. Fixed: added `computeRemainingDescent` (mirror of `computeRemainingClimb`) so both values are live-remaining, making the comparison apples-to-apples.
 - Files: `packages/core/src/navigation.ts` (new `computeRemainingDescent`), `apps/mobile/app/navigation.tsx` (both fixes), `packages/core/src/navigation.extended.test.ts` (8 new descent tests)
-- Evidence: 992 tests passing (core: 292), 0 type errors
+- Evidence: 1015 tests passing (core: 315), 0 type errors
+- Regression test file: `packages/core/src/navigation.regression.test.ts` — 23 comprehensive tests across all 3 fixes (walk-through, monotonic decrease, edge cases, climb/descent symmetry, full ride simulation)
