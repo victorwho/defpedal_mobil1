@@ -689,3 +689,12 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Files: `packages/core/src/navigation.ts` (new `computeRemainingDescent`), `apps/mobile/app/navigation.tsx` (both fixes), `packages/core/src/navigation.extended.test.ts` (8 new descent tests)
 - Evidence: 1015 tests passing (core: 315), 0 type errors
 - Regression test file: `packages/core/src/navigation.regression.test.ts` — 23 comprehensive tests across all 3 fixes (walk-through, monotonic decrease, edge cases, climb/descent symmetry, full ride simulation)
+
+### Fix: Post-Ride XP Always Shows Zero (2026-04-13)
+
+- Status: Done
+- Bug: Post-ride impact card always showed 0 XP earned, regardless of trip length.
+- Root cause: `GET /v1/rides/:tripId/impact` hardcoded `xpBreakdown: []` and `totalXpEarned: 0`. It read cumulative XP from `profiles` but never queried ride-specific XP from `xp_events` (where the POST endpoint writes via `award_ride_xp` RPC with `source_id = tripId`).
+- Fix: GET handler now queries `xp_events` for rows matching `source_id = tripId`, builds `xpBreakdown` array and sums `totalXpEarned` from the log.
+- File: `services/mobile-api/src/routes/v1.ts` (GET `/rides/:tripId/impact` handler)
+- Evidence: 420 API tests passing, 0 type errors

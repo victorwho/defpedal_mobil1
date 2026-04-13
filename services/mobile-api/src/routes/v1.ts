@@ -2136,6 +2136,30 @@ export const buildV1Routes = (
           }
         } catch { /* non-fatal */ }
 
+        // Fetch ride-specific XP from the event log (source_id = tripId)
+        let xpBreakdown: XpBreakdownItem[] = [];
+        let totalXpEarned = 0;
+        try {
+          const { data: xpRows } = await supabaseAdmin
+            .from('xp_events')
+            .select('action, base_xp, multiplier, final_xp, source_id')
+            .eq('user_id', user.id)
+            .eq('source_id', request.params.tripId)
+            .order('created_at', { ascending: true });
+
+          if (xpRows && xpRows.length > 0) {
+            xpBreakdown = xpRows.map((row: Record<string, unknown>) => ({
+              action: String(row.action ?? ''),
+              label: XP_ACTION_LABELS[row.action as string] ?? String(row.action ?? ''),
+              baseXp: Number(row.base_xp ?? 0),
+              multiplier: Number(row.multiplier ?? 1),
+              finalXp: Number(row.final_xp ?? 0),
+              sourceId: String(row.source_id ?? ''),
+            }));
+            totalXpEarned = xpBreakdown.reduce((sum, item) => sum + item.finalXp, 0);
+          }
+        } catch { /* xp lookup is non-fatal */ }
+
         return {
           tripId: impactRow.trip_id as string,
           co2SavedKg: Number(impactRow.co2_saved_kg),
@@ -2146,8 +2170,8 @@ export const buildV1Routes = (
           personalMicrolives,
           communitySeconds,
           newBadges: newBadgesFromCheck,
-          xpBreakdown: [],
-          totalXpEarned: 0,
+          xpBreakdown,
+          totalXpEarned,
           currentTotalXp,
           riderTier: currentRiderTier,
           tierPromotion: null,
