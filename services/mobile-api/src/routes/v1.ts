@@ -402,6 +402,7 @@ export const buildV1Routes = (
           response: {
             200: routePreviewResponseSchema,
             400: errorResponseSchema,
+            401: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
             500: errorResponseSchema,
@@ -409,7 +410,8 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        await applyRateLimit(request, reply, dependencies, 'routePreview');
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
         const normalizedRequest = normalizeRoutePreviewRequest(request.body);
 
         return buildRouteResponse(dependencies, normalizedRequest, 'preview', {
@@ -979,13 +981,15 @@ export const buildV1Routes = (
           response: {
             200: { type: 'object' as const, properties: { riskSegments: { type: 'array' as const } } },
             400: errorResponseSchema,
+            401: errorResponseSchema,
             429: errorResponseSchema,
             500: errorResponseSchema,
           },
         },
       },
       async (request, reply) => {
-        await applyRateLimit(request, reply, dependencies, 'routePreview');
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
 
         const geometry = request.body?.geometry;
         if (!geometry || geometry.type !== 'LineString' || !Array.isArray(geometry.coordinates)) {
@@ -1019,6 +1023,7 @@ export const buildV1Routes = (
           response: {
             200: routePreviewResponseSchema,
             400: errorResponseSchema,
+            401: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
             500: errorResponseSchema,
@@ -1026,7 +1031,8 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        await applyRateLimit(request, reply, dependencies, 'routeReroute');
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routeReroute', { userId: user.id });
         const normalizedRequest = normalizeRerouteRequest(request.body);
 
         return buildRouteResponse(dependencies, normalizedRequest, 'reroute', {
@@ -1543,12 +1549,8 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        // Risk map is read-only public safety data — auth optional
-        // Still try to authenticate for rate limiting, but don't require it
-        const user = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
-        if (user) {
-          await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
-        }
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
         if (!supabaseAdmin) {
           throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });

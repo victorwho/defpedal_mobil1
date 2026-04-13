@@ -58,9 +58,14 @@ const sampleRouteResponse: RouteResponse = {
   ],
 };
 
+const mockAuthenticateUser = vi.fn().mockResolvedValue({ id: 'test-user', email: 'test@test.local' });
+
 const createApp = (dependencies: Parameters<typeof buildApp>[0]['dependencies'] = {}) =>
   buildApp({
-    dependencies,
+    dependencies: {
+      authenticateUser: mockAuthenticateUser,
+      ...dependencies,
+    },
   });
 
 const authHeader = {
@@ -162,6 +167,7 @@ describe('mobile-api v1 routes', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/v1/routes/preview',
+        headers: authHeader,
         payload: {
           origin: {
             lat: 44.4268,
@@ -240,6 +246,7 @@ describe('mobile-api v1 routes', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/v1/routes/preview',
+        headers: authHeader,
         payload: {
           origin: {
             lat: 44.4268,
@@ -310,12 +317,14 @@ describe('mobile-api v1 routes', () => {
       const firstResponse = await app.inject({
         method: 'POST',
         url: '/v1/routes/preview',
+        headers: authHeader,
         payload,
       });
 
       const secondResponse = await app.inject({
         method: 'POST',
         url: '/v1/routes/preview',
+        headers: authHeader,
         payload,
       });
 
@@ -342,6 +351,7 @@ describe('mobile-api v1 routes', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/v1/routes/reroute',
+        headers: authHeader,
         payload: {
           origin: {
             lat: 44.4268,
@@ -417,12 +427,14 @@ describe('mobile-api v1 routes', () => {
       const firstResponse = await app.inject({
         method: 'POST',
         url: '/v1/routes/reroute',
+        headers: authHeader,
         payload,
       });
 
       const secondResponse = await app.inject({
         method: 'POST',
         url: '/v1/routes/reroute',
+        headers: authHeader,
         payload,
       });
 

@@ -328,6 +328,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
     expect(response.statusCode).toBe(200);
@@ -347,6 +348,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: { mode: 'safe' },
     });
     expect(response.statusCode).toBe(400);
@@ -361,6 +363,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: { ...validPreviewBody, mode: 'turbo' },
     });
     expect(response.statusCode).toBe(400);
@@ -387,6 +390,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
     expect(response.statusCode).toBe(429);
@@ -416,6 +420,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
     expect(response.statusCode).toBe(200);
@@ -431,6 +436,7 @@ describe('POST /v1/routes/preview', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
     expect(response.headers['x-route-cache']).toBe('MISS');
@@ -449,12 +455,14 @@ describe('POST /v1/routes/preview', () => {
     await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
 
     const second = await app.inject({
       method: 'POST',
       url: '/v1/routes/preview',
+      headers: authHeaders,
       payload: validPreviewBody,
     });
     expect(second.headers['x-route-cache']).toBe('HIT');
@@ -975,6 +983,7 @@ describe('POST /v1/risk-segments', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/risk-segments',
+      headers: authHeaders,
       payload: validLineString,
     });
     expect(response.statusCode).toBe(200);
@@ -990,6 +999,7 @@ describe('POST /v1/risk-segments', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/risk-segments',
+      headers: authHeaders,
       payload: { geometry: { type: 'Point', coordinates: [[26.1, 44.4]] } },
     });
     expect(response.statusCode).toBe(400);
@@ -1004,6 +1014,7 @@ describe('POST /v1/risk-segments', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/risk-segments',
+      headers: authHeaders,
       payload: {},
     });
     expect(response.statusCode).toBe(400);

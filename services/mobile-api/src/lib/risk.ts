@@ -29,6 +29,22 @@ const getRiskColor = (score: number): string => {
   return '#000000';
 };
 
+/**
+ * Quantize a raw risk score to its bucket midpoint.
+ * Preserves category ordering and relative comparison but strips the precision
+ * needed to reverse-engineer the scoring algorithm.
+ */
+const quantizeRiskScore = (score: number): number => {
+  if (score <= 0) return 0;
+  if (score < 33) return 16;
+  if (score < 43.5) return 38;
+  if (score < 51.8) return 48;
+  if (score < 57.6) return 55;
+  if (score < 69) return 63;
+  if (score <= 101.8) return 85;
+  return 110;
+};
+
 type RiskFeatureProperties = {
   risk_score?: number;
 };
@@ -63,7 +79,7 @@ export const fetchRiskSegments = async (
 
     return {
       id: `risk-${index}`,
-      riskScore,
+      riskScore: quantizeRiskScore(riskScore),
       color: getRiskColor(riskScore),
       geometry: feature.geometry,
     };
