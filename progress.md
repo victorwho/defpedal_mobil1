@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-12 (session 17)
+Last updated: 2026-04-13 (session 17)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -279,6 +279,7 @@ Update it at the end of each implementation slice.
     - **Infrastructure**: Cloud Run redeployed (revision 00045), 982 tests passing, 0 type errors
     - **GPS Signal Indicator (P3-11)**: Color-coded dot in ManeuverCard (green/amber/red) + pulsating GPS icon when signal is poor or lost
     - **Screen Reader Accessibility (P1-21 phases 1-2)**: PoiCard/RouteInfoOverlay/MapView labels, HazardAlert live region for auto-announce
+    - **Supabase migrations applied** (2026-04-13): RLS tightening, award_xp auth check, search_path hardening — all 3 live on production DB
     - **Remaining (2 items)**: P1-21 phase 3 (map contents list, deferred), P3-4 GCP monitoring (infra)
 
 ## Phase Status

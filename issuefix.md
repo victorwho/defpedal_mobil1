@@ -247,3 +247,6 @@
 | 2026-04-12 | P3-11 | GPS signal quality indicator in ManeuverCard — color-coded dot + pulsating navigate icon when poor/lost | Claude |
 | 2026-04-12 | P1-21 | Phase 1: PoiCard a11y labels (role, label, link), RouteInfoOverlay summary role, MapView label+hint | Claude |
 | 2026-04-12 | P1-21 | Phase 2: HazardAlert accessibilityRole="alert" + accessibilityLiveRegion="assertive" for TalkBack auto-announce | Claude |
+| 2026-04-13 | P0-2 | Applied migration 202604110002 to Supabase — RLS policies live on trips/hazards/feedback | Claude |
+| 2026-04-13 | P1-4 | Applied migration 202604110003 to Supabase — award_xp auth check + anon revoke live | Claude |
+| 2026-04-13 | P2-1 | Applied migration 202604120001 to Supabase — search_path hardened on 8 SECURITY DEFINER functions | Claude |
