@@ -427,7 +427,9 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - GPS signal quality indicator in ManeuverCard: color-coded dot (green ≤10m, amber ≤25m, red >25m) + pulsating navigate icon when poor/lost
   - Screen reader accessibility: PoiCard/RouteInfoOverlay/MapView labeled, HazardAlert `accessibilityLiveRegion="assertive"` auto-announces hazards to TalkBack/VoiceOver
   - Stale auth token recovery: AuthSessionProvider catches expired refresh tokens, clears local session, falls through to anonymous sign-in
-- **1015 tests across 3 packages** (core: 315, mobile-api: 210, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
+  - Steep grade indicator during navigation: amber pill for uphill >= 8%, red pill for downhill >= 7%. `computeCurrentGrade()` in core, `SteepGradeIndicator` in NavigationHUD
+- **Security hardening (2026-04-13):** Risk score IP protection — quantized `riskScore` to 7 bucket midpoints (was raw float), auth required on `/routes/preview`, `/routes/reroute`, `/risk-segments`, `/risk-map` (were unauthenticated), rate limiting user-keyed. See `securityfix.md`
+- **1052 tests across 3 packages** (core: 330, mobile-api: 232, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)
