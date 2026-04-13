@@ -244,6 +244,6 @@
 | 2026-04-12 | P2-12 | Extracted queue management into `queueSlice.ts` — appStore.ts 823→574 lines (-30%) | Claude |
 | 2026-04-12 | P2-13 | Split feed.ts (1091 lines) into 6 modules: feed, feed-helpers, feed-share, feed-reactions, feed-comments, feed-profile | Claude |
 | 2026-04-12 | — | Fixed AuthSessionProvider crash on stale refresh token — catch + local signOut fallback to anonymous sign-in | Claude |
-| 2026-04-12 | P3-11 | GPS signal quality indicator in ManeuverCard — color-coded dot (green/amber/red/gray) + accuracy in meters | Claude |
+| 2026-04-12 | P3-11 | GPS signal quality indicator in ManeuverCard — color-coded dot + pulsating navigate icon when poor/lost | Claude |
 | 2026-04-12 | P1-21 | Phase 1: PoiCard a11y labels (role, label, link), RouteInfoOverlay summary role, MapView label+hint | Claude |
 | 2026-04-12 | P1-21 | Phase 2: HazardAlert accessibilityRole="alert" + accessibilityLiveRegion="assertive" for TalkBack auto-announce | Claude |

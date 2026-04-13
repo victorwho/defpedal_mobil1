@@ -277,7 +277,9 @@ Update it at the end of each implementation slice.
     - **UX**: WCAG AA contrast fix, community feed error+retry state, waypoint autocomplete error indicators
     - **Refactors (P2-12/P2-13)**: Extracted `queueSlice.ts` from appStore (823→574 lines). Split feed.ts (1091 lines) into 6 focused modules (feed, feed-helpers, feed-share, feed-reactions, feed-comments, feed-profile)
     - **Infrastructure**: Cloud Run redeployed (revision 00045), 982 tests passing, 0 type errors
-    - **Remaining (4 items)**: Mapbox screen reader a11y (P1-21), GPS signal loss indicator (P3-11), Supabase anon key rotation (accepted), GCP monitoring (infra)
+    - **GPS Signal Indicator (P3-11)**: Color-coded dot in ManeuverCard (green/amber/red) + pulsating GPS icon when signal is poor or lost
+    - **Screen Reader Accessibility (P1-21 phases 1-2)**: PoiCard/RouteInfoOverlay/MapView labels, HazardAlert live region for auto-announce
+    - **Remaining (2 items)**: P1-21 phase 3 (map contents list, deferred), P3-4 GCP monitoring (infra)
 
 ## Phase Status
 
