@@ -363,16 +363,25 @@ export const getNavigationProgress = (
     currentManeuverPolylineIndex,
   );
   const futureSteps = route.steps.slice(currentStepIndex + 1);
-  const progressThroughStep =
-    currentStep.distanceMeters > 0
-      ? 1 - distanceToManeuverMeters / currentStep.distanceMeters
-      : 0;
-  const clampedProgress = Math.max(0, Math.min(1, progressThroughStep));
+
+  // distanceToManeuverMeters is the remaining distance on the PREVIOUS step's
+  // segment (from the user's position to the current step's maneuver).
+  // The current step's distanceMeters covers the segment from the current
+  // maneuver to the next maneuver — it must be included in the remaining total.
   const remainingDistanceMeters =
     distanceToManeuverMeters +
+    currentStep.distanceMeters +
     futureSteps.reduce((total, step) => total + step.distanceMeters, 0);
+
+  // Estimate time to reach the current maneuver using the previous step's pace
+  const prevStep = currentStepIndex > 0 ? route.steps[currentStepIndex - 1] : null;
+  const timeToManeuverSeconds =
+    prevStep && prevStep.distanceMeters > 0
+      ? Math.min(1, distanceToManeuverMeters / prevStep.distanceMeters) * prevStep.durationSeconds
+      : 0;
   const remainingDurationSeconds =
-    currentStep.durationSeconds * (1 - clampedProgress) +
+    timeToManeuverSeconds +
+    currentStep.durationSeconds +
     futureSteps.reduce((total, step) => total + step.durationSeconds, 0);
   const alreadyPreAnnounced = session.lastPreAnnouncementStepId === currentStep.id;
   const alreadyAnnouncedApproach = session.lastApproachAnnouncementStepId === currentStep.id;

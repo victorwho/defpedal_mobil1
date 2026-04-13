@@ -118,6 +118,165 @@ describe('navigation helpers', () => {
     expect(progress.remainingDistanceMeters).toBeGreaterThanOrEqual(0);
   });
 
+  it('includes current step distance in remaining totals (off-by-one fix)', () => {
+    // A 3-step route with a clear intermediate segment.
+    // Points are spaced ~111m apart along longitude at ~44.43°N.
+    const geometryPolyline6 = encodePolyline([
+      [26.1000, 44.4300], // index 0 — depart
+      [26.1010, 44.4300], // index 1
+      [26.1020, 44.4300], // index 2 — turn (step-2 maneuver)
+      [26.1030, 44.4300], // index 3
+      [26.1040, 44.4300], // index 4 — arrive (step-3 maneuver)
+    ]);
+    const route = {
+      id: 'remaining-dist-test',
+      source: 'custom_osrm' as const,
+      routingEngineVersion: 'safe-osrm-v1',
+      routingProfileVersion: 'safety-profile-v1',
+      mapDataVersion: 'osm-europe-current',
+      riskModelVersion: 'risk-model-v1',
+      geometryPolyline6,
+      distanceMeters: 320,
+      durationSeconds: 120,
+      adjustedDurationSeconds: 120,
+      totalClimbMeters: 0,
+      riskSegments: [],
+      warnings: [],
+      steps: [
+        {
+          id: 'step-1',
+          instruction: 'Head east',
+          streetName: 'Main Street',
+          distanceMeters: 160, // depart → turn
+          durationSeconds: 60,
+          maneuver: {
+            bearing_after: 90,
+            bearing_before: 0,
+            location: [26.1000, 44.4300] as [number, number],
+            type: 'depart',
+          },
+          mode: 'cycling',
+        },
+        {
+          id: 'step-2',
+          instruction: 'Continue east',
+          streetName: 'Main Street',
+          distanceMeters: 160, // turn → arrive
+          durationSeconds: 60,
+          maneuver: {
+            bearing_after: 90,
+            bearing_before: 90,
+            location: [26.1020, 44.4300] as [number, number],
+            type: 'new name',
+          },
+          mode: 'cycling',
+        },
+        {
+          id: 'step-3',
+          instruction: 'Arrive',
+          streetName: 'Main Street',
+          distanceMeters: 0,
+          durationSeconds: 0,
+          maneuver: {
+            bearing_after: 0,
+            bearing_before: 90,
+            location: [26.1040, 44.4300] as [number, number],
+            type: 'arrive',
+          },
+          mode: 'cycling',
+        },
+      ],
+    };
+
+    // User is near the start, approaching step-2's maneuver (the turn).
+    // currentStepIndex = 1 means step-2 is the step being approached.
+    const session = {
+      ...createNavigationSession(route.id),
+      currentStepIndex: 1,
+    };
+    const progress = getNavigationProgress(route, session, {
+      lat: 44.4300,
+      lon: 26.1005, // near index 0-1, ~40m into the route
+    });
+
+    // distanceToManeuver = distance to step-2's maneuver at index 2
+    // (remaining portion of step-1's segment). ~120m.
+    expect(progress.distanceToManeuverMeters).toBeGreaterThan(80);
+    expect(progress.distanceToManeuverMeters).toBeLessThan(200);
+
+    // Remaining distance MUST include the current step's distance (step-2 = 160m)
+    // plus step-3 (0m), on top of distanceToManeuver.
+    // Without the fix, step-2's 160m was omitted, making remaining ≈ 120m instead of ≈ 280m.
+    const expectedMin = progress.distanceToManeuverMeters! + 160; // + step-2 dist
+    expect(progress.remainingDistanceMeters).toBeGreaterThanOrEqual(expectedMin - 5);
+
+    // Duration should also include step-2's full duration (60s).
+    expect(progress.remainingDurationSeconds).toBeGreaterThanOrEqual(60);
+  });
+
+  it('remaining distance decreases monotonically across step advance', () => {
+    // Verify no upward jump when advancing from step 1 → step 2.
+    const geometryPolyline6 = encodePolyline([
+      [26.1000, 44.4300], // 0 — depart
+      [26.1010, 44.4300], // 1
+      [26.1020, 44.4300], // 2 — step-2 maneuver
+      [26.1030, 44.4300], // 3
+      [26.1040, 44.4300], // 4 — arrive
+    ]);
+    const route = {
+      id: 'monotonic-test',
+      source: 'custom_osrm' as const,
+      routingEngineVersion: 'v1',
+      routingProfileVersion: 'v1',
+      mapDataVersion: 'v1',
+      riskModelVersion: 'v1',
+      geometryPolyline6,
+      distanceMeters: 320,
+      durationSeconds: 120,
+      adjustedDurationSeconds: 120,
+      totalClimbMeters: 0,
+      riskSegments: [],
+      warnings: [],
+      steps: [
+        {
+          id: 's1', instruction: 'Depart', streetName: 'A',
+          distanceMeters: 160, durationSeconds: 60,
+          maneuver: { bearing_after: 90, bearing_before: 0, location: [26.1000, 44.4300] as [number, number], type: 'depart' },
+          mode: 'cycling',
+        },
+        {
+          id: 's2', instruction: 'Continue', streetName: 'A',
+          distanceMeters: 160, durationSeconds: 60,
+          maneuver: { bearing_after: 90, bearing_before: 90, location: [26.1020, 44.4300] as [number, number], type: 'new name' },
+          mode: 'cycling',
+        },
+        {
+          id: 's3', instruction: 'Arrive', streetName: 'A',
+          distanceMeters: 0, durationSeconds: 0,
+          maneuver: { bearing_after: 0, bearing_before: 90, location: [26.1040, 44.4300] as [number, number], type: 'arrive' },
+          mode: 'cycling',
+        },
+      ],
+    };
+
+    // Just before step advance: user near step-2's maneuver, currentStepIndex = 1
+    const beforeSession = { ...createNavigationSession(route.id), currentStepIndex: 1 };
+    const beforeProgress = getNavigationProgress(route, beforeSession, {
+      lat: 44.4300, lon: 26.10195, // ~5m before the turn
+    });
+
+    // Just after step advance: user slightly past, currentStepIndex = 2
+    const afterSession = { ...createNavigationSession(route.id), currentStepIndex: 2 };
+    const afterProgress = getNavigationProgress(route, afterSession, {
+      lat: 44.4300, lon: 26.10205, // ~5m past the turn
+    });
+
+    // Remaining distance should NOT jump upward across the advance
+    expect(afterProgress.remainingDistanceMeters).toBeLessThanOrEqual(
+      beforeProgress.remainingDistanceMeters + 5, // small tolerance for GPS snap
+    );
+  });
+
   it('does not advance step when rider is laterally offset >30m from route (prevents false maneuver-passed)', () => {
     // Scenario: Rider is on a parallel street ~50m north of the route.
     // closestPointIndex may snap past the maneuver, but the lateral offset

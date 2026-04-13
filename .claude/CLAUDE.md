@@ -288,7 +288,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app |
 | **Flat routing = separate OSRM instance** | `bicycle-flat` profile uses 7.0x uphill penalty (vs 1.1x standard). Runs on port 5001, proxied via nginx at `/route/v1/bicycle-flat/`. Activated by "Flat" pill on route planning (3-way toggle: Safe/Fast/Flat). `avoidHills` flag composes with `avoidUnpaved` |
 | **Mapbox Terrain-RGB for elevation** (not Open-Meteo) | Open-Meteo rate-limits (HTTP 429) during heavy usage. Terrain-RGB tiles decode elevation from PNG pixels, are CDN-cached, zero external API calls |
-| **Along-route polyline distance** (not haversine to maneuver) | Haversine underestimates distance on winding roads (switchbacks, curves). `polylineSegmentDistance` sums vertex-to-vertex distances along the decoded polyline — keeps `remainingDistanceMeters` consistent with `step.distanceMeters` and `route.distanceMeters` |
+| **Along-route polyline distance** (not haversine to maneuver) | Haversine underestimates distance on winding roads (switchbacks, curves). `polylineSegmentDistance` sums vertex-to-vertex distances along the decoded polyline — keeps `remainingDistanceMeters` consistent with `step.distanceMeters` and `route.distanceMeters`. Note: `remainingDistanceMeters` = distanceToManeuver + **currentStep.distanceMeters** + futureSteps — the current step's segment must be included (fixed 2026-04-13) |
 
 ## Code Conventions
 
@@ -427,7 +427,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - GPS signal quality indicator in ManeuverCard: color-coded dot (green ≤10m, amber ≤25m, red >25m) + pulsating navigate icon when poor/lost
   - Screen reader accessibility: PoiCard/RouteInfoOverlay/MapView labeled, HazardAlert `accessibilityLiveRegion="assertive"` auto-announces hazards to TalkBack/VoiceOver
   - Stale auth token recovery: AuthSessionProvider catches expired refresh tokens, clears local session, falls through to anonymous sign-in
-- **982 tests across 3 packages** (core: 282, mobile-api: 210, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
+- **984 tests across 3 packages** (core: 284, mobile-api: 210, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)

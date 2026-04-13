@@ -660,3 +660,14 @@ For normal day-to-day feature work, we also recognize a softer milestone:
     - Fixed `showSuggestions` logic to include `hasSearchedWithNoResults` condition
 - Translations: Added `search.recent` key in en.ts ("Recent") and ro.ts ("Recente")
 - Evidence: Verified on phone via Metro hot reload
+
+### Navigation Remaining Distance / ETA Fix (2026-04-13)
+
+- Status: Done
+- Bug: `remainingDistanceMeters` and `remainingDurationSeconds` in `getNavigationProgress` were systematically too low — missing the current step's distance/duration segment. The error was proportionally small early in a ride but grew near the end, and caused visible upward jumps when steps advanced.
+- Root cause: `futureSteps = route.steps.slice(currentStepIndex + 1)` skipped the current step's `distanceMeters` (the segment from the approaching maneuver to the next maneuver). Duration used a broken `progressThroughStep` ratio that divided distance on the previous step's segment by the current step's total length (mixing two different segments).
+- Fix in `packages/core/src/navigation.ts`:
+  - Distance: added `currentStep.distanceMeters` to the remaining sum
+  - Duration: replaced broken progress ratio with `timeToManeuverSeconds` estimated from the previous step's pace, plus `currentStep.durationSeconds` + future steps
+- Tests: 2 new tests in `navigation.test.ts` — verifies current step inclusion and monotonic decrease across step advance
+- Evidence: 984 tests passing (core: 284), 0 type errors
