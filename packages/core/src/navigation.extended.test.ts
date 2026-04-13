@@ -7,6 +7,7 @@ import {
   advanceNavigationStep,
   completeNavigationSession,
   computeRemainingClimb,
+  computeRemainingDescent,
   createNavigationSession,
   getAppStateFromSession,
   hasArrived,
@@ -564,5 +565,51 @@ describe('computeRemainingClimb', () => {
     const copy = [...profile];
     computeRemainingClimb(profile, 1000, 500);
     expect(profile).toEqual(copy);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeRemainingDescent
+// ---------------------------------------------------------------------------
+
+describe('computeRemainingDescent', () => {
+  it('returns 0 for an empty profile', () => {
+    expect(computeRemainingDescent([], 1000, 500)).toBe(0);
+  });
+
+  it('returns 0 for a single-element profile', () => {
+    expect(computeRemainingDescent([100], 1000, 500)).toBe(0);
+  });
+
+  it('returns full descent at the start (remaining = total)', () => {
+    const profile = [130, 120, 110, 100]; // 30m total descent
+    expect(computeRemainingDescent(profile, 1000, 1000)).toBe(30);
+  });
+
+  it('returns 0 at the destination (remaining = 0)', () => {
+    const profile = [130, 120, 110, 100];
+    expect(computeRemainingDescent(profile, 1000, 0)).toBe(0);
+  });
+
+  it('returns partial descent at midpoint', () => {
+    // 4 points, 50% progress → startIndex = floor(0.5 * 3) = 1
+    // Descent from index 1: (110-120=-10) + (100-110=-10) = 20
+    const profile = [130, 120, 110, 100];
+    expect(computeRemainingDescent(profile, 1000, 500)).toBe(20);
+  });
+
+  it('ignores climbs — only counts negative deltas', () => {
+    const profile = [130, 110, 120, 100]; // -20, +10, -20 = 40m descent
+    expect(computeRemainingDescent(profile, 1000, 1000)).toBe(40);
+  });
+
+  it('returns 0 for a monotonically climbing profile', () => {
+    const profile = [100, 110, 120, 130]; // only climbing
+    expect(computeRemainingDescent(profile, 1000, 1000)).toBe(0);
+  });
+
+  it('clamps progress ratio so remaining > total still gives full descent', () => {
+    const profile = [120, 110, 100];
+    expect(computeRemainingDescent(profile, 500, 1000)).toBe(20);
   });
 });

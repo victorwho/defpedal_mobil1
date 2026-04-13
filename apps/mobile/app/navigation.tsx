@@ -7,6 +7,7 @@ import {
   getNavigationProgress,
   getPreviewOrigin,
   computeRemainingClimb,
+  computeRemainingDescent,
   decodePolyline,
   haversineDistance,
   shouldTriggerAutomaticReroute,
@@ -188,7 +189,7 @@ export default function NavigationScreen() {
       return { value: null, isLive: false };
     }
     const profile = selectedRoute?.elevationProfile;
-    if (!profile?.length || !selectedRoute || !navigationSession?.remainingDistanceMeters) {
+    if (!profile?.length || !selectedRoute || navigationSession?.remainingDistanceMeters == null) {
       return { value: selectedRoute?.totalClimbMeters ?? null, isLive: false };
     }
     return {
@@ -201,16 +202,28 @@ export default function NavigationScreen() {
     };
   }, [selectedRoute, navigationSession?.remainingDistanceMeters, navigationSession?.offRouteSince]);
 
-  const totalDescentMeters = useMemo(() => {
-    const profile = selectedRoute?.elevationProfile;
-    if (!profile || profile.length < 2) return null;
-    let descent = 0;
-    for (let i = 1; i < profile.length; i++) {
-      const diff = profile[i] - profile[i - 1];
-      if (diff < 0) descent += Math.abs(diff);
+  const descentData = useMemo(() => {
+    const isOffRoute = navigationSession?.offRouteSince != null;
+    if (isOffRoute) {
+      return null;
     }
-    return Math.round(descent);
-  }, [selectedRoute?.elevationProfile]);
+    const profile = selectedRoute?.elevationProfile;
+    if (!profile || profile.length < 2 || !selectedRoute) return null;
+    if (navigationSession?.remainingDistanceMeters == null) {
+      // No live progress yet — compute total descent from the full profile
+      let descent = 0;
+      for (let i = 1; i < profile.length; i++) {
+        const diff = profile[i] - profile[i - 1];
+        if (diff < 0) descent += Math.abs(diff);
+      }
+      return Math.round(descent);
+    }
+    return computeRemainingDescent(
+      profile,
+      selectedRoute.distanceMeters,
+      navigationSession.remainingDistanceMeters,
+    );
+  }, [selectedRoute, navigationSession?.remainingDistanceMeters, navigationSession?.offRouteSince]);
 
   const liveCoordinate =
     locationState.sample?.coordinate ??
@@ -885,7 +898,7 @@ export default function NavigationScreen() {
               navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
             }
             totalClimbMeters={climbData.value}
-            totalDescentMeters={totalDescentMeters}
+            totalDescentMeters={descentData}
             isClimbLive={climbData.isLive}
             speedKmh={
               locationState.sample?.speedMetersPerSecond != null

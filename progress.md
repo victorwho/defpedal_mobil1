@@ -680,3 +680,11 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Fix: `handleAddStop` now pads `waypointQueries` to match persisted `waypoints.length` before appending the new empty entry.
 - File: `apps/mobile/app/route-planning.tsx`
 - Evidence: 0 type errors
+
+### Fix: Remaining Climb/Descent Indicator Bugs (2026-04-13)
+
+- Status: Done
+- P2-1: `!navigationSession?.remainingDistanceMeters` treated `0` as falsy (JS `!0 === true`), causing the climb indicator to briefly fall back to total route climb instead of live `↑0 m` when exactly at a maneuver. Fixed: changed to `== null` check.
+- P2-2: FooterCard compared static total route descent against live remaining climb — as remaining climb decreased during the ride, the label flipped to "Descent ↓(total)m" prematurely. Fixed: added `computeRemainingDescent` (mirror of `computeRemainingClimb`) so both values are live-remaining, making the comparison apples-to-apples.
+- Files: `packages/core/src/navigation.ts` (new `computeRemainingDescent`), `apps/mobile/app/navigation.tsx` (both fixes), `packages/core/src/navigation.extended.test.ts` (8 new descent tests)
+- Evidence: 992 tests passing (core: 292), 0 type errors

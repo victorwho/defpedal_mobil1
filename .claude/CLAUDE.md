@@ -427,7 +427,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - GPS signal quality indicator in ManeuverCard: color-coded dot (green ≤10m, amber ≤25m, red >25m) + pulsating navigate icon when poor/lost
   - Screen reader accessibility: PoiCard/RouteInfoOverlay/MapView labeled, HazardAlert `accessibilityLiveRegion="assertive"` auto-announces hazards to TalkBack/VoiceOver
   - Stale auth token recovery: AuthSessionProvider catches expired refresh tokens, clears local session, falls through to anonymous sign-in
-- **984 tests across 3 packages** (core: 284, mobile-api: 210, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
+- **992 tests across 3 packages** (core: 292, mobile-api: 210, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)

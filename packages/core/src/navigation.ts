@@ -465,3 +465,29 @@ export const computeRemainingClimb = (
 
   return Math.round(climb);
 };
+
+/**
+ * Compute the remaining elevation loss (descent) from the current position to
+ * the end of the route. Mirror of `computeRemainingClimb` — sums negative deltas.
+ */
+export const computeRemainingDescent = (
+  elevationProfile: readonly number[],
+  totalDistanceMeters: number,
+  remainingDistanceMeters: number,
+): number => {
+  if (elevationProfile.length < 2 || totalDistanceMeters <= 0) return 0;
+
+  const progressRatio = Math.max(
+    0,
+    Math.min(1, 1 - remainingDistanceMeters / totalDistanceMeters),
+  );
+  const startIndex = Math.floor(progressRatio * (elevationProfile.length - 1));
+
+  let descent = 0;
+  for (let i = startIndex; i < elevationProfile.length - 1; i++) {
+    const delta = elevationProfile[i + 1] - elevationProfile[i];
+    if (delta < 0) descent += Math.abs(delta);
+  }
+
+  return Math.round(descent);
+};
