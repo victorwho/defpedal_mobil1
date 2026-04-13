@@ -305,6 +305,61 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = (props) => (
 );
 
 // ---------------------------------------------------------------------------
+// Steep grade indicator
+// ---------------------------------------------------------------------------
+
+const STEEP_UPHILL_THRESHOLD = 8; // %
+const STEEP_DOWNHILL_THRESHOLD = 7; // %
+
+/**
+ * Compact pill that appears when the rider is on a steep segment.
+ * Shows uphill (>=8%) in amber or downhill (>=7%) in red.
+ */
+export const SteepGradeIndicator: React.FC<{ gradePercent: number | null }> = ({
+  gradePercent,
+}) => {
+  if (gradePercent == null) return null;
+
+  const isSteepUp = gradePercent >= STEEP_UPHILL_THRESHOLD;
+  const isSteepDown = gradePercent <= -STEEP_DOWNHILL_THRESHOLD;
+
+  if (!isSteepUp && !isSteepDown) return null;
+
+  const label = isSteepUp ? `↑ ${Math.abs(gradePercent)}% Steep` : `↓ ${Math.abs(gradePercent)}% Steep`;
+  const bgColor = isSteepUp ? '#92400E' : '#991B1B'; // amber-800 / red-800
+  const textColor = isSteepUp ? '#FDE68A' : '#FCA5A5'; // amber-200 / red-300
+  const iconName = isSteepUp ? 'trending-up' : 'trending-down';
+
+  return (
+    <View
+      style={[steepStyles.pill, { backgroundColor: bgColor }]}
+      accessibilityLabel={`Steep ${isSteepUp ? 'uphill' : 'downhill'}: ${Math.abs(gradePercent)} percent grade`}
+      accessibilityRole="text"
+    >
+      <Ionicons name={iconName} size={14} color={textColor} />
+      <Text style={[steepStyles.text, { color: textColor }]}>{label}</Text>
+    </View>
+  );
+};
+
+const steepStyles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: space[3],
+    paddingVertical: 4,
+    borderRadius: radii.full,
+  },
+  text: {
+    fontFamily: fontFamily.body.bold,
+    fontSize: 12,
+    letterSpacing: 0.3,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Sub-component
 // ---------------------------------------------------------------------------
 

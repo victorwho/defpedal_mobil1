@@ -491,3 +491,36 @@ export const computeRemainingDescent = (
 
   return Math.round(descent);
 };
+
+/**
+ * Compute the current road grade (%) at the rider's position on the route.
+ *
+ * Grade is calculated from the elevation profile by finding the segment the
+ * rider is on and computing rise / run.  Positive = uphill, negative = downhill.
+ *
+ * Returns `null` when data is insufficient (profile too short, no progress, etc.).
+ */
+export const computeCurrentGrade = (
+  elevationProfile: readonly number[],
+  totalDistanceMeters: number,
+  remainingDistanceMeters: number,
+): number | null => {
+  if (elevationProfile.length < 2 || totalDistanceMeters <= 0) return null;
+
+  const progressRatio = Math.max(
+    0,
+    Math.min(1, 1 - remainingDistanceMeters / totalDistanceMeters),
+  );
+
+  const segments = elevationProfile.length - 1;
+  const exactIndex = progressRatio * segments;
+  const segmentIndex = Math.min(Math.floor(exactIndex), segments - 1);
+
+  const segmentLengthMeters = totalDistanceMeters / segments;
+  if (segmentLengthMeters <= 0) return null;
+
+  const rise = elevationProfile[segmentIndex + 1] - elevationProfile[segmentIndex];
+  const grade = (rise / segmentLengthMeters) * 100;
+
+  return Math.round(grade * 10) / 10; // one decimal
+};

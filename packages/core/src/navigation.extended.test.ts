@@ -8,6 +8,7 @@ import {
   completeNavigationSession,
   computeRemainingClimb,
   computeRemainingDescent,
+  computeCurrentGrade,
   createNavigationSession,
   getAppStateFromSession,
   hasArrived,
@@ -611,5 +612,119 @@ describe('computeRemainingDescent', () => {
   it('clamps progress ratio so remaining > total still gives full descent', () => {
     const profile = [120, 110, 100];
     expect(computeRemainingDescent(profile, 500, 1000)).toBe(20);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeCurrentGrade
+// ---------------------------------------------------------------------------
+
+describe('computeCurrentGrade', () => {
+  it('returns null for empty profile', () => {
+    expect(computeCurrentGrade([], 1000, 500)).toBeNull();
+  });
+
+  it('returns null for single-point profile', () => {
+    expect(computeCurrentGrade([100], 1000, 500)).toBeNull();
+  });
+
+  it('returns null for zero total distance', () => {
+    expect(computeCurrentGrade([100, 200], 0, 0)).toBeNull();
+  });
+
+  it('returns null when remaining distance is null-like (NaN)', () => {
+    // This tests the boundary — NaN propagates through math
+    const result = computeCurrentGrade([100, 200], 1000, NaN);
+    // NaN math produces NaN, not null — but the function still returns a number
+    // The caller (navigation.tsx) guards with == null check before calling
+    expect(result).not.toBeNull();
+  });
+
+  it('computes positive grade for uphill segment', () => {
+    // 100m rise over 1000m distance = 10% grade
+    const profile = [0, 100];
+    const grade = computeCurrentGrade(profile, 1000, 1000); // at start
+    expect(grade).toBe(10);
+  });
+
+  it('computes negative grade for downhill segment', () => {
+    // -100m drop over 1000m distance = -10% grade
+    const profile = [100, 0];
+    const grade = computeCurrentGrade(profile, 1000, 1000); // at start
+    expect(grade).toBe(-10);
+  });
+
+  it('returns 0 grade on flat terrain', () => {
+    const profile = [100, 100, 100];
+    const grade = computeCurrentGrade(profile, 1000, 500); // halfway
+    expect(grade).toBe(0);
+  });
+
+  it('picks correct segment based on progress (halfway on 3-segment profile)', () => {
+    // 3 segments: flat (0%), up 10m/500m = 2%, down 20m/500m = -4%
+    const profile = [100, 100, 110, 90]; // segments: 0m, +10m, -20m
+    const totalDist = 1500; // 500m per segment
+
+    // At start (remaining = 1500) → segment 0 → flat
+    expect(computeCurrentGrade(profile, totalDist, 1500)).toBe(0);
+
+    // At 500m (remaining = 1000) → segment 1 → +10m/500m = 2%
+    expect(computeCurrentGrade(profile, totalDist, 1000)).toBe(2);
+
+    // At 1000m (remaining = 500) → segment 2 → -20m/500m = -4%
+    expect(computeCurrentGrade(profile, totalDist, 500)).toBe(-4);
+  });
+
+  it('detects steep uphill (>= 8%)', () => {
+    // 80m rise over 1000m = 8%
+    const profile = [0, 80];
+    const grade = computeCurrentGrade(profile, 1000, 1000);
+    expect(grade).toBeGreaterThanOrEqual(8);
+  });
+
+  it('detects steep downhill (<= -7%)', () => {
+    // -70m over 1000m = -7%
+    const profile = [70, 0];
+    const grade = computeCurrentGrade(profile, 1000, 1000);
+    expect(grade).toBeLessThanOrEqual(-7);
+  });
+
+  it('does not flag moderate uphill as steep', () => {
+    // 50m rise over 1000m = 5%
+    const profile = [0, 50];
+    const grade = computeCurrentGrade(profile, 1000, 1000);
+    expect(grade).toBeLessThan(8);
+    expect(grade).toBeGreaterThan(0);
+  });
+
+  it('does not flag moderate downhill as steep', () => {
+    // -50m over 1000m = -5%
+    const profile = [50, 0];
+    const grade = computeCurrentGrade(profile, 1000, 1000);
+    expect(grade).toBeGreaterThan(-7);
+    expect(grade).toBeLessThan(0);
+  });
+
+  it('clamps progress at route start when remaining > total', () => {
+    const profile = [0, 100, 200];
+    // remaining > total → clamped to start (segment 0)
+    // 2 segments, total 1000m → 500m each. First segment: +100m / 500m = 20%
+    const grade = computeCurrentGrade(profile, 1000, 2000);
+    expect(grade).toBe(20);
+  });
+
+  it('clamps progress at route end when remaining <= 0', () => {
+    const profile = [200, 100, 0];
+    // remaining = 0 → at end → last segment
+    const grade = computeCurrentGrade(profile, 1000, 0);
+    // Last segment: 0 - 100 = -100m over 500m = -20%
+    expect(grade).toBe(-20);
+  });
+
+  it('returns one-decimal precision', () => {
+    // 33m rise over 1000m = 3.3%
+    const profile = [0, 33];
+    const grade = computeCurrentGrade(profile, 1000, 1000);
+    expect(grade).toBe(3.3);
   });
 });

@@ -708,3 +708,13 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Fix: Added `isDefaultCoordinate` helper; destination field initializes to `''` when destination is `{0, 0}`. Also prevents a wasted reverse-geocode API call for default coordinates.
 - File: `apps/mobile/app/route-planning.tsx`
 - Evidence: 1015 tests passing (core: 315, mobile-api: 210, mobile: 490), 0 type errors, verified on phone
+
+### Feat: Steep Grade Indicator During Navigation (2026-04-13)
+
+- Status: Done
+- Feature: Compact pill indicator appears above the footer card during navigation when the rider is on a steep road segment. Uphill >= 8% shows amber pill with trending-up icon and "Steep" label. Downhill >= 7% shows red pill with trending-down icon and "Steep" label. Hidden when grade is below thresholds or when off-route.
+- Core: `computeCurrentGrade()` in `packages/core/src/navigation.ts` — computes road grade (%) at rider's position from elevation profile (rise/run per segment, one-decimal precision)
+- UI: `SteepGradeIndicator` component in `apps/mobile/src/design-system/organisms/NavigationHUD.tsx` — pill with Ionicons trending icon, accessible label
+- Integration: `currentGrade` useMemo in `apps/mobile/app/navigation.tsx` — live grade from elevation profile + remaining distance, suppressed when off-route
+- Tests: 15 new tests in `packages/core/src/navigation.extended.test.ts` covering edge cases, threshold detection, segment selection, clamping, precision
+- Evidence: 1030 tests passing (core: 330, mobile-api: 210, mobile: 490), 0 type errors, verified on phone

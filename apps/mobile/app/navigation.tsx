@@ -8,6 +8,7 @@ import {
   getPreviewOrigin,
   computeRemainingClimb,
   computeRemainingDescent,
+  computeCurrentGrade,
   decodePolyline,
   haversineDistance,
   shouldTriggerAutomaticReroute,
@@ -43,7 +44,7 @@ import { useAppStore } from '../src/store/appStore';
 import { useShallow } from 'zustand/shallow';
 
 // Design system imports
-import { ManeuverCard, FooterCard } from '../src/design-system/organisms/NavigationHUD';
+import { ManeuverCard, FooterCard, SteepGradeIndicator } from '../src/design-system/organisms/NavigationHUD';
 
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
@@ -219,6 +220,18 @@ export default function NavigationScreen() {
       return Math.round(descent);
     }
     return computeRemainingDescent(
+      profile,
+      selectedRoute.distanceMeters,
+      navigationSession.remainingDistanceMeters,
+    );
+  }, [selectedRoute, navigationSession?.remainingDistanceMeters, navigationSession?.offRouteSince]);
+
+  const currentGrade = useMemo(() => {
+    if (navigationSession?.offRouteSince != null) return null;
+    const profile = selectedRoute?.elevationProfile;
+    if (!profile || profile.length < 2 || !selectedRoute) return null;
+    if (navigationSession?.remainingDistanceMeters == null) return null;
+    return computeCurrentGrade(
       profile,
       selectedRoute.distanceMeters,
       navigationSession.remainingDistanceMeters,
@@ -889,6 +902,7 @@ export default function NavigationScreen() {
               isOffRoute={offRouteDetails !== null}
             />
           ) : null}
+          <SteepGradeIndicator gradePercent={currentGrade} />
           <FooterCard
             nextStep={nextStep}
             remainingDurationSeconds={Math.round(
