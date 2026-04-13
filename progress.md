@@ -734,3 +734,17 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Deployed: Cloud Run revision `defpedal-api-00047-cjs` (2026-04-13)
 - Verified: curl to production returns 401 for unauthenticated `/routes/preview` and `/risk-map`
 - Tracking: `securityfix.md` has full fix list (P0 done, P1/P2 open)
+
+### Fix: Post-Ride Impact Stats Inflated When Rider Didn't Move (2026-04-13)
+
+- Status: Done
+- Bug: Post-ride impact screen showed CO2, microlives, and money stats based on planned route distance even when the rider started a ride and immediately ended it without moving.
+- Root cause: `initialImpact` in `feedback.tsx` fell back to `routeDist` (planned route distance) when `trailDist` (GPS trail) was 0. This inflated all derived stats.
+- Fix: Always use actual GPS trail distance. No movement = zero stats.
+- File: `apps/mobile/app/feedback.tsx`
+
+### Fix: Always Show Remaining Climb in Navigation Footer (2026-04-13)
+
+- Status: Done
+- Change: Navigation footer was flipping between "Climb ↑X m" and "Descent ↓X m" based on which was greater. Now always shows remaining climb (total ascent from current position to route end).
+- File: `apps/mobile/src/design-system/organisms/NavigationHUD.tsx`

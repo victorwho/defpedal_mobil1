@@ -368,7 +368,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Safe vs fast route comparison with "Switch to safe route" button (shows "Slightly safer" / "Similar safety" for small differences)
 - Flat routing (avoid hills) — 3-way toggle on route planning (Safe/Fast/Flat), uses separate OSRM instance with 7x uphill penalty
 - Turn-by-turn navigation with 3D follow camera
-- Remaining climb tracker (decreasing during navigation)
+- Remaining climb tracker (always shows ascent remaining, decreasing during navigation)
 - Elevation progress card (toggleable during navigation)
 - Waze-style hazard reporting (from both planning and navigation screens)
 - Hazard proximity alerts during navigation with "Still there?" validation
