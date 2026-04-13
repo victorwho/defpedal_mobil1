@@ -113,11 +113,6 @@ const getGpsSignalColor = (accuracy: number | null | undefined): string => {
   return '#F44336'; // red — poor
 };
 
-const getGpsSignalLabel = (accuracy: number | null | undefined): string => {
-  if (accuracy == null) return '—';
-  return `${Math.round(accuracy)}m`;
-};
-
 export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
   distanceToManeuverMeters: number | null;
@@ -134,7 +129,6 @@ export const ManeuverCard: React.FC<{
         : '—';
 
   const gpsColor = getGpsSignalColor(gpsAccuracyMeters);
-  const gpsLabel = getGpsSignalLabel(gpsAccuracyMeters);
 
   const Wrapper = onPress ? Pressable : View;
 
@@ -154,11 +148,10 @@ export const ManeuverCard: React.FC<{
       <Text style={styles.maneuverDivider}>·</Text>
       <Text style={styles.maneuverDist}>{distance}</Text>
       <View
-        style={styles.gpsBadge}
-        accessibilityLabel={`GPS accuracy ${gpsLabel}`}
+        style={styles.gpsDot}
+        accessibilityLabel={`GPS signal ${gpsAccuracyMeters == null ? 'unavailable' : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD ? 'strong' : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD ? 'fair' : 'poor'}`}
       >
-        <View style={[styles.gpsDot, { backgroundColor: gpsColor }]} />
-        <Text style={styles.gpsText}>{gpsLabel}</Text>
+        <View style={[styles.gpsDotInner, { backgroundColor: gpsColor }]} />
       </View>
     </Wrapper>
   );
@@ -338,25 +331,14 @@ const styles = StyleSheet.create({
     color: gray[200],
     fontFamily: fontFamily.mono.bold,
   },
-  gpsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: space[1],
-    paddingHorizontal: space[2],
-    paddingVertical: 2,
-    borderRadius: radii.sm,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
   gpsDot: {
+    marginLeft: space[1],
+    padding: 2,
+  },
+  gpsDotInner: {
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  gpsText: {
-    fontFamily: fontFamily.mono.bold,
-    fontSize: 10,
-    color: gray[400],
   },
   // -- Footer card (bottom) --
   footerCard: {
