@@ -42,3 +42,6 @@ export type { TierPillProps } from './TierPill';
 
 export { XpGainToast } from './XpGainToast';
 export type { XpGainToastProps } from './XpGainToast';
+
+export { LeaderboardRow } from './LeaderboardRow';
+export type { LeaderboardRowProps } from './LeaderboardRow';

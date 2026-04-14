@@ -531,4 +531,37 @@ export const ro: TranslationKeys = {
     loading: 'Se încarcă...',
     notFound: 'Utilizator negăsit',
   },
+
+  // ── Leaderboard ──
+  leaderboard: {
+    title: 'Clasament de cartier',
+    tabs: {
+      co2: 'CO2 economisit',
+      hazards: 'Pericole raportate',
+    },
+    periods: {
+      week: 'Săptămâna aceasta',
+      month: 'Luna aceasta',
+      all: 'Tot timpul',
+    },
+    rank: 'Loc',
+    champion: 'Campion',
+    weeklyChampion: 'Campionul săptămânii',
+    ghostRankSeparator: 'Locul tău',
+    emptyState: 'Nicio activitate în zona ta încă',
+    metricUnit: {
+      co2: 'kg',
+      hazards: 'raportate',
+    },
+    rankChange: {
+      up: 'urcat',
+      down: 'coborât',
+      new: 'nou',
+    },
+    podium: {
+      gold: 'Locul 1',
+      silver: 'Locul 2',
+      bronze: 'Locul 3',
+    },
+  },
 } as const;

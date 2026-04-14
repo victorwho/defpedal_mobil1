@@ -454,6 +454,8 @@ export interface FeedItem {
   commentCount: number;
   likedByMe: boolean;
   lovedByMe: boolean;
+  isWeeklyChampion?: boolean;
+  championMetric?: 'co2' | 'hazards' | null;
 }
 
 export interface UserStats {
@@ -793,6 +795,30 @@ export interface CityHeartbeat {
   };
   readonly hazardHotspots: readonly HazardHotspot[];
   readonly topContributors: readonly TopContributor[];
+}
+
+// ── Neighborhood Leaderboard ──
+
+export type LeaderboardMetric = 'co2' | 'hazards';
+export type LeaderboardPeriod = 'week' | 'month' | 'all';
+
+export interface LeaderboardEntry {
+  readonly rank: number;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly avatarUrl: string | null;
+  readonly riderTier: string;
+  readonly metricValue: number;
+  readonly rankDelta: number | null;  // positive = moved up, negative = moved down, null = new
+  readonly isChampion: boolean;
+  readonly isRequestingUser: boolean;
+}
+
+export interface LeaderboardResponse {
+  readonly entries: readonly LeaderboardEntry[];
+  readonly userRank: LeaderboardEntry | null;
+  readonly periodStart: string;
+  readonly periodEnd: string;
 }
 
 // ── Saved Routes ──

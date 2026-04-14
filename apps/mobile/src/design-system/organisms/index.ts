@@ -24,3 +24,5 @@ export type { TierRankCardProps } from './TierRankCard';
 
 export { RankUpOverlay } from './RankUpOverlay';
 export type { RankUpOverlayProps } from './RankUpOverlay';
+
+export { LeaderboardSection } from './LeaderboardSection';

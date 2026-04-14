@@ -140,7 +140,8 @@ C:\dev\defpedal/
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
 │   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
 │   │   │                        # TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay,
-│   │   │                        # ActivityChart, PulseHeader, TierRankCard, RankUpOverlay
+│   │   │                        # ActivityChart, PulseHeader, TierRankCard, RankUpOverlay,
+│   │   │                        # LeaderboardSection
 │   │   ├── hooks/               # Custom React hooks
 │   │   │   ├── useBicycleParking.ts   # Overpass API for parking
 │   │   │   ├── useBicycleRental.ts    # Overpass API for rentals
@@ -152,7 +153,8 @@ C:\dev\defpedal/
 │   │   │   ├── useRouteGuard.ts       # Screen access control
 │   │   │   ├── useCurrentLocation.ts  # GPS location
 │   │   │   ├── useCityHeartbeat.ts    # City Heartbeat dashboard data
-│   │   │   └── useTiers.ts           # Rider tier + XP data (TanStack Query)
+│   │   │   ├── useTiers.ts           # Rider tier + XP data (TanStack Query)
+│   │   │   └── useLeaderboard.ts     # Neighborhood leaderboard (TanStack Query)
 │   │   ├── lib/                 # Utility libraries
 │   │   │   ├── mapbox-routing.ts      # Client-side route fetching (Mapbox + OSRM)
 │   │   │   ├── mapbox-search.ts       # Autocomplete/geocoding
@@ -192,7 +194,8 @@ C:\dev\defpedal/
 │       ├── app.ts               # Fastify app builder (registers routes)
 │       ├── routes/
 │       │   ├── v1.ts            # Core API routes (routes, hazards, trips, feedback)
-│       │   └── feed.ts          # Community feed routes (share, like, love, comment)
+│       │   ├── feed.ts          # Community feed routes (share, like, love, comment)
+│       │   └── leaderboard.ts   # Neighborhood leaderboard + settlement cron
 │       ├── lib/
 │       │   ├── auth.ts          # JWT + dev-bypass auth middleware
 │       │   ├── risk.ts          # Road risk segment fetching (Supabase RPC)
@@ -200,6 +203,7 @@ C:\dev\defpedal/
 │       │   ├── submissions.ts   # Trip/hazard/feedback DB writes
 │       │   ├── normalize.ts     # Route response normalization
 │       │   ├── feedSchemas.ts   # JSON Schema for feed endpoints
+│       │   ├── leaderboardSchemas.ts # JSON Schema for leaderboard endpoints
 │       │   └── dependencies.ts  # Dependency injection container
 │       └── Dockerfile           # Production Docker image
 ├── supabase/migrations/         # Database migrations
@@ -208,6 +212,8 @@ C:\dev\defpedal/
 │   ├── 202603240001_create_trip_tracks.sql
 │   ├── 202603260001_community_feed.sql
 │   ├── 202603270001_hazard_validations.sql
+│   ├── 202604140001_leaderboard.sql
+│   ├── 202604140002_leaderboard_badges_eval.sql
 │   └── legacy/                  # Archived root SQL files
 ├── scripts/
 │   └── check-bundle.sh          # Metro bundle health check
@@ -359,7 +365,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-04-10)
+## Current State (as of 2026-04-14)
 
 ### Working Features
 - Route planning with destination autocomplete and recent destinations (Google Maps-style UX)
@@ -431,12 +437,13 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - **Security hardening (2026-04-13 + 2026-04-14):** Risk score IP protection — quantized `riskScore` to bucket midpoints, `riskCategory` label in API response, auth required on `/routes/preview`, `/routes/reroute`, `/risk-segments`, `/risk-map`, OAuth required (anonymous rejected) on all 4 risk endpoints, score thresholds server-side only (removed from client bundle), map uses server-provided `color` directly. Cloud Run revision `defpedal-api-00048-gtj`. See `securityfix.md`
 - **Segment-aware off-route detection (2026-04-14):** `closestPointOnPolyline` projects GPS onto nearest polyline segment (perpendicular distance) instead of nearest vertex. Threshold lowered from 100m to 50m. Fixes false triggers on straight roads with sparse vertices.
 - **Reroute profile preservation (2026-04-14):** Reroute uses same routing profile as original route: Safe→Safe, Fast→Fast, Flat→Fast. `effectiveRouteRequest` in navigation.tsx merges global `avoidHills`/`avoidUnpaved` into the reroute request.
-- **1069 tests across 3 packages** (core: 347, mobile-api: 232, mobile: 490). Mobile coverage: hooks (9 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
+- **Neighborhood Safety Leaderboard (2026-04-14):** Full-stack competitive social layer on City Heartbeat screen. Two metrics (CO2 saved, hazards reported) with three time windows (week/month/all-time). Top 50 per 15km GPS radius. Rank-change delta arrows from previous period snapshots. Weekly champion crown on leaderboard + FeedCard. Ghost rank for opted-out users. Settlement cron (Cloud Scheduler, Monday 4AM weekly + 1st monthly) snapshots rankings, awards tiered XP (#1=50/150, #2-3=30/100, #4-10=15/50, #11-50=5/20), and podium badges. 6 champion badges (143 total). `leaderboard_snapshots` table, `get_neighborhood_leaderboard` RPC, `GET /v1/leaderboard`, `POST /v1/leaderboard/settle`. LeaderboardRow atom + LeaderboardSection organism. Cloud Run revision `defpedal-api-00049-529`.
+- **~1093 tests across 3 packages** (core: 347, mobile-api: 250, mobile: 496). Mobile coverage: hooks (10 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)
 - Redis activation: code complete (`redisStore.ts`), needs GCP Memorystore + REDIS_URL on Cloud Run
-- Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
+- Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, mentorship, city reports
 
 ### Known Issues
 - Community feed radius search requires GPS permission on first visit
@@ -479,8 +486,8 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 ### Supabase Project
 - Project ID: `uobubaulcdcuggnetzei`
 - Region: (Supabase cloud)
-- Key tables: `road_risk_data`, `hazards`, `trips`, `trip_tracks`, `navigation_feedback`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `profiles`, `push_tokens`
-- Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`
+- Key tables: `road_risk_data`, `hazards`, `trips`, `trip_tracks`, `navigation_feedback`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `profiles`, `push_tokens`, `leaderboard_snapshots`
+- Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`, `get_neighborhood_leaderboard`, `check_champion_repeat_badges`
 
 ### OSRM Server
 - Hosted on GCP project `osrmro1` in `europe-central2-c`

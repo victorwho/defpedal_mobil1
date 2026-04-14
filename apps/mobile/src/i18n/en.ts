@@ -529,6 +529,39 @@ export const en = {
     loading: 'Loading...',
     notFound: 'User not found',
   },
+
+  // ── Leaderboard ──
+  leaderboard: {
+    title: 'Neighborhood Leaderboard',
+    tabs: {
+      co2: 'CO2 Saved',
+      hazards: 'Hazards Reported',
+    },
+    periods: {
+      week: 'This Week',
+      month: 'This Month',
+      all: 'All Time',
+    },
+    rank: 'Rank',
+    champion: 'Champion',
+    weeklyChampion: 'Weekly Champion',
+    ghostRankSeparator: 'Your Rank',
+    emptyState: 'No activity in your area yet',
+    metricUnit: {
+      co2: 'kg',
+      hazards: 'reported',
+    },
+    rankChange: {
+      up: 'up',
+      down: 'down',
+      new: 'new',
+    },
+    podium: {
+      gold: '1st',
+      silver: '2nd',
+      bronze: '3rd',
+    },
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

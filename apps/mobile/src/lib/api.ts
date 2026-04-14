@@ -14,6 +14,9 @@ import type {
   HazardReportResponse,
   HazardValidationResponse,
   ImpactDashboard,
+  LeaderboardMetric,
+  LeaderboardPeriod,
+  LeaderboardResponse,
   NavigationFeedbackRequest,
   NearbyHazard,
   NeighborhoodSafetyScore,
@@ -546,4 +549,23 @@ export const mobileApi = {
     requestJson<WriteAckResponse>(`/v1/saved-routes/${id}/use`, {
       method: 'PATCH',
     }),
+
+  // ── Leaderboard ──
+
+  fetchLeaderboard: (
+    lat: number,
+    lon: number,
+    metric: LeaderboardMetric,
+    period: LeaderboardPeriod,
+    radiusKm = 15,
+  ) => {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      metric,
+      period,
+      radiusKm: String(radiusKm),
+    });
+    return requestJson<LeaderboardResponse>(`/v1/leaderboard?${params.toString()}`);
+  },
 };

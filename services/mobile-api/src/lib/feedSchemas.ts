@@ -122,6 +122,7 @@ export const feedItemSchema = {
     'distanceMeters', 'durationSeconds', 'elevationGainMeters',
     'averageSpeedMps', 'safetyRating', 'safetyTags', 'geometryPolyline6',
     'note', 'sharedAt', 'likeCount', 'loveCount', 'co2SavedKg', 'commentCount', 'likedByMe', 'lovedByMe',
+    'isWeeklyChampion', 'championMetric',
   ],
   properties: {
     id: { type: 'string' },
@@ -144,6 +145,8 @@ export const feedItemSchema = {
     commentCount: { type: 'integer' },
     likedByMe: { type: 'boolean' },
     lovedByMe: { type: 'boolean' },
+    isWeeklyChampion: { type: 'boolean' },
+    championMetric: { type: ['string', 'null'] },
   },
 } as const;
 

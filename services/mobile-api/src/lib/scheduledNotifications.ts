@@ -201,9 +201,67 @@ export const sendWeeklyImpactSummary = async (
         // Social data is optional — don't fail the notification
       }
 
+      // Leaderboard rank + personal best suffix
+      let leaderboardSuffix = '';
+      try {
+        // Get latest weekly snapshot for this user (CO2 metric)
+        const { data: latestRank } = await supabaseAdmin
+          .from('leaderboard_snapshots')
+          .select('rank, metric, value, period_end')
+          .eq('user_id', user.id)
+          .eq('period_type', 'weekly')
+          .order('period_end', { ascending: false })
+          .limit(2);
+
+        if (latestRank && latestRank.length > 0) {
+          const latest = latestRank[0] as Record<string, unknown>;
+          const metricLabel = latest.metric === 'co2' ? 'CO2 savings' : 'hazard reporting';
+          leaderboardSuffix += ` You finished #${latest.rank} in ${metricLabel}.`;
+
+          // Personal best check: compare current value against all-time max
+          const currentValue = Number(latest.value ?? 0);
+          const { data: allSnapshots } = await supabaseAdmin
+            .from('leaderboard_snapshots')
+            .select('value')
+            .eq('user_id', user.id)
+            .eq('metric', latest.metric as string)
+            .eq('period_type', 'weekly')
+            .order('value', { ascending: false })
+            .limit(1);
+
+          if (allSnapshots && allSnapshots.length > 0) {
+            const bestValue = Number((allSnapshots[0] as Record<string, unknown>).value ?? 0);
+            // If the latest value IS the all-time best (or very close), it's a new PB
+            if (currentValue >= bestValue * 0.99 && currentValue > 0) {
+              if (latest.metric === 'co2') {
+                // Check if there was a previous best that was lower
+                const { data: prevBest } = await supabaseAdmin
+                  .from('leaderboard_snapshots')
+                  .select('value')
+                  .eq('user_id', user.id)
+                  .eq('metric', 'co2')
+                  .eq('period_type', 'weekly')
+                  .neq('period_end', latest.period_end as string)
+                  .order('value', { ascending: false })
+                  .limit(1);
+
+                if (prevBest && prevBest.length > 0) {
+                  const prevBestValue = Number((prevBest[0] as Record<string, unknown>).value ?? 0);
+                  if (currentValue > prevBestValue) {
+                    leaderboardSuffix += ` New personal best! You saved ${currentValue.toFixed(1)} kg CO2 this week (previous best: ${prevBestValue.toFixed(1)}).`;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // Leaderboard data is optional — don't fail the notification
+      }
+
       await dispatchNotification(user.id, 'system', {
         title: 'Your weekly cycling impact',
-        body: `This week: ${weekCo2.toFixed(1)} kg CO2 saved, ${weekMoney.toFixed(2)} EUR saved in ${count} rides.${socialSuffix}`,
+        body: `This week: ${weekCo2.toFixed(1)} kg CO2 saved, ${weekMoney.toFixed(2)} EUR saved in ${count} rides.${socialSuffix}${leaderboardSuffix}`,
         data: { type: 'weekly_summary', screen: 'impact-dashboard' },
       });
 

@@ -11,7 +11,7 @@
 - [ ] NOT STARTED — Mia persona progressive journey (4 levels with safety floor constraints)
 - [ ] NOT STARTED — Neighborhood safety challenge (invite 3 cyclists)
 - [ ] NOT STARTED — Safety Wrapped (Spotify-style annual/monthly summary) — schedule for December
-- [ ] NOT STARTED — Neighborhood safety leaderboard
+- [x] DONE — Neighborhood safety leaderboard (PRD #4: CO2+hazards ranking, 15km radius, weekly/monthly/all-time, settlement cron, champion crown, 6 badges, Cloud Scheduler) (2026-04-14)
 - [ ] NOT STARTED — Safety Guide mentorship system (100+ rides)
 - [ ] NOT STARTED — City Safety Report (auto-generated monthly)
 - [x] DONE — Microlives Phase 0-3: calculation engine, DB schema, server integration, post-ride UI, TimeBankWidget, history + dashboard (2026-04-04)

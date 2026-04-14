@@ -23,13 +23,24 @@ export const ensureSupabase = () => {
 
 export const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
 
-export const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedItem => {
+export type ChampionLookup = ReadonlyMap<string, string>;
+
+export const mapFeedRow = (
+  row: Record<string, unknown>,
+  userId: string,
+  championLookup: ChampionLookup = new Map(),
+): FeedItem => {
   const profile = row.profiles as Record<string, unknown> | null;
   const username = profile?.username as string | null;
+  const rowUserId = row.user_id as string;
+  const rawChampionMetric = championLookup.get(rowUserId) ?? null;
+  const championMetric = (rawChampionMetric === 'co2' || rawChampionMetric === 'hazards')
+    ? rawChampionMetric
+    : null;
   return {
     id: row.id as string,
     user: {
-      id: row.user_id as string,
+      id: rowUserId,
       displayName: username ? `@${username}` : (profile?.display_name as string) ?? 'Rider',
       avatarUrl: (profile?.avatar_url as string) ?? null,
       riderTier: (profile?.rider_tier as import('@defensivepedal/core').RiderTierName | undefined) ?? undefined,
@@ -52,5 +63,7 @@ export const mapFeedRow = (row: Record<string, unknown>, userId: string): FeedIt
     commentCount: Number(row.comment_count ?? 0),
     likedByMe: Boolean(row.liked_by_me),
     lovedByMe: Boolean(row.loved_by_me ?? false),
+    isWeeklyChampion: championMetric !== null,
+    championMetric,
   };
 };

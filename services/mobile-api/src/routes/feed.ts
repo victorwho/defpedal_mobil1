@@ -23,7 +23,7 @@ import {
   type HeartbeatQuerystring,
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
-import { ensureSupabase, mapFeedRow, requireUser } from './feed-helpers';
+import { ensureSupabase, mapFeedRow, requireUser, type ChampionLookup } from './feed-helpers';
 import { buildFeedCommentRoutes } from './feed-comments';
 import { buildFeedProfileRoutes } from './feed-profile';
 import { buildFeedReactionRoutes } from './feed-reactions';
@@ -83,7 +83,45 @@ export const buildFeedRoutes = (
         }
 
         const rows = (data ?? []) as Record<string, unknown>[];
-        const items: FeedItem[] = rows.map((row) => mapFeedRow(row, user.id));
+
+        // Build champion lookup: user_id -> metric for latest weekly champions
+        let championLookup: ChampionLookup = new Map();
+        try {
+          const userIds = [...new Set(rows.map((r) => r.user_id as string))];
+          if (userIds.length > 0) {
+            // Get the latest weekly snapshot period_end
+            const { data: latestSnap } = await db
+              .from('leaderboard_snapshots')
+              .select('period_end')
+              .eq('period_type', 'weekly')
+              .eq('rank', 1)
+              .order('period_end', { ascending: false })
+              .limit(1);
+
+            if (latestSnap && latestSnap.length > 0) {
+              const latestEnd = (latestSnap[0] as Record<string, unknown>).period_end as string;
+              const { data: champions } = await db
+                .from('leaderboard_snapshots')
+                .select('user_id, metric')
+                .eq('period_type', 'weekly')
+                .eq('rank', 1)
+                .eq('period_end', latestEnd)
+                .in('user_id', userIds);
+
+              if (champions && champions.length > 0) {
+                const lookup = new Map<string, string>();
+                for (const c of champions as Array<{ user_id: string; metric: string }>) {
+                  lookup.set(c.user_id, c.metric);
+                }
+                championLookup = lookup;
+              }
+            }
+          }
+        } catch {
+          // Champion lookup is optional — don't fail the feed
+        }
+
+        const items: FeedItem[] = rows.map((row) => mapFeedRow(row, user.id, championLookup));
         const nextCursor = items.length === limit ? (items[items.length - 1]?.sharedAt ?? null) : null;
 
         return { items, cursor: nextCursor };

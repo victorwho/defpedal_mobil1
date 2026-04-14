@@ -20,6 +20,7 @@ import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
 import { Card } from '../src/design-system/atoms/Card';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { ActivityChart } from '../src/design-system/organisms/ActivityChart';
+import { LeaderboardSection } from '../src/design-system/organisms/LeaderboardSection';
 import { PulseHeader } from '../src/design-system/organisms/PulseHeader';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -248,6 +249,11 @@ export default function CityHeartbeatScreen() {
             </View>
           </FadeSlideIn>
         )}
+
+        {/* Neighborhood Leaderboard */}
+        <FadeSlideIn delay={600}>
+          <LeaderboardSection />
+        </FadeSlideIn>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>

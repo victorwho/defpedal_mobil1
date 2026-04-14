@@ -1,5 +1,6 @@
 import type { FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
+import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -96,6 +97,9 @@ export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUser
               </Text>
               {item.user.riderTier && riderTiers[item.user.riderTier as RiderTierKey]?.level >= 3 && (
                 <TierPill tier={item.user.riderTier as any} size="sm" />
+              )}
+              {item.isWeeklyChampion && (
+                <Ionicons name="trophy" size={16} color="#D4A843" style={{ marginLeft: 4 }} />
               )}
             </Pressable>
           </View>

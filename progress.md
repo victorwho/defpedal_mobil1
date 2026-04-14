@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-14 (session 20)
+Last updated: 2026-04-14 (session 21)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -9,6 +9,7 @@ Update it at the end of each implementation slice.
 
 - Overall progress: roughly 87-92 percent of product migration, 85-90 percent of production hardening
 - Current milestone: physical Android validation confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded design system
+- Session 21 (2026-04-14): Neighborhood Safety Leaderboard — full-stack feature (PRD victorwho/defpedal_mobil1#4)
 - Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
 - Primary risk: iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
@@ -294,6 +295,23 @@ Update it at the end of each implementation slice.
       - #10: Risk score thresholds moved server-side only (`RISK_BUCKETS` in `risk.ts`); client uses server-provided `riskCategory` + `color`; `RISK_CATEGORIES` with score boundaries removed from client bundle
     - **Map risk overlay**: Now uses server-provided `color` directly instead of client-side score interpolation with threshold breakpoints
     - **Cloud Run**: Revision `defpedal-api-00048-gtj` deployed with all security changes
+
+- Session 21 — Neighborhood Safety Leaderboard (2026-04-14):
+    - **Full-stack feature** implementing PRD victorwho/defpedal_mobil1#4 via 3-agent team (backend, frontend, QA)
+    - **Database**: `leaderboard_snapshots` table (period_type, metric, rank, value, xp_awarded) with RLS + indexes. `get_neighborhood_leaderboard` RPC: spatial aggregation (CO2 via trip_shares+ride_impacts, hazards via hazards table), ST_DWithin 15km radius, privacy filtering (auto_share_rides), top-50 + ghost rank injection, rank delta from previous snapshot, champion flag. `check_champion_repeat_badges` RPC for cumulative wins
+    - **6 new badge definitions**: Green Crown, Emerald Throne, Watchdog Crown, Guardian Shield (champion badges, tier 0), Serial Saver (5 CO2 wins, tier 1), Eternal Watchdog (10 hazard wins, tier 1). Badge count: 137 → 143
+    - **API**: New `leaderboard.ts` route file. `GET /v1/leaderboard` (OAuth-only, rate-limited, full JSON schema). `POST /v1/leaderboard/settle` (CRON_SECRET-protected, idempotent XP tiered awards: #1=50/150, #2-3=30/100, #4-10=15/50, #11-50=5/20 weekly/monthly)
+    - **Feed champion crown**: Feed response extended with `isWeeklyChampion` + `championMetric` from leaderboard_snapshots join. FeedCard shows gold trophy icon (Ionicons, #D4A843, 16px) after TierPill
+    - **Weekly notification**: Extended with leaderboard rank + personal best detection from snapshots
+    - **Types**: `LeaderboardMetric`, `LeaderboardPeriod`, `LeaderboardEntry`, `LeaderboardResponse` in contracts.ts
+    - **Client**: `fetchLeaderboard()` in api.ts, `useLeaderboard` TanStack Query hook (5min stale, GPS-dependent)
+    - **Design system**: `LeaderboardRow` atom (rank gold/silver/bronze, avatar, TierPill, metric value, delta arrows, champion crown, highlighted row). `LeaderboardSection` organism (metric tabs CO2/Hazards, period pills Week/Month/All, ScrollView list, ghost rank separator, loading/error/empty states)
+    - **City Heartbeat integration**: LeaderboardSection rendered below Top Contributors with FadeSlideIn delay
+    - **i18n**: Full `leaderboard` namespace in en.ts + ro.ts
+    - **QA fixes**: CRITICAL — settle idempotency check used `data.length` (always 0 with head:true) instead of `count` property, would have duplicated snapshots on every cron run. HIGH — badge insert `.select().single()` logged false warnings on re-settlement
+    - **Tests**: +24 new passing tests (18 API integration + 6 hook). 14 component tests written but blocked by pre-existing Vite/Rollup env issue
+    - **Infrastructure**: Cloud Scheduler API enabled, 2 cron jobs created (weekly Monday 4AM, monthly 1st 4AM). Cloud Run revision `defpedal-api-00049-529` deployed with CRON_SECRET. Both Supabase migrations applied
+    - TypeScript: 0 errors. Bundle: HTTP 200. Settle endpoint smoke test: 200 OK
 
 ## Phase Status
 
