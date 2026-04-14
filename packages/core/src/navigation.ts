@@ -4,12 +4,17 @@ import type {
   NavigationSession,
   RouteOption,
 } from './contracts';
-import { findClosestPointIndex, haversineDistance, polylineSegmentDistance } from './distance';
+import {
+  closestPointOnPolyline,
+  findClosestPointIndex,
+  haversineDistance,
+  polylineSegmentDistance,
+} from './distance';
 import { decodePolyline } from './polyline';
 
 export type AppState = 'IDLE' | 'ROUTE_PREVIEW' | 'NAVIGATING' | 'AWAITING_FEEDBACK';
 
-export const OFF_ROUTE_THRESHOLD_METERS = 100;
+export const OFF_ROUTE_THRESHOLD_METERS = 50;
 export const PRE_ANNOUNCEMENT_METERS = 200;
 export const APPROACH_ANNOUNCEMENT_METERS = 50;
 export const ARRIVAL_THRESHOLD_METERS = 25;
@@ -247,6 +252,24 @@ const getClampedStepIndex = (
     ? 0
     : Math.min(Math.max(session.currentStepIndex, 0), Math.max(totalSteps - 1, 0));
 
+/**
+ * Given a segment index, return whichever of the two segment endpoints is closer
+ * to the target coordinate. Used for step/maneuver tracking which works with
+ * vertex indices on the decoded polyline.
+ */
+const pickCloserVertex = (
+  segmentIndex: number,
+  points: [number, number][],
+  targetLatLon: [number, number],
+): number => {
+  const a = segmentIndex;
+  const b = Math.min(segmentIndex + 1, points.length - 1);
+  if (a === b) return a;
+  const distA = haversineDistance(targetLatLon, [points[a][1], points[a][0]]);
+  const distB = haversineDistance(targetLatLon, [points[b][1], points[b][0]]);
+  return distB < distA ? b : a;
+};
+
 const getUpcomingStepIndex = (
   maneuverIndices: number[],
   closestPointIndex: number,
@@ -290,25 +313,35 @@ export const getNavigationProgress = (
 
   const totalSteps = route.steps.length;
   const clampedStepIndex = getClampedStepIndex(session, totalSteps);
-  const closestPointIndex = findClosestPointIndex(
+
+  // Segment-aware snap: projects onto the nearest line segment between vertices
+  // instead of snapping to the nearest vertex. This gives the true perpendicular
+  // distance to the route and prevents false off-route triggers on straight roads
+  // where vertices can be 50-200m apart.
+  const snapResult = closestPointOnPolyline(
     [location.lat, location.lon],
     routeCoordinates,
   );
 
-  const snappedCoordinate =
-    closestPointIndex >= 0
+  // Vertex index needed for step tracking and along-route distance calculations.
+  // Pick the closer of the two segment endpoints to the user's position.
+  // Note: this is an approximation — polylineSegmentDistance measures vertex-to-vertex,
+  // so distanceToManeuver can be off by up to half a segment length on sparse polylines.
+  // OSRM safety profiles typically produce vertices every 10-50m, keeping error small.
+  const closestPointIndex = snapResult
+    ? pickCloserVertex(snapResult.segmentIndex, routeCoordinates, [location.lat, location.lon])
+    : findClosestPointIndex([location.lat, location.lon], routeCoordinates);
+
+  const snappedCoordinate = snapResult
+    ? { lat: snapResult.projectedPoint[0], lon: snapResult.projectedPoint[1] }
+    : closestPointIndex >= 0
       ? {
           lat: routeCoordinates[closestPointIndex][1],
           lon: routeCoordinates[closestPointIndex][0],
         }
       : null;
 
-  const distanceToRouteMeters = snappedCoordinate
-    ? haversineDistance(
-        [location.lat, location.lon],
-        [snappedCoordinate.lat, snappedCoordinate.lon],
-      )
-    : 0;
+  const distanceToRouteMeters = snapResult ? snapResult.distanceMeters : 0;
   const offRoute = isOffRoute(distanceToRouteMeters, OFF_ROUTE_THRESHOLD_METERS, gpsAccuracyMeters);
 
   const maneuverIndices = route.steps.map((step) =>
@@ -329,7 +362,7 @@ export const getNavigationProgress = (
     distanceToRouteMeters < PASSED_MANEUVER_MAX_OFFSET_METERS;
 
   // Recalculate step index when:
-  // 1. Off-route (>100m from route)
+  // 1. Off-route (>50m from route)
   // 2. Just returned from being off-route
   // 3. Reroute eligible
   // 4. Rider has passed the current maneuver on the polyline (missed turn)

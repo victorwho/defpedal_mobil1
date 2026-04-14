@@ -160,3 +160,85 @@ describe('multi-stop reroute — waypoint stripping', () => {
     ]);
   });
 });
+
+describe('reroute preserves routing profile', () => {
+  const baseOrigin = { lat: 44.42, lon: 26.10 };
+  const destination = { lat: 44.45, lon: 26.04 };
+  const riderPosition = { lat: 44.43, lon: 26.08 };
+
+  it('preserves safe mode on reroute', () => {
+    const request = {
+      origin: baseOrigin,
+      destination,
+      mode: 'safe' as const,
+      avoidUnpaved: false,
+      avoidHills: false,
+      locale: 'en',
+    };
+    const result = buildRerouteRequest(request, 'safe-route', riderPosition);
+    expect(result.mode).toBe('safe');
+    expect(result.avoidHills).toBe(false);
+  });
+
+  it('preserves fast mode on reroute', () => {
+    const request = {
+      origin: baseOrigin,
+      destination,
+      mode: 'fast' as const,
+      avoidUnpaved: false,
+      avoidHills: false,
+      locale: 'en',
+    };
+    const result = buildRerouteRequest(request, 'fast-route', riderPosition);
+    expect(result.mode).toBe('fast');
+  });
+
+  it('preserves avoidHills flag in reroute request', () => {
+    // buildRerouteRequest preserves all fields from the input request.
+    // The Flat→Fast conversion is done in navigation.tsx before calling
+    // buildRerouteRequest (via effectiveRouteRequest).
+    const request = {
+      origin: baseOrigin,
+      destination,
+      mode: 'safe' as const,
+      avoidUnpaved: false,
+      avoidHills: true,
+      locale: 'en',
+    };
+    const result = buildRerouteRequest(request, 'flat-route', riderPosition);
+    expect(result.mode).toBe('safe');
+    expect(result.avoidHills).toBe(true);
+  });
+
+  it('preserves avoidUnpaved preference on reroute', () => {
+    const request = {
+      origin: baseOrigin,
+      destination,
+      mode: 'safe' as const,
+      avoidUnpaved: true,
+      avoidHills: true,
+      locale: 'en',
+    };
+    const result = buildRerouteRequest(request, 'full-prefs', riderPosition);
+    expect(result.mode).toBe('safe');
+    expect(result.avoidHills).toBe(true);
+    expect(result.avoidUnpaved).toBe(true);
+  });
+
+  it('updates origin to rider position while keeping profile', () => {
+    const request = {
+      origin: baseOrigin,
+      destination,
+      mode: 'safe' as const,
+      avoidUnpaved: true,
+      avoidHills: true,
+      locale: 'ro',
+    };
+    const result = buildRerouteRequest(request, 'test-route', riderPosition);
+    expect(result.origin).toEqual(riderPosition);
+    expect(result.destination).toEqual(destination);
+    expect(result.mode).toBe('safe');
+    expect(result.avoidHills).toBe(true);
+    expect(result.locale).toBe('ro');
+  });
+});

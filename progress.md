@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-13 (session 19)
+Last updated: 2026-04-14 (session 20)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -9,6 +9,7 @@ Update it at the end of each implementation slice.
 
 - Overall progress: roughly 87-92 percent of product migration, 85-90 percent of production hardening
 - Current milestone: physical Android validation confirms offline continuity end to end, the repo includes both a manual GitHub Actions release workflow and a runnable mobile-API load-test/operations baseline, and the main native rider plus utility screens now all run through the branded design system
+- Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
 - Primary risk: iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
 - Current validation blocker: the bridgeless debug client is still failing to consume the staged JS bundle over `10.0.2.2:8081`, so the release / embedded-bundle validator remains the reliable native QA path on this machine
 - Webapp cleanup (2026-03-22): all legacy React/Vite/Leaflet webapp code has been removed from the repo root — components/, hooks/, utils/, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json, and webapp dependencies (leaflet, react-dom, vite, vitest, jsdom, testing-library). Root SQL files moved to supabase/migrations/legacy/. Root tsconfig.json cleaned of DOM libs. The repo is now mobile-only.
@@ -281,6 +282,11 @@ Update it at the end of each implementation slice.
     - **Screen Reader Accessibility (P1-21 phases 1-2)**: PoiCard/RouteInfoOverlay/MapView labels, HazardAlert live region for auto-announce
     - **Supabase migrations applied** (2026-04-13): RLS tightening, award_xp auth check, search_path hardening — all 3 live on production DB
     - **Remaining (2 items)**: P1-21 phase 3 (map contents list, deferred), P3-4 GCP monitoring (infra)
+- Session 20 — Off-route fix, reroute profiles, grade indicator (2026-04-14):
+    - **Segment-aware off-route detection**: Replaced vertex-only `findClosestPointIndex` with `closestPointOnPolyline` that projects GPS onto nearest line segment (perpendicular distance). Fixes false off-route triggers on straight roads with sparse polyline vertices (e.g., 10m from road but 100m from nearest vertex). Threshold lowered from 100m to 50m (accurate now). New `projectOntoSegment` uses flat-Earth approximation with cos(lat) scaling.
+    - **Reroute routing profile preservation**: Reroute now uses the same routing profile as the original route. Safe→Safe, Fast→Fast, Flat→Fast. Previously, `avoidHills` (global store field) was not merged into `routeRequest` during reroute. Added `effectiveRouteRequest` in navigation.tsx.
+    - **Steep grade indicator cleanup**: Removed grade percentage number from the pill (was "↑ 9.2% Steep", now "↑ Steep"). Accessibility label still includes the grade for screen readers.
+    - **Tests**: +17 new tests (9 closestPointOnPolyline unit, 3 off-route regression with sparse segments, 5 reroute profile preservation). Core: 347 tests, 0 type errors.
 
 ## Phase Status
 

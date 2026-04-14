@@ -85,6 +85,8 @@ export default function NavigationScreen() {
     activeTripClientId,
     queuedMutations,
     shareTripsPublicly,
+    avoidHills,
+    avoidUnpaved,
   } = useAppStore(useShallow((state) => ({
     routeRequest: state.routeRequest,
     voiceGuidanceEnabled: state.voiceGuidanceEnabled,
@@ -95,6 +97,8 @@ export default function NavigationScreen() {
     activeTripClientId: state.activeTripClientId,
     queuedMutations: state.queuedMutations,
     shareTripsPublicly: state.shareTripsPublicly,
+    avoidHills: state.avoidHills,
+    avoidUnpaved: state.avoidUnpaved,
   })));
 
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
@@ -438,14 +442,30 @@ export default function NavigationScreen() {
     }
   };
 
+  // Build the effective request for rerouting, matching the original routing profile:
+  //   Safe  → reroute as Safe
+  //   Fast  → reroute as Fast
+  //   Flat  → reroute as Fast  (flat OSRM is slow; fast Mapbox is better for reroute)
+  const effectiveRouteRequest = useMemo(() => {
+    const isFlat = routeRequest.mode === 'safe' && avoidHills;
+    return {
+      ...routeRequest,
+      avoidUnpaved,
+      // Flat mode reroutes as Fast (Mapbox) for speed; otherwise preserve original profile
+      mode: isFlat ? 'fast' as const : routeRequest.mode,
+      avoidHills: isFlat ? false : avoidHills,
+    };
+  }, [routeRequest, avoidHills, avoidUnpaved]);
+
   const rerouteMutation = useMutation({
     mutationFn: (origin: Coordinate) =>
-      mobileApi.reroute(buildRerouteRequest(routeRequest, selectedRoute?.id, origin, routeCoordinates)),
+      mobileApi.reroute(buildRerouteRequest(effectiveRouteRequest, selectedRoute?.id, origin, routeCoordinates)),
     onMutate: () => {
       recordNavigationReroute();
       telemetry.capture('reroute_requested', {
         route_id: selectedRoute?.id ?? 'unknown',
-        mode: routeRequest.mode,
+        mode: effectiveRouteRequest.mode,
+        avoid_hills: effectiveRouteRequest.avoidHills,
       });
     },
     onSuccess: (response) => {
@@ -467,12 +487,13 @@ export default function NavigationScreen() {
     onError: (error) => {
       telemetry.capture('reroute_failed', {
         route_id: selectedRoute?.id ?? 'unknown',
-        mode: routeRequest.mode,
+        mode: effectiveRouteRequest.mode,
+        avoid_hills: effectiveRouteRequest.avoidHills,
       });
       telemetry.captureError(error, {
         feature: 'reroute',
         route_id: selectedRoute?.id ?? 'unknown',
-        mode: routeRequest.mode,
+        mode: effectiveRouteRequest.mode,
       });
     },
   });

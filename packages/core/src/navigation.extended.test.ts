@@ -30,8 +30,8 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('navigation constants', () => {
-  it('OFF_ROUTE_THRESHOLD_METERS is 100', () => {
-    expect(OFF_ROUTE_THRESHOLD_METERS).toBe(100);
+  it('OFF_ROUTE_THRESHOLD_METERS is 50', () => {
+    expect(OFF_ROUTE_THRESHOLD_METERS).toBe(50);
   });
 
   it('APPROACH_ANNOUNCEMENT_METERS is 50', () => {
@@ -388,9 +388,9 @@ describe('isOffRoute', () => {
     expect(isOffRoute(131, 100, 30)).toBe(true);
   });
 
-  it('uses default threshold of 100m', () => {
-    expect(isOffRoute(99)).toBe(false);
-    expect(isOffRoute(101)).toBe(true);
+  it('uses default threshold of 50m', () => {
+    expect(isOffRoute(49)).toBe(false);
+    expect(isOffRoute(51)).toBe(true);
   });
 
   it('uses default GPS accuracy of 0', () => {

@@ -323,7 +323,7 @@ export const SteepGradeIndicator: React.FC<{ gradePercent: number | null }> = ({
 
   if (!isSteepUp && !isSteepDown) return null;
 
-  const label = isSteepUp ? `↑ ${Math.abs(gradePercent)}% Steep` : `↓ ${Math.abs(gradePercent)}% Steep`;
+  const label = isSteepUp ? '↑ Steep' : '↓ Steep';
   const bgColor = isSteepUp ? '#92400E' : '#991B1B'; // amber-800 / red-800
   const textColor = isSteepUp ? '#FDE68A' : '#FCA5A5'; // amber-200 / red-300
   const iconName = isSteepUp ? 'trending-up' : 'trending-down';

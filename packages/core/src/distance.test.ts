@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { findClosestPointIndex, haversineDistance, polylineSegmentDistance } from './distance';
+import {
+  closestPointOnPolyline,
+  findClosestPointIndex,
+  haversineDistance,
+  polylineSegmentDistance,
+} from './distance';
 
 // ---------------------------------------------------------------------------
 // haversineDistance
@@ -213,5 +218,127 @@ describe('polylineSegmentDistance', () => {
     expect(polylineSegmentDistance([], 0, 0)).toBe(0);
     expect(polylineSegmentDistance([[26.1, 44.4]], 0, 0)).toBe(0);
     expect(polylineSegmentDistance([[26.1, 44.4]], 0, 1)).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// closestPointOnPolyline
+// ---------------------------------------------------------------------------
+
+describe('closestPointOnPolyline', () => {
+  // All polyline points are [lon, lat] (GeoJSON order).
+  // Target coordinates are [lat, lon].
+
+  it('returns null for empty array', () => {
+    expect(closestPointOnPolyline([44.43, 26.10], [])).toBeNull();
+  });
+
+  it('returns null for null/undefined input (defensive)', () => {
+    expect(closestPointOnPolyline([44.43, 26.10], null as unknown as [number, number][])).toBeNull();
+  });
+
+  it('snaps to the only vertex for a single-point polyline', () => {
+    const result = closestPointOnPolyline([44.4300, 26.1000], [[26.1000, 44.4300]]);
+    expect(result).not.toBeNull();
+    expect(result!.segmentIndex).toBe(0);
+    expect(result!.distanceMeters).toBeCloseTo(0, 0);
+  });
+
+  it('snaps to exact vertex when target is on a vertex', () => {
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+    ];
+    const result = closestPointOnPolyline([44.4300, 26.1000], points);
+    expect(result).not.toBeNull();
+    expect(result!.distanceMeters).toBeLessThan(1); // <1m due to float precision
+  });
+
+  it('projects onto segment midpoint — much closer than nearest vertex', () => {
+    // Two vertices 400m apart on a straight east-west road.
+    // Target is 10m north of the midpoint.
+    //
+    //  A [26.1000, 44.4300] ●━━━━━━━━━━━━━━━━━● B [26.1050, 44.4300]
+    //                             ↑ target (10m north of midpoint)
+    //
+    // Vertex-only: ~200m to each endpoint (plus 10m lateral)
+    // Segment-aware: ~10m (perpendicular to segment)
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+    ];
+    // Midpoint longitude = 26.1025, offset 10m north (~0.00009 lat)
+    const target: [number, number] = [44.4300 + 0.00009, 26.1025];
+
+    const result = closestPointOnPolyline(target, points);
+    expect(result).not.toBeNull();
+
+    // True perpendicular distance should be ~10m, not ~200m
+    expect(result!.distanceMeters).toBeLessThan(15);
+    expect(result!.distanceMeters).toBeGreaterThan(5);
+
+    // Vertex-only would report ~200m
+    const vertexDist = Math.min(
+      haversineDistance(target, [points[0][1], points[0][0]]),
+      haversineDistance(target, [points[1][1], points[1][0]]),
+    );
+    expect(vertexDist).toBeGreaterThan(180); // confirm vertex-only is way off
+    expect(result!.distanceMeters).toBeLessThan(vertexDist / 10); // segment-aware is 10x+ closer
+  });
+
+  it('clamps projection to segment start when target is before segment', () => {
+    // Target is 100m west of segment start — should snap to start vertex, not project past
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+    ];
+    const target: [number, number] = [44.4300, 26.0985]; // west of A
+
+    const result = closestPointOnPolyline(target, points);
+    expect(result).not.toBeNull();
+    // Should be ~same distance as haversine to the start vertex
+    const distToA = haversineDistance(target, [points[0][1], points[0][0]]);
+    expect(result!.distanceMeters).toBeCloseTo(distToA, 0);
+  });
+
+  it('clamps projection to segment end when target is past segment', () => {
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+    ];
+    const target: [number, number] = [44.4300, 26.1065]; // east of B
+
+    const result = closestPointOnPolyline(target, points);
+    expect(result).not.toBeNull();
+    const distToB = haversineDistance(target, [points[1][1], points[1][0]]);
+    expect(result!.distanceMeters).toBeCloseTo(distToB, 0);
+  });
+
+  it('selects the correct segment on a multi-segment polyline', () => {
+    // L-shaped route: east then north
+    const points: [number, number][] = [
+      [26.1000, 44.4300], // A
+      [26.1050, 44.4300], // B (corner)
+      [26.1050, 44.4350], // C (north)
+    ];
+    // Target is 10m east of segment B→C (the north-going segment)
+    const target: [number, number] = [44.4325, 26.1050 + 0.00013]; // ~10m east of B→C midpoint
+
+    const result = closestPointOnPolyline(target, points);
+    expect(result).not.toBeNull();
+    expect(result!.segmentIndex).toBe(1); // segment B→C
+    expect(result!.distanceMeters).toBeLessThan(20);
+  });
+
+  it('handles degenerate segment (two identical points)', () => {
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1000, 44.4300], // same as first
+    ];
+    const target: [number, number] = [44.4301, 26.1001];
+    const result = closestPointOnPolyline(target, points);
+    expect(result).not.toBeNull();
+    // Should still work — snaps to the (identical) vertex
+    expect(result!.distanceMeters).toBeGreaterThan(0);
   });
 });

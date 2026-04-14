@@ -501,3 +501,109 @@ describe('full ride simulation: remaining distance + climb + descent', () => {
     expect(computeRemainingDescent(elevationProfile, route.distanceMeters, 0)).toBe(0);
   });
 });
+
+// ============================================================================
+// FIX 4: Segment-aware off-route snapping (2026-04-13)
+//
+// Rider on a straight road midway between two vertices should NOT be flagged
+// off-route. Before this fix, findClosestPointIndex only checked vertex
+// distances, inflating distanceToRouteMeters on sparse polylines.
+// ============================================================================
+
+describe('segment-aware off-route detection', () => {
+  it('rider at midpoint of a long straight segment is NOT off-route', () => {
+    // Two vertices 400m apart on an east-west road. Rider is exactly at the
+    // midpoint, 10m north of the road (simulating GPS lateral offset).
+    //
+    // Vertex-only: distance ≈ 200m → FALSE off-route with old 100m threshold
+    // Segment-aware: distance ≈ 10m → correctly on-route
+    const sparsePolyline: [number, number][] = [
+      [26.1000, BASE_LAT],       // A (start)
+      [26.1050, BASE_LAT],       // B (~400m east) — sparse vertices!
+    ];
+    const route = buildRoute({
+      id: 'sparse-segment-test',
+      polyline: sparsePolyline,
+      steps: [
+        { id: 's0', distanceMeters: 400, durationSeconds: 120, maneuverLon: 26.1000, type: 'depart' },
+        { id: 's1', distanceMeters: 0, durationSeconds: 0, maneuverLon: 26.1050, type: 'arrive' },
+      ],
+    });
+
+    const session = createNavigationSession(route.id);
+
+    // Midpoint of segment, 10m north (~0.00009 lat)
+    const progress = getNavigationProgress(route, session, {
+      lat: BASE_LAT + 0.00009,
+      lon: 26.1025, // midpoint longitude
+    });
+
+    // Must NOT be off-route — the rider is only ~10m from the road
+    expect(progress.isOffRoute).toBe(false);
+    expect(progress.distanceToRouteMeters).toBeLessThan(15);
+    expect(progress.distanceToRouteMeters).toBeGreaterThan(5);
+
+    // Snapped coordinate should be near the midpoint of the segment, not a vertex
+    expect(progress.snappedCoordinate).not.toBeNull();
+    expect(progress.snappedCoordinate!.lon).toBeCloseTo(26.1025, 3);
+    expect(progress.snappedCoordinate!.lat).toBeCloseTo(BASE_LAT, 3);
+  });
+
+  it('rider 80m away from a sparse segment IS off-route', () => {
+    // Same sparse road, but rider is 80m north — genuinely off-route
+    const sparsePolyline: [number, number][] = [
+      [26.1000, BASE_LAT],
+      [26.1050, BASE_LAT],
+    ];
+    const route = buildRoute({
+      id: 'off-route-test',
+      polyline: sparsePolyline,
+      steps: [
+        { id: 's0', distanceMeters: 400, durationSeconds: 120, maneuverLon: 26.1000, type: 'depart' },
+        { id: 's1', distanceMeters: 0, durationSeconds: 0, maneuverLon: 26.1050, type: 'arrive' },
+      ],
+    });
+
+    const session = createNavigationSession(route.id);
+
+    // 80m north of midpoint (~0.00072 lat)
+    const progress = getNavigationProgress(route, session, {
+      lat: BASE_LAT + 0.00072,
+      lon: 26.1025,
+    });
+
+    // 80m > 50m threshold → off-route
+    expect(progress.isOffRoute).toBe(true);
+    expect(progress.distanceToRouteMeters).toBeGreaterThan(70);
+    expect(progress.distanceToRouteMeters).toBeLessThan(90);
+  });
+
+  it('GPS accuracy buffer prevents false off-route near threshold', () => {
+    // Rider is 55m from route, GPS accuracy is 20m → effective threshold = 50+20 = 70m
+    const sparsePolyline: [number, number][] = [
+      [26.1000, BASE_LAT],
+      [26.1050, BASE_LAT],
+    ];
+    const route = buildRoute({
+      id: 'accuracy-buffer-test',
+      polyline: sparsePolyline,
+      steps: [
+        { id: 's0', distanceMeters: 400, durationSeconds: 120, maneuverLon: 26.1000, type: 'depart' },
+        { id: 's1', distanceMeters: 0, durationSeconds: 0, maneuverLon: 26.1050, type: 'arrive' },
+      ],
+    });
+
+    const session = createNavigationSession(route.id);
+
+    // ~55m north of midpoint (~0.0005 lat)
+    const progress = getNavigationProgress(route, session, {
+      lat: BASE_LAT + 0.0005,
+      lon: 26.1025,
+    }, 20); // 20m GPS accuracy
+
+    // 55m distance, threshold = 50+20 = 70m → NOT off-route
+    expect(progress.isOffRoute).toBe(false);
+    expect(progress.distanceToRouteMeters).toBeGreaterThan(50);
+    expect(progress.distanceToRouteMeters).toBeLessThan(60);
+  });
+});

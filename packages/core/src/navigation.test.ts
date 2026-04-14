@@ -38,10 +38,10 @@ describe('navigation helpers', () => {
   });
 
   it('flags off-route states using the shared threshold', () => {
-    // OFF_ROUTE_THRESHOLD_METERS is 100 — values above it are off-route
-    expect(isOffRoute(101)).toBe(true);
-    expect(isOffRoute(100)).toBe(false);
-    expect(isOffRoute(60)).toBe(false);
+    // OFF_ROUTE_THRESHOLD_METERS is 50 — values above it are off-route
+    expect(isOffRoute(51)).toBe(true);
+    expect(isOffRoute(50)).toBe(false);
+    expect(isOffRoute(30)).toBe(false);
     expect(isOffRoute(20)).toBe(false);
   });
 
