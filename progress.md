@@ -287,6 +287,13 @@ Update it at the end of each implementation slice.
     - **Reroute routing profile preservation**: Reroute now uses the same routing profile as the original route. Safe→Safe, Fast→Fast, Flat→Fast. Previously, `avoidHills` (global store field) was not merged into `routeRequest` during reroute. Added `effectiveRouteRequest` in navigation.tsx.
     - **Steep grade indicator cleanup**: Removed grade percentage number from the pill (was "↑ 9.2% Steep", now "↑ Steep"). Accessibility label still includes the grade for screen readers.
     - **Tests**: +17 new tests (9 closestPointOnPolyline unit, 3 off-route regression with sparse segments, 5 reroute profile preservation). Core: 347 tests, 0 type errors.
+    - **Security hardening (securityfix.md items 7-10)**:
+      - #7: User-keyed rate limits verified (already per-userId via `applyRateLimit`)
+      - #8: `riskCategory` string label added to API response alongside quantized score + color
+      - #9: OAuth required on 4 risk endpoints (`requireOAuthUser` rejects anonymous Supabase sessions)
+      - #10: Risk score thresholds moved server-side only (`RISK_BUCKETS` in `risk.ts`); client uses server-provided `riskCategory` + `color`; `RISK_CATEGORIES` with score boundaries removed from client bundle
+    - **Map risk overlay**: Now uses server-provided `color` directly instead of client-side score interpolation with threshold breakpoints
+    - **Cloud Run**: Revision `defpedal-api-00048-gtj` deployed with all security changes
 
 ## Phase Status
 
