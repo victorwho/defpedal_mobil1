@@ -439,7 +439,6 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, leaderboards, mentorship, city reports
 
 ### Known Issues
-- Off-route detection can still trigger in dense urban areas with poor GPS
 - Community feed radius search requires GPS permission on first visit
 - Profile section expands beyond system navigation bar on some devices
 

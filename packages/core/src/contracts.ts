@@ -22,6 +22,7 @@ export interface CoverageRegion {
 export interface RiskSegment {
   id: string;
   riskScore: number;
+  riskCategory: string;
   color: string;
   geometry: GeoJsonLineString | GeoJsonMultiLineString;
 }

@@ -181,7 +181,7 @@ const coverageRegionSchema = {
 const riskSegmentSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'riskScore', 'color', 'geometry'],
+  required: ['id', 'riskScore', 'riskCategory', 'color', 'geometry'],
   properties: {
     id: {
       type: 'string',
@@ -189,6 +189,10 @@ const riskSegmentSchema = {
     },
     riskScore: {
       type: 'number',
+    },
+    riskCategory: {
+      type: 'string',
+      minLength: 1,
     },
     color: {
       type: 'string',

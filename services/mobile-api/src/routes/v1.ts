@@ -30,7 +30,7 @@ import { getPreviewOrigin } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
-import { getAuthenticatedUserFromRequest, requireAuthenticatedUser } from '../lib/auth';
+import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullUser } from '../lib/auth';
 import { buildCacheKey } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
@@ -309,6 +309,12 @@ const requireWriteUser = (
   dependencies: MobileApiDependencies,
 ) => requireAuthenticatedUser(request, dependencies.authenticateUser);
 
+/** Require a full OAuth user (rejects anonymous Supabase sessions). */
+const requireOAuthUser = (
+  request: Parameters<typeof requireFullUser>[0],
+  dependencies: MobileApiDependencies,
+) => requireFullUser(request, dependencies.authenticateUser);
+
 export const buildV1Routes = (
   dependencies: MobileApiDependencies,
 ): FastifyPluginAsync => {
@@ -403,6 +409,7 @@ export const buildV1Routes = (
             200: routePreviewResponseSchema,
             400: errorResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
             500: errorResponseSchema,
@@ -410,7 +417,7 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
+        const user = await requireOAuthUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
         const normalizedRequest = normalizeRoutePreviewRequest(request.body);
 
@@ -982,13 +989,14 @@ export const buildV1Routes = (
             200: { type: 'object' as const, properties: { riskSegments: { type: 'array' as const } } },
             400: errorResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             429: errorResponseSchema,
             500: errorResponseSchema,
           },
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
+        const user = await requireOAuthUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
 
         const geometry = request.body?.geometry;
@@ -1024,6 +1032,7 @@ export const buildV1Routes = (
             200: routePreviewResponseSchema,
             400: errorResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             429: errorResponseSchema,
             502: errorResponseSchema,
             500: errorResponseSchema,
@@ -1031,7 +1040,7 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
+        const user = await requireOAuthUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'routeReroute', { userId: user.id });
         const normalizedRequest = normalizeRerouteRequest(request.body);
 
@@ -1544,12 +1553,13 @@ export const buildV1Routes = (
           },
           response: {
             401: errorResponseSchema,
+            403: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
       async (request, reply) => {
-        const user = await requireWriteUser(request, dependencies);
+        const user = await requireOAuthUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
         if (!supabaseAdmin) {

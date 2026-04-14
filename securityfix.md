@@ -64,7 +64,7 @@ No auth, 30 req/min per IP. With 10 rotating proxy IPs (~$50/month), attacker ha
 | 4 | Auth on `/v1/risk-segments` | FIXED (2026-04-13) |
 | 5 | Auth on `/v1/routes/reroute` | FIXED (2026-04-13) |
 | 6 | Redis rate limiting | OPEN (deferred — needs GCP Memorystore) |
-| 7 | User-keyed rate limits | OPEN |
-| 8 | Quantize scores to buckets | OPEN |
-| 9 | Require OAuth for risk data | OPEN |
-| 10 | Server-side thresholds only | OPEN |
+| 7 | User-keyed rate limits | FIXED (2026-04-14) — already per-userId via `applyRateLimit` |
+| 8 | Quantize scores to category labels | FIXED (2026-04-14) — `riskCategory` field added to API response |
+| 9 | Require OAuth for risk data | FIXED (2026-04-14) — `requireOAuthUser` on 4 risk endpoints (rejects anonymous) |
+| 10 | Server-side thresholds only | FIXED (2026-04-14) — thresholds in `risk.ts` only; client uses server-provided `riskCategory` + `color` |

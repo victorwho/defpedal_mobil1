@@ -53,6 +53,7 @@ const mockRouteOption = {
     {
       id: 'risk-0',
       riskScore: 16, // quantized midpoint for "very safe" bucket
+      riskCategory: 'Very safe',
       color: '#4CAF50',
       geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] },
     },
@@ -315,9 +316,9 @@ describe('Risk score quantization', () => {
     // Mock fetchRiskSegments to return segments with quantized scores
     // (as it now does after the fix)
     const quantizedSegments = [
-      { id: 'risk-0', riskScore: 16, color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.15, 44.45]] } },
-      { id: 'risk-1', riskScore: 55, color: '#FF9800', geometry: { type: 'LineString' as const, coordinates: [[26.15, 44.45], [26.2, 44.5]] } },
-      { id: 'risk-2', riskScore: 85, color: '#F44336', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.25, 44.55]] } },
+      { id: 'risk-0', riskScore: 16, riskCategory: 'Very safe', color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.15, 44.45]] } },
+      { id: 'risk-1', riskScore: 55, riskCategory: 'Elevated', color: '#FF9800', geometry: { type: 'LineString' as const, coordinates: [[26.15, 44.45], [26.2, 44.5]] } },
+      { id: 'risk-2', riskScore: 85, riskCategory: 'Very risky', color: '#F44336', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.25, 44.55]] } },
     ];
 
     const routeWithRisk = {
@@ -361,8 +362,8 @@ describe('Risk score quantization', () => {
 
   it('riskScore values are integers (not decimals)', async () => {
     const segments = [
-      { id: 'risk-0', riskScore: 16, color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] } },
-      { id: 'risk-1', riskScore: 63, color: '#FF5722', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.3, 44.6]] } },
+      { id: 'risk-0', riskScore: 16, riskCategory: 'Very safe', color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] } },
+      { id: 'risk-1', riskScore: 63, riskCategory: 'Risky', color: '#FF5722', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.3, 44.6]] } },
     ];
 
     const app = buildTestApp({

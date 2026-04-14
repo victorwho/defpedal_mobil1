@@ -2,8 +2,6 @@ import type { RiskSegment } from './contracts';
 
 export interface RiskCategory {
   readonly label: string;
-  readonly minScore: number;
-  readonly maxScore: number;
   readonly color: string;
 }
 
@@ -13,14 +11,20 @@ export interface RiskDistributionEntry {
   readonly percentage: number;
 }
 
-export const RISK_CATEGORIES: readonly RiskCategory[] = [
-  { label: 'Very safe', minScore: -Infinity, maxScore: 33, color: '#4CAF50' },
-  { label: 'Safe', minScore: 33, maxScore: 43.5, color: '#8BC34A' },
-  { label: 'Average', minScore: 43.5, maxScore: 51.8, color: '#FFEB3B' },
-  { label: 'Elevated', minScore: 51.8, maxScore: 57.6, color: '#FF9800' },
-  { label: 'Risky', minScore: 57.6, maxScore: 69, color: '#FF5722' },
-  { label: 'Very risky', minScore: 69, maxScore: 101.8, color: '#F44336' },
-  { label: 'Extreme', minScore: 101.8, maxScore: Infinity, color: '#000000' },
+/**
+ * Canonical order of risk categories for display (safest → most dangerous).
+ * Score thresholds are server-side only; the client uses the `riskCategory`
+ * label returned per segment to classify.
+ */
+export const RISK_CATEGORY_ORDER: readonly string[] = [
+  'No data',
+  'Very safe',
+  'Safe',
+  'Average',
+  'Elevated',
+  'Risky',
+  'Very risky',
+  'Extreme',
 ] as const;
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -61,16 +65,12 @@ const segmentDistanceMeters = (segment: RiskSegment): number => {
   return total;
 };
 
-const classifyScore = (score: number): RiskCategory =>
-  RISK_CATEGORIES.find(
-    (cat) => score >= cat.minScore && score < cat.maxScore,
-  ) ?? RISK_CATEGORIES[RISK_CATEGORIES.length - 1];
-
 /**
  * Compute the distance-weighted risk distribution for a set of risk segments.
  *
- * Returns only categories that have a non-zero share, sorted from safest to
- * most dangerous (matching the order of `RISK_CATEGORIES`).
+ * Uses the server-provided `riskCategory` and `color` per segment — no local
+ * score thresholds needed. Returns categories sorted safest → most dangerous
+ * (matching `RISK_CATEGORY_ORDER`).
  */
 export const computeRiskDistribution = (
   riskSegments: readonly RiskSegment[],
@@ -79,28 +79,34 @@ export const computeRiskDistribution = (
     return [];
   }
 
-  const buckets = new Map<RiskCategory, number>();
+  // Accumulate distance per category label
+  const buckets = new Map<string, { distance: number; color: string }>();
 
   for (const segment of riskSegments) {
-    const category = classifyScore(segment.riskScore);
+    const label = segment.riskCategory ?? 'No data';
     const distance = segmentDistanceMeters(segment);
-    buckets.set(category, (buckets.get(category) ?? 0) + distance);
+    const existing = buckets.get(label);
+    buckets.set(label, {
+      distance: (existing?.distance ?? 0) + distance,
+      color: existing?.color ?? segment.color,
+    });
   }
 
-  const totalDistance = [...buckets.values()].reduce((sum, d) => sum + d, 0);
+  const totalDistance = [...buckets.values()].reduce((sum, b) => sum + b.distance, 0);
 
   if (totalDistance === 0) {
     return [];
   }
 
-  return RISK_CATEGORIES.filter((cat) => (buckets.get(cat) ?? 0) > 0).map(
-    (cat) => {
-      const distance = buckets.get(cat) ?? 0;
+  // Sort by canonical order, then return only non-zero entries
+  return RISK_CATEGORY_ORDER
+    .filter((label) => buckets.has(label))
+    .map((label) => {
+      const { distance, color } = buckets.get(label)!;
       return {
-        category: cat,
+        category: { label, color },
         distanceMeters: distance,
         percentage: Math.round((distance / totalDistance) * 100),
       };
-    },
-  );
+    });
 };

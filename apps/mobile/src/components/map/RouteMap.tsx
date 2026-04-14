@@ -47,19 +47,7 @@ if (mobileEnv.mapboxPublicToken) {
 /** Hoisted Mapbox layer style — avoids re-creating the object on every render. */
 const riskOverlayLineStyle = {
   lineWidth: 4,
-  lineColor: [
-    'interpolate',
-    ['linear'],
-    ['get', 'riskScore'],
-    0, safetyColors.safe,
-    33, safetyColors.safe,
-    43.5, '#8BC34A',
-    51.8, safetyColors.caution,
-    57.6, '#FF9800',
-    69, '#FF5722',
-    101.8, safetyColors.danger,
-    120, brandColors.bgDeep,
-  ] as any,
+  lineColor: ['get', 'color'] as any,
   lineOpacity: 0.8,
   lineCap: 'round' as const,
   lineJoin: 'round' as const,

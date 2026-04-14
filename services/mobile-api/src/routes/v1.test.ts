@@ -147,6 +147,7 @@ describe('mobile-api v1 routes', () => {
       {
         id: 'risk-1',
         riskScore: 18,
+        riskCategory: 'Very safe',
         color: '#4CAF50',
         geometry: {
           type: 'LineString',
