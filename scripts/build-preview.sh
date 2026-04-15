@@ -58,6 +58,10 @@ for f in app.config.ts metro.config.js tsconfig.json package.json; do
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
 cp -f "$SRC/apps/mobile/android/app/build.gradle" "$DST/apps/mobile/android/app/build.gradle" 2>/dev/null || true
+cp -f "$SRC/apps/mobile/android/app/google-services.json" "$DST/apps/mobile/android/app/google-services.json" 2>/dev/null || true
+cp -f "$SRC/apps/mobile/android/build.gradle" "$DST/apps/mobile/android/build.gradle" 2>/dev/null || true
+cp -f "$SRC/apps/mobile/android/settings.gradle" "$DST/apps/mobile/android/settings.gradle" 2>/dev/null || true
+cp -f "$SRC/apps/mobile/android/gradle.properties" "$DST/apps/mobile/android/gradle.properties" 2>/dev/null || true
 
 echo "── Step 1b: Set APP_VARIANT in .env ──"
 # The JS bundle reads APP_VARIANT to determine the scheme, package name,

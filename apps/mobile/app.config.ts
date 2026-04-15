@@ -131,7 +131,8 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.1.0',
+    version: '0.2.0',
+    icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
     // Disable new architecture for development — bridgeless mode fails to load
@@ -185,6 +186,10 @@ export default () => ({
       },
     },
     android: {
+      adaptiveIcon: {
+        foregroundImage: './assets/adaptive-icon.png',
+        backgroundColor: '#D4A843',
+      },
       package: appIdentifierByVariant[appVariant],
       permissions: [
         'ACCESS_COARSE_LOCATION',
