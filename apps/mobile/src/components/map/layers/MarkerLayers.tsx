@@ -6,6 +6,7 @@ import { brandColors, gray, safetyColors } from '../../../design-system/tokens/c
 // Hoisted styles for Mapbox layer performance (avoid recreation on every render)
 // ---------------------------------------------------------------------------
 
+// Origin: small green dot — "you are here" (understated)
 const originMarkerStyle = {
   circleColor: safetyColors.safe,
   circleRadius: 6,
@@ -14,11 +15,19 @@ const originMarkerStyle = {
   circleEmissiveStrength: 1,
 };
 
-const destinationMarkerStyle = {
-  circleColor: safetyColors.info,
-  circleRadius: 6,
+// Destination: larger red outer ring — "go here" (prominent, Google Maps convention)
+const destinationOuterStyle = {
+  circleColor: '#EF4444',
+  circleRadius: 11,
   circleStrokeColor: gray[50],
   circleStrokeWidth: 2,
+  circleEmissiveStrength: 1,
+};
+
+// Destination: white inner dot for target/bullseye effect
+const destinationInnerStyle = {
+  circleColor: '#FFFFFF',
+  circleRadius: 4,
   circleEmissiveStrength: 1,
 };
 
@@ -67,8 +76,8 @@ type MarkerLayersProps = {
 };
 
 /**
- * Renders origin (green), destination (blue), and user (blue with border)
- * circle markers, plus the off-route dashed connector line.
+ * Renders origin (green dot), destination (red bullseye), waypoints (yellow),
+ * and user (blue with border) circle markers, plus the off-route dashed connector line.
  */
 export const MarkerLayers = React.memo(({
   markerFeatureCollection,
@@ -77,16 +86,18 @@ export const MarkerLayers = React.memo(({
   <>
     {markerFeatureCollection.features.length > 0 ? (
       <Mapbox.ShapeSource id="route-markers" shape={markerFeatureCollection}>
-        <Mapbox.CircleLayer id="route-marker-origin" filter={originFilter} style={originMarkerStyle} />
-        <Mapbox.CircleLayer id="route-marker-destination" filter={destinationFilter} style={destinationMarkerStyle} />
-        <Mapbox.CircleLayer id="route-marker-waypoint" filter={waypointFilter} style={waypointMarkerStyle} />
-        <Mapbox.CircleLayer id="route-marker-user" filter={userFilter} style={userMarkerStyle} />
+        <Mapbox.CircleLayer id="route-marker-origin" existing filter={originFilter} style={originMarkerStyle} />
+        {/* Destination: outer red ring + inner white dot = bullseye target */}
+        <Mapbox.CircleLayer id="route-marker-destination-outer" existing filter={destinationFilter} style={destinationOuterStyle} />
+        <Mapbox.CircleLayer id="route-marker-destination-inner" existing filter={destinationFilter} style={destinationInnerStyle} />
+        <Mapbox.CircleLayer id="route-marker-waypoint" existing filter={waypointFilter} style={waypointMarkerStyle} />
+        <Mapbox.CircleLayer id="route-marker-user" existing filter={userFilter} style={userMarkerStyle} />
       </Mapbox.ShapeSource>
     ) : null}
 
     {offRouteFeatureCollection.features.length > 0 ? (
       <Mapbox.ShapeSource id="off-route-connector" shape={offRouteFeatureCollection}>
-        <Mapbox.LineLayer id="off-route-connector-layer" style={offRouteConnectorStyle} />
+        <Mapbox.LineLayer id="off-route-connector-layer" existing style={offRouteConnectorStyle} />
       </Mapbox.ShapeSource>
     ) : null}
   </>

@@ -59,7 +59,7 @@ import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { gray } from '../src/design-system/tokens/colors';
+import { gray, safetyColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -921,10 +921,10 @@ export default function NavigationScreen() {
             />
           </View>
 
-          {/* End ride — round gray button with X icon */}
-          <View style={styles.roundButton}>
+          {/* End ride — distinct danger-styled stop button */}
+          <View style={styles.endRideButton}>
             <IconButton
-              icon={<Ionicons name="close" size={22} color={gray[300]} />}
+              icon={<Ionicons name="stop-circle" size={24} color="#FFFFFF" />}
               onPress={() => {
                 confirm({
                   title: t('nav.endRideConfirmTitle'),
@@ -942,7 +942,7 @@ export default function NavigationScreen() {
                 });
               }}
               accessibilityLabel={t('nav.endRide')}
-              variant="secondary"
+              variant="danger"
             />
           </View>
         </View>
@@ -1183,6 +1183,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       height: 40,
       borderRadius: 20,
       backgroundColor: gray[800],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    endRideButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: safetyColors.danger,
       alignItems: 'center',
       justifyContent: 'center',
     },

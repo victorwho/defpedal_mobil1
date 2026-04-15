@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-15 (session 22)
+Last updated: 2026-04-15 (session 23)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -8,7 +8,8 @@ Update it at the end of each implementation slice.
 ## Snapshot
 
 - Overall progress: roughly 90-95 percent of product migration, 88-92 percent of production hardening
-- Current milestone: Mia Persona Journey shipped (all 5 phases), OSRM server migrated to direct IP, app icon resized
+- Current milestone: Navigation UX polish — end ride button safety differentiation, destination marker bullseye
+- Session 23 (2026-04-15): Navigation UX polish — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix
 - Session 22 (2026-04-15): Mia persona journey (all 5 phases), OSRM migration to 34.116.139.172, app icon resize, Mia skip-ahead UX fix
 - Session 21 (2026-04-14): Neighborhood Safety Leaderboard — full-stack feature (PRD victorwho/defpedal_mobil1#4)
 - Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
@@ -315,6 +316,12 @@ Update it at the end of each implementation slice.
     - **Tests**: +24 new passing tests (18 API integration + 6 hook). 14 component tests written but blocked by pre-existing Vite/Rollup env issue
     - **Infrastructure**: Cloud Scheduler API enabled, 2 cron jobs created (weekly Monday 4AM, monthly 1st 4AM). Cloud Run revision `defpedal-api-00049-529` deployed with CRON_SECRET. Both Supabase migrations applied
     - TypeScript: 0 errors. Bundle: HTTP 200. Settle endpoint smoke test: 200 OK
+
+- Session 23 — Navigation UX polish (2026-04-15):
+    - **End Ride button differentiation**: Changed end ride button from identical gray `close` (X) icon to distinct red (`safetyColors.danger`) background with white `stop-circle` icon. Prevents accidental ride cancellation by visual separation from the menu close button. Uses `variant="danger"` on IconButton. New `endRideButton` style in navigation.tsx stylesheet.
+    - **Destination marker bullseye**: Replaced identical-shaped origin/destination dots with differentiated markers. Origin stays as small green dot (6px). Destination changed to red bullseye — 11px red outer ring + 4px white inner dot, following Google Maps convention. Distinct by size, shape, and color (satisfies `color-not-only` accessibility rule).
+    - **Mapbox existing layer fix**: Added `existing` prop to all CircleLayer and LineLayer in MarkerLayers.tsx to suppress `RNMBXLayer` deprecation warning during hot reload (layer ID collision on fast refresh).
+    - Bundle: HTTP 200. Phone-tested on Samsung S23 Ultra.
 
 ## Phase Status
 
