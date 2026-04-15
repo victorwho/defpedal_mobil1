@@ -8,7 +8,7 @@
 - [x] DONE — Push notification registration on sign-in (permission prompt + token sent to server) (2026-04-04)
 
 ### Phase 7: Endgame (Deferred)
-- [ ] NOT STARTED — Mia persona progressive journey (4 levels with safety floor constraints)
+- [x] DONE — Mia persona progressive journey (5 levels with safety floor constraints, 3-layer detection, celebrations, share cards, journey tracker, 6 notification templates, badge #144, "Skip ahead" opt-out). Cloud Run revision defpedal-api-00050-n2k. Cloud Scheduler: mia-detection-cron + mia-notification-cron. 83 new tests. (2026-04-15)
 - [ ] NOT STARTED — Neighborhood safety challenge (invite 3 cyclists)
 - [ ] NOT STARTED — Safety Wrapped (Spotify-style annual/monthly summary) — schedule for December
 - [x] DONE — Neighborhood safety leaderboard (PRD #4: CO2+hazards ranking, 15km radius, weekly/monthly/all-time, settlement cron, champion crown, 6 badges, Cloud Scheduler) (2026-04-14)
