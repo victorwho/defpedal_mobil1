@@ -564,4 +564,115 @@ export const ro: TranslationKeys = {
       bronze: 'Locul 3',
     },
   },
+
+  // ── Mia Persona Copy ──
+  mia: {
+    detection: {
+      headline: 'Am observat c\u0103 nu ai pedalat \u00EEnc\u0103 \u2014 e perfect \u00EEn regul\u0103.',
+      body: 'Mul\u021Bi oameni desc\u0103rc\u0103 aplica\u021Bii de ciclism \u00EEnainte s\u0103 se simt\u0103 preg\u0103ti\u021Bi. Dac\u0103 vrei, putem \u00EEncepe cu trasee mai scurte \u0219i mai u\u0219oare pe cele mai lini\u0219tite str\u0103zi din apropierea ta.',
+      accept: 'Da, \u00EEncepe u\u0219or',
+      decline: 'Nu mul\u021Bumesc, voi pedala c\u00E2nd sunt preg\u0103tit',
+    },
+    ride: {
+      summary: {
+        headline: 'Ai reușit! Încă o cursă bifată.',
+        hazards: 'Te-am protejat prin {{count}} zone dificile — și ai trecut prin toate cu brio.',
+      },
+    },
+    route: {
+      preview: {
+        safetyLabel: 'Cât de sigur este traseul? Foarte sigur.',
+        safetyLabelModerate: 'Majoritar sigur, cu o secțiune mai aglomerată.',
+        moderateWarning: 'Atenție: {{street}} este puțin mai aglomerată — dar are pistă de biciclete. Te alertăm cu 200m înainte.',
+        moderateWarningNoBikeLane: 'Atenție: {{street}} este puțin mai aglomerată. Stai pe banda din dreapta și totul va fi bine.',
+        allCalm: 'Fiecare drum de pe acest traseu este o stradă liniștită.',
+        whatToExpect: 'La ce să te aștepți',
+      },
+    },
+    planning: {
+      emptyState: 'Bicicleta te așteaptă. Prima ta cursă e de doar 5 minute pe străzi liniștite. Mii de oameni ca tine au început chiar aici.',
+      firstRoute: 'Iată prima ta cursă — 5 minute pe cele mai liniștite străzi din apropierea ta.',
+      seeMyRoute: 'Vezi prima mea cursă',
+      autoRouteButton: 'Vezi traseul meu',
+      destinationIntro: 'Unde ai vrea să pedalezi?',
+    },
+    navigation: {
+      segmentEntry: 'Stradă mai aglomerată înainte — pistă de biciclete în dreapta ta. Ai mai trecut prin asta.',
+      segmentEntryNoBikeLane: 'Stradă mai aglomerată înainte. Stai constant — te descurci.',
+      segmentExit: 'Bravo! Ai trecut perfect prin acea secțiune.',
+      segmentExitFirst: 'Uimitor! Tocmai ai trecut prin prima ta secțiune aglomerată.',
+    },
+    postRide: {
+      courageTitle: 'Curajul tău',
+      segmentsHandled: 'Segmente moderate parcurse: {{handled}}/{{total}}',
+      segmentsHandledAll: 'Toate segmentele moderate parcurse!',
+      levelProgress: '{{rides}}/{{needed}} curse pentru Nivelul {{level}}',
+      courageLabel: 'Ai parcurs {{handled}} din {{total}} segmente moderate. {{rides}} din {{needed}} curse pentru nivelul următor.',
+    },
+    notifications: {
+      firstRideNudge: 'Primul tău traseu este gata — doar 5 minute pe străzi liniștite lângă casă. Weekendul acesta ar putea fi începutul a ceva minunat.',
+      postFirstRide: 'Ieri ai pedalat pentru prima dată. Îți amintești cât de bine te-ai simțit? Încă o cursă scurtă te așteaptă.',
+      levelUpAvailable: 'Ești la o cursă distanță de a debloca {{nextLevelName}}! Gata când ești tu.',
+      weatherInvite: 'Vreme perfectă de ciclism weekendul acesta. O cursă scurtă pe străzi liniștite?',
+      milestoneApproaching: 'Mai ai doar {{ridesLeft}} cursă până la {{nextLevelName}} — ești aproape.',
+      lapsedReengagement: 'A trecut ceva timp — nu-i nimic. Traseul tău este încă aici oricând ești pregătit. Fără presiune.',
+    },
+    levelUp: {
+      '1to2': {
+        title: 'Nivelul 2: Explorator de cartier',
+        subtitle: 'Ai făcut prima pedalare. Totul începe aici.',
+        shareText: 'Tocmai am terminat prima mea cursă pe bicicletă cu Defensive Pedal. Drumul de la nervos la încrezător începe cu o singură cursă.',
+      },
+      '2to3': {
+        title: 'Nivelul 3: Ciclist de cafenea',
+        subtitle: 'Ți-ai explorat cartierul. Acum pedalează CĂTRE un loc.',
+        shareText: '3 curse efectuate! Am trecut de la frică de a pedala la explorarea cartierului pe două roți.',
+      },
+      '3to4': {
+        title: 'Nivelul 4: Navigator urban',
+        subtitle: 'Acum pedalezi către destinații. Întregul oraș se deschide.',
+        shareText: '5 curse finalizate și acum pedalez către destinații reale.',
+      },
+      '4to5': {
+        title: 'Ciclist încrezător',
+        subtitle: 'EȘTI ciclist. Asta ești acum.',
+        shareText: 'Am reușit. De la prea nervos să pedalez la ciclist încrezător. {{totalRides}} curse, {{totalKm}} km.',
+        testimonialPrompt: 'Ce i-ai spune cuiva care este nervos în legătură cu ciclismul?',
+        testimonialAlt: 'Ce te-a surprins cel mai mult la primele tale curse?',
+      },
+    },
+    journey: {
+      title: 'Călătoria ta de ciclism',
+      progressBar: 'Nivelul {{level}}: {{name}}',
+      progressRides: '{{rides}}/{{needed}} curse',
+      levelNames: {
+        '1': 'Prima pedalare',
+        '2': 'Explorator de cartier',
+        '3': 'Ciclist de cafenea',
+        '4': 'Navigator urban',
+        '5': 'Ciclist încrezător',
+      },
+      unlockPreviews: {
+        '2': 'Deblochează trasee mai lungi',
+        '3': 'Deblochează pedalatul către destinații',
+        '4': 'Deblochează preferințe de traseu',
+        '5': 'Experiența completă de ciclist',
+      },
+      conquered: {
+        '1': 'Străzi rezidențiale liniștite',
+        '2': 'Segmente cu trafic moderat',
+        '3': 'Pedalat către destinații',
+        '4': 'Navigare completă în oraș',
+      },
+      completed: 'Călătorie finalizată',
+      graduationBadge: 'Ciclist încrezător',
+      shareProgress: 'Distribuie progresul',
+      writeStory: 'Scrie-ți povestea de ciclism',
+      skipAhead: 'Sari înainte — sunt pregătit pentru experiența completă',
+      skipAheadSub: 'Ieși din călătoria ghidată și deblochează toate funcțiile',
+    },
+    errors: {
+      noSafeRoute: 'Nu am putut găsi un traseu suficient de sigur pentru nivelul tău actual. Încearcă o destinație mai apropiată sau verifică mai târziu.',
+    },
+  },
 } as const;

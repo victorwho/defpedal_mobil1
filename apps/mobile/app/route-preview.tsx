@@ -44,6 +44,9 @@ import {
   textSm,
   textDataSm,
 } from '../src/design-system/tokens/typography';
+import { MiaSegmentPreview } from '../src/design-system/molecules/MiaSegmentPreview';
+import type { MiaSegmentInfo } from '../src/design-system/molecules/MiaSegmentPreview';
+import { usePersonaT } from '../src/hooks/usePersonaT';
 
 const formatDuration = (seconds: number): string => {
   const totalMinutes = Math.round(seconds / 60);
@@ -78,6 +81,23 @@ export default function RoutePreviewScreen() {
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
+  const enqueueTelemetryEvent = useAppStore((state) => state.enqueueTelemetryEvent);
+
+  // ── Route Preview Telemetry: route_generated_not_started ──
+  const navigationStartedRef = useRef(false);
+  // Keep route data in a ref so the cleanup closure sees the latest values
+  const routeDataRef = useRef<{ mode: string; distanceKm: number }>({
+    mode: 'safe',
+    distanceKm: 0,
+  });
+
+  // ── Mia Persona Journey ──
+  const persona = useAppStore((state) => state.persona);
+  const miaJourneyLevel = useAppStore((state) => state.miaJourneyLevel);
+  const miaJourneyStatus = useAppStore((state) => state.miaJourneyStatus);
+  const isMia = persona === 'mia' && miaJourneyStatus === 'active';
+  const pt = usePersonaT();
+
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
@@ -167,6 +187,45 @@ export default function RoutePreviewScreen() {
     [routePreview, selectedRouteId],
   );
 
+  // Keep route data ref in sync for unmount telemetry
+  useEffect(() => {
+    if (selectedRoute) {
+      routeDataRef.current = {
+        mode: routePreview?.selectedMode ?? routeRequest.mode,
+        distanceKm: selectedRoute.distanceMeters / 1000,
+      };
+    }
+  }, [selectedRoute, routePreview, routeRequest.mode]);
+
+  // Emit route_generated_not_started if user leaves without pressing Start Navigation
+  useEffect(() => {
+    return () => {
+      if (!navigationStartedRef.current) {
+        const { mode, distanceKm } = routeDataRef.current;
+        useAppStore.getState().enqueueTelemetryEvent({
+          eventType: 'route_generated_not_started',
+          properties: {
+            route_mode: mode,
+            distance_km: Math.round(distanceKm * 10) / 10,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
+  }, []);
+
+  // ── Mia: extract moderate risk segments for "What to Expect" ──
+  const miaModerateSegments = useMemo((): readonly MiaSegmentInfo[] => {
+    if (!isMia || miaJourneyLevel > 3 || !selectedRoute) return [];
+    return selectedRoute.riskSegments
+      .filter((seg) => seg.riskScore >= 3 && seg.riskScore < 8)
+      .map((seg) => ({
+        streetName: seg.id,
+        hasBikeLane: false, // determined server-side in future
+        lengthMeters: 0, // not yet available from risk segments
+      }));
+  }, [isMia, miaJourneyLevel, selectedRoute]);
+
   const isMissingApi = false; // Routing now calls OSRM/Mapbox directly
   const isEmpty =
     !previewQuery.isPending &&
@@ -201,6 +260,7 @@ export default function RoutePreviewScreen() {
     if (!selectedRoute) {
       return;
     }
+    navigationStartedRef.current = true;
 
     const sessionId =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -443,6 +503,11 @@ export default function RoutePreviewScreen() {
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
         <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
+      ) : null}
+
+      {/* Mia "What to Expect" — moderate segments preview */}
+      {isMia && miaJourneyLevel <= 3 ? (
+        <MiaSegmentPreview segments={miaModerateSegments} />
       ) : null}
 
       {routePreview?.comparisonLabel ? (

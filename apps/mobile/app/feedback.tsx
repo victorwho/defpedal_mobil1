@@ -351,12 +351,18 @@ export default function FeedbackScreen() {
       try {
         // Award XP and fetch server-enriched impact data
         if (tripServerId) {
+          // Derive hadDestination from route request (non-zero destination)
+          const storeState = useAppStore.getState();
+          const dest = storeState.routeRequest.destination;
+          const hadDestination = dest.lat !== 0 || dest.lon !== 0;
+
           // POST first to award XP, then use the response
           let result: RideImpact;
           try {
             result = await mobileApi.recordRideImpact(
               tripServerId,
               initialImpact.distanceMeters,
+              { hadDestination },
             );
           } catch {
             // POST may 409 (already recorded) — fall back to GET
@@ -386,6 +392,14 @@ export default function FeedbackScreen() {
             // Queue tier promotion overlay (shows after badge overlays)
             if (result.tierPromotion?.promoted) {
               setTierPromotion(result.tierPromotion);
+            }
+            // Handle Mia level-up
+            if (result.miaLevelUp) {
+              const toLevel = result.miaLevelUp.toLevel;
+              useAppStore.getState().levelUpMia(toLevel as import('@defensivepedal/core').MiaJourneyLevel);
+              if (toLevel === 5) {
+                useAppStore.getState().completeMiaJourney();
+              }
             }
           }
         }

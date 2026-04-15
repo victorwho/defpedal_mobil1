@@ -26,3 +26,12 @@ export { RankUpOverlay } from './RankUpOverlay';
 export type { RankUpOverlayProps } from './RankUpOverlay';
 
 export { LeaderboardSection } from './LeaderboardSection';
+
+export { MiaInvitationPrompt } from './MiaInvitationPrompt';
+export type { MiaInvitationPromptProps } from './MiaInvitationPrompt';
+
+export { MiaLevelUpOverlay } from './MiaLevelUpOverlay';
+export type { MiaLevelUpOverlayProps } from './MiaLevelUpOverlay';
+
+export { MiaJourneyTracker } from './MiaJourneyTracker';
+export type { MiaJourneyTrackerProps } from './MiaJourneyTracker';

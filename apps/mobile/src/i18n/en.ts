@@ -562,6 +562,117 @@ export const en = {
       bronze: '3rd',
     },
   },
+
+  // ── Mia Persona Copy ──
+  mia: {
+    detection: {
+      headline: "We noticed you haven't ridden yet \u2014 that's totally okay.",
+      body: "A lot of people download cycling apps before they feel ready to ride. If you'd like, we can start you with shorter, easier routes on the quietest streets near you.",
+      accept: 'Yes, start me easy',
+      decline: "No thanks, I'll ride when I'm ready",
+    },
+    ride: {
+      summary: {
+        headline: 'You did it! Another ride in the books.',
+        hazards: 'We watched over you through {{count}} tricky spots — and you sailed through all of them.',
+      },
+    },
+    route: {
+      preview: {
+        safetyLabel: 'How safe is this route? Very safe.',
+        safetyLabelModerate: 'Mostly safe with one busier section.',
+        moderateWarning: 'Heads up: {{street}} is a bit busier — but it has a bike lane. We\'ll alert you 200m before.',
+        moderateWarningNoBikeLane: 'Heads up: {{street}} is a bit busier. Stay in the right lane and you\'ll be fine.',
+        allCalm: 'Every road on this route is a calm, quiet street.',
+        whatToExpect: 'What to Expect',
+      },
+    },
+    planning: {
+      emptyState: 'Your bike is waiting. Your first ride is just 5 minutes on quiet streets. Thousands of people just like you started right here.',
+      firstRoute: 'Here\'s your first ride — 5 minutes on the quietest streets near you.',
+      seeMyRoute: 'See my first route',
+      autoRouteButton: 'See my route',
+      destinationIntro: 'Where would you like to ride to?',
+    },
+    navigation: {
+      segmentEntry: 'Busier street ahead — bike lane on your right. You\'ve handled this before.',
+      segmentEntryNoBikeLane: 'Busier street ahead. Stay steady — you\'ve got this.',
+      segmentExit: 'Nice! You handled that section perfectly.',
+      segmentExitFirst: 'Amazing! You just handled your first busy section.',
+    },
+    postRide: {
+      courageTitle: 'Your Courage',
+      segmentsHandled: 'Moderate segments handled: {{handled}}/{{total}}',
+      segmentsHandledAll: 'All moderate segments handled!',
+      levelProgress: '{{rides}}/{{needed}} rides to Level {{level}}',
+      courageLabel: 'You handled {{handled}} of {{total}} moderate segments. {{rides}} of {{needed}} rides to next level.',
+    },
+    notifications: {
+      firstRideNudge: 'Your first route is ready — just 5 minutes on quiet streets near home. This weekend could be the start of something great.',
+      postFirstRide: 'Yesterday you rode for the first time. Remember how good that felt? Another short ride is waiting for you.',
+      levelUpAvailable: 'You\'re one ride away from unlocking {{nextLevelName}}! Ready when you are.',
+      weatherInvite: 'Perfect cycling weather this weekend. A short ride through quiet streets?',
+      milestoneApproaching: 'Just {{ridesLeft}} more ride to reach {{nextLevelName}} — you\'re almost there.',
+      lapsedReengagement: 'It\'s been a while — that\'s okay. Your route is still here whenever you\'re ready. No pressure.',
+    },
+    levelUp: {
+      '1to2': {
+        title: 'Level 2: Neighborhood Explorer',
+        subtitle: 'You took the first pedal. Everything starts here.',
+        shareText: 'I just completed my first cycling ride with Defensive Pedal. The journey from nervous to confident starts with one ride.',
+      },
+      '2to3': {
+        title: 'Level 3: Cafe Rider',
+        subtitle: 'You\'ve explored your neighborhood. Now ride TO somewhere.',
+        shareText: '3 rides in! I went from scared to ride to exploring my neighborhood on two wheels.',
+      },
+      '3to4': {
+        title: 'Level 4: Urban Navigator',
+        subtitle: 'You ride to places now. The whole city is opening up.',
+        shareText: '5 rides completed and I\'m now riding to real destinations.',
+      },
+      '4to5': {
+        title: 'Confident Cyclist',
+        subtitle: 'You ARE a cyclist. This is who you are now.',
+        shareText: 'I did it. From too nervous to cycle to a confident cyclist. {{totalRides}} rides, {{totalKm}} km.',
+        testimonialPrompt: 'What would you tell someone who\'s nervous about cycling?',
+        testimonialAlt: 'What surprised you most about your first rides?',
+      },
+    },
+    journey: {
+      title: 'Your Cycling Journey',
+      progressBar: 'Level {{level}}: {{name}}',
+      progressRides: '{{rides}}/{{needed}} rides',
+      levelNames: {
+        '1': 'First Pedal',
+        '2': 'Neighborhood Explorer',
+        '3': 'Cafe Rider',
+        '4': 'Urban Navigator',
+        '5': 'Confident Cyclist',
+      },
+      unlockPreviews: {
+        '2': 'Unlocks longer routes',
+        '3': 'Unlocks destination riding',
+        '4': 'Unlocks route preferences',
+        '5': 'Full cyclist experience',
+      },
+      conquered: {
+        '1': 'Quiet residential streets',
+        '2': 'Moderate traffic segments',
+        '3': 'Riding to destinations',
+        '4': 'Full city navigation',
+      },
+      completed: 'Journey Complete',
+      graduationBadge: 'Confident Cyclist',
+      shareProgress: 'Share your progress',
+      writeStory: 'Write Your Cycling Story',
+      skipAhead: 'Skip ahead — I\'m ready for the full experience',
+      skipAheadSub: 'Exit the guided journey and unlock all features',
+    },
+    errors: {
+      noSafeRoute: 'We couldn\'t find a route that feels safe enough for your current level. Try a closer destination or check back later.',
+    },
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

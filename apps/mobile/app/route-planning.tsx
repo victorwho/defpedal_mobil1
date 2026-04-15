@@ -42,7 +42,11 @@ import { duration, easing } from '../src/design-system/tokens/motion';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
+import { usePersonaT } from '../src/hooks/usePersonaT';
 import { useRecentRideDestinations } from '../src/hooks/useRecentRideDestinations';
+import { useMiaJourney } from '../src/hooks/useMiaJourney';
+import { MiaJourneyBar } from '../src/design-system/atoms/MiaJourneyBar';
+import { MiaEmptyState } from '../src/design-system/molecules/MiaEmptyState';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -79,6 +83,58 @@ export default function RoutePlanningScreen() {
   const recentRideDestinations = useRecentRideDestinations();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
 
+  // ── Mia Persona Journey ──
+  const persona = useAppStore((state) => state.persona);
+  const miaJourneyLevel = useAppStore((state) => state.miaJourneyLevel);
+  const miaJourneyStatus = useAppStore((state) => state.miaJourneyStatus);
+  const isMia = persona === 'mia' && miaJourneyStatus === 'active';
+  const { data: miaJourney } = useMiaJourney();
+  const pt = usePersonaT();
+
+  // Mia ride-count lookups: rides needed per level
+  const MIA_RIDES_NEEDED: Record<number, number> = { 1: 1, 2: 3, 3: 5, 4: 12 };
+  const miaRidesCompleted = miaJourney?.totalRides ?? 0;
+  const miaRidesNeeded = MIA_RIDES_NEEDED[miaJourneyLevel] ?? 12;
+
+  // ── map_browse_session telemetry ──
+  const browseStartRef = useRef<number>(Date.now());
+  const browseActionCountRef = useRef<number>(0);
+
+  // Emit map_browse_session event on unmount
+  useEffect(() => {
+    browseStartRef.current = Date.now();
+    browseActionCountRef.current = 0;
+    return () => {
+      const durationSeconds = Math.round((Date.now() - browseStartRef.current) / 1000);
+      const state = useAppStore.getState();
+      const home = state.homeLocation;
+      // Approximate max distance from home using the current map center or route destination
+      let maxDistFromHome = 0;
+      if (home) {
+        const dest = state.routeRequest.destination;
+        if (dest.lat !== 0 || dest.lon !== 0) {
+          // Haversine approximation (km)
+          const dLat = (dest.lat - home.lat) * Math.PI / 180;
+          const dLon = (dest.lon - home.lon) * Math.PI / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(home.lat * Math.PI / 180) * Math.cos(dest.lat * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          maxDistFromHome = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+      }
+      state.enqueueTelemetryEvent({
+        eventType: 'map_browse_session',
+        properties: {
+          duration_seconds: durationSeconds,
+          actions_taken: browseActionCountRef.current,
+          max_distance_from_home_km: Math.round(maxDistFromHome * 10) / 10,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    };
+  }, []);
+
   const {
     location: currentLocation,
     accuracyMeters,
@@ -110,6 +166,15 @@ export default function RoutePlanningScreen() {
   );
   const showBikeLanes = useAppStore((state) => state.showBicycleLanes);
   const planningOrigin = mapUserLocation ?? (routeRequest.origin.lat !== 0 ? routeRequest.origin : null);
+
+  // Set homeLocation on first GPS fix if not already set (used by telemetry)
+  const homeLocation = useAppStore((state) => state.homeLocation);
+  const setHomeLocation = useAppStore((state) => state.setHomeLocation);
+  useEffect(() => {
+    if (!homeLocation && currentLocation) {
+      setHomeLocation({ lat: currentLocation.lat, lon: currentLocation.lon });
+    }
+  }, [homeLocation, currentLocation, setHomeLocation]);
   const { weather, isLoading: weatherLoading } = useWeather(
     planningOrigin?.lat ?? null,
     planningOrigin?.lon ?? null,
@@ -158,6 +223,13 @@ export default function RoutePlanningScreen() {
       }
     };
   }, []);
+
+  // Mia: force safe mode for levels 1-3
+  useEffect(() => {
+    if (isMia && miaJourneyLevel <= 3 && routeRequest.mode !== 'safe') {
+      setRoutingMode('safe');
+    }
+  }, [isMia, miaJourneyLevel, routeRequest.mode, setRoutingMode]);
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
@@ -240,6 +312,7 @@ export default function RoutePlanningScreen() {
   };
 
   const handleHazardTypeSelect = (hazardType: HazardType) => {
+    browseActionCountRef.current += 1;
     // If long-press initiated, submit directly at that coordinate
     if (pendingHazardCoordinate) {
       enqueueMutation('hazard', {
@@ -460,6 +533,7 @@ export default function RoutePlanningScreen() {
     setDestinationQuery(suggestion.label);
     setDestinationHydrated(true);
     setActiveField(null);
+    browseActionCountRef.current += 1;
     // Save to recent destinations
     addRecentDestination({
       ...suggestion,
@@ -598,6 +672,17 @@ export default function RoutePlanningScreen() {
       }
       topOverlay={
         <View style={styles.topContainer}>
+          {/* Mia Journey progress bar */}
+          {isMia ? (
+            <MiaJourneyBar
+              level={miaJourneyLevel}
+              levelName={pt(`journey.levelNames.${miaJourneyLevel}`)}
+              ridesCompleted={miaRidesCompleted}
+              ridesNeeded={miaRidesNeeded}
+              onInfoPress={() => router.push('/achievements')}
+            />
+          ) : null}
+
           {/* Origin card — shown only after destination is set (progressive disclosure) */}
           {(hasValidDestination || activeField === 'startOverride') && (activeField === 'startOverride' ? (
             /* Start override search (expanded) */
@@ -663,35 +748,47 @@ export default function RoutePlanningScreen() {
             </View>
           ))}
 
-          {/* Destination search bar */}
-          <View style={styles.destinationCard}>
-            <SearchBar
-              label="Destination"
-              value={destinationQuery}
-              placeholder="Where to?"
-              active={activeField === 'destination'}
-              isLoading={destinationAutocompleteQuery.isPending}
-              errorMessage={
-                destinationAutocompleteQuery.isError
-                  ? destinationAutocompleteQuery.error.message
-                  : null
-              }
-              suggestions={mergedDestinationSuggestions}
-              recentDestinations={recentRideDestinations}
-              onFocus={() => setActiveField('destination')}
-              onChangeText={(value) => {
-                setDestinationQuery(value);
-                setDestinationHydrated(true);
-                setActiveField('destination');
-              }}
-              onClear={() => {
-                setDestinationQuery('');
-                setDestinationHydrated(true);
-                setActiveField('destination');
-              }}
-              onSelectSuggestion={handleDestinationSelect}
-            />
-          </View>
+          {/* Destination search bar — hidden for Mia levels 1-2 (auto-route instead) */}
+          {isMia && miaJourneyLevel <= 2 ? (
+            <Pressable
+              style={styles.miaAutoRouteButton}
+              onPress={() => router.push('/route-preview')}
+              accessibilityLabel={pt('planning.autoRouteButton')}
+              accessibilityRole="button"
+            >
+              <Ionicons name="navigate-outline" size={20} color={colors.textInverse} />
+              <Text style={styles.miaAutoRouteLabel}>{pt('planning.autoRouteButton')}</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.destinationCard}>
+              <SearchBar
+                label="Destination"
+                value={destinationQuery}
+                placeholder="Where to?"
+                active={activeField === 'destination'}
+                isLoading={destinationAutocompleteQuery.isPending}
+                errorMessage={
+                  destinationAutocompleteQuery.isError
+                    ? destinationAutocompleteQuery.error.message
+                    : null
+                }
+                suggestions={mergedDestinationSuggestions}
+                recentDestinations={recentRideDestinations}
+                onFocus={() => setActiveField('destination')}
+                onChangeText={(value) => {
+                  setDestinationQuery(value);
+                  setDestinationHydrated(true);
+                  setActiveField('destination');
+                }}
+                onClear={() => {
+                  setDestinationQuery('');
+                  setDestinationHydrated(true);
+                  setActiveField('destination');
+                }}
+                onSelectSuggestion={handleDestinationSelect}
+              />
+            </View>
+          )}
 
           {/* Waypoint stops — shown between destination and weather */}
           {waypoints.map((wp, index) => (
@@ -847,81 +944,88 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat routing toggle — shown only after destination set */}
-          {hasValidDestination ? <View style={styles.modeToggleRow}>
-            <Pressable
-              style={[
-                styles.modeTogglePill,
-                routeRequest.mode === 'safe' && !avoidHills && styles.modeTogglePillActive,
-              ]}
-              onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
-              accessibilityLabel="Safe routing"
-              accessibilityRole="button"
-              accessibilityState={{ selected: routeRequest.mode === 'safe' && !avoidHills }}
-            >
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={14}
-                color={routeRequest.mode === 'safe' && !avoidHills ? colors.info : gray[400]}
-              />
-              <Text
-                style={[
-                  styles.modeToggleLabel,
-                  routeRequest.mode === 'safe' && !avoidHills && styles.modeToggleLabelActive,
-                ]}
-              >
-                {t('planning.safe')}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.modeTogglePill,
-                routeRequest.mode === 'fast' && styles.modeTogglePillActive,
-              ]}
-              onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
-              accessibilityLabel="Fast routing"
-              accessibilityRole="button"
-              accessibilityState={{ selected: routeRequest.mode === 'fast' }}
-            >
-              <Ionicons
-                name="flash-outline"
-                size={14}
-                color={routeRequest.mode === 'fast' ? colors.info : gray[400]}
-              />
-              <Text
-                style={[
-                  styles.modeToggleLabel,
-                  routeRequest.mode === 'fast' && styles.modeToggleLabelActive,
-                ]}
-              >
-                {t('planning.fast')}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.modeTogglePill,
-                avoidHills && routeRequest.mode === 'safe' && styles.modeTogglePillFlat,
-              ]}
-              onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
-              accessibilityLabel="Flat routing — avoid hills"
-              accessibilityRole="button"
-              accessibilityState={{ selected: avoidHills && routeRequest.mode === 'safe' }}
-            >
-              <Ionicons
-                name="trending-down-outline"
-                size={14}
-                color={avoidHills && routeRequest.mode === 'safe' ? colors.safe : gray[400]}
-              />
-              <Text
-                style={[
-                  styles.modeToggleLabel,
-                  avoidHills && routeRequest.mode === 'safe' && styles.modeToggleLabelFlat,
-                ]}
-              >
-                {t('planning.flat')}
-              </Text>
-            </Pressable>
-          </View> : null}
+          {/* Safe / Fast / Flat routing toggle — hidden for Mia levels 1-3, shown with tooltip at 4+ */}
+          {hasValidDestination && !(isMia && miaJourneyLevel <= 3) ? (
+            <View>
+              {isMia && miaJourneyLevel >= 4 ? (
+                <Text style={styles.miaToggleTooltip}>You've earned this control</Text>
+              ) : null}
+              <View style={styles.modeToggleRow}>
+                <Pressable
+                  style={[
+                    styles.modeTogglePill,
+                    routeRequest.mode === 'safe' && !avoidHills && styles.modeTogglePillActive,
+                  ]}
+                  onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
+                  accessibilityLabel="Safe routing"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: routeRequest.mode === 'safe' && !avoidHills }}
+                >
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={14}
+                    color={routeRequest.mode === 'safe' && !avoidHills ? colors.info : gray[400]}
+                  />
+                  <Text
+                    style={[
+                      styles.modeToggleLabel,
+                      routeRequest.mode === 'safe' && !avoidHills && styles.modeToggleLabelActive,
+                    ]}
+                  >
+                    {t('planning.safe')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modeTogglePill,
+                    routeRequest.mode === 'fast' && styles.modeTogglePillActive,
+                  ]}
+                  onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
+                  accessibilityLabel="Fast routing"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: routeRequest.mode === 'fast' }}
+                >
+                  <Ionicons
+                    name="flash-outline"
+                    size={14}
+                    color={routeRequest.mode === 'fast' ? colors.info : gray[400]}
+                  />
+                  <Text
+                    style={[
+                      styles.modeToggleLabel,
+                      routeRequest.mode === 'fast' && styles.modeToggleLabelActive,
+                    ]}
+                  >
+                    {t('planning.fast')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modeTogglePill,
+                    avoidHills && routeRequest.mode === 'safe' && styles.modeTogglePillFlat,
+                  ]}
+                  onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
+                  accessibilityLabel="Flat routing — avoid hills"
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: avoidHills && routeRequest.mode === 'safe' }}
+                >
+                  <Ionicons
+                    name="trending-down-outline"
+                    size={14}
+                    color={avoidHills && routeRequest.mode === 'safe' ? colors.safe : gray[400]}
+                  />
+                  <Text
+                    style={[
+                      styles.modeToggleLabel,
+                      avoidHills && routeRequest.mode === 'safe' && styles.modeToggleLabelFlat,
+                    ]}
+                  >
+                    {t('planning.flat')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
         </View>
       }
       rightOverlay={
@@ -992,6 +1096,7 @@ export default function RoutePlanningScreen() {
               size="lg"
               fullWidth
               onPress={() => {
+                browseActionCountRef.current += 1;
                 setActiveField(null);
                 router.push('/route-preview');
               }}
@@ -1485,5 +1590,32 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: 'white',
       fontFamily: fontFamily.body.medium,
+    },
+
+    // ── Mia persona styles ──
+    miaAutoRouteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[2],
+      backgroundColor: colors.accent,
+      borderRadius: radii.full,
+      paddingVertical: space[3],
+      paddingHorizontal: space[5],
+      ...shadows.md,
+    },
+    miaAutoRouteLabel: {
+      ...textXs,
+      fontFamily: fontFamily.heading.bold,
+      color: colors.textInverse,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    miaToggleTooltip: {
+      ...textXs,
+      fontFamily: fontFamily.body.medium,
+      color: colors.safe,
+      textAlign: 'center',
+      marginBottom: space[1],
     },
   });

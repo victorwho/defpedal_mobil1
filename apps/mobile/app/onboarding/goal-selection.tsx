@@ -17,6 +17,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useAppStore } from '../../src/store/appStore';
+import { mobileApi } from '../../src/lib/api';
 
 type GoalOption = {
   readonly goal: CyclingGoal;
@@ -58,6 +59,16 @@ export default function OnboardingGoalSelectionScreen() {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
     setCyclingGoal(goal);
+
+    // Activate the Mia guided journey for beginner cyclists
+    if (goal === 'beginner') {
+      useAppStore.getState().activateMiaJourney('self_selected');
+      // Fire-and-forget server sync — don't block navigation
+      mobileApi.activateMia('self_selected').catch(() => {
+        // Silently ignore — store is already updated, server will sync later
+      });
+    }
+
     router.push('/onboarding/first-route');
   };
 

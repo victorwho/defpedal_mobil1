@@ -577,6 +577,7 @@ export interface RideImpact {
   readonly currentTotalXp: number;
   readonly riderTier: RiderTierName;
   readonly tierPromotion: XpAwardResult | null;
+  readonly miaLevelUp?: MiaLevelUpEvent | null;
 }
 
 export interface BadgeResponse {
@@ -819,6 +820,53 @@ export interface LeaderboardResponse {
   readonly userRank: LeaderboardEntry | null;
   readonly periodStart: string;
   readonly periodEnd: string;
+}
+
+// ── Mia Persona Journey ──
+
+export type MiaPersona = 'alex' | 'mia';
+export type MiaJourneyLevel = 1 | 2 | 3 | 4 | 5;
+export type MiaJourneyStatus = 'active' | 'completed' | 'opted_out';
+export type MiaDetectionSource = 'self_selected' | 'behavioral' | 'contextual';
+
+export interface MiaJourneyState {
+  readonly persona: MiaPersona;
+  readonly level: MiaJourneyLevel;
+  readonly status: MiaJourneyStatus | null;
+  readonly totalRides: number;
+  readonly ridesWithDestination: number;
+  readonly ridesOver5km: number;
+  readonly moderateSegmentsCompleted: number;
+  readonly ridesNeeded: number;
+  readonly detectionSource: MiaDetectionSource | null;
+  readonly startedAt: string | null;
+  readonly completedAt: string | null;
+  readonly testimonial: string | null;
+}
+
+export interface MiaLevelUpEvent {
+  readonly fromLevel: MiaJourneyLevel;
+  readonly toLevel: MiaJourneyLevel;
+}
+
+export interface MiaJourneyEventRecord {
+  readonly id: string;
+  readonly eventType: string;
+  readonly fromLevel: number | null;
+  readonly toLevel: number | null;
+  readonly metadata: Record<string, unknown>;
+  readonly createdAt: string;
+}
+
+// ── Telemetry Events ──
+
+export type TelemetryEventType = 'app_open' | 'route_generated_not_started' | 'map_browse_session';
+
+export interface TelemetryEvent {
+  readonly eventType: TelemetryEventType;
+  readonly properties: Record<string, unknown>;
+  readonly sessionId?: string;
+  readonly timestamp: string;
 }
 
 // ── Saved Routes ──

@@ -17,3 +17,5 @@ export { zIndex } from './zIndex';
 export { riderTiers, getNextTier, getTierProgress, getXpToNextTier } from './tierColors';
 export type { RiderTierKey } from './tierColors';
 export { hasTierImage } from './tierImages';
+export { miaLevelColors } from './miaColors';
+export type { MiaLevelColorKey } from './miaColors';

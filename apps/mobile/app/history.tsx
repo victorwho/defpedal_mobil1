@@ -21,6 +21,8 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
+import { useAppStore } from '../src/store/appStore';
+import { MiaEmptyState } from '../src/design-system/molecules/MiaEmptyState';
 
 // ---------------------------------------------------------------------------
 // Compact stat item
@@ -83,6 +85,11 @@ export default function HistoryScreen() {
   const t = useT();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // ── Mia Persona ──
+  const persona = useAppStore((state) => state.persona);
+  const miaJourneyStatus = useAppStore((state) => state.miaJourneyStatus);
+  const isMia = persona === 'mia' && miaJourneyStatus === 'active';
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['user-stats'],
@@ -287,6 +294,12 @@ export default function HistoryScreen() {
         </View>
       );
     }
+    // Mia persona: warm empty state with CTA
+    if (isMia) {
+      return (
+        <MiaEmptyState onStartFirstRide={() => router.push('/route-planning')} />
+      );
+    }
     return (
       <View style={styles.emptyCenter}>
         <Ionicons name="bicycle-outline" size={40} color={colors.textMuted} />
@@ -294,7 +307,7 @@ export default function HistoryScreen() {
         <Text style={styles.emptyText}>{t('history.noRidesSub')}</Text>
       </View>
     );
-  }, [tripsLoading, tripsError, styles, colors, t]);
+  }, [tripsLoading, tripsError, styles, colors, t, isMia]);
 
   return (
     <View style={styles.root}>

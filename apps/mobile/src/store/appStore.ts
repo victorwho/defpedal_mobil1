@@ -1,6 +1,11 @@
 import type {
   Coordinate,
   CyclingGoal,
+  MiaDetectionSource,
+  MiaJourneyLevel,
+  MiaJourneyStatus,
+  MiaLevelUpEvent,
+  MiaPersona,
   OfflineRegion,
   NavigationLocationSample,
   RecentDestination,
@@ -9,6 +14,7 @@ import type {
   RoutePreviewResponse,
   RoutingMode,
   StreakState,
+  TelemetryEvent,
 } from '@defensivepedal/core';
 import {
   advanceNavigationStep,
@@ -94,6 +100,24 @@ type AppStore = QueueSlice & {
   earnedMilestones: readonly string[];
   recentDestinations: readonly RecentDestination[];
   addRecentDestination: (destination: RecentDestination) => void;
+  // ── Mia Persona Journey ──
+  persona: MiaPersona;
+  miaJourneyLevel: MiaJourneyLevel;
+  miaJourneyStatus: MiaJourneyStatus | null;
+  miaPromptShown: boolean;
+  pendingMiaLevelUp: MiaLevelUpEvent | null;
+  activateMiaJourney: (source: MiaDetectionSource) => void;
+  levelUpMia: (toLevel: MiaJourneyLevel) => void;
+  optOutMia: () => void;
+  completeMiaJourney: () => void;
+  setMiaPromptShown: () => void;
+  shiftMiaLevelUp: () => MiaLevelUpEvent | null;
+  // ── Telemetry Queue ──
+  pendingTelemetryEvents: readonly TelemetryEvent[];
+  homeLocation: { lat: number; lon: number } | null;
+  enqueueTelemetryEvent: (event: TelemetryEvent) => void;
+  clearTelemetryEvents: () => void;
+  setHomeLocation: (loc: { lat: number; lon: number }) => void;
   pendingBadgeUnlocks: readonly import('@defensivepedal/core').BadgeUnlockEvent[];
   enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
@@ -198,6 +222,55 @@ export const useAppStore = create<AppStore>()(
       anonymousOpenCount: 0,
       earnedMilestones: [],
       recentDestinations: [],
+      // ── Mia Persona Journey ──
+      persona: 'alex' as MiaPersona,
+      miaJourneyLevel: 1 as MiaJourneyLevel,
+      miaJourneyStatus: null,
+      miaPromptShown: false,
+      pendingMiaLevelUp: null,
+      activateMiaJourney: (source: MiaDetectionSource) =>
+        set(() => ({
+          persona: 'mia' as MiaPersona,
+          miaJourneyLevel: 1 as MiaJourneyLevel,
+          miaJourneyStatus: 'active' as MiaJourneyStatus,
+        })),
+      levelUpMia: (toLevel: MiaJourneyLevel) =>
+        set((state) => ({
+          pendingMiaLevelUp: {
+            fromLevel: state.miaJourneyLevel,
+            toLevel,
+          },
+          miaJourneyLevel: toLevel,
+        })),
+      optOutMia: () =>
+        set(() => ({
+          persona: 'alex' as MiaPersona,
+          miaJourneyStatus: 'opted_out' as MiaJourneyStatus,
+        })),
+      completeMiaJourney: () =>
+        set(() => ({
+          persona: 'alex' as MiaPersona,
+          miaJourneyStatus: 'completed' as MiaJourneyStatus,
+        })),
+      setMiaPromptShown: () =>
+        set(() => ({ miaPromptShown: true })),
+      shiftMiaLevelUp: () => {
+        const current = get().pendingMiaLevelUp;
+        if (!current) return null;
+        set(() => ({ pendingMiaLevelUp: null }));
+        return current;
+      },
+      // ── Telemetry Queue ──
+      pendingTelemetryEvents: [],
+      homeLocation: null,
+      enqueueTelemetryEvent: (event: TelemetryEvent) =>
+        set((state) => ({
+          pendingTelemetryEvents: [...state.pendingTelemetryEvents, event],
+        })),
+      clearTelemetryEvents: () =>
+        set(() => ({ pendingTelemetryEvents: [] })),
+      setHomeLocation: (loc: { lat: number; lon: number }) =>
+        set(() => ({ homeLocation: loc })),
       addRecentDestination: (destination) =>
         set((state) => {
           // Remove existing entry with same coordinates (de-duplicate)
@@ -568,6 +641,13 @@ export const useAppStore = create<AppStore>()(
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
         pendingTierPromotion: state.pendingTierPromotion,
         locale: state.locale,
+        persona: state.persona,
+        miaJourneyLevel: state.miaJourneyLevel,
+        miaJourneyStatus: state.miaJourneyStatus,
+        miaPromptShown: state.miaPromptShown,
+        pendingMiaLevelUp: state.pendingMiaLevelUp,
+        pendingTelemetryEvents: state.pendingTelemetryEvents,
+        homeLocation: state.homeLocation,
       }),
     },
   ),

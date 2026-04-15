@@ -43,7 +43,7 @@ const fetchCategoryPois = async (
 
     if (!response.ok) return [];
 
-    const data = await response.json();
+    const data: any = await response.json();
     const features = data?.features ?? [];
 
     return features.map((f: any) => ({

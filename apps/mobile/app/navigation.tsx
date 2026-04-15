@@ -35,6 +35,7 @@ import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
+import { useMiaSegmentBanners } from '../src/hooks/useMiaSegmentBanners';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -48,6 +49,7 @@ import { ManeuverCard, FooterCard, SteepGradeIndicator } from '../src/design-sys
 
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
+import { MiaSegmentBanner } from '../src/design-system/molecules/MiaSegmentBanner';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
@@ -87,6 +89,8 @@ export default function NavigationScreen() {
     shareTripsPublicly,
     avoidHills,
     avoidUnpaved,
+    persona,
+    miaJourneyLevel,
   } = useAppStore(useShallow((state) => ({
     routeRequest: state.routeRequest,
     voiceGuidanceEnabled: state.voiceGuidanceEnabled,
@@ -99,6 +103,8 @@ export default function NavigationScreen() {
     shareTripsPublicly: state.shareTripsPublicly,
     avoidHills: state.avoidHills,
     avoidUnpaved: state.avoidUnpaved,
+    persona: state.persona,
+    miaJourneyLevel: state.miaJourneyLevel,
   })));
 
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
@@ -170,6 +176,15 @@ export default function NavigationScreen() {
     Boolean(navigationSession),
     hazardRadius,
   );
+
+  // Mia segment banners — contextual entry/exit alerts for moderate risk segments
+  const miaSegmentBanner = useMiaSegmentBanners(
+    selectedRoute?.riskSegments ?? [],
+    locationState.sample?.coordinate ?? null,
+    persona,
+    miaJourneyLevel,
+  );
+
   const introAnnouncementKeyRef = useRef<string | null>(null);
   const offRouteAnnouncedRef = useRef(false);
   const dismissedHazardIdsRef = useRef<Set<string>>(new Set());
@@ -177,6 +192,18 @@ export default function NavigationScreen() {
     hazard: import('@defensivepedal/core').NearbyHazard;
     distanceMeters: number;
   } | null>(null);
+  const [miaSegmentBannerDismissed, setMiaSegmentBannerDismissed] = useState(false);
+
+  // Reset dismissed flag when a new banner type appears
+  const prevMiaBannerTypeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (miaSegmentBanner.type !== prevMiaBannerTypeRef.current) {
+      prevMiaBannerTypeRef.current = miaSegmentBanner.type;
+      if (miaSegmentBanner.type !== null) {
+        setMiaSegmentBannerDismissed(false);
+      }
+    }
+  }, [miaSegmentBanner.type]);
 
   const currentStep =
     selectedRoute && navigationSession
@@ -765,6 +792,15 @@ export default function NavigationScreen() {
       <View style={[styles.overlayRoot, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">
         {/* ── Top: maneuver card only ── */}
         <View style={styles.topCluster} pointerEvents="box-none">
+          {/* Mia segment banner — contextual entry/exit for moderate risk segments */}
+          {persona === 'mia' && miaSegmentBanner.type !== null && !miaSegmentBannerDismissed && (
+            <MiaSegmentBanner
+              type={miaSegmentBanner.type}
+              streetName={miaSegmentBanner.streetName}
+              hasBikeLane={miaSegmentBanner.hasBikeLane}
+              onDismiss={() => setMiaSegmentBannerDismissed(true)}
+            />
+          )}
           <ManeuverCard
             currentStep={currentStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}

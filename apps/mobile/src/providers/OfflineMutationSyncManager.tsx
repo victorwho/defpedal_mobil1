@@ -305,6 +305,22 @@ export const OfflineMutationSyncManager = () => {
             // The failed mutation will be skipped on the next iteration due to backoff.
           }
         }
+        // ── Telemetry flush (best-effort, non-fatal) ──
+        try {
+          const telemetryState = useAppStore.getState();
+          const events = [...telemetryState.pendingTelemetryEvents];
+          if (events.length > 0) {
+            await mobileApi.sendTelemetryEvents(events);
+            // Only remove the events we actually sent — new events may have
+            // been enqueued during the await.
+            useAppStore.setState((state) => ({
+              pendingTelemetryEvents: state.pendingTelemetryEvents.slice(events.length),
+            }));
+          }
+        } catch {
+          // Telemetry is best-effort — silently ignore failures.
+          // Events remain in the queue and will retry next cycle.
+        }
       } finally {
         flushingRef.current = false;
       }

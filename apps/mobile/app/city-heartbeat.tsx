@@ -34,6 +34,7 @@ import {
   textDataMd,
 } from '../src/design-system/tokens/typography';
 import { useCityHeartbeat } from '../src/hooks/useCityHeartbeat';
+import { useAppStore } from '../src/store/appStore';
 import { HAZARD_TYPE_OPTIONS, type HazardType } from '@defensivepedal/core';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ export default function CityHeartbeatScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { heartbeat, isLoading, error, refetch } = useCityHeartbeat();
+  const persona = useAppStore((s) => s.persona);
 
   if (isLoading && !heartbeat) {
     return (
@@ -250,10 +252,12 @@ export default function CityHeartbeatScreen() {
           </FadeSlideIn>
         )}
 
-        {/* Neighborhood Leaderboard */}
-        <FadeSlideIn delay={600}>
-          <LeaderboardSection />
-        </FadeSlideIn>
+        {/* Neighborhood Leaderboard — hidden for Mia persona (avoid competitive anxiety) */}
+        {persona !== 'mia' && (
+          <FadeSlideIn delay={600}>
+            <LeaderboardSection />
+          </FadeSlideIn>
+        )}
 
         <View style={styles.bottomSpacer} />
       </ScrollView>

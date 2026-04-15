@@ -102,7 +102,22 @@ export const Animated = {
   Value: AnimatedValue,
   timing: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
   spring: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
+  delay: (_ms: number) => createAnimationResult(),
   parallel: (animations: { start: (cb?: () => void) => void }[]) => ({
+    start: (callback?: () => void) => {
+      animations.forEach((a) => a.start());
+      callback?.();
+    },
+    stop: () => {},
+  }),
+  sequence: (animations: { start: (cb?: () => void) => void }[]) => ({
+    start: (callback?: () => void) => {
+      animations.forEach((a) => a.start());
+      callback?.();
+    },
+    stop: () => {},
+  }),
+  stagger: (_delay: number, animations: { start: (cb?: () => void) => void }[]) => ({
     start: (callback?: () => void) => {
       animations.forEach((a) => a.start());
       callback?.();
@@ -145,6 +160,62 @@ export const Easing = {
   in: (t: number) => t,
   out: (t: number) => t,
   inOut: (t: number) => t,
+};
+
+export const TextInput = React.forwardRef(
+  (
+    {
+      value,
+      placeholder,
+      placeholderTextColor: _ptc,
+      onChangeText,
+      maxLength,
+      multiline: _ml,
+      numberOfLines: _nol,
+      textAlignVertical: _tav,
+      style: _style,
+      testID,
+      ...props
+    }: {
+      value?: string;
+      placeholder?: string;
+      placeholderTextColor?: string;
+      onChangeText?: (text: string) => void;
+      maxLength?: number;
+      multiline?: boolean;
+      numberOfLines?: number;
+      textAlignVertical?: string;
+      style?: unknown;
+      testID?: string;
+    },
+    ref,
+  ) =>
+    React.createElement('input', {
+      ref,
+      value,
+      placeholder,
+      maxLength,
+      'data-testid': testID,
+      onChange: onChangeText
+        ? (e: React.ChangeEvent<HTMLInputElement>) => onChangeText(e.target.value)
+        : undefined,
+      ...props,
+    }),
+);
+
+export const Share = {
+  share: async (_content: { message?: string; url?: string; title?: string }) => ({
+    action: 'sharedAction',
+    activityType: undefined,
+  }),
+};
+
+export const Linking = {
+  openURL: async (_url: string) => {},
+  canOpenURL: async (_url: string) => true,
+  getInitialURL: async () => null,
+  addEventListener: () => ({ remove: () => {} }),
+  createURL: (path: string, _opts?: unknown) => `exp://localhost${path}`,
 };
 
 // ViewStyle / TextStyle type exports (runtime no-ops)

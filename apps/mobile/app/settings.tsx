@@ -1,5 +1,6 @@
 import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useShallow } from 'zustand/react/shallow';
 
 import { Screen } from '../src/components/Screen';
 import { useTheme } from '../src/design-system';
@@ -9,9 +10,11 @@ import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { textLg, textSm, textBase, fontFamily } from '../src/design-system/tokens/typography';
+import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
+import { useAppStore } from '../src/store/appStore';
 
 export default function SettingsScreen() {
   const authCtx = useAuthSessionOptional();
@@ -21,6 +24,18 @@ export default function SettingsScreen() {
   const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
   const { colors } = useTheme();
   const t = useT();
+  const { persona, miaJourneyStatus } = useAppStore(
+    useShallow((s) => ({ persona: s.persona, miaJourneyStatus: s.miaJourneyStatus })),
+  );
+  const showMiaOptOut = persona === 'mia' && miaJourneyStatus === 'active';
+
+  const handleMiaOptOut = () => {
+    useAppStore.getState().optOutMia();
+    // Fire-and-forget server sync
+    mobileApi.optOutMia().catch(() => {
+      // Silently ignore — store is already updated
+    });
+  };
 
   return (
     <Screen
@@ -134,6 +149,14 @@ export default function SettingsScreen() {
             />
           </Pressable>
         </Link>
+        {showMiaOptOut ? (
+          <MenuItem
+            icon="exit-outline"
+            label={t('mia.journey.skipAhead')}
+            description={t('mia.journey.skipAheadSub')}
+            onPress={handleMiaOptOut}
+          />
+        ) : null}
       </View>
 
       {/* ── App wiring card ── */}

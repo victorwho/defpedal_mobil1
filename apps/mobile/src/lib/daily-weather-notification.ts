@@ -133,7 +133,7 @@ const fetchTomorrowForecast = async (lat: number, lon: number): Promise<WeatherF
     const response = await fetch(url);
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const data: any = await response.json();
     const daily = data.daily;
     if (!daily || !daily.time || daily.time.length < 2) return null;
 

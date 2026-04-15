@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
-import { Alert, Image, NativeModules } from 'react-native';
+import { Alert, Image, NativeModules, Share } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as Linking from 'expo-linking';
 // expo-image-picker is a native module — lazy require to avoid crash if not in APK
 const hasImagePicker = Boolean(NativeModules.ExpoImagePicker);
 import { useQuery } from '@tanstack/react-query';
@@ -294,6 +295,82 @@ export default function ProfileScreen() {
     );
   };
 
+  const MiaJourneyRow = () => {
+    const persona = useAppStore((s) => s.persona);
+    const miaJourneyStatus = useAppStore((s) => s.miaJourneyStatus);
+    const miaJourneyLevel = useAppStore((s) => s.miaJourneyLevel);
+
+    if (persona !== 'mia' && miaJourneyStatus !== 'completed') return null;
+
+    // Completed journey — show static "Confident Cyclist" row
+    if (miaJourneyStatus === 'completed') {
+      return (
+        <View style={styles.achievementsCard}>
+          <View style={styles.achievementsRow}>
+            <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+            <View style={styles.achievementsTextCol}>
+              <Text style={styles.achievementsCount}>Confident Cyclist</Text>
+            </View>
+          </View>
+          {/* Referral row */}
+          <Pressable
+            onPress={() => {
+              const referralUrl = Linking.createURL('/', { queryParams: { persona: 'mia' } });
+              void Share.share({
+                message: `Start your cycling journey with Defensive Pedal! ${referralUrl} #DefensivePedal`,
+              });
+            }}
+            style={styles.helpFaqRow}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Help a friend start their journey"
+          >
+            <Ionicons name="heart-outline" size={22} color={colors.accent} />
+            <View style={styles.settingTextCol}>
+              <Text style={styles.settingLabel}>Help a friend start their journey</Text>
+              <Text style={styles.settingDescription}>Share a referral link with ?persona=mia</Text>
+            </View>
+            <Ionicons name="share-social-outline" size={18} color={gray[400]} />
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Active journey — show "My Cycling Journey" row
+    if (miaJourneyStatus === 'active') {
+      const levelIcons: Record<number, keyof typeof Ionicons.glyphMap> = {
+        1: 'bicycle', 2: 'shield-checkmark', 3: 'cafe', 4: 'compass', 5: 'star',
+      };
+      return (
+        <Pressable
+          onPress={() => router.push('/impact-dashboard' as any)}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="My Cycling Journey"
+        >
+          <View style={styles.achievementsCard}>
+            <View style={styles.achievementsRow}>
+              <Ionicons
+                name={levelIcons[miaJourneyLevel] ?? 'bicycle'}
+                size={24}
+                color={colors.accent}
+              />
+              <View style={styles.achievementsTextCol}>
+                <Text style={styles.achievementsCount}>My Cycling Journey</Text>
+                <Text style={[styles.settingDescription, { marginTop: 2 }]}>
+                  Level {miaJourneyLevel}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </View>
+          </View>
+        </Pressable>
+      );
+    }
+
+    return null;
+  };
+
   const AchievementsRow = () => {
     const { data } = useBadges();
     const earned = data?.earned.length ?? 0;
@@ -453,6 +530,7 @@ export default function ProfileScreen() {
           {/* ── Progression ─────────────────────────────────────────── */}
           <TierRankSection />
           <AchievementsRow />
+          <MiaJourneyRow />
 
           {/* ── Section 1: Cycling Preferences ─────────────────────── */}
           <View style={styles.section}>

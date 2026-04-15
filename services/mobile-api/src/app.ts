@@ -7,6 +7,7 @@ import { formatValidationDetails, HttpError, toErrorResponse } from './lib/http'
 import { buildRequestTelemetry } from './lib/telemetry';
 import { buildFeedRoutes } from './routes/feed';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
+import { buildMiaRoutes } from './routes/mia';
 import { buildV1Routes } from './routes/v1';
 
 export const buildApp = (options: {
@@ -110,6 +111,10 @@ export const buildApp = (options: {
   });
 
   void app.register(buildLeaderboardRoutes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildMiaRoutes(dependencies), {
     prefix: '/v1',
   });
 

@@ -61,7 +61,7 @@ const findNearbyDestinations = async (
 
       if (!response.ok) continue;
 
-      const data = await response.json();
+      const data: any = await response.json();
       for (const feature of data?.features ?? []) {
         if (!feature?.geometry?.coordinates) continue;
         const [lon, lat] = feature.geometry.coordinates;

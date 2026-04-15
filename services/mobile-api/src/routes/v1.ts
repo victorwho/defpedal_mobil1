@@ -1596,8 +1596,9 @@ export const buildV1Routes = (
         aqiLevel?: string;
         rideStartHour?: number;
         durationMinutes?: number;
+        hadDestination?: boolean;
       };
-      Reply: RideImpact | ErrorResponse;
+      Reply: (RideImpact & { miaLevelUp?: import('@defensivepedal/core').MiaLevelUpEvent | null }) | ErrorResponse;
     }>(
       '/rides/:tripId/impact',
       {
@@ -1621,6 +1622,7 @@ export const buildV1Routes = (
               rideStartHour:    { type: 'integer', minimum: 0, maximum: 23 },
               durationMinutes:  { type: 'number', minimum: 0 },
               routeType:        { type: 'string', enum: ['safe', 'fast'] },
+              hadDestination:   { type: 'boolean' },
             },
           },
           response: {
@@ -1686,6 +1688,13 @@ export const buildV1Routes = (
                     tierColor:        { type: 'string' },
                     tierLevel:        { type: 'integer' },
                     tierPerk:         { type: 'string' },
+                  },
+                },
+                miaLevelUp: {
+                  type: ['object', 'null'],
+                  properties: {
+                    fromLevel: { type: 'integer' },
+                    toLevel:   { type: 'integer' },
                   },
                 },
               },
@@ -1939,6 +1948,37 @@ export const buildV1Routes = (
 
         const totalXpEarned = xpBreakdown.reduce((sum, item) => sum + item.finalXp, 0);
 
+        // --- Mia Level-Up Evaluation (non-fatal) ---
+        let miaLevelUp: import('@defensivepedal/core').MiaLevelUpEvent | null = null;
+        try {
+          const { data: profileRow } = await supabaseAdmin
+            .from('profiles')
+            .select('persona')
+            .eq('id', user.id)
+            .single();
+
+          if ((profileRow as Record<string, unknown> | null)?.persona === 'mia') {
+            const rideDistKm = distanceMeters / 1000;
+            const hadDest = (request.body as Record<string, unknown>).hadDestination === true;
+
+            const { data: levelResult } = await supabaseAdmin.rpc('evaluate_mia_level_up', {
+              p_user_id: user.id,
+              p_ride_distance_km: rideDistKm,
+              p_had_destination: hadDest,
+            });
+
+            const lr = levelResult as Record<string, unknown> | null;
+            if (lr?.leveled_up === true) {
+              miaLevelUp = {
+                fromLevel: Number(lr.from_level) as import('@defensivepedal/core').MiaJourneyLevel,
+                toLevel: Number(lr.to_level) as import('@defensivepedal/core').MiaJourneyLevel,
+              };
+            }
+          }
+        } catch {
+          // Mia level-up failure is non-fatal
+        }
+
         return {
           tripId,
           co2SavedKg,
@@ -1954,6 +1994,7 @@ export const buildV1Routes = (
           currentTotalXp: lastAwardResult?.totalXp ?? 0,
           riderTier: (lastAwardResult?.newTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
           tierPromotion: lastAwardResult?.promoted ? lastAwardResult : null,
+          miaLevelUp,
         };
       },
     );
