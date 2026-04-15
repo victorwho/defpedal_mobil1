@@ -17,6 +17,7 @@ import {
   telemetryBatchBodySchema,
   telemetryBatchResponseSchema,
   detectionEvaluateResponseSchema,
+  notificationEvaluateResponseSchema,
   type ActivateMiaBody,
   type ActivateMiaResponse,
   type MiaJourneyResponse,
@@ -26,7 +27,9 @@ import {
   type TelemetryBatchBody,
   type TelemetryBatchResponse,
   type DetectionEvaluateResponse,
+  type NotificationEvaluateResponse,
 } from '../lib/miaSchemas';
+import { evaluateMiaNotifications } from '../lib/miaNotifications';
 
 // Rides needed per level to advance (level -> rides needed for next level)
 const RIDES_NEEDED_BY_LEVEL: Record<number, number> = {
@@ -599,6 +602,99 @@ export const buildMiaRoutes = (
         );
 
         return { evaluated, prompted };
+      },
+    );
+
+    // POST /mia/notifications/evaluate — cron endpoint for daily Mia nudges
+    app.post<{ Reply: NotificationEvaluateResponse | ErrorResponse }>(
+      '/mia/notifications/evaluate',
+      {
+        schema: {
+          response: {
+            200: notificationEvaluateResponseSchema,
+            401: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        // Authenticate via CRON_SECRET header
+        const cronSecret = process.env.CRON_SECRET ?? '';
+        if (!cronSecret) {
+          throw new HttpError('Cron secret not configured.', {
+            statusCode: 500,
+            code: 'INTERNAL_ERROR',
+          });
+        }
+
+        const auth = request.headers.authorization;
+        if (auth !== `Bearer ${cronSecret}`) {
+          throw new HttpError('Unauthorized cron call.', {
+            statusCode: 401,
+            code: 'UNAUTHORIZED',
+          });
+        }
+
+        const db = ensureSupabase();
+
+        // Find active Mia users with notifications enabled
+        const { data: miaUsers, error: queryError } = await db
+          .from('profiles')
+          .select('id, persona, mia_journey_level, mia_journey_status, mia_total_rides, mia_rides_with_destination, mia_started_at, notify_mia, created_at, last_ride_at')
+          .eq('persona', 'mia')
+          .eq('mia_journey_status', 'active')
+          .eq('notify_mia', true)
+          .limit(500);
+
+        if (queryError) {
+          request.log.error(
+            { event: 'mia_notification_query_error', error: queryError.message },
+            'notification eligible user query failed',
+          );
+          throw new HttpError('Notification query failed.', {
+            statusCode: 500,
+            code: 'INTERNAL_ERROR',
+            details: [queryError.message],
+          });
+        }
+
+        const users = (miaUsers ?? []) as Array<{
+          id: string;
+          persona: string;
+          mia_journey_level: number;
+          mia_journey_status: string | null;
+          mia_total_rides: number;
+          mia_rides_with_destination: number;
+          mia_started_at: string | null;
+          notify_mia: boolean;
+          created_at: string;
+          last_ride_at: string | null;
+        }>;
+
+        let evaluated = 0;
+        let notified = 0;
+
+        for (const user of users) {
+          try {
+            const results = await evaluateMiaNotifications(db, user);
+            evaluated++;
+            if (results.some((r) => r.sent)) {
+              notified++;
+            }
+          } catch (err) {
+            request.log.warn(
+              { event: 'mia_notification_error', userId: user.id, error: (err as Error).message },
+              'notification evaluation failed for user',
+            );
+          }
+        }
+
+        request.log.info(
+          { event: 'mia_notifications_complete', evaluated, notified },
+          'mia notification evaluation complete',
+        );
+
+        return { evaluated, notified };
       },
     );
 

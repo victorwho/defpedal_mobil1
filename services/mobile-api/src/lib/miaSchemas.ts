@@ -213,3 +213,22 @@ export type DetectionEvaluateResponse = {
   evaluated: number;
   prompted: number;
 };
+
+// ---------------------------------------------------------------------------
+// Notification cron
+// ---------------------------------------------------------------------------
+
+export const notificationEvaluateResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['evaluated', 'notified'],
+  properties: {
+    evaluated: { type: 'integer' },
+    notified: { type: 'integer' },
+  },
+} as const;
+
+export type NotificationEvaluateResponse = {
+  evaluated: number;
+  notified: number;
+};

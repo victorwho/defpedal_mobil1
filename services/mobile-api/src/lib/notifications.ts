@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendPushNotification } from './push';
 
-type NotificationCategory = 'weather' | 'hazard' | 'community' | 'system';
+type NotificationCategory = 'weather' | 'hazard' | 'community' | 'system' | 'mia';
 
 interface NotificationPayload {
   readonly title: string;
@@ -13,6 +13,7 @@ export interface UserPrefs {
   notify_weather: boolean;
   notify_hazard: boolean;
   notify_community: boolean;
+  notify_mia: boolean;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   quiet_hours_timezone: string | null;
@@ -30,6 +31,7 @@ const categoryToField: Record<NotificationCategory, keyof UserPrefs | null> = {
   weather: 'notify_weather',
   hazard: 'notify_hazard',
   community: 'notify_community',
+  mia: 'notify_mia',
   system: null, // system notifications always go through
 };
 
@@ -126,7 +128,7 @@ export const dispatchNotification = async (
   // Load user preferences
   const { data: prefs } = await supabase
     .from('profiles')
-    .select('notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end, quiet_hours_timezone')
+    .select('notify_weather, notify_hazard, notify_community, notify_mia, quiet_hours_start, quiet_hours_end, quiet_hours_timezone')
     .eq('id', userId)
     .single();
 
