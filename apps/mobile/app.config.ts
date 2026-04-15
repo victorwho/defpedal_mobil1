@@ -97,7 +97,9 @@ const resolveMapboxDownloadToken = () => {
 const appEnv =
   resolveExpoExtraValue(['EXPO_PUBLIC_APP_ENV'], appVariant === 'preview' ? 'staging' : appVariant);
 const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
-const usesCleartextTraffic = /^http:\/\//i.test(mobileApiUrl) && appVariant !== 'production';
+// OSRM server uses plain HTTP (34.116.139.172:5000/5001), so cleartext is
+// required for all variants — not just when the API URL is HTTP.
+const usesCleartextTraffic = true;
 
 const mapboxDownloadToken = resolveMapboxDownloadToken();
 
@@ -131,7 +133,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.0',
+    version: '0.2.1',
     icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
