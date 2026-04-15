@@ -672,15 +672,26 @@ export default function RoutePlanningScreen() {
       }
       topOverlay={
         <View style={styles.topContainer}>
-          {/* Mia Journey progress bar */}
+          {/* Mia Journey progress bar + skip ahead */}
           {isMia ? (
-            <MiaJourneyBar
-              level={miaJourneyLevel}
-              levelName={pt(`journey.levelNames.${miaJourneyLevel}`)}
-              ridesCompleted={miaRidesCompleted}
-              ridesNeeded={miaRidesNeeded}
-              onInfoPress={() => router.push('/achievements')}
-            />
+            <View style={styles.miaHeaderWrap}>
+              <MiaJourneyBar
+                level={miaJourneyLevel}
+                levelName={pt(`journey.levelNames.${miaJourneyLevel}`)}
+                ridesCompleted={miaRidesCompleted}
+                ridesNeeded={miaRidesNeeded}
+                onInfoPress={() => router.push('/achievements')}
+              />
+              <Pressable
+                onPress={() => {
+                  useAppStore.getState().optOutMia();
+                }}
+                accessibilityLabel={pt('journey.skipAhead')}
+                accessibilityRole="button"
+              >
+                <Text style={styles.miaSkipAhead}>{pt('journey.skipAhead')}</Text>
+              </Pressable>
+            </View>
           ) : null}
 
           {/* Origin card — shown only after destination is set (progressive disclosure) */}
@@ -748,47 +759,35 @@ export default function RoutePlanningScreen() {
             </View>
           ))}
 
-          {/* Destination search bar — hidden for Mia levels 1-2 (auto-route instead) */}
-          {isMia && miaJourneyLevel <= 2 ? (
-            <Pressable
-              style={styles.miaAutoRouteButton}
-              onPress={() => router.push('/route-preview')}
-              accessibilityLabel={pt('planning.autoRouteButton')}
-              accessibilityRole="button"
-            >
-              <Ionicons name="navigate-outline" size={20} color={colors.textInverse} />
-              <Text style={styles.miaAutoRouteLabel}>{pt('planning.autoRouteButton')}</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.destinationCard}>
-              <SearchBar
-                label="Destination"
-                value={destinationQuery}
-                placeholder="Where to?"
-                active={activeField === 'destination'}
-                isLoading={destinationAutocompleteQuery.isPending}
-                errorMessage={
-                  destinationAutocompleteQuery.isError
-                    ? destinationAutocompleteQuery.error.message
-                    : null
-                }
-                suggestions={mergedDestinationSuggestions}
-                recentDestinations={recentRideDestinations}
-                onFocus={() => setActiveField('destination')}
-                onChangeText={(value) => {
-                  setDestinationQuery(value);
-                  setDestinationHydrated(true);
-                  setActiveField('destination');
-                }}
-                onClear={() => {
-                  setDestinationQuery('');
-                  setDestinationHydrated(true);
-                  setActiveField('destination');
-                }}
+          {/* Destination search bar — always shown, even for Mia (users can always plan routes) */}
+          <View style={styles.destinationCard}>
+            <SearchBar
+              label="Destination"
+              value={destinationQuery}
+              placeholder="Where to?"
+              active={activeField === 'destination'}
+              isLoading={destinationAutocompleteQuery.isPending}
+              errorMessage={
+                destinationAutocompleteQuery.isError
+                  ? destinationAutocompleteQuery.error.message
+                  : null
+              }
+              suggestions={mergedDestinationSuggestions}
+              recentDestinations={recentRideDestinations}
+              onFocus={() => setActiveField('destination')}
+              onChangeText={(value) => {
+                setDestinationQuery(value);
+                setDestinationHydrated(true);
+                setActiveField('destination');
+              }}
+              onClear={() => {
+                setDestinationQuery('');
+                setDestinationHydrated(true);
+                setActiveField('destination');
+              }}
                 onSelectSuggestion={handleDestinationSelect}
               />
             </View>
-          )}
 
           {/* Waypoint stops — shown between destination and weather */}
           {waypoints.map((wp, index) => (
@@ -1593,23 +1592,15 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
 
     // ── Mia persona styles ──
-    miaAutoRouteButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: space[2],
-      backgroundColor: colors.accent,
-      borderRadius: radii.full,
-      paddingVertical: space[3],
-      paddingHorizontal: space[5],
-      ...shadows.md,
+    miaHeaderWrap: {
+      gap: space[1],
     },
-    miaAutoRouteLabel: {
+    miaSkipAhead: {
       ...textXs,
-      fontFamily: fontFamily.heading.bold,
-      color: colors.textInverse,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textMuted,
+      textAlign: 'center',
+      textDecorationLine: 'underline',
     },
     miaToggleTooltip: {
       ...textXs,

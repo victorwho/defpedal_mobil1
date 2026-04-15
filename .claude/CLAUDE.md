@@ -89,7 +89,7 @@ All three variants are defined as Gradle product flavors in `build.gradle`:
 | **Auth** | Supabase Auth (Google OAuth) | User authentication |
 | **Database** | Supabase (PostgreSQL + PostGIS) | Trips, hazards, feedback, community feed, road risk data |
 | **API server** | Fastify (Node.js) | Mobile API (services/mobile-api) |
-| **Safe routing** | Custom OSRM server (europe-central2) | Safety-optimized cycling routes |
+| **Safe routing** | Custom OSRM server (`34.116.139.172:5000`) | Safety-optimized cycling routes |
 | **Fast routing** | Mapbox Directions API | Standard cycling routes |
 | **Geocoding/search** | Mapbox Search Box API v1 | Destination autocomplete |
 | **Weather** | Open-Meteo API (free, no key) | Current + forecast weather + AQI |
@@ -195,7 +195,8 @@ C:\dev\defpedal/
 │       ├── routes/
 │       │   ├── v1.ts            # Core API routes (routes, hazards, trips, feedback)
 │       │   ├── feed.ts          # Community feed routes (share, like, love, comment)
-│       │   └── leaderboard.ts   # Neighborhood leaderboard + settlement cron
+│       │   ├── leaderboard.ts   # Neighborhood leaderboard + settlement cron
+│       │   └── mia.ts           # Mia persona journey routes (activate, opt-out, detection, notifications)
 │       ├── lib/
 │       │   ├── auth.ts          # JWT + dev-bypass auth middleware
 │       │   ├── risk.ts          # Road risk segment fetching (Supabase RPC)
@@ -291,8 +292,8 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **Short path `C:\dev\defpedal`** | Original path `C:\Users\Victor\Documents\1. Projects\...` exceeds Windows 260-char limit for CMake. Junction from old path preserved for file explorer |
 | **`C:\dpb` for release builds** | Even `C:\dev\defpedal` can fail for release builds (node_modules resolves to long paths). Full copy to `C:\dpb` with fresh `npm install` is the reliable path |
 | **Off-route threshold 50m + segment-aware snap** | `closestPointOnPolyline` projects GPS onto nearest line segment (perpendicular distance), not just nearest vertex. 50m base + up to 50m GPS accuracy buffer = effective 50-100m. Old vertex-only approach needed 100m because midpoint of straight segments inflated distance |
-| **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app |
-| **Flat routing = separate OSRM instance** | `bicycle-flat` profile uses 7.0x uphill penalty (vs 1.1x standard). Runs on port 5001, proxied via nginx at `/route/v1/bicycle-flat/`. Activated by "Flat" pill on route planning (3-way toggle: Safe/Fast/Flat). `avoidHills` flag composes with `avoidUnpaved` |
+| **Safe routing = OSRM, Fast routing = Mapbox** | OSRM has custom safety profile using road_risk_data. Mapbox Directions is standard cycling. Both fetched client-side from the mobile app. OSRM at `34.116.139.172:5000` |
+| **Flat routing = separate OSRM instance** | `bicycle-flat` profile uses 7.0x uphill penalty (vs 1.1x standard). Runs on port 5001 (`34.116.139.172:5001`). Activated by "Flat" pill on route planning (3-way toggle: Safe/Fast/Flat). `avoidHills` flag composes with `avoidUnpaved` |
 | **Mapbox Terrain-RGB for elevation** (not Open-Meteo) | Open-Meteo rate-limits (HTTP 429) during heavy usage. Terrain-RGB tiles decode elevation from PNG pixels, are CDN-cached, zero external API calls |
 | **Along-route polyline distance** (not haversine to maneuver) | Haversine underestimates distance on winding roads (switchbacks, curves). `polylineSegmentDistance` sums vertex-to-vertex distances along the decoded polyline — keeps `remainingDistanceMeters` consistent with `step.distanceMeters` and `route.distanceMeters`. Note: `remainingDistanceMeters` = distanceToManeuver + **currentStep.distanceMeters** + futureSteps — the current step's segment must be included (fixed 2026-04-13) |
 
@@ -438,12 +439,14 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - **Segment-aware off-route detection (2026-04-14):** `closestPointOnPolyline` projects GPS onto nearest polyline segment (perpendicular distance) instead of nearest vertex. Threshold lowered from 100m to 50m. Fixes false triggers on straight roads with sparse vertices.
 - **Reroute profile preservation (2026-04-14):** Reroute uses same routing profile as original route: Safe→Safe, Fast→Fast, Flat→Fast. `effectiveRouteRequest` in navigation.tsx merges global `avoidHills`/`avoidUnpaved` into the reroute request.
 - **Neighborhood Safety Leaderboard (2026-04-14):** Full-stack competitive social layer on City Heartbeat screen. Two metrics (CO2 saved, hazards reported) with three time windows (week/month/all-time). Top 50 per 15km GPS radius. Rank-change delta arrows from previous period snapshots. Weekly champion crown on leaderboard + FeedCard. Ghost rank for opted-out users. Settlement cron (Cloud Scheduler, Monday 4AM weekly + 1st monthly) snapshots rankings, awards tiered XP (#1=50/150, #2-3=30/100, #4-10=15/50, #11-50=5/20), and podium badges. 6 champion badges (143 total). `leaderboard_snapshots` table, `get_neighborhood_leaderboard` RPC, `GET /v1/leaderboard`, `POST /v1/leaderboard/settle`. LeaderboardRow atom + LeaderboardSection organism. Cloud Run revision `defpedal-api-00049-529`.
-- **~1093 tests across 3 packages** (core: 347, mobile-api: 250, mobile: 496). Mobile coverage: hooks (10 files), lib (12 files), design system atoms+molecules (14 files), store (79 tests). Vitest + happy-dom + @testing-library/react
+- **Mia Persona Journey (2026-04-15):** Fear-to-confidence guided journey converting nervous non-cyclists ("Mia") into confident riders ("Alex") through 5 levels. Three-layer detection (self-selection, behavioral cron, deep link). Progressive feature disclosure (destination search hidden L1-2 with skip-ahead opt-out, route mode forced to safe L1-3, risk slider hidden L1-3). Level-up celebrations (4 animation variants + testimonial at L5). Share cards, journey tracker on Impact Dashboard, profile referral link. 6 Mia notification templates with 2/week budget. Badge #144 "Confident Cyclist". 6 DB migrations, 21 new files. `mia.ts` routes, `miaNotifications.ts`, `usePersonaT` hook, `useMiaJourney` hook, `MiaLevelUpOverlay`, `MiaJourneyTracker`, `MiaShareCard`. Cloud Scheduler: `mia-detection-cron` (daily 10AM UTC), `mia-notification-cron` (daily 9AM UTC). Cloud Run revision `defpedal-api-00050-n2k`.
+- **OSRM server migration (2026-04-15):** Switched from `osrm.defensivepedal.com` (nginx proxy) to direct IP `34.116.139.172:5000` (standard) and `:5001` (flat).
+- **~1174 tests across 3 packages** (core: 339, mobile-api: 270, mobile: 565). Vitest + happy-dom + @testing-library/react
 
 ### Known Incomplete
 - iPhone validation (no macOS hardware available)
 - Redis activation: code complete (`redisStore.ts`), needs GCP Memorystore + REDIS_URL on Cloud Run
-- Habit Engine Phase 7 deferred: Mia persona journey, neighborhood challenges, Safety Wrapped, mentorship, city reports
+- Habit Engine Phase 7 deferred: neighborhood challenges, Safety Wrapped, mentorship, city reports
 
 ### Known Issues
 - Community feed radius search requires GPS permission on first visit
@@ -490,6 +493,8 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 - Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`, `get_neighborhood_leaderboard`, `check_champion_repeat_badges`
 
 ### OSRM Server
+- Standard (safe): `http://34.116.139.172:5000/route/v1/bicycle`
+- Flat (avoid hills): `http://34.116.139.172:5001/route/v1/bicycle-flat`
 - Hosted on GCP project `osrmro1` in `europe-central2-c`
 - Custom safety profile using OSM road attributes
 - Supports `&exclude=unpaved` parameter
