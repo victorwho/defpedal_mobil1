@@ -63,6 +63,7 @@ cp -f "$SRC/apps/mobile/android/build.gradle" "$DST/apps/mobile/android/build.gr
 cp -f "$SRC/apps/mobile/android/settings.gradle" "$DST/apps/mobile/android/settings.gradle" 2>/dev/null || true
 cp -f "$SRC/apps/mobile/android/gradle.properties" "$DST/apps/mobile/android/gradle.properties" 2>/dev/null || true
 cp -f "$SRC/apps/mobile/android/app/src/main/AndroidManifest.xml" "$DST/apps/mobile/android/app/src/main/AndroidManifest.xml" 2>/dev/null || true
+robocopy "$SRC/apps/mobile/android/app/src/main/res" "$DST/apps/mobile/android/app/src/main/res" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
 
 echo "── Step 1b: Set APP_VARIANT in .env ──"
 # The JS bundle reads APP_VARIANT to determine the scheme, package name,
