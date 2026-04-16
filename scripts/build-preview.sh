@@ -57,13 +57,17 @@ for f in app.config.ts metro.config.js tsconfig.json package.json; do
   cp -f "$SRC/apps/mobile/$f" "$DST/apps/mobile/$f" 2>/dev/null || true
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/app/build.gradle" "$DST/apps/mobile/android/app/build.gradle" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/app/google-services.json" "$DST/apps/mobile/android/app/google-services.json" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/build.gradle" "$DST/apps/mobile/android/build.gradle" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/settings.gradle" "$DST/apps/mobile/android/settings.gradle" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/gradle.properties" "$DST/apps/mobile/android/gradle.properties" 2>/dev/null || true
-cp -f "$SRC/apps/mobile/android/app/src/main/AndroidManifest.xml" "$DST/apps/mobile/android/app/src/main/AndroidManifest.xml" 2>/dev/null || true
-robocopy "$SRC/apps/mobile/android/app/src/main/res" "$DST/apps/mobile/android/app/src/main/res" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
+
+# Sync the entire Android source + config tree (icons, manifest, gradle, etc.)
+# This prevents dev/release icon and config drift — no more cherry-picking files.
+# Excludes build/ output to avoid syncing gigabytes of cached artifacts.
+robocopy "$SRC/apps/mobile/android/app/src" "$DST/apps/mobile/android/app/src" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
+for f in build.gradle google-services.json; do
+  cp -f "$SRC/apps/mobile/android/app/$f" "$DST/apps/mobile/android/app/$f" 2>/dev/null || true
+done
+for f in build.gradle settings.gradle gradle.properties; do
+  cp -f "$SRC/apps/mobile/android/$f" "$DST/apps/mobile/android/$f" 2>/dev/null || true
+done
 
 echo "── Step 1b: Set APP_VARIANT in .env ──"
 # The JS bundle reads APP_VARIANT to determine the scheme, package name,
