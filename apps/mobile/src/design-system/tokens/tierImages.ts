@@ -1,7 +1,7 @@
 /**
  * Tier Mascot Images
  *
- * Each tier has a mascot illustration (512x512 PNG, transparent bg).
+ * Each tier has a mascot illustration (256x256 PNG, transparent bg).
  */
 
 import type { RiderTierKey } from './tierColors';

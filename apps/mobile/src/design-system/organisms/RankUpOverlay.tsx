@@ -188,7 +188,9 @@ export const RankUpOverlay = React.memo(function RankUpOverlay({
       {/* Mascot / fallback icon */}
       <Animated.View style={{ transform: [{ scale: mascotScale }], marginBottom: space[3] }}>
         {hasTierImage(tierKey) ? (
-          <Image source={tierImages[tierKey]} style={styles.mascotImage} resizeMode="contain" />
+          <View style={styles.mascotImageWrap}>
+            <Image source={tierImages[tierKey]} style={styles.mascotImageInner} resizeMode="cover" />
+          </View>
         ) : (
           <View style={[styles.mascotCircle, { borderColor: tierColor }]}>
             <Ionicons name="bicycle" size={64} color={tierColor} />
@@ -267,10 +269,18 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
   },
-  mascotImage: {
+  mascotImageWrap: {
     width: 120,
     height: 120,
-    borderRadius: 16,
+    borderRadius: 60,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  mascotImageInner: {
+    width: 156,
+    height: 156,
   },
   mascotCircle: {
     width: 120,

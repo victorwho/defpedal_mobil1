@@ -50,7 +50,9 @@ export const TierRankCard = React.memo(function TierRankCard({
         {showMascot && (
           <View style={s.leftCol}>
             {hasTierImage(key) ? (
-              <Image source={tierImages[key]} style={s.mascotImage} resizeMode="contain" />
+              <View style={s.mascotCircle}>
+                <Image source={tierImages[key]} style={s.mascotImage} resizeMode="cover" />
+              </View>
             ) : (
               <View style={[s.mascotFallback, { borderColor: tierDef.color }]}>
                 <Ionicons name="bicycle" size={28} color={tierDef.color} />
@@ -109,10 +111,18 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: space[2],
     },
-    mascotImage: {
+    mascotCircle: {
       width: 56,
       height: 56,
-      borderRadius: radii.md,
+      borderRadius: 28,
+      backgroundColor: '#FFFFFF',
+      overflow: 'hidden' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+    },
+    mascotImage: {
+      width: 72,
+      height: 72,
     },
     mascotFallback: {
       width: 56,
