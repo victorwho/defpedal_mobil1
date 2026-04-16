@@ -8,8 +8,8 @@ Update it at the end of each implementation slice.
 ## Snapshot
 
 - Overall progress: roughly 90-95 percent of product migration, 88-92 percent of production hardening
-- Current milestone: Profile photo upload working, navigation UX polish
-- Session 23 (2026-04-15/16): Navigation UX polish + profile photo upload fix — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix, profile avatar upload fixed (3 issues: NativeModules→requireOptionalNativeModule, expo-image-picker added to mobile workspace, fetch blob→expo-file-system File.bytes())
+- Current milestone: Profile photo upload working, navigation UX polish, app icon refresh
+- Session 23 (2026-04-15/16): Navigation UX polish + profile photo upload fix + app icon — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix, profile avatar upload fixed (3 issues), app icon: pedal logo shrunk 15% with uniform #F7D02A yellow from brand SVG
 - Session 22 (2026-04-15): Mia persona journey (all 5 phases), OSRM migration to 34.116.139.172, app icon resize, Mia skip-ahead UX fix
 - Session 21 (2026-04-14): Neighborhood Safety Leaderboard — full-stack feature (PRD victorwho/defpedal_mobil1#4)
 - Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
@@ -325,7 +325,8 @@ Update it at the end of each implementation slice.
       1. Native module detection used `NativeModules.ExpoImagePicker` (React Native bridge) but expo-image-picker registers as `ExponentImagePicker` via Expo Modules API — replaced with `requireOptionalNativeModule('ExponentImagePicker')` from `expo-modules-core`
       2. `expo-image-picker` was in root `package.json` but not in `apps/mobile/package.json` — Expo autolinking only reads the workspace package.json, so the native module was never compiled into the APK
       3. Upload used `fetch(asset.uri).blob()` which fails on Android `content://` URIs — replaced with `expo-file-system` new `File` class (`file.bytes()`) which properly reads local files
-    - Bundle: HTTP 200. Phone-tested on Samsung S23 Ultra — avatar picker opens, image uploads to Supabase Storage, profile photo displays.
+    - **App icon refresh**: Shrunk pedal logo 15% within adaptive icon for more breathing room. Replaced background yellow from `#D4A843` to `#F7D02A` (matching brand SVG). Updated source assets (`adaptive-icon.png`, `icon.png`), regenerated all mipmap PNGs (foreground + launcher + round, 5 densities), updated `ic_launcher_background` color and `app.config.ts` backgroundColor.
+    - Bundle: HTTP 200. Phone-tested on Samsung S23 Ultra — avatar picker opens, image uploads to Supabase Storage, profile photo displays. New icon visible on home screen.
 
 ## Phase Status
 

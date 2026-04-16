@@ -190,7 +190,7 @@ export default () => ({
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#D4A843',
+        backgroundColor: '#F7D02A',
       },
       package: appIdentifierByVariant[appVariant],
       permissions: [
