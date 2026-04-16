@@ -8,8 +8,8 @@ Update it at the end of each implementation slice.
 ## Snapshot
 
 - Overall progress: roughly 90-95 percent of product migration, 88-92 percent of production hardening
-- Current milestone: Navigation UX polish — end ride button safety differentiation, destination marker bullseye
-- Session 23 (2026-04-15): Navigation UX polish — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix
+- Current milestone: Profile photo upload working, navigation UX polish
+- Session 23 (2026-04-15/16): Navigation UX polish + profile photo upload fix — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix, profile avatar upload fixed (3 issues: NativeModules→requireOptionalNativeModule, expo-image-picker added to mobile workspace, fetch blob→expo-file-system File.bytes())
 - Session 22 (2026-04-15): Mia persona journey (all 5 phases), OSRM migration to 34.116.139.172, app icon resize, Mia skip-ahead UX fix
 - Session 21 (2026-04-14): Neighborhood Safety Leaderboard — full-stack feature (PRD victorwho/defpedal_mobil1#4)
 - Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
@@ -317,11 +317,15 @@ Update it at the end of each implementation slice.
     - **Infrastructure**: Cloud Scheduler API enabled, 2 cron jobs created (weekly Monday 4AM, monthly 1st 4AM). Cloud Run revision `defpedal-api-00049-529` deployed with CRON_SECRET. Both Supabase migrations applied
     - TypeScript: 0 errors. Bundle: HTTP 200. Settle endpoint smoke test: 200 OK
 
-- Session 23 — Navigation UX polish (2026-04-15):
+- Session 23 — Navigation UX polish + profile photo upload (2026-04-15/16):
     - **End Ride button differentiation**: Changed end ride button from identical gray `close` (X) icon to distinct red (`safetyColors.danger`) background with white `stop-circle` icon. Prevents accidental ride cancellation by visual separation from the menu close button. Uses `variant="danger"` on IconButton. New `endRideButton` style in navigation.tsx stylesheet.
     - **Destination marker bullseye**: Replaced identical-shaped origin/destination dots with differentiated markers. Origin stays as small green dot (6px). Destination changed to red bullseye — 11px red outer ring + 4px white inner dot, following Google Maps convention. Distinct by size, shape, and color (satisfies `color-not-only` accessibility rule).
     - **Mapbox existing layer fix**: Added `existing` prop to all CircleLayer and LineLayer in MarkerLayers.tsx to suppress `RNMBXLayer` deprecation warning during hot reload (layer ID collision on fast refresh).
-    - Bundle: HTTP 200. Phone-tested on Samsung S23 Ultra.
+    - **Profile photo upload fix (3 layered issues)**:
+      1. Native module detection used `NativeModules.ExpoImagePicker` (React Native bridge) but expo-image-picker registers as `ExponentImagePicker` via Expo Modules API — replaced with `requireOptionalNativeModule('ExponentImagePicker')` from `expo-modules-core`
+      2. `expo-image-picker` was in root `package.json` but not in `apps/mobile/package.json` — Expo autolinking only reads the workspace package.json, so the native module was never compiled into the APK
+      3. Upload used `fetch(asset.uri).blob()` which fails on Android `content://` URIs — replaced with `expo-file-system` new `File` class (`file.bytes()`) which properly reads local files
+    - Bundle: HTTP 200. Phone-tested on Samsung S23 Ultra — avatar picker opens, image uploads to Supabase Storage, profile photo displays.
 
 ## Phase Status
 

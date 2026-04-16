@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
-import { Alert, Image, NativeModules, Share } from 'react-native';
+import { Alert, Image, Share } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Linking from 'expo-linking';
-// expo-image-picker is a native module — lazy require to avoid crash if not in APK
-const hasImagePicker = Boolean(NativeModules.ExpoImagePicker);
+// expo-image-picker uses Expo Modules API (not classic NativeModules bridge).
+// requireOptionalNativeModule returns null if module isn't installed.
+import { requireOptionalNativeModule } from 'expo-modules-core';
+const hasImagePicker = Boolean(requireOptionalNativeModule('ExponentImagePicker'));
 import { useQuery } from '@tanstack/react-query';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -82,13 +84,14 @@ export default function ProfileScreen() {
       const ext = asset.uri.split('.').pop() ?? 'jpg';
       const path = `${user.id}/avatar.${ext}`;
 
-      // Read the image as a blob for upload
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
+      // Use new expo-file-system File class (implements Blob) for Supabase upload
+      const { File: ExpoFile } = require('expo-file-system') as typeof import('expo-file-system');
+      const file = new ExpoFile(asset.uri);
+      const bytes = await file.bytes();
 
       const { error: uploadError } = await supabaseClient.storage
         .from('avatars')
-        .upload(path, blob, { upsert: true, contentType: asset.mimeType ?? 'image/jpeg' });
+        .upload(path, bytes, { upsert: true, contentType: asset.mimeType ?? 'image/jpeg' });
 
       if (uploadError) throw uploadError;
 
