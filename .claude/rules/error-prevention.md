@@ -14,6 +14,9 @@ Before making any code changes, consult `.claude/error-log.md` for known pitfall
 8. **Fetching POI data?** Prefer Mapbox vector tiles over Overpass API (Error #14)
 9. **Using SafeAreaView?** Import from `react-native-safe-area-context`, not `react-native` (Error #15)
 10. **Phone blank?** Check USB + port forwarding + Metro status first (Error #16, #17)
+11. **Changed icons/manifest/res?** Build script syncs `android/app/src/` automatically, but verify with a preview build — dev and release use different source dirs (Error #20)
+12. **Detecting Expo native modules?** Use `requireOptionalNativeModule()` from `expo-modules-core`, NOT `NativeModules` from React Native (Error #21)
+13. **Installing Expo native packages?** Must be in `apps/mobile/package.json`, not just root — autolinking only reads the workspace (Error #22)
 
 ## After every code change
 

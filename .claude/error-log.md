@@ -151,3 +151,18 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Pattern:** `.env` has `EXPO_PUBLIC_MOBILE_API_URL` pointing to Cloud Run production URL. Changes to API code aren't visible until deployed to Cloud Run, even though a local API server is running on port 8080.
 **Fix:** Either deploy API changes to Cloud Run before testing, or temporarily switch .env to `http://localhost:8080` for local testing (requires `adb reverse tcp:8080 tcp:8080`).
 **Occurrences:** CO2 feature testing (2026-04-02)
+
+### 20. Dev and release builds have different icons/resources
+**Pattern:** The `C:\dpb` short-path copy used for preview/production builds has its own `android/app/src/main/res/` directory. Changing icons, manifest, or resources in `C:\dev\defpedal` only affects dev builds. Release builds from `C:\dpb` keep stale resources until explicitly synced.
+**Fix:** `build-preview.sh` now syncs the entire `android/app/src/` tree via `robocopy --MIR`. If you ever add files outside `android/app/src/` or `android/app/build.gradle`, add them to the sync section in the script.
+**Occurrences:** App icon mismatch between dev and production (2026-04-16), missing AndroidManifest cleartext flag (2026-04-15), missing google-services.json preview entry (2026-04-15)
+
+### 21. Expo native module detection — use requireOptionalNativeModule, not NativeModules
+**Pattern:** Expo SDK 55 modules (expo-image-picker, expo-haptics, etc.) register via Expo Modules API (`globalThis.expo.modules`), NOT the classic React Native `NativeModules` bridge. Checking `NativeModules.ExpoImagePicker` always returns `undefined` even when the module is installed.
+**Fix:** Use `requireOptionalNativeModule('ExponentImagePicker')` from `expo-modules-core` to detect presence. Check the module's source for the registered name (often different from the package name — e.g., `ExponentImagePicker` not `ExpoImagePicker`).
+**Occurrences:** Profile photo upload silently disabled (2026-04-16)
+
+### 22. expo-image-picker must be in mobile workspace package.json
+**Pattern:** Dependencies in the root `package.json` are available to JS `require()` but Expo autolinking only reads the workspace `apps/mobile/package.json` to decide which native modules to compile. A module in root-only won't be linked into the native build.
+**Fix:** Always `cd apps/mobile && npm install <package>` for native Expo modules, not `npm install` at root.
+**Occurrences:** expo-image-picker installed at root but not linked into APK (2026-04-16)
