@@ -39,8 +39,10 @@ import { useMiaSegmentBanners } from '../src/hooks/useMiaSegmentBanners';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
+import { cacheActiveRoute, clearCachedRoute, type CachedRouteData } from '../src/lib/offlineRouteCache';
 import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
+import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAppStore } from '../src/store/appStore';
 import { useShallow } from 'zustand/shallow';
 
@@ -120,6 +122,7 @@ export default function NavigationScreen() {
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
 
+  const { isOnline } = useConnectivity();
   const t = useT();
   const confirm = useConfirmation();
 
@@ -173,7 +176,7 @@ export default function NavigationScreen() {
 
   const { hazards: nearbyHazards } = useNearbyHazards(
     hazardQueryCoordinate,
-    Boolean(navigationSession),
+    isOnline && Boolean(navigationSession),
     hazardRadius,
   );
 
@@ -307,6 +310,7 @@ export default function NavigationScreen() {
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showElevationProgress, setShowElevationProgress] = useState(false);
+  const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hazardTypeLabels = HAZARD_TYPE_OPTIONS.reduce<Record<HazardType, string>>(
@@ -535,6 +539,33 @@ export default function NavigationScreen() {
     };
   }, []);
 
+  // ── Cache active route for offline recovery ──
+  useEffect(() => {
+    if (!selectedRoute || !navigationSession) return;
+
+    const routingMode: CachedRouteData['routingMode'] =
+      routeRequest.mode === 'safe' && avoidHills ? 'flat' : routeRequest.mode;
+
+    const cachedData: CachedRouteData = {
+      routeId: selectedRoute.id,
+      geometry: selectedRoute.geometryPolyline6,
+      steps: selectedRoute.steps,
+      distanceMeters: selectedRoute.distanceMeters,
+      durationSeconds: selectedRoute.durationSeconds,
+      originLabel: `${routeRequest.origin.lat.toFixed(4)}, ${routeRequest.origin.lon.toFixed(4)}`,
+      destinationLabel: `${routeRequest.destination.lat.toFixed(4)}, ${routeRequest.destination.lon.toFixed(4)}`,
+      routingMode,
+      waypoints: (routeRequest.waypoints ?? []).map((wp) => ({
+        lat: wp.lat,
+        lon: wp.lon,
+        label: `${wp.lat.toFixed(4)}, ${wp.lon.toFixed(4)}`,
+      })),
+      cachedAt: new Date().toISOString(),
+    };
+
+    void cacheActiveRoute(cachedData);
+  }, [selectedRoute?.id, navigationSession?.sessionId, routeRequest.mode, avoidHills]);
+
   // ── Hazard proximity detection ──
   useEffect(() => {
     const userCoord = locationState.sample?.coordinate;
@@ -652,6 +683,7 @@ export default function NavigationScreen() {
         session_id: navigationSession?.sessionId ?? 'unknown',
       });
       speak(t('nav.arrived'));
+      void clearCachedRoute();
       finishNavigation();
       router.replace('/feedback');
     }
@@ -697,13 +729,21 @@ export default function NavigationScreen() {
       !selectedRoute ||
       !locationState.sample ||
       isReroutePending ||
+      !isOnline ||
       !shouldTriggerAutomaticReroute(navigationSession)
     ) {
       return;
     }
 
     rerouteMutateRef.current(locationState.sample.coordinate);
-  }, [locationState.sample, navigationSession, isReroutePending, selectedRoute]);
+  }, [locationState.sample, navigationSession, isReroutePending, selectedRoute, isOnline]);
+
+  // Reset offline banner dismissed state when coming back online
+  useEffect(() => {
+    if (isOnline) {
+      setOfflineBannerDismissed(false);
+    }
+  }, [isOnline]);
 
   if (!selectedRoute || !navigationSession) {
     return (
@@ -761,6 +801,7 @@ export default function NavigationScreen() {
     ? { label: t('nav.retryGps'), handler: () => void locationState.refreshLocation() }
     : navigationSession.rerouteEligible &&
         !rerouteMutation.isPending &&
+        isOnline &&
         mobileEnv.mobileApiUrl &&
         locationState.sample
       ? { label: t('nav.rerouteNow'), handler: () => rerouteMutation.mutate(locationState.sample!.coordinate) }
@@ -805,6 +846,7 @@ export default function NavigationScreen() {
             currentStep={currentStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
             gpsAccuracyMeters={locationState.sample?.accuracyMeters}
+            isOffline={!isOnline}
             onPress={() => {
               if (currentStep) {
                 const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);
@@ -825,6 +867,22 @@ export default function NavigationScreen() {
                   {warningAction.label}
                 </Button>
               ) : null}
+            </View>
+          ) : null}
+
+          {/* Offline + off-route banner */}
+          {!isOnline && navigationSession.rerouteEligible && !offlineBannerDismissed ? (
+            <View style={[styles.warningBanner, shadows.md]}>
+              <Text style={[textSm, styles.warningBannerText]}>
+                No connection — follow the planned route
+              </Text>
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => setOfflineBannerDismissed(true)}
+              >
+                Dismiss
+              </Button>
             </View>
           ) : null}
         </View>
@@ -936,6 +994,7 @@ export default function NavigationScreen() {
                       route_id: selectedRoute.id,
                       session_id: navigationSession.sessionId,
                     });
+                    void clearCachedRoute();
                     finishNavigation();
                     router.push('/feedback');
                   },

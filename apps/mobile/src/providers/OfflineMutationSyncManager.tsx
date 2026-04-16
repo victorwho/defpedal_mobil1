@@ -6,6 +6,7 @@ import { mobileApi } from '../lib/api';
 import { mobileEnv } from '../lib/env';
 import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
+import { useConnectivity } from './ConnectivityMonitor';
 
 const SYNC_INTERVAL_MS = 15000;
 const MUTATION_SYNC_TIMEOUT_MS = 10000;
@@ -170,7 +171,9 @@ const withMutationTimeout = async <TResponse,>(
   });
 
 export const OfflineMutationSyncManager = () => {
+  const { isOnline } = useConnectivity();
   const flushingRef = useRef(false);
+  const prevOnlineRef = useRef(isOnline);
 
   useEffect(() => {
     const state = useAppStore.getState();
@@ -326,10 +329,27 @@ export const OfflineMutationSyncManager = () => {
       }
     };
 
-    // Flush immediately on mount, then on a stable 15s interval.
-    // The flush function reads fresh state via useAppStore.getState()
-    // so it always sees the latest queue without needing reactive deps.
+    // Skip flush cycle entirely when offline — saves battery on doomed requests.
+    if (!isOnline) {
+      prevOnlineRef.current = false;
+      return () => { cancelled = true; };
+    }
+
+    // If we just transitioned from offline to online, trigger immediate flush.
+    // Otherwise, flush on mount as usual.
+    const wasOffline = !prevOnlineRef.current;
+    prevOnlineRef.current = true;
+
+    // Flush immediately (on mount or on offline→online transition),
+    // then on a stable 15s interval.
     void flushQueue();
+
+    if (wasOffline) {
+      telemetry.capture('offline_sync_reconnected', {
+        queue_length: useAppStore.getState().queuedMutations.length,
+      });
+    }
+
     const intervalHandle = setInterval(() => {
       void flushQueue();
     }, SYNC_INTERVAL_MS);
@@ -338,7 +358,7 @@ export const OfflineMutationSyncManager = () => {
       cancelled = true;
       clearInterval(intervalHandle);
     };
-  }, []);
+  }, [isOnline]);
 
   return null;
 };

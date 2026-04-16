@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
@@ -26,6 +26,39 @@ import {
   textLg,
   textXl,
 } from '../src/design-system/tokens/typography';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Estimated average tile size in bytes (~15 KB). */
+const ESTIMATED_TILE_SIZE_BYTES = 15 * 1024;
+
+/** Storage cap in bytes (200 MB). */
+const STORAGE_CAP_BYTES = 200 * 1024 * 1024;
+
+/** Format bytes to human-readable MB string. */
+const formatMB = (bytes: number): string =>
+  `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+/** Format a date as a human-readable "time ago" string. */
+const formatTimeAgo = (date: Date): string => {
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
+
+/** Get storage bar color based on usage fraction. */
+const getStorageColor = (fraction: number): string => {
+  if (fraction < 0.5) return '#22C55E'; // green
+  if (fraction < 0.8) return '#F59E0B'; // amber
+  return '#EF4444'; // red
+};
 
 function MetricBlock({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
   const { colors } = useTheme();
@@ -103,6 +136,32 @@ function Card({
   );
 }
 
+function StorageOverview({ totalBytes }: { totalBytes: number }) {
+  const { colors } = useTheme();
+  const fraction = Math.min(totalBytes / STORAGE_CAP_BYTES, 1);
+  const barColor = getStorageColor(fraction);
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.bgSecondary }, shadows.md]}>
+      <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Storage</Text>
+      <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+        {formatMB(totalBytes)} used of {formatMB(STORAGE_CAP_BYTES)}
+      </Text>
+      <View style={styles.storageBarTrack}>
+        <View
+          style={[
+            styles.storageBarFill,
+            { width: `${Math.max(fraction * 100, 1)}%`, backgroundColor: barColor },
+          ]}
+        />
+      </View>
+      <Text style={[styles.helperText, { color: colors.textMuted }]}>
+        Packs older than 5 days are automatically removed. Storage capped at 200 MB.
+      </Text>
+    </View>
+  );
+}
+
 export default function OfflineMapsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
@@ -125,6 +184,14 @@ export default function OfflineMapsScreen() {
     selectedRoute?.id ?? null,
     offlineRegions,
   );
+
+  // Calculate total storage used across all offline packs
+  const totalStorageBytes = useMemo(() => {
+    return offlineRegions.reduce((acc, region) => {
+      const count = region.completedResourceCount ?? 0;
+      return acc + count * ESTIMATED_TILE_SIZE_BYTES;
+    }, 0);
+  }, [offlineRegions]);
 
   const refreshOfflineRegions = async () => {
     if (!mobileEnv.mapboxPublicToken) {
@@ -153,6 +220,10 @@ export default function OfflineMapsScreen() {
       eyebrow="Keep riding"
       subtitle="This surface now mirrors the web app more closely: one clear readiness signal, a primary download action, and visible pack progress."
     >
+      {offlineRegions.length > 0 ? (
+        <StorageOverview totalBytes={totalStorageBytes} />
+      ) : null}
+
       <Card title="Selected route readiness" tone={selectedRouteOfflineSummary.isSelectedRouteReady ? 'accent' : 'default'}>
         <Text style={[styles.bodyText, selectedRouteOfflineSummary.isSelectedRouteReady ? { color: colors.textInverse } : { color: colors.textSecondary }]}>
           {selectedRouteOfflineSummary.isSelectedRouteReady
@@ -280,6 +351,11 @@ export default function OfflineMapsScreen() {
             </View>
             <ProgressBar progress={progress} />
             <View style={styles.regionMeta}>
+              {region.updatedAt ? (
+                <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
+                  Downloaded {formatTimeAgo(new Date(region.updatedAt))}
+                </Text>
+              ) : null}
               <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
                 Progress: {region.progressPercentage !== undefined ? `${progress}%` : 'Waiting'}
               </Text>
@@ -292,6 +368,11 @@ export default function OfflineMapsScreen() {
                   ? `${region.completedResourceCount}/${region.requiredResourceCount}`
                   : 'Unknown'}
               </Text>
+              {region.completedResourceCount != null ? (
+                <Text style={[styles.metaText, { color: region.status === 'ready' ? colors.textInverse : colors.textSecondary }]}>
+                  Size: ~{formatMB(region.completedResourceCount * ESTIMATED_TILE_SIZE_BYTES)}
+                </Text>
+              ) : null}
             </View>
             {region.error ? <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{region.error}</Text> : null}
             <Button
@@ -386,5 +467,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...textXl,
     fontWeight: '900',
+  },
+  storageBarTrack: {
+    height: space[2] + 2,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+    overflow: 'hidden',
+  },
+  storageBarFill: {
+    height: '100%',
+    borderRadius: radii.full,
   },
 });

@@ -23,6 +23,18 @@
 - [x] DONE — Personal safety map overlay (ride history as colored lines, FAB toggle, safe=green/fast=blue) (2026-04-04)
 - [x] DONE — Hazard alert sharing (share button on hazard toast, native share sheet with location) (2026-04-04)
 
+## Offline Navigation (GitHub Issue #6)
+- [x] DONE — Connectivity detection: ConnectivityMonitor provider with debounced NetInfo, lazy NativeModules.RNCNetInfo guard, "Back online" toast (2026-04-16)
+- [x] DONE — App restart recovery: OfflineRouteCache (MMKV), NavigationResumeGuard (auto-resume <15min, prompt >=15min, discard inconsistent state) (2026-04-16)
+- [x] DONE — Offline feature gating: reroute suppressed with banner, hazards disabled, weather hidden, ManeuverCard wifi-off indicator (2026-04-16)
+- [x] DONE — Download for offline: route-preview button with progress states (idle/downloading/complete/error) using existing Mapbox offline packs (2026-04-16)
+- [x] DONE — Offline pack cleanup: auto-delete >5 days, 200MB LRU eviction on app launch (2026-04-16)
+- [x] DONE — OfflineMutationSyncManager: skip flush when offline, immediate flush on reconnect (2026-04-16)
+- [x] DONE — Route planning offline mode: disabled search, OfflineBanner, resume cached route card (2026-04-16)
+- [x] DONE — Offline maps storage display: used/200MB progress bar, pack ages, cleanup policy text (2026-04-16)
+- [x] DONE — 26 unit tests across 4 test files (OfflineRouteCache, OfflinePackCleanup, NavigationResumeGuard, ConnectivityMonitor) (2026-04-16)
+- [!] PENDING — Dev APK rebuild needed to activate real NetInfo (currently falls back to isOnline: true)
+
 ## Onboarding
 - [x] DONE — Risk overlay on safety score map (2026-04-03)
 - [x] DONE — 4-category safety score display (2026-04-03)

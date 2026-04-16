@@ -142,8 +142,10 @@ export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
   distanceToManeuverMeters: number | null;
   gpsAccuracyMeters?: number | null;
+  /** When true, replaces the GPS quality dot with an offline indicator. */
+  isOffline?: boolean;
   onPress?: () => void;
-}> = ({ currentStep, distanceToManeuverMeters, gpsAccuracyMeters, onPress }) => {
+}> = ({ currentStep, distanceToManeuverMeters, gpsAccuracyMeters, isOffline, onPress }) => {
   const iconName = getManeuverIcon(currentStep);
   const description = getManeuverDescription(currentStep);
   const distance =
@@ -175,10 +177,20 @@ export const ManeuverCard: React.FC<{
       <Text style={styles.maneuverDist}>{distance}</Text>
       <View
         style={styles.gpsIndicator}
-        accessibilityLabel={`GPS signal ${gpsAccuracyMeters == null ? 'unavailable' : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD ? 'strong' : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD ? 'fair' : 'poor'}`}
+        accessibilityLabel={
+          isOffline
+            ? 'Offline — no internet connection'
+            : `GPS signal ${gpsAccuracyMeters == null ? 'unavailable' : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD ? 'strong' : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD ? 'fair' : 'poor'}`
+        }
       >
-        {poor ? <PulsingGpsIcon color={gpsColor} /> : null}
-        <View style={[styles.gpsDotInner, { backgroundColor: gpsColor }]} />
+        {isOffline ? (
+          <Ionicons name="cloud-offline-outline" size={16} color="#FFC107" />
+        ) : (
+          <>
+            {poor ? <PulsingGpsIcon color={gpsColor} /> : null}
+            <View style={[styles.gpsDotInner, { backgroundColor: gpsColor }]} />
+          </>
+        )}
       </View>
     </Wrapper>
   );

@@ -22,10 +22,13 @@ import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useWeather } from '../src/hooks/useWeather';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
+import { loadCachedRoute } from '../src/lib/offlineRouteCache';
+import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 import { SearchBar } from '../src/design-system/molecules';
+import { OfflineBanner } from '../src/design-system/molecules/OfflineBanner';
 import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
@@ -51,6 +54,18 @@ import { MiaEmptyState } from '../src/design-system/molecules/MiaEmptyState';
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
 const MAX_WAYPOINTS = 3;
+
+/** Format a date as a human-readable "time ago" string. */
+const formatTimeAgo = (date: Date): string => {
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+};
 
 const isDefaultCoordinate = (coordinate: Coordinate) =>
   coordinate.lat === 0 && coordinate.lon === 0;
@@ -82,6 +97,32 @@ export default function RoutePlanningScreen() {
   const addRecentDestination = useAppStore((state) => state.addRecentDestination);
   const recentRideDestinations = useRecentRideDestinations();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
+  const { isOnline } = useConnectivity();
+
+  // ── Offline cached route ──
+  const [cachedRoute, setCachedRoute] = useState<{
+    destinationLabel: string;
+    cachedAt: string;
+  } | null>(null);
+  useEffect(() => {
+    if (isOnline) {
+      setCachedRoute(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const cached = await loadCachedRoute();
+        if (cached) {
+          setCachedRoute({
+            destinationLabel: cached.destinationLabel,
+            cachedAt: cached.cachedAt,
+          });
+        }
+      } catch {
+        // Silently fail — cached route is optional
+      }
+    })();
+  }, [isOnline]);
 
   // ── Mia Persona Journey ──
   const persona = useAppStore((state) => state.persona);
@@ -672,6 +713,41 @@ export default function RoutePlanningScreen() {
       }
       topOverlay={
         <View style={styles.topContainer}>
+          {/* Offline banner — shown when not connected */}
+          <OfflineBanner
+            visible={!isOnline}
+            message="You're offline — saved routes and recent destinations still available"
+          />
+
+          {/* Resume cached route card — shown when offline and a cached route exists */}
+          {!isOnline && cachedRoute ? (
+            <Pressable
+              style={styles.cachedRouteCard}
+              onPress={() => {
+                // Restore cached route into Zustand store so route-preview/navigation can use it
+                const { setRouteRequest, startNavigation } = useAppStore.getState();
+                // Navigate directly to navigation screen (resume from where we left off)
+                router.replace('/navigation');
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Resume last route to ${cachedRoute.destinationLabel}`}
+            >
+              <View style={styles.cachedRouteContent}>
+                <Ionicons name="navigate-outline" size={18} color={colors.accent} />
+                <View style={styles.cachedRouteTextWrap}>
+                  <Text style={styles.cachedRouteTitle} numberOfLines={1}>
+                    Resume last route
+                  </Text>
+                  <Text style={styles.cachedRouteSubtitle} numberOfLines={1}>
+                    {cachedRoute.destinationLabel} — cached{' '}
+                    {formatTimeAgo(new Date(cachedRoute.cachedAt))}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={gray[400]} />
+              </View>
+            </Pressable>
+          ) : null}
+
           {/* Mia Journey progress bar + skip ahead */}
           {isMia ? (
             <View style={styles.miaHeaderWrap}>
@@ -763,9 +839,9 @@ export default function RoutePlanningScreen() {
           <View style={styles.destinationCard}>
             <SearchBar
               label="Destination"
-              value={destinationQuery}
-              placeholder="Where to?"
-              active={activeField === 'destination'}
+              value={isOnline ? destinationQuery : destinationQuery}
+              placeholder={isOnline ? 'Where to?' : 'Connect to internet to search'}
+              active={isOnline && activeField === 'destination'}
               isLoading={destinationAutocompleteQuery.isPending}
               errorMessage={
                 destinationAutocompleteQuery.isError
@@ -774,8 +850,9 @@ export default function RoutePlanningScreen() {
               }
               suggestions={mergedDestinationSuggestions}
               recentDestinations={recentRideDestinations}
-              onFocus={() => setActiveField('destination')}
+              onFocus={() => { if (isOnline) setActiveField('destination'); }}
               onChangeText={(value) => {
+                if (!isOnline) return;
                 setDestinationQuery(value);
                 setDestinationHydrated(true);
                 setActiveField('destination');
@@ -1255,6 +1332,31 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     topContainer: {
       gap: space[2],
+    },
+    cachedRouteCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: radii.xl,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      ...shadows.md,
+    },
+    cachedRouteContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    cachedRouteTextWrap: {
+      flex: 1,
+      gap: 2,
+    },
+    cachedRouteTitle: {
+      color: gray[800],
+      fontFamily: fontFamily.body.bold,
+      fontSize: 15,
+    },
+    cachedRouteSubtitle: {
+      color: gray[500],
+      fontSize: 12,
     },
     originCard: {
       backgroundColor: '#FFFFFF',

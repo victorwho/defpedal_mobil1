@@ -1,20 +1,21 @@
 # Implementation Progress
 
-Last updated: 2026-04-15 (session 23)
+Last updated: 2026-04-16 (session 24)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
 
-- Overall progress: roughly 90-95 percent of product migration, 88-92 percent of production hardening
-- Current milestone: Profile photo upload working, navigation UX polish, app icon refresh
+- Overall progress: roughly 92-95 percent of product migration, 90-93 percent of production hardening
+- Current milestone: Offline navigation (GitHub issue #6) — three-layer offline system
+- Session 24 (2026-04-16): Offline Navigation (victorwho/defpedal_mobil1#6) — three-layer system: (1) ConnectivityMonitor provider with debounced NetInfo + lazy native module guard, (2) OfflineRouteCache for app restart recovery with NavigationResumeGuard (auto-resume <15min, prompt >=15min), (3) route-preview "Download for offline" button with progress states. Offline gating: reroute suppressed with banner, hazards disabled, weather hidden, ManeuverCard wifi-off indicator. OfflineMutationSyncManager skips flush when offline, immediate flush on reconnect. OfflinePackCleanup auto-deletes packs >5 days + 200MB LRU eviction. OfflineBanner molecule. offline-maps storage display with progress bar + pack ages. route-planning offline mode (disabled search, resume cached route card). 26 new tests, 9 new files, 9 modified files. Requires APK rebuild for real NetInfo activation.
 - Session 23 (2026-04-15/16): Navigation UX polish + profile photo upload fix + app icon — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix, profile avatar upload fixed (3 issues), app icon: pedal logo shrunk 15% with uniform #F7D02A yellow from brand SVG
 - Session 22 (2026-04-15): Mia persona journey (all 5 phases), OSRM migration to 34.116.139.172, app icon resize, Mia skip-ahead UX fix
 - Session 21 (2026-04-14): Neighborhood Safety Leaderboard — full-stack feature (PRD victorwho/defpedal_mobil1#4)
 - Session 20 (2026-04-14): segment-aware off-route detection, reroute profile preservation, steep grade indicator cleanup
 - Primary risk: iPhone validation, Redis-backed staging load testing, deeper rollout automation, and final visual polish parity across every screen are still incomplete
-- Test counts: 1174 total (core: 339, mobile-api: 270, mobile: 565)
+- Test counts: ~1200 total (core: 339, mobile-api: 270, mobile: ~591)
 - Cloud Run: revision defpedal-api-00050-n2k
 - Cloud Scheduler: 4 jobs (leaderboard weekly/monthly, mia-detection daily 10AM, mia-notification daily 9AM)
 - Webapp cleanup (2026-03-22): all legacy React/Vite/Leaflet webapp code has been removed from the repo root — components/, hooks/, utils/, App.tsx, web-index.tsx, index.html, vite.config.ts, sw.js, manifest.json, and webapp dependencies (leaflet, react-dom, vite, vitest, jsdom, testing-library). Root SQL files moved to supabase/migrations/legacy/. Root tsconfig.json cleaned of DOM libs. The repo is now mobile-only.

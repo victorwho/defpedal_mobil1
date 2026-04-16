@@ -30,3 +30,6 @@ export type { MiaCourageSectionProps } from './MiaCourageSection';
 
 export { MiaEmptyState } from './MiaEmptyState';
 export type { MiaEmptyStateProps } from './MiaEmptyState';
+
+export { OfflineBanner } from './OfflineBanner';
+export type { OfflineBannerProps } from './OfflineBanner';

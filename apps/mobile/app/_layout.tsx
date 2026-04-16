@@ -8,6 +8,8 @@ import { AppState as RNAppState, StyleSheet, Text, View } from 'react-native';
 
 import { mobileEnv } from '../src/lib/env';
 import { mobileApi } from '../src/lib/api';
+import { cleanupOfflinePacks } from '../src/lib/offlinePackCleanup';
+import { listOfflineRegions } from '../src/lib/offlinePacks';
 import { AppProviders } from '../src/providers/AppProviders';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -21,6 +23,7 @@ import { MiaInvitationPrompt } from '../src/design-system/organisms/MiaInvitatio
 import { MiaLevelUpOverlay } from '../src/design-system/organisms/MiaLevelUpOverlay';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
+import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -296,6 +299,15 @@ const RootLayoutInner = () => {
   const { colors } = useTheme();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
 
+  // Fire-and-forget offline pack cleanup on app launch
+  useEffect(() => {
+    void listOfflineRegions()
+      .then((regions) => cleanupOfflinePacks(regions))
+      .catch(() => {
+        // Non-blocking — cleanup failure is acceptable
+      });
+  }, []);
+
   if (__DEV__ && showValidationOverlay) {
     console.log('validation: RootLayout render', {
       bundleId: mobileEnv.validationBundleId || 'missing',
@@ -309,6 +321,7 @@ const RootLayoutInner = () => {
       <RouteTelemetryObserver />
       <AppOpenTelemetryObserver />
       <OnboardingGuard />
+      <NavigationResumeGuard />
       {showValidationOverlay ? (
         <View pointerEvents="none" style={styles.validationOverlay}>
           <Text style={styles.validationLabel}>Validation build active</Text>

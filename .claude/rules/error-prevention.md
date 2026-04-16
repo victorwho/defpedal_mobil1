@@ -17,6 +17,7 @@ Before making any code changes, consult `.claude/error-log.md` for known pitfall
 11. **Changed icons/manifest/res?** Build script syncs `android/app/src/` automatically, but verify with a preview build — dev and release use different source dirs (Error #20)
 12. **Detecting Expo native modules?** Use `requireOptionalNativeModule()` from `expo-modules-core`, NOT `NativeModules` from React Native (Error #21)
 13. **Installing Expo native packages?** Must be in `apps/mobile/package.json`, not just root — autolinking only reads the workspace (Error #22)
+14. **Using community native modules (non-Expo)?** Check `NativeModules.<BridgeName>` BEFORE `require()` — the module's invariant throw can escape try/catch (Error #23)
 
 ## After every code change
 

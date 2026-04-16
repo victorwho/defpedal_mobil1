@@ -19,8 +19,13 @@ import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { createClientTripId } from '../src/lib/offlineQueue';
+import {
+  buildOfflineRegionFromRoute,
+  downloadOfflineRegion,
+} from '../src/lib/offlinePacks';
 import { mobileApi } from '../src/lib/api';
 import { telemetry } from '../src/lib/telemetry';
+import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
@@ -82,6 +87,23 @@ export default function RoutePreviewScreen() {
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
   const enqueueTelemetryEvent = useAppStore((state) => state.enqueueTelemetryEvent);
+
+  const { isOnline } = useConnectivity();
+
+  // ── Offline download state ──
+  type OfflineDownloadStatus = 'idle' | 'downloading' | 'complete' | 'error';
+  const [offlineDownloadStatus, setOfflineDownloadStatus] = useState<OfflineDownloadStatus>('idle');
+  const [offlineDownloadProgress, setOfflineDownloadProgress] = useState(0);
+  const [offlineDownloadError, setOfflineDownloadError] = useState<string | null>(null);
+  const upsertOfflineRegion = useAppStore((state) => state.upsertOfflineRegion);
+  const offlineRegions = useAppStore((state) => state.offlineRegions);
+
+  // Check if the selected route already has a ready offline pack
+  const isRouteOfflineReady = useMemo(() => {
+    if (!selectedRouteId) return false;
+    const packId = `route-pack-${selectedRouteId}`;
+    return offlineRegions.some((r) => r.id === packId && r.status === 'ready');
+  }, [selectedRouteId, offlineRegions]);
 
   // ── Route Preview Telemetry: route_generated_not_started ──
   const navigationStartedRef = useRef(false);
@@ -186,6 +208,30 @@ export default function RoutePreviewScreen() {
       null,
     [routePreview, selectedRouteId],
   );
+
+  const handleDownloadOffline = useCallback(() => {
+    if (!selectedRoute) return;
+    setOfflineDownloadStatus('downloading');
+    setOfflineDownloadProgress(0);
+    setOfflineDownloadError(null);
+
+    const region = buildOfflineRegionFromRoute(selectedRoute);
+    void downloadOfflineRegion(region, (updated) => {
+      if (updated.status === 'ready') {
+        setOfflineDownloadStatus('complete');
+        setOfflineDownloadProgress(100);
+      } else if (updated.status === 'failed') {
+        setOfflineDownloadStatus('error');
+        setOfflineDownloadError(updated.error ?? 'Download failed');
+      } else {
+        setOfflineDownloadProgress(Math.round(updated.progressPercentage ?? 0));
+      }
+      upsertOfflineRegion(updated);
+    }).catch((err) => {
+      setOfflineDownloadStatus('error');
+      setOfflineDownloadError(err instanceof Error ? err.message : 'Download failed');
+    });
+  }, [selectedRoute, upsertOfflineRegion]);
 
   // Keep route data ref in sync for unmount telemetry
   useEffect(() => {
@@ -564,6 +610,58 @@ export default function RoutePreviewScreen() {
         />
       ) : null}
 
+      {/* Download for offline — only visible when online */}
+      {selectedRoute && isOnline ? (
+        <View style={styles.offlineDownloadCard}>
+          {isRouteOfflineReady || offlineDownloadStatus === 'complete' ? (
+            <View style={styles.offlineReadyRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.safe} />
+              <Text style={styles.offlineReadyText}>Available offline</Text>
+            </View>
+          ) : offlineDownloadStatus === 'downloading' ? (
+            <View style={styles.offlineDownloadingWrap}>
+              <View style={styles.offlineDownloadingRow}>
+                <Spinner size={16} />
+                <Text style={styles.offlineDownloadingText}>
+                  Downloading... {offlineDownloadProgress}%
+                </Text>
+              </View>
+              <View style={styles.offlineProgressTrack}>
+                <View
+                  style={[
+                    styles.offlineProgressFill,
+                    { width: `${offlineDownloadProgress}%`, backgroundColor: colors.accent },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : offlineDownloadStatus === 'error' ? (
+            <View style={styles.offlineErrorWrap}>
+              <View style={styles.offlineErrorRow}>
+                <Ionicons name="alert-circle" size={16} color={colors.danger} />
+                <Text style={styles.offlineErrorText}>
+                  {offlineDownloadError ?? 'Download failed'}
+                </Text>
+              </View>
+              <Pressable style={styles.offlineRetryButton} onPress={handleDownloadOffline}>
+                <Ionicons name="refresh" size={14} color={colors.accent} />
+                <Text style={styles.offlineRetryLabel}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              style={styles.offlineDownloadButton}
+              onPress={handleDownloadOffline}
+              accessibilityRole="button"
+              accessibilityLabel="Download route for offline use"
+            >
+              <Ionicons name="cloud-download-outline" size={18} color={colors.accent} />
+              <Text style={styles.offlineDownloadLabel}>Download for offline</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
+
       {isMissingApi ? (
         <View style={styles.warningPanel}>
           <Text style={styles.warningTitle}>Missing configuration</Text>
@@ -910,5 +1008,80 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: colors.textMuted,
       fontFamily: fontFamily.body.regular,
+    },
+    // -- Offline download --
+    offlineDownloadCard: {
+      borderRadius: radii.lg,
+      backgroundColor: colors.bgSecondary,
+      paddingHorizontal: space[3],
+      paddingVertical: space[3],
+    },
+    offlineDownloadButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    offlineDownloadLabel: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.accent,
+    },
+    offlineReadyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    offlineReadyText: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.safe,
+    },
+    offlineDownloadingWrap: {
+      gap: space[2],
+    },
+    offlineDownloadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    offlineDownloadingText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textSecondary,
+    },
+    offlineProgressTrack: {
+      height: 6,
+      borderRadius: radii.full,
+      backgroundColor: 'rgba(15, 23, 42, 0.12)',
+      overflow: 'hidden',
+    },
+    offlineProgressFill: {
+      height: '100%',
+      borderRadius: radii.full,
+    },
+    offlineErrorWrap: {
+      gap: space[2],
+    },
+    offlineErrorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    offlineErrorText: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.danger,
+      flex: 1,
+    },
+    offlineRetryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[1],
+      alignSelf: 'flex-start',
+    },
+    offlineRetryLabel: {
+      ...textSm,
+      fontFamily: fontFamily.body.bold,
+      color: colors.accent,
     },
   });

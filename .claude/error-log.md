@@ -166,3 +166,8 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Pattern:** Dependencies in the root `package.json` are available to JS `require()` but Expo autolinking only reads the workspace `apps/mobile/package.json` to decide which native modules to compile. A module in root-only won't be linked into the native build.
 **Fix:** Always `cd apps/mobile && npm install <package>` for native Expo modules, not `npm install` at root.
 **Occurrences:** expo-image-picker installed at root but not linked into APK (2026-04-16)
+
+### 23. @react-native-community/netinfo throws invariant before try/catch can catch
+**Pattern:** `require('@react-native-community/netinfo')` evaluates the module's top-level code, which throws `NativeModule.RNCNetInfo is null` if the native module isn't compiled into the APK. This invariant throw escapes `try/catch` around `require()` in some RN runtimes.
+**Fix:** Check `NativeModules.RNCNetInfo` from `react-native` BEFORE calling `require('@react-native-community/netinfo')`. If null, skip the require entirely and fall back to `isOnline: true`. This is the same pattern as error #2b but for a community (non-Expo) native module — use `NativeModules` directly (not `requireOptionalNativeModule` which is Expo-only).
+**Occurrences:** ConnectivityMonitor.tsx blank screen on dev build without native rebuild (2026-04-16)
