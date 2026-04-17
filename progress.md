@@ -795,3 +795,44 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - Status: Done
 - Change: Navigation footer was flipping between "Climb ↑X m" and "Descent ↓X m" based on which was greater. Now always shows remaining climb (total ascent from current position to route end).
 - File: `apps/mobile/src/design-system/organisms/NavigationHUD.tsx`
+
+### Feat: Social Network Expansion — Public Profiles, Follow System, Unified Activity Feed (2026-04-17, GitHub #7)
+
+- Status: Done
+- Scope: 34 files changed, 5836 insertions. 19 new files, 14 modified. 5 Supabase migrations. Cloud Run revision `defpedal-api-00051-q9c`.
+- **Database (5 migrations)**:
+  - `activity_feed` table: unified feed with 5 types (ride, hazard_batch, hazard_standalone, tier_up, badge_unlock), JSONB payload, geography location, GIST spatial index
+  - `activity_reactions` table: replaces `feed_likes` + `trip_loves` with unified (activity_id, user_id, reaction_type) unique constraint
+  - `activity_comments` table: replaces `feed_comments`, references activity_feed
+  - `user_follows` table: added `status` column (pending/accepted) to existing table, self-follow CHECK constraint, update policy for approve flow
+  - Profile changes: `is_private` boolean (default false), `auto_share_rides` default changed to true, `trim_route_endpoints` default changed to true for new users
+  - `get_ranked_feed` RPC: blended feed (own posts + followed users any distance + nearby strangers within 50km). Scoring: `recency_decay * (type_weight + follow_boost + own_demotion + reaction_score + comment_score + proximity_score)`. 12h half-life decay. Private profile exclusion. Cursor pagination on (score, id).
+  - `get_suggested_users` RPC: nearby active riders within 15km in last 30 days, ranked by mutual follows then activity count, excludes already-followed
+  - `get_user_public_profile` RPC: fixed jsonb_agg bug, migrated from trip_shares to activity_feed, added followStatus/isPrivate fields
+  - Backfill migration: 116 trip_shares migrated to activity_feed (type=ride), 6 reactions + 1 comment preserved, old tables archived (not dropped)
+- **API (5 new files, 2 modified)**:
+  - `follow.ts`: POST /users/:id/follow (public=instant accept, private=pending + push notification), DELETE /users/:id/follow, POST /users/:id/follow/approve, POST /users/:id/follow/decline, GET /profile/follow-requests, GET /feed/suggested-users
+  - `activity-feed.ts`: GET /v1/v2/feed (ranked feed via RPC), POST /v1/v2/feed/:id/react (like/love), DELETE /v1/v2/feed/:id/react/:type, GET/POST comments
+  - `autoPublish.ts`: auto-publish service with 5 functions — autoPublishRide (respects auto_share_rides, trim_route_endpoints 200m, private profile skip), autoPublishHazardBatch, autoPublishHazardStandalone, autoPublishBadgeUnlock, autoPublishTierUp
+  - `v1.ts`: wired auto-publish fire-and-forget calls into ride impact handler (ride + hazard batch + badges + tier promotion) and hazard submit handler (standalone hazards)
+  - `feed-profile.ts`: removed old simple follow/unfollow (moved to follow.ts), added is_private to profile PATCH/GET
+  - `feedSchemas.ts`: added isPrivate to profile request/response schemas
+  - `followSchemas.ts`, `activityFeedSchemas.ts`: new JSON schemas
+- **Core types (2 modified)**:
+  - `contracts.ts`: 15+ new types — ActivityFeedItem discriminated union (5 variants with typed payloads), ActivityFeedResponse, FollowStatus, FollowRequest, SuggestedUser. Updated UserPublicProfile (followStatus, isPrivate), ProfileUpdateRequest, ProfileResponse
+  - `polyline.ts`: `trimPolylineEndpoints(encoded, trimMeters)` — trims first/last N meters for privacy. 6 tests in polyline.test.ts
+- **Mobile — Components (5 new)**:
+  - `FollowButton` atom: 3 states (Follow/Requested/Following), 32px pill
+  - `SuggestedUserCard` molecule: 140px compact card for horizontal scroll
+  - `FollowRequestItem` molecule: approve/decline row with avatar + tier pill
+  - `ActivityFeedCard` organism: discriminated union renderer for all 5 activity types (ride map, hazard batch chips, hazard standalone, tier mascot, badge icon), shared header + ReactionBar
+  - `SuggestedUsersRow` organism: horizontal scroll, session-dismissable, FadeSlideIn animation
+- **Mobile — Hooks & API (4 new, 1 modified)**:
+  - `useActivityFeed.ts`: useActivityFeedQuery (infinite scroll ranked), useActivityReaction (optimistic like/love), useActivityComments, usePostActivityComment
+  - `useFollow.ts`: useFollowUser, useUnfollowUser, useApproveFollowRequest, useDeclineFollowRequest, useFollowRequests, useSuggestedUsers
+  - `api.ts`: 11 new methods (getActivityFeed, reactToActivity, unreactToActivity, getActivityComments, postActivityComment, approveFollowRequest, declineFollowRequest, getFollowRequests, getSuggestedUsers, updated followUser response type)
+- **Mobile — Screens (2 modified)**:
+  - `community-feed.tsx`: replaced old FeedCard/useFeedQuery with ActivityFeedCard/useActivityFeedQuery, SuggestedUsersRow injected every 10 items, merged data array with discriminated union rendering
+  - `profile.tsx`: added Private Profile toggle (SettingRow), Follow Requests section with count badge + FollowRequestItem list (visible when isPrivate=true)
+- **Tests**: 62 new API tests (follow-system: 20, activity-feed: 25, auto-publish: 17), 6 polyline tests. Fixed latent v1.test.ts mock issue (vi.restoreAllMocks → vi.clearAllMocks). Total: 677 passing (345 core + 332 API)
+- Evidence: Typecheck 0 errors, bundle HTTP 200, all 677 tests passing, verified on phone via Metro hot reload

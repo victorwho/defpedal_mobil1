@@ -35,6 +35,22 @@
 - [x] DONE — 26 unit tests across 4 test files (OfflineRouteCache, OfflinePackCleanup, NavigationResumeGuard, ConnectivityMonitor) (2026-04-16)
 - [!] PENDING — Dev APK rebuild needed to activate real NetInfo (currently falls back to isOnline: true)
 
+## Social Network Expansion (GitHub Issue #7)
+- [x] DONE — Database: activity_feed table (5 types), activity_reactions, activity_comments, user_follows (pending/accepted), profile is_private column (2026-04-17)
+- [x] DONE — Database: get_ranked_feed RPC (recency decay, follow boost, type weights, proximity scoring, private profile exclusion) (2026-04-17)
+- [x] DONE — Database: get_suggested_users RPC (nearby active riders, mutual follows) (2026-04-17)
+- [x] DONE — Database: backfill migration (116 trip_shares → activity_feed, reactions + comments preserved) (2026-04-17)
+- [x] DONE — Database: fix get_user_public_profile RPC (jsonb_agg bug, migrated to activity_feed, added followStatus/isPrivate) (2026-04-17)
+- [x] DONE — API: follow system (follow/unfollow with private profile pending flow, approve/decline, follow requests, push notifications) (2026-04-17)
+- [x] DONE — API: unified activity feed v2 (ranked blended feed, reactions, comments, suggested users) (2026-04-17)
+- [x] DONE — API: auto-publish service (rides with 200m endpoint trimming, hazard batches, standalone hazards, badge unlocks, tier promotions) (2026-04-17)
+- [x] DONE — Core: 15+ new types (ActivityFeedItem union, FollowStatus, FollowRequest, SuggestedUser), trimPolylineEndpoints utility (2026-04-17)
+- [x] DONE — Mobile: 5 new components (ActivityFeedCard, FollowButton, SuggestedUsersRow, SuggestedUserCard, FollowRequestItem) (2026-04-17)
+- [x] DONE — Mobile: hooks (useActivityFeed, useFollow), API client (11 new methods) (2026-04-17)
+- [x] DONE — Mobile: community-feed.tsx updated to ranked activity feed + suggested users, profile.tsx with Private Profile toggle + Follow Requests (2026-04-17)
+- [x] DONE — Tests: 62 new API tests, 6 polyline tests, 677 total passing (2026-04-17)
+- [x] DONE — Deployed: Cloud Run revision defpedal-api-00051-q9c, 5 Supabase migrations applied (2026-04-17)
+
 ## Onboarding
 - [x] DONE — Risk overlay on safety score map (2026-04-03)
 - [x] DONE — 4-category safety score display (2026-04-03)
