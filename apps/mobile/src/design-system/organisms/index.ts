@@ -35,3 +35,9 @@ export type { MiaLevelUpOverlayProps } from './MiaLevelUpOverlay';
 
 export { MiaJourneyTracker } from './MiaJourneyTracker';
 export type { MiaJourneyTrackerProps } from './MiaJourneyTracker';
+
+export { ActivityFeedCard } from './ActivityFeedCard';
+export type { ActivityFeedCardProps } from './ActivityFeedCard';
+
+export { SuggestedUsersRow } from './SuggestedUsersRow';
+export type { SuggestedUsersRowProps } from './SuggestedUsersRow';

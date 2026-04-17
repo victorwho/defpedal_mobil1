@@ -60,6 +60,7 @@ export const buildFeedProfileRoutes = (
         if (request.body.trimRouteEndpoints !== undefined) updates.trim_route_endpoints = request.body.trimRouteEndpoints;
         if (request.body.cyclingGoal !== undefined) updates.cycling_goal = request.body.cyclingGoal;
         if (request.body.avatarUrl !== undefined) updates.avatar_url = request.body.avatarUrl;
+        if (request.body.isPrivate !== undefined) updates.is_private = request.body.isPrivate;
         if (request.body.notifyWeather !== undefined) updates.notify_weather = request.body.notifyWeather;
         if (request.body.notifyHazard !== undefined) updates.notify_hazard = request.body.notifyHazard;
         if (request.body.notifyCommunity !== undefined) updates.notify_community = request.body.notifyCommunity;
@@ -93,7 +94,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
           .eq('id', user.id)
           .single();
 
@@ -113,6 +114,7 @@ export const buildFeedProfileRoutes = (
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
+          isPrivate: Boolean(data.is_private),
         };
       },
     );
@@ -135,7 +137,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
           .eq('id', user.id)
           .single();
 
@@ -146,7 +148,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
             .single();
 
           if (createError || !created) {
@@ -165,6 +167,7 @@ export const buildFeedProfileRoutes = (
             autoShareRides: Boolean(created.auto_share_rides),
             trimRouteEndpoints: Boolean(created.trim_route_endpoints),
             cyclingGoal: (created.cycling_goal as CyclingGoal) ?? null,
+            isPrivate: Boolean(created.is_private),
           };
         }
 
@@ -176,57 +179,12 @@ export const buildFeedProfileRoutes = (
           autoShareRides: Boolean(data.auto_share_rides),
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
+          isPrivate: Boolean(data.is_private),
         };
       },
     );
 
-    // POST /users/:id/follow — follow a user
-    app.post<{ Params: { id: string } }>(
-      '/users/:id/follow',
-      {
-        schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
-          response: { 200: { type: 'object', properties: { followedAt: { type: 'string' } } }, 401: errorResponseSchema, 409: errorResponseSchema },
-        },
-      },
-      async (request) => {
-        const user = await requireUser(request, dependencies);
-        const db = ensureSupabase();
-        const targetId = request.params.id;
-
-        if (targetId === user.id) {
-          throw new HttpError('Cannot follow yourself.', { statusCode: 400, code: 'BAD_REQUEST' });
-        }
-
-        const { error } = await db.from('user_follows').insert({ follower_id: user.id, following_id: targetId });
-
-        if (error) {
-          if (error.code === '23505') return { followedAt: new Date().toISOString() }; // already following
-          throw new HttpError('Follow failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
-        }
-
-        return { followedAt: new Date().toISOString() };
-      },
-    );
-
-    // DELETE /users/:id/follow — unfollow a user
-    app.delete<{ Params: { id: string } }>(
-      '/users/:id/follow',
-      {
-        schema: {
-          params: { type: 'object', required: ['id'], properties: { id: { type: 'string', format: 'uuid' } } },
-          response: { 200: { type: 'object', properties: { unfollowedAt: { type: 'string' } } }, 401: errorResponseSchema },
-        },
-      },
-      async (request) => {
-        const user = await requireUser(request, dependencies);
-        const db = ensureSupabase();
-
-        await db.from('user_follows').delete().match({ follower_id: user.id, following_id: request.params.id });
-
-        return { unfollowedAt: new Date().toISOString() };
-      },
-    );
+    // NOTE: follow/unfollow endpoints moved to routes/follow.ts (enhanced with private profile handling)
 
     // GET /recent-destinations — 3 most recent distinct ride destinations
     app.get<{ Reply: { destinations: Array<{ label: string; coordinates: { lat: number; lon: number } }> } }>(

@@ -44,6 +44,8 @@ const CYCLING_FREQUENCY_KEYS = [
   'profile.freqFewMonth', 'profile.freqOnceMonth', 'profile.freqRarely',
 ] as const;
 
+import { useFollowRequests, useApproveFollowRequest, useDeclineFollowRequest } from '../src/hooks/useFollow';
+import { FollowRequestItem } from '../src/design-system/molecules/FollowRequestItem';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 export default function ProfileScreen() {
@@ -671,6 +673,16 @@ export default function ProfileScreen() {
               onChange={setShareTripsPublicly}
             />
 
+            <PrivateProfileSection
+              isPrivate={profile?.isPrivate ?? false}
+              onToggle={(value) => {
+                void mobileApi.updateProfile({ isPrivate: value });
+                void refetchProfile();
+              }}
+              styles={styles}
+              colors={colors}
+            />
+
             <Pressable
               style={styles.helpFaqRow}
               onPress={() => router.push('/faq' as any)}
@@ -715,6 +727,70 @@ export default function ProfileScreen() {
       </View>
       <BottomNav activeTab="profile" onTabPress={handleTabPress} />
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PrivateProfileSection — toggle + follow requests list
+// ---------------------------------------------------------------------------
+
+interface PrivateProfileSectionProps {
+  isPrivate: boolean;
+  onToggle: (value: boolean) => void;
+  styles: ReturnType<typeof createThemedStyles>;
+  colors: ThemeColors;
+}
+
+function PrivateProfileSection({ isPrivate, onToggle, styles, colors }: PrivateProfileSectionProps) {
+  const t = useT();
+  const { data: requestsData } = useFollowRequests();
+  const approveRequest = useApproveFollowRequest();
+  const declineRequest = useDeclineFollowRequest();
+
+  const requests = requestsData?.requests ?? [];
+
+  const handleApprove = useCallback(
+    (id: string) => { approveRequest.mutate(id); },
+    [approveRequest],
+  );
+
+  const handleDecline = useCallback(
+    (id: string) => { declineRequest.mutate(id); },
+    [declineRequest],
+  );
+
+  return (
+    <>
+      <SettingRow
+        label="Private Profile"
+        description={
+          isPrivate
+            ? 'Only approved followers can see your rides'
+            : 'Anyone can follow you and see your rides'
+        }
+        checked={isPrivate}
+        onChange={onToggle}
+      />
+
+      {isPrivate && requests.length > 0 && (
+        <View style={styles.followRequestsSection}>
+          <View style={styles.followRequestsHeader}>
+            <Text style={styles.followRequestsTitle}>Follow Requests</Text>
+            <View style={styles.followRequestsBadge}>
+              <Text style={styles.followRequestsBadgeText}>{requests.length}</Text>
+            </View>
+          </View>
+          {requests.map((req) => (
+            <FollowRequestItem
+              key={req.id}
+              request={req}
+              onApprove={handleApprove}
+              onDecline={handleDecline}
+            />
+          ))}
+        </View>
+      )}
+    </>
   );
 }
 
@@ -961,5 +1037,39 @@ const createThemedStyles = (colors: ThemeColors) =>
       height: 4,
       borderRadius: radii.sm,
       backgroundColor: colors.accent,
+    },
+    followRequestsSection: {
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+      overflow: 'hidden',
+    },
+    followRequestsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingTop: space[3],
+      paddingBottom: space[2],
+    },
+    followRequestsTitle: {
+      ...textBase,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textPrimary,
+    },
+    followRequestsBadge: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: space[1],
+    },
+    followRequestsBadgeText: {
+      fontSize: 12,
+      fontFamily: fontFamily.body.bold,
+      color: colors.textInverse,
     },
   });

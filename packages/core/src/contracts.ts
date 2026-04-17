@@ -422,6 +422,8 @@ export interface UserPublicProfile {
   readonly followersCount: number;
   readonly followingCount: number;
   readonly isFollowedByMe: boolean;
+  readonly followStatus: FollowStatus;
+  readonly isPrivate: boolean;
   readonly recentTrips: readonly {
     readonly id: string;
     readonly title: string;
@@ -456,6 +458,135 @@ export interface FeedItem {
   lovedByMe: boolean;
   isWeeklyChampion?: boolean;
   championMetric?: 'co2' | 'hazards' | null;
+}
+
+// ── Social Network (Activity Feed) ──
+
+export type ActivityType = 'ride' | 'hazard_batch' | 'hazard_standalone' | 'tier_up' | 'badge_unlock';
+
+export type FollowStatus = 'none' | 'pending' | 'accepted';
+
+export interface ActivityFeedUser {
+  readonly id: string;
+  readonly displayName: string;
+  readonly avatarUrl: string | null;
+  readonly riderTier?: RiderTierName;
+}
+
+// Payload types for each activity type
+export interface RideActivityPayload {
+  readonly title: string;
+  readonly startLocationText: string;
+  readonly destinationText: string;
+  readonly distanceMeters: number;
+  readonly durationSeconds: number;
+  readonly elevationGainMeters: number | null;
+  readonly averageSpeedMps: number | null;
+  readonly safetyRating: number | null;
+  readonly safetyTags: SafetyTag[];
+  readonly geometryPolyline6: string;
+  readonly note: string | null;
+  readonly tripId: string | null;
+  readonly co2SavedKg: number | null;
+}
+
+export interface HazardBatchPayload {
+  readonly rideActivityId: string | null;
+  readonly hazards: readonly {
+    readonly hazardType: HazardType;
+    readonly lat: number;
+    readonly lon: number;
+    readonly reportedAt: string;
+  }[];
+}
+
+export interface HazardStandalonePayload {
+  readonly hazardType: HazardType;
+  readonly lat: number;
+  readonly lon: number;
+  readonly reportedAt: string;
+}
+
+export interface TierUpPayload {
+  readonly tierName: RiderTierName;
+  readonly tierLevel: number;
+  readonly tierDisplayName: string;
+  readonly tierColor: string;
+}
+
+export interface BadgeUnlockPayload {
+  readonly badgeKey: string;
+  readonly badgeName: string;
+  readonly iconKey: string;
+  readonly category: string;
+  readonly flavorText: string;
+}
+
+// Base fields common to all activity items
+interface ActivityFeedItemBase {
+  readonly id: string;
+  readonly user: ActivityFeedUser;
+  readonly type: ActivityType;
+  readonly createdAt: string;
+  readonly likeCount: number;
+  readonly loveCount: number;
+  readonly commentCount: number;
+  readonly likedByMe: boolean;
+  readonly lovedByMe: boolean;
+  readonly score?: number;
+}
+
+// Discriminated union for type-safe activity feed items
+export interface RideActivity extends ActivityFeedItemBase {
+  readonly type: 'ride';
+  readonly payload: RideActivityPayload;
+}
+
+export interface HazardBatchActivity extends ActivityFeedItemBase {
+  readonly type: 'hazard_batch';
+  readonly payload: HazardBatchPayload;
+}
+
+export interface HazardStandaloneActivity extends ActivityFeedItemBase {
+  readonly type: 'hazard_standalone';
+  readonly payload: HazardStandalonePayload;
+}
+
+export interface TierUpActivity extends ActivityFeedItemBase {
+  readonly type: 'tier_up';
+  readonly payload: TierUpPayload;
+}
+
+export interface BadgeUnlockActivity extends ActivityFeedItemBase {
+  readonly type: 'badge_unlock';
+  readonly payload: BadgeUnlockPayload;
+}
+
+export type ActivityFeedItem =
+  | RideActivity
+  | HazardBatchActivity
+  | HazardStandaloneActivity
+  | TierUpActivity
+  | BadgeUnlockActivity;
+
+export interface ActivityFeedResponse {
+  readonly items: readonly ActivityFeedItem[];
+  readonly cursor: string | null;
+}
+
+export interface FollowRequest {
+  readonly id: string;
+  readonly user: ActivityFeedUser;
+  readonly requestedAt: string;
+}
+
+export interface SuggestedUser {
+  readonly id: string;
+  readonly displayName: string;
+  readonly avatarUrl: string | null;
+  readonly riderTier?: RiderTierName;
+  readonly activityCount: number;
+  readonly mutualFollows: number;
 }
 
 export interface UserStats {
@@ -538,6 +669,7 @@ export interface ProfileUpdateRequest {
   autoShareRides?: boolean;
   trimRouteEndpoints?: boolean;
   cyclingGoal?: CyclingGoal | null;
+  isPrivate?: boolean;
   notifyWeather?: boolean;
   notifyHazard?: boolean;
   notifyCommunity?: boolean;
@@ -556,6 +688,7 @@ export interface ProfileResponse {
   autoShareRides: boolean;
   trimRouteEndpoints: boolean;
   cyclingGoal: CyclingGoal | null;
+  isPrivate: boolean;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────

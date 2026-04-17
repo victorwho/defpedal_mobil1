@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodePolyline, encodePolyline } from './polyline';
+import { decodePolyline, encodePolyline, trimPolylineEndpoints } from './polyline';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -174,5 +174,91 @@ describe('encodePolyline / decodePolyline round-trip', () => {
     ];
     const decoded = roundTrip(original);
     expect(coordsMatch(decoded, original)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trimPolylineEndpoints
+// ---------------------------------------------------------------------------
+
+describe('trimPolylineEndpoints', () => {
+  // A ~5km route through Bucharest (lon, lat pairs)
+  const longRoute: [number, number][] = [
+    [26.1025, 44.4268],
+    [26.1040, 44.4280],
+    [26.1060, 44.4300],
+    [26.1080, 44.4320],
+    [26.1100, 44.4340],
+    [26.1120, 44.4360],
+    [26.1140, 44.4380],
+    [26.1160, 44.4400],
+    [26.1180, 44.4420],
+    [26.1200, 44.4440],
+    [26.1220, 44.4460],
+    [26.1240, 44.4480],
+    [26.1260, 44.4500],
+    [26.1280, 44.4520],
+    [26.1300, 44.4540],
+    [26.1320, 44.4560],
+    [26.1340, 44.4580],
+    [26.1360, 44.4600],
+    [26.1380, 44.4620],
+    [26.1400, 44.4640],
+  ];
+
+  it('returns the original polyline for an empty string', () => {
+    expect(trimPolylineEndpoints('', 200)).toBe('');
+  });
+
+  it('returns the original polyline for a single point', () => {
+    const single = encodePolyline([[26.1025, 44.4268]]);
+    expect(trimPolylineEndpoints(single, 200)).toBe(single);
+  });
+
+  it('returns the original polyline when route is too short to trim', () => {
+    // Two points very close together (~250m)
+    const shortRoute: [number, number][] = [
+      [26.1025, 44.4268],
+      [26.1040, 44.4280],
+    ];
+    const encoded = encodePolyline(shortRoute);
+    // Trim 200m from each end = need at least 500m (2.5 * 200)
+    expect(trimPolylineEndpoints(encoded, 200)).toBe(encoded);
+  });
+
+  it('trims both ends of a normal polyline', () => {
+    const encoded = encodePolyline(longRoute);
+    const trimmed = trimPolylineEndpoints(encoded, 200);
+
+    // Should be different from the original
+    expect(trimmed).not.toBe(encoded);
+
+    // Decoded trimmed should have fewer points
+    const originalPoints = decodePolyline(encoded);
+    const trimmedPoints = decodePolyline(trimmed);
+    expect(trimmedPoints.length).toBeLessThan(originalPoints.length);
+    expect(trimmedPoints.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('produces a shorter polyline than the original', () => {
+    const encoded = encodePolyline(longRoute);
+    const trimmed = trimPolylineEndpoints(encoded, 200);
+
+    const originalPoints = decodePolyline(encoded);
+    const trimmedPoints = decodePolyline(trimmed);
+
+    // First point of trimmed should NOT be the same as the first point of the original
+    expect(trimmedPoints[0][0]).not.toBeCloseTo(originalPoints[0][0], 3);
+    // Last point of trimmed should NOT be the same as the last point of the original
+    const origLast = originalPoints[originalPoints.length - 1];
+    const trimLast = trimmedPoints[trimmedPoints.length - 1];
+    expect(trimLast[0]).not.toBeCloseTo(origLast[0], 3);
+  });
+
+  it('does not mutate the encoded input', () => {
+    const encoded = encodePolyline(longRoute);
+    const copy = encoded;
+    trimPolylineEndpoints(encoded, 200);
+    expect(encoded).toBe(copy);
   });
 });

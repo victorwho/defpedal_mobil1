@@ -1,4 +1,5 @@
 import type {
+  ActivityFeedResponse,
   AutocompleteRequest,
   AutocompleteResponse,
   BadgeResponse,
@@ -10,6 +11,7 @@ import type {
   FeedComment,
   FeedCommentRequest,
   FeedResponse,
+  FollowRequest,
   HazardReportRequest,
   HazardReportResponse,
   HazardValidationResponse,
@@ -33,6 +35,7 @@ import type {
   SavedRoute,
   SavedRouteCreateRequest,
   ShareTripRequest,
+  SuggestedUser,
   TelemetryEvent,
   UserPublicProfile,
   TiersResponse,
@@ -525,13 +528,58 @@ export const mobileApi = {
   // ── Social ──
 
   followUser: (userId: string) =>
-    requestJson<{ followedAt: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }),
+    requestJson<{ status: string; actionAt: string }>(`/v1/users/${userId}/follow`, { method: 'POST' }),
 
   unfollowUser: (userId: string) =>
     requestJson<{ unfollowedAt: string }>(`/v1/users/${userId}/follow`, { method: 'DELETE' }),
 
+  approveFollowRequest: (userId: string) =>
+    requestJson<{ actionAt: string }>(`/v1/users/${userId}/follow/approve`, { method: 'POST' }),
+
+  declineFollowRequest: (userId: string) =>
+    requestJson<{ actionAt: string }>(`/v1/users/${userId}/follow/decline`, { method: 'POST' }),
+
+  getFollowRequests: () =>
+    requestJson<{ requests: FollowRequest[] }>('/v1/profile/follow-requests'),
+
   getUserProfile: (userId: string) =>
     requestJson<UserPublicProfile>(`/v1/users/${userId}/profile`),
+
+  getSuggestedUsers: (lat: number, lon: number, limit?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (limit) params.set('limit', String(limit));
+    return requestJson<{ users: SuggestedUser[] }>(`/v1/feed/suggested-users?${params.toString()}`);
+  },
+
+  // ── Activity Feed (v2) ──
+
+  getActivityFeed: (lat: number, lon: number, cursorScore?: number, cursorId?: string, limit?: number) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    if (cursorScore != null) params.set('cursorScore', String(cursorScore));
+    if (cursorId) params.set('cursorId', cursorId);
+    if (limit) params.set('limit', String(limit));
+    return requestJson<ActivityFeedResponse>(`/v1/v2/feed?${params.toString()}`);
+  },
+
+  reactToActivity: (activityId: string, type: 'like' | 'love') =>
+    requestJson<WriteAckResponse>(`/v1/v2/feed/${activityId}/react`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    }),
+
+  unreactToActivity: (activityId: string, type: 'like' | 'love') =>
+    requestJson<WriteAckResponse>(`/v1/v2/feed/${activityId}/react/${type}`, {
+      method: 'DELETE',
+    }),
+
+  getActivityComments: (activityId: string) =>
+    requestJson<{ comments: FeedComment[] }>(`/v1/v2/feed/${activityId}/comments`),
+
+  postActivityComment: (activityId: string, body: string) =>
+    requestJson<WriteAckResponse>(`/v1/v2/feed/${activityId}/comment`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
 
   // ── Saved Routes ──
 

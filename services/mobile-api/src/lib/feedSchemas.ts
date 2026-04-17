@@ -87,6 +87,7 @@ export const profileUpdateRequestSchema = {
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
+    isPrivate: { type: 'boolean' },
     notifyWeather: { type: 'boolean' },
     notifyHazard: { type: 'boolean' },
     notifyCommunity: { type: 'boolean' },
@@ -184,7 +185,7 @@ export const feedCommentsResponseSchema = {
 export const profileResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'username'],
+  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'username', 'isPrivate'],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
@@ -193,6 +194,7 @@ export const profileResponseSchema = {
     autoShareRides: { type: 'boolean' },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
+    isPrivate: { type: 'boolean' },
   },
 } as const;
 

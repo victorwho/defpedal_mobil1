@@ -33,3 +33,9 @@ export type { MiaEmptyStateProps } from './MiaEmptyState';
 
 export { OfflineBanner } from './OfflineBanner';
 export type { OfflineBannerProps } from './OfflineBanner';
+
+export { SuggestedUserCard } from './SuggestedUserCard';
+export type { SuggestedUserCardProps } from './SuggestedUserCard';
+
+export { FollowRequestItem } from './FollowRequestItem';
+export type { FollowRequestItemProps } from './FollowRequestItem';

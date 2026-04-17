@@ -73,7 +73,7 @@ const authHeader = {
 };
 
 afterEach(async () => {
-  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('mobile-api v1 routes', () => {

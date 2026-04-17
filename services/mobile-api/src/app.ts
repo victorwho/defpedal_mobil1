@@ -5,7 +5,9 @@ import { config } from './config';
 import { createMobileApiDependencies, type MobileApiDependencies } from './lib/dependencies';
 import { formatValidationDetails, HttpError, toErrorResponse } from './lib/http';
 import { buildRequestTelemetry } from './lib/telemetry';
+import { buildActivityFeedRoutes } from './routes/activity-feed';
 import { buildFeedRoutes } from './routes/feed';
+import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
 import { buildMiaRoutes } from './routes/mia';
 import { buildV1Routes } from './routes/v1';
@@ -107,6 +109,14 @@ export const buildApp = (options: {
   });
 
   void app.register(buildFeedRoutes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildActivityFeedRoutes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildFollowRoutes(dependencies), {
     prefix: '/v1',
   });
 

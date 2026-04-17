@@ -664,8 +664,9 @@ export const buildV1Routes = (
         });
 
         try {
+          const normalizedRequest = normalizeHazardReportRequest(request.body);
           const result = await dependencies.submitHazardReport(
-            normalizeHazardReportRequest(request.body),
+            normalizedRequest,
             user?.id ?? null,
           );
           // Streak qualification (fire-and-forget)
@@ -678,6 +679,21 @@ export const buildV1Routes = (
                   p_user_id: user.id, p_action: 'hazard_report',
                   p_base_xp: XP_VALUES.hazard_report, p_multiplier: 1.0,
                 }); } catch { /* non-fatal */ }
+              })();
+            }
+            // Auto-publish standalone hazards to activity feed (fire-and-forget)
+            if (normalizedRequest.source !== 'in_ride') {
+              void (async () => {
+                try {
+                  const { autoPublishHazardStandalone } = await import('../lib/autoPublish');
+                  await autoPublishHazardStandalone({
+                    userId: user.id,
+                    hazardType: normalizedRequest.hazardType ?? 'other',
+                    lat: normalizedRequest.coordinate.lat,
+                    lon: normalizedRequest.coordinate.lon,
+                    reportedAt: normalizedRequest.reportedAt,
+                  });
+                } catch { /* non-fatal */ }
               })();
             }
           }
@@ -1977,6 +1993,119 @@ export const buildV1Routes = (
           }
         } catch {
           // Mia level-up failure is non-fatal
+        }
+
+        // --- Auto-publish to activity feed (fire-and-forget) ---
+        void (async () => {
+          try {
+            if (!supabaseAdmin) return;
+            const { autoPublishRide, autoPublishHazardBatch } = await import('../lib/autoPublish');
+
+            // Fetch trip metadata for auto-publish
+            const { data: tripRow } = await supabaseAdmin
+              .from('trips')
+              .select('start_location_text, destination_text, start_location, distance_meters, started_at, ended_at')
+              .eq('id', tripId)
+              .eq('user_id', user.id)
+              .single();
+
+            if (!tripRow) return;
+
+            // Fetch trip track for geometry
+            const { data: trackRow } = await supabaseAdmin
+              .from('trip_tracks')
+              .select('planned_route_polyline6, started_at, ended_at')
+              .eq('trip_id', tripId)
+              .single();
+
+            const startLocation = tripRow.start_location as Record<string, unknown> | null;
+            const startLat = Number(startLocation?.latitude ?? startLocation?.lat ?? 0);
+            const startLon = Number(startLocation?.longitude ?? startLocation?.lon ?? 0);
+            const tripStartedAt = (trackRow?.started_at ?? tripRow.started_at) as string;
+            const tripEndedAt = (trackRow?.ended_at ?? tripRow.ended_at ?? new Date().toISOString()) as string;
+            const durationSeconds = (new Date(tripEndedAt).getTime() - new Date(tripStartedAt).getTime()) / 1000;
+
+            // Publish the ride
+            const rideActivityId = await autoPublishRide({
+              userId: user.id,
+              tripId,
+              title: `Ride to ${(tripRow.destination_text as string) ?? 'destination'}`,
+              startLocationText: (tripRow.start_location_text as string) ?? '',
+              destinationText: (tripRow.destination_text as string) ?? '',
+              distanceMeters: Number(tripRow.distance_meters ?? distanceMeters),
+              durationSeconds: Math.max(0, Math.round(durationSeconds)),
+              elevationGainMeters: elevationGainM ?? null,
+              averageSpeedMps: null,
+              safetyRating: null,
+              safetyTags: [],
+              geometryPolyline6: (trackRow?.planned_route_polyline6 as string) ?? '',
+              note: null,
+              co2SavedKg,
+              startLat,
+              startLon,
+            });
+
+            // Batch in-ride hazards if any
+            if (rideActivityId) {
+              const { data: rideHazards } = await supabaseAdmin
+                .from('hazards')
+                .select('hazard_type, location, created_at')
+                .eq('user_id', user.id)
+                .eq('source', 'in_ride')
+                .gte('created_at', tripStartedAt)
+                .lte('created_at', tripEndedAt);
+
+              if (rideHazards && rideHazards.length > 0) {
+                await autoPublishHazardBatch({
+                  userId: user.id,
+                  rideActivityId,
+                  hazards: rideHazards.map((h: Record<string, unknown>) => ({
+                    hazardType: (h.hazard_type as string) ?? 'other',
+                    lat: ((h.location as Record<string, unknown>)?.latitude as number) ?? 0,
+                    lon: ((h.location as Record<string, unknown>)?.longitude as number) ?? 0,
+                    reportedAt: (h.created_at as string) ?? new Date().toISOString(),
+                  })),
+                  startLat,
+                  startLon,
+                });
+              }
+            }
+          } catch { /* non-fatal */ }
+        })();
+
+        // Auto-publish badge unlocks (fire-and-forget)
+        if (newBadges.length > 0) {
+          void (async () => {
+            try {
+              const { autoPublishBadgeUnlock } = await import('../lib/autoPublish');
+              for (const badge of newBadges) {
+                await autoPublishBadgeUnlock({
+                  userId: user.id,
+                  badgeKey: badge.badgeKey,
+                  badgeName: badge.name,
+                  iconKey: badge.iconKey,
+                  category: 'riding',
+                  flavorText: badge.flavorText,
+                });
+              }
+            } catch { /* non-fatal */ }
+          })();
+        }
+
+        // Auto-publish tier promotion (fire-and-forget)
+        if (lastAwardResult?.promoted) {
+          void (async () => {
+            try {
+              const { autoPublishTierUp } = await import('../lib/autoPublish');
+              await autoPublishTierUp({
+                userId: user.id,
+                tierName: lastAwardResult.newTier,
+                tierLevel: lastAwardResult.tierLevel ?? 0,
+                tierDisplayName: lastAwardResult.tierDisplayName ?? lastAwardResult.newTier,
+                tierColor: lastAwardResult.tierColor ?? '#888888',
+              });
+            } catch { /* non-fatal */ }
+          })();
         }
 
         return {

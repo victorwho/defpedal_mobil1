@@ -1,4 +1,4 @@
-import type { FeedItem } from '@defensivepedal/core';
+import type { ActivityFeedItem } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -15,14 +15,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { FeedCard } from '../src/components/FeedCard';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { ActivityFeedCard } from '../src/design-system/organisms/ActivityFeedCard';
+import { SuggestedUsersRow } from '../src/design-system/organisms/SuggestedUsersRow';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
-import { useFeedQuery, useLikeToggle, useLoveToggle } from '../src/hooks/useFeed';
+import { useActivityFeedQuery, useActivityReaction } from '../src/hooks/useActivityFeed';
+import { useSuggestedUsers, useFollowUser } from '../src/hooks/useFollow';
 import { useT } from '../src/hooks/useTranslation';
+
+// ---------------------------------------------------------------------------
+// Merged list item type: either a feed item or a "suggested users" separator
+// ---------------------------------------------------------------------------
+
+type MergedItem =
+  | { kind: 'activity'; data: ActivityFeedItem }
+  | { kind: 'suggested'; key: string };
 
 export default function CommunityFeedScreen() {
   const t = useT();
@@ -48,44 +58,72 @@ export default function CommunityFeedScreen() {
     fetchNextPage,
     refetch,
     isRefetching,
-  } = useFeedQuery(lat, lon);
+  } = useActivityFeedQuery(lat, lon);
 
-  const likeToggle = useLikeToggle();
-  const loveToggle = useLoveToggle();
+  const reaction = useActivityReaction();
+  const followUser = useFollowUser();
+  const { data: suggestedData } = useSuggestedUsers(lat, lon);
+  const suggestedUsers = suggestedData?.users ?? [];
 
   // Track visible items for lazy map loading
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      setVisibleIds(new Set(viewableItems.map((v) => v.item?.id).filter(Boolean)));
+      setVisibleIds(
+        new Set(
+          viewableItems
+            .map((v) => {
+              const merged = v.item as MergedItem;
+              return merged.kind === 'activity' ? merged.data.id : undefined;
+            })
+            .filter(Boolean) as string[],
+        ),
+      );
     },
   ).current;
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 20 }).current;
 
-  // Memoize flattened items to prevent array recreation on every render
-  const items = useMemo(
+  // Flatten activity items from paginated response
+  const activityItems = useMemo(
     () => data?.pages.flatMap((page) => page.items) ?? [],
     [data?.pages],
   );
 
-  const handleLike = useCallback(
-    (id: string, liked: boolean) => {
-      likeToggle.mutate({ id, liked });
+  // Merge activity items with "suggested users" separators every 10 items
+  const mergedItems: readonly MergedItem[] = useMemo(() => {
+    const result: MergedItem[] = [];
+    for (let i = 0; i < activityItems.length; i++) {
+      result.push({ kind: 'activity', data: activityItems[i] });
+      // Insert suggested users row after every 10th activity item
+      if ((i + 1) % 10 === 0 && suggestedUsers.length > 0) {
+        result.push({ kind: 'suggested', key: `suggested-${i}` });
+      }
+    }
+    return result;
+  }, [activityItems, suggestedUsers.length]);
+
+  const handleReact = useCallback(
+    (id: string, type: 'like' | 'love', active: boolean) => {
+      reaction.mutate({ id, type, active });
     },
-    [likeToggle],
+    [reaction],
   );
 
-  const handleLove = useCallback(
-    (id: string, loved: boolean) => {
-      loveToggle.mutate({ id, loved });
-    },
-    [loveToggle],
-  );
-
-  const handlePress = useCallback((id: string) => {
+  const handleComment = useCallback((id: string) => {
     router.push({ pathname: '/community-trip', params: { id } });
   }, []);
+
+  const handleUserPress = useCallback((userId: string) => {
+    router.push(`/user-profile?id=${userId}` as any);
+  }, []);
+
+  const handleFollow = useCallback(
+    (userId: string) => {
+      followUser.mutate(userId);
+    },
+    [followUser],
+  );
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -94,22 +132,36 @@ export default function CommunityFeedScreen() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: FeedItem; index: number }) => (
-      <FadeSlideIn delay={Math.min(index * 50, 300)}>
-        <FeedCard
-          item={item}
-          isVisible={visibleIds.has(item.id)}
-          onLike={handleLike}
-          onLove={handleLove}
-          onPress={handlePress}
-          onUserPress={(userId) => router.push(`/user-profile?id=${userId}`)}
-        />
-      </FadeSlideIn>
-    ),
-    [visibleIds, handleLike, handleLove, handlePress, router],
+    ({ item, index }: { item: MergedItem; index: number }) => {
+      if (item.kind === 'suggested') {
+        return (
+          <SuggestedUsersRow
+            users={suggestedUsers}
+            onFollow={handleFollow}
+            onUserPress={handleUserPress}
+          />
+        );
+      }
+
+      return (
+        <FadeSlideIn delay={Math.min(index * 50, 300)}>
+          <ActivityFeedCard
+            item={item.data}
+            isVisible={visibleIds.has(item.data.id)}
+            onReact={handleReact}
+            onComment={handleComment}
+            onUserPress={handleUserPress}
+          />
+        </FadeSlideIn>
+      );
+    },
+    [visibleIds, handleReact, handleComment, handleUserPress, handleFollow, suggestedUsers],
   );
 
-  const keyExtractor = useCallback((item: FeedItem) => item.id, []);
+  const keyExtractor = useCallback(
+    (item: MergedItem) => (item.kind === 'activity' ? item.data.id : item.key),
+    [],
+  );
 
   if (!lat || !lon) {
     const isDenied = permissionStatus === 'denied';
@@ -158,8 +210,8 @@ export default function CommunityFeedScreen() {
         <Text style={styles.headerTitle}>{t('communityScreen.feed')}</Text>
       </View>
 
-      <FlatList
-        data={items}
+      <FlatList<MergedItem>
+        data={mergedItems as MergedItem[]}
         renderItem={renderItem}
         keyExtractor={keyExtractor}
         contentContainerStyle={styles.list}

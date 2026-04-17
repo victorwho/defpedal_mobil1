@@ -1,7 +1,22 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs -I {} basename {})"
-    ]
+      "*",
+      "Bash(npm run:*)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(xargs grep:*)",
+      "Bash(curl:*)",
+      "Bash(gcloud run:*)",
+      "Bash(gcloud logging read:*)",
+      "Bash(gcloud builds:*)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(git:*)",
+      "Bash(find:*)",
+      "Bash(npx expo:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:expo.dev)"
+    ],
+    "deny": []
   }
 }

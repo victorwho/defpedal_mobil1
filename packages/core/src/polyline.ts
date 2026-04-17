@@ -1,3 +1,5 @@
+import { haversineDistance } from './distance';
+
 const DEFAULT_PRECISION = 1e6;
 
 export const encodePolyline = (
@@ -72,4 +74,65 @@ export const decodePolyline = (
   }
 
   return coordinates;
+};
+
+/**
+ * Trims the first and last `trimMeters` from an encoded polyline.
+ * Used for privacy: removes start/end of ride so home/work locations aren't revealed.
+ * Returns the original polyline if it's too short to trim (< 2.5x trimMeters).
+ */
+export const trimPolylineEndpoints = (
+  encoded: string,
+  trimMeters: number,
+): string => {
+  const points = decodePolyline(encoded);
+
+  if (points.length < 2) return encoded;
+
+  // Calculate total length
+  let totalLength = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    totalLength += haversineDistance(
+      [points[i][1], points[i][0]],
+      [points[i + 1][1], points[i + 1][0]],
+    );
+  }
+
+  // If route is too short to trim, return as-is
+  if (totalLength < trimMeters * 2.5) return encoded;
+
+  // Find start trim index
+  let startIndex = 0;
+  let accumulated = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const segLen = haversineDistance(
+      [points[i][1], points[i][0]],
+      [points[i + 1][1], points[i + 1][0]],
+    );
+    accumulated += segLen;
+    if (accumulated >= trimMeters) {
+      startIndex = i + 1;
+      break;
+    }
+  }
+
+  // Find end trim index
+  let endIndex = points.length - 1;
+  accumulated = 0;
+  for (let i = points.length - 1; i > 0; i--) {
+    const segLen = haversineDistance(
+      [points[i][1], points[i][0]],
+      [points[i - 1][1], points[i - 1][0]],
+    );
+    accumulated += segLen;
+    if (accumulated >= trimMeters) {
+      endIndex = i - 1;
+      break;
+    }
+  }
+
+  // Ensure we have at least 2 points
+  if (startIndex >= endIndex) return encoded;
+
+  return encodePolyline(points.slice(startIndex, endIndex + 1));
 };
