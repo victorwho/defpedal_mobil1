@@ -10,10 +10,10 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +23,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { MiaJourneyLevel } from '@defensivepedal/core';
 
+import { MiaShareCard } from '../../components/MiaShareCard';
+import { useShareCard } from '../../hooks/useShareCard';
 import { usePersonaT } from '../../hooks/usePersonaT';
 import { miaLevelColors } from '../tokens/miaColors';
 import { brandColors } from '../tokens/colors';
@@ -132,20 +134,39 @@ function animateParticles(particles: readonly Particle[]) {
 // Component
 // ---------------------------------------------------------------------------
 
+export interface MiaLevelUpOverlayStats {
+  readonly totalRides: number;
+  readonly totalKm: number;
+  readonly daysSinceStart: number;
+}
+
 export interface MiaLevelUpOverlayProps {
   readonly fromLevel: MiaJourneyLevel;
   readonly toLevel: MiaJourneyLevel;
   readonly onDismiss: () => void;
   readonly onTestimonialSubmit?: (text: string) => void;
+  readonly stats?: MiaLevelUpOverlayStats;
 }
+
+// English level titles — captions are always English regardless of locale so
+// they cross-post cleanly. Mirrors the LEVEL_NAMES map in MiaShareCard.
+const LEVEL_TITLES_EN: Record<number, string> = {
+  1: 'First Pedal',
+  2: 'Neighborhood Explorer',
+  3: 'Cafe Rider',
+  4: 'Urban Navigator',
+  5: 'Confident Cyclist',
+};
 
 export const MiaLevelUpOverlay: React.FC<MiaLevelUpOverlayProps> = ({
   fromLevel,
   toLevel,
   onDismiss,
   onTestimonialSubmit,
+  stats,
 }) => {
   const t = usePersonaT();
+  const { share: shareCard, isSharing } = useShareCard();
   const variantKey = `${fromLevel}to${toLevel}`;
   const variant = LEVEL_VARIANTS[variantKey] ?? LEVEL_VARIANTS['1to2'];
   const levelColor = miaLevelColors[variant.colorKey];
@@ -256,10 +277,21 @@ export const MiaLevelUpOverlay: React.FC<MiaLevelUpOverlayProps> = ({
     };
   }, []);
 
+  const resolvedStats = stats ?? { totalRides: 0, totalKm: 0, daysSinceStart: 0 };
+  const levelTitle = LEVEL_TITLES_EN[toLevel] ?? 'Cyclist';
+
   const handleShare = () => {
-    const shareText = t(`${variant.i18nKey}.shareText`);
-    void Share.share({
-      message: `${shareText} #DefensivePedal #SaferCycling`,
+    void shareCard({
+      type: 'mia',
+      level: toLevel,
+      levelTitle,
+      card: (
+        <MiaShareCard
+          variant="capture"
+          level={toLevel}
+          stats={resolvedStats}
+        />
+      ),
     });
   };
 
@@ -331,9 +363,20 @@ export const MiaLevelUpOverlay: React.FC<MiaLevelUpOverlayProps> = ({
 
       {/* Share button */}
       <Animated.View style={{ opacity: shareOpacity, marginTop: space[4] }}>
-        <Pressable style={styles.shareButton} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={18} color={brandColors.textInverse} />
-          <Text style={styles.shareButtonText}>Share</Text>
+        <Pressable
+          style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+          onPress={handleShare}
+          disabled={isSharing}
+          accessibilityState={{ disabled: isSharing, busy: isSharing }}
+        >
+          {isSharing ? (
+            <ActivityIndicator size="small" color={brandColors.textInverse} />
+          ) : (
+            <>
+              <Ionicons name="share-social-outline" size={18} color={brandColors.textInverse} />
+              <Text style={styles.shareButtonText}>{t('share.shareLevelUp')}</Text>
+            </>
+          )}
         </Pressable>
       </Animated.View>
 
@@ -450,6 +493,11 @@ const styles = StyleSheet.create({
     paddingVertical: space[2],
     borderRadius: radii.full,
     backgroundColor: brandColors.accent,
+    minWidth: 120,
+    justifyContent: 'center',
+  },
+  shareButtonDisabled: {
+    opacity: 0.6,
   },
   shareButtonText: {
     ...textSm,

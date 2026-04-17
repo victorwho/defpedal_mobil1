@@ -51,6 +51,8 @@ export interface ActivityFeedCardProps {
   onReact: (id: string, type: 'like' | 'love', active: boolean) => void;
   onComment: (id: string) => void;
   onUserPress: (userId: string) => void;
+  /** Invoked when the user taps the card-level share icon. Only rendered when set. */
+  onSharePress?: (item: ActivityFeedItem) => void;
   /** Whether the card is visible in viewport (for lazy map loading) */
   isVisible?: boolean;
 }
@@ -139,6 +141,7 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
   onReact,
   onComment,
   onUserPress,
+  onSharePress,
   isVisible = true,
 }: ActivityFeedCardProps) {
   const { colors } = useTheme();
@@ -165,6 +168,11 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
     () => onUserPress(item.user.id),
     [item.user.id, onUserPress],
   );
+  const handleSharePress = useCallback(
+    () => onSharePress?.(item),
+    [item, onSharePress],
+  );
+  const canShare = onSharePress != null && item.type === 'ride';
 
   return (
     <View style={styles.card}>
@@ -198,16 +206,29 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
 
       {/* Reaction bar */}
       <View style={styles.actionBar}>
-        <ReactionBar
-          likeCount={item.likeCount}
-          loveCount={item.loveCount}
-          commentCount={item.commentCount}
-          likedByMe={item.likedByMe}
-          lovedByMe={item.lovedByMe}
-          onLike={handleLike}
-          onLove={handleLove}
-          onComment={handleComment}
-        />
+        <View style={styles.reactionBarWrap}>
+          <ReactionBar
+            likeCount={item.likeCount}
+            loveCount={item.loveCount}
+            commentCount={item.commentCount}
+            likedByMe={item.likedByMe}
+            lovedByMe={item.lovedByMe}
+            onLike={handleLike}
+            onLove={handleLove}
+            onComment={handleComment}
+          />
+        </View>
+        {canShare && (
+          <Pressable
+            onPress={handleSharePress}
+            accessibilityRole="button"
+            accessibilityLabel="Share this ride"
+            hitSlop={8}
+            style={styles.shareButton}
+          >
+            <Ionicons name="share-social-outline" size={20} color={colors.textSecondary} />
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -744,5 +765,12 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderTopWidth: 1,
       borderTopColor: colors.borderDefault,
       paddingTop: space[2],
+    },
+    reactionBarWrap: {
+      flex: 1,
+    },
+    shareButton: {
+      padding: space[2],
+      borderRadius: radii.full,
     },
   });

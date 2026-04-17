@@ -4,11 +4,13 @@
  * Bottom sheet modal showing full badge information:
  * hero icon (lg), name, tier, flavor text, criteria, progress bar, rarity, share.
  */
-import React, { useCallback, useRef } from 'react';
-import { Modal, Pressable, ScrollView, Share, Text, View, StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
 
 import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
 
+import { BadgeShareCard } from '../../components/BadgeShareCard';
+import { useShareCard } from '../../hooks/useShareCard';
 import { BadgeIcon } from '../atoms/BadgeIcon';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import {
@@ -75,18 +77,35 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
   onShare,
   onClose,
 }) => {
+  const { share: shareCard, isSharing } = useShareCard();
+
   const handleShare = useCallback(async () => {
     if (!badge) return;
     const t: BadgeTier = earnedTier ?? TIER_FROM_LEVEL[badge.tier] ?? 'bronze';
     const tierLabel = TIER_LABELS[t];
-    const shareText = `I just earned the "${badge.name}" badge (${tierLabel}) on Defensive Pedal! ${badge.flavorText} #DefensivePedal #SaferCycling`;
-    try {
-      await Share.share({ message: shareText });
-    } catch {
-      // User cancelled share
+    const rarity = rarityPercent != null ? getRarity(rarityPercent) : null;
+
+    const result = await shareCard({
+      type: 'badge',
+      badgeName: badge.name,
+      tier: tierLabel,
+      rarity: rarity?.level,
+      card: (
+        <BadgeShareCard
+          variant="capture"
+          badge={badge}
+          tier={t}
+          rarityPercent={rarityPercent}
+        />
+      ),
+    });
+
+    // Fire the parent tracking callback AFTER a successful share so analytics
+    // reflect completed shares only.
+    if (result.shared) {
+      onShare();
     }
-    onShare();
-  }, [badge, earnedTier, onShare]);
+  }, [badge, earnedTier, onShare, rarityPercent, shareCard]);
 
   if (!badge) return null;
 
@@ -206,8 +225,17 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 
             {/* Share button */}
             {earned ? (
-              <Pressable style={styles.shareButton} onPress={handleShare}>
-                <Text style={styles.shareButtonText}>Share</Text>
+              <Pressable
+                style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
+                onPress={handleShare}
+                disabled={isSharing}
+                accessibilityState={{ disabled: isSharing, busy: isSharing }}
+              >
+                {isSharing ? (
+                  <ActivityIndicator size="small" color="#111827" />
+                ) : (
+                  <Text style={styles.shareButtonText}>Share</Text>
+                )}
               </Pressable>
             ) : null}
           </ScrollView>
@@ -303,6 +331,9 @@ const styles = StyleSheet.create({
     paddingVertical: space[3],
     alignItems: 'center',
     marginTop: space[2],
+  },
+  shareButtonDisabled: {
+    opacity: 0.6,
   },
   shareButtonText: {
     fontFamily: fontFamily.body.bold,

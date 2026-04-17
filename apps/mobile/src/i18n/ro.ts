@@ -675,4 +675,10 @@ export const ro: TranslationKeys = {
       noSafeRoute: 'Nu am putut găsi un traseu suficient de sigur pentru nivelul tău actual. Încearcă o destinație mai apropiată sau verifică mai târziu.',
     },
   },
-} as const;
+
+  // ── Share (image-based) ──
+  share: {
+    shareRide: 'Distribuie această cursă',
+    shareLevelUp: 'Distribuie',
+  },
+};

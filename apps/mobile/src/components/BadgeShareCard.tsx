@@ -1,10 +1,13 @@
 /**
- * BadgeShareCard — Capturable view for social sharing.
+ * BadgeShareCard — Dual-variant capturable badge share card.
  *
- * Follows MilestoneShareCard pattern:
- * 320px width, bgDeep background, accent border, centered badge icon.
+ *   - variant="preview" (default): compact 320px card shown inline in modals.
+ *   - variant="capture": 1080x1080 branded social image for offscreen capture.
+ *
+ * Pure presentational. No share logic, no side effects.
+ * The outer View forwards its ref so capture hosts can `captureRef` it.
  */
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
 import type { BadgeDefinition } from '@defensivepedal/core';
@@ -31,35 +34,81 @@ const TIER_LABELS: Record<BadgeTier, string> = {
   diamond: 'Diamond',
 };
 
-const TIER_FROM_LEVEL: Record<number, BadgeTier> = {
-  1: 'bronze',
-  2: 'silver',
-  3: 'gold',
-  4: 'platinum',
-  5: 'diamond',
-};
+export type BadgeShareCardVariant = 'preview' | 'capture';
 
 export interface BadgeShareCardProps {
   badge: BadgeDefinition;
   tier: BadgeTier;
   rarityPercent?: number;
+  variant?: BadgeShareCardVariant;
 }
 
-export const BadgeShareCard = React.forwardRef<View, BadgeShareCardProps>(
-  ({ badge, tier, rarityPercent }, ref) => {
+export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
+  ({ badge, tier, rarityPercent, variant = 'preview' }, ref) => {
     const tierColor = tierColors[tier].primary;
     const rarity = rarityPercent != null ? getRarity(rarityPercent) : null;
+    const isCapture = variant === 'capture';
+
+    if (isCapture) {
+      return (
+        <View ref={ref} collapsable={false} style={captureStyles.card}>
+          {/* Brand header */}
+          <View style={captureStyles.header}>
+            <View style={captureStyles.headerLeft}>
+              <BrandLogo size={56} />
+              <Text style={captureStyles.brandText}>DEFENSIVE PEDAL</Text>
+            </View>
+          </View>
+
+          {/* Hero: large scaled-up badge shield */}
+          <View style={captureStyles.hero}>
+            <View style={captureStyles.badgeScaleWrap}>
+              <BadgeIcon
+                badgeKey={badge.badgeKey}
+                tierFamily={badge.tierFamily}
+                tier={tier}
+                size="lg"
+              />
+            </View>
+          </View>
+
+          {/* Text block */}
+          <View style={captureStyles.textBlock}>
+            <Text style={captureStyles.badgeName} numberOfLines={2}>
+              {badge.name}
+            </Text>
+            <Text style={[captureStyles.tierLabel, { color: tierColor }]}>
+              {TIER_LABELS[tier]}
+            </Text>
+            <Text style={captureStyles.criteriaText} numberOfLines={3}>
+              {badge.criteriaText}
+            </Text>
+            {rarity && rarityPercent != null ? (
+              <Text style={captureStyles.rarityText}>
+                Only {rarityPercent.toFixed(0)}% of cyclists earn this
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Footer */}
+          <View style={captureStyles.footer}>
+            <BrandLogo size={44} />
+            <Text style={captureStyles.footerUrl}>defensivepedal.com</Text>
+          </View>
+        </View>
+      );
+    }
 
     return (
-      <View ref={ref} style={styles.card} collapsable={false}>
+      <View ref={ref} collapsable={false} style={previewStyles.card}>
         {/* Brand header */}
-        <View style={styles.topRow}>
+        <View style={previewStyles.topRow}>
           <BrandLogo size={32} />
-          <Text style={styles.brandText}>DEFENSIVE PEDAL</Text>
+          <Text style={previewStyles.brandText}>DEFENSIVE PEDAL</Text>
         </View>
 
         {/* Badge hero */}
-        <View style={styles.centerSection}>
+        <View style={previewStyles.centerSection}>
           <BadgeIcon
             badgeKey={badge.badgeKey}
             tierFamily={badge.tierFamily}
@@ -69,17 +118,17 @@ export const BadgeShareCard = React.forwardRef<View, BadgeShareCardProps>(
         </View>
 
         {/* Badge name */}
-        <Text style={styles.badgeName}>{badge.name}</Text>
-        <Text style={[styles.tierLabel, { color: tierColor }]}>
+        <Text style={previewStyles.badgeName}>{badge.name}</Text>
+        <Text style={[previewStyles.tierLabel, { color: tierColor }]}>
           {TIER_LABELS[tier]}
         </Text>
 
         {/* Criteria */}
-        <Text style={styles.criteriaText}>{badge.criteriaText}</Text>
+        <Text style={previewStyles.criteriaText}>{badge.criteriaText}</Text>
 
         {/* Rarity */}
         {rarity && rarityPercent != null ? (
-          <Text style={styles.rarityText}>
+          <Text style={previewStyles.rarityText}>
             <Text style={{ color: rarity.color }}>-- </Text>
             Only {rarityPercent.toFixed(0)}% of cyclists
             <Text style={{ color: rarity.color }}> --</Text>
@@ -87,8 +136,8 @@ export const BadgeShareCard = React.forwardRef<View, BadgeShareCardProps>(
         ) : null}
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>defensivepedal.com</Text>
+        <View style={previewStyles.footer}>
+          <Text style={previewStyles.footerText}>defensivepedal.com</Text>
         </View>
       </View>
     );
@@ -100,9 +149,13 @@ export const getBadgeShareText = (badge: BadgeDefinition, tier: BadgeTier): stri
   return `I just earned the "${badge.name}" badge (${tierLabel}) on Defensive Pedal! ${badge.flavorText} #DefensivePedal #SaferCycling`;
 };
 
+// ---------------------------------------------------------------------------
+// Styles — preview variant (unchanged 320px layout, share button removed)
+// ---------------------------------------------------------------------------
+
 const CARD_WIDTH = Math.min(320, Dimensions.get('window').width - 32);
 
-const styles = StyleSheet.create({
+const previewStyles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     backgroundColor: darkTheme.bgDeep,
@@ -159,5 +212,98 @@ const styles = StyleSheet.create({
   footerText: {
     ...textXs,
     color: darkTheme.textMuted,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Styles — capture variant (1080x1080 branded social image)
+// ---------------------------------------------------------------------------
+
+const CAPTURE_SIZE = 1080;
+const CAPTURE_HEADER_H = 96;
+const CAPTURE_FOOTER_H = 80;
+const ACCENT = brandColors.accent;
+const HEADER_BG = '#1A1A1A';
+
+// BadgeIcon lg is 120x139; scale ~4x to fit the hero area.
+const BADGE_SCALE = 4;
+
+const captureStyles = StyleSheet.create({
+  card: {
+    width: CAPTURE_SIZE,
+    height: CAPTURE_SIZE,
+    backgroundColor: darkTheme.bgDeep,
+    overflow: 'hidden',
+  },
+  header: {
+    height: CAPTURE_HEADER_H,
+    backgroundColor: HEADER_BG,
+    paddingHorizontal: space[6],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  brandText: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: ACCENT,
+    fontSize: 22,
+    letterSpacing: 2,
+  },
+  hero: {
+    height: 560,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space[6],
+  },
+  badgeScaleWrap: {
+    transform: [{ scale: BADGE_SCALE }],
+  },
+  textBlock: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space[8],
+    gap: space[3],
+  },
+  badgeName: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: darkTheme.textPrimary,
+    fontSize: 56,
+    textAlign: 'center',
+  },
+  tierLabel: {
+    fontFamily: fontFamily.mono.semiBold,
+    fontSize: 28,
+    letterSpacing: 2,
+    textAlign: 'center',
+  },
+  criteriaText: {
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textSecondary,
+    fontSize: 28,
+    lineHeight: 36,
+    textAlign: 'center',
+  },
+  rarityText: {
+    fontFamily: fontFamily.body.regular,
+    color: darkTheme.textMuted,
+    fontSize: 22,
+    textAlign: 'center',
+  },
+  footer: {
+    height: CAPTURE_FOOTER_H,
+    backgroundColor: HEADER_BG,
+    paddingHorizontal: space[6],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[3],
+  },
+  footerUrl: {
+    fontFamily: fontFamily.body.semiBold,
+    color: ACCENT,
+    fontSize: 20,
+    letterSpacing: 1,
   },
 });

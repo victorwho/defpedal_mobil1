@@ -9,6 +9,7 @@ import { NavigationLifecycleManager } from './NavigationLifecycleManager';
 import { DailyWeatherScheduler } from './DailyWeatherScheduler';
 import { NotificationProvider } from './NotificationProvider';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
+import { OffScreenCaptureHostProvider } from './OffScreenCaptureHost';
 import { TelemetryProvider } from './TelemetryProvider';
 
 const queryClient = new QueryClient();
@@ -24,7 +25,9 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
               <OfflineMutationSyncManager />
               <NotificationProvider />
               <DailyWeatherScheduler />
-              {children}
+              <OffScreenCaptureHostProvider>
+                {children}
+              </OffScreenCaptureHostProvider>
             </QueryClientProvider>
           </ConnectivityProvider>
         </TelemetryProvider>

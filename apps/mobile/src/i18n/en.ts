@@ -673,6 +673,12 @@ export const en = {
       noSafeRoute: 'We couldn\'t find a route that feels safe enough for your current level. Try a closer destination or check back later.',
     },
   },
+
+  // ── Share (image-based) ──
+  share: {
+    shareRide: 'Share this ride',
+    shareLevelUp: 'Share',
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

@@ -1,4 +1,9 @@
 import type { TripHistoryItem } from '@defensivepedal/core';
+import {
+  calculateCo2SavedKg,
+  calculateTrailDistanceMeters,
+  decodePolyline,
+} from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
@@ -8,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Button } from '../src/design-system/atoms/Button';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -16,6 +22,7 @@ import { fontFamily, textBase, textSm, text3xl, textXs } from '../src/design-sys
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
+import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
 
 export default function TripsScreen() {
@@ -26,6 +33,44 @@ export default function TripsScreen() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const shareRide = useShareRide();
+
+  const handleShareTrip = useCallback((trip: TripHistoryItem) => {
+    // Prefer GPS trail; fall back to planned route polyline for trips that
+    // ended without breadcrumbs (killed app, permission loss, etc).
+    let coords: [number, number][] = trip.gpsBreadcrumbs.map((pt) => [pt.lon, pt.lat]);
+    if (coords.length < 2 && trip.plannedRoutePolyline6) {
+      try {
+        coords = decodePolyline(trip.plannedRoutePolyline6);
+      } catch {
+        coords = [];
+      }
+    }
+
+    const distanceMeters =
+      trip.distanceMeters ??
+      (trip.gpsBreadcrumbs.length >= 2
+        ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
+        : trip.plannedRouteDistanceMeters ?? 0);
+    const distanceKm = distanceMeters / 1000;
+
+    const durationMinutes = trip.endedAt
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(trip.endedAt).getTime() - new Date(trip.startedAt).getTime()) / 60_000,
+          ),
+        )
+      : 0;
+
+    void shareRide.share({
+      coords,
+      distanceKm,
+      durationMinutes,
+      co2SavedKg: calculateCo2SavedKg(distanceMeters),
+      dateIso: trip.startedAt,
+    });
+  }, [shareRide]);
 
   const { data: trips, isLoading, error } = useQuery({
     queryKey: ['trip-history'],
@@ -81,15 +126,31 @@ export default function TripsScreen() {
             </View>
           </Pressable>
         ) : (
-          <TripCard
-            trip={item}
-            expanded={expandedId === item.id}
-            onToggle={() => handleToggle(item.id)}
-          />
+          <View style={styles.tripCardWrapper}>
+            <TripCard
+              trip={item}
+              expanded={expandedId === item.id}
+              onToggle={() => handleToggle(item.id)}
+            />
+            <Pressable
+              style={styles.shareTripButton}
+              onPress={() => handleShareTrip(item)}
+              disabled={shareRide.isSharing}
+              accessibilityRole="button"
+              accessibilityLabel={t('share.shareRide')}
+              hitSlop={10}
+            >
+              <Ionicons
+                name="share-social-outline"
+                size={18}
+                color={shareRide.isSharing ? gray[500] : colors.accent}
+              />
+            </Pressable>
+          </View>
         )}
       </View>
     ),
-    [expandedId, handleToggle, compareMode, selectedIds, styles, colors],
+    [expandedId, handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, t],
   );
 
   return (
@@ -166,6 +227,15 @@ export default function TripsScreen() {
         ) : null}
       </View>
       <BottomNav activeTab="history" onTabPress={handleTabPress} />
+      {shareRide.toastMessage ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={shareRide.toastMessage}
+            variant="warning"
+            onDismiss={shareRide.consumeToast}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -281,5 +351,28 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingVertical: space[3],
       borderTopWidth: 1,
       borderTopColor: colors.borderDefault,
+    },
+    tripCardWrapper: {
+      position: 'relative',
+    },
+    shareTripButton: {
+      position: 'absolute',
+      top: space[2],
+      right: space[2],
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.bgSecondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+    },
+    shareToastContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 80,
+      alignItems: 'center',
     },
   });

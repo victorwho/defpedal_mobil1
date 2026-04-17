@@ -24,6 +24,7 @@ import { MiaLevelUpOverlay } from '../src/design-system/organisms/MiaLevelUpOver
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
+import { useMiaJourney } from '../src/hooks/useMiaJourney';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -275,6 +276,7 @@ const MiaLevelUpOverlayManager = () => {
   const appState = useAppStore((s) => s.appState);
   const pendingMiaLevelUp = useAppStore((s) => s.pendingMiaLevelUp);
   const shiftMiaLevelUp = useAppStore((s) => s.shiftMiaLevelUp);
+  const miaJourney = useMiaJourney();
 
   // Suppress during navigation (same as badges and rank-up)
   if (!pendingMiaLevelUp || appState === 'NAVIGATING') return null;
@@ -285,12 +287,32 @@ const MiaLevelUpOverlayManager = () => {
     });
   };
 
+  // Derive share-card stats from the journey query. Falls back to zeros until
+  // the query resolves — the overlay renders immediately on level-up and we
+  // don't want to block the celebration waiting for data.
+  const journeyStats = miaJourney.data
+    ? {
+        totalRides: miaJourney.data.totalRides,
+        totalKm: 0, // Not in MiaJourneyState — distance stats live in the impact dashboard.
+        daysSinceStart: miaJourney.data.startedAt
+          ? Math.max(
+              0,
+              Math.floor(
+                (Date.now() - new Date(miaJourney.data.startedAt).getTime()) /
+                  (1000 * 60 * 60 * 24),
+              ),
+            )
+          : 0,
+      }
+    : undefined;
+
   return (
     <MiaLevelUpOverlay
       fromLevel={pendingMiaLevelUp.fromLevel}
       toLevel={pendingMiaLevelUp.toLevel}
       onDismiss={() => shiftMiaLevelUp()}
       onTestimonialSubmit={handleTestimonialSubmit}
+      stats={journeyStats}
     />
   );
 };

@@ -2,10 +2,11 @@
 /**
  * MiaShareCard Component — Unit Tests
  *
- * Tests rendering for all 5 levels, stats display, share text generation,
- * and the exported getMiaShareText helper.
+ * Tests rendering for all 5 levels, stats display, and dual-variant
+ * (preview / capture) layout. Also covers ref forwarding for offscreen
+ * capture via OffScreenCaptureHost, and the exported getMiaShareText helper.
  */
-import React from 'react';
+import React, { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
@@ -75,7 +76,7 @@ const { MiaShareCard, getMiaShareText } = await import('../MiaShareCard');
 describe('MiaShareCard', () => {
   const defaultStats = { totalRides: 10, totalKm: 45, daysSinceStart: 14 };
 
-  describe('rendering for each level', () => {
+  describe('rendering for each level (preview variant)', () => {
     const levelNames: Record<number, string> = {
       1: 'First Pedal',
       2: 'Neighborhood Explorer',
@@ -95,7 +96,7 @@ describe('MiaShareCard', () => {
     for (const level of [1, 2, 3, 4, 5] as const) {
       it(`renders level ${level} with correct name and icon`, () => {
         const { unmount } = render(
-          <MiaShareCard level={level} stats={defaultStats} onShare={vi.fn()} />,
+          <MiaShareCard level={level} stats={defaultStats} />,
         );
         expect(screen.getByText(levelNames[level])).toBeTruthy();
         expect(screen.getByTestId(`icon-${levelIcons[level]}`)).toBeTruthy();
@@ -104,10 +105,10 @@ describe('MiaShareCard', () => {
     }
   });
 
-  describe('stats display', () => {
+  describe('stats display (preview)', () => {
     it('shows rides, km, and days', () => {
       render(
-        <MiaShareCard level={3} stats={defaultStats} onShare={vi.fn()} />,
+        <MiaShareCard level={3} stats={defaultStats} />,
       );
       expect(screen.getByText('10')).toBeTruthy();
       expect(screen.getByText('45')).toBeTruthy();
@@ -122,7 +123,6 @@ describe('MiaShareCard', () => {
         <MiaShareCard
           level={1}
           stats={{ totalRides: 0, totalKm: 0, daysSinceStart: 0 }}
-          onShare={vi.fn()}
         />,
       );
       const zeros = screen.getAllByText('0');
@@ -130,36 +130,93 @@ describe('MiaShareCard', () => {
     });
   });
 
-  describe('branding', () => {
+  describe('branding (preview)', () => {
     it('renders brand logo', () => {
       render(
-        <MiaShareCard level={2} stats={defaultStats} onShare={vi.fn()} />,
+        <MiaShareCard level={2} stats={defaultStats} />,
       );
-      expect(screen.getByTestId('brand-logo')).toBeTruthy();
+      expect(screen.getAllByTestId('brand-logo').length).toBeGreaterThan(0);
     });
 
     it('renders brand name', () => {
       render(
-        <MiaShareCard level={2} stats={defaultStats} onShare={vi.fn()} />,
+        <MiaShareCard level={2} stats={defaultStats} />,
       );
       expect(screen.getByText('Defensive Pedal')).toBeTruthy();
     });
 
     it('renders footer tagline', () => {
       render(
-        <MiaShareCard level={2} stats={defaultStats} onShare={vi.fn()} />,
+        <MiaShareCard level={2} stats={defaultStats} />,
       );
       expect(screen.getByText('Safer streets, one ride at a time')).toBeTruthy();
     });
   });
 
-  describe('share button', () => {
-    it('renders share button', () => {
+  describe('capture variant', () => {
+    it('renders the level name in capture variant', () => {
       render(
-        <MiaShareCard level={3} stats={defaultStats} onShare={vi.fn()} />,
+        <MiaShareCard level={4} stats={defaultStats} variant="capture" />,
       );
-      expect(screen.getByText('Share')).toBeTruthy();
-      expect(screen.getByTestId('icon-share-social-outline')).toBeTruthy();
+      expect(screen.getByText('Urban Navigator')).toBeTruthy();
+    });
+
+    it('renders the level number and LEVEL label in the hero', () => {
+      render(
+        <MiaShareCard level={5} stats={defaultStats} variant="capture" />,
+      );
+      expect(screen.getByText('5')).toBeTruthy();
+      expect(screen.getByText('LEVEL')).toBeTruthy();
+    });
+
+    it('renders rides / km / days stats in capture variant', () => {
+      render(
+        <MiaShareCard level={3} stats={defaultStats} variant="capture" />,
+      );
+      expect(screen.getByText('10')).toBeTruthy();
+      expect(screen.getByText('45')).toBeTruthy();
+      expect(screen.getByText('14')).toBeTruthy();
+    });
+
+    it('renders the defensivepedal.com footer in capture variant', () => {
+      render(
+        <MiaShareCard level={2} stats={defaultStats} variant="capture" />,
+      );
+      expect(screen.getByText('defensivepedal.com')).toBeTruthy();
+    });
+
+    it('does not render the preview-only tagline in capture variant', () => {
+      render(
+        <MiaShareCard level={2} stats={defaultStats} variant="capture" />,
+      );
+      expect(screen.queryByText('Safer streets, one ride at a time')).toBeNull();
+    });
+  });
+
+  describe('ref forwarding', () => {
+    it('forwards ref to the outermost View in capture variant', () => {
+      const ref = createRef<unknown>();
+      render(
+        <MiaShareCard
+          ref={ref as React.Ref<unknown>}
+          level={3}
+          stats={defaultStats}
+          variant="capture"
+        />,
+      );
+      expect(ref.current).toBeTruthy();
+    });
+
+    it('forwards ref to the outermost View in preview variant', () => {
+      const ref = createRef<unknown>();
+      render(
+        <MiaShareCard
+          ref={ref as React.Ref<unknown>}
+          level={2}
+          stats={defaultStats}
+        />,
+      );
+      expect(ref.current).toBeTruthy();
     });
   });
 });

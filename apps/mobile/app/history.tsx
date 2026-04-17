@@ -1,5 +1,10 @@
 import type { ImpactDashboard, TripHistoryItem } from '@defensivepedal/core';
-import { formatCo2Saved } from '@defensivepedal/core';
+import {
+  calculateCo2SavedKg,
+  calculateTrailDistanceMeters,
+  decodePolyline,
+  formatCo2Saved,
+} from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -21,6 +26,8 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
+import { useShareRide } from '../src/hooks/useShareRide';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { useAppStore } from '../src/store/appStore';
 import { MiaEmptyState } from '../src/design-system/molecules/MiaEmptyState';
 
@@ -116,6 +123,45 @@ export default function HistoryScreen() {
     setExpandedId((prev) => (prev === tripId ? null : tripId));
   }, []);
 
+  const shareRide = useShareRide();
+
+  const handleShareTrip = useCallback((trip: TripHistoryItem) => {
+    // Same data-shape extraction as trips.tsx — prefer GPS trail, fall back
+    // to decoded planned polyline for trips without breadcrumbs.
+    let coords: [number, number][] = trip.gpsBreadcrumbs.map((pt) => [pt.lon, pt.lat]);
+    if (coords.length < 2 && trip.plannedRoutePolyline6) {
+      try {
+        coords = decodePolyline(trip.plannedRoutePolyline6);
+      } catch {
+        coords = [];
+      }
+    }
+
+    const distanceMeters =
+      trip.distanceMeters ??
+      (trip.gpsBreadcrumbs.length >= 2
+        ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
+        : trip.plannedRouteDistanceMeters ?? 0);
+    const distanceKm = distanceMeters / 1000;
+
+    const durationMinutes = trip.endedAt
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(trip.endedAt).getTime() - new Date(trip.startedAt).getTime()) / 60_000,
+          ),
+        )
+      : 0;
+
+    void shareRide.share({
+      coords,
+      distanceKm,
+      durationMinutes,
+      co2SavedKg: calculateCo2SavedKg(distanceMeters),
+      dateIso: trip.startedAt,
+    });
+  }, [shareRide]);
+
   const renderTripItem = useCallback(
     ({ item, index }: { item: TripHistoryItem; index: number }) => (
       <FadeSlideIn delay={Math.min(index * 50, 300)}>
@@ -123,10 +169,12 @@ export default function HistoryScreen() {
           trip={item}
           expanded={expandedId === item.id}
           onToggle={() => handleToggle(item.id)}
+          onSharePress={handleShareTrip}
+          sharePending={shareRide.isSharing}
         />
       </FadeSlideIn>
     ),
-    [expandedId, handleToggle],
+    [expandedId, handleToggle, handleShareTrip, shareRide.isSharing],
   );
 
   // ── Derived stat values ──
@@ -325,6 +373,15 @@ export default function HistoryScreen() {
         />
       </SafeAreaView>
       <BottomNav activeTab="history" onTabPress={handleTabPress} />
+      {shareRide.toastMessage ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={shareRide.toastMessage}
+            variant="warning"
+            onDismiss={shareRide.consumeToast}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -482,5 +539,11 @@ const createThemedStyles = (colors: ThemeColors) =>
     quizCardSubtitle: {
       ...textXs,
       color: colors.textSecondary,
+    },
+    shareToastContainer: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 80,
     },
   });

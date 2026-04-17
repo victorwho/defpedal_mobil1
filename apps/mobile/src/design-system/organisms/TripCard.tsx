@@ -16,6 +16,10 @@ type TripCardProps = {
   readonly trip: TripHistoryItem;
   readonly expanded: boolean;
   readonly onToggle: () => void;
+  /** Invoked when the user taps the share icon. Icon is only rendered when set. */
+  readonly onSharePress?: (trip: TripHistoryItem) => void;
+  /** Disable the share button while a share is in flight. */
+  readonly sharePending?: boolean;
 };
 
 const formatDate = (iso: string): string => {
@@ -59,7 +63,7 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
   }
 };
 
-export const TripCard = memo(({ trip, expanded, onToggle }: TripCardProps) => {
+export const TripCard = memo(({ trip, expanded, onToggle, onSharePress, sharePending = false }: TripCardProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
@@ -116,6 +120,27 @@ export const TripCard = memo(({ trip, expanded, onToggle }: TripCardProps) => {
           </View>
           <Ionicons name={icon.name} size={18} color={icon.color} />
         </View>
+
+        {onSharePress ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              onSharePress(trip);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Share this ride"
+            accessibilityState={{ disabled: sharePending }}
+            disabled={sharePending}
+            hitSlop={8}
+            style={styles.shareIconButton}
+          >
+            <Ionicons
+              name="share-social-outline"
+              size={20}
+              color={sharePending ? gray[500] : colors.accent}
+            />
+          </Pressable>
+        ) : null}
 
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
@@ -209,5 +234,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       flex: 1,
       borderRadius: 0,
       borderWidth: 0,
+    },
+    shareIconButton: {
+      padding: space[1],
+      borderRadius: radii.full,
     },
   });

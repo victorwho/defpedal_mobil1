@@ -15,8 +15,8 @@
 
 set -euo pipefail
 
-SRC="C:/dev/defpedal"
-DST="C:/dpb"
+SRC="${SRC:-C:/dev/defpedal}"
+DST="${DST:-C:/dpb}"
 ADB_DEVICE="R5CX61E737J"
 
 # ── Parse arguments ──
@@ -57,6 +57,25 @@ for f in app.config.ts metro.config.js tsconfig.json package.json; do
   cp -f "$SRC/apps/mobile/$f" "$DST/apps/mobile/$f" 2>/dev/null || true
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
+cp -f "$SRC/package-lock.json" "$DST/package-lock.json" 2>/dev/null || true
+
+# Sync workspace package.json files (in case new deps were added)
+cp -f "$SRC/apps/mobile/package.json" "$DST/apps/mobile/package.json" 2>/dev/null || true
+cp -f "$SRC/packages/core/package.json" "$DST/packages/core/package.json" 2>/dev/null || true
+cp -f "$SRC/services/mobile-api/package.json" "$DST/services/mobile-api/package.json" 2>/dev/null || true
+
+# Ensure node_modules on DST match the synced package-lock.json.
+# Checks a sentinel module from the worktree — if missing on DST, run install.
+if [ "${SKIP_NPM_INSTALL:-0}" != "1" ]; then
+  if [ ! -d "$DST/node_modules/react-native-view-shot" ] \
+     || [ ! -d "$DST/node_modules/expo-sharing" ] \
+     || [ ! -d "$DST/node_modules/expo-media-library" ]; then
+    echo "── Step 1a: Install npm deps on DST (new packages detected) ──"
+    ( cd "$DST" && npm install --no-audit --no-fund )
+  else
+    echo "── Step 1a: DST node_modules OK (skipping npm install) ──"
+  fi
+fi
 
 # Sync the entire Android source + config tree (icons, manifest, gradle, etc.)
 # This prevents dev/release icon and config drift — no more cherry-picking files.

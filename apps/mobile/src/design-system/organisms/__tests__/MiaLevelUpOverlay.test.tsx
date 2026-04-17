@@ -61,6 +61,21 @@ vi.mock('@expo/vector-icons/Ionicons', () => ({
   default: MockIonicons,
 }));
 
+// Share-card hook is used inside the overlay — capture host isn't available
+// in the test DOM so we stub it wholesale.
+vi.mock('../../../hooks/useShareCard', () => ({
+  useShareCard: () => ({
+    share: vi.fn().mockResolvedValue({ shared: false, savedToLibrary: false }),
+    isSharing: false,
+  }),
+}));
+
+// MiaShareCard renders native RN primitives that happy-dom can't lay out, and
+// it's rendered only inside the capture host so a stub is fine for overlay tests.
+vi.mock('../../../components/MiaShareCard', () => ({
+  MiaShareCard: () => null,
+}));
+
 const { MiaLevelUpOverlay } = await import('../MiaLevelUpOverlay');
 
 // ---------------------------------------------------------------------------

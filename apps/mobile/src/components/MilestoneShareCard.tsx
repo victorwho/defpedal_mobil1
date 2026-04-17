@@ -1,3 +1,14 @@
+/**
+ * MilestoneShareCard — Dual-variant capturable share card.
+ *
+ *   - variant="preview" (default): compact 320px card used inside modals.
+ *   - variant="capture": 1080x1080 branded social image rendered offscreen
+ *     by the OffScreenCaptureHost.
+ *
+ * Pure presentational. No share logic, no side effects.
+ * The outer View forwards its ref so capture hosts can `captureRef` it.
+ */
+import React, { forwardRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
 import { BrandLogo } from './BrandLogo';
@@ -78,39 +89,75 @@ export const detectNewMilestones = (input: MilestoneCheckInput): MilestoneKey[] 
 };
 
 // ---------------------------------------------------------------------------
-// Share card component (capturable view)
+// Share card component
 // ---------------------------------------------------------------------------
 
-type MilestoneShareCardProps = {
+export type MilestoneShareCardVariant = 'preview' | 'capture';
+
+export interface MilestoneShareCardProps {
   readonly milestoneKey: MilestoneKey;
-};
+  readonly variant?: MilestoneShareCardVariant;
+}
 
-export const MilestoneShareCard = ({ milestoneKey }: MilestoneShareCardProps) => {
-  const config = MILESTONE_CONFIGS[milestoneKey];
+export const MilestoneShareCard = forwardRef<View, MilestoneShareCardProps>(
+  function MilestoneShareCard({ milestoneKey, variant = 'preview' }, ref) {
+    const config = MILESTONE_CONFIGS[milestoneKey];
+    const isCapture = variant === 'capture';
 
-  return (
-    <View style={styles.card}>
-      <View style={styles.topRow}>
-        <BrandLogo size={32} />
-        <Text style={styles.brandText}>Defensive Pedal</Text>
+    if (isCapture) {
+      return (
+        <View ref={ref} collapsable={false} style={captureStyles.card}>
+          <View style={captureStyles.header}>
+            <View style={captureStyles.headerLeft}>
+              <BrandLogo size={56} />
+              <Text style={captureStyles.brandText}>DEFENSIVE PEDAL</Text>
+            </View>
+          </View>
+
+          <View style={captureStyles.hero}>
+            <View style={captureStyles.heroIconRing}>
+              <Text style={captureStyles.heroIcon}>{config.icon}</Text>
+            </View>
+            <Text style={captureStyles.heroStat}>{config.statLabel}</Text>
+          </View>
+
+          <View style={captureStyles.textBlock}>
+            <Text style={captureStyles.title}>{config.title}</Text>
+            <Text style={captureStyles.subtitle}>{config.subtitle}</Text>
+          </View>
+
+          <View style={captureStyles.footer}>
+            <BrandLogo size={44} />
+            <Text style={captureStyles.footerUrl}>defensivepedal.com</Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View ref={ref} collapsable={false} style={previewStyles.card}>
+        <View style={previewStyles.topRow}>
+          <BrandLogo size={32} />
+          <Text style={previewStyles.brandText}>Defensive Pedal</Text>
+        </View>
+
+        <View style={previewStyles.centerSection}>
+          <Text style={previewStyles.iconText}>{config.icon}</Text>
+          <Text style={previewStyles.statLabel}>{config.statLabel}</Text>
+          <Text style={previewStyles.title}>{config.title}</Text>
+          <Text style={previewStyles.subtitle}>{config.subtitle}</Text>
+        </View>
+
+        <View style={previewStyles.footer}>
+          <Text style={previewStyles.footerText}>Safer streets, one ride at a time</Text>
+        </View>
       </View>
-
-      <View style={styles.centerSection}>
-        <Text style={styles.iconText}>{config.icon}</Text>
-        <Text style={styles.statLabel}>{config.statLabel}</Text>
-        <Text style={styles.title}>{config.title}</Text>
-        <Text style={styles.subtitle}>{config.subtitle}</Text>
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Safer streets, one ride at a time</Text>
-      </View>
-    </View>
-  );
-};
+    );
+  },
+);
 
 // ---------------------------------------------------------------------------
-// Share text generator (for RN Share API)
+// Share text generator (for consumer-driven sharing via shareImage / Share API)
 // ---------------------------------------------------------------------------
 
 export const getMilestoneShareText = (milestoneKey: MilestoneKey): string => {
@@ -119,12 +166,12 @@ export const getMilestoneShareText = (milestoneKey: MilestoneKey): string => {
 };
 
 // ---------------------------------------------------------------------------
-// Styles
+// Styles — preview variant (unchanged 320px layout, no share button)
 // ---------------------------------------------------------------------------
 
 const CARD_WIDTH = Math.min(320, Dimensions.get('window').width - 32);
 
-const styles = StyleSheet.create({
+const previewStyles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     backgroundColor: darkTheme.bgDeep,
@@ -184,5 +231,104 @@ const styles = StyleSheet.create({
     ...textXs,
     color: darkTheme.textMuted,
     fontStyle: 'italic',
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Styles — capture variant (1080x1080 branded social image)
+// ---------------------------------------------------------------------------
+
+const CAPTURE_SIZE = 1080;
+const CAPTURE_HEADER_H = 96;
+const CAPTURE_FOOTER_H = 80;
+const ACCENT = brandColors.accent;
+const HEADER_BG = '#1A1A1A';
+
+const captureStyles = StyleSheet.create({
+  card: {
+    width: CAPTURE_SIZE,
+    height: CAPTURE_SIZE,
+    backgroundColor: darkTheme.bgDeep,
+    overflow: 'hidden',
+  },
+  header: {
+    height: CAPTURE_HEADER_H,
+    backgroundColor: HEADER_BG,
+    paddingHorizontal: space[6],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+  brandText: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: ACCENT,
+    fontSize: 22,
+    letterSpacing: 2,
+  },
+  hero: {
+    height: 560,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[5],
+    paddingHorizontal: space[6],
+  },
+  heroIconRing: {
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    borderWidth: 6,
+    borderColor: ACCENT,
+    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIcon: {
+    fontFamily: fontFamily.mono.bold,
+    color: ACCENT,
+    fontSize: 180,
+    lineHeight: 200,
+    textAlign: 'center',
+  },
+  heroStat: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: darkTheme.textPrimary,
+    fontSize: 72,
+    letterSpacing: 1,
+  },
+  textBlock: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space[8],
+    gap: space[3],
+  },
+  title: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: ACCENT,
+    fontSize: 56,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontFamily: fontFamily.body.regular,
+    color: darkTheme.textSecondary,
+    fontSize: 30,
+    textAlign: 'center',
+    lineHeight: 38,
+  },
+  footer: {
+    height: CAPTURE_FOOTER_H,
+    backgroundColor: HEADER_BG,
+    paddingHorizontal: space[6],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[3],
+  },
+  footerUrl: {
+    fontFamily: fontFamily.body.semiBold,
+    color: ACCENT,
+    fontSize: 20,
+    letterSpacing: 1,
   },
 });

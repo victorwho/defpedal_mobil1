@@ -1,4 +1,5 @@
 import type { ActivityFeedItem } from '@defensivepedal/core';
+import { decodePolyline } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -19,11 +20,13 @@ import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { ActivityFeedCard } from '../src/design-system/organisms/ActivityFeedCard';
 import { SuggestedUsersRow } from '../src/design-system/organisms/SuggestedUsersRow';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useActivityFeedQuery, useActivityReaction } from '../src/hooks/useActivityFeed';
 import { useSuggestedUsers, useFollowUser } from '../src/hooks/useFollow';
+import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
@@ -62,6 +65,7 @@ export default function CommunityFeedScreen() {
 
   const reaction = useActivityReaction();
   const followUser = useFollowUser();
+  const shareRide = useShareRide();
   const { data: suggestedData } = useSuggestedUsers(lat, lon);
   const suggestedUsers = suggestedData?.users ?? [];
 
@@ -125,6 +129,31 @@ export default function CommunityFeedScreen() {
     [followUser],
   );
 
+  const handleSharePress = useCallback(
+    (item: ActivityFeedItem) => {
+      if (item.type !== 'ride') return;
+      let coords: [number, number][] = [];
+      try {
+        coords = decodePolyline(item.payload.geometryPolyline6);
+      } catch {
+        coords = [];
+      }
+      const distanceKm = item.payload.distanceMeters / 1000;
+      const durationMinutes = Math.round(item.payload.durationSeconds / 60);
+      const co2SavedKg = item.payload.co2SavedKg ?? distanceKm * 0.12;
+      void shareRide.share({
+        coords,
+        distanceKm,
+        durationMinutes,
+        co2SavedKg,
+        originLabel: item.payload.startLocationText,
+        destinationLabel: item.payload.destinationText,
+        dateIso: item.createdAt,
+      });
+    },
+    [shareRide],
+  );
+
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       void fetchNextPage();
@@ -151,11 +180,12 @@ export default function CommunityFeedScreen() {
             onReact={handleReact}
             onComment={handleComment}
             onUserPress={handleUserPress}
+            onSharePress={handleSharePress}
           />
         </FadeSlideIn>
       );
     },
-    [visibleIds, handleReact, handleComment, handleUserPress, handleFollow, suggestedUsers],
+    [visibleIds, handleReact, handleComment, handleUserPress, handleSharePress, handleFollow, suggestedUsers],
   );
 
   const keyExtractor = useCallback(
@@ -258,6 +288,15 @@ export default function CommunityFeedScreen() {
         }
       />
     <BottomNav activeTab="community" onTabPress={handleTabPress} />
+    {shareRide.toastMessage ? (
+      <View style={styles.shareToastContainer} pointerEvents="box-none">
+        <Toast
+          message={shareRide.toastMessage}
+          variant="warning"
+          onDismiss={shareRide.consumeToast}
+        />
+      </View>
+    ) : null}
     </View>
   );
 }
@@ -335,5 +374,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textInverse,
       fontSize: 15,
       fontWeight: '700',
+    },
+    shareToastContainer: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      bottom: 80,
     },
   });

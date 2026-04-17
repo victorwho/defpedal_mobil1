@@ -6,6 +6,7 @@ import {
   calculateCommunitySeconds,
   mapBikeTypeToVehicle,
 } from '@defensivepedal/core';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -14,7 +15,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -28,9 +28,9 @@ import {
   MilestoneShareCard,
   MILESTONE_CONFIGS,
   detectNewMilestones,
-  getMilestoneShareText,
 } from '../src/components/MilestoneShareCard';
 import { Button } from '../src/design-system/atoms';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -39,6 +39,8 @@ import { radii } from '../src/design-system/tokens/radii';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
+import { useShareCard } from '../src/hooks/useShareCard';
+import { useShareRide } from '../src/hooks/useShareRide';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -99,10 +101,13 @@ function StarRow({
 type ImpactStepProps = {
   readonly rideImpact: RideImpact;
   readonly onContinue: () => void;
+  readonly onShare: () => void;
+  readonly isSharing: boolean;
   readonly styles: ThemedStyles;
+  readonly colors: ThemeColors;
 };
 
-const ImpactStep = ({ rideImpact, onContinue, styles }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -117,6 +122,22 @@ const ImpactStep = ({ rideImpact, onContinue, styles }: ImpactStepProps) => {
       <ImpactSummaryCard rideImpact={rideImpact} newBadges={rideImpact.newBadges} />
 
       <View style={styles.impactActions}>
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
+          onPress={onShare}
+          loading={isSharing}
+          disabled={isSharing}
+          leftIcon={
+            isSharing ? null : (
+              <Ionicons name="share-social-outline" size={20} color={colors.textPrimary} />
+            )
+          }
+          accessibilityLabel={t('share.shareRide')}
+        >
+          {t('share.shareRide')}
+        </Button>
         <Button variant="primary" size="lg" fullWidth onPress={onContinue}>
           {t('feedback.continue')}
         </Button>
@@ -339,6 +360,53 @@ export default function FeedbackScreen() {
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
 
+  // Ride share (image-based, Surface A)
+  const shareRide = useShareRide();
+
+  // Milestone card share (image-based, Surface F)
+  const shareCard = useShareCard();
+  const handleShareRide = async () => {
+    const store = useAppStore.getState();
+    const session = store.navigationSession;
+    const breadcrumbs = session?.gpsBreadcrumbs ?? [];
+    // [lon, lat] order required by the share hook — DO NOT swap.
+    const coords: [number, number][] = breadcrumbs.map((pt) => [pt.lon, pt.lat]);
+    if (coords.length < 2) {
+      // Without a GPS trail we can't render a map background — let the hook
+      // fail gracefully; it will surface an error message via toastMessage.
+    }
+
+    const distanceKm = rideImpact.distanceMeters / 1000;
+    const startedAt = session?.startedAt ?? new Date().toISOString();
+    const endedAt = new Date().toISOString();
+    const durationMinutes = Math.max(
+      1,
+      Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 60_000),
+    );
+
+    const preview = store.routePreview;
+    const selectedRoute =
+      preview?.routes.find((r) => r.id === store.selectedRouteId) ?? preview?.routes[0] ?? null;
+    // Only forward LineString risk segments — MultiLineString is rare and not
+    // worth expanding for the static map background.
+    const riskSegments = selectedRoute?.riskSegments
+      ?.filter((seg) => seg.geometry.type === 'LineString')
+      .map((seg) => ({
+        coords: (seg.geometry as { type: 'LineString'; coordinates: [number, number][] }).coordinates,
+        color: seg.color,
+      }));
+
+    await shareRide.share({
+      coords,
+      riskSegments,
+      distanceKm,
+      durationMinutes,
+      co2SavedKg: rideImpact.co2SavedKg,
+      microlivesGained: rideImpact.personalMicrolives > 0 ? rideImpact.personalMicrolives : undefined,
+      dateIso: endedAt,
+    });
+  };
+
   // Try to enhance impact data from server (non-blocking — local data already shown)
   useEffect(() => {
     const tripServerId = activeTripClientId
@@ -444,15 +512,19 @@ export default function FeedbackScreen() {
 
   const handleShareMilestone = async () => {
     if (!pendingMilestone) return;
+    const milestoneKey = pendingMilestone;
+    const config = MILESTONE_CONFIGS[milestoneKey];
 
-    addEarnedMilestone(pendingMilestone);
-    const shareText = getMilestoneShareText(pendingMilestone);
+    // Mark earned up-front so the modal can close immediately if the user
+    // cancels the share sheet — the milestone shouldn't reappear next session.
+    addEarnedMilestone(milestoneKey);
 
-    try {
-      await Share.share({ message: shareText });
-    } catch {
-      // User cancelled share — that's fine
-    }
+    await shareCard.share({
+      type: 'milestone',
+      milestoneTitle: config.title,
+      milestoneValue: config.statLabel,
+      card: <MilestoneShareCard variant="capture" milestoneKey={milestoneKey} />,
+    });
 
     setPendingMilestone(null);
   };
@@ -514,7 +586,10 @@ export default function FeedbackScreen() {
           <ImpactStep
             rideImpact={rideImpact}
             onContinue={() => setStep('rating')}
+            onShare={() => void handleShareRide()}
+            isSharing={shareRide.isSharing}
             styles={styles}
+            colors={colors}
           />
         ) : (
           <RatingStep
@@ -536,6 +611,17 @@ export default function FeedbackScreen() {
         )}
       </SafeAreaView>
 
+      {/* Ride share toast (offline / error states) */}
+      {shareRide.toastMessage ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={shareRide.toastMessage}
+            variant="warning"
+            onDismiss={shareRide.consumeToast}
+          />
+        </View>
+      ) : null}
+
       {/* Milestone share modal */}
       {pendingMilestone ? (
         <Modal
@@ -550,6 +636,8 @@ export default function FeedbackScreen() {
                 size="lg"
                 fullWidth
                 onPress={() => void handleShareMilestone()}
+                loading={shareCard.isSharing}
+                disabled={shareCard.isSharing}
               >
                 {t('feedback.shareAchievement')}
               </Button>
@@ -752,6 +840,13 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     signupPromptFooter: {
       gap: space[3],
+      alignItems: 'center',
+    },
+    shareToastContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: space[6],
       alignItems: 'center',
     },
     signupGoogleButton: {

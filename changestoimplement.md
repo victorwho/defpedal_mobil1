@@ -51,6 +51,16 @@
 - [x] DONE — Tests: 62 new API tests, 6 polyline tests, 677 total passing (2026-04-17)
 - [x] DONE — Deployed: Cloud Run revision defpedal-api-00051-q9c, 5 Supabase migrations applied (2026-04-17)
 
+## Image-Based Social Sharing (GitHub Issue #8)
+- [x] DONE — Phase 1: Core pure modules (trimPrivacyZone 200m default, mapboxStaticImageUrl with GeoJSON + encoded-polyline fallback, buildShareCaption English-only). 38 tests. (2026-04-17)
+- [x] DONE — Phase 2: OffScreenCaptureHost provider (1080×1080 offscreen mount + captureRef), shareImage service (expo-sharing + expo-media-library with NativeModules guard), useShareRide hook (offline gating via ConnectivityMonitor). 13 tests. Added 3 native deps to apps/mobile. (2026-04-17)
+- [x] DONE — Phase 3: RideShareCard 1080×1080 forwardRef component (5 stat tiles + map background + brand header/footer). 12 tests. (2026-04-17)
+- [x] DONE — Phase 4: Upgraded MilestoneShareCard/BadgeShareCard/MiaShareCard with variant:'preview'|'capture' prop + forwardRef. Removed internal Share.share calls. 44 tests. (2026-04-17)
+- [x] DONE — Phase 5a: Wired useShareRide into feedback.tsx (post-ride hero), trips.tsx, community-trip.tsx. i18n share.shareRide. (2026-04-17)
+- [x] DONE — Phase 5b: useShareCard hook (cards don't need offline gating). Wired into BadgeDetailModal, MiaLevelUpOverlay, milestone modal in feedback.tsx. i18n share.shareLevelUp. _layout.tsx wires useMiaJourney stats. 6 tests. (2026-04-17)
+- [x] DONE — Post-QA fixes from phone testing (preview APK 0.2.0 builds 1-6): (1) switched useShareRide from unreliable Image.prefetch to expo-file-system downloadAsync to local cache, (2) moved expo-file-system from dynamic to static import (dynamic await import() failed silently in Hermes release bytecode), (3) fixed polyline5 precision bug — encodePolyline defaulted to 1e6 but Mapbox Static Images path overlay decodes at 1e5, causing HTTP 422 on long-GPS-trail rides (safe routes specifically). Regression test added in core. (4) Added share icon to ActivityFeedCard (community feed list) and TripCard (history section) via optional onSharePress prop. (2026-04-17)
+- [!] PENDING — Dev APK rebuild needed to activate the 3 new native modules (currently fails soft with NativeModules guard warning)
+
 ## Onboarding
 - [x] DONE — Risk overlay on safety score map (2026-04-03)
 - [x] DONE — 4-category safety score display (2026-04-03)

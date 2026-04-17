@@ -1,5 +1,6 @@
 import type { FeedComment, FeedItem, RouteOption } from '@defensivepedal/core';
-import { formatDistance, formatDuration, formatSpeed } from '@defensivepedal/core';
+import { decodePolyline, formatDistance, formatDuration, formatSpeed } from '@defensivepedal/core';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 import { LikeButton } from '../src/components/LikeButton';
@@ -28,6 +30,8 @@ import {
   usePostComment,
 } from '../src/hooks/useFeed';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
+import { useShareRide } from '../src/hooks/useShareRide';
+import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 
@@ -52,6 +56,7 @@ export default function CommunityTripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const [commentText, setCommentText] = useState('');
 
   const location = useCurrentLocation();
@@ -59,6 +64,7 @@ export default function CommunityTripScreen() {
   const likeToggle = useLikeToggle();
   const commentsQuery = useComments(id ?? null);
   const postComment = usePostComment();
+  const shareRide = useShareRide();
 
   // Find the item from the feed cache
   const item: FeedItem | undefined = useMemo(
@@ -94,6 +100,31 @@ export default function CommunityTripScreen() {
       likeToggle.mutate({ id: item.id, liked: item.likedByMe });
     }
   }, [item, likeToggle]);
+
+  const handleShare = useCallback(() => {
+    if (!item) return;
+    // Community trips only expose the encoded polyline; decode it into
+    // [lon, lat] coordinate pairs for the share card map background.
+    let coords: [number, number][] = [];
+    try {
+      coords = decodePolyline(item.geometryPolyline6);
+    } catch {
+      coords = [];
+    }
+    const distanceKm = item.distanceMeters / 1000;
+    const durationMinutes = Math.max(1, Math.round(item.durationSeconds / 60));
+    void shareRide.share({
+      coords,
+      distanceKm,
+      durationMinutes,
+      // CO2 may be null on older feed records — omit rather than pass 0.
+      co2SavedKg: item.co2SavedKg ?? distanceKm * 0.12,
+      // safetyRating is 1-5 stars on feed items, not a /100 score, so skip.
+      dateIso: item.sharedAt,
+      originLabel: item.startLocationText,
+      destinationLabel: item.destinationText,
+    });
+  }, [item, shareRide]);
 
   const handleSubmitComment = useCallback(() => {
     if (!id || !commentText.trim()) return;
@@ -149,10 +180,26 @@ export default function CommunityTripScreen() {
         contentContainerStyle={styles.content}
         ListHeaderComponent={
           <>
-            {/* Back button */}
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <Text style={styles.backText}>{'\u2190'} Back to feed</Text>
-            </Pressable>
+            {/* Top bar: back + share */}
+            <View style={styles.topBar}>
+              <Pressable style={styles.backButton} onPress={() => router.back()}>
+                <Text style={styles.backText}>{'\u2190'} Back to feed</Text>
+              </Pressable>
+              <Pressable
+                style={styles.shareButton}
+                onPress={handleShare}
+                disabled={shareRide.isSharing}
+                accessibilityRole="button"
+                accessibilityLabel={t('share.shareRide')}
+                hitSlop={10}
+              >
+                <Ionicons
+                  name="share-social-outline"
+                  size={20}
+                  color={shareRide.isSharing ? gray[500] : colors.accent}
+                />
+              </Pressable>
+            </View>
 
             {/* Map */}
             {syntheticRoute ? (
@@ -229,6 +276,15 @@ export default function CommunityTripScreen() {
       </View>
     </KeyboardAvoidingView>
     <BottomNav activeTab="community" onTabPress={handleTabPress} />
+    {shareRide.toastMessage ? (
+      <View style={styles.shareToastContainer} pointerEvents="box-none">
+        <Toast
+          message={shareRide.toastMessage}
+          variant="warning"
+          onDismiss={shareRide.consumeToast}
+        />
+      </View>
+    ) : null}
     </View>
   );
 }
@@ -252,6 +308,11 @@ const createThemedStyles = (colors: ThemeColors) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 60,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   backButton: {
     paddingVertical: 8,
   },
@@ -259,6 +320,23 @@ const createThemedStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.accent,
     fontSize: 15,
     fontWeight: '700',
+  },
+  shareButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+  },
+  shareToastContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 80,
+    alignItems: 'center',
   },
   map: {
     height: 260,

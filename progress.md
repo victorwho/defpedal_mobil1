@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-04-16 (session 24)
+Last updated: 2026-04-17 (session 25)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -8,7 +8,8 @@ Update it at the end of each implementation slice.
 ## Snapshot
 
 - Overall progress: roughly 92-95 percent of product migration, 90-93 percent of production hardening
-- Current milestone: Offline navigation (GitHub issue #6) — three-layer offline system
+- Current milestone: Image-based social sharing (GitHub issue #8) — Strava-style image shares across 6 surfaces
+- Session 25 (2026-04-17): Image-Based Social Sharing (victorwho/defpedal_mobil1#8) — 5-phase pipeline replacing text `Share.share({message})` with 1080×1080 images. Phase 1: 3 pure core modules (`trimPrivacyZone`, `mapboxStaticImageUrl`, `buildShareCaption`) + 38 tests. Phase 2: `OffScreenCaptureHost` provider, `shareImage` service, `useShareRide` hook + 13 tests; added `react-native-view-shot`, `expo-sharing`, `expo-media-library` to `apps/mobile`. Phase 3: `RideShareCard` forwardRef + 12 tests. Phase 4: `variant: 'preview' | 'capture'` + forwardRef on `MilestoneShareCard`/`BadgeShareCard`/`MiaShareCard`, removed internal `Share.share` + 44 tests. Phase 5a: wired `useShareRide` into `feedback.tsx`/`trips.tsx`/`community-trip.tsx`. Phase 5b: new `useShareCard` hook + 6 tests, wired into `BadgeDetailModal`/`MiaLevelUpOverlay`/milestone modal, `_layout.tsx` wires `useMiaJourney()` stats. ~113 new tests. Out of scope per PRD: hazard alert share (`route-planning.tsx`) and Mia referral link (`profile.tsx`) kept as text. Requires dev APK rebuild to activate new native modules.
 - Session 24 (2026-04-16): Offline Navigation (victorwho/defpedal_mobil1#6) — three-layer system: (1) ConnectivityMonitor provider with debounced NetInfo + lazy native module guard, (2) OfflineRouteCache for app restart recovery with NavigationResumeGuard (auto-resume <15min, prompt >=15min), (3) route-preview "Download for offline" button with progress states. Offline gating: reroute suppressed with banner, hazards disabled, weather hidden, ManeuverCard wifi-off indicator. OfflineMutationSyncManager skips flush when offline, immediate flush on reconnect. OfflinePackCleanup auto-deletes packs >5 days + 200MB LRU eviction. OfflineBanner molecule. offline-maps storage display with progress bar + pack ages. route-planning offline mode (disabled search, resume cached route card). 26 new tests, 9 new files, 9 modified files. Requires APK rebuild for real NetInfo activation.
 - Session 23 (2026-04-15/16): Navigation UX polish + profile photo upload fix + app icon — end ride button red danger style, destination bullseye marker, Mapbox existing layer fix, profile avatar upload fixed (3 issues), app icon: pedal logo shrunk 15% with uniform #F7D02A yellow from brand SVG
 - Session 22 (2026-04-15): Mia persona journey (all 5 phases), OSRM migration to 34.116.139.172, app icon resize, Mia skip-ahead UX fix
@@ -836,3 +837,45 @@ For normal day-to-day feature work, we also recognize a softer milestone:
   - `profile.tsx`: added Private Profile toggle (SettingRow), Follow Requests section with count badge + FollowRequestItem list (visible when isPrivate=true)
 - **Tests**: 62 new API tests (follow-system: 20, activity-feed: 25, auto-publish: 17), 6 polyline tests. Fixed latent v1.test.ts mock issue (vi.restoreAllMocks → vi.clearAllMocks). Total: 677 passing (345 core + 332 API)
 - Evidence: Typecheck 0 errors, bundle HTTP 200, all 677 tests passing, verified on phone via Metro hot reload
+
+### Feat: Image-Based Social Sharing — Strava-Style Shares Across 6 Surfaces (2026-04-17, GitHub #8)
+
+- Status: Done
+- Scope: Five-phase implementation replacing text `Share.share({message})` with image-based sharing (1080×1080 PNG + caption) on post-ride hero, trip history, community trip detail, milestone modal, badge detail modal, and Mia level-up overlay.
+- **Phase 1 — Pure core modules** (`packages/core/src/`):
+  - `sharePrivacy.ts`: `trimPrivacyZone(coords, trimMeters=200)` with linear interpolation at exact 200m cut points, unchanged-return for routes shorter than 2×trim
+  - `mapboxStaticImageUrl.ts`: builds Mapbox Static Images API URLs with GeoJSON path overlays (short routes) and encoded-polyline fallback (long routes >8192 chars), retina + styleId + risk segments
+  - `shareCaption.ts`: `buildShareCaption({type: 'ride'|'milestone'|'badge'|'mia', ...})` — always English regardless of locale
+  - 38 new unit tests (`sharePrivacy.test.ts`, `mapboxStaticImageUrl.test.ts`, `shareCaption.test.ts`)
+- **Phase 2 — Mobile infra** (`apps/mobile/src/`):
+  - `providers/OffScreenCaptureHost.tsx`: context provider with a hidden 1080×1080 mount, `useCaptureHost().capture(node, {width, height})` returns a PNG file URI via `captureRef`
+  - `lib/shareImage.ts`: `shareImage(uri, caption)` wraps `Sharing.shareAsync` + `MediaLibrary.saveToLibraryAsync`, handles cancellation as non-error, `NativeModules` guard prevents crash on unrebuilt APK (Error #23 pattern)
+  - `hooks/useShareRide.ts`: composes `trimPrivacyZone` → `mapboxStaticImageUrl` → `captureHost.capture(<RideShareCard/>)` → `shareImage`, gated on `useConnectivity().isOnline` (toast on offline)
+  - Added `react-native-view-shot`, `expo-sharing`, `expo-media-library` to `apps/mobile/package.json` (via `npx expo install` for SDK 55 compat)
+  - 13 new tests
+- **Phase 3 — `RideShareCard`** (`apps/mobile/src/components/share/`):
+  - 1080×1080 `forwardRef<View>` component: brand header + Mapbox static map image + 5 stat tiles (distance, duration, CO₂, safety, microlives) + "defensivepedal.com" footer
+  - Conditional tile rendering for optional fields; deterministic (no animations) for offscreen capture
+  - 12 new tests
+- **Phase 4 — Card upgrades**:
+  - `MilestoneShareCard`, `BadgeShareCard`, `MiaShareCard` now accept `variant?: 'preview' | 'capture'` (default preview) and forwardRef<View>. `capture` variant is 1080×1080 branded card.
+  - Removed internal `Share.share` calls and inline share buttons. Cards are now pure presentational; consumers (modals) own share actions.
+  - 44 tests across the three card suites
+- **Phase 5a — Ride surfaces**:
+  - `app/feedback.tsx`: "Share this ride" button above Continue on impact step; passes GPS trail + risk segments + stats to `useShareRide`
+  - `app/trips.tsx`: share icon on each trip card; falls back to decoded polyline if GPS trail missing
+  - `app/community-trip.tsx`: share button decodes `geometryPolyline6` and shares with origin/destination text labels
+  - i18n: `share.shareRide`
+- **Phase 5b — Card surfaces**:
+  - `hooks/useShareCard.ts`: unified card share hook (no offline gating for cards); captures card element + calls `shareImage` + `buildShareCaption`
+  - `design-system/organisms/BadgeDetailModal.tsx`: removed `Share.share`, wired to `useShareCard({type:'badge'}, card: <BadgeShareCard variant="capture"/>)`
+  - `design-system/organisms/MiaLevelUpOverlay.tsx`: added Share CTA button; `_layout.tsx` wires `useMiaJourney()` stats into the overlay so the share card has live data
+  - `app/feedback.tsx` milestone modal: replaced `Share.share` with `useShareCard({type:'milestone'})`
+  - i18n: `share.shareLevelUp`
+  - 6 hook tests
+- **Out of scope per PRD (kept as text)**:
+  - `route-planning.tsx` hazard alert share — stays text for speed
+  - `profile.tsx` Mia referral link share — stays text (it's a deep-link URL, not an achievement)
+- **Cumulative test impact**: +113 tests. Core 345 → 383. Mobile 612 → 649 passing (pre-existing 4 failures unchanged: ConnectivityMonitor x3, FeedCard.champion, LeaderboardSection).
+- Evidence: `npm run typecheck` passes (0 errors), `npm run check:bundle` HTTP 200.
+- **Dev APK rebuild required** to activate the 3 new native modules: `cd apps/mobile/android && ./gradlew installDevelopmentDebug`. Until then, `shareImage` fails soft with a guarded warning (Error #23 pattern, same as offline NetInfo).
