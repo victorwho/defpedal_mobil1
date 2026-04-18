@@ -19,10 +19,12 @@ out
 .gradle
 **/.gradle
 
-# Sibling workspaces — not used by the web holding page
+# Sibling workspaces — only packages/core is consumed by apps/web
+# (via `@defensivepedal/core: file:../../packages/core` in apps/web/package.json)
 apps/mobile
 services
-packages
+packages/*
+!packages/core
 android
 ios
 supabase
