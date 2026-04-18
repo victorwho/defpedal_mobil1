@@ -2,6 +2,11 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Treat @defensivepedal/core (file:../../packages/core workspace link) as app-local source.
+  // Without this, Next.js follows the symlink to its real path and walks up for transitive
+  // deps (zod) from packages/core/, where there's no node_modules on Vercel since vercel.json
+  // sets installCommand=--workspaces=false and only installs apps/web's deps.
+  transpilePackages: ['@defensivepedal/core'],
   // Apple's AASA validator follows 301/308 redirects as "failed" — never redirect trailing slashes.
   skipTrailingSlashRedirect: true,
   async headers() {
