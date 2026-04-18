@@ -183,6 +183,7 @@ export default () => ({
     ios: {
       supportsTablet: false,
       bundleIdentifier: appIdentifierByVariant[appVariant],
+      associatedDomains: ['applinks:routes.defensivepedal.com'],
       infoPlist: {
         UIBackgroundModes: ['location', 'processing', 'remote-notification'],
       },
@@ -201,6 +202,20 @@ export default () => ({
         'RECEIVE_BOOT_COMPLETED',
         'WAKE_LOCK',
         'POST_NOTIFICATIONS',
+      ],
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [
+            {
+              scheme: 'https',
+              host: 'routes.defensivepedal.com',
+              pathPrefix: '/r/',
+            },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
       ],
     },
     extra: {
