@@ -87,8 +87,19 @@ export function ShareCtas({ code }: ShareCtasProps) {
   // Self-referencing universal-link href — the OS intercepts and opens the app if installed.
   // When the app is NOT installed, this href just reloads the same page (harmless).
   const appUrl = `https://routes.defensivepedal.com/r/${encodeURIComponent(code)}`;
-  const utm = `utm_source=share&utm_medium=web&utm_campaign=r_${encodeURIComponent(code)}`;
-  const playUrl = `${PLAY_STORE_URL}&referrer=${encodeURIComponent(utm)}`;
+  // Play Store CTA carries two distinct attribution params:
+  //   - utm_source/medium/campaign: consumed by PostHog/web analytics (slice 7)
+  //   - referrer: the Play Store's native com.android.installreferrer pickup value,
+  //     read by the Android app at first launch to restore the share context post-install.
+  //     Must be `share=<code>` (URL-encoded as `share%3D<code>`) — the mobile parser in
+  //     installReferrer.ts feeds the install-referrer string directly into URLSearchParams
+  //     and calls `params.get('share')`. Using `share_<code>` would produce a keyless entry
+  //     and the code would never be extracted. Don't change without updating both sides.
+  const encodedCode = encodeURIComponent(code);
+  const playUrl =
+    `${PLAY_STORE_URL}` +
+    `&utm_source=share&utm_medium=web&utm_campaign=r_${encodedCode}` +
+    `&referrer=${encodeURIComponent(`share=${code}`)}`;
 
   return (
     <nav style={styles.nav} aria-label="Route sharing actions">

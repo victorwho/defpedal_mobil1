@@ -3,6 +3,7 @@ import {
   routeShareCreateSchema,
   routeShareRecordSchema,
   routeSharePublicViewSchema,
+  routeShareClaimResponseSchema,
   type RouteShareCreate,
 } from './routeShareContract';
 
@@ -255,6 +256,86 @@ describe('routeSharePublicViewSchema', () => {
     const result = routeSharePublicViewSchema.safeParse({
       ...validPublicView,
       createdAt: 'not-a-date',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// routeShareClaimResponseSchema
+// ---------------------------------------------------------------------------
+
+describe('routeShareClaimResponseSchema', () => {
+  const validClaim = {
+    code: 'abcd1234',
+    routePayload: validPlannedRoute,
+    sharerDisplayName: 'Jane',
+    sharerAvatarUrl: 'https://cdn.example/avatar.png',
+    alreadyClaimed: false,
+  };
+
+  it('accepts a well-formed first-time claim response', () => {
+    const result = routeShareClaimResponseSchema.safeParse(validClaim);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts alreadyClaimed=true (idempotent re-claim)', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      alreadyClaimed: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts null sharerDisplayName and null sharerAvatarUrl', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      sharerDisplayName: null,
+      sharerAvatarUrl: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('defaults sharerAvatarUrl to null when omitted', () => {
+    const { sharerAvatarUrl: _omit, ...rest } = validClaim;
+    void _omit;
+    const result = routeShareClaimResponseSchema.safeParse(rest);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sharerAvatarUrl).toBeNull();
+    }
+  });
+
+  it('rejects malformed share code', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      code: 'too-short',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid routePayload (missing routingMode)', () => {
+    const { routingMode: _omit, ...routeRest } = validPlannedRoute;
+    void _omit;
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      routePayload: routeRest,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-boolean alreadyClaimed', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      alreadyClaimed: 'yes',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-URL sharerAvatarUrl string', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      sharerAvatarUrl: 'not a url',
     });
     expect(result.success).toBe(false);
   });

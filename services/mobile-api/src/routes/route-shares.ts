@@ -22,10 +22,14 @@ import {
 } from '../lib/routeShareService';
 import {
   errorResponseSchema,
+  routeShareClaimParamsSchema,
+  routeShareClaimResponseSchema,
   routeShareCreateRequestSchema,
   routeShareCreateResponseSchema,
   routeSharePublicParamsSchema,
   routeSharePublicResponseSchema,
+  type RouteShareClaimParams,
+  type RouteShareClaimResponse,
   type RouteShareCreateRequest,
   type RouteShareCreateResponse,
   type RouteSharePublicParams,
@@ -185,6 +189,92 @@ export const buildRouteShareRoutes = (
             details: [errorCode],
           },
         );
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // POST /v1/route-shares/:code/claim
+    //
+    // Authenticated — the invitee's user id is taken from the auth context,
+    // not the request body. Anonymous Supabase sessions are accepted (same
+    // pattern as POST /v1/route-shares) since the Habit Engine flow can
+    // activate the invitee before they sign up for a full account.
+    // -----------------------------------------------------------------------
+    app.post<{
+      Params: RouteShareClaimParams;
+      Reply: RouteShareClaimResponse | ErrorResponse;
+    }>(
+      '/route-shares/:code/claim',
+      {
+        schema: {
+          params: routeShareClaimParamsSchema,
+          response: {
+            200: routeShareClaimResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            410: errorResponseSchema,
+            422: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireAuthenticatedUser(
+          request,
+          dependencies.authenticateUser,
+        );
+
+        const service = buildService();
+
+        let result;
+        try {
+          result = await service.claimShare({
+            code: request.params.code,
+            inviteeUserId: user.id,
+          });
+        } catch (err) {
+          request.log.error(
+            { event: 'route_share_claim_error', err: (err as Error).message },
+            'claim_route_share RPC failed',
+          );
+          throw new HttpError('Failed to claim route share.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [(err as Error).message],
+          });
+        }
+
+        if (result.status === 'ok') {
+          return result.data as unknown as RouteShareClaimResponse;
+        }
+
+        if (result.status === 'not_found') {
+          throw new HttpError('Route share not found.', {
+            statusCode: 404,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (result.status === 'gone') {
+          throw new HttpError(
+            result.reason === 'expired'
+              ? 'Route share has expired.'
+              : 'Route share has been revoked.',
+            {
+              statusCode: 410,
+              code: 'NOT_FOUND',
+              details: [result.reason],
+            },
+          );
+        }
+
+        // result.status === 'invalid' — currently only self_referral
+        throw new HttpError('Cannot claim your own route share.', {
+          statusCode: 422,
+          code: 'BAD_REQUEST',
+          details: [result.reason],
+        });
       },
     );
   };

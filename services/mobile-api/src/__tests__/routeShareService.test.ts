@@ -343,3 +343,170 @@ describe('routeShareService.getPublicShare', () => {
     expect(result).toEqual({ ok: false, error: 'NOT_FOUND' });
   });
 });
+
+// ---------------------------------------------------------------------------
+// claimShare
+// ---------------------------------------------------------------------------
+
+describe('routeShareService.claimShare', () => {
+  const rpcOk = {
+    routePayload: {
+      origin: { lat: 44, lon: 26 },
+      destination: { lat: 44.1, lon: 26.1 },
+      geometryPolyline6: shortPolyline,
+      distanceMeters: 150,
+      durationSeconds: 60,
+      routingMode: 'safe',
+      riskSegments: [],
+      safetyScore: null,
+    },
+    sharerDisplayName: 'Jane',
+    sharerAvatarUrl: 'https://cdn.example/avatar.png',
+    alreadyClaimed: false,
+  };
+
+  it('returns status="ok" with the RPC payload on first-time claim', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: rpcOk, error: null },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      // `code` is re-attached from the path so the response envelope is
+      // self-contained on the wire — the RPC itself doesn't return it.
+      expect(result.data.code).toBe('abcd1234');
+      expect(result.data.alreadyClaimed).toBe(false);
+      expect(result.data.sharerDisplayName).toBe('Jane');
+      expect(result.data.sharerAvatarUrl).toBe(
+        'https://cdn.example/avatar.png',
+      );
+      expect(result.data.routePayload).toEqual(rpcOk.routePayload);
+    }
+  });
+
+  it('returns alreadyClaimed=true on idempotent re-claim', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: {
+        data: { ...rpcOk, alreadyClaimed: true },
+        error: null,
+      },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+
+    expect(result.status).toBe('ok');
+    if (result.status === 'ok') {
+      expect(result.data.alreadyClaimed).toBe(true);
+    }
+  });
+
+  it('maps SHARE_NOT_FOUND to status="not_found"', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: { message: 'SHARE_NOT_FOUND' } },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+    expect(result).toEqual({ status: 'not_found' });
+  });
+
+  it('maps SHARE_EXPIRED to status=gone,reason=expired', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: { message: 'SHARE_EXPIRED' } },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+    expect(result).toEqual({ status: 'gone', reason: 'expired' });
+  });
+
+  it('maps SHARE_REVOKED to status=gone,reason=revoked', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: { message: 'SHARE_REVOKED' } },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+    expect(result).toEqual({ status: 'gone', reason: 'revoked' });
+  });
+
+  it('maps SELF_REFERRAL to status=invalid,reason=self_referral', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: { message: 'SELF_REFERRAL' } },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-1',
+    });
+    expect(result).toEqual({ status: 'invalid', reason: 'self_referral' });
+  });
+
+  it('rethrows unknown RPC errors so the route returns 502', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: { message: 'connection refused' } },
+    });
+    const service = createRouteShareService({ supabase });
+
+    await expect(
+      service.claimShare({ code: 'abcd1234', inviteeUserId: 'user-2' }),
+    ).rejects.toThrow(/connection refused/);
+  });
+
+  it('treats null RPC data with no error as not_found (defensive)', async () => {
+    const supabase = makeSupabaseStub({
+      rpcOutcome: { data: null, error: null },
+    });
+    const service = createRouteShareService({ supabase });
+
+    const result = await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+    expect(result).toEqual({ status: 'not_found' });
+  });
+
+  it('calls the claim_route_share RPC with the expected params', async () => {
+    const rpcSpy = vi.fn(async () => ({ data: rpcOk, error: null }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: vi.fn(),
+      })),
+      rpc: rpcSpy,
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase });
+    await service.claimShare({
+      code: 'abcd1234',
+      inviteeUserId: 'user-2',
+    });
+
+    expect(rpcSpy).toHaveBeenCalledWith('claim_route_share', {
+      p_code: 'abcd1234',
+      p_invitee_id: 'user-2',
+    });
+  });
+});

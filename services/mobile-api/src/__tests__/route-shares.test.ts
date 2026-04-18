@@ -172,6 +172,7 @@ describe('POST /v1/route-shares', () => {
   const happyService = (): RouteShareService => ({
     createShare: vi.fn().mockResolvedValue(happyCreateRow),
     getPublicShare: vi.fn(),
+    claimShare: vi.fn(),
   });
 
   it('returns 401 without an Authorization header', async () => {
@@ -228,7 +229,7 @@ describe('POST /v1/route-shares', () => {
 
   it('passes the authenticated user id through to the service', async () => {
     const createShare = vi.fn().mockResolvedValue(happyCreateRow);
-    const service: RouteShareService = { createShare, getPublicShare: vi.fn() };
+    const service: RouteShareService = { createShare, getPublicShare: vi.fn(), claimShare: vi.fn() };
     const app = buildTestApp(service);
     await app.ready();
 
@@ -291,6 +292,7 @@ describe('POST /v1/route-shares', () => {
     const service: RouteShareService = {
       createShare: vi.fn().mockRejectedValue(new Error('db down')),
       getPublicShare: vi.fn(),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -316,6 +318,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare: vi.fn().mockResolvedValue({ ok: true, value: happyPublicView }),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -339,6 +342,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare: vi.fn().mockResolvedValue({ ok: false, error: 'NOT_FOUND' }),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -355,6 +359,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare: vi.fn().mockResolvedValue({ ok: false, error: 'EXPIRED' }),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -373,6 +378,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare: vi.fn().mockResolvedValue({ ok: false, error: 'REVOKED' }),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -391,6 +397,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare: vi.fn(),
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -408,6 +415,7 @@ describe('GET /v1/route-shares/public/:code', () => {
     const service: RouteShareService = {
       createShare: vi.fn(),
       getPublicShare,
+      claimShare: vi.fn(),
     };
     const app = buildTestApp(service);
     await app.ready();
@@ -417,6 +425,221 @@ describe('GET /v1/route-shares/public/:code', () => {
       url: '/v1/route-shares/public/toolongoralpha',
     });
     expect(getPublicShare).not.toHaveBeenCalled();
+    await app.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/route-shares/:code/claim
+// ---------------------------------------------------------------------------
+
+describe('POST /v1/route-shares/:code/claim', () => {
+  beforeEach(() => {
+    fakeAuthenticateUser.mockReset();
+    fakeAuthenticateUser.mockResolvedValue({ id: USER_ID, email: 'rider@test.local' });
+  });
+
+  const happyClaimPayload = {
+    code: 'abcd1234',
+    routePayload: publicRoute,
+    sharerDisplayName: 'Jane',
+    sharerAvatarUrl: null,
+    alreadyClaimed: false,
+  };
+
+  const makeClaimService = (
+    claimShareImpl: RouteShareService['claimShare'],
+  ): RouteShareService => ({
+    createShare: vi.fn(),
+    getPublicShare: vi.fn(),
+    claimShare: claimShareImpl,
+  });
+
+  it('returns 401 without an Authorization header', async () => {
+    const app = buildTestApp(makeClaimService(vi.fn()));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+    });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('returns 401 when bypass token is invalid', async () => {
+    fakeAuthenticateUser.mockResolvedValue(null);
+    const app = buildTestApp(makeClaimService(vi.fn()));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('returns 400 when :code fails the shape check', async () => {
+    const claimShare = vi.fn();
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/bad-code/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(400);
+    // Malformed :code must short-circuit before the service is called.
+    expect(claimShare).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('returns 404 when service reports not_found', async () => {
+    const claimShare = vi.fn().mockResolvedValue({ status: 'not_found' });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(404);
+    await app.close();
+  });
+
+  it('returns 410 + details:["expired"] for expired shares', async () => {
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'gone', reason: 'expired' });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(410);
+    const body = res.json() as Record<string, unknown>;
+    expect((body.details as string[])[0]).toBe('expired');
+    await app.close();
+  });
+
+  it('returns 410 + details:["revoked"] for revoked shares', async () => {
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'gone', reason: 'revoked' });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(410);
+    const body = res.json() as Record<string, unknown>;
+    expect((body.details as string[])[0]).toBe('revoked');
+    await app.close();
+  });
+
+  it('returns 422 + details:["self_referral"] when the invitee owns the share', async () => {
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'invalid', reason: 'self_referral' });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+    expect(res.statusCode).toBe(422);
+    const body = res.json() as Record<string, unknown>;
+    expect(body.code).toBe('BAD_REQUEST');
+    expect((body.details as string[])[0]).toBe('self_referral');
+    await app.close();
+  });
+
+  it('returns 200 with alreadyClaimed:false on first-time claim', async () => {
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', data: happyClaimPayload });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(body.code).toBe('abcd1234');
+    expect(body.alreadyClaimed).toBe(false);
+    expect(body.sharerDisplayName).toBe('Jane');
+    expect(body.sharerAvatarUrl).toBeNull();
+    expect(body.routePayload).toEqual(publicRoute);
+    await app.close();
+  });
+
+  it('passes the authenticated user id through to the service as inviteeUserId', async () => {
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', data: happyClaimPayload });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+
+    expect(claimShare).toHaveBeenCalledWith({
+      code: 'abcd1234',
+      inviteeUserId: USER_ID,
+    });
+    await app.close();
+  });
+
+  it('returns 200 with alreadyClaimed:true on idempotent re-claim (same payload)', async () => {
+    const idempotent = {
+      ...happyClaimPayload,
+      alreadyClaimed: true,
+    };
+    const claimShare = vi
+      .fn()
+      .mockResolvedValue({ status: 'ok', data: idempotent });
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    expect(body.alreadyClaimed).toBe(true);
+    // The routePayload echoes the same shape on both first-claim and
+    // re-claim so the mobile client's navigation logic is uniform.
+    expect(body.routePayload).toEqual(publicRoute);
+    await app.close();
+  });
+
+  it('returns 502 when claimShare throws (unknown DB error)', async () => {
+    const claimShare = vi.fn().mockRejectedValue(new Error('db down'));
+    const app = buildTestApp(makeClaimService(claimShare));
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares/abcd1234/claim',
+      headers: authHeaders,
+    });
+
+    expect(res.statusCode).toBe(502);
     await app.close();
   });
 });
