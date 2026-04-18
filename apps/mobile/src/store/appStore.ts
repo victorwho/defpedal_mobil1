@@ -186,6 +186,31 @@ type AppStore = QueueSlice & {
   upsertOfflineRegion: (region: OfflineRegion) => void;
   removeOfflineRegion: (regionId: string) => void;
   resetFlow: () => void;
+
+  // ── Pending Share Claim (slice 2 route-share PRD) ──
+  //
+  // Captured by the deep-link handler when a /r/<code> URL opens the app,
+  // drained by `ShareClaimProcessor` once auth-session is ready.
+  //
+  // `pendingShareClaim` is PERSISTED so a claim queued during anon
+  // sign-in survives the redirect-to-onboarding dance that can kill the
+  // in-memory value. `pendingShareClaimAttempts` is NOT persisted —
+  // retries reset on cold start.
+  pendingShareClaim: string | null;
+  pendingShareClaimAttempts: number;
+  setPendingShareClaim: (code: string) => void;
+  clearPendingShareClaim: () => void;
+  incrementClaimAttempts: () => void;
+
+  // ── Deferred Deep Link Fallbacks (slice 2 route-share PRD) ──
+  //
+  // One-shot guard so the Android install-referrer + iOS clipboard
+  // fallbacks only run once per app lifetime. NOT persisted — resets on
+  // cold start. In practice install-referrer only populates on the first
+  // post-install launch anyway, so re-running on subsequent cold starts
+  // is a cheap no-op.
+  hasCheckedInstallReferrer: boolean;
+  markInstallReferrerChecked: () => void;
 };
 
 export const useAppStore = create<AppStore>()(
@@ -260,6 +285,31 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ pendingMiaLevelUp: null }));
         return current;
       },
+      // ── Pending Share Claim (slice 2) ──
+      pendingShareClaim: null,
+      pendingShareClaimAttempts: 0,
+      setPendingShareClaim: (code) =>
+        set(() => ({
+          pendingShareClaim: code,
+          // Reset attempts whenever a new code lands so prior-code failures
+          // don't carry over to a fresh claim.
+          pendingShareClaimAttempts: 0,
+        })),
+      clearPendingShareClaim: () =>
+        set(() => ({
+          pendingShareClaim: null,
+          pendingShareClaimAttempts: 0,
+        })),
+      incrementClaimAttempts: () =>
+        set((state) => ({
+          pendingShareClaimAttempts: state.pendingShareClaimAttempts + 1,
+        })),
+
+      // ── Deferred Deep Link Fallbacks one-shot guard (slice 2) ──
+      hasCheckedInstallReferrer: false,
+      markInstallReferrerChecked: () =>
+        set(() => ({ hasCheckedInstallReferrer: true })),
+
       // ── Telemetry Queue ──
       pendingTelemetryEvents: [],
       homeLocation: null,
@@ -648,6 +698,10 @@ export const useAppStore = create<AppStore>()(
         pendingMiaLevelUp: state.pendingMiaLevelUp,
         pendingTelemetryEvents: state.pendingTelemetryEvents,
         homeLocation: state.homeLocation,
+        // pendingShareClaim persisted — survives redirect-to-onboarding
+        // that can drop in-memory state before auth finishes. Attempts
+        // are intentionally NOT persisted (reset on cold start).
+        pendingShareClaim: state.pendingShareClaim,
       }),
     },
   ),

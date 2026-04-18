@@ -244,3 +244,45 @@ export type RouteSharePublicResponse = {
   createdAt: string;
   expiresAt: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// POST /v1/route-shares/:code/claim — params + response
+//
+// Request body is empty (the code comes from the path param; the invitee id
+// comes from the auth context). Response mirrors the `claim_route_share` RPC
+// return shape from migration 2026041802_route_share_claims.sql and the
+// `routeShareClaimResponseSchema` Zod in packages/core.
+//
+// Reuses `routeSharePublicParamsSchema` for the :code path param so the
+// 8-char base62 validation is centralised.
+// ---------------------------------------------------------------------------
+
+export { routeSharePublicParamsSchema as routeShareClaimParamsSchema };
+export type RouteShareClaimParams = RouteSharePublicParams;
+
+export const routeShareClaimResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'code',
+    'routePayload',
+    'sharerDisplayName',
+    'sharerAvatarUrl',
+    'alreadyClaimed',
+  ],
+  properties: {
+    code: { type: 'string', minLength: 8, maxLength: 8 },
+    routePayload: plannedRoutePayloadResponseSchema,
+    sharerDisplayName: { type: ['string', 'null'] },
+    sharerAvatarUrl: { type: ['string', 'null'] },
+    alreadyClaimed: { type: 'boolean' },
+  },
+} as const;
+
+export type RouteShareClaimResponse = {
+  code: string;
+  routePayload: PlannedRouteResponsePayload;
+  sharerDisplayName: string | null;
+  sharerAvatarUrl: string | null;
+  alreadyClaimed: boolean;
+};

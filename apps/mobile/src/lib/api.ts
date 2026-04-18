@@ -670,6 +670,126 @@ export const mobileApi = {
     requestJson<PublicRouteShare>(
       `/v1/route-shares/public/${encodeURIComponent(code)}`,
     ),
+
+  // ── Route Share Claim (slice 2) ──
+  //
+  // Separate from `requestJson` because we care about discriminating on
+  // HTTP status (404 / 410 / 422) rather than throwing a generic Error.
+  // Returns a `ClaimRouteShareResult` discriminated union that mirrors the
+  // server-side `ClaimShareResult`.
+  claimRouteShare: (code: string): Promise<ClaimRouteShareResult> =>
+    claimRouteShareImpl(code),
+};
+
+// ---------------------------------------------------------------------------
+// claimRouteShare — implementation
+// ---------------------------------------------------------------------------
+
+export type ClaimRouteShareSuccess = {
+  status: 'ok';
+  data: RouteShareClaimResponseBody;
+};
+
+export type ClaimRouteShareGone = {
+  status: 'gone';
+  reason: 'expired' | 'revoked';
+};
+
+export type ClaimRouteShareResult =
+  | ClaimRouteShareSuccess
+  | { status: 'not_found' }
+  | ClaimRouteShareGone
+  | { status: 'invalid'; reason: 'self_referral' }
+  | { status: 'auth_required' }
+  | { status: 'network_error'; message: string };
+
+export type RouteShareClaimResponseBody = {
+  code: string;
+  routePayload: PublicRouteShare['route'];
+  sharerDisplayName: string | null;
+  sharerAvatarUrl: string | null;
+  alreadyClaimed: boolean;
+};
+
+const claimRouteShareImpl = async (
+  code: string,
+): Promise<ClaimRouteShareResult> => {
+  const accessToken = await getAccessToken();
+  const url = `${ensureBaseUrl()}/v1/route-shares/${encodeURIComponent(code)}/claim`;
+  const init: RequestInit = { method: 'POST' };
+
+  let response: RequestResponse;
+  try {
+    const transport = await executeTransport(url, init, accessToken);
+    response = transport.response;
+
+    // 401 → refresh-token-and-retry (same pattern as requestJson)
+    if (response.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        const retry = await executeTransport(url, init, refreshedToken);
+        response = retry.response;
+      }
+    }
+  } catch (err) {
+    return {
+      status: 'network_error',
+      message: err instanceof Error ? err.message : 'Network error',
+    };
+  }
+
+  const status = response.status;
+
+  if (response.ok) {
+    try {
+      const body = (await response.json()) as RouteShareClaimResponseBody;
+      return { status: 'ok', data: body };
+    } catch (err) {
+      return {
+        status: 'network_error',
+        message:
+          err instanceof Error
+            ? `Malformed claim response: ${err.message}`
+            : 'Malformed claim response',
+      };
+    }
+  }
+
+  if (status === 401 || status === 403) return { status: 'auth_required' };
+  if (status === 404) return { status: 'not_found' };
+  if (status === 410) {
+    // Parse the `details: [reason]` emitted by the route handler to
+    // distinguish expired vs revoked. Fall back to 'expired' if the detail
+    // is missing — the UX message is the same either way ("no longer
+    // available"), but analytics benefit from the finer grain.
+    let reason: 'expired' | 'revoked' = 'expired';
+    try {
+      const raw = await response.text();
+      const parsed = JSON.parse(raw) as ErrorResponse;
+      const detail = parsed.details?.[0];
+      if (detail === 'revoked') reason = 'revoked';
+      else if (detail === 'expired') reason = 'expired';
+    } catch {
+      // Keep default `expired` on parse failure.
+    }
+    return { status: 'gone', reason };
+  }
+  if (status === 422) return { status: 'invalid', reason: 'self_referral' };
+
+  // 500 / 502 / anything else → surface as network_error so the caller
+  // retries with backoff.
+  try {
+    const raw = await response.text();
+    return {
+      status: 'network_error',
+      message: raw || `Claim failed with HTTP ${status}`,
+    };
+  } catch {
+    return {
+      status: 'network_error',
+      message: `Claim failed with HTTP ${status}`,
+    };
+  }
 };
 
 // ---------------------------------------------------------------------------

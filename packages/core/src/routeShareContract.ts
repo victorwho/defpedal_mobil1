@@ -120,3 +120,26 @@ export const routeSharePublicViewSchema = z.object({
 });
 
 export type RouteSharePublicView = z.infer<typeof routeSharePublicViewSchema>;
+
+// ---------------------------------------------------------------------------
+// RouteShareClaimResponse — payload returned from POST /r/:code/claim
+//
+// Returned on HTTP 200 (both first-time claim and idempotent re-claim).
+// `routePayload` is the same shape as the public-view `route` object: full
+// polyline when `hide_endpoints=false`, trimmed 200m both ends otherwise.
+// `alreadyClaimed=true` means the invitee had already claimed this share
+// before — the API skipped side effects (no duplicate saved_route,
+// user_follow, signup_count++) and just echoed the payload.
+// ---------------------------------------------------------------------------
+
+export const routeShareClaimResponseSchema = z.object({
+  code: shareCodeSchema,
+  routePayload: plannedRoutePayloadSchema,
+  sharerDisplayName: z.string().nullable(),
+  sharerAvatarUrl: z.string().url().nullable().default(null),
+  alreadyClaimed: z.boolean(),
+});
+
+export type RouteShareClaimResponse = z.infer<
+  typeof routeShareClaimResponseSchema
+>;

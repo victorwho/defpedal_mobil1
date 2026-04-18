@@ -82,7 +82,41 @@ export type CreateShareRow = {
 export type RouteShareService = {
   createShare: (input: CreateShareInput) => Promise<CreateShareRow>;
   getPublicShare: (code: string) => Promise<GetPublicShareResult>;
+  claimShare: (input: ClaimShareInput) => Promise<ClaimShareResult>;
 };
+
+// ---------------------------------------------------------------------------
+// claimShare — wraps claim_route_share RPC (slice 2)
+//
+// Errors emitted by the RPC map to typed discriminated-union results so the
+// route layer can pick HTTP statuses without inspecting the raw PG error
+// string:
+//   SHARE_NOT_FOUND  → { status: 'not_found' }                    → HTTP 404
+//   SHARE_EXPIRED    → { status: 'gone',   reason: 'expired' }    → HTTP 410
+//   SHARE_REVOKED    → { status: 'gone',   reason: 'revoked' }    → HTTP 410
+//   SELF_REFERRAL    → { status: 'invalid',reason: 'self_referral'} → HTTP 422
+//   happy path       → { status: 'ok', data: <RPC return shape> }
+// Unknown RPC errors re-throw so the route's errorHandler yields 502.
+// ---------------------------------------------------------------------------
+
+export type ClaimShareInput = {
+  code: string;
+  inviteeUserId: string;
+};
+
+export type ClaimSharePayload = {
+  code: string;
+  routePayload: Record<string, unknown>;
+  sharerDisplayName: string | null;
+  sharerAvatarUrl: string | null;
+  alreadyClaimed: boolean;
+};
+
+export type ClaimShareResult =
+  | { status: 'ok'; data: ClaimSharePayload }
+  | { status: 'not_found' }
+  | { status: 'gone'; reason: 'expired' | 'revoked' }
+  | { status: 'invalid'; reason: 'self_referral' };
 
 export type CreateRouteShareServiceOptions = {
   supabase: SupabaseLike;
@@ -199,5 +233,51 @@ export const createRouteShareService = (
     return { ok: true, value: data as Record<string, unknown> };
   };
 
-  return { createShare, getPublicShare };
+  const claimShare: RouteShareService['claimShare'] = async ({
+    code,
+    inviteeUserId,
+  }) => {
+    const { data, error } = await supabase.rpc('claim_route_share', {
+      p_code: code,
+      p_invitee_id: inviteeUserId,
+    });
+
+    if (error) {
+      const msg = error.message ?? '';
+      if (msg.includes('SHARE_NOT_FOUND')) return { status: 'not_found' };
+      if (msg.includes('SHARE_EXPIRED'))
+        return { status: 'gone', reason: 'expired' };
+      if (msg.includes('SHARE_REVOKED'))
+        return { status: 'gone', reason: 'revoked' };
+      if (msg.includes('SELF_REFERRAL'))
+        return { status: 'invalid', reason: 'self_referral' };
+      throw new Error(`claim_route_share RPC failed: ${msg}`);
+    }
+
+    if (!data || typeof data !== 'object') {
+      // RPC returned no row but no error either — treat as not found to be
+      // defensive. In practice the RPC always returns JSONB or raises.
+      return { status: 'not_found' };
+    }
+
+    const raw = data as Record<string, unknown>;
+    // The RPC returns { routePayload, sharerDisplayName, sharerAvatarUrl,
+    // alreadyClaimed } — we re-attach the `code` from the path so the
+    // response envelope is self-contained (client doesn't need to remember
+    // which code it posted).
+    return {
+      status: 'ok',
+      data: {
+        code,
+        routePayload: (raw.routePayload ?? {}) as Record<string, unknown>,
+        sharerDisplayName:
+          (raw.sharerDisplayName as string | null | undefined) ?? null,
+        sharerAvatarUrl:
+          (raw.sharerAvatarUrl as string | null | undefined) ?? null,
+        alreadyClaimed: Boolean(raw.alreadyClaimed),
+      },
+    };
+  };
+
+  return { createShare, getPublicShare, claimShare };
 };

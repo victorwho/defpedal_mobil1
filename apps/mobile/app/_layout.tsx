@@ -23,9 +23,9 @@ import { MiaInvitationPrompt } from '../src/design-system/organisms/MiaInvitatio
 import { MiaLevelUpOverlay } from '../src/design-system/organisms/MiaLevelUpOverlay';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
-import { Toast } from '../src/design-system/molecules/Toast';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import { useMiaJourney } from '../src/hooks/useMiaJourney';
+import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -273,58 +273,38 @@ const MiaDeepLinkHandler = () => {
 };
 
 /**
- * Route-share deep-link stub (slice 0 of route-share PRD).
+ * Route-share deep-link handler (slice 2 of route-share PRD).
  *
  * Captures `https://routes.defensivepedal.com/r/<code>` universal links
  * (plus the app-scheme fallback `defensivepedal*://route-share/<code>`)
- * and shows a "coming soon" toast. Slice 2 replaces this stub with the
- * claim pipeline that posts the code to the API and navigates to
- * route-preview.
+ * and queues the claim by writing the code into Zustand. The
+ * `ShareClaimProcessor` provider in AppProviders watches that slot and
+ * runs the claim pipeline once auth-session is ready.
  *
  * Runs as a sibling to MiaDeepLinkHandler — both subscribe to
  * Linking.addEventListener independently, so the two handlers compose
  * without interfering with each other.
+ *
+ * URL parsing lives in `src/lib/shareDeepLinkParser.ts` so it can be
+ * unit-tested and reused by the install-referrer + clipboard fallbacks
+ * (task S2-MOBILE-REFERRER).
  */
-const ROUTE_SHARE_HOST = 'routes.defensivepedal.com';
-const ROUTE_SHARE_APP_HOST = 'route-share';
-
-const extractRouteShareCode = (url: string): string | null => {
-  try {
-    const parsed = Linking.parse(url);
-    const hostname = parsed.hostname ?? '';
-    const path = parsed.path ?? '';
-
-    if (hostname === ROUTE_SHARE_HOST) {
-      // https://routes.defensivepedal.com/r/<code>
-      const match = path.match(/^\/?r\/([A-Za-z0-9]+)\/?$/);
-      return match ? match[1] : null;
-    }
-
-    if (hostname === ROUTE_SHARE_APP_HOST) {
-      // defensivepedal://route-share/<code>  (path == "<code>")
-      const match = path.match(/^\/?([A-Za-z0-9]+)\/?$/);
-      return match ? match[1] : null;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-};
-
 const RouteShareDeepLinkHandler = () => {
-  const [toastVisible, setToastVisible] = useState(false);
+  const setPendingShareClaim = useAppStore((s) => s.setPendingShareClaim);
   const handledUrlsRef = useRef<Set<string>>(new Set());
 
-  const handleUrl = useCallback((url: string) => {
-    if (handledUrlsRef.current.has(url)) return;
+  const handleUrl = useCallback(
+    (url: string) => {
+      if (handledUrlsRef.current.has(url)) return;
 
-    const code = extractRouteShareCode(url);
-    if (!code) return;
+      const code = extractRouteShareCode(url);
+      if (!code) return;
 
-    handledUrlsRef.current.add(url);
-    setToastVisible(true);
-  }, []);
+      handledUrlsRef.current.add(url);
+      setPendingShareClaim(code);
+    },
+    [setPendingShareClaim],
+  );
 
   useEffect(() => {
     void Linking.getInitialURL().then((url) => {
@@ -341,15 +321,7 @@ const RouteShareDeepLinkHandler = () => {
     };
   }, [handleUrl]);
 
-  if (!toastVisible) return null;
-
-  return (
-    <Toast
-      message="Route sharing coming soon"
-      variant="info"
-      onDismiss={() => setToastVisible(false)}
-    />
-  );
+  return null;
 };
 
 /** Shows the MiaLevelUpOverlay when a level-up is queued in appStore. */
