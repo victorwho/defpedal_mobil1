@@ -657,4 +657,79 @@ export const mobileApi = {
         })),
       }),
     }).then(() => undefined),
+
+  // ── Route Shares (slice 1) ──
+
+  createRouteShare: (payload: RouteShareCreatePayload) =>
+    requestJson<RouteShareCreateResult>('/v1/route-shares', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getPublicRouteShare: (code: string) =>
+    requestJson<PublicRouteShare>(
+      `/v1/route-shares/public/${encodeURIComponent(code)}`,
+    ),
+};
+
+// ---------------------------------------------------------------------------
+// Route-share client types — mirror the API wire format declared in
+// services/mobile-api/src/lib/routeShareSchemas.ts
+// ---------------------------------------------------------------------------
+
+export type RouteShareRiskCategory =
+  | 'very_safe'
+  | 'safe'
+  | 'moderate'
+  | 'dangerous'
+  | 'extreme';
+
+export type RouteShareRiskSegment = {
+  startIndex: number;
+  endIndex: number;
+  riskCategory: RouteShareRiskCategory;
+};
+
+export type RouteShareCreatePayload = {
+  source: 'planned';
+  route: {
+    origin: { lat: number; lon: number };
+    destination: { lat: number; lon: number };
+    geometryPolyline6: string;
+    distanceMeters: number;
+    durationSeconds: number;
+    routingMode: 'safe' | 'fast' | 'flat';
+    /** Optional per-segment risk data (drives web viewer's safety colors). */
+    riskSegments?: RouteShareRiskSegment[];
+    /** Optional aggregate 0-100 safety score. Null when unscored. */
+    safetyScore?: number | null;
+  };
+};
+
+export type RouteShareCreateResult = {
+  id: string;
+  code: string;
+  source: 'planned' | 'saved' | 'past_ride';
+  appUrl: string;
+  webUrl: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type PublicRouteShare = {
+  code: string;
+  source: 'planned' | 'saved' | 'past_ride';
+  sharerDisplayName: string | null;
+  sharerAvatarUrl: string | null;
+  route: Required<
+    Omit<RouteShareCreatePayload['route'], 'riskSegments' | 'safetyScore'>
+  > & {
+    riskSegments: RouteShareRiskSegment[];
+    safetyScore: number | null;
+  };
+  endpointsHidden: boolean;
+  fullLengthMeters: number;
+  viewCount: number;
+  createdAt: string;
+  expiresAt: string | null;
 };
