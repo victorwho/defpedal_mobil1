@@ -10,6 +10,7 @@ import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
 import { buildMiaRoutes } from './routes/mia';
+import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
 import { buildV1Routes } from './routes/v1';
 
 export const buildApp = (options: {
@@ -127,6 +128,15 @@ export const buildApp = (options: {
   void app.register(buildMiaRoutes(dependencies), {
     prefix: '/v1',
   });
+
+  // Route-share routes are feature-flagged via ENABLE_ROUTE_SHARES (default on).
+  // Checked at registration time so disabling the flag cleanly removes the
+  // route surface — hits return Fastify's default 404.
+  if (isRouteSharesEnabled()) {
+    void app.register(buildRouteShareRoutes(dependencies), {
+      prefix: '/v1',
+    });
+  }
 
   return app;
 };

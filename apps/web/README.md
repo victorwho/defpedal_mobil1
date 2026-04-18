@@ -26,11 +26,15 @@ npm run typecheck  # tsc --noEmit
 npm run lint       # next lint
 ```
 
-## Known security advisories (slice 0)
+## Security advisories
 
-This scaffold pins `next@^14.2.35`, the latest patched release on the 14.2.x line. The following CVEs against Next.js have fixes **only in Next.js 15.5.15+ or 16.x** and therefore remain unpatched on 14.2.35:
+Pinned to `next@^15.5.15`. CVEs cleared by Next 15.5.15 bump (2026-04-18) — `npm audit` returns 0 vulnerabilities on runtime and dev trees.
 
-| CVE | Severity | Applies to our surface? |
+### Historical (pre-15.5.15)
+
+While slice 0 shipped on `next@^14.2.35`, the following CVEs had fixes only in Next.js 15.5.15+ or 16.x and were therefore unpatched on 14.2.35. All have since been cleared by the 15.5.15 bump:
+
+| CVE | Severity | Applied to our surface? |
 |-----|----------|-------------------------|
 | [GHSA-f82v-jwr5-mffw](https://github.com/advisories/GHSA-f82v-jwr5-mffw) Middleware auth bypass | critical | **No** — no middleware in slice 0 |
 | [GHSA-ggv3-7p47-pfv8](https://github.com/advisories/GHSA-ggv3-7p47-pfv8) HTTP smuggling in rewrites | high | **No** — no rewrites |
@@ -38,8 +42,6 @@ This scaffold pins `next@^14.2.35`, the latest patched release on the 14.2.x lin
 | [GHSA-q4gf-8mx6-v5v3](https://github.com/advisories/GHSA-q4gf-8mx6-v5v3) Server Components DoS | high | Low — surface is one static page + one 404 stub |
 | [GHSA-9g9p-9gw9-jx7f](https://github.com/advisories/GHSA-9g9p-9gw9-jx7f) Image Optimizer remotePatterns DoS | high | **No** — Vercel-hosted (managed) |
 | [GHSA-h25m-26qc-wcjf](https://github.com/advisories/GHSA-h25m-26qc-wcjf) Server Component deserialization | critical | Low — no user-controlled RSC inputs |
-
-**Slice 1+ migration:** upgrade to Next.js 15.5.15 or 16.x once the route-share viewer lands and the attack surface expands. Staying on 14.2.x in slice 0 avoids a major-version bump inside a scaffold PR.
 
 ---
 

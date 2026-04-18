@@ -10,5 +10,8 @@ export * from './routeRequest';
 export * from './routeAnalysis';
 export * from './riskDistribution';
 export * from './shareCaption';
+export * from './shareCodeGenerator';
+export * from './shareDeepLinkBuilder';
 export * from './sharePrivacy';
+export * from './routeShareContract';
 export * from './types';

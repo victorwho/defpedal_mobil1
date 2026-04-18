@@ -32,10 +32,13 @@ import { useAppStore } from '../src/store/appStore';
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
+import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -89,6 +92,14 @@ export default function RoutePreviewScreen() {
   const enqueueTelemetryEvent = useAppStore((state) => state.enqueueTelemetryEvent);
 
   const { isOnline } = useConnectivity();
+
+  // ── Route-share flow (slice 1 of route-share PRD) ──
+  const {
+    share: shareRoute,
+    isSharing: isSharingRoute,
+    toastMessage: shareToastMessage,
+    consumeToast: consumeShareToast,
+  } = useShareRoute();
 
   // ── Offline download state ──
   type OfflineDownloadStatus = 'idle' | 'downloading' | 'complete' | 'error';
@@ -208,6 +219,19 @@ export default function RoutePreviewScreen() {
       null,
     [routePreview, selectedRouteId],
   );
+
+  const handleSharePress = useCallback(() => {
+    if (!selectedRoute || !routeRequest) return;
+    const routingMode: 'safe' | 'fast' | 'flat' = avoidHills
+      ? 'flat'
+      : routeRequest.mode;
+    void shareRoute({
+      route: selectedRoute,
+      origin: routeRequest.origin,
+      destination: routeRequest.destination,
+      routingMode,
+    });
+  }, [selectedRoute, routeRequest, avoidHills, shareRoute]);
 
   const handleDownloadOffline = useCallback(() => {
     if (!selectedRoute) return;
@@ -455,6 +479,14 @@ export default function RoutePreviewScreen() {
                 Back to planning
               </Button>
             </View>
+            {selectedRoute ? (
+              <ShareRouteButton
+                variant="icon"
+                onPress={handleSharePress}
+                disabled={isSharingRoute}
+                loading={isSharingRoute}
+              />
+            ) : null}
             {user ? (
               <Pressable
                 style={styles.saveRouteButton}
@@ -730,6 +762,17 @@ export default function RoutePreviewScreen() {
         </View>
       </View>
     ) : null}
+
+    {/* Route-share feedback toast (offline / error) */}
+    {shareToastMessage ? (
+      <View style={styles.shareToastContainer}>
+        <Toast
+          message={shareToastMessage}
+          variant="info"
+          onDismiss={consumeShareToast}
+        />
+      </View>
+    ) : null}
     </>
   );
 }
@@ -964,6 +1007,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
     },
     toastContainer: {
+      position: 'absolute',
+      bottom: 100,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: zIndex.toast,
+    },
+    shareToastContainer: {
       position: 'absolute',
       bottom: 100,
       left: 0,

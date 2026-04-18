@@ -51,3 +51,6 @@ export type { MiaJourneyBarProps } from './MiaJourneyBar';
 
 export { FollowButton } from './FollowButton';
 export type { FollowButtonProps } from './FollowButton';
+
+export { ShareRouteButton } from './ShareRouteButton';
+export type { ShareRouteButtonProps, ShareRouteButtonVariant } from './ShareRouteButton';
