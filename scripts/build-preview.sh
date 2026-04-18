@@ -115,6 +115,22 @@ else
   echo "  Scheme $TARGET_SCHEME already present"
 fi
 
+echo "── Step 1d: Ensure route-share universal link intent filter ──"
+# Slice 0 of the route-share PRD: the app must advertise itself as the
+# handler for https://routes.defensivepedal.com/r/*. Expo's intentFilters
+# in app.config.ts only land in the manifest via `expo prebuild`, which
+# we explicitly avoid on C:\dpb (error-log #27 — it overwrites source).
+# So inject the filter here, idempotently, after the robocopy sync.
+if ! grep -q 'android:host="routes.defensivepedal.com"' "$MANIFEST" 2>/dev/null; then
+  # Insert a new <intent-filter> block just before </activity> of MainActivity.
+  # autoVerify="true" + https + host + pathPrefix triggers Android App Links
+  # verification against /.well-known/assetlinks.json on the host.
+  sed -i 's|    </activity>|      <intent-filter android:autoVerify="true">\n        <action android:name="android.intent.action.VIEW"/>\n        <category android:name="android.intent.category.DEFAULT"/>\n        <category android:name="android.intent.category.BROWSABLE"/>\n        <data android:scheme="https" android:host="routes.defensivepedal.com" android:pathPrefix="/r/"/>\n      </intent-filter>\n    </activity>|' "$MANIFEST"
+  echo "  Added route-share intent filter (https://routes.defensivepedal.com/r/*)"
+else
+  echo "  Route-share intent filter already present"
+fi
+
 echo "── Step 2: Clean Gradle bundle cache ──"
 # Forces Gradle to re-run the Metro bundle task instead of reusing stale output.
 rm -rf "$DST/apps/mobile/android/app/build/generated/assets/"

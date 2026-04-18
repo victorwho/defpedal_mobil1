@@ -23,6 +23,7 @@ import { MiaInvitationPrompt } from '../src/design-system/organisms/MiaInvitatio
 import { MiaLevelUpOverlay } from '../src/design-system/organisms/MiaLevelUpOverlay';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import { useMiaJourney } from '../src/hooks/useMiaJourney';
 
@@ -271,6 +272,86 @@ const MiaDeepLinkHandler = () => {
   return null;
 };
 
+/**
+ * Route-share deep-link stub (slice 0 of route-share PRD).
+ *
+ * Captures `https://routes.defensivepedal.com/r/<code>` universal links
+ * (plus the app-scheme fallback `defensivepedal*://route-share/<code>`)
+ * and shows a "coming soon" toast. Slice 2 replaces this stub with the
+ * claim pipeline that posts the code to the API and navigates to
+ * route-preview.
+ *
+ * Runs as a sibling to MiaDeepLinkHandler — both subscribe to
+ * Linking.addEventListener independently, so the two handlers compose
+ * without interfering with each other.
+ */
+const ROUTE_SHARE_HOST = 'routes.defensivepedal.com';
+const ROUTE_SHARE_APP_HOST = 'route-share';
+
+const extractRouteShareCode = (url: string): string | null => {
+  try {
+    const parsed = Linking.parse(url);
+    const hostname = parsed.hostname ?? '';
+    const path = parsed.path ?? '';
+
+    if (hostname === ROUTE_SHARE_HOST) {
+      // https://routes.defensivepedal.com/r/<code>
+      const match = path.match(/^\/?r\/([A-Za-z0-9]+)\/?$/);
+      return match ? match[1] : null;
+    }
+
+    if (hostname === ROUTE_SHARE_APP_HOST) {
+      // defensivepedal://route-share/<code>  (path == "<code>")
+      const match = path.match(/^\/?([A-Za-z0-9]+)\/?$/);
+      return match ? match[1] : null;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const RouteShareDeepLinkHandler = () => {
+  const [toastVisible, setToastVisible] = useState(false);
+  const handledUrlsRef = useRef<Set<string>>(new Set());
+
+  const handleUrl = useCallback((url: string) => {
+    if (handledUrlsRef.current.has(url)) return;
+
+    const code = extractRouteShareCode(url);
+    if (!code) return;
+
+    handledUrlsRef.current.add(url);
+    setToastVisible(true);
+  }, []);
+
+  useEffect(() => {
+    void Linking.getInitialURL().then((url) => {
+      if (url) handleUrl(url);
+    });
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleUrl(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+      handledUrlsRef.current.clear();
+    };
+  }, [handleUrl]);
+
+  if (!toastVisible) return null;
+
+  return (
+    <Toast
+      message="Route sharing coming soon"
+      variant="info"
+      onDismiss={() => setToastVisible(false)}
+    />
+  );
+};
+
 /** Shows the MiaLevelUpOverlay when a level-up is queued in appStore. */
 const MiaLevelUpOverlayManager = () => {
   const appState = useAppStore((s) => s.appState);
@@ -365,6 +446,7 @@ const RootLayoutInner = () => {
       <MiaLevelUpOverlayManager />
       <MiaInvitationPromptManager />
       <MiaDeepLinkHandler />
+      <RouteShareDeepLinkHandler />
     </>
   );
 };
