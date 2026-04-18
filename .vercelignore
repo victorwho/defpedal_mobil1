@@ -1,0 +1,73 @@
+# Vercel rootDirectory is apps/web. This file trims the upload payload
+# to avoid uploading the rest of the monorepo (node_modules, APKs, etc.).
+# vercel.json's installCommand uses --workspaces=false, so only apps/web
+# is actually installed/built.
+
+# Large dependency trees
+node_modules
+**/node_modules
+
+# Build outputs
+.next
+**/.next
+dist
+**/dist
+build
+out
+.turbo
+.cache
+.gradle
+**/.gradle
+
+# Sibling workspaces — not used by the web holding page
+apps/mobile
+services
+packages
+android
+ios
+supabase
+
+# Mobile build artifacts
+*.apk
+*.aab
+*.ipa
+*.keystore
+apkreleases
+graphify-out
+
+# Large binary docs (not read by build)
+*.docx
+*.pdf
+
+# Design / planning files in repo root
+design-work
+docs
+
+# Test outputs
+coverage
+**/coverage
+
+# Logs and temp
+*.log
+**/*.log
+logs
+.tmp
+tmp
+
+# VCS and tooling metadata
+.git
+.github
+.claude
+.vscode
+.idea
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Env files (Vercel uses dashboard env vars)
+.env
+.env.*
+**/.env
+**/.env.*
+!apps/web/.env.example

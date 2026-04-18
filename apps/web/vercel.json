@@ -3,21 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "installCommand": "npm install --workspaces=false --legacy-peer-deps",
-  "outputDirectory": ".next",
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_SUPABASE_URL": "@defpedal_supabase_url",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@defpedal_supabase_anon_key",
-      "NEXT_PUBLIC_POSTHOG_KEY": "@defpedal_posthog_key",
-      "NEXT_PUBLIC_POSTHOG_HOST": "@defpedal_posthog_host",
-      "NEXT_PUBLIC_SENTRY_DSN": "@defpedal_sentry_dsn"
-    }
-  },
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@defpedal_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@defpedal_supabase_anon_key",
-    "NEXT_PUBLIC_POSTHOG_KEY": "@defpedal_posthog_key",
-    "NEXT_PUBLIC_POSTHOG_HOST": "@defpedal_posthog_host",
-    "NEXT_PUBLIC_SENTRY_DSN": "@defpedal_sentry_dsn"
-  }
+  "outputDirectory": ".next"
 }
