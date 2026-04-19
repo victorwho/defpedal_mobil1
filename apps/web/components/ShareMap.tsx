@@ -74,9 +74,10 @@ export function ShareMap({ share }: ShareMapProps) {
     mapboxgl.accessToken = token;
 
     const { origin, destination, geometryPolyline6, riskSegments } = share.route;
-    // Core's decoder returns [lat, lon] pairs — Mapbox wants [lon, lat]. Swap here.
-    const decoded = decodePolyline(geometryPolyline6, 6);
-    const coords: Array<[number, number]> = decoded.map(([lat, lon]) => [lon, lat]);
+    // Core's decoder already returns [lon, lat] at the default precision 1e6 — matches the
+    // "polyline6" naming (6 decimal digits). Passing `6` as precision divides coordinates by 6,
+    // producing latitudes in the millions that LngLat rejects.
+    const coords: Array<[number, number]> = decodePolyline(geometryPolyline6);
     const bounds = computeBounds(coords);
     const features = buildSegmentFeatures(coords, riskSegments);
 
