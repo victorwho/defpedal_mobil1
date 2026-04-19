@@ -1,4 +1,3 @@
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { fetchRouteShare } from '../../../lib/fetchRouteShare';
 import { ShareCtas } from '../../../components/ShareCtas';
@@ -17,8 +16,8 @@ interface PageProps {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// Cookie lifetime matches the PRD default share expiry.
-const SHARE_CODE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+// `dp_share_code` attribution cookie is set in apps/web/middleware.ts (Next.js 15
+// disallows cookie mutation during Server Component render).
 
 export default async function RouteSharePage({ params }: PageProps) {
   const { code } = await params;
@@ -27,18 +26,6 @@ export default async function RouteSharePage({ params }: PageProps) {
   if (result.status === 'not_found') notFound();
   if (result.status === 'gone') return <ShareGoneCard />;
   if (result.status === 'error') throw new Error(result.message);
-
-  // Attribution cookie for the slice-2 claim pipeline.
-  // SameSite=Lax + NOT HttpOnly — the slice-7 PostHog snippet reads this from JS to bridge
-  // the web session into the mobile app's PostHog user at claim time.
-  const jar = await cookies();
-  jar.set('dp_share_code', code, {
-    maxAge: SHARE_CODE_COOKIE_MAX_AGE_SECONDS,
-    sameSite: 'lax',
-    httpOnly: false,
-    secure: true,
-    path: '/',
-  });
 
   return (
     <ShareLayout
