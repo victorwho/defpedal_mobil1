@@ -267,9 +267,10 @@ export const buildRouteShareRoutes = (
           });
 
           // Strip inviter-side reward fields before replying — the invitee
-          // only ever sees their own XP/badge deltas. Fastify's schema
-          // validation will also reject any leaked inviter field as an
-          // additionalProperties violation (belt and suspenders).
+          // only ever sees their own XP/badge deltas and the slice-4
+          // followPending flag. Fastify's schema validation rejects any
+          // leaked inviter field as an additionalProperties violation
+          // (belt and suspenders).
           const { inviterXpAwarded, inviterNewBadges, inviterUserId, miaMilestoneAdvanced, ...inviteeRewards } =
             result.data.rewards;
           void inviterXpAwarded;

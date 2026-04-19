@@ -263,6 +263,7 @@ export const buildFollowRoutes = (
           .select(`
             follower_id,
             created_at,
+            source,
             profiles!user_follows_follower_id_fkey (
               id,
               display_name,
@@ -286,6 +287,17 @@ export const buildFollowRoutes = (
         const requests: FollowRequest[] = (data ?? []).map((row) => {
           const profile = row.profiles as unknown as Record<string, unknown> | null;
           const username = profile?.username as string | null;
+          // Slice 4: user_follows.source='route_share_claim' tags pending
+          // follows produced by claim_route_share against a private sharer.
+          // Surface a human-readable subtitle so the Follow Requests UI can
+          // render "Signed up via your shared route" under the timestamp.
+          // Anything else (NULL = standard manual follow) leaves `context`
+          // undefined and the UI renders nothing extra.
+          const source = (row as Record<string, unknown>).source as string | null | undefined;
+          const context =
+            source === 'route_share_claim'
+              ? 'Signed up via your shared route'
+              : undefined;
           return {
             id: row.follower_id as string,
             user: {
@@ -295,6 +307,7 @@ export const buildFollowRoutes = (
               riderTier: (profile?.rider_tier as RiderTierName) ?? undefined,
             },
             requestedAt: row.created_at as string,
+            ...(context ? { context } : {}),
           };
         });
 

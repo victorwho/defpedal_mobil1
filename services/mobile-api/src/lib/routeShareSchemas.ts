@@ -269,7 +269,7 @@ export type RouteShareClaimParams = RouteSharePublicParams;
 const claimRewardsResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['inviteeXpAwarded', 'inviteeNewBadges'],
+  required: ['inviteeXpAwarded', 'inviteeNewBadges', 'followPending'],
   properties: {
     inviteeXpAwarded: { type: ['integer', 'null'] },
     inviteeNewBadges: {
@@ -287,6 +287,11 @@ const claimRewardsResponseSchema = {
         },
       },
     },
+    // Slice 4: true when the sharer's profile is private — the follow
+    // relationship was created as 'pending' rather than 'accepted'. XP and
+    // badges are still awarded (route access isn't gated on follow
+    // approval); this flag only drives the invitee-side toast copy.
+    followPending: { type: 'boolean', default: false },
   },
 } as const;
 
@@ -322,6 +327,7 @@ export type ClaimRewardBadge = {
 export type ClaimInviteeRewards = {
   inviteeXpAwarded: number | null;
   inviteeNewBadges: ClaimRewardBadge[];
+  followPending: boolean;
 };
 
 export type RouteShareClaimResponse = {

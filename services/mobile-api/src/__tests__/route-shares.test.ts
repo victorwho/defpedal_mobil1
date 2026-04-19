@@ -457,6 +457,9 @@ describe('POST /v1/route-shares/:code/claim', () => {
     inviterNewBadges: [],
     inviterUserId: '',
     miaMilestoneAdvanced: false,
+    // Slice 4: default public-sharer branch — follow is created as 'accepted'
+    // so no pending follow request is raised on the sharer side.
+    followPending: false,
   } as const;
 
   const happyClaimPayload = {
@@ -813,6 +816,95 @@ describe('POST /v1/route-shares/:code/claim', () => {
 
       const [[args]] = dispatchAmbassadorRewardNotificationMock.mock.calls;
       expect(args).toMatchObject({ sharerDisplayName: 'Alice' });
+      await app.close();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Slice 4 — private-profile pending follow
+  // ─────────────────────────────────────────────────────────────────────
+
+  describe('private-profile pending follow (slice 4)', () => {
+    it('surfaces rewards.followPending=true in the response when sharer is private', async () => {
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: {
+          ...happyClaimPayload,
+          rewards: {
+            ...emptyRewards,
+            inviteeXpAwarded: 50,
+            followPending: true,
+          },
+        },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as Record<string, unknown>;
+      const rewards = body.rewards as Record<string, unknown>;
+      expect(rewards.followPending).toBe(true);
+      // Reward fields still arrive — slice-4 doesn't gate XP/badges on follow state.
+      expect(rewards.inviteeXpAwarded).toBe(50);
+      await app.close();
+    });
+
+    it('surfaces rewards.followPending=false in the response when sharer is public', async () => {
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: {
+          ...happyClaimPayload,
+          rewards: {
+            ...emptyRewards,
+            inviteeXpAwarded: 50,
+            followPending: false,
+          },
+        },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      const rewards = (res.json() as Record<string, unknown>).rewards as Record<string, unknown>;
+      expect(rewards.followPending).toBe(false);
+      await app.close();
+    });
+
+    it('defaults followPending to false when the RPC/service omits it (backward compat)', async () => {
+      // Simulate a stale service layer that hasn't been updated yet — the API
+      // must not crash; Fastify schema fills the default.
+      const { followPending: _omit, ...rewardsWithoutFollowPending } = emptyRewards;
+      void _omit;
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: {
+          ...happyClaimPayload,
+          rewards: rewardsWithoutFollowPending,
+        },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const rewards = (res.json() as Record<string, unknown>).rewards as Record<string, unknown>;
+      expect(rewards.followPending).toBe(false);
       await app.close();
     });
   });

@@ -786,6 +786,7 @@ function PrivateProfileSection({ isPrivate, onToggle, styles, colors }: PrivateP
               request={req}
               onApprove={handleApprove}
               onDecline={handleDecline}
+              context={req.context}
             />
           ))}
         </View>

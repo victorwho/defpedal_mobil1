@@ -23,6 +23,13 @@ export interface FollowRequestItemProps {
   request: FollowRequest;
   onApprove: (id: string) => void;
   onDecline: (id: string) => void;
+  /**
+   * Optional context subtitle. Renders under the timestamp as a muted
+   * one-liner explaining why the request was made. Used by slice-4 route-
+   * share claims to surface "Signed up via your shared route"; callers that
+   * don't have a context signal should omit the prop entirely.
+   */
+  context?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +64,7 @@ export const FollowRequestItem = React.memo(function FollowRequestItem({
   request,
   onApprove,
   onDecline,
+  context,
 }: FollowRequestItemProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -86,6 +94,11 @@ export const FollowRequestItem = React.memo(function FollowRequestItem({
           )}
         </View>
         <Text style={styles.timestamp}>{formatRelativeTime(request.requestedAt)}</Text>
+        {context ? (
+          <Text style={styles.context} numberOfLines={2}>
+            {context}
+          </Text>
+        ) : null}
       </View>
 
       {/* Right: Action buttons */}
@@ -162,6 +175,12 @@ const createThemedStyles = (colors: ThemeColors) =>
     timestamp: {
       ...textXs,
       color: colors.textSecondary,
+    },
+    context: {
+      ...textXs,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+      marginTop: 2,
     },
     actions: {
       flexDirection: 'row',

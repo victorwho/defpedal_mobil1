@@ -94,6 +94,18 @@ vi.mock('../../design-system/molecules/Toast', () => ({
     ),
 }));
 
+// Stub XpGainToast — the real atom uses useWindowDimensions which isn't
+// in the happy-dom react-native mock. We only need presence-detection for
+// assertions about the invitee +50 XP surface.
+vi.mock('../../design-system/atoms/XpGainToast', () => ({
+  XpGainToast: ({ xp }: { xp: number }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'xp-gain-toast', 'data-xp': String(xp) },
+      `+${xp} XP`,
+    ),
+}));
+
 vi.mock('../../design-system/tokens/zIndex', () => ({
   zIndex: { toast: 9999 },
 }));
@@ -152,6 +164,11 @@ const resetState = () => {
 // mapper needs (origin, destination, geometryPolyline6, distance, duration,
 // routingMode). Fields the mapper doesn't need (sharer info, timestamps,
 // etc.) are omitted from `as any` — the store doesn't inspect them.
+//
+// The `rewards` sub-object matches the invitee-facing shape from slice 3
+// (inviteeXpAwarded + inviteeNewBadges) extended with slice-4 followPending.
+// Defaults reflect a public-sharer, no-new-badges claim — individual tests
+// override fields as needed.
 const okClaimData = {
   code: 'abcd1234',
   alreadyClaimed: false,
@@ -166,6 +183,11 @@ const okClaimData = {
     routingMode: 'safe' as const,
     riskSegments: [],
     safetyScore: null,
+  },
+  rewards: {
+    inviteeXpAwarded: null,
+    inviteeNewBadges: [],
+    followPending: false,
   },
 };
 
@@ -395,5 +417,92 @@ describe('ShareClaimProcessor', () => {
     expect(useAppStore.getState().pendingShareClaim).toBeNull();
     // No toast rendered — component returns null when toast is null.
     expect(screen.queryByTestId('toast')).toBeNull();
+  });
+
+  // ── Slice 4: private-profile pending-follow branch ──
+
+  it('slice 4: toast explicitly mentions "Follow request sent" when followPending=true', async () => {
+    claimRouteShareSpy.mockResolvedValue({
+      status: 'ok',
+      data: {
+        ...okClaimData,
+        rewards: {
+          inviteeXpAwarded: 50,
+          inviteeNewBadges: [],
+          followPending: true,
+        },
+      },
+    });
+    useAppStore.setState({ pendingShareClaim: 'abcd1234' });
+    render(<ShareClaimProcessor />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId('toast');
+      expect(toast.getAttribute('data-variant')).toBe('success');
+      expect(toast.getAttribute('data-message')).toMatch(/follow request sent/i);
+    });
+  });
+
+  it('slice 4: toast uses the standard "saved routes" copy when followPending=false', async () => {
+    claimRouteShareSpy.mockResolvedValue({
+      status: 'ok',
+      data: {
+        ...okClaimData,
+        rewards: {
+          inviteeXpAwarded: 50,
+          inviteeNewBadges: [],
+          followPending: false,
+        },
+      },
+    });
+    useAppStore.setState({ pendingShareClaim: 'abcd1234' });
+    render(<ShareClaimProcessor />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId('toast');
+      expect(toast.getAttribute('data-variant')).toBe('success');
+      expect(toast.getAttribute('data-message')).toMatch(/saved routes/i);
+      // Must NOT include the pending-follow suffix on the public-sharer branch.
+      expect(toast.getAttribute('data-message')).not.toMatch(/follow request/i);
+    });
+  });
+
+  it('slice 4: idempotent re-claim does not surface followPending copy even when the reward is true', async () => {
+    // alreadyClaimed=true means the server already processed the reward on a
+    // previous claim. The follow relationship is already in place (or pending
+    // from before); the toast stays on the standard copy to avoid suggesting
+    // a fresh action was taken.
+    claimRouteShareSpy.mockResolvedValue({
+      status: 'ok',
+      data: {
+        ...okClaimData,
+        alreadyClaimed: true,
+        rewards: {
+          inviteeXpAwarded: 50,
+          inviteeNewBadges: [],
+          followPending: true,
+        },
+      },
+    });
+    useAppStore.setState({ pendingShareClaim: 'abcd1234' });
+    render(<ShareClaimProcessor />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const toast = screen.getByTestId('toast');
+      expect(toast.getAttribute('data-message')).toMatch(/saved routes/i);
+      expect(toast.getAttribute('data-message')).not.toMatch(/follow request/i);
+    });
   });
 });

@@ -115,7 +115,8 @@ export type ClaimRewardBadge = {
 // Full reward shape returned by the claim_route_share RPC.
 // The API strips the `inviter*` fields before forwarding to the invitee —
 // those are consumed server-side to drive the push notification to the sharer
-// (see route-shares.ts claim handler).
+// (see route-shares.ts claim handler). `followPending` (slice 4) is an
+// invitee-facing field that stays in the response.
 export type ClaimRewardsAll = {
   inviteeXpAwarded: number | null;
   inviteeNewBadges: ClaimRewardBadge[];
@@ -123,6 +124,7 @@ export type ClaimRewardsAll = {
   inviterNewBadges: ClaimRewardBadge[];
   inviterUserId: string;
   miaMilestoneAdvanced: boolean;
+  followPending: boolean;
 };
 
 export type ClaimSharePayload = {
@@ -308,6 +310,9 @@ export const createRouteShareService = (
           ? rawRewards.inviterUserId
           : '',
       miaMilestoneAdvanced: Boolean(rawRewards.miaMilestoneAdvanced),
+      // Slice 4: defaults to false so a slice-3-era RPC (no followPending in
+      // the JSON) doesn't flip the mobile toast copy on public-sharer claims.
+      followPending: Boolean(rawRewards.followPending),
     };
 
     return {

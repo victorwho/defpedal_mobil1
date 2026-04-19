@@ -54,6 +54,10 @@ const RETRY_BACKOFF_MS: Record<number, number> = {
 
 const TOAST_MESSAGES = {
   ok: 'Shared route added to your saved routes.',
+  // Slice 4: sharer's profile is private — the follow relationship is held
+  // as a pending request on their side. The route is still saved and the
+  // invitee still gets XP; only the follow is deferred pending approval.
+  okFollowPending: 'Shared route added. Follow request sent.',
   gone: 'This shared route is no longer available.',
   selfReferral: 'You can\u2019t claim your own shared route.',
   exhausted: 'Couldn\u2019t load shared route. Please try again later.',
@@ -165,7 +169,18 @@ export const ShareClaimProcessor = () => {
               });
               router.push('/route-preview');
             }
-            setToast({ message: TOAST_MESSAGES.ok, variant: 'success' });
+            // Slice 4: toast copy branches on the sharer's privacy setting.
+            // Idempotent re-claims keep the standard copy — the follow state
+            // was settled on the first claim, so promising "Follow request
+            // sent" a second time would be misleading.
+            const isPendingFollow =
+              !result.data.alreadyClaimed && result.data.rewards.followPending;
+            setToast({
+              message: isPendingFollow
+                ? TOAST_MESSAGES.okFollowPending
+                : TOAST_MESSAGES.ok,
+              variant: 'success',
+            });
 
             // Slice 3: surface invitee-side rewards. Skip if alreadyClaimed
             // (replay path returns empty rewards from the server, but

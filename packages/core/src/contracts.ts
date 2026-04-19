@@ -578,6 +578,14 @@ export interface FollowRequest {
   readonly id: string;
   readonly user: ActivityFeedUser;
   readonly requestedAt: string;
+  /**
+   * Optional human-readable subtitle explaining *why* the request was made,
+   * rendered by `FollowRequestItem` under the timestamp. Populated by the
+   * server when a pending follow can be attributed to a specific action
+   * (e.g. slice-4 route-share claims against a private sharer emit
+   * "Signed up via your shared route").
+   */
+  readonly context?: string;
 }
 
 export interface SuggestedUser {

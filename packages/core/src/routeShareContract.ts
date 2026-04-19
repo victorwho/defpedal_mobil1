@@ -154,6 +154,11 @@ const claimRewardBadgeSchema = z.object({
 const claimInviteeRewardsSchema = z.object({
   inviteeXpAwarded: z.number().int().nullable().default(null),
   inviteeNewBadges: z.array(claimRewardBadgeSchema).default([]),
+  // Slice 4: `true` when the sharer has a private profile — the follow
+  // relationship was inserted as 'pending' instead of 'accepted'. Route
+  // access, XP, and badges are NOT gated on follow approval; this flag
+  // only drives the mobile toast copy on the invitee side.
+  followPending: z.boolean().default(false),
 });
 
 export type RouteShareClaimRewardBadge = z.infer<typeof claimRewardBadgeSchema>;
@@ -170,6 +175,7 @@ export const routeShareClaimResponseSchema = z.object({
   rewards: claimInviteeRewardsSchema.default({
     inviteeXpAwarded: null,
     inviteeNewBadges: [],
+    followPending: false,
   }),
 });
 

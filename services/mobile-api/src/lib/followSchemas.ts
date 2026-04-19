@@ -64,6 +64,11 @@ const followRequestItemSchema = {
       },
     },
     requestedAt: { type: 'string', format: 'date-time' },
+    // Slice 4: optional attribution subtitle. Fastify strips unlisted
+    // response fields — must be declared here or the 'Signed up via your
+    // shared route' string emitted by /profile/follow-requests won't
+    // reach the client.
+    context: { type: 'string' },
   },
 } as const;
 

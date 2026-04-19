@@ -339,4 +339,62 @@ describe('routeShareClaimResponseSchema', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // ── Slice 4: private-profile pending-follow branch ──
+
+  it('slice 4: accepts rewards.followPending=true (private sharer branch)', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      rewards: {
+        inviteeXpAwarded: 50,
+        inviteeNewBadges: [],
+        followPending: true,
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rewards.followPending).toBe(true);
+    }
+  });
+
+  it('slice 4: accepts rewards.followPending=false (public sharer branch)', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      rewards: {
+        inviteeXpAwarded: 50,
+        inviteeNewBadges: [],
+        followPending: false,
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rewards.followPending).toBe(false);
+    }
+  });
+
+  it('slice 4: followPending defaults to false when omitted (backward compat with slice 3 servers)', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      rewards: {
+        inviteeXpAwarded: null,
+        inviteeNewBadges: [],
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.rewards.followPending).toBe(false);
+    }
+  });
+
+  it('slice 4: rejects non-boolean followPending', () => {
+    const result = routeShareClaimResponseSchema.safeParse({
+      ...validClaim,
+      rewards: {
+        inviteeXpAwarded: null,
+        inviteeNewBadges: [],
+        followPending: 'yes',
+      },
+    });
+    expect(result.success).toBe(false);
+  });
 });
