@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-04-19 — Route-Share Slice 3 + Follow-Up Fixes
+
+### Features — Slice 3 (Ambassador Rewards)
+- **Rewarded claim**: taking a share link now awards XP on both sides. Invitee earns +50 welcome XP once in their lifetime (action `referral_welcome`). Inviter earns +100 XP per conversion (action `referral`), capped at 5 per calendar month.
+- **Ambassador badges**: 3-tier progression (`ambassador_bronze` @ 1 conversion, `ambassador_silver` @ 5, `ambassador_gold` @ 25). Evaluated inside the claim RPC using a distinct-invitee COUNT across all of the inviter's shares.
+- **Mia milestone**: when the inviter is on an active Mia journey, `profiles.mia_non_cyclists_converted` increments. Auxiliary stat for the Mia Journey Tracker — not a level-up gate.
+- **Push notification**: "Someone joined via your share! — +100 XP + Ambassador badge." dispatched to the sharer on first-time claim. A "first 3 referral pushes per calendar day" bypass overrides the stock 1-per-24h daily budget; subsequent same-day referral pushes fall through to the normal suppression path.
+- **Mobile surfaces**: `ShareClaimProcessor` enqueues invitee badges onto the existing `BadgeUnlockOverlayManager` and renders `XpGainToast` for the +50. New `/my-shares` stub screen as the push-notification landing target.
+- **DB**: migration `2026041901_route_share_ambassador_rewards.sql` (applied as `route_share_ambassador_rewards_slice3`) seeds badges + adds the Mia counter + extends `claim_route_share` RPC.
+- **API**: new `lib/ambassadorRewards.ts` dispatcher. Fastify schema strips inviter-side reward fields from the claim response before replying (additionalProperties:false enforces the barrier). Cloud Run revision `defpedal-api-00054-44f`.
+
+### Fixes
+- **Email signup 500 "Database error saving new user"**: `public.handle_new_user()` is SECURITY DEFINER but had no `search_path` pinned (long-standing `function_search_path_mutable` advisor warning). GoTrue's signup transaction runs with `search_path=auth, pg_catalog`, so the trigger body's unqualified `profiles` reference threw `relation "profiles" does not exist`. Fix: migration `2026041902_fix_handle_new_user_search_path.sql` pins the function's search_path to `public, auth, pg_temp`. One-liner, no body change. Same pattern as `202604120001_set_search_path_on_security_definer.sql` which had hardened the other SECURITY DEFINER functions but missed this one.
+- **Trophy Case crash on fresh claimant account**: the slice-3 seed used `display_tab='social'` for the ambassador badges, but `BadgeDisplayTab` in `packages/core/src/contracts.ts` is a strict union (`firsts | riding | consistency | impact | safety | community | explore | events`). `achievements.tsx:214` indexes into a tab-counter by `displayTab`, so `counts['social']` was undefined and `.total++` threw. Fix: migration `2026041903_ambassador_badges_use_community_tab.sql` UPDATEs the 3 rows to `category='community' + display_tab='community'`. Slice 3 migration file also corrected in the repo for fresh rebuilds.
+- **Stale badges/tiers/XP after account switch**: signing out of account A and signing in with B surfaced A's values until each individual query happened to refetch. Two layers of staleness: TanStack Query keys (`['badges']`, `['tiers']`, `['mia-journey', persona]`) aren't user-scoped, and the Zustand persist whitelist caches user-scoped projections (`cachedImpact`, `cachedStreak`, `earnedMilestones`, `pendingBadgeUnlocks`, `pendingTierPromotion`, `persona`, `mia*`, `queuedMutations`, `tripServerIds`, etc.). Fix: new `store.resetUserScopedState()` action + new `UserCacheResetBridge` provider that sits inside QueryClientProvider and under AuthSessionProvider. Tracks previous user id via `useRef` and on X→null (sign-out) or X→Y (account switch) calls `queryClient.clear()` + `resetUserScopedState()` in lockstep. Skips null→X (initial sign-in) and X→X (refresh-token rotation). Device preferences (theme, locale, voice, offline map packs, bike type, routing prefs, notify toggles) are preserved across sign-outs.
+
 ## 2026-04-19 — Route-Share Vercel Production Repair
 
 ### Fixes
