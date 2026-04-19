@@ -120,14 +120,27 @@ export function ShareMap({ share }: ShareMapProps) {
         },
       });
 
-      // Origin (green) and destination (yellow) markers — coords from contract are {lat, lon}
-      // objects. When endpointsHidden=true the server has already trimmed them, so these are
-      // the visible endpoints, not the true ride start/finish.
+      // Slice 6: when the public view hides endpoints, derive the start/end
+      // marker positions from the first and last points of the trimmed
+      // polyline rather than from the raw origin/destination. The raw
+      // origin/destination are the sharer's actual home/work coordinates —
+      // pinning them on the map would defeat the whole privacy trim.
+      //
+      // When endpointsHidden=false (public-sharer opt-out, short-route
+      // fallback where no trim happened, or slice-1 grandfathered shares
+      // with the flag off), the original origin/destination is the correct
+      // position and matches the polyline endpoints exactly.
+      const [startLonLat, endLonLat] = share.endpointsHidden
+        ? [coords[0], coords[coords.length - 1]]
+        : [
+            [origin.lon, origin.lat] as [number, number],
+            [destination.lon, destination.lat] as [number, number],
+          ];
       new mapboxgl.Marker({ color: '#22C55E' })
-        .setLngLat([origin.lon, origin.lat])
+        .setLngLat(startLonLat)
         .addTo(map);
       new mapboxgl.Marker({ color: '#FACC15' })
-        .setLngLat([destination.lon, destination.lat])
+        .setLngLat(endLonLat)
         .addTo(map);
     });
 

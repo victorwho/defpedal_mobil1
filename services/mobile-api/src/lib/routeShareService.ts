@@ -267,17 +267,24 @@ export const createRouteShareService = (
     const sourceRefId =
       request.source === 'saved' ? request.savedRouteId : null;
 
+    // Slice 6: honor an explicit `hideEndpoints` override. Omitted from
+    // the insert means the DB default (true) wins — that way the
+    // privacy-safe default stays authoritative at the schema layer and
+    // any future DB-default change is not silently overridden by the API.
+    const insertRow: Record<string, unknown> = {
+      user_id: userId,
+      source: request.source,
+      source_ref_id: sourceRefId,
+      payload,
+      short_code: code,
+    };
+    if (request.hideEndpoints !== undefined) {
+      insertRow.hide_endpoints = request.hideEndpoints;
+    }
+
     const { data, error } = await supabase
       .from('route_shares')
-      .insert({
-        user_id: userId,
-        source: request.source,
-        source_ref_id: sourceRefId,
-        payload,
-        short_code: code,
-        // hide_endpoints defaults to true at the DB layer; letting the
-        // default apply keeps the privacy guarantee unambiguous.
-      })
+      .insert(insertRow)
       .select('id, code:short_code, source, created_at, expires_at')
       .single();
 

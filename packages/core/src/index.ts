@@ -13,5 +13,6 @@ export * from './shareCaption';
 export * from './shareCodeGenerator';
 export * from './shareDeepLinkBuilder';
 export * from './sharePrivacy';
+export * from './trimEndpointsForShare';
 export * from './routeShareContract';
 export * from './types';

@@ -32,6 +32,7 @@ import { useAppStore } from '../src/store/appStore';
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
+import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
@@ -220,8 +221,32 @@ export default function RoutePreviewScreen() {
     [routePreview, selectedRouteId],
   );
 
+  // Slice 6: the share button no longer jumps straight to the native
+  // share sheet — it opens ShareOptionsModal where the user can flip
+  // the privacy toggle. PRD default is hideEndpoints=true; the toggle
+  // state resets every time the modal opens (not persisted across
+  // shares) so a one-off "show the whole route" decision on share A
+  // can't accidentally leak endpoints on share B.
+  const [shareOptionsVisible, setShareOptionsVisible] = useState(false);
+  const [shareHideEndpoints, setShareHideEndpoints] = useState(true);
+
+  // 400m safeguard threshold (PRD: 2 × 200m trim). Disables the toggle
+  // when trimming would produce an empty / degenerate polyline.
+  const SHORT_ROUTE_THRESHOLD_METERS = 400;
+  const shareShortRouteFallback =
+    (selectedRoute?.distanceMeters ?? 0) < SHORT_ROUTE_THRESHOLD_METERS;
+
   const handleSharePress = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;
+    // Reset the toggle to the PRD default each open — the state is
+    // per-share, never cross-share.
+    setShareHideEndpoints(true);
+    setShareOptionsVisible(true);
+  }, [selectedRoute, routeRequest]);
+
+  const handleShareConfirm = useCallback(() => {
+    if (!selectedRoute || !routeRequest) return;
+    setShareOptionsVisible(false);
     const routingMode: 'safe' | 'fast' | 'flat' = avoidHills
       ? 'flat'
       : routeRequest.mode;
@@ -230,8 +255,19 @@ export default function RoutePreviewScreen() {
       origin: routeRequest.origin,
       destination: routeRequest.destination,
       routingMode,
+      // Short-route fallback: the server ignores the flag below 400m
+      // anyway, but sending false makes the intent explicit and matches
+      // the effective behavior the UI communicated.
+      hideEndpoints: shareShortRouteFallback ? false : shareHideEndpoints,
     });
-  }, [selectedRoute, routeRequest, avoidHills, shareRoute]);
+  }, [
+    selectedRoute,
+    routeRequest,
+    avoidHills,
+    shareRoute,
+    shareHideEndpoints,
+    shareShortRouteFallback,
+  ]);
 
   const handleDownloadOffline = useCallback(() => {
     if (!selectedRoute) return;
@@ -423,6 +459,15 @@ export default function RoutePreviewScreen() {
       warnings={weatherWarnings}
       visible={weatherWarnings.length > 0 && !weatherWarningDismissed}
       onDismiss={() => setWeatherWarningDismissed(true)}
+    />
+    <ShareOptionsModal
+      visible={shareOptionsVisible}
+      hideEndpoints={shareHideEndpoints}
+      onHideEndpointsChange={setShareHideEndpoints}
+      onConfirm={handleShareConfirm}
+      onDismiss={() => setShareOptionsVisible(false)}
+      shortRouteFallback={shareShortRouteFallback}
+      distanceKm={((selectedRoute?.distanceMeters ?? 0) / 1000).toFixed(1)}
     />
     <MapStageScreen
       useBottomSheet

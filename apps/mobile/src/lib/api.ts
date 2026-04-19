@@ -829,7 +829,11 @@ export type RouteShareRoutePayload = {
 // can validate ownership + persist source_ref_id for analytics. 'past_ride'
 // stays off the client contract until slice 5b lands the server-side
 // re-planning path.
-export type RouteShareCreatePayload =
+//
+// Slice 6: optional `hideEndpoints` override. Omitted → server DB default
+// (true) wins; false → public viewer sees full polyline with real
+// endpoints. Toggled per-share from the route-preview screen.
+export type RouteShareCreatePayload = (
   | {
       source: 'planned';
       route: RouteShareRoutePayload;
@@ -838,7 +842,10 @@ export type RouteShareCreatePayload =
       source: 'saved';
       savedRouteId: string;
       route: RouteShareRoutePayload;
-    };
+    }
+) & {
+  hideEndpoints?: boolean;
+};
 
 export type RouteShareCreateResult = {
   id: string;

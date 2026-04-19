@@ -136,6 +136,9 @@ type PlannedRouteResponsePayload = Required<
 // requires a `savedRouteId` uuid — the server validates ownership in
 // `routeShareService.createShare` before persisting. 'past_ride' stays
 // rejected (z.never in the core zod stub) until slice 5b.
+//
+// Slice 6: optional `hideEndpoints` boolean. Omitted → DB default
+// (true) applies; false → full polyline visible to the public viewer.
 export const routeShareCreateRequestSchema = {
   type: 'object',
   additionalProperties: false,
@@ -144,6 +147,7 @@ export const routeShareCreateRequestSchema = {
     source: { type: 'string', enum: ['planned', 'saved'] },
     route: plannedRoutePayloadRequestSchema,
     savedRouteId: { type: 'string', format: 'uuid' },
+    hideEndpoints: { type: 'boolean' },
   },
   // Conditional: when source='saved', savedRouteId is required. Planned
   // requests must not carry it (defense against typos that would silently
@@ -160,7 +164,7 @@ export const routeShareCreateRequestSchema = {
   ],
 } as const;
 
-export type RouteShareCreateRequest =
+export type RouteShareCreateRequest = (
   | {
       source: 'planned';
       route: PlannedRouteRequestPayload;
@@ -169,7 +173,12 @@ export type RouteShareCreateRequest =
       source: 'saved';
       savedRouteId: string;
       route: PlannedRouteRequestPayload;
-    };
+    }
+) & {
+  // Slice 6: optional per-share privacy override. Absence means the
+  // route_shares.hide_endpoints column default (true) wins.
+  hideEndpoints?: boolean;
+};
 
 // ---------------------------------------------------------------------------
 // POST /v1/route-shares — response

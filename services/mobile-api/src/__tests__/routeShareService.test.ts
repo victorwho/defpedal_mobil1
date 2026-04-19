@@ -336,6 +336,118 @@ describe('routeShareService.createShare', () => {
     ).rejects.toThrow(/db timeout|ownership check/i);
   });
 
+  // ──────────────────────────────────────────────────────────────────────
+  // Slice 6 — hideEndpoints flag
+  //
+  // The API now accepts an optional `hideEndpoints` boolean on the create
+  // request. True (default) = `route_shares.hide_endpoints` column set to
+  // true and the RPC selects the trimmed polyline for public reads.
+  // False = column set to false, RPC returns the full polyline.
+  //
+  // The column itself defaults to true at the DB level, so omitting the
+  // flag continues to produce a privacy-safe share (existing slice-1
+  // behavior preserved).
+  // ──────────────────────────────────────────────────────────────────────
+
+  it('slice 6: persists hide_endpoints=false when caller opts out', async () => {
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({
+      userId: 'user-1',
+      request: { ...validCreateRequest, hideEndpoints: false },
+    });
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall.hide_endpoints).toBe(false);
+  });
+
+  it('slice 6: persists hide_endpoints=true when caller explicitly opts in', async () => {
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({
+      userId: 'user-1',
+      request: { ...validCreateRequest, hideEndpoints: true },
+    });
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall.hide_endpoints).toBe(true);
+  });
+
+  it('slice 6: omits hide_endpoints from the insert when caller does not specify (column default applies)', async () => {
+    // Backward-compat: every slice-1 caller omitted the flag. The service
+    // should let the DB default (true) apply — NOT inject hide_endpoints=true
+    // explicitly, so DB-side default changes remain authoritative.
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({
+      userId: 'user-1',
+      request: validCreateRequest,
+    });
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall).not.toHaveProperty('hide_endpoints');
+  });
+
   it('passes through riskSegments + safetyScore to the stored payload', async () => {
     const insertSpy = vi.fn(() => ({
       select: vi.fn(() => ({

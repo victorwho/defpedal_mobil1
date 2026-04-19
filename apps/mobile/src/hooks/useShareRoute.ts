@@ -48,6 +48,16 @@ export type ShareRouteInput = {
   readonly riskSegments?: readonly RouteShareRiskSegment[];
   /** Optional aggregate 0-100 safety score. Null when the route wasn't scored. */
   readonly safetyScore?: number | null;
+  /**
+   * Slice 6: per-share privacy toggle. When true (the PRD default), the
+   * web viewer shows a polyline with the first and last 200m trimmed so
+   * home/work addresses are not revealed. When false, the full polyline
+   * is visible. Omitted → server DB default (true) applies; explicit
+   * passes override it. Routes shorter than 400m have this ignored
+   * server-side (the RPC falls back to the full polyline since trimming
+   * 200m off each end would leave nothing visible).
+   */
+  readonly hideEndpoints?: boolean;
 };
 
 export type ShareRouteResult =
@@ -139,7 +149,7 @@ export function useShareRoute(): UseShareRouteReturn {
         const source: 'planned' | 'saved' = lastLoadedSavedRouteId
           ? 'saved'
           : 'planned';
-        const payload: RouteShareCreatePayload =
+        const basePayload: RouteShareCreatePayload =
           source === 'saved' && lastLoadedSavedRouteId
             ? {
                 source: 'saved',
@@ -147,6 +157,14 @@ export function useShareRoute(): UseShareRouteReturn {
                 route: routePayload,
               }
             : { source: 'planned', route: routePayload };
+        // Slice 6: only spread the field when the caller explicitly set
+        // it. Omitting preserves the DB column default (true), which is
+        // important because the DB-level default is the authoritative
+        // privacy guarantee.
+        const payload: RouteShareCreatePayload =
+          input.hideEndpoints !== undefined
+            ? { ...basePayload, hideEndpoints: input.hideEndpoints }
+            : basePayload;
 
         const created = await mobileApi.createRouteShare(payload);
         const caption = buildShareCaption(input, source);
