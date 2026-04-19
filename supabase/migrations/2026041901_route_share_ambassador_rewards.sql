@@ -20,24 +20,31 @@
 -- 1. Seed Ambassador badges into badge_definitions
 -- ───────────────────────────────────────────────────────────────────────────
 --
--- Category: 'social' (community-facing achievements), display_tab: 'social'.
+-- Category + display_tab: 'community'. NOTE: `BadgeDisplayTab` in
+-- packages/core/src/contracts.ts is a strict union — firsts | riding |
+-- consistency | impact | safety | community | explore | events — the mobile
+-- Trophy Case screen (achievements.tsx) indexes into a tab-counter by this
+-- field, so anything outside that union crashes the client. 'community' is
+-- the closest semantic match for a referral achievement. Corrected from the
+-- initial 'social' seed (see 2026041903_ambassador_badges_use_community_tab
+-- for the retrofit against already-deployed databases).
 -- tier_family='ambassador' lets the Trophy Case group bronze/silver/gold as a
 -- single progression chip. sort_order in the 400s sits after the existing
--- social milestones (first_share=103, etc).
+-- community milestones.
 
 INSERT INTO badge_definitions
   (badge_key, category, display_tab, name, flavor_text, criteria_text,
    criteria_unit, tier, tier_family, is_hidden, is_seasonal, sort_order, icon_key)
 VALUES
-  ('ambassador_bronze', 'social', 'social', 'Ambassador',
+  ('ambassador_bronze', 'community', 'community', 'Ambassador',
    'Your first convert. The ripple begins.',
    'Invite 1 rider via a shared route',  'rider', 1, 'ambassador',
    false, false, 401, 'ambassador_bronze'),
-  ('ambassador_silver', 'social', 'social', 'Ambassador',
+  ('ambassador_silver', 'community', 'community', 'Ambassador',
    'Five riders safer because of you.',
    'Invite 5 riders via shared routes',  'riders', 2, 'ambassador',
    false, false, 402, 'ambassador_silver'),
-  ('ambassador_gold',   'social', 'social', 'Ambassador',
+  ('ambassador_gold',   'community', 'community', 'Ambassador',
    'You built a small peloton.',
    'Invite 25 riders via shared routes', 'riders', 3, 'ambassador',
    false, false, 403, 'ambassador_gold')
