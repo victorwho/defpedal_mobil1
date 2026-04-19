@@ -72,6 +72,10 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: 'none',
     opacity: 0.6,
     cursor: 'not-allowed',
+    // Backstop for the span render — without this a user could still highlight
+    // or click-drag; keep the disabled look consistent.
+    pointerEvents: 'none',
+    userSelect: 'none',
   },
   helpText: {
     fontSize: 12,
@@ -116,15 +120,19 @@ export function ShareCtas({ code }: ShareCtasProps) {
         >
           Get it on Google Play
         </a>
-        <a
-          href="#"
+        {/* Non-interactive span (not <a> + onClick) so this file stays a
+            server component — Next.js 15 rejects event handlers passed from a
+            Server Component. `role="button"` + `aria-disabled` keep screen
+            readers informed; `pointer-events: none` on the style prevents
+            accidental clicks. */}
+        <span
           style={styles.downloadBtnDisabled}
+          role="button"
           aria-disabled="true"
           aria-label="Defensive Pedal is not yet available on the App Store"
-          onClick={(e) => e.preventDefault()}
         >
           Coming to iOS
-        </a>
+        </span>
       </div>
       <p style={styles.helpText}>
         Already have the app? The button above opens the route directly. No app yet? Install from
