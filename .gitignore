@@ -42,3 +42,5 @@ ios
 *.sln
 *.sw?
 .claude/worktrees/
+
+.vercel
