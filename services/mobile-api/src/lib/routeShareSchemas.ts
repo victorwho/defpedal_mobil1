@@ -260,6 +260,36 @@ export type RouteSharePublicResponse = {
 export { routeSharePublicParamsSchema as routeShareClaimParamsSchema };
 export type RouteShareClaimParams = RouteSharePublicParams;
 
+// Slice 3: invitee-facing reward summary. The RPC also returns inviter-side
+// reward info (XP delta + new badges + user id + Mia milestone flag) that the
+// API uses to dispatch a push notification to the sharer, but those fields are
+// stripped before the response is sent to the invitee. Fastify's schema
+// validation enforces that stripping — any inviter* field leaking into the
+// reply is rejected as an `additionalProperties` violation.
+const claimRewardsResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['inviteeXpAwarded', 'inviteeNewBadges'],
+  properties: {
+    inviteeXpAwarded: { type: ['integer', 'null'] },
+    inviteeNewBadges: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['badgeKey', 'name', 'flavorText', 'iconKey', 'tier'],
+        properties: {
+          badgeKey: { type: 'string' },
+          name: { type: 'string' },
+          flavorText: { type: 'string' },
+          iconKey: { type: 'string' },
+          tier: { type: 'integer' },
+        },
+      },
+    },
+  },
+} as const;
+
 export const routeShareClaimResponseSchema = {
   type: 'object',
   additionalProperties: false,
@@ -269,6 +299,7 @@ export const routeShareClaimResponseSchema = {
     'sharerDisplayName',
     'sharerAvatarUrl',
     'alreadyClaimed',
+    'rewards',
   ],
   properties: {
     code: { type: 'string', minLength: 8, maxLength: 8 },
@@ -276,8 +307,22 @@ export const routeShareClaimResponseSchema = {
     sharerDisplayName: { type: ['string', 'null'] },
     sharerAvatarUrl: { type: ['string', 'null'] },
     alreadyClaimed: { type: 'boolean' },
+    rewards: claimRewardsResponseSchema,
   },
 } as const;
+
+export type ClaimRewardBadge = {
+  badgeKey: string;
+  name: string;
+  flavorText: string;
+  iconKey: string;
+  tier: number;
+};
+
+export type ClaimInviteeRewards = {
+  inviteeXpAwarded: number | null;
+  inviteeNewBadges: ClaimRewardBadge[];
+};
 
 export type RouteShareClaimResponse = {
   code: string;
@@ -285,4 +330,5 @@ export type RouteShareClaimResponse = {
   sharerDisplayName: string | null;
   sharerAvatarUrl: string | null;
   alreadyClaimed: boolean;
+  rewards: ClaimInviteeRewards;
 };

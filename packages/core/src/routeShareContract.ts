@@ -138,12 +138,39 @@ export type RouteSharePublicView = z.infer<typeof routeSharePublicViewSchema>;
 // user_follow, signup_count++) and just echoed the payload.
 // ---------------------------------------------------------------------------
 
+// Slice 3: invitee-facing reward summary. Inviter-side reward info from the
+// claim_route_share RPC (inviterXpAwarded / inviterNewBadges / inviterUserId /
+// miaMilestoneAdvanced) is consumed server-side to dispatch the push
+// notification to the sharer and is stripped before the claim response is
+// returned to the invitee.
+const claimRewardBadgeSchema = z.object({
+  badgeKey: z.string(),
+  name: z.string(),
+  flavorText: z.string(),
+  iconKey: z.string(),
+  tier: z.number().int(),
+});
+
+const claimInviteeRewardsSchema = z.object({
+  inviteeXpAwarded: z.number().int().nullable().default(null),
+  inviteeNewBadges: z.array(claimRewardBadgeSchema).default([]),
+});
+
+export type RouteShareClaimRewardBadge = z.infer<typeof claimRewardBadgeSchema>;
+export type RouteShareClaimInviteeRewards = z.infer<
+  typeof claimInviteeRewardsSchema
+>;
+
 export const routeShareClaimResponseSchema = z.object({
   code: shareCodeSchema,
   routePayload: plannedRoutePayloadSchema,
   sharerDisplayName: z.string().nullable(),
   sharerAvatarUrl: z.string().url().nullable().default(null),
   alreadyClaimed: z.boolean(),
+  rewards: claimInviteeRewardsSchema.default({
+    inviteeXpAwarded: null,
+    inviteeNewBadges: [],
+  }),
 });
 
 export type RouteShareClaimResponse = z.infer<

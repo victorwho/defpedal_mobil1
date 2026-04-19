@@ -13,6 +13,7 @@ import type { ErrorResponse } from '@defensivepedal/core';
 import { buildShareDeepLinks } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { dispatchAmbassadorRewardNotification } from '../lib/ambassadorRewards';
 import { requireAuthenticatedUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
@@ -246,7 +247,45 @@ export const buildRouteShareRoutes = (
         }
 
         if (result.status === 'ok') {
-          return result.data as unknown as RouteShareClaimResponse;
+          // Fire-and-forget push to the sharer. Any failure is logged inside
+          // dispatchNotification via notification_log, so we don't block the
+          // claim response on it (best-effort — the reward rows are already
+          // committed in the DB transaction by the time we get here).
+          void dispatchAmbassadorRewardNotification({
+            rewards: result.data.rewards,
+            sharerDisplayName: result.data.sharerDisplayName,
+            // The invitee display name is not currently surfaced in the RPC
+            // return — using null falls back to "Someone" in the push copy.
+            // A future refinement can wire it through if the push-copy UX
+            // needs the real name.
+            inviteeDisplayName: null,
+          }).catch((err) => {
+            request.log.warn(
+              { event: 'ambassador_push_dispatch_failed', err: (err as Error).message },
+              'Ambassador reward push dispatch failed',
+            );
+          });
+
+          // Strip inviter-side reward fields before replying — the invitee
+          // only ever sees their own XP/badge deltas. Fastify's schema
+          // validation will also reject any leaked inviter field as an
+          // additionalProperties violation (belt and suspenders).
+          const { inviterXpAwarded, inviterNewBadges, inviterUserId, miaMilestoneAdvanced, ...inviteeRewards } =
+            result.data.rewards;
+          void inviterXpAwarded;
+          void inviterNewBadges;
+          void inviterUserId;
+          void miaMilestoneAdvanced;
+
+          const response: RouteShareClaimResponse = {
+            code: result.data.code,
+            routePayload: result.data.routePayload as RouteShareClaimResponse['routePayload'],
+            sharerDisplayName: result.data.sharerDisplayName,
+            sharerAvatarUrl: result.data.sharerAvatarUrl,
+            alreadyClaimed: result.data.alreadyClaimed,
+            rewards: inviteeRewards,
+          };
+          return response;
         }
 
         if (result.status === 'not_found') {

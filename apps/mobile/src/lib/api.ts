@@ -40,6 +40,7 @@ import type {
   UserPublicProfile,
   TiersResponse,
   RerouteRequest,
+  RouteShareClaimInviteeRewards,
   TripEndRequest,
   TripEndResponse,
   TripHistoryItem,
@@ -709,6 +710,7 @@ export type RouteShareClaimResponseBody = {
   sharerDisplayName: string | null;
   sharerAvatarUrl: string | null;
   alreadyClaimed: boolean;
+  rewards: RouteShareClaimInviteeRewards;
 };
 
 const claimRouteShareImpl = async (

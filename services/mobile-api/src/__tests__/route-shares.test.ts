@@ -10,6 +10,17 @@ vi.mock('../lib/supabaseAdmin', () => ({
   supabaseAdmin: {} as Record<string, unknown>,
 }));
 
+// Slice 3: mock the ambassador-reward push dispatcher. Tests that care about
+// the push side effect inspect `dispatchAmbassadorRewardNotificationMock`.
+const dispatchAmbassadorRewardNotificationMock = vi.fn().mockResolvedValue({
+  dispatched: false,
+  priority: 'normal' as const,
+});
+vi.mock('../lib/ambassadorRewards', () => ({
+  dispatchAmbassadorRewardNotification: (...args: unknown[]) =>
+    dispatchAmbassadorRewardNotificationMock(...args),
+}));
+
 import Fastify from 'fastify';
 import type { FastifyError } from 'fastify';
 
@@ -439,12 +450,22 @@ describe('POST /v1/route-shares/:code/claim', () => {
     fakeAuthenticateUser.mockResolvedValue({ id: USER_ID, email: 'rider@test.local' });
   });
 
+  const emptyRewards = {
+    inviteeXpAwarded: null,
+    inviteeNewBadges: [],
+    inviterXpAwarded: null,
+    inviterNewBadges: [],
+    inviterUserId: '',
+    miaMilestoneAdvanced: false,
+  } as const;
+
   const happyClaimPayload = {
     code: 'abcd1234',
     routePayload: publicRoute,
     sharerDisplayName: 'Jane',
     sharerAvatarUrl: null,
     alreadyClaimed: false,
+    rewards: emptyRewards,
   };
 
   const makeClaimService = (
@@ -641,5 +662,158 @@ describe('POST /v1/route-shares/:code/claim', () => {
 
     expect(res.statusCode).toBe(502);
     await app.close();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Slice 3 — ambassador rewards
+  // ─────────────────────────────────────────────────────────────────────
+
+  describe('ambassador rewards (slice 3)', () => {
+    beforeEach(() => {
+      dispatchAmbassadorRewardNotificationMock.mockClear();
+    });
+
+    it('surfaces invitee rewards and hides inviter rewards in the response', async () => {
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: {
+          ...happyClaimPayload,
+          rewards: {
+            inviteeXpAwarded: 50,
+            inviteeNewBadges: [],
+            inviterXpAwarded: 100,
+            inviterNewBadges: [
+              {
+                badgeKey: 'ambassador_bronze',
+                name: 'Ambassador',
+                flavorText: 'Your first convert. The ripple begins.',
+                iconKey: 'ambassador_bronze',
+                tier: 1,
+              },
+            ],
+            inviterUserId: 'inviter-uuid-777',
+            miaMilestoneAdvanced: true,
+          },
+        },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as Record<string, unknown>;
+      const rewards = body.rewards as Record<string, unknown>;
+      expect(rewards.inviteeXpAwarded).toBe(50);
+      expect(rewards.inviteeNewBadges).toEqual([]);
+      // Inviter fields MUST NOT leak. Fastify's additionalProperties:false on
+      // the rewards schema is the enforcement; this asserts it.
+      expect(rewards).not.toHaveProperty('inviterXpAwarded');
+      expect(rewards).not.toHaveProperty('inviterNewBadges');
+      expect(rewards).not.toHaveProperty('inviterUserId');
+      expect(rewards).not.toHaveProperty('miaMilestoneAdvanced');
+      await app.close();
+    });
+
+    it('dispatches the inviter push notification with the full reward payload', async () => {
+      const rewards = {
+        inviteeXpAwarded: 50,
+        inviteeNewBadges: [],
+        inviterXpAwarded: 100,
+        inviterNewBadges: [
+          {
+            badgeKey: 'ambassador_bronze',
+            name: 'Ambassador',
+            flavorText: 'Your first convert. The ripple begins.',
+            iconKey: 'ambassador_bronze',
+            tier: 1,
+          },
+        ],
+        inviterUserId: 'inviter-uuid-777',
+        miaMilestoneAdvanced: false,
+      };
+      const claimShare = vi
+        .fn()
+        .mockResolvedValue({ status: 'ok', data: { ...happyClaimPayload, rewards } });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      // Fire-and-forget: the call is initiated inside the handler but awaits
+      // elsewhere. A microtask flush is enough because the handler uses
+      // `void .catch(...)` and the mock is synchronous-resolved.
+      await new Promise((r) => setImmediate(r));
+
+      expect(dispatchAmbassadorRewardNotificationMock).toHaveBeenCalledTimes(1);
+      const [[args]] = dispatchAmbassadorRewardNotificationMock.mock.calls;
+      expect(args).toMatchObject({
+        rewards,
+        sharerDisplayName: 'Jane',
+        inviteeDisplayName: null,
+      });
+      await app.close();
+    });
+
+    it('does not blow up when the rewards payload is absent (backward compat)', async () => {
+      // The RPC is guaranteed to return a rewards object, but if for some
+      // reason the Supabase client strips it, the route handler should still
+      // reply cleanly with invitee-side defaults.
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: { ...happyClaimPayload, rewards: emptyRewards },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as Record<string, unknown>;
+      const rewards = body.rewards as Record<string, unknown>;
+      expect(rewards.inviteeXpAwarded).toBeNull();
+      expect(rewards.inviteeNewBadges).toEqual([]);
+      await app.close();
+    });
+
+    it('passes through sharerDisplayName for the push-copy formatter', async () => {
+      const rewards = {
+        inviteeXpAwarded: null,
+        inviteeNewBadges: [],
+        inviterXpAwarded: 100,
+        inviterNewBadges: [],
+        inviterUserId: 'inviter-uuid-777',
+        miaMilestoneAdvanced: true,
+      };
+      const claimShare = vi.fn().mockResolvedValue({
+        status: 'ok',
+        data: { ...happyClaimPayload, sharerDisplayName: 'Alice', rewards },
+      });
+      const app = buildTestApp(makeClaimService(claimShare));
+      await app.ready();
+
+      await app.inject({
+        method: 'POST',
+        url: '/v1/route-shares/abcd1234/claim',
+        headers: authHeaders,
+      });
+      await new Promise((r) => setImmediate(r));
+
+      const [[args]] = dispatchAmbassadorRewardNotificationMock.mock.calls;
+      expect(args).toMatchObject({ sharerDisplayName: 'Alice' });
+      await app.close();
+    });
   });
 });

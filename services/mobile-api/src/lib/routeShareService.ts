@@ -104,12 +104,34 @@ export type ClaimShareInput = {
   inviteeUserId: string;
 };
 
+export type ClaimRewardBadge = {
+  badgeKey: string;
+  name: string;
+  flavorText: string;
+  iconKey: string;
+  tier: number;
+};
+
+// Full reward shape returned by the claim_route_share RPC.
+// The API strips the `inviter*` fields before forwarding to the invitee —
+// those are consumed server-side to drive the push notification to the sharer
+// (see route-shares.ts claim handler).
+export type ClaimRewardsAll = {
+  inviteeXpAwarded: number | null;
+  inviteeNewBadges: ClaimRewardBadge[];
+  inviterXpAwarded: number | null;
+  inviterNewBadges: ClaimRewardBadge[];
+  inviterUserId: string;
+  miaMilestoneAdvanced: boolean;
+};
+
 export type ClaimSharePayload = {
   code: string;
   routePayload: Record<string, unknown>;
   sharerDisplayName: string | null;
   sharerAvatarUrl: string | null;
   alreadyClaimed: boolean;
+  rewards: ClaimRewardsAll;
 };
 
 export type ClaimShareResult =
@@ -261,10 +283,33 @@ export const createRouteShareService = (
     }
 
     const raw = data as Record<string, unknown>;
-    // The RPC returns { routePayload, sharerDisplayName, sharerAvatarUrl,
-    // alreadyClaimed } — we re-attach the `code` from the path so the
-    // response envelope is self-contained (client doesn't need to remember
-    // which code it posted).
+    // The RPC (slice 3) returns { routePayload, sharerDisplayName,
+    // sharerAvatarUrl, alreadyClaimed, rewards } — we re-attach the `code`
+    // from the path so the response envelope is self-contained (client
+    // doesn't need to remember which code it posted).
+    const rawRewards = (raw.rewards ?? {}) as Record<string, unknown>;
+    const rewards: ClaimRewardsAll = {
+      inviteeXpAwarded:
+        typeof rawRewards.inviteeXpAwarded === 'number'
+          ? rawRewards.inviteeXpAwarded
+          : null,
+      inviteeNewBadges: Array.isArray(rawRewards.inviteeNewBadges)
+        ? (rawRewards.inviteeNewBadges as ClaimRewardBadge[])
+        : [],
+      inviterXpAwarded:
+        typeof rawRewards.inviterXpAwarded === 'number'
+          ? rawRewards.inviterXpAwarded
+          : null,
+      inviterNewBadges: Array.isArray(rawRewards.inviterNewBadges)
+        ? (rawRewards.inviterNewBadges as ClaimRewardBadge[])
+        : [],
+      inviterUserId:
+        typeof rawRewards.inviterUserId === 'string'
+          ? rawRewards.inviterUserId
+          : '',
+      miaMilestoneAdvanced: Boolean(rawRewards.miaMilestoneAdvanced),
+    };
+
     return {
       status: 'ok',
       data: {
@@ -275,6 +320,7 @@ export const createRouteShareService = (
         sharerAvatarUrl:
           (raw.sharerAvatarUrl as string | null | undefined) ?? null,
         alreadyClaimed: Boolean(raw.alreadyClaimed),
+        rewards,
       },
     };
   };

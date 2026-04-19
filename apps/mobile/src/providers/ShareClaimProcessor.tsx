@@ -27,9 +27,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 
+import type { BadgeUnlockEvent, RouteShareClaimInviteeRewards } from '@defensivepedal/core';
+
 import { mobileApi } from '../lib/api';
 import { mapShareClaimToPreview } from '../lib/shareClaimToPreview';
+import { XpGainToast } from '../design-system/atoms/XpGainToast';
 import { Toast } from '../design-system/molecules/Toast';
+import { tierColors, type BadgeTier } from '../design-system/tokens/badgeColors';
 import { space } from '../design-system/tokens/spacing';
 import { zIndex } from '../design-system/tokens/zIndex';
 import { useAppStore } from '../store/appStore';
@@ -60,6 +64,31 @@ type ToastState = {
   variant: 'info' | 'success' | 'warning' | 'error';
 } | null;
 
+// Slice 3: map the server-side numeric tier (1/2/3 for bronze/silver/gold
+// from badge_definitions.tier) onto the design-system BadgeTier string
+// name. Badges outside the bronze/silver/gold range (e.g. ad-hoc tier=0
+// "firsts" style) fall back to bronze so the celebration still renders.
+const TIER_NAME_BY_NUMBER: Record<number, BadgeTier> = {
+  1: 'bronze',
+  2: 'silver',
+  3: 'gold',
+  4: 'platinum',
+  5: 'diamond',
+};
+
+const toBadgeUnlockEvents = (
+  rewards: RouteShareClaimInviteeRewards,
+  claimedAtIso: string,
+): BadgeUnlockEvent[] =>
+  rewards.inviteeNewBadges.map((b) => ({
+    badgeKey: b.badgeKey,
+    tier: TIER_NAME_BY_NUMBER[b.tier] ?? 'bronze',
+    name: b.name,
+    flavorText: b.flavorText,
+    iconKey: b.iconKey,
+    earnedAt: claimedAtIso,
+  }));
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -77,9 +106,14 @@ export const ShareClaimProcessor = () => {
   const incrementClaimAttempts = useAppStore((s) => s.incrementClaimAttempts);
   const setRouteRequest = useAppStore((s) => s.setRouteRequest);
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
+  const enqueueBadgeUnlocks = useAppStore((s) => s.enqueueBadgeUnlocks);
   const appState = useAppStore((s) => s.appState);
 
   const [toast, setToast] = useState<ToastState>(null);
+  // Slice 3: floating "+50 XP" indicator for the invitee's referral welcome.
+  // Kept as a single active value (not a queue) because the claim-time flow
+  // only ever awards the +50 once in the user's lifetime.
+  const [xpGain, setXpGain] = useState<number | null>(null);
   // Track "is this particular (code + attempts) run already flying" so we
   // don't double-fire the claim when multiple state updates land.
   const isProcessingRef = useRef(false);
@@ -132,6 +166,21 @@ export const ShareClaimProcessor = () => {
               router.push('/route-preview');
             }
             setToast({ message: TOAST_MESSAGES.ok, variant: 'success' });
+
+            // Slice 3: surface invitee-side rewards. Skip if alreadyClaimed
+            // (replay path returns empty rewards from the server, but
+            // defensive skip keeps the UI idle on re-taps).
+            if (!result.data.alreadyClaimed) {
+              const { rewards } = result.data;
+              if (rewards.inviteeXpAwarded != null && rewards.inviteeXpAwarded > 0) {
+                setXpGain(rewards.inviteeXpAwarded);
+              }
+              if (rewards.inviteeNewBadges.length > 0) {
+                enqueueBadgeUnlocks(
+                  toBadgeUnlockEvents(rewards, new Date().toISOString()),
+                );
+              }
+            }
             break;
           }
 
@@ -195,27 +244,39 @@ export const ShareClaimProcessor = () => {
     incrementClaimAttempts,
     setRouteRequest,
     setRoutePreview,
+    enqueueBadgeUnlocks,
   ]);
 
-  if (!toast) return null;
+  if (!toast && xpGain == null) return null;
 
   return (
-    <View
-      style={{
-        position: 'absolute',
-        bottom: 100,
-        left: 0,
-        right: 0,
-        paddingHorizontal: space[4],
-        zIndex: zIndex.toast,
-      }}
-      pointerEvents="box-none"
-    >
-      <Toast
-        message={toast.message}
-        variant={toast.variant}
-        onDismiss={consumeToast}
-      />
-    </View>
+    <>
+      {toast ? (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 100,
+            left: 0,
+            right: 0,
+            paddingHorizontal: space[4],
+            zIndex: zIndex.toast,
+          }}
+          pointerEvents="box-none"
+        >
+          <Toast
+            message={toast.message}
+            variant={toast.variant}
+            onDismiss={consumeToast}
+          />
+        </View>
+      ) : null}
+      {xpGain != null ? (
+        <XpGainToast
+          xp={xpGain}
+          tierColor={tierColors.bronze.primary}
+          onDone={() => setXpGain(null)}
+        />
+      ) : null}
+    </>
   );
 };
