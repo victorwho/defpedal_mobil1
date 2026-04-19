@@ -84,14 +84,20 @@ export type RouteShareCreatePlanned = z.infer<
 // RouteShareRecord — DB row shape returned to the owner
 // ---------------------------------------------------------------------------
 
+// `.datetime({ offset: true })` accepts both `Z` suffix (ISO UTC) and `+HH:MM`
+// offset form. Postgres `timestamptz` serializes as offset form (e.g.
+// `2026-04-19T04:54:28.298107+00:00`), which the default strict `.datetime()`
+// rejects — so anything coming back from Supabase needs the offset allowance.
+const isoDateTime = z.string().datetime({ offset: true });
+
 export const routeShareRecordSchema = z.object({
   id: z.string().uuid(),
   code: shareCodeSchema,
   ownerUserId: z.string().uuid(),
   source: z.enum(['planned', 'saved', 'past_ride']),
-  createdAt: z.string().datetime(),
-  expiresAt: z.string().datetime().nullable(),
-  revokedAt: z.string().datetime().nullable(),
+  createdAt: isoDateTime,
+  expiresAt: isoDateTime.nullable(),
+  revokedAt: isoDateTime.nullable(),
   viewCount: z.number().int().nonnegative(),
   hideEndpoints: z.boolean(),
 });
@@ -115,8 +121,8 @@ export const routeSharePublicViewSchema = z.object({
   fullLengthMeters: z.number().nonnegative(),
   /** Accumulated public views. Drives slice 8 first-view push notification. */
   viewCount: z.number().int().nonnegative().default(0),
-  createdAt: z.string().datetime(),
-  expiresAt: z.string().datetime().nullable(),
+  createdAt: isoDateTime,
+  expiresAt: isoDateTime.nullable(),
 });
 
 export type RouteSharePublicView = z.infer<typeof routeSharePublicViewSchema>;
