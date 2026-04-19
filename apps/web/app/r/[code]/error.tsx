@@ -75,11 +75,29 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     padding: '12px 16px',
   },
+  debug: {
+    marginTop: 32,
+    padding: 16,
+    background: 'rgba(239, 68, 68, 0.08)',
+    border: '1px solid rgba(239, 68, 68, 0.4)',
+    borderRadius: 8,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: 12,
+    color: '#FCA5A5',
+    textAlign: 'left',
+    maxWidth: 560,
+    overflow: 'auto',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  },
 };
 
 export default function ShareErrorBoundary({ error, reset }: ErrorProps) {
   useEffect(() => {
-    // TODO(slice-7): send to Sentry once NEXT_PUBLIC_SENTRY_DSN is wired.
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.error('[ShareErrorBoundary]', error);
+    }
   }, [error]);
 
   return (
@@ -98,6 +116,11 @@ export default function ShareErrorBoundary({ error, reset }: ErrorProps) {
           Go to Defensive Pedal
         </a>
       </div>
+      <pre style={styles.debug} aria-label="Error details">
+        <strong>{error.name}:</strong> {error.message}
+        {error.digest ? `\nDigest: ${error.digest}` : ''}
+        {error.stack ? `\n\n${error.stack}` : ''}
+      </pre>
     </main>
   );
 }
