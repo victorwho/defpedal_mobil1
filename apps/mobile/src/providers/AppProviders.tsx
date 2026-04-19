@@ -13,6 +13,7 @@ import { OffScreenCaptureHostProvider } from './OffScreenCaptureHost';
 import { ShareClaimProcessor } from './ShareClaimProcessor';
 import { ShareFallbackBootstrap } from './ShareFallbackBootstrap';
 import { TelemetryProvider } from './TelemetryProvider';
+import { UserCacheResetBridge } from './UserCacheResetBridge';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,14 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
         <TelemetryProvider>
           <ConnectivityProvider>
             <QueryClientProvider client={queryClient}>
+              {/*
+                UserCacheResetBridge must sit inside QueryClientProvider (needs
+                useQueryClient) AND under AuthSessionProvider (needs the
+                session). On user-id change it clears the React-Query cache
+                and resets user-scoped Zustand state so the next account
+                doesn't see stale badges/tiers/XP/Mia from the previous one.
+              */}
+              <UserCacheResetBridge />
               <NavigationLifecycleManager />
               <OfflineMutationSyncManager />
               <NotificationProvider />

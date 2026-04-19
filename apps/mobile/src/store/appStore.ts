@@ -186,6 +186,7 @@ type AppStore = QueueSlice & {
   upsertOfflineRegion: (region: OfflineRegion) => void;
   removeOfflineRegion: (regionId: string) => void;
   resetFlow: () => void;
+  resetUserScopedState: () => void;
 
   // ── Pending Share Claim (slice 2 route-share PRD) ──
   //
@@ -649,6 +650,49 @@ export const useAppStore = create<AppStore>()(
             tripServerIds: prunedIds,
           };
         }),
+      // Resets every user-scoped field to the initial default while preserving
+      // device-level preferences (theme, locale, voice guidance, offline map
+      // packs, POI visibility, bike/routing defaults). Invoked on sign-out and
+      // on user-id change so the Trophy Case, tier card, Mia journey tracker
+      // etc. don't keep the previous account's values in the persisted slice.
+      //
+      // Companion to TanStack Query's cache.clear() — the persist layer here
+      // holds the *cached projections* of server state (cachedImpact,
+      // cachedStreak, earnedMilestones, pendingBadgeUnlocks) that need to reset
+      // in lockstep with the React-Query cache. Device preferences are kept
+      // intentionally so the next sign-in doesn't re-surface onboarding
+      // questions like dark-mode and language.
+      resetUserScopedState: () =>
+        set(() => ({
+          appState: 'IDLE',
+          routePreview: null,
+          selectedRouteId: null,
+          navigationSession: resetNavigationSession(),
+          routeRequest: DEFAULT_ROUTE_REQUEST,
+          queuedMutations: [],
+          tripServerIds: {},
+          activeTripClientId: null,
+          onboardingCompleted: false,
+          cyclingGoal: null,
+          cachedStreak: null,
+          cachedImpact: null,
+          ratingSkipCount: 0,
+          notificationPermissionAsked: false,
+          anonymousOpenCount: 0,
+          earnedMilestones: [],
+          recentDestinations: [],
+          pendingBadgeUnlocks: [],
+          pendingTierPromotion: null,
+          persona: 'alex' as MiaPersona,
+          miaJourneyLevel: 1 as MiaJourneyLevel,
+          miaJourneyStatus: null,
+          miaPromptShown: false,
+          pendingMiaLevelUp: null,
+          pendingTelemetryEvents: [],
+          homeLocation: null,
+          pendingShareClaim: null,
+          pendingShareClaimAttempts: 0,
+        })),
     }),
     {
       name: 'defensivepedal-app-store',
