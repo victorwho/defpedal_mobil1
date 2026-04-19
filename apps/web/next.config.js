@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,6 +9,16 @@ const nextConfig = {
   // deps (zod) from packages/core/, where there's no node_modules on Vercel since vercel.json
   // sets installCommand=--workspaces=false and only installs apps/web's deps.
   transpilePackages: ['@defensivepedal/core'],
+  // transpilePackages alone doesn't fully flatten transitive resolution on Vercel — webpack
+  // still walks up from packages/core/src/ looking for node_modules/zod and finds nothing.
+  // Pin resolution explicitly so the import always lands on apps/web/node_modules/zod.
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      zod: path.resolve(__dirname, 'node_modules/zod'),
+    };
+    return config;
+  },
   // Apple's AASA validator follows 301/308 redirects as "failed" — never redirect trailing slashes.
   skipTrailingSlashRedirect: true,
   async headers() {
