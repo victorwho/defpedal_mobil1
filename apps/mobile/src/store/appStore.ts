@@ -187,6 +187,17 @@ type AppStore = QueueSlice & {
   removeOfflineRegion: (regionId: string) => void;
   resetFlow: () => void;
   resetUserScopedState: () => void;
+  // Slice 5a: transient flag set by handleLoadSavedRoute in route-planning
+  // and read by useShareRoute when composing the POST /v1/route-shares
+  // payload. When present, the share is created with source='saved' and the
+  // saved_route id is propagated so the API can validate ownership and the
+  // server can populate source_ref_id for analytics.
+  //
+  // NOT persisted — the flag is per-planning-session. setRouteRequest clears
+  // it on any destination change so a subsequent manual search doesn't
+  // accidentally inherit the saved-route lineage.
+  lastLoadedSavedRouteId: string | null;
+  setLastLoadedSavedRouteId: (id: string | null) => void;
 
   // ── Pending Share Claim (slice 2 route-share PRD) ──
   //
@@ -431,6 +442,9 @@ export const useAppStore = create<AppStore>()(
             mode,
           },
         })),
+      lastLoadedSavedRouteId: null,
+      setLastLoadedSavedRouteId: (id) =>
+        set(() => ({ lastLoadedSavedRouteId: id })),
       setRouteRequest: (request) =>
         set((state) => ({
           // Sync top-level preference flags when present in the request
@@ -440,6 +454,19 @@ export const useAppStore = create<AppStore>()(
             ...state.routeRequest,
             ...request,
           },
+          // Any origin/destination/mode change breaks the saved-route lineage
+          // — the resulting preview no longer corresponds to the saved_route
+          // whose id was stashed. Explicit null keeps the share emit path
+          // accurate. Callers that want to preserve the lineage (e.g.
+          // handleLoadSavedRoute itself) call setLastLoadedSavedRouteId
+          // AFTER setRouteRequest.
+          lastLoadedSavedRouteId:
+            request.origin !== undefined ||
+            request.destination !== undefined ||
+            request.mode !== undefined ||
+            request.waypoints !== undefined
+              ? null
+              : state.lastLoadedSavedRouteId,
         })),
       addWaypoint: (coordinate) =>
         set((state) => ({

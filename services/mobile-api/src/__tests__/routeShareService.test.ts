@@ -204,6 +204,138 @@ describe('routeShareService.createShare', () => {
     expect(payload.safetyScore).toBeNull();
   });
 
+  // ──────────────────────────────────────────────────────────────────────
+  // Slice 5a — saved-route source variant
+  //
+  // `source: 'saved'` branches the pre-insert flow:
+  //   1. SELECT saved_routes WHERE id=<savedRouteId> AND user_id=<caller>
+  //      (ownership check; RLS would also block cross-user reads at the
+  //      DB, but we belt-and-suspenders here so the API can return a
+  //      clean error instead of a DB upstream failure)
+  //   2. INSERT route_shares with source='saved' AND source_ref_id=<savedRouteId>
+  //
+  // The route payload shape is identical to planned — the difference is
+  // tracking/analytics (source column + source_ref_id) and the mobile-side
+  // caption. No web-viewer changes.
+  // ──────────────────────────────────────────────────────────────────────
+
+  const savedCreateRequest: RouteShareCreateRequest = {
+    source: 'saved',
+    savedRouteId: '550e8400-e29b-41d4-a716-446655440000',
+    route: validCreateRequest.route,
+  };
+
+  // Per-test stub factory — models two tables:
+  //   route_shares: standard select-uniqueness + insert path
+  //   saved_routes: single .select().eq().eq().single() for ownership
+  type SavedRoutesOutcome =
+    | { data: { id: string; user_id: string }; error: null }
+    | { data: null; error: { message: string; code?: string } | null };
+
+  const makeSavedStub = (opts: {
+    savedLookup: SavedRoutesOutcome;
+    insertSpy?: ReturnType<typeof vi.fn>;
+  }) => {
+    const insertSpy =
+      opts.insertSpy ??
+      vi.fn(() => ({
+        select: vi.fn(() => ({
+          single: vi.fn(async () => ({
+            data: {
+              id: 'ins-1',
+              code: 'abcd1234',
+              source: 'saved',
+              created_at: 't',
+              expires_at: 't2',
+            },
+            error: null,
+          })),
+        })),
+      }));
+
+    const from = vi.fn((table: string) => {
+      if (table === 'saved_routes') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => opts.savedLookup),
+              })),
+            })),
+          })),
+        } as unknown as ReturnType<typeof vi.fn>;
+      }
+      // route_shares path — uniqueness select + insert
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      };
+    });
+
+    return { supabase: { from, rpc: vi.fn() } as unknown as SupabaseLike, insertSpy };
+  };
+
+  it('slice 5a: saved source — validates ownership and persists source_ref_id', async () => {
+    const { supabase, insertSpy } = makeSavedStub({
+      savedLookup: {
+        data: {
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          user_id: 'user-1',
+        },
+        error: null,
+      },
+    });
+    const service = createRouteShareService({ supabase, randomSource: det });
+
+    const row = await service.createShare({
+      userId: 'user-1',
+      request: savedCreateRequest,
+    });
+    expect(row.source).toBe('saved');
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall.source).toBe('saved');
+    expect(firstCall.source_ref_id).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('slice 5a: saved source — rejects when saved_route belongs to another user', async () => {
+    const { supabase } = makeSavedStub({
+      savedLookup: {
+        data: { id: 'x', user_id: 'someone-else' },
+        error: null,
+      },
+    });
+    const service = createRouteShareService({ supabase, randomSource: det });
+
+    await expect(
+      service.createShare({ userId: 'user-1', request: savedCreateRequest }),
+    ).rejects.toThrow(/saved route not found|not authorised|forbidden/i);
+  });
+
+  it('slice 5a: saved source — rejects when saved_route does not exist', async () => {
+    const { supabase } = makeSavedStub({
+      savedLookup: { data: null, error: null },
+    });
+    const service = createRouteShareService({ supabase, randomSource: det });
+
+    await expect(
+      service.createShare({ userId: 'user-1', request: savedCreateRequest }),
+    ).rejects.toThrow(/saved route not found/i);
+  });
+
+  it('slice 5a: saved source — propagates DB errors from the ownership check', async () => {
+    const { supabase } = makeSavedStub({
+      savedLookup: { data: null, error: { message: 'db timeout' } },
+    });
+    const service = createRouteShareService({ supabase, randomSource: det });
+
+    await expect(
+      service.createShare({ userId: 'user-1', request: savedCreateRequest }),
+    ).rejects.toThrow(/db timeout|ownership check/i);
+  });
+
   it('passes through riskSegments + safetyScore to the stored payload', async () => {
     const insertSpy = vi.fn(() => ({
       select: vi.fn(() => ({

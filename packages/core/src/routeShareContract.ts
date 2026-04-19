@@ -50,18 +50,28 @@ const plannedRoutePayloadSchema = z.object({
 // RouteShareCreate — request body when creating a new share
 // ---------------------------------------------------------------------------
 //
-// Discriminated union on `source`. In slice 1, only `'planned'` is active;
-// `'saved'` and `'past_ride'` are stubbed with `z.never()` so any attempt to
-// create them in slice 1 is a parse error. Slice 5 replaces the stubs.
+// Discriminated union on `source`. Slice 1 activated `'planned'`; slice 5a
+// adds `'saved'` (savedRouteId + route payload identical to planned);
+// `'past_ride'` stays stubbed with z.never until slice 5b delivers the
+// server-side re-planning + ghost-polyline machinery.
+//
+// The `saved` shape intentionally re-uses plannedRoutePayloadSchema rather
+// than a trimmed variant. Rationale: the mobile client fetches a fresh
+// preview for the saved route before submitting, so origin / destination /
+// polyline / risk segments / mode all come from the same source as planned.
+// The only semantic difference is bookkeeping: the API persists `source='saved'`
+// and `source_ref_id=<savedRouteId>` for analytics and for the Impact
+// Dashboard's Ambassador-per-source breakdown in slice 8.
 
 export const routeShareCreatePlannedSchema = z.object({
   source: z.literal('planned'),
   route: plannedRoutePayloadSchema,
 });
 
-const routeShareCreateSavedStubSchema = z.object({
+export const routeShareCreateSavedSchema = z.object({
   source: z.literal('saved'),
-  savedRouteId: z.never(),
+  savedRouteId: z.string().uuid(),
+  route: plannedRoutePayloadSchema,
 });
 
 const routeShareCreatePastRideStubSchema = z.object({
@@ -71,13 +81,16 @@ const routeShareCreatePastRideStubSchema = z.object({
 
 export const routeShareCreateSchema = z.discriminatedUnion('source', [
   routeShareCreatePlannedSchema,
-  routeShareCreateSavedStubSchema,
+  routeShareCreateSavedSchema,
   routeShareCreatePastRideStubSchema,
 ]);
 
 export type RouteShareCreate = z.infer<typeof routeShareCreateSchema>;
 export type RouteShareCreatePlanned = z.infer<
   typeof routeShareCreatePlannedSchema
+>;
+export type RouteShareCreateSaved = z.infer<
+  typeof routeShareCreateSavedSchema
 >;
 
 // ---------------------------------------------------------------------------

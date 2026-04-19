@@ -292,6 +292,11 @@ export default function RoutePlanningScreen() {
       avoidUnpaved: route.avoidUnpaved,
       avoidHills: route.avoidHills,
     });
+    // Slice 5a: stash the saved route id so a subsequent Share action on
+    // route-preview emits `source: 'saved'` and populates `source_ref_id`
+    // server-side. Must run AFTER setRouteRequest — that action clears the
+    // lineage flag defensively on any origin/destination change.
+    useAppStore.getState().setLastLoadedSavedRouteId(route.id);
     if (route.waypoints.length > 0) {
       // Clear then add each waypoint
       useAppStore.getState().clearWaypoints();

@@ -812,21 +812,33 @@ export type RouteShareRiskSegment = {
   riskCategory: RouteShareRiskCategory;
 };
 
-export type RouteShareCreatePayload = {
-  source: 'planned';
-  route: {
-    origin: { lat: number; lon: number };
-    destination: { lat: number; lon: number };
-    geometryPolyline6: string;
-    distanceMeters: number;
-    durationSeconds: number;
-    routingMode: 'safe' | 'fast' | 'flat';
-    /** Optional per-segment risk data (drives web viewer's safety colors). */
-    riskSegments?: RouteShareRiskSegment[];
-    /** Optional aggregate 0-100 safety score. Null when unscored. */
-    safetyScore?: number | null;
-  };
+export type RouteShareRoutePayload = {
+  origin: { lat: number; lon: number };
+  destination: { lat: number; lon: number };
+  geometryPolyline6: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  routingMode: 'safe' | 'fast' | 'flat';
+  /** Optional per-segment risk data (drives web viewer's safety colors). */
+  riskSegments?: RouteShareRiskSegment[];
+  /** Optional aggregate 0-100 safety score. Null when unscored. */
+  safetyScore?: number | null;
 };
+
+// Slice 5a: discriminated union. 'saved' carries a savedRouteId so the API
+// can validate ownership + persist source_ref_id for analytics. 'past_ride'
+// stays off the client contract until slice 5b lands the server-side
+// re-planning path.
+export type RouteShareCreatePayload =
+  | {
+      source: 'planned';
+      route: RouteShareRoutePayload;
+    }
+  | {
+      source: 'saved';
+      savedRouteId: string;
+      route: RouteShareRoutePayload;
+    };
 
 export type RouteShareCreateResult = {
   id: string;
@@ -844,7 +856,7 @@ export type PublicRouteShare = {
   sharerDisplayName: string | null;
   sharerAvatarUrl: string | null;
   route: Required<
-    Omit<RouteShareCreatePayload['route'], 'riskSegments' | 'safetyScore'>
+    Omit<RouteShareRoutePayload, 'riskSegments' | 'safetyScore'>
   > & {
     riskSegments: RouteShareRiskSegment[];
     safetyScore: number | null;

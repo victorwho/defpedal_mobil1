@@ -97,16 +97,59 @@ describe('routeShareCreateSchema — reject', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects source "saved" in slice 1 (stubbed with z.never)', () => {
-    // Slice 5 will replace the stub with a real savedRouteId schema.
+  // ── Slice 5a — saved-route variant ──
+  //
+  // The slice-1 stub rejected `source: 'saved'` with z.never. Slice 5a
+  // replaces it with a real schema: savedRouteId (uuid) + route payload
+  // (same shape as planned). past_ride stays on z.never until slice 5b,
+  // which adds the server-side re-planning + ghost polyline machinery.
+
+  const validSavedRouteId = '550e8400-e29b-41d4-a716-446655440000';
+
+  it('slice 5a: accepts a well-formed saved-route create request', () => {
     const result = routeShareCreateSchema.safeParse({
       source: 'saved',
-      savedRouteId: 'some-id',
+      savedRouteId: validSavedRouteId,
+      route: validPlannedRoute,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('slice 5a: rejects saved-route request without savedRouteId', () => {
+    const result = routeShareCreateSchema.safeParse({
+      source: 'saved',
+      route: validPlannedRoute,
     });
     expect(result.success).toBe(false);
   });
 
-  it('rejects source "past_ride" in slice 1 (stubbed with z.never)', () => {
+  it('slice 5a: rejects saved-route request without route payload', () => {
+    const result = routeShareCreateSchema.safeParse({
+      source: 'saved',
+      savedRouteId: validSavedRouteId,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('slice 5a: rejects saved-route request with non-UUID savedRouteId', () => {
+    const result = routeShareCreateSchema.safeParse({
+      source: 'saved',
+      savedRouteId: 'not-a-uuid',
+      route: validPlannedRoute,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('slice 5a: rejects saved-route request with invalid route payload', () => {
+    const result = routeShareCreateSchema.safeParse({
+      source: 'saved',
+      savedRouteId: validSavedRouteId,
+      route: { ...validPlannedRoute, origin: { lat: 91, lon: 0 } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects source "past_ride" (stubbed with z.never until slice 5b)', () => {
     const result = routeShareCreateSchema.safeParse({
       source: 'past_ride',
       tripId: 'some-trip-id',

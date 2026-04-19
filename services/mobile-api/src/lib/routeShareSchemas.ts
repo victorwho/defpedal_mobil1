@@ -132,20 +132,44 @@ type PlannedRouteResponsePayload = Required<
 // POST /v1/route-shares — request body
 // ---------------------------------------------------------------------------
 
+// Slice 5a: accepts both 'planned' (slice 1) and 'saved' variants. Saved
+// requires a `savedRouteId` uuid — the server validates ownership in
+// `routeShareService.createShare` before persisting. 'past_ride' stays
+// rejected (z.never in the core zod stub) until slice 5b.
 export const routeShareCreateRequestSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['source', 'route'],
   properties: {
-    source: { type: 'string', enum: ['planned'] },
+    source: { type: 'string', enum: ['planned', 'saved'] },
     route: plannedRoutePayloadRequestSchema,
+    savedRouteId: { type: 'string', format: 'uuid' },
   },
+  // Conditional: when source='saved', savedRouteId is required. Planned
+  // requests must not carry it (defense against typos that would silently
+  // set an unrelated source_ref_id).
+  allOf: [
+    {
+      if: { properties: { source: { const: 'saved' } } },
+      then: { required: ['savedRouteId'] },
+    },
+    {
+      if: { properties: { source: { const: 'planned' } } },
+      then: { not: { required: ['savedRouteId'] } },
+    },
+  ],
 } as const;
 
-export type RouteShareCreateRequest = {
-  source: 'planned';
-  route: PlannedRouteRequestPayload;
-};
+export type RouteShareCreateRequest =
+  | {
+      source: 'planned';
+      route: PlannedRouteRequestPayload;
+    }
+  | {
+      source: 'saved';
+      savedRouteId: string;
+      route: PlannedRouteRequestPayload;
+    };
 
 // ---------------------------------------------------------------------------
 // POST /v1/route-shares — response

@@ -183,7 +183,60 @@ export const createRouteShareService = (
     return (count ?? 0) === 0;
   };
 
+  // Slice 5a: ownership check for saved-route shares. RLS on saved_routes
+  // would also block cross-user reads, but going through a dedicated
+  // lookup lets us map the three failure modes (not found, wrong owner, DB
+  // error) to clean API errors instead of a generic upstream 502.
+  const validateSavedRouteOwnership = async (
+    savedRouteId: string,
+    userId: string,
+  ): Promise<void> => {
+    const { data, error } = await (
+      supabase.from('saved_routes') as unknown as {
+        select: (cols: string) => {
+          eq: (col: string, val: string) => {
+            eq: (col: string, val: string) => {
+              maybeSingle: () => Promise<{
+                data: { id: string; user_id: string } | null;
+                error: { message: string; code?: string } | null;
+              }>;
+            };
+          };
+        };
+      }
+    )
+      .select('id, user_id')
+      .eq('id', savedRouteId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Saved route ownership check failed: ${error.message}`,
+      );
+    }
+    if (!data) {
+      throw new Error(
+        'Saved route not found or not authorised for this user',
+      );
+    }
+    // Belt-and-suspenders: even though the query filters on both id AND
+    // user_id, re-check the returned row's user_id. This guards against
+    // any future query refactor that accidentally relaxes the filter.
+    if (data.user_id !== userId) {
+      throw new Error(
+        'Saved route not found or not authorised for this user',
+      );
+    }
+  };
+
   const createShare: RouteShareService['createShare'] = async ({ userId, request }) => {
+    // Slice 5a: gate saved-source creates on the saved_routes ownership
+    // check. Planned (slice 1) short-circuits straight to code generation.
+    if (request.source === 'saved') {
+      await validateSavedRouteOwnership(request.savedRouteId, userId);
+    }
+
     const code = await generateUniqueShareCode({ isCodeUnique, randomSource });
 
     const fullPolyline = request.route.geometryPolyline6;
@@ -208,11 +261,18 @@ export const createRouteShareService = (
       safetyScore: request.route.safetyScore ?? null,
     };
 
+    // Slice 5a: `source_ref_id` tracks which saved_route this share was
+    // generated from, null for planned. Feeds analytics + the slice-8
+    // Ambassador-per-source breakdown; the RPC itself doesn't consult it.
+    const sourceRefId =
+      request.source === 'saved' ? request.savedRouteId : null;
+
     const { data, error } = await supabase
       .from('route_shares')
       .insert({
         user_id: userId,
         source: request.source,
+        source_ref_id: sourceRefId,
         payload,
         short_code: code,
         // hide_endpoints defaults to true at the DB layer; letting the

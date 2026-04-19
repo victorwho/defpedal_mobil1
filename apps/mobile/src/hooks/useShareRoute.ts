@@ -23,6 +23,7 @@ import {
   type RouteShareRiskSegment,
 } from '../lib/api';
 import { useConnectivity } from '../providers/ConnectivityMonitor';
+import { useAppStore } from '../store/appStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,8 +68,17 @@ export type UseShareRouteReturn = {
 const OFFLINE_TOAST_MESSAGE = 'You are offline. Try again when connected.';
 const GENERIC_ERROR_MESSAGE = 'Couldn\u2019t share this route. Try again.';
 
-const buildShareCaption = (input: ShareRouteInput): string => {
+const buildShareCaption = (
+  input: ShareRouteInput,
+  source: 'planned' | 'saved',
+): string => {
   const km = (input.route.distanceMeters / 1000).toFixed(1);
+  // Slice 5a: saved-route shares get their own voice — the sharer is
+  // signalling "this is a route I've saved and use", not "I just planned
+  // this". Keeps the same Defensive Pedal sign-off for consistency.
+  if (source === 'saved') {
+    return `I saved this safer ${km} km cycling route \u2014 open it in Defensive Pedal.`;
+  }
   const label = input.destinationLabel?.trim();
   if (label) {
     return `Check out this ${km} km cycling route to ${label} on Defensive Pedal.`;
@@ -82,6 +92,13 @@ const buildShareCaption = (input: ShareRouteInput): string => {
 
 export function useShareRoute(): UseShareRouteReturn {
   const { isOnline } = useConnectivity();
+  // Slice 5a: reading the saved-route lineage at share-time (rather than
+  // requiring callers to pass it in) keeps every existing caller on the
+  // share flow untouched. The flag is set by handleLoadSavedRoute in
+  // route-planning and cleared by setRouteRequest on any destination change.
+  const lastLoadedSavedRouteId = useAppStore(
+    (s) => s.lastLoadedSavedRouteId,
+  );
 
   const [isSharing, setIsSharing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -100,31 +117,39 @@ export function useShareRoute(): UseShareRouteReturn {
       setIsSharing(true);
 
       try {
-        const payload: RouteShareCreatePayload = {
-          source: 'planned',
-          route: {
-            origin: { lat: input.origin.lat, lon: input.origin.lon },
-            destination: {
-              lat: input.destination.lat,
-              lon: input.destination.lon,
-            },
-            geometryPolyline6: input.route.geometryPolyline6,
-            distanceMeters: input.route.distanceMeters,
-            durationSeconds: input.route.durationSeconds,
-            routingMode: input.routingMode,
-            // Only spread optional fields when the caller provided them so
-            // we don't ship undefined through to JSON.stringify.
-            ...(input.riskSegments
-              ? { riskSegments: [...input.riskSegments] }
-              : {}),
-            ...(input.safetyScore !== undefined
-              ? { safetyScore: input.safetyScore }
-              : {}),
+        const routePayload = {
+          origin: { lat: input.origin.lat, lon: input.origin.lon },
+          destination: {
+            lat: input.destination.lat,
+            lon: input.destination.lon,
           },
+          geometryPolyline6: input.route.geometryPolyline6,
+          distanceMeters: input.route.distanceMeters,
+          durationSeconds: input.route.durationSeconds,
+          routingMode: input.routingMode,
+          // Only spread optional fields when the caller provided them so
+          // we don't ship undefined through to JSON.stringify.
+          ...(input.riskSegments
+            ? { riskSegments: [...input.riskSegments] }
+            : {}),
+          ...(input.safetyScore !== undefined
+            ? { safetyScore: input.safetyScore }
+            : {}),
         };
+        const source: 'planned' | 'saved' = lastLoadedSavedRouteId
+          ? 'saved'
+          : 'planned';
+        const payload: RouteShareCreatePayload =
+          source === 'saved' && lastLoadedSavedRouteId
+            ? {
+                source: 'saved',
+                savedRouteId: lastLoadedSavedRouteId,
+                route: routePayload,
+              }
+            : { source: 'planned', route: routePayload };
 
         const created = await mobileApi.createRouteShare(payload);
-        const caption = buildShareCaption(input);
+        const caption = buildShareCaption(input, source);
 
         // Native share sheet. iOS prefers `url`; Android concatenates the
         // message. Passing both fields gives us the best behavior on both.
