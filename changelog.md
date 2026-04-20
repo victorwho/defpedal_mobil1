@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-04-20 — Route-Share Slice 8a (Ambassador Backend)
+
+### Features
+- **`GET /v1/route-shares/mine`** — authenticated list of caller's shares (active + revoked, newest first) with per-row `{shortCode, sourceType, createdAt, expiresAt, viewCount, signupCount, revokedAt}` + lifetime `ambassadorStats: {sharesSent, opens, signups, xpEarned}`.
+- **`DELETE /v1/route-shares/:id`** — authenticated, owner-only. Non-owner and unknown id both return 404 (anti-enumeration). Idempotent on already-revoked shares.
+- **`POST /v1/route-shares/:code/view`** — public UA-filtered + per-IP throttled (60/min) view beacon. Fires a first-view push notification to the sharer on the atomic 0→1 view_count transition.
+- **First-view push notification** — new `dispatchFirstViewNotification` dispatcher with the same 3/day high-priority bypass pattern used for conversion pushes. `kind:'referral_view'` tag so conversion + first-view budgets don't collide. Title "Someone just opened your shared route", deep link `/my-shares`.
+- **`profiles.share_conversion_feed_optin`** BOOLEAN (default TRUE) — sharer-controlled opt-out for the activity-feed conversion card. Extended to `PATCH /profile` + `GET /profile`.
+- **Activity feed integration** — `claim_route_share` RPC now inserts an `activity_feed` row of type `'route_share_signup'` (gated on sharer opt-in) with payload `{sharerUserId, inviteeUserId, shareId, routePreviewPolylineTrimmed}`. Feed row owned by sharer so followers see it.
+
+### Schema
+- **`activity_feed.type` CHECK** — dropped and re-added with `'route_share_signup'` included.
+- **`profiles.share_conversion_feed_optin`** — new BOOLEAN column, default TRUE.
+- **`revoke_route_share(p_id, p_user_id)`** — new SECURITY DEFINER RPC.
+- **`record_route_share_view(p_code)`** — new SECURITY DEFINER RPC using atomic `UPDATE ... RETURNING view_count` for exactly-once first-view detection under concurrent beacons.
+- **`claim_route_share`** — replaced with slice-4-body + activity_feed fork gated on sharer opt-in.
+- Migration: `2026042001_route_share_slice8.sql` / applied as `route_share_slice8_ambassador_observability`.
+
+### Tests
+- `packages/core` — 17 new (contract schemas) → 474 total.
+- `services/mobile-api` — 19 new (bot UA filter + first-view dispatch) → 424 total. Typecheck green across api + mobile + web.
+
+### Deferred (slice 8b)
+- My Shares mobile screen (replaces current stub)
+- `AmbassadorImpactCard` organism on Impact Dashboard
+- Profile toggle for `shareConversionFeedOptin`
+- `RouteShareSignupFeedCard` component
+- Web viewer beacon hook (`POST /r/:code/view`)
+
+### User action required
+- **Cloud Run redeploy** so the new endpoints become callable: `gcloud builds submit --config cloudbuild.yaml --timeout=600 && gcloud run deploy defpedal-api --image ... --region europe-central2 --platform managed --allow-unauthenticated`. Migration already applied via MCP.
+
 ## 2026-04-20 — Route-Share Slice 7c (PostHog Analytics)
 
 ### Features

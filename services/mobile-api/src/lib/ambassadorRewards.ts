@@ -112,3 +112,76 @@ export const dispatchAmbassadorRewardNotification = async ({
 
   return { dispatched: true, priority };
 };
+
+// ---------------------------------------------------------------------------
+// Slice 8 — First-view push notification
+//
+// Fired when record_route_share_view RPC reports the 0→1 transition. Uses
+// the same 3/day high-priority bypass as the conversion push, and tags the
+// notification_log row with `kind: 'referral_view'` so the bypass counts
+// don't collide with conversion pushes — a sharer can still receive up to 3
+// first-view pushes AND up to 3 conversion pushes in a single day.
+// ---------------------------------------------------------------------------
+
+type FirstViewDispatchArgs = {
+  sharerUserId: string;
+  shortCode: string;
+  now?: Date;
+};
+
+const FIRST_VIEW_HIGH_PRIORITY_BUDGET = 3;
+
+const countFirstViewNotificationsToday = async ({
+  userId,
+  sinceIso,
+}: CountArgs): Promise<number> => {
+  if (!supabaseAdmin) return 0;
+  const { count, error } = await supabaseAdmin
+    .from('notification_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'sent')
+    .eq('category', 'community')
+    .gte('created_at', sinceIso)
+    .contains('payload', { data: { kind: 'referral_view' } });
+
+  if (error) return 0;
+  return count ?? 0;
+};
+
+export const dispatchFirstViewNotification = async ({
+  sharerUserId,
+  shortCode,
+  now = new Date(),
+}: FirstViewDispatchArgs): Promise<{ dispatched: boolean; priority: 'high' | 'normal' }> => {
+  if (!sharerUserId) {
+    return { dispatched: false, priority: 'normal' };
+  }
+
+  const startOfDay = new Date(now);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const priorCount = await countFirstViewNotificationsToday({
+    userId: sharerUserId,
+    sinceIso: startOfDay.toISOString(),
+  });
+
+  const priority: 'high' | 'normal' =
+    priorCount < FIRST_VIEW_HIGH_PRIORITY_BUDGET ? 'high' : 'normal';
+
+  await dispatchNotification(
+    sharerUserId,
+    'community',
+    {
+      title: 'Someone just opened your shared route',
+      body: 'Tap to see how your shares are performing.',
+      data: {
+        kind: 'referral_view',
+        shortCode,
+        deepLink: '/my-shares',
+      },
+    },
+    { priority },
+  );
+
+  return { dispatched: true, priority };
+};

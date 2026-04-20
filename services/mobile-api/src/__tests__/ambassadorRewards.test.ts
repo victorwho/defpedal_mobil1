@@ -166,3 +166,97 @@ describe('dispatchAmbassadorRewardNotification', () => {
     expect(payload.body.startsWith('Someone ')).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Slice 8: dispatchFirstViewNotification
+// ---------------------------------------------------------------------------
+
+import { dispatchFirstViewNotification } from '../lib/ambassadorRewards';
+
+describe('dispatchFirstViewNotification', () => {
+  beforeEach(() => {
+    dispatchNotificationMock.mockClear();
+    from.mockClear();
+    todayCount = 0;
+  });
+
+  it('no-ops when sharerUserId is empty', async () => {
+    const result = await dispatchFirstViewNotification({
+      sharerUserId: '',
+      shortCode: 'abcd1234',
+    });
+    expect(result.dispatched).toBe(false);
+    expect(dispatchNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it('sends with priority:high for the first 3 first-view pushes of the day', async () => {
+    todayCount = 0;
+    const result = await dispatchFirstViewNotification({
+      sharerUserId: 'sharer-uuid-001',
+      shortCode: 'abcd1234',
+    });
+    expect(result).toEqual({ dispatched: true, priority: 'high' });
+    expect(dispatchNotificationMock).toHaveBeenCalledWith(
+      'sharer-uuid-001',
+      'community',
+      expect.objectContaining({
+        title: 'Someone just opened your shared route',
+        data: expect.objectContaining({
+          kind: 'referral_view',
+          shortCode: 'abcd1234',
+          deepLink: '/my-shares',
+        }),
+      }),
+      { priority: 'high' },
+    );
+  });
+
+  it('falls back to priority:normal on the 4th+ first-view push of the day', async () => {
+    todayCount = 3;
+    const result = await dispatchFirstViewNotification({
+      sharerUserId: 'sharer-uuid-002',
+      shortCode: 'xyz00001',
+    });
+    expect(result.priority).toBe('normal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice 8: isBotUserAgent
+// ---------------------------------------------------------------------------
+
+import { isBotUserAgent } from '../lib/routeShareService';
+
+describe('isBotUserAgent', () => {
+  it('flags empty / missing UAs as bots', () => {
+    expect(isBotUserAgent(undefined)).toBe(true);
+    expect(isBotUserAgent(null)).toBe(true);
+    expect(isBotUserAgent('')).toBe(true);
+    expect(isBotUserAgent('   ')).toBe(true);
+  });
+
+  it.each([
+    ['Googlebot/2.1 (+http://www.google.com/bot.html)'],
+    ['Mozilla/5.0 (compatible; Bingbot/2.0)'],
+    ['facebookexternalhit/1.1'],
+    ['Twitterbot/1.0'],
+    ['Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)'],
+    ['WhatsApp/2.19.81 A'],
+    ['curl/7.68.0'],
+    ['wget/1.20.3'],
+    ['python-requests/2.28.1'],
+    ['node-fetch/1.0 (+https://github.com/bitinn/node-fetch)'],
+    ['axios/0.21.1'],
+    ['Mozilla/5.0 (Linux; Android 10) HeadlessChrome/90.0'],
+  ])('flags "%s" as a bot', (ua) => {
+    expect(isBotUserAgent(ua)).toBe(true);
+  });
+
+  it.each([
+    ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'],
+    ['Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'],
+    ['Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'],
+  ])('does NOT flag "%s" as a bot', (ua) => {
+    expect(isBotUserAgent(ua)).toBe(false);
+  });
+});

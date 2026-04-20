@@ -19,7 +19,13 @@ import {
   generateUniqueShareCode,
   trimPrivacyZone,
 } from '@defensivepedal/core';
-import type { RouteShareCreateRequest } from './routeShareSchemas';
+import type {
+  AmbassadorStatsApi,
+  MyShareRowApi,
+  MySharesResponse,
+  RouteShareCreateRequest,
+  RouteShareViewBeaconResponse,
+} from './routeShareSchemas';
 
 // ---------------------------------------------------------------------------
 // Minimal shape of the Supabase admin client we rely on. Declaring this
@@ -83,6 +89,67 @@ export type RouteShareService = {
   createShare: (input: CreateShareInput) => Promise<CreateShareRow>;
   getPublicShare: (code: string) => Promise<GetPublicShareResult>;
   claimShare: (input: ClaimShareInput) => Promise<ClaimShareResult>;
+  // Slice 8
+  listMyShares: (userId: string) => Promise<MySharesResponse>;
+  revokeShare: (input: { id: string; userId: string }) => Promise<RevokeShareResult>;
+  recordView: (code: string) => Promise<RecordViewResult>;
+};
+
+// Slice 8: typed results for the new methods.
+export type RevokeShareResult =
+  | { status: 'ok' }
+  | { status: 'not_found' };
+
+export type RecordViewResult =
+  | {
+      status: 'ok';
+      bumped: boolean;
+      firstView: boolean;
+      shortCode: string;
+      sharerUserId: string;
+      shareId: string;
+    }
+  | { status: 'not_found' }
+  | { status: 'gone'; reason: 'expired' | 'revoked' };
+
+// Bot user-agent regex list. Hardcoded (not a DB table) so the list is
+// reviewable in PRs. Covers the usual suspects: search crawlers, link
+// unfurlers (Slack/Twitter/Facebook/Discord/WhatsApp), and generic HTTP
+// libraries that leak their default UA (curl, wget, node-fetch, axios,
+// python-requests). A missing/empty UA also counts as a bot.
+const BOT_UA_PATTERNS: RegExp[] = [
+  /bot/i,
+  /crawler/i,
+  /spider/i,
+  /slurp/i,
+  /baidu/i,
+  /yandex/i,
+  /duckduckbot/i,
+  /facebookexternalhit/i,
+  /twitterbot/i,
+  /linkedinbot/i,
+  /slackbot/i,
+  /whatsapp/i,
+  /discordbot/i,
+  /telegrambot/i,
+  /embedly/i,
+  /pinterest/i,
+  /preview/i,
+  /headlesschrome/i,
+  /phantomjs/i,
+  /curl\//i,
+  /wget\//i,
+  /^go-http-client/i,
+  /^python-requests/i,
+  /node-fetch/i,
+  /axios/i,
+  /httpclient/i,
+  /okhttp/i,
+];
+
+export const isBotUserAgent = (ua: string | null | undefined): boolean => {
+  if (!ua || ua.trim().length === 0) return true;
+  return BOT_UA_PATTERNS.some((re) => re.test(ua));
 };
 
 // ---------------------------------------------------------------------------
@@ -397,5 +464,131 @@ export const createRouteShareService = (
     };
   };
 
-  return { createShare, getPublicShare, claimShare };
+  // --------------------------------------------------------------------
+  // Slice 8 — listMyShares
+  //
+  // The strict `SupabaseLike` type is a minimal subset used by slice 1–6.
+  // List queries + sum aggregations for slice 8 need a richer query chain;
+  // casting `supabase` to `any` inside these methods keeps the shared type
+  // surface small without lying about the runtime client's capabilities.
+  // --------------------------------------------------------------------
+  type LooseSupabase = {
+    from: (table: string) => any;
+    rpc: (fn: string, params: Record<string, unknown>) => Promise<{
+      data: unknown;
+      error: { message: string; code?: string } | null;
+    }>;
+  };
+  const loose = supabase as unknown as LooseSupabase;
+
+  const listMyShares: RouteShareService['listMyShares'] = async (userId) => {
+    if (!userId) {
+      return {
+        shares: [],
+        ambassadorStats: { sharesSent: 0, opens: 0, signups: 0, xpEarned: 0 },
+      };
+    }
+
+    const sharesQuery = await loose
+      .from('route_shares')
+      .select(
+        'id, short_code, source, created_at, expires_at, view_count, signup_count, revoked_at',
+      )
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (sharesQuery.error) {
+      throw new Error(`listMyShares failed: ${sharesQuery.error.message}`);
+    }
+
+    const rows: MyShareRowApi[] = (sharesQuery.data ?? []).map((row: any) => ({
+      id: String(row.id),
+      shortCode: String(row.short_code),
+      sourceType: row.source as MyShareRowApi['sourceType'],
+      createdAt: String(row.created_at),
+      expiresAt: row.expires_at ? String(row.expires_at) : null,
+      viewCount: Number(row.view_count ?? 0),
+      signupCount: Number(row.signup_count ?? 0),
+      revokedAt: row.revoked_at ? String(row.revoked_at) : null,
+    }));
+
+    // Ambassador aggregates derived from the same row set (active-only for
+    // sharesSent; opens + signups summed across all, including revoked,
+    // since those counts represent lifetime activity).
+    const sharesSent = rows.filter((r) => r.revokedAt === null).length;
+    const opens = rows.reduce((acc, r) => acc + r.viewCount, 0);
+    const signups = rows.reduce((acc, r) => acc + r.signupCount, 0);
+
+    // XP earned from inviter referrals (slice 3 seeded action='referral' at
+    // 100 XP per conversion, capped 5/month). Aggregated via a sum select.
+    const xpQuery = await loose
+      .from('xp_events')
+      .select('final_xp')
+      .eq('user_id', userId)
+      .eq('action', 'referral');
+
+    let xpEarned = 0;
+    if (!xpQuery.error && Array.isArray(xpQuery.data)) {
+      xpEarned = xpQuery.data.reduce(
+        (acc: number, ev: any) => acc + Number(ev.final_xp ?? 0),
+        0,
+      );
+    }
+
+    const stats: AmbassadorStatsApi = {
+      sharesSent,
+      opens,
+      signups,
+      xpEarned,
+    };
+
+    return { shares: rows, ambassadorStats: stats };
+  };
+
+  const revokeShare: RouteShareService['revokeShare'] = async ({ id, userId }) => {
+    const { data, error } = await supabase.rpc('revoke_route_share', {
+      p_id: id,
+      p_user_id: userId,
+    });
+
+    if (error) {
+      throw new Error(`revoke_route_share RPC failed: ${error.message}`);
+    }
+
+    const raw = (data ?? {}) as { status?: unknown };
+    if (raw.status === 'ok') return { status: 'ok' };
+    return { status: 'not_found' };
+  };
+
+  const recordView: RouteShareService['recordView'] = async (code) => {
+    const { data, error } = await supabase.rpc('record_route_share_view', {
+      p_code: code,
+    });
+
+    if (error) {
+      const msg = error.message ?? '';
+      if (msg.includes('SHARE_NOT_FOUND')) return { status: 'not_found' };
+      if (msg.includes('SHARE_EXPIRED'))
+        return { status: 'gone', reason: 'expired' };
+      if (msg.includes('SHARE_REVOKED'))
+        return { status: 'gone', reason: 'revoked' };
+      throw new Error(`record_route_share_view RPC failed: ${msg}`);
+    }
+
+    if (!data || typeof data !== 'object') {
+      return { status: 'not_found' };
+    }
+
+    const raw = data as Record<string, unknown>;
+    return {
+      status: 'ok',
+      bumped: Boolean(raw.bumped),
+      firstView: Boolean(raw.firstView),
+      shortCode: String(raw.shortCode ?? ''),
+      sharerUserId: String(raw.sharerUserId ?? ''),
+      shareId: String(raw.shareId ?? ''),
+    };
+  };
+
+  return { createShare, getPublicShare, claimShare, listMyShares, revokeShare, recordView };
 };

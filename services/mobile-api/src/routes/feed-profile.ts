@@ -69,6 +69,8 @@ export const buildFeedProfileRoutes = (
         if (request.body.quietHoursStart !== undefined) updates.quiet_hours_start = request.body.quietHoursStart;
         if (request.body.quietHoursEnd !== undefined) updates.quiet_hours_end = request.body.quietHoursEnd;
         if (request.body.quietHoursTimezone !== undefined) updates.quiet_hours_timezone = request.body.quietHoursTimezone;
+        if (request.body.shareConversionFeedOptin !== undefined)
+          updates.share_conversion_feed_optin = request.body.shareConversionFeedOptin;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db
@@ -94,7 +96,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
           .eq('id', user.id)
           .single();
 
@@ -115,6 +117,11 @@ export const buildFeedProfileRoutes = (
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
           isPrivate: Boolean(data.is_private),
+          shareConversionFeedOptin:
+            data.share_conversion_feed_optin === undefined ||
+            data.share_conversion_feed_optin === null
+              ? true
+              : Boolean(data.share_conversion_feed_optin),
         };
       },
     );
@@ -137,7 +144,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
           .eq('id', user.id)
           .single();
 
@@ -148,7 +155,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
             .single();
 
           if (createError || !created) {
@@ -168,6 +175,11 @@ export const buildFeedProfileRoutes = (
             trimRouteEndpoints: Boolean(created.trim_route_endpoints),
             cyclingGoal: (created.cycling_goal as CyclingGoal) ?? null,
             isPrivate: Boolean(created.is_private),
+            shareConversionFeedOptin:
+              created.share_conversion_feed_optin === undefined ||
+              created.share_conversion_feed_optin === null
+                ? true
+                : Boolean(created.share_conversion_feed_optin),
           };
         }
 
@@ -180,6 +192,11 @@ export const buildFeedProfileRoutes = (
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
           isPrivate: Boolean(data.is_private),
+          shareConversionFeedOptin:
+            data.share_conversion_feed_optin === undefined ||
+            data.share_conversion_feed_optin === null
+              ? true
+              : Boolean(data.share_conversion_feed_optin),
         };
       },
     );

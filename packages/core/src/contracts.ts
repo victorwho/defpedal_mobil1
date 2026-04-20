@@ -686,6 +686,9 @@ export interface ProfileUpdateRequest {
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;
   quietHoursTimezone?: string | null;
+  // Slice 8: sharer controls whether claimed-shares publish to the
+  // activity feed. Default true. Claim rewards/XP/badges ship regardless.
+  shareConversionFeedOptin?: boolean;
 }
 
 export interface ProfileResponse {
@@ -697,6 +700,7 @@ export interface ProfileResponse {
   trimRouteEndpoints: boolean;
   cyclingGoal: CyclingGoal | null;
   isPrivate: boolean;
+  shareConversionFeedOptin: boolean;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────

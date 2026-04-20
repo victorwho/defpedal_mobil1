@@ -4,6 +4,11 @@ import {
   routeShareRecordSchema,
   routeSharePublicViewSchema,
   routeShareClaimResponseSchema,
+  myShareRowSchema,
+  mySharesResponseSchema,
+  ambassadorStatsSchema,
+  routeShareViewBeaconResponseSchema,
+  routeShareSignupFeedPayloadSchema,
   type RouteShareCreate,
 } from './routeShareContract';
 
@@ -437,6 +442,171 @@ describe('routeShareClaimResponseSchema', () => {
         inviteeNewBadges: [],
         followPending: 'yes',
       },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Slice 8 — Ambassador observability schemas
+// ---------------------------------------------------------------------------
+
+const validMyShareRow = {
+  id: '00000000-0000-4000-8000-000000000010',
+  shortCode: 'abcd1234',
+  sourceType: 'planned' as const,
+  createdAt: '2026-04-19T04:54:28.298107+00:00',
+  expiresAt: '2026-05-19T04:54:28.298107+00:00',
+  viewCount: 3,
+  signupCount: 1,
+  revokedAt: null,
+};
+
+const validAmbassadorStats = {
+  sharesSent: 2,
+  opens: 10,
+  signups: 3,
+  xpEarned: 300,
+};
+
+describe('slice 8: myShareRowSchema', () => {
+  it('accepts a well-formed row', () => {
+    const result = myShareRowSchema.safeParse(validMyShareRow);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a revoked row (revokedAt set)', () => {
+    const result = myShareRowSchema.safeParse({
+      ...validMyShareRow,
+      revokedAt: '2026-04-20T00:00:00+00:00',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a saved-source row', () => {
+    const result = myShareRowSchema.safeParse({
+      ...validMyShareRow,
+      sourceType: 'saved',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects negative view/signup counts', () => {
+    expect(myShareRowSchema.safeParse({ ...validMyShareRow, viewCount: -1 }).success).toBe(false);
+    expect(myShareRowSchema.safeParse({ ...validMyShareRow, signupCount: -1 }).success).toBe(false);
+  });
+
+  it('rejects non-uuid id', () => {
+    const result = myShareRowSchema.safeParse({ ...validMyShareRow, id: 'nope' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects malformed short code', () => {
+    const result = myShareRowSchema.safeParse({ ...validMyShareRow, shortCode: 'ABC' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('slice 8: ambassadorStatsSchema', () => {
+  it('accepts zeroed stats', () => {
+    const result = ambassadorStatsSchema.safeParse({
+      sharesSent: 0,
+      opens: 0,
+      signups: 0,
+      xpEarned: 0,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects negative values', () => {
+    expect(
+      ambassadorStatsSchema.safeParse({ ...validAmbassadorStats, opens: -1 }).success,
+    ).toBe(false);
+  });
+
+  it('rejects non-integer xpEarned', () => {
+    const result = ambassadorStatsSchema.safeParse({
+      ...validAmbassadorStats,
+      xpEarned: 12.5,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('slice 8: mySharesResponseSchema', () => {
+  it('accepts a response with multiple shares', () => {
+    const result = mySharesResponseSchema.safeParse({
+      shares: [validMyShareRow, { ...validMyShareRow, id: '00000000-0000-4000-8000-000000000011', shortCode: 'aaaaaaaa' }],
+      ambassadorStats: validAmbassadorStats,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an empty shares array', () => {
+    const result = mySharesResponseSchema.safeParse({
+      shares: [],
+      ambassadorStats: validAmbassadorStats,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing ambassadorStats', () => {
+    const result = mySharesResponseSchema.safeParse({ shares: [] });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('slice 8: routeShareViewBeaconResponseSchema', () => {
+  it('accepts bumped=true firstView=true', () => {
+    const result = routeShareViewBeaconResponseSchema.safeParse({
+      bumped: true,
+      firstView: true,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts bumped=false firstView=false', () => {
+    const result = routeShareViewBeaconResponseSchema.safeParse({
+      bumped: false,
+      firstView: false,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects non-boolean bumped', () => {
+    const result = routeShareViewBeaconResponseSchema.safeParse({
+      bumped: 'true',
+      firstView: false,
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('slice 8: routeShareSignupFeedPayloadSchema', () => {
+  const valid = {
+    sharerUserId: '00000000-0000-4000-8000-000000000020',
+    inviteeUserId: '00000000-0000-4000-8000-000000000021',
+    shareId: '00000000-0000-4000-8000-000000000022',
+    routePreviewPolylineTrimmed: 'abc123',
+  };
+
+  it('accepts a well-formed payload', () => {
+    const result = routeShareSignupFeedPayloadSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty trimmed polyline', () => {
+    const result = routeShareSignupFeedPayloadSchema.safeParse({
+      ...valid,
+      routePreviewPolylineTrimmed: '',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-uuid ids', () => {
+    const result = routeShareSignupFeedPayloadSchema.safeParse({
+      ...valid,
+      shareId: 'not-uuid',
     });
     expect(result.success).toBe(false);
   });

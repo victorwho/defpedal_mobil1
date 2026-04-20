@@ -195,3 +195,62 @@ export const routeShareClaimResponseSchema = z.object({
 export type RouteShareClaimResponse = z.infer<
   typeof routeShareClaimResponseSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Slice 8 — Ambassador observability + control
+// ---------------------------------------------------------------------------
+
+// Per-row stats surfaced on My Shares.
+export const myShareRowSchema = z.object({
+  id: z.string().uuid(),
+  shortCode: shareCodeSchema,
+  sourceType: z.enum(['planned', 'saved', 'past_ride']),
+  createdAt: isoDateTime,
+  expiresAt: isoDateTime.nullable(),
+  viewCount: z.number().int().nonnegative(),
+  signupCount: z.number().int().nonnegative(),
+  revokedAt: isoDateTime.nullable(),
+});
+
+export type MyShareRow = z.infer<typeof myShareRowSchema>;
+
+// Lifetime aggregates for the Ambassador Impact tile.
+export const ambassadorStatsSchema = z.object({
+  sharesSent: z.number().int().nonnegative(),
+  opens: z.number().int().nonnegative(),
+  signups: z.number().int().nonnegative(),
+  xpEarned: z.number().int().nonnegative(),
+});
+
+export type AmbassadorStats = z.infer<typeof ambassadorStatsSchema>;
+
+// Envelope returned by GET /v1/route-shares/mine.
+export const mySharesResponseSchema = z.object({
+  shares: z.array(myShareRowSchema),
+  ambassadorStats: ambassadorStatsSchema,
+});
+
+export type MySharesResponse = z.infer<typeof mySharesResponseSchema>;
+
+// Envelope returned by POST /v1/route-shares/:code/view.
+export const routeShareViewBeaconResponseSchema = z.object({
+  bumped: z.boolean(),
+  firstView: z.boolean(),
+});
+
+export type RouteShareViewBeaconResponse = z.infer<
+  typeof routeShareViewBeaconResponseSchema
+>;
+
+// Payload stored inside activity_feed rows of type 'route_share_signup'.
+// Consumed by the mobile feed to render a conversion card.
+export const routeShareSignupFeedPayloadSchema = z.object({
+  sharerUserId: z.string().uuid(),
+  inviteeUserId: z.string().uuid(),
+  shareId: z.string().uuid(),
+  routePreviewPolylineTrimmed: z.string().min(1),
+});
+
+export type RouteShareSignupFeedPayload = z.infer<
+  typeof routeShareSignupFeedPayloadSchema
+>;

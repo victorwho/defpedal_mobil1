@@ -96,6 +96,7 @@ export const profileUpdateRequestSchema = {
     quietHoursStart: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
     quietHoursEnd: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
     quietHoursTimezone: { type: ['string', 'null'] },
+    shareConversionFeedOptin: { type: 'boolean' },
   },
 } as const;
 
@@ -185,7 +186,17 @@ export const feedCommentsResponseSchema = {
 export const profileResponseSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['id', 'displayName', 'avatarUrl', 'autoShareRides', 'trimRouteEndpoints', 'cyclingGoal', 'username', 'isPrivate'],
+  required: [
+    'id',
+    'displayName',
+    'avatarUrl',
+    'autoShareRides',
+    'trimRouteEndpoints',
+    'cyclingGoal',
+    'username',
+    'isPrivate',
+    'shareConversionFeedOptin',
+  ],
   properties: {
     id: { type: 'string' },
     displayName: { type: 'string' },
@@ -195,6 +206,7 @@ export const profileResponseSchema = {
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
     isPrivate: { type: 'boolean' },
+    shareConversionFeedOptin: { type: 'boolean' },
   },
 } as const;
 

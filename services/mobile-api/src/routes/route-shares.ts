@@ -13,30 +13,50 @@ import type { ErrorResponse } from '@defensivepedal/core';
 import { buildShareDeepLinks } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
-import { dispatchAmbassadorRewardNotification } from '../lib/ambassadorRewards';
+import {
+  dispatchAmbassadorRewardNotification,
+  dispatchFirstViewNotification,
+} from '../lib/ambassadorRewards';
 import { requireAuthenticatedUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import {
   createRouteShareService,
+  isBotUserAgent,
   type RouteShareService,
 } from '../lib/routeShareService';
 import {
   errorResponseSchema,
+  mySharesResponseSchema,
   routeShareClaimParamsSchema,
   routeShareClaimResponseSchema,
   routeShareCreateRequestSchema,
   routeShareCreateResponseSchema,
+  routeShareDeleteParamsSchema,
   routeSharePublicParamsSchema,
   routeSharePublicResponseSchema,
+  routeShareViewBeaconResponseSchema,
+  type MySharesResponse,
   type RouteShareClaimParams,
   type RouteShareClaimResponse,
   type RouteShareCreateRequest,
   type RouteShareCreateResponse,
+  type RouteShareDeleteParams,
   type RouteSharePublicParams,
   type RouteSharePublicResponse,
+  type RouteShareViewBeaconResponse,
 } from '../lib/routeShareSchemas';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
+
+// Slice 8: rate limit on the public view beacon. Keyed by IP (+ optional
+// user agent via the memory rate limiter's bucket namespacing) so a single
+// client can only bump view_count `PUBLIC_VIEW_LIMIT` times per window per
+// share code. We enforce against (bucket, ip) rather than (ip, code) alone
+// so bots/automation scripts that spray many codes still hit the ceiling.
+const PUBLIC_VIEW_BUCKET = 'publicShareView';
+const PUBLIC_VIEW_LIMIT = 60; // 60 beacons/min/ip is generous
+const PUBLIC_VIEW_WINDOW_MS = 60_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -315,6 +335,202 @@ export const buildRouteShareRoutes = (
           code: 'BAD_REQUEST',
           details: [result.reason],
         });
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Slice 8: GET /v1/route-shares/mine
+    //
+    // Authenticated. Returns the caller's share rows (active + revoked,
+    // newest first) plus the Ambassador lifetime aggregates.
+    // -----------------------------------------------------------------------
+    app.get<{ Reply: MySharesResponse | ErrorResponse }>(
+      '/route-shares/mine',
+      {
+        schema: {
+          response: {
+            200: mySharesResponseSchema,
+            401: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireAuthenticatedUser(
+          request,
+          dependencies.authenticateUser,
+        );
+
+        const service = buildService();
+
+        try {
+          const result = await service.listMyShares(user.id);
+          return result;
+        } catch (err) {
+          request.log.error(
+            { event: 'route_share_list_mine_error', err: (err as Error).message },
+            'listMyShares failed',
+          );
+          throw new HttpError('Failed to load your shared routes.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [(err as Error).message],
+          });
+        }
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Slice 8: DELETE /v1/route-shares/:id
+    //
+    // Authenticated, owner-only. Non-owner and unknown id both resolve to
+    // 404 (anti-enumeration, same rationale as the RPC). Idempotent: revoking
+    // an already-revoked share still returns 204.
+    // -----------------------------------------------------------------------
+    app.delete<{ Params: RouteShareDeleteParams; Reply: ErrorResponse | undefined }>(
+      '/route-shares/:id',
+      {
+        schema: {
+          params: routeShareDeleteParamsSchema,
+          response: {
+            204: { type: 'null' },
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireAuthenticatedUser(
+          request,
+          dependencies.authenticateUser,
+        );
+
+        const service = buildService();
+
+        let result;
+        try {
+          result = await service.revokeShare({
+            id: request.params.id,
+            userId: user.id,
+          });
+        } catch (err) {
+          request.log.error(
+            { event: 'route_share_revoke_error', err: (err as Error).message },
+            'revokeShare failed',
+          );
+          throw new HttpError('Failed to revoke route share.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [(err as Error).message],
+          });
+        }
+
+        if (result.status === 'not_found') {
+          throw new HttpError('Route share not found.', {
+            statusCode: 404,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        reply.code(204).send(undefined);
+      },
+    );
+
+    // -----------------------------------------------------------------------
+    // Slice 8: POST /v1/route-shares/:code/view
+    //
+    // Public, UA-filtered + per-IP throttled. Fires the first-view push
+    // (best-effort) when the RPC reports firstView=true. Bot UAs and
+    // throttled callers get `{ bumped: false, firstView: false }` with
+    // HTTP 200 — we never reveal whether a code exists to a probable bot.
+    // -----------------------------------------------------------------------
+    app.post<{
+      Params: RouteSharePublicParams;
+      Reply: RouteShareViewBeaconResponse | ErrorResponse;
+    }>(
+      '/route-shares/:code/view',
+      {
+        schema: {
+          params: routeSharePublicParamsSchema,
+          response: {
+            200: routeShareViewBeaconResponseSchema,
+            404: errorResponseSchema,
+            410: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const ua = request.headers['user-agent'] as string | undefined;
+        if (isBotUserAgent(ua)) {
+          return { bumped: false, firstView: false };
+        }
+
+        const rlDecision = await dependencies.rateLimiter.consume({
+          bucket: PUBLIC_VIEW_BUCKET,
+          key: buildRateLimitIdentity({ ip: request.ip }),
+          limit: PUBLIC_VIEW_LIMIT,
+          windowMs: PUBLIC_VIEW_WINDOW_MS,
+        });
+        if (!rlDecision.allowed) {
+          return { bumped: false, firstView: false };
+        }
+
+        const service = buildService();
+
+        let result;
+        try {
+          result = await service.recordView(request.params.code);
+        } catch (err) {
+          request.log.error(
+            { event: 'route_share_view_error', err: (err as Error).message },
+            'recordView failed',
+          );
+          throw new HttpError('Failed to record route share view.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [(err as Error).message],
+          });
+        }
+
+        if (result.status === 'not_found') {
+          throw new HttpError('Route share not found.', {
+            statusCode: 404,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        if (result.status === 'gone') {
+          throw new HttpError(
+            result.reason === 'expired'
+              ? 'Route share has expired.'
+              : 'Route share has been revoked.',
+            {
+              statusCode: 410,
+              code: 'NOT_FOUND',
+              details: [result.reason],
+            },
+          );
+        }
+
+        // First view → fire-and-forget push to the sharer. Any failure is
+        // logged inside dispatchNotification; we never block the beacon
+        // response on push delivery (a push retry is cheaper than a view
+        // beacon timeout).
+        if (result.firstView) {
+          void dispatchFirstViewNotification({
+            sharerUserId: result.sharerUserId,
+            shortCode: result.shortCode,
+          }).catch((err) => {
+            request.log.warn(
+              { event: 'first_view_push_dispatch_failed', err: (err as Error).message },
+              'First-view push dispatch failed',
+            );
+          });
+        }
+
+        return { bumped: result.bumped, firstView: result.firstView };
       },
     );
   };

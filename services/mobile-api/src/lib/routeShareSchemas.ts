@@ -371,3 +371,106 @@ export type RouteShareClaimResponse = {
   alreadyClaimed: boolean;
   rewards: ClaimInviteeRewards;
 };
+
+// ---------------------------------------------------------------------------
+// Slice 8 — Ambassador observability + control
+// ---------------------------------------------------------------------------
+
+// GET /v1/route-shares/mine
+export const mySharesResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['shares', 'ambassadorStats'],
+  properties: {
+    shares: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: [
+          'id',
+          'shortCode',
+          'sourceType',
+          'createdAt',
+          'expiresAt',
+          'viewCount',
+          'signupCount',
+          'revokedAt',
+        ],
+        properties: {
+          id: { type: 'string' },
+          shortCode: { type: 'string', minLength: 8, maxLength: 8 },
+          sourceType: { type: 'string', enum: ['planned', 'saved', 'past_ride'] },
+          createdAt: { type: 'string' },
+          expiresAt: { type: ['string', 'null'] },
+          viewCount: { type: 'integer', minimum: 0 },
+          signupCount: { type: 'integer', minimum: 0 },
+          revokedAt: { type: ['string', 'null'] },
+        },
+      },
+    },
+    ambassadorStats: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['sharesSent', 'opens', 'signups', 'xpEarned'],
+      properties: {
+        sharesSent: { type: 'integer', minimum: 0 },
+        opens: { type: 'integer', minimum: 0 },
+        signups: { type: 'integer', minimum: 0 },
+        xpEarned: { type: 'integer', minimum: 0 },
+      },
+    },
+  },
+} as const;
+
+export type MyShareRowApi = {
+  id: string;
+  shortCode: string;
+  sourceType: 'planned' | 'saved' | 'past_ride';
+  createdAt: string;
+  expiresAt: string | null;
+  viewCount: number;
+  signupCount: number;
+  revokedAt: string | null;
+};
+
+export type AmbassadorStatsApi = {
+  sharesSent: number;
+  opens: number;
+  signups: number;
+  xpEarned: number;
+};
+
+export type MySharesResponse = {
+  shares: MyShareRowApi[];
+  ambassadorStats: AmbassadorStatsApi;
+};
+
+// DELETE /v1/route-shares/:id
+export const routeShareDeleteParamsSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id'],
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+  },
+} as const;
+
+export type RouteShareDeleteParams = { id: string };
+
+// POST /v1/route-shares/:code/view
+// Reuses the existing 8-char base62 param schema shape.
+export const routeShareViewBeaconResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['bumped', 'firstView'],
+  properties: {
+    bumped: { type: 'boolean' },
+    firstView: { type: 'boolean' },
+  },
+} as const;
+
+export type RouteShareViewBeaconResponse = {
+  bumped: boolean;
+  firstView: boolean;
+};
