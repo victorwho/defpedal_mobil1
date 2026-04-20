@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-04-20 — Route-Share Slice 7c (PostHog Analytics)
+
+### Features
+- **Three web events** captured on `/r/[code]` with `{ share_code }` property so funnels join end-to-end with the mobile-side `share_claim_success`:
+  - `share_view` — fires on page mount
+  - `install_cta_click` — fires on Google Play CTA tap
+  - `app_open_intent` — fires on Open-in-app universal-link tap
+- **Mobile counterpart**: `ShareClaimProcessor` captures `share_claim_success` on the ok branch with `{ share_code, already_claimed, follow_pending }` so re-claims and private-sharer follow branches stay distinguishable in PostHog.
+- **Delegated click listener**: `data-share-cta="<event_name>"` attributes on the CTA anchors are read at click time. Keeps `ShareCtas` a pure Server Component — no onClick prop, no client-component conversion.
+- **Quota protection**: PostHog initialized with `person_profiles: 'identified_only'` so OG scrapers (WhatsApp/Twitter/Slack) that render preview cards don't create anonymous profiles that bill against quota.
+- **Graceful no-op**: absent `NEXT_PUBLIC_POSTHOG_API_KEY` → `ShareAnalytics` silently returns; page renders and CTAs work unchanged.
+
+### Build infra
+- **Web zod alias**: switched `apps/web/next.config.js` from a hardcoded `apps/web/node_modules/zod` path to `require.resolve('zod/package.json')`. Works on both Vercel (`--workspaces=false`) and local workspace installs (where zod hoists to the repo root).
+
+### User action required
+- Set `NEXT_PUBLIC_POSTHOG_API_KEY` (and optionally `NEXT_PUBLIC_POSTHOG_HOST`) on the Vercel project and redeploy to pick up the env var. Reuse the existing PostHog key from `apps/mobile/.env` (`EXPO_PUBLIC_POSTHOG_API_KEY`).
+
+### Deferred
+- **7b** — next-intl EN + RO bundles + manual language toggle
+- **cookie-based distinct_id bridge** — PRD's "share_code also bridged via cookie at claim time" isn't needed for the funnels the PRD lists; the `share_code` property join already stitches web + mobile events.
+
+### Verified
+- Vercel `dpl_AM3YMBc5AFFTmx67asSzQxavy1Ck` READY at 1776659204946.
+- HTML on live share `NX0MHjeZ` carries both `data-share-cta` attributes; page bundle `page-9ca834075bdd9db8.js` contains `posthog` / `share_view` / `share-cta` tokens.
+
+### Tests
+- mobile: +2 new in `ShareClaimProcessor.test.tsx` (fires on ok with correct properties; does NOT fire on 404/gone/invalid/auth_required/network_error). 17/17 `ShareClaimProcessor` green.
+
 ## 2026-04-20 — Route-Share Slice 7a (OG Preview Image)
 
 ### Features
