@@ -21,7 +21,6 @@
 - Typecheck green on mobile + web + api. Mobile bundle check HTTP 200. Existing AuthSessionProvider tests pass.
 
 ### Known followups
-- Email template body is a placeholder; rewrite with real copy.
 - Consider Android App Links + iOS Universal Links for a smoother UX that skips the browser-flash step.
 
 ## 2026-04-20 — Route-Share Slice 8b (Mobile UI + Web Beacon)

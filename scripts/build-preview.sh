@@ -57,7 +57,7 @@ for f in app.config.ts metro.config.js tsconfig.json package.json; do
   cp -f "$SRC/apps/mobile/$f" "$DST/apps/mobile/$f" 2>/dev/null || true
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
-cp -f "$SRC/package-lock.json" "$DST/package-lock.json" 2>/dev/null || true
+cp -pf "$SRC/package-lock.json" "$DST/package-lock.json" 2>/dev/null || true
 
 # Sync workspace package.json files (in case new deps were added)
 cp -f "$SRC/apps/mobile/package.json" "$DST/apps/mobile/package.json" 2>/dev/null || true
@@ -65,15 +65,28 @@ cp -f "$SRC/packages/core/package.json" "$DST/packages/core/package.json" 2>/dev
 cp -f "$SRC/services/mobile-api/package.json" "$DST/services/mobile-api/package.json" 2>/dev/null || true
 
 # Ensure node_modules on DST match the synced package-lock.json.
-# Checks a sentinel module from the worktree — if missing on DST, run install.
+#
+# Previous approach hard-coded a sentinel module list and missed any new
+# dependency not on the list (e.g. expo-clipboard added for route-share
+# slice 8b broke the 2026-04-20 build). Now we compare the lockfile mtime
+# against the marker npm writes inside node_modules on every install —
+# any change to dependencies, regardless of which workspace added them,
+# triggers a reinstall.
 if [ "${SKIP_NPM_INSTALL:-0}" != "1" ]; then
-  if [ ! -d "$DST/node_modules/react-native-view-shot" ] \
-     || [ ! -d "$DST/node_modules/expo-sharing" ] \
-     || [ ! -d "$DST/node_modules/expo-media-library" ]; then
-    echo "── Step 1a: Install npm deps on DST (new packages detected) ──"
+  NEEDS_INSTALL=false
+  if [ ! -f "$DST/node_modules/.package-lock.json" ]; then
+    NEEDS_INSTALL=true
+    REASON="node_modules missing or never installed"
+  elif [ "$DST/package-lock.json" -nt "$DST/node_modules/.package-lock.json" ]; then
+    NEEDS_INSTALL=true
+    REASON="package-lock.json newer than last install"
+  fi
+
+  if [ "$NEEDS_INSTALL" = "true" ]; then
+    echo "── Step 1a: Install npm deps on DST ($REASON) ──"
     ( cd "$DST" && npm install --no-audit --no-fund )
   else
-    echo "── Step 1a: DST node_modules OK (skipping npm install) ──"
+    echo "── Step 1a: DST node_modules up to date with lockfile (skipping npm install) ──"
   fi
 fi
 
