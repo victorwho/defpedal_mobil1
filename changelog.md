@@ -23,6 +23,10 @@
 - **Past-ride share variant** (slice 5b) — contract discriminator still stubs `past_ride` with `z.never()`.
 - **Richer feed-card** — current `RouteShareSignupContent` is minimal (icon + "Someone signed up via a shared route"). A future slice can add the trimmed polyline mini-map preview if conversion CTR warrants it.
 
+### Post-ship fixes (verified on-device)
+- **Require cycle** in `AmbassadorImpactCard` — the organism was importing `useTheme` / `ThemeColors` from the `..` barrel (`src/design-system/index.ts`), which re-exports organisms and forms a cycle. Switched to importing from `../ThemeContext` directly (the same path other organisms use for their theme imports).
+- **VirtualizedLists-should-never-be-nested warning** on `/my-shares` — the shared `Screen` wrapper nests children inside a `ScrollView`, and our `FlatList` was triggering the React Native dev warning. Refactored `my-shares.tsx` to compose `SafeAreaView` + `ScreenHeader` atom + `FlatList` directly (matches the pattern used by `community-feed.tsx` and `history.tsx` which also host FlatLists).
+
 ## 2026-04-20 — Route-Share Slice 8a (Ambassador Backend)
 
 ### Features

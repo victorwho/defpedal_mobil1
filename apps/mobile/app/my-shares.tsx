@@ -21,10 +21,11 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 
-import { Screen } from '../src/components/Screen';
+import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { AmbassadorImpactCard } from '../src/design-system/organisms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -214,78 +215,76 @@ export default function MySharesScreen() {
     );
   };
 
-  if (query.isLoading && !data) {
-    return (
-      <Screen headerVariant="back" title="Your shared routes">
+  // Don't wrap in the shared `Screen` component — its ScrollView nests
+  // our FlatList and triggers the "VirtualizedLists should never be
+  // nested inside plain ScrollViews" warning. Composing the header atom
+  // + FlatList directly makes the FlatList the only scroller.
+  return (
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: colors.bgDeep }]}
+    >
+      <ScreenHeader variant="back" title="Your shared routes" />
+
+      {query.isLoading && !data ? (
         <View style={styles.centerBox}>
           <ActivityIndicator color={colors.accent} />
         </View>
-      </Screen>
-    );
-  }
-
-  if (query.isError && !data) {
-    return (
-      <Screen headerVariant="back" title="Your shared routes">
+      ) : query.isError && !data ? (
         <View style={styles.centerBox}>
           <Text style={styles.errorText}>
             Couldn&apos;t load your shares. Pull to refresh.
           </Text>
         </View>
-      </Screen>
-    );
-  }
-
-  return (
-    <Screen headerVariant="back" title="Your shared routes">
-      <FlatList
-        data={shares}
-        keyExtractor={(item) => item.id}
-        renderItem={renderRow}
-        refreshControl={
-          <RefreshControl
-            refreshing={query.isFetching && !query.isLoading}
-            onRefresh={() => query.refetch()}
-            tintColor={colors.accent}
-          />
-        }
-        ListHeaderComponent={
-          data?.ambassadorStats ? (
-            <View style={styles.headerWrap}>
-              <AmbassadorImpactCard
-                stats={data.ambassadorStats}
-                isLoading={false}
-                hideWhenEmpty={false}
-              />
+      ) : (
+        <FlatList
+          data={shares}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRow}
+          refreshControl={
+            <RefreshControl
+              refreshing={query.isFetching && !query.isLoading}
+              onRefresh={() => query.refetch()}
+              tintColor={colors.accent}
+            />
+          }
+          ListHeaderComponent={
+            data?.ambassadorStats ? (
+              <View style={styles.headerWrap}>
+                <AmbassadorImpactCard
+                  stats={data.ambassadorStats}
+                  isLoading={false}
+                  hideWhenEmpty={false}
+                />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>No shares yet</Text>
+              <Text style={styles.emptySubtitle}>
+                Share a route and it will show up here, along with view and
+                signup counts.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.replace('/route-planning')}
+                style={({ pressed }) => [
+                  styles.emptyCta,
+                  pressed && styles.actionBtnPressed,
+                ]}
+              >
+                <Text style={styles.emptyCtaText}>Plan a route</Text>
+              </Pressable>
             </View>
-          ) : null
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>No shares yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Share a route and it will show up here, along with view and
-              signup counts.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.replace('/route-planning')}
-              style={({ pressed }) => [
-                styles.emptyCta,
-                pressed && styles.actionBtnPressed,
-              ]}
-            >
-              <Text style={styles.emptyCtaText}>Plan a route</Text>
-            </Pressable>
-          </View>
-        }
-        contentContainerStyle={[
-          styles.listContent,
-          shares.length === 0 && styles.listContentEmpty,
-        ]}
-        ItemSeparatorComponent={() => <View style={{ height: space[3] }} />}
-      />
-    </Screen>
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            shares.length === 0 && styles.listContentEmpty,
+          ]}
+          ItemSeparatorComponent={() => <View style={{ height: space[3] }} />}
+        />
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -295,6 +294,9 @@ export default function MySharesScreen() {
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    safeArea: {
+      flex: 1,
+    },
     listContent: {
       padding: space[4],
       gap: space[3],

@@ -16,7 +16,7 @@ import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import type { AmbassadorStatsClient } from '../../lib/api';
-import { useTheme, type ThemeColors } from '..';
+import { useTheme, type ThemeColors } from '../ThemeContext';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
