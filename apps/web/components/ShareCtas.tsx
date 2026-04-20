@@ -107,7 +107,16 @@ export function ShareCtas({ code }: ShareCtasProps) {
 
   return (
     <nav style={styles.nav} aria-label="Route sharing actions">
-      <a href={appUrl} style={styles.primary}>
+      {/*
+        data-share-cta attributes (slice 7c) hook into ShareAnalytics's
+        delegated click listener. Keeping the logic declarative avoids
+        turning this Server Component into a Client Component, which
+        would break server-rendered HTML and add a hydration boundary
+        we don't need (Next.js 15 forbids event-handler props on
+        Server-Component DOM elements anyway — see slice-1 Vercel
+        repair notes for the onClick incident).
+      */}
+      <a href={appUrl} style={styles.primary} data-share-cta="app_open_intent">
         Open in Defensive Pedal
       </a>
       <div style={styles.downloadRow}>
@@ -117,6 +126,7 @@ export function ShareCtas({ code }: ShareCtasProps) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Download Defensive Pedal on Google Play"
+          data-share-cta="install_cta_click"
         >
           Get it on Google Play
         </a>

@@ -31,6 +31,7 @@ import type { BadgeUnlockEvent, RouteShareClaimInviteeRewards } from '@defensive
 
 import { mobileApi } from '../lib/api';
 import { mapShareClaimToPreview } from '../lib/shareClaimToPreview';
+import { telemetry } from '../lib/telemetry';
 import { XpGainToast } from '../design-system/atoms/XpGainToast';
 import { Toast } from '../design-system/molecules/Toast';
 import { tierColors, type BadgeTier } from '../design-system/tokens/badgeColors';
@@ -157,6 +158,19 @@ export const ShareClaimProcessor = () => {
         switch (result.status) {
           case 'ok': {
             clearPendingShareClaim();
+            // Slice 7c: mobile-side counterpart to the web viewer's
+            // share_view / install_cta_click / app_open_intent events.
+            // PostHog joins the funnel on `share_code` — web-side
+            // scrapers-and-real-views on one side, device-side claims
+            // on the other. alreadyClaimed=true is still a signal (the
+            // user ended up in the app from the same share on a
+            // different device or after a reinstall), so fire both
+            // branches but tag the re-claim flag.
+            telemetry.capture('share_claim_success', {
+              share_code: code,
+              already_claimed: result.data.alreadyClaimed,
+              follow_pending: result.data.rewards.followPending,
+            });
             // Seed store with the claimed route + navigate to route-preview
             // so the user lands directly on the map (PRD E2E AC). Suppress
             // navigation if the user is already NAVIGATING a different ride —

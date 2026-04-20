@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchRouteShare } from '../../../lib/fetchRouteShare';
+import { ShareAnalytics } from '../../../components/ShareAnalytics';
 import { ShareCtas } from '../../../components/ShareCtas';
 import { ShareGoneCard } from '../../../components/ShareGoneCard';
 import { ShareLayout } from '../../../components/ShareLayout';
@@ -75,10 +76,20 @@ export default async function RouteSharePage({ params }: PageProps) {
   if (result.status === 'error') throw new Error(result.message);
 
   return (
-    <ShareLayout
-      map={<ShareMap share={result.data} />}
-      stats={<ShareStatsBar share={result.data} />}
-      ctas={<ShareCtas code={code} />}
-    />
+    <>
+      {/*
+        Slice 7c: PostHog analytics client component. Fires share_view
+        on mount and sets up delegated click listeners for the
+        data-share-cta attributes on ShareCtas buttons. Returns null
+        so layout is unaffected. Sibling of ShareLayout rather than a
+        child so the instrumentation stays colocated with the page.
+      */}
+      <ShareAnalytics shareCode={code} />
+      <ShareLayout
+        map={<ShareMap share={result.data} />}
+        stats={<ShareStatsBar share={result.data} />}
+        ctas={<ShareCtas code={code} />}
+      />
+    </>
   );
 }

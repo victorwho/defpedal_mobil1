@@ -11,11 +11,15 @@ const nextConfig = {
   transpilePackages: ['@defensivepedal/core'],
   // transpilePackages alone doesn't fully flatten transitive resolution on Vercel — webpack
   // still walks up from packages/core/src/ looking for node_modules/zod and finds nothing.
-  // Pin resolution explicitly so the import always lands on apps/web/node_modules/zod.
+  // Pin resolution explicitly. `require.resolve('zod')` uses Node's module resolution, which
+  // walks from this config file outward and picks up zod wherever it actually is:
+  //   - Vercel (--workspaces=false): apps/web/node_modules/zod
+  //   - Local workspace install:     <repo-root>/node_modules/zod (hoisted)
+  // Both build environments stay green without a hardcoded apps/web path.
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
-      zod: path.resolve(__dirname, 'node_modules/zod'),
+      zod: path.dirname(require.resolve('zod/package.json')),
     };
     return config;
   },

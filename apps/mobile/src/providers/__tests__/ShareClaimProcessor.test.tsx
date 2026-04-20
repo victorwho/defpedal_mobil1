@@ -123,6 +123,23 @@ vi.mock('../AuthSessionProvider', () => ({
   }),
 }));
 
+// Slice 7c: telemetry.capture fires share_claim_success on ok branch.
+// The real module pulls in @sentry/react-native + posthog-react-native
+// which don't resolve cleanly under vitest's ESM strictness — stub the
+// surface the component actually calls.
+const telemetryCaptureSpy = vi.fn();
+vi.mock('../../lib/telemetry', () => ({
+  telemetry: {
+    capture: (...args: unknown[]) => telemetryCaptureSpy(...args),
+    identify: vi.fn(),
+    screen: vi.fn(),
+    captureError: vi.fn(),
+    flush: vi.fn(),
+  },
+  telemetryStatus: { sentryEnabled: false, posthogEnabled: false },
+  initializeTelemetry: vi.fn(),
+}));
+
 // ── mobileApi.claimRouteShare mock ──
 type ClaimResult =
   | { status: 'ok'; data: Record<string, unknown> }
@@ -201,6 +218,7 @@ describe('ShareClaimProcessor', () => {
     mockAuth = { user: { id: 'invitee-1' }, isLoading: false };
     claimRouteShareSpy.mockReset();
     routerPushSpy.mockReset();
+    telemetryCaptureSpy.mockReset();
   });
 
   afterEach(() => {
@@ -473,6 +491,45 @@ describe('ShareClaimProcessor', () => {
       // Must NOT include the pending-follow suffix on the public-sharer branch.
       expect(toast.getAttribute('data-message')).not.toMatch(/follow request/i);
     });
+  });
+
+  it('slice 7c: fires share_claim_success telemetry event with share_code + flags on ok branch', async () => {
+    claimRouteShareSpy.mockResolvedValue({
+      status: 'ok',
+      data: {
+        ...okClaimData,
+        rewards: {
+          inviteeXpAwarded: 50,
+          inviteeNewBadges: [],
+          followPending: true,
+        },
+      },
+    });
+    useAppStore.setState({ pendingShareClaim: 'abcd1234' });
+    render(<ShareClaimProcessor />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(telemetryCaptureSpy).toHaveBeenCalledTimes(1);
+    expect(telemetryCaptureSpy).toHaveBeenCalledWith('share_claim_success', {
+      share_code: 'abcd1234',
+      already_claimed: false,
+      follow_pending: true,
+    });
+  });
+
+  it('slice 7c: telemetry NOT fired on 404/gone/invalid/auth_required/network_error branches', async () => {
+    // Only the 'ok' branch fires share_claim_success — everything else is a
+    // miss funnel step, tracked on the server side or not at all.
+    claimRouteShareSpy.mockResolvedValue({ status: 'not_found' });
+    useAppStore.setState({ pendingShareClaim: 'abcd1234' });
+    render(<ShareClaimProcessor />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(telemetryCaptureSpy).not.toHaveBeenCalled();
   });
 
   it('slice 4: idempotent re-claim does not surface followPending copy even when the reward is true', async () => {
