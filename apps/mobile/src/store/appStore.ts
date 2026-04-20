@@ -65,6 +65,10 @@ type AppStore = QueueSlice & {
   navigationSession: NavigationSession | null;
   offlineRegions: OfflineRegion[];
   shareTripsPublicly: boolean;
+  // Slice 8: sharer opt-in for route-share conversion activity-feed cards.
+  // Default true. When false, a successful claim still awards XP + badges,
+  // but no feed entry is published to the sharer's followers.
+  shareConversionFeedOptin: boolean;
   bikeType: string | null;
   cyclingFrequency: string | null;
   avoidUnpaved: boolean;
@@ -150,6 +154,7 @@ type AppStore = QueueSlice & {
   showRouteComparison: boolean;
   setShowRouteComparison: (enabled: boolean) => void;
   setShareTripsPublicly: (enabled: boolean) => void;
+  setShareConversionFeedOptin: (enabled: boolean) => void;
   setBikeType: (type: string | null) => void;
   setCyclingFrequency: (frequency: string | null) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
@@ -238,6 +243,7 @@ export const useAppStore = create<AppStore>()(
       showRouteComparison: true,
       ...createQueueSlice(set, get),
       shareTripsPublicly: true,
+      shareConversionFeedOptin: true,
       bikeType: null,
       cyclingFrequency: null,
       avoidUnpaved: false,
@@ -414,6 +420,9 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ showRouteComparison: enabled })),
       setShareTripsPublicly: (enabled) =>
         set(() => ({ shareTripsPublicly: enabled })),
+
+      setShareConversionFeedOptin: (enabled) =>
+        set(() => ({ shareConversionFeedOptin: enabled })),
       setBikeType: (type) => {
         const pavedPreferred = type === 'Road bike' || type === 'City bike' || type === 'Recumbent';
         const unpavedPreferred = type === 'Mountain bike';
@@ -737,6 +746,7 @@ export const useAppStore = create<AppStore>()(
         activeTripClientId: state.activeTripClientId,
         showRouteComparison: state.showRouteComparison,
         shareTripsPublicly: state.shareTripsPublicly,
+        shareConversionFeedOptin: state.shareConversionFeedOptin,
         showBicycleLanes: state.showBicycleLanes,
         poiVisibility: state.poiVisibility,
         notifyWeather: state.notifyWeather,

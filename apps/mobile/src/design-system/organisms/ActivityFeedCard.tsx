@@ -203,6 +203,9 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
       {item.type === 'badge_unlock' && (
         <BadgeUnlockContent item={item} styles={styles} colors={colors} />
       )}
+      {item.type === 'route_share_signup' && (
+        <RouteShareSignupContent styles={styles} colors={colors} />
+      )}
 
       {/* Reaction bar */}
       <View style={styles.actionBar}>
@@ -530,6 +533,33 @@ const BadgeUnlockContent = React.memo(function BadgeUnlockContent({
 });
 
 // ---------------------------------------------------------------------------
+// Route Share Signup content (Slice 8)
+//
+// Minimal card — just icon + message. The trimmed polyline payload is
+// available but a full mini-map preview would add weight; slice 8c can
+// layer that in if conversion CTR warrants it.
+// ---------------------------------------------------------------------------
+
+interface RouteShareSignupContentProps {
+  styles: ReturnType<typeof createThemedStyles>;
+  colors: ThemeColors;
+}
+
+const RouteShareSignupContent = React.memo(function RouteShareSignupContent({
+  styles,
+  colors,
+}: RouteShareSignupContentProps) {
+  return (
+    <View style={styles.routeShareSignupContainer}>
+      <Ionicons name="share-social" size={20} color={colors.accent} />
+      <Text style={styles.routeShareSignupText}>
+        Someone signed up via a shared route.
+      </Text>
+    </View>
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
@@ -755,6 +785,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontSize: textSm.fontSize,
       fontFamily: fontFamily.body.regular,
       fontStyle: 'italic',
+    },
+
+    // Route Share Signup (Slice 8)
+    routeShareSignupContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingVertical: space[1],
+    },
+    routeShareSignupText: {
+      color: colors.textPrimary,
+      fontSize: textBase.fontSize,
+      fontFamily: fontFamily.body.medium,
+      flex: 1,
     },
 
     // Action bar

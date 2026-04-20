@@ -33,7 +33,7 @@ export const activityFeedItemSchema = {
   properties: {
     id: { type: 'string' },
     user: activityFeedUserSchema,
-    type: { type: 'string', enum: ['ride', 'hazard_batch', 'hazard_standalone', 'tier_up', 'badge_unlock'] },
+    type: { type: 'string', enum: ['ride', 'hazard_batch', 'hazard_standalone', 'tier_up', 'badge_unlock', 'route_share_signup'] },
     payload: { type: 'object', additionalProperties: true },
     createdAt: { type: 'string', format: 'date-time' },
     likeCount: { type: 'integer' },

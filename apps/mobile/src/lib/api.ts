@@ -680,6 +680,13 @@ export const mobileApi = {
   // server-side `ClaimShareResult`.
   claimRouteShare: (code: string): Promise<ClaimRouteShareResult> =>
     claimRouteShareImpl(code),
+
+  // ── Slice 8: My Shares + Revoke ──
+
+  listMyShares: () => requestJson<MySharesResult>('/v1/route-shares/mine'),
+
+  revokeMyShare: (id: string): Promise<RevokeRouteShareResult> =>
+    revokeMyShareImpl(id),
 };
 
 // ---------------------------------------------------------------------------
@@ -873,4 +880,95 @@ export type PublicRouteShare = {
   viewCount: number;
   createdAt: string;
   expiresAt: string | null;
+};
+
+// ---------------------------------------------------------------------------
+// Slice 8 — My Shares client types (mirror mobile-api wire format)
+// ---------------------------------------------------------------------------
+
+export type MyShareRowClient = {
+  id: string;
+  shortCode: string;
+  sourceType: 'planned' | 'saved' | 'past_ride';
+  createdAt: string;
+  expiresAt: string | null;
+  viewCount: number;
+  signupCount: number;
+  revokedAt: string | null;
+};
+
+export type AmbassadorStatsClient = {
+  sharesSent: number;
+  opens: number;
+  signups: number;
+  xpEarned: number;
+};
+
+export type MySharesResult = {
+  shares: MyShareRowClient[];
+  ambassadorStats: AmbassadorStatsClient;
+};
+
+// ---------------------------------------------------------------------------
+// Slice 8 — revokeMyShare
+//
+// Returns a discriminated union so the hook can tell 204 (ok) from 404
+// (not_found) without a throw-on-error dance. 401 surfaces as auth_required
+// (consistent with claimRouteShare's shape).
+// ---------------------------------------------------------------------------
+
+export type RevokeRouteShareResult =
+  | { status: 'ok' }
+  | { status: 'not_found' }
+  | { status: 'auth_required' }
+  | { status: 'network_error'; message: string };
+
+const revokeMyShareImpl = async (
+  id: string,
+): Promise<RevokeRouteShareResult> => {
+  const accessToken = await getAccessToken();
+  const url = `${ensureBaseUrl()}/v1/route-shares/${encodeURIComponent(id)}`;
+  const init: RequestInit = { method: 'DELETE' };
+
+  let response: RequestResponse;
+  try {
+    const transport = await executeTransport(url, init, accessToken);
+    response = transport.response;
+
+    if (response.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        const retry = await executeTransport(url, init, refreshedToken);
+        response = retry.response;
+      }
+    }
+  } catch (err) {
+    return {
+      status: 'network_error',
+      message: err instanceof Error ? err.message : 'Network error',
+    };
+  }
+
+  if (response.status === 204 || response.ok) {
+    return { status: 'ok' };
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { status: 'auth_required' };
+  }
+  if (response.status === 404) {
+    return { status: 'not_found' };
+  }
+
+  try {
+    const raw = await response.text();
+    return {
+      status: 'network_error',
+      message: raw || `Revoke failed with HTTP ${response.status}`,
+    };
+  } catch {
+    return {
+      status: 'network_error',
+      message: `Revoke failed with HTTP ${response.status}`,
+    };
+  }
 };

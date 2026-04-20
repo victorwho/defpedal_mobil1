@@ -130,6 +130,7 @@ export default function ProfileScreen() {
     locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
     shareTripsPublicly, themePreference, showBicycleLanes, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
+    shareConversionFeedOptin,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -146,6 +147,7 @@ export default function ProfileScreen() {
     notifyCommunity: state.notifyCommunity,
     quietHoursStart: state.quietHoursStart,
     quietHoursEnd: state.quietHoursEnd,
+    shareConversionFeedOptin: state.shareConversionFeedOptin,
   })));
 
   // Actions - stable references, single selector with shallow comparison
@@ -154,6 +156,7 @@ export default function ProfileScreen() {
     setShowRouteComparison, setShareTripsPublicly, setThemePreference,
     setShowBicycleLanes, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
+    setShareConversionFeedOptin,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -169,6 +172,7 @@ export default function ProfileScreen() {
     setNotifyHazard: state.setNotifyHazard,
     setNotifyCommunity: state.setNotifyCommunity,
     setQuietHours: state.setQuietHours,
+    setShareConversionFeedOptin: state.setShareConversionFeedOptin,
   })));
 
   // Sync a single notification preference to the backend (fire-and-forget).
@@ -200,9 +204,10 @@ export default function ProfileScreen() {
         quietHoursStart,
         quietHoursEnd,
         quietHoursTimezone: tz,
+        shareConversionFeedOptin,
       })
       .catch(() => {/* best-effort */});
-  }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd]);
+  }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd, shareConversionFeedOptin]);
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
@@ -672,6 +677,40 @@ export default function ProfileScreen() {
               checked={shareTripsPublicly}
               onChange={setShareTripsPublicly}
             />
+
+            {/* Slice 8: sharer controls whether successful claims publish
+                a route_share_signup card to their activity feed. XP/badges
+                ship regardless — this is only the feed fork. */}
+            <SettingRow
+              label="Share activity feed"
+              description={
+                shareConversionFeedOptin
+                  ? 'Your followers see when someone signs up via your shared routes.'
+                  : 'Signups via your shares stay private — you still earn XP and badges.'
+              }
+              checked={shareConversionFeedOptin}
+              onChange={(checked) => {
+                setShareConversionFeedOptin(checked);
+                void mobileApi
+                  .updateProfile({ shareConversionFeedOptin: checked })
+                  .catch(() => {/* best-effort */});
+              }}
+            />
+
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => router.push('/my-shares' as any)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="My shared routes"
+            >
+              <Ionicons name="share-social-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>My shared routes</Text>
+                <Text style={styles.settingDescription}>See opens, signups, and revoke stale links.</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
 
             <PrivateProfileSection
               isPrivate={profile?.isPrivate ?? false}

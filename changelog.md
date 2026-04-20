@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-04-20 — Route-Share Slice 8b (Mobile UI + Web Beacon)
+
+### Features
+- **My Shares screen** (`apps/mobile/app/my-shares.tsx`) — replaces the slice-3 landing stub with a real list of the user's shares, per-row opens + signups counters, expiry countdown, revoked pill, and Copy / Share again / Revoke actions with a confirm dialog.
+- **Ambassador Impact card** — new `AmbassadorImpactCard` organism rendered at the top of My Shares showing shares sent, opens, signups, and XP earned.
+- **Profile toggle** — "Share activity feed" in Profile → Account controls `shareConversionFeedOptin` (default on). When off, claimed shares no longer publish a conversion card to the sharer's activity feed. Rewards (XP + badges) ship regardless.
+- **My Shared Routes nav** — new row in Profile → Account deep-linking to `/my-shares`. Target for slice-8a first-view push notifications (`data.deepLink = '/my-shares'`).
+- **Activity feed** — `ActivityFeedCard` now renders the new `'route_share_signup'` row type via an internal `RouteShareSignupContent` variant. Wire-response schema in `activityFeedSchemas.ts` extends the type enum so `get_ranked_feed` rows don't get stripped.
+- **Web viewer beacon** — new `ShareViewBeacon` client component on `/r/[code]/page.tsx` POSTs `/v1/route-shares/:code/view` on mount. Fire-and-forget, `sessionStorage` de-duped so Strict Mode / tab-refocus don't double-bump. Triggers first-view push notifications to sharers server-side.
+
+### Infra
+- **Cloud Run redeploy** — revision `defpedal-api-00058-6m6` shipped slice 8a endpoints; follow-up revision `defpedal-api-00059-cj5` ships the content-type parser fix: Fastify was rejecting POSTs without a `Content-Type` header (415) before the route handler could run, which broke the public view beacon for any caller that didn't explicitly set the header. Added a wildcard `addContentTypeParser('*')` on `services/mobile-api/src/app.ts` that resolves empty/unknown bodies to `undefined`. Verified live with `Googlebot/2.1` UA → HTTP 200 `{bumped:false,firstView:false}`.
+- **Core contract** — `ActivityType` extends with `'route_share_signup'`; new `RouteShareSignupActivity` / `RouteShareSignupPayload` interfaces, `ActivityFeedItem` union updated.
+- **Zustand store** — `shareConversionFeedOptin: boolean` (default true) + `setShareConversionFeedOptin` action persisted to AsyncStorage.
+
+### Tests
+- 474/474 core, 424/424 mobile-api, typecheck green across api + mobile + web, mobile bundle check HTTP 200.
+- 4 pre-existing mobile test failures (ConnectivityMonitor × 4 NetInfo mock issue, FeedCard.champion parse error, LeaderboardSection) confirmed unrelated via stash-bisect.
+
+### Deferred
+- **Past-ride share variant** (slice 5b) — contract discriminator still stubs `past_ride` with `z.never()`.
+- **Richer feed-card** — current `RouteShareSignupContent` is minimal (icon + "Someone signed up via a shared route"). A future slice can add the trimmed polyline mini-map preview if conversion CTR warrants it.
+
 ## 2026-04-20 — Route-Share Slice 8a (Ambassador Backend)
 
 ### Features

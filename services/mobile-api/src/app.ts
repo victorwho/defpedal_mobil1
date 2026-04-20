@@ -39,6 +39,16 @@ export const buildApp = (options: {
     }
   });
 
+  // Slice 8: accept POSTs with no/unknown content type (e.g. beacon
+  // requests from scrapers or curl without `-H "Content-Type: ..."`).
+  // Without this, Fastify rejects them with 415 before the route handler
+  // can see them — which breaks the public view beacon. Empty/unknown
+  // bodies resolve to `undefined` so routes that don't declare a body
+  // schema behave as if no body was sent.
+  app.addContentTypeParser('*', { parseAs: 'string' }, (_req, _body, done) => {
+    done(null, undefined);
+  });
+
   void app.register(cors, {
     origin:
       config.corsOrigin === '*'

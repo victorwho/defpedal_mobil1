@@ -462,7 +462,15 @@ export interface FeedItem {
 
 // ── Social Network (Activity Feed) ──
 
-export type ActivityType = 'ride' | 'hazard_batch' | 'hazard_standalone' | 'tier_up' | 'badge_unlock';
+export type ActivityType =
+  | 'ride'
+  | 'hazard_batch'
+  | 'hazard_standalone'
+  | 'tier_up'
+  | 'badge_unlock'
+  // Slice 8: surfaced when someone claims a share and the sharer has
+  // shareConversionFeedOptin=true (see claim_route_share RPC).
+  | 'route_share_signup';
 
 export type FollowStatus = 'none' | 'pending' | 'accepted';
 
@@ -562,12 +570,28 @@ export interface BadgeUnlockActivity extends ActivityFeedItemBase {
   readonly payload: BadgeUnlockPayload;
 }
 
+// Slice 8: payload for 'route_share_signup' activity-feed rows. Mirrors the
+// server-side jsonb in claim_route_share RPC; the polyline is the *trimmed*
+// variant so feed viewers never see home/work addresses.
+export interface RouteShareSignupPayload {
+  readonly sharerUserId: string;
+  readonly inviteeUserId: string;
+  readonly shareId: string;
+  readonly routePreviewPolylineTrimmed: string;
+}
+
+export interface RouteShareSignupActivity extends ActivityFeedItemBase {
+  readonly type: 'route_share_signup';
+  readonly payload: RouteShareSignupPayload;
+}
+
 export type ActivityFeedItem =
   | RideActivity
   | HazardBatchActivity
   | HazardStandaloneActivity
   | TierUpActivity
-  | BadgeUnlockActivity;
+  | BadgeUnlockActivity
+  | RouteShareSignupActivity;
 
 export interface ActivityFeedResponse {
   readonly items: readonly ActivityFeedItem[];

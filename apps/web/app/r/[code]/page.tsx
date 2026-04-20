@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { fetchRouteShare } from '../../../lib/fetchRouteShare';
 import { ShareAnalytics } from '../../../components/ShareAnalytics';
+import { ShareViewBeacon } from '../../../components/ShareViewBeacon';
 import { ShareCtas } from '../../../components/ShareCtas';
 import { ShareGoneCard } from '../../../components/ShareGoneCard';
 import { ShareLayout } from '../../../components/ShareLayout';
@@ -111,6 +112,10 @@ export default async function RouteSharePage({ params }: PageProps) {
         child so the instrumentation stays colocated with the page.
       */}
       <ShareAnalytics shareCode={code} />
+      {/* Slice 8b: fires POST /v1/route-shares/:code/view so the server
+          can dispatch a first-view push to the sharer. Fire-and-forget,
+          UA/IP-filtered server-side, session-deduped client-side. */}
+      <ShareViewBeacon shareCode={code} />
       <ShareLayout
         map={<ShareMap share={result.data} />}
         stats={<ShareStatsBar share={result.data} />}
