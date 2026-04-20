@@ -21,6 +21,13 @@ export const revalidate = 0;
 // `dp_share_code` attribution cookie is set in apps/web/middleware.ts (Next.js 15
 // disallows cookie mutation during Server Component render).
 
+// Share codes are always 8 chars of base62 (see shareCodeGenerator in core).
+// A client-side regex check keeps malformed URLs (trailing punctuation from
+// sentence-wrapped pastes, copy-paste whitespace, etc.) from round-tripping
+// to the API. fetchRouteShare also maps a 400 response to `not_found` as a
+// belt-and-suspenders; this guard just saves the round trip.
+const SHARE_CODE_REGEX = /^[0-9A-Za-z]{8}$/;
+
 // Slice 7a: populate OG + Twitter meta from the real share so the card
 // title/description match the route. The OG image URL is auto-wired by
 // Next.js 15's `opengraph-image.tsx` convention (sibling file in this
@@ -31,7 +38,6 @@ export const revalidate = 0;
 // must still be private).
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { code } = await params;
-  const result = await fetchRouteShare(code);
 
   const baseMeta: Metadata = {
     robots: { index: false, follow: false },
@@ -39,6 +45,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     // opengraph-image.tsx so Twitter shows a big card not a small square.
     twitter: { card: 'summary_large_image' },
   };
+
+  // Malformed codes short-circuit here too so metadata generation for
+  // trailing-punctuation URLs doesn't round-trip to the API.
+  if (!SHARE_CODE_REGEX.test(code)) {
+    return {
+      ...baseMeta,
+      title: 'Defensive Pedal',
+      description: 'Safer cycling routes, shared.',
+    };
+  }
+
+  const result = await fetchRouteShare(code);
 
   if (result.status !== 'ok') {
     return {
@@ -69,6 +87,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function RouteSharePage({ params }: PageProps) {
   const { code } = await params;
+
+  // Short-circuit: malformed share codes never reach the API. A trailing
+  // period or punctuation from a sentence-wrapped paste (e.g. tapping a
+  // link that ends with `.` in a SMS message) would otherwise round-trip
+  // to the API, get a 400, and render the generic error boundary.
+  // fetchRouteShare also maps 400 → not_found as a safety net.
+  if (!SHARE_CODE_REGEX.test(code)) notFound();
+
   const result = await fetchRouteShare(code);
 
   if (result.status === 'not_found') notFound();

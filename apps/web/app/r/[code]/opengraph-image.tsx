@@ -125,12 +125,20 @@ const FallbackImage = (reason: 'gone' | 'not_found' | 'error') => {
 };
 
 // ── Main image ────────────────────────────────────────────────────────────
+// Share codes are always 8 chars of base62. Guard here mirrors page.tsx —
+// stops garbage URLs (trailing punctuation, injection attempts) from
+// round-tripping to the API just to render a fallback card.
+const SHARE_CODE_REGEX = /^[0-9A-Za-z]{8}$/;
+
 export default async function OpengraphImage({
   params,
 }: {
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
+
+  if (!SHARE_CODE_REGEX.test(code)) return FallbackImage('not_found');
+
   const result = await fetchRouteShare(code);
 
   if (result.status === 'gone') return FallbackImage('gone');

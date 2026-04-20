@@ -27,6 +27,12 @@ export async function fetchRouteShare(code: string): Promise<FetchRouteShareResu
 
   if (response.status === 404) return { status: 'not_found' };
   if (response.status === 410) return { status: 'gone' };
+  // A 400 here means the API rejected the code shape (share-code regex
+  // mismatch). That happens when a user pastes a link with garbage after
+  // the code — e.g. a trailing period from a sentence-wrapped paste. The
+  // right UX is the "not found" card, not the scary error boundary;
+  // treat 400 as not_found rather than throwing.
+  if (response.status === 400) return { status: 'not_found' };
 
   if (!response.ok) {
     return { status: 'error', message: `Upstream HTTP ${response.status}` };
