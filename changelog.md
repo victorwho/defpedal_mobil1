@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-04-20 — Route-Share Slice 7a (OG Preview Image)
+
+### Features
+- **Rich link previews**: pasting a share link into WhatsApp, iMessage, Slack, Twitter, Discord, etc. now shows a 1200×630 preview card with the route map, stats, and branding instead of a generic text card. Generated on-demand via Next.js 15's `opengraph-image.tsx` convention.
+- **Image layout** (per PRD): Mapbox Static Images render on the left 60%, stats panel on the right 40% (routing mode eyebrow, distance hero, duration + safety-score tile, sharer avatar chip), 56px yellow brand footer across the bottom.
+- **Branded fallback**: 404 / 410 / fetch error / missing `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN` all render a "This route is no longer available" card at the same 1200×630 size, so a previously-scraped OG card gets visually replaced on re-scrape instead of becoming a broken-image icon.
+- **Meta tags**: `generateMetadata` on `/r/[code]` populates `<title>`, `og:title`, `og:description`, `og:site_name`, `og:type`, and `twitter:card=summary_large_image` from the live share payload (e.g. "victor shared a 6.8 km cycling route"). Next.js auto-wires `og:image` / `twitter:image` + width/height from the `opengraph-image.tsx` convention, with a per-deploy fingerprint query param so scrapers re-fetch after re-deploys.
+- **Cache headers**: `Cache-Control: public, immutable, max-age=31536000` on the image response; `revalidate=3600` on the route handler. OG scrapers cache aggressively; this balances "fresh on re-share" against "don't re-render every OG scraper hit."
+
+### Follow-ups deferred as separate slices
+- **7b** — `next-intl` EN + RO bundles, Accept-Language detection, manual toggle
+- **7c** — PostHog JS snippet with `share_view` / `install_cta_click` / `app_open_intent` events + web→mobile cookie bridge
+
+### Verified on live share
+- Share code `NX0MHjeZ` renders the full card; HTML meta tags and `Content-Type: image/png` on the image endpoint both check out. Vercel `dpl_DvConagdQSiggV2Xe55tzJrSYkTR`.
+
+## 2026-04-19 — Route-Share Slices 4, 5a, 6
+
+### Slice 4 — Private-Profile Pending-Follow
+- Invitees claiming a share from a private sharer get `user_follows.status='pending'` instead of `'accepted'`. XP + badges + saved-route all still fire (PRD: access isn't gated on follow approval).
+- `user_follows.source TEXT` column tags rows created by `claim_route_share` so the Follow Requests UI can render attribution context without a join at read time.
+- Mobile toast on first-time claim swaps to "Shared route added. Follow request sent." when `rewards.followPending=true`; `FollowRequestItem` gains optional `context?: string` prop rendered as italic muted subtitle.
+- Migration `2026041904_route_share_claim_private_follow.sql`. Cloud Run `defpedal-api-00055-xkg`.
+
+### Slice 5a — Saved-Route Source Variant
+- Replaces the slice-1 `z.never()` stub for `source: 'saved'` with a real schema (`savedRouteId` uuid + route payload identical to planned). API validates `saved_routes.user_id` ownership and persists `route_shares.source_ref_id` for analytics.
+- `past_ride` stays stubbed until a follow-up slice delivers server-side re-planning.
+- Mobile: transient `lastLoadedSavedRouteId` Zustand flag auto-branches the share emit after a saved route is loaded. No new UI surface — the existing route-preview share button does the right thing. New caption: "I saved this safer X km cycling route — open it in Defensive Pedal."
+- Cloud Run `defpedal-api-00056-sc2`. No DB migration (source_ref_id exists from slice 1).
+
+### Slice 6 — Per-Share Privacy Trim Toggle
+- New `ShareOptionsModal` molecule — pre-share sheet with "Hide exact start/end address (recommended)" toggle. Defaults ON per PRD, resets each open. Short-route fallback (<400m) disables the toggle with helper text.
+- Core helper `trimEndpointsForShare(polyline, { hideEndpoints, trimMeters? })` wraps `trimPrivacyZone` with the 400m safeguard and returns `{ polyline, endpointsHidden, shortRouteFallback, fullLengthMeters }`.
+- API request accepts optional `hideEndpoints`; omitting it preserves the DB-level default (true).
+- **Web viewer privacy fix**: `ShareMap` now derives start/end markers from the trimmed polyline's first/last coord when `endpointsHidden=true` — previously pinned the real home/work addresses even while the polyline hid them.
+- Cloud Run `defpedal-api-00057-twk`. No DB migration.
+
+### Test counts after all three slices
+- core: 441 → 456 (+15)
+- mobile-api: 398 → 405 (+7)
+- mobile: no net change (existing useShareRoute / ShareClaimProcessor suites green)
+
 ## 2026-04-19 — Route-Share Slice 3 + Follow-Up Fixes
 
 ### Features — Slice 3 (Ambassador Rewards)
