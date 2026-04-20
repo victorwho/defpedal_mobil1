@@ -30,7 +30,7 @@ const PACKAGE_MAP: Record<string, string> = {
 // Desktop visitors get redirected here because Supabase's edge runtime
 // wraps non-redirect responses in CSP sandbox + text/plain (anti-phishing).
 // The static page lives in the Next.js web app (apps/web).
-const DESKTOP_SUCCESS_URL = 'https://beta.defensivepedal.com/email-confirmed';
+const DESKTOP_SUCCESS_URL = 'https://routes.defensivepedal.com/email-confirmed';
 
 Deno.serve((req: Request): Response => {
   const url = new URL(req.url);
