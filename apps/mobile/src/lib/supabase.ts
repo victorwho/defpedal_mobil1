@@ -131,9 +131,21 @@ export const signInWithEmail = async (email: string, password: string) => {
 
 export const signUpWithEmail = async (email: string, password: string) => {
   await clearDeveloperBypassSession();
-  return requireSupabaseClient().auth.signUp({
+  const client = requireSupabaseClient();
+
+  // Email confirmation links are https:// and cannot open a custom scheme
+  // directly from an email client. We route through an HTTPS intermediary
+  // edge function that JS-redirects to ${appScheme}://auth/callback while
+  // preserving the PKCE code appended by Supabase.
+  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
+  const emailRedirectTo = `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
+
+  return client.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo,
+    },
   });
 };
 

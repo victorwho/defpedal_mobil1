@@ -397,7 +397,7 @@ export const en = {
     submit: 'Submit',
     enterBoth: 'Enter both email and password.',
     signedInSuccess: 'Signed in successfully.',
-    accountCreated: 'Account created. Check your email if confirmation is required.',
+    accountCreated: 'Check your inbox — we sent a confirmation link. Tap it on this device to finish signing in.',
     authFailed: 'Authentication failed.',
     devSession: 'Developer session enabled for',
     devSignInFailed: 'Developer sign-in failed.',

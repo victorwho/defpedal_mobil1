@@ -130,19 +130,47 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       try {
         const queryString = url.includes('?') ? url.split('?')[1]?.split('#')[0] : '';
         const params = new URLSearchParams(queryString ?? '');
+
+        // Supabase may surface an error in the redirect (expired link, etc.)
+        const errorCode = params.get('error');
+        const errorDescription = params.get('error_description');
+        if (errorCode) {
+          setAuthError(
+            `Sign-in failed: ${errorDescription?.replace(/\+/g, ' ') ?? errorCode}`,
+          );
+          return;
+        }
+
         const code = params.get('code');
+        const tokenHash = params.get('token_hash');
+        const type = params.get('type');
 
         if (code) {
+          // PKCE flow (OAuth + email confirmation on same device).
           const { error } = await supabaseClient.auth.exchangeCodeForSession(code);
           if (error) {
             setAuthError(`Sign-in failed: ${error.message}`);
-          } else {
-            // Sync the new session into React state immediately.
-            // onAuthStateChange also fires, but this avoids a visible delay.
-            const newSession = await getCurrentSession();
-            setSession(newSession);
+            return;
           }
+        } else if (tokenHash && type) {
+          // Non-PKCE email confirmation (e.g. link opened on a different
+          // device where the PKCE verifier is not in SecureStore).
+          const { error } = await supabaseClient.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: type as 'signup' | 'magiclink' | 'recovery' | 'invite' | 'email_change' | 'email',
+          });
+          if (error) {
+            setAuthError(`Sign-in failed: ${error.message}`);
+            return;
+          }
+        } else {
+          return;
         }
+
+        // Sync the new session into React state immediately.
+        // onAuthStateChange also fires, but this avoids a visible delay.
+        const newSession = await getCurrentSession();
+        setSession(newSession);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         setAuthError(`Sign-in failed: ${message}`);

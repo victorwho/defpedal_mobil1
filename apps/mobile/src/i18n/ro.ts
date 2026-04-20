@@ -399,7 +399,7 @@ export const ro: TranslationKeys = {
     submit: 'Trimite',
     enterBoth: 'Introdu email-ul și parola.',
     signedInSuccess: 'Conectare reușită.',
-    accountCreated: 'Cont creat. Verifică email-ul dacă este necesară confirmarea.',
+    accountCreated: 'Verifică inbox-ul — ți-am trimis un link de confirmare. Apasă-l pe acest dispozitiv ca să finalizezi înregistrarea.',
     authFailed: 'Autentificare eșuată.',
     devSession: 'Sesiune dezvoltator activată pentru',
     devSignInFailed: 'Autentificarea dezvoltator a eșuat.',
