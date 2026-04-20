@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-04-20 — Branded Signup Email + Cross-Device Confirmation
+
+### Features
+- **Branded sender** — signup emails now come from `team@defensivepedal.com` (Resend SMTP, DKIM/SPF verified on `defensivepedal.com`) instead of the default `noreply@supabase.io`.
+- **Edge function `email-confirm`** (`supabase/functions/email-confirm/index.ts`) — HTTPS intermediary that branches per platform:
+  - Android → 302 `intent://auth/callback?code=...#Intent;scheme=defensivepedal-dev;package=com.defensivepedal.mobile.dev;end` (Chrome opens the app natively, no JS redirect).
+  - iOS → 302 `defensivepedal-dev://auth/callback?code=...` (OS opens the app).
+  - Desktop → 302 to `routes.defensivepedal.com/email-confirmed` (branded success page).
+- **Mobile client wiring** — `signUpWithEmail` in `apps/mobile/src/lib/supabase.ts` now sets `emailRedirectTo` pointing at the edge function with the active app scheme. `AuthSessionProvider` deep-link handler extended to support both PKCE `code` (same-device) and non-PKCE `token_hash + type` (cross-device) flows, plus surfaces Supabase redirect errors.
+- **Desktop success page** — new Next.js route `apps/web/app/email-confirmed/page.tsx` renders a branded green-check "Email confirmed" card; the database-level confirmation has already happened at `/auth/v1/verify` so no code exchange is needed on desktop.
+- **Updated signup status message** — "Check your inbox — we sent a confirmation link. Tap it on this device to finish signing in." (en + ro).
+
+### Infra
+- **Supabase SMTP** configured in dashboard with Resend credentials; DNS records (DKIM TXT at `resend._domainkey`, SPF MX + TXT at `send`) verified.
+- **Redirect URL allowlist** extended for the 3 app schemes + edge function URL.
+- **Migration `202604200001_cascade_user_fks.sql`** — adds `ON DELETE CASCADE` to 14 FK constraints on `auth.users(id)` (trips, hazard_validations, ride_impacts, streak_state, user_badges, user_quiz_history, user_follows ×2, quiz_answers, xp_events, leaderboard_snapshots, mia_journey_events, mia_detection_signals, user_telemetry_events). Fixes generic "Database error deleting user" from the Supabase dashboard delete button.
+
+### Tests
+- Typecheck green on mobile + web + api. Mobile bundle check HTTP 200. Existing AuthSessionProvider tests pass.
+
+### Known followups
+- Email template body is a placeholder; rewrite with real copy.
+- Consider Android App Links + iOS Universal Links for a smoother UX that skips the browser-flash step.
+
 ## 2026-04-20 — Route-Share Slice 8b (Mobile UI + Web Beacon)
 
 ### Features
