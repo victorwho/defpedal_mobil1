@@ -175,7 +175,7 @@ C:\dev\defpedal/
 │   │   │   ├── NavigationLifecycleManager.tsx # GPS breadcrumb sampling
 │   │   │   ├── OfflineMutationSyncManager.tsx # Queue drain to API
 │   │   │   ├── DailyWeatherScheduler.tsx      # 9am notification scheduler
-│   │   │   └── NotificationProvider.tsx       # Disabled (needs EAS project ID)
+│   │   │   └── NotificationProvider.tsx       # Registers Expo push token + handles taps
 │   │   └── store/
 │   │       └── appStore.ts      # Zustand store (state + actions + persist)
 │   ├── app.config.ts            # Expo/EAS config (variants, plugins, keys)
@@ -287,7 +287,7 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 | **Overpass only for parking/rental/shops** | These specific OSM tags aren't in Mapbox's POI layer. Rate limit risk accepted (cached 5-10 min via TanStack Query) |
 | **Filter-based layer hiding** (not conditional mount/unmount) | Mapbox RN caches rendered features. Unmounting a ShapeSource doesn't clear markers. Use `key={vis ? 'on' : 'off'}` or impossible filter to force remount |
 | **`newArchEnabled` per variant** | Development: off (bridge mode) so Metro bundle loads over USB. Preview/production: on (bridgeless). Controlled in `app.config.ts` + `gradle.properties` |
-| **Local notifications** (not Expo Push) | Push notifications require EAS project ID which isn't configured. Local scheduling via `expo-notifications` works without server infrastructure |
+| **Expo Push + local notifications** | Server-side pushes go through Expo Push API (`services/mobile-api/src/lib/push.ts` → `https://exp.host/--/api/v2/push/send`) with per-user prefs, quiet hours, and daily budget. Local scheduling (`expo-notifications`) handles the daily 9am weather ping. EAS project ID `f8bcd740-...` wired in `app.config.ts:223` |
 | **`NativeModules` guard before `require('expo-notifications')`** | `require()` of a missing native module causes uncatchable fatal crash on Android. Checking `NativeModules.ExpoPushTokenManager` first prevents this |
 | **Short path `C:\dev\defpedal`** | Original path `C:\Users\Victor\Documents\1. Projects\...` exceeds Windows 260-char limit for CMake. Junction from old path preserved for file explorer |
 | **`C:\dpb` for release builds** | Even `C:\dev\defpedal` can fail for release builds (node_modules resolves to long paths). Full copy to `C:\dpb` with fresh `npm install` is the reliable path |
