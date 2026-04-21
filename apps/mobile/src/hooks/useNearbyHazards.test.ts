@@ -12,6 +12,10 @@ vi.mock('../lib/api', () => ({
   },
 }));
 
+vi.mock('../providers/AuthSessionProvider', () => ({
+  useAuthSessionOptional: () => ({ user: { id: 'test-user' } }),
+}));
+
 import { useNearbyHazards } from './useNearbyHazards';
 
 let queryClient: QueryClient;
@@ -65,6 +69,7 @@ describe('useNearbyHazards', () => {
   });
 
   it('fetches hazards when enabled and coordinate is provided', async () => {
+    const futureExpiry = new Date(Date.now() + 86_400_000).toISOString();
     const mockHazards = [
       {
         id: 'hz-1',
@@ -74,6 +79,10 @@ describe('useNearbyHazards', () => {
         createdAt: '2026-04-01T10:00:00Z',
         confirmCount: 3,
         denyCount: 0,
+        score: 3,
+        userVote: null,
+        expiresAt: futureExpiry,
+        lastConfirmedAt: null,
         distanceMeters: 150,
       },
       {
@@ -84,6 +93,10 @@ describe('useNearbyHazards', () => {
         createdAt: '2026-04-02T10:00:00Z',
         confirmCount: 1,
         denyCount: 0,
+        score: 1,
+        userVote: null,
+        expiresAt: futureExpiry,
+        lastConfirmedAt: null,
       },
     ];
     mockGetNearbyHazards.mockResolvedValue(mockHazards);
@@ -99,6 +112,37 @@ describe('useNearbyHazards', () => {
 
     expect(result.current.hazards).toEqual(mockHazards);
     expect(mockGetNearbyHazards).toHaveBeenCalledWith(44.43, 26.1, 1000);
+  });
+
+  it('client-side filters out expired hazards even when the server returns them', async () => {
+    const past = new Date(Date.now() - 1000).toISOString();
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    mockGetNearbyHazards.mockResolvedValue([
+      {
+        id: 'hz-expired',
+        lat: 44.431, lon: 26.101, hazardType: 'pothole',
+        createdAt: '2026-04-01T10:00:00Z',
+        confirmCount: 1, denyCount: 0, score: 1,
+        userVote: null, expiresAt: past, lastConfirmedAt: null,
+      },
+      {
+        id: 'hz-live',
+        lat: 44.432, lon: 26.102, hazardType: 'pothole',
+        createdAt: '2026-04-01T10:00:00Z',
+        confirmCount: 1, denyCount: 0, score: 1,
+        userVote: null, expiresAt: future, lastConfirmedAt: null,
+      },
+    ]);
+
+    const { result } = renderHook(
+      () => useNearbyHazards(userCoordinate, true),
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.hazards).toHaveLength(1);
+    });
+    expect(result.current.hazards[0].id).toBe('hz-live');
   });
 
   it('uses custom radius when provided', async () => {

@@ -139,6 +139,14 @@ const submitQueuedMutation = async (
 
       return mobileApi.submitFeedback(nextPayload);
     }
+    case 'hazard_vote': {
+      const payload = mutation.payload as QueuedMutationPayloadByType['hazard_vote'];
+      return mobileApi.voteHazard(
+        payload.hazardId,
+        payload.direction,
+        payload.clientSubmittedAt,
+      );
+    }
     default:
       return null;
   }

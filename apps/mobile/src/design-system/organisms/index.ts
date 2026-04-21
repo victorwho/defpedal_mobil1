@@ -44,3 +44,6 @@ export type { SuggestedUsersRowProps } from './SuggestedUsersRow';
 
 export { AmbassadorImpactCard } from './AmbassadorImpactCard';
 export type { AmbassadorImpactCardProps } from './AmbassadorImpactCard';
+
+export { HazardDetailSheet } from './HazardDetailSheet';
+export type { HazardDetailSheetProps } from './HazardDetailSheet';

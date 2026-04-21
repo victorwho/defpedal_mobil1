@@ -116,6 +116,13 @@ export const config = {
         60000,
       ),
     },
+    hazardVote: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_HAZARD_VOTE_MAX'], '5'), 5),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_HAZARD_VOTE_WINDOW_MS'], '600000'),
+        600000,
+      ),
+    },
   },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),

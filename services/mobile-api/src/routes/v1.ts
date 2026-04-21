@@ -84,6 +84,13 @@ import {
 } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
+import {
+  hazardExpireResponseSchema,
+  hazardVoteRequestBodySchema,
+  hazardVoteResponseSchema,
+  nearbyHazardsResponseSchema,
+  type HazardVoteBody,
+} from '../lib/hazardSchemas';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
@@ -724,27 +731,7 @@ export const buildV1Routes = (
           },
         },
         response: {
-          200: {
-            type: 'object',
-            required: ['hazards'],
-            properties: {
-              hazards: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    lat: { type: 'number' },
-                    lon: { type: 'number' },
-                    hazardType: { type: 'string' },
-                    createdAt: { type: 'string' },
-                    confirmCount: { type: 'integer' },
-                    denyCount: { type: 'integer' },
-                  },
-                },
-              },
-            },
-          },
+          200: nearbyHazardsResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
           429: errorResponseSchema,
@@ -765,45 +752,70 @@ export const buildV1Routes = (
         });
       }
 
+      // Optional caller identity so we can surface `userVote` for signed-in users.
+      const caller = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
+
       try {
-        // Convert radius to approximate degree delta for bbox query
         const degDelta = radiusMeters / 111_000;
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
 
-        // location is JSONB with { latitude, longitude } — use raw SQL filter
+        // location is JSONB with { latitude, longitude }; we filter by bbox in JS below.
         const { data, error } = await supabaseAdmin
           .from('hazards')
-          .select('id, location, hazard_type, created_at, confirm_count, deny_count, expires_at')
+          .select(
+            'id, location, hazard_type, created_at, confirm_count, deny_count, score, expires_at, last_confirmed_at',
+          )
           .gt('expires_at', new Date().toISOString())
+          .gt('score', -3) // hide strongly downvoted hazards immediately
           .order('created_at', { ascending: false })
           .limit(200);
 
         if (error) throw error;
 
-        // Filter by bbox in JS since JSONB nested fields can't use .gte/.lte
-        const hazards = (data ?? [])
-          .filter((row: Record<string, unknown>) => {
-            const loc = row.location as { latitude?: number; longitude?: number } | null;
-            if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
-            return (
-              loc.latitude >= lat - degDelta &&
-              loc.latitude <= lat + degDelta &&
-              loc.longitude >= lon - degDelta &&
-              loc.longitude <= lon + degDelta
-            );
-          })
-          .map((row: Record<string, unknown>) => {
-            const loc = row.location as { latitude: number; longitude: number };
-            return {
-              id: row.id,
-              lat: loc.latitude,
-              lon: loc.longitude,
-              hazardType: row.hazard_type,
-              createdAt: row.created_at,
-              confirmCount: (row.confirm_count as number) ?? 0,
-              denyCount: (row.deny_count as number) ?? 0,
-            };
-          });
+        const filtered = (data ?? []).filter((row: Record<string, unknown>) => {
+          const loc = row.location as { latitude?: number; longitude?: number } | null;
+          if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
+          return (
+            loc.latitude >= lat - degDelta &&
+            loc.latitude <= lat + degDelta &&
+            loc.longitude >= lon - degDelta &&
+            loc.longitude <= lon + degDelta
+          );
+        });
+
+        // Batch-fetch caller's votes so we can attach `userVote`.
+        const userVoteById = new Map<string, 'up' | 'down'>();
+        if (caller?.id && filtered.length > 0) {
+          const hazardIds = filtered.map((row) => row.id as string);
+          const { data: voteRows } = await supabaseAdmin
+            .from('hazard_validations')
+            .select('hazard_id, response')
+            .eq('user_id', caller.id)
+            .in('hazard_id', hazardIds);
+          for (const row of voteRows ?? []) {
+            const response = (row as { response?: string }).response;
+            if (response === 'confirm') userVoteById.set(row.hazard_id as string, 'up');
+            else if (response === 'deny') userVoteById.set(row.hazard_id as string, 'down');
+          }
+        }
+
+        const hazards = filtered.map((row: Record<string, unknown>) => {
+          const loc = row.location as { latitude: number; longitude: number };
+          const id = row.id as string;
+          return {
+            id,
+            lat: loc.latitude,
+            lon: loc.longitude,
+            hazardType: row.hazard_type as string,
+            createdAt: row.created_at as string,
+            confirmCount: (row.confirm_count as number) ?? 0,
+            denyCount: (row.deny_count as number) ?? 0,
+            score: (row.score as number) ?? 0,
+            userVote: userVoteById.get(id) ?? null,
+            expiresAt: row.expires_at as string,
+            lastConfirmedAt: (row.last_confirmed_at as string | null) ?? null,
+          };
+        });
 
         return { hazards };
       } catch (error) {
@@ -894,6 +906,220 @@ export const buildV1Routes = (
           details: [error instanceof Error ? error.message : 'Unknown error.'],
         });
       }
+    });
+
+    // ── Hazard voting (thumbs up / thumbs down) ──
+    // Product: upvote → response='confirm', downvote → response='deny'.
+    // The DB CHECK(response IN ('confirm','deny','pass')) is unchanged — the
+    // wire-protocol mapping lives here so clients speak in vote semantics.
+    //
+    // Auth: requireFullUser rejects anonymous Supabase sessions with 403. This
+    // prevents throwaway anonymous accounts from circumventing the per-user
+    // UNIQUE (hazard_id, user_id) constraint by minting new identities.
+
+    app.post<{
+      Params: { hazardId: string };
+      Body: HazardVoteBody;
+    }>('/hazards/:hazardId/vote', {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['hazardId'],
+          properties: {
+            hazardId: { type: 'string', format: 'uuid' },
+          },
+        },
+        body: hazardVoteRequestBodySchema,
+        response: {
+          200: hazardVoteResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
+      const user = await requireFullUser(request, dependencies.authenticateUser);
+      await applyRateLimit(request, reply, dependencies, 'hazardVote', { userId: user.id });
+
+      const { hazardId } = request.params;
+      const { direction } = request.body;
+      const storedResponse = direction === 'up' ? 'confirm' : 'deny';
+
+      try {
+        if (!supabaseAdmin) throw new Error('Supabase admin client not available');
+
+        const { error: upsertError } = await supabaseAdmin
+          .from('hazard_validations')
+          .upsert(
+            {
+              hazard_id: hazardId,
+              user_id: user.id,
+              response: storedResponse,
+              responded_at: new Date().toISOString(),
+            },
+            { onConflict: 'hazard_id,user_id' },
+          );
+
+        if (upsertError) throw upsertError;
+
+        // Trigger has now mutated confirm_count / deny_count / expires_at.
+        const { data: hazardRow, error: selectError } = await supabaseAdmin
+          .from('hazards')
+          .select('id, confirm_count, deny_count, score, expires_at, last_confirmed_at')
+          .eq('id', hazardId)
+          .single();
+
+        if (selectError || !hazardRow) {
+          throw new HttpError('Hazard not found.', {
+            statusCode: 404,
+            code: 'NOT_FOUND',
+            details: [selectError?.message ?? 'No matching hazard.'],
+          });
+        }
+
+        // Streak + XP (fire-and-forget)
+        qualifyStreakAsync(user.id, 'hazard_validate', getTimezone(request), request.log);
+        if (supabaseAdmin) {
+          void (async () => {
+            try {
+              await supabaseAdmin.rpc('award_xp', {
+                p_user_id: user.id,
+                p_action: 'hazard_validate',
+                p_base_xp: XP_VALUES.hazard_validate,
+                p_multiplier: 1.0,
+              });
+            } catch { /* non-fatal */ }
+          })();
+        }
+
+        return {
+          hazardId: hazardRow.id as string,
+          score: (hazardRow.score as number) ?? 0,
+          confirmCount: (hazardRow.confirm_count as number) ?? 0,
+          denyCount: (hazardRow.deny_count as number) ?? 0,
+          userVote: direction,
+          expiresAt: hazardRow.expires_at as string,
+          lastConfirmedAt: (hazardRow.last_confirmed_at as string | null) ?? null,
+        };
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError('Hazard vote failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown error.'],
+        });
+      }
+    });
+
+    // ── Hazard expiry cron ──
+    // Daily Cloud Scheduler hits this with Authorization: Bearer ${CRON_SECRET}.
+    // Deletes hazards past the 7d post-expiry grace window AND hazards that
+    // have sat at score<=-3 for >=24h (enforced via last_confirmed_at dwell).
+
+    app.post<{
+      Reply:
+        | { deletedCount: number; purgedCount: number; runAt: string }
+        | ErrorResponse;
+    }>('/hazards/expire', {
+      schema: {
+        response: {
+          200: hazardExpireResponseSchema,
+          401: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request) => {
+      const cronSecret = process.env.CRON_SECRET ?? '';
+      if (!cronSecret) {
+        throw new HttpError('Cron secret not configured.', {
+          statusCode: 500,
+          code: 'INTERNAL_ERROR',
+        });
+      }
+      const auth = request.headers.authorization;
+      if (auth !== `Bearer ${cronSecret}`) {
+        throw new HttpError('Unauthorized cron call.', {
+          statusCode: 401,
+          code: 'UNAUTHORIZED',
+        });
+      }
+
+      if (!supabaseAdmin) {
+        throw new HttpError('Database unavailable.', {
+          statusCode: 500,
+          code: 'INTERNAL_ERROR',
+        });
+      }
+
+      const nowIso = new Date().toISOString();
+      const dwellCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const graceCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Purge strongly-downvoted hazards that have dwelled at score<=-3 for
+      // >=24h. Split the OR-condition into two separate DELETEs because
+      // supabase-js's `.or()` filter-string doesn't escape ISO timestamps
+      // (colons + dots) reliably and returns a 400 from PostgREST.
+      const { data: purgedNullRows, error: purgeNullError } = await supabaseAdmin
+        .from('hazards')
+        .delete()
+        .lte('score', -3)
+        .is('last_confirmed_at', null)
+        .select('id');
+
+      if (purgeNullError) {
+        throw new HttpError('Purge failed (null branch).', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [purgeNullError.message],
+        });
+      }
+
+      const { data: purgedDwelledRows, error: purgeDwelledError } = await supabaseAdmin
+        .from('hazards')
+        .delete()
+        .lte('score', -3)
+        .lt('last_confirmed_at', dwellCutoff)
+        .select('id');
+
+      if (purgeDwelledError) {
+        throw new HttpError('Purge failed (dwelled branch).', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [purgeDwelledError.message],
+        });
+      }
+
+      const purgedRows = [...(purgedNullRows ?? []), ...(purgedDwelledRows ?? [])];
+
+      // Hard-delete hazards past the 7d post-expiry grace window.
+      const { data: deletedRows, error: deleteError } = await supabaseAdmin
+        .from('hazards')
+        .delete()
+        .lt('expires_at', graceCutoff)
+        .select('id');
+
+      if (deleteError) {
+        throw new HttpError('Delete failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [deleteError.message],
+        });
+      }
+
+      const purgedCount = purgedRows?.length ?? 0;
+      const deletedCount = deletedRows?.length ?? 0;
+
+      request.log.info(
+        { event: 'hazards_expire_run', purgedCount, deletedCount, runAt: nowIso },
+        'Hazard expire cron completed.',
+      );
+
+      return { deletedCount, purgedCount, runAt: nowIso };
     });
 
     app.post<{ Body: NavigationFeedbackBody; Reply: WriteAckResponse | ErrorResponse }>(

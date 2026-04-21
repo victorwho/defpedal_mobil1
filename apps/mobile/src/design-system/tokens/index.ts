@@ -19,3 +19,4 @@ export type { RiderTierKey } from './tierColors';
 export { hasTierImage } from './tierImages';
 export { miaLevelColors } from './miaColors';
 export type { MiaLevelColorKey } from './miaColors';
+export { HAZARD_ICONS, getHazardIcon } from './hazardIcons';

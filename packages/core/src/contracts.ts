@@ -238,10 +238,37 @@ export interface NearbyHazard {
   readonly createdAt: string;
   readonly confirmCount: number;
   readonly denyCount: number;
+  readonly score: number;
+  readonly userVote: HazardVoteDirection | null;
+  readonly expiresAt: string;
+  readonly lastConfirmedAt: string | null;
   readonly distanceMeters?: number;
 }
 
 export type HazardValidationResponse = 'confirm' | 'deny' | 'pass';
+
+export type HazardVoteDirection = 'up' | 'down';
+
+export interface HazardVoteRequest {
+  readonly direction: HazardVoteDirection;
+  readonly clientSubmittedAt?: string;
+}
+
+export interface HazardVoteResponse {
+  readonly hazardId: string;
+  readonly score: number;
+  readonly confirmCount: number;
+  readonly denyCount: number;
+  readonly userVote: HazardVoteDirection;
+  readonly expiresAt: string;
+  readonly lastConfirmedAt: string | null;
+}
+
+export interface HazardVoteQueuePayload {
+  readonly hazardId: string;
+  readonly direction: HazardVoteDirection;
+  readonly clientSubmittedAt: string;
+}
 
 export interface TripStartRequest {
   clientTripId: string;
@@ -375,7 +402,7 @@ export interface OfflineRegion {
   error?: string | null;
 }
 
-export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback';
+export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote';
 export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed' | 'dead';
 
 export interface QueuedMutation {

@@ -40,6 +40,7 @@ afterEach(() => {
     tripServerIds: {},
     activeTripClientId: null,
     recentDestinations: [],
+    userHazardVotes: {},
     pendingBadgeUnlocks: [],
     earnedMilestones: [],
     bikeType: null,
@@ -996,6 +997,62 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().selectedRouteId).toBeNull();
       expect(useAppStore.getState().activeTripClientId).toBeNull();
       expect(useAppStore.getState().routeRequest.origin).toEqual({ lat: 0, lon: 0 });
+    });
+  });
+
+  describe('userHazardVotes', () => {
+    it('starts empty', () => {
+      expect(useAppStore.getState().userHazardVotes).toEqual({});
+    });
+
+    it('setUserHazardVote records a vote without mutating the prior object', () => {
+      const before = useAppStore.getState().userHazardVotes;
+      useAppStore.getState().setUserHazardVote('haz-1', 'up');
+      const after = useAppStore.getState().userHazardVotes;
+
+      expect(after).toEqual({ 'haz-1': 'up' });
+      expect(after).not.toBe(before);
+    });
+
+    it('setUserHazardVote overwrites an existing direction on flip', () => {
+      useAppStore.getState().setUserHazardVote('haz-1', 'up');
+      useAppStore.getState().setUserHazardVote('haz-1', 'down');
+      expect(useAppStore.getState().userHazardVotes).toEqual({ 'haz-1': 'down' });
+    });
+
+    it('clearUserHazardVote removes an entry via rest-destructure (no delete)', () => {
+      useAppStore.getState().setUserHazardVote('haz-1', 'up');
+      useAppStore.getState().setUserHazardVote('haz-2', 'down');
+      const before = useAppStore.getState().userHazardVotes;
+
+      useAppStore.getState().clearUserHazardVote('haz-1');
+      const after = useAppStore.getState().userHazardVotes;
+
+      expect(after).toEqual({ 'haz-2': 'down' });
+      // Rest-destructure produces a fresh object — the old one is untouched.
+      expect(after).not.toBe(before);
+      expect(before).toEqual({ 'haz-1': 'up', 'haz-2': 'down' });
+    });
+
+    it('clearUserHazardVote for an unknown id is a no-op clone', () => {
+      useAppStore.getState().setUserHazardVote('haz-1', 'up');
+      const before = useAppStore.getState().userHazardVotes;
+      useAppStore.getState().clearUserHazardVote('does-not-exist');
+      expect(useAppStore.getState().userHazardVotes).toEqual({ 'haz-1': 'up' });
+      // Still produces a fresh reference — harmless; keeps behavior simple.
+      expect(useAppStore.getState().userHazardVotes).not.toBe(before);
+    });
+
+    it('resetUserScopedState wipes userHazardVotes', () => {
+      useAppStore.getState().setUserHazardVote('haz-1', 'up');
+      useAppStore.getState().setUserHazardVote('haz-2', 'down');
+      expect(useAppStore.getState().userHazardVotes).toEqual({
+        'haz-1': 'up',
+        'haz-2': 'down',
+      });
+
+      useAppStore.getState().resetUserScopedState();
+      expect(useAppStore.getState().userHazardVotes).toEqual({});
     });
   });
 });

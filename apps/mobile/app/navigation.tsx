@@ -35,6 +35,7 @@ import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
+import { useHazardVote } from '../src/hooks/useHazardVote';
 import { useMiaSegmentBanners } from '../src/hooks/useMiaSegmentBanners';
 import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavigationLocation';
 import { mobileApi } from '../src/lib/api';
@@ -179,6 +180,8 @@ export default function NavigationScreen() {
     isOnline && Boolean(navigationSession),
     hazardRadius,
   );
+
+  const hazardVote = useHazardVote();
 
   // Mia segment banners — contextual entry/exit alerts for moderate risk segments
   const miaSegmentBanner = useMiaSegmentBanners(
@@ -1079,13 +1082,15 @@ export default function NavigationScreen() {
         <HazardAlert
           hazard={activeHazardAlert.hazard}
           distanceMeters={activeHazardAlert.distanceMeters}
-          onConfirm={() => {
-            mobileApi.validateHazard(activeHazardAlert.hazard.id, 'confirm').catch(() => {});
+          userVote={activeHazardAlert.hazard.userVote}
+          voteState={hazardVote.isVoting ? 'pending' : 'idle'}
+          onUpvote={() => {
+            hazardVote.upvote(activeHazardAlert.hazard.id).catch(() => {});
             dismissedHazardIdsRef.current.add(activeHazardAlert.hazard.id);
             setActiveHazardAlert(null);
           }}
-          onDeny={() => {
-            mobileApi.validateHazard(activeHazardAlert.hazard.id, 'deny').catch(() => {});
+          onDownvote={() => {
+            hazardVote.downvote(activeHazardAlert.hazard.id).catch(() => {});
             dismissedHazardIdsRef.current.add(activeHazardAlert.hazard.id);
             setActiveHazardAlert(null);
           }}

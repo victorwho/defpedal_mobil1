@@ -27,6 +27,7 @@ const generousRateLimitPolicies: RateLimitPolicies = {
   routePreview: { limit: 100, windowMs: 60_000 },
   routeReroute: { limit: 100, windowMs: 60_000 },
   write: { limit: 100, windowMs: 60_000 },
+  hazardVote: { limit: 100, windowMs: 600_000 },
 };
 
 const mockCoverage = {

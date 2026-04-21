@@ -1,6 +1,7 @@
 import type {
   Coordinate,
   CyclingGoal,
+  HazardVoteDirection,
   MiaDetectionSource,
   MiaJourneyLevel,
   MiaJourneyStatus,
@@ -104,6 +105,9 @@ type AppStore = QueueSlice & {
   earnedMilestones: readonly string[];
   recentDestinations: readonly RecentDestination[];
   addRecentDestination: (destination: RecentDestination) => void;
+  userHazardVotes: Record<string, HazardVoteDirection>;
+  setUserHazardVote: (hazardId: string, direction: HazardVoteDirection) => void;
+  clearUserHazardVote: (hazardId: string) => void;
   // ── Mia Persona Journey ──
   persona: MiaPersona;
   miaJourneyLevel: MiaJourneyLevel;
@@ -265,6 +269,17 @@ export const useAppStore = create<AppStore>()(
       anonymousOpenCount: 0,
       earnedMilestones: [],
       recentDestinations: [],
+      userHazardVotes: {},
+      setUserHazardVote: (hazardId, direction) =>
+        set((state) => ({
+          userHazardVotes: { ...state.userHazardVotes, [hazardId]: direction },
+        })),
+      // Rest-destructure clone — never `delete` (mutates original).
+      clearUserHazardVote: (hazardId) =>
+        set((state) => {
+          const { [hazardId]: _discarded, ...rest } = state.userHazardVotes;
+          return { userHazardVotes: rest };
+        }),
       // ── Mia Persona Journey ──
       persona: 'alex' as MiaPersona,
       miaJourneyLevel: 1 as MiaJourneyLevel,
@@ -717,6 +732,7 @@ export const useAppStore = create<AppStore>()(
           anonymousOpenCount: 0,
           earnedMilestones: [],
           recentDestinations: [],
+          userHazardVotes: {},
           pendingBadgeUnlocks: [],
           pendingTierPromotion: null,
           persona: 'alex' as MiaPersona,
@@ -769,6 +785,7 @@ export const useAppStore = create<AppStore>()(
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
+        userHazardVotes: state.userHazardVotes,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
         pendingTierPromotion: state.pendingTierPromotion,
         locale: state.locale,

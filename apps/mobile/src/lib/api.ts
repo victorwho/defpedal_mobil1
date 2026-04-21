@@ -15,6 +15,8 @@ import type {
   HazardReportRequest,
   HazardReportResponse,
   HazardValidationResponse,
+  HazardVoteDirection,
+  HazardVoteResponse,
   ImpactDashboard,
   LeaderboardMetric,
   LeaderboardPeriod,
@@ -367,6 +369,19 @@ export const mobileApi = {
     requestJson<WriteAckResponse>(`/v1/hazards/${hazardId}/validate`, {
       method: 'POST',
       body: JSON.stringify({ response }),
+    }),
+
+  voteHazard: (
+    hazardId: string,
+    direction: HazardVoteDirection,
+    clientSubmittedAt?: string,
+  ) =>
+    requestJson<HazardVoteResponse>(`/v1/hazards/${hazardId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({
+        direction,
+        ...(clientSubmittedAt ? { clientSubmittedAt } : {}),
+      }),
     }),
 
   // ── Community Feed ──

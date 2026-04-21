@@ -7,6 +7,7 @@ export type RateLimitPolicies = {
   routePreview: RateLimitPolicy;
   routeReroute: RateLimitPolicy;
   write: RateLimitPolicy;
+  hazardVote: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {

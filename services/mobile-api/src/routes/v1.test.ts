@@ -408,6 +408,10 @@ describe('mobile-api v1 routes', () => {
           limit: 20,
           windowMs: 60000,
         },
+        hazardVote: {
+          limit: 5,
+          windowMs: 600000,
+        },
       },
     });
 
@@ -738,6 +742,10 @@ describe('mobile-api v1 routes', () => {
         write: {
           limit: 1,
           windowMs: 60000,
+        },
+        hazardVote: {
+          limit: 5,
+          windowMs: 600000,
         },
       },
     });

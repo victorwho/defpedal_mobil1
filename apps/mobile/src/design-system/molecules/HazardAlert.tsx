@@ -1,4 +1,4 @@
-import type { HazardType, NearbyHazard } from '@defensivepedal/core';
+import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
 import { HAZARD_TYPE_OPTIONS } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,44 +7,63 @@ import { brandColors, gray, safetyColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
+import { getHazardIcon } from '../tokens/hazardIcons';
 import { useT } from '../../hooks/useTranslation';
 
-const HAZARD_ICONS: Record<HazardType, string> = {
-  illegally_parked_car: 'car-outline',
-  blocked_bike_lane: 'close-circle-outline',
-  missing_bike_lane: 'remove-circle-outline',
-  pothole: 'alert-circle-outline',
-  poor_surface: 'warning-outline',
-  narrow_street: 'resize-outline',
-  dangerous_intersection: 'git-branch-outline',
-  construction: 'construct-outline',
-  aggressive_traffic: 'speedometer-outline',
-  other: 'help-circle-outline',
+const POSITIVE_SCORE_THRESHOLD = 3;
+const NEGATIVE_SCORE_THRESHOLD = -3;
+
+const scoreColor = (score: number): string => {
+  if (score >= POSITIVE_SCORE_THRESHOLD) return safetyColors.safe;
+  if (score <= NEGATIVE_SCORE_THRESHOLD) return safetyColors.danger;
+  return gray[400];
+};
+
+const formatScore = (score: number): string => {
+  if (score > 0) return `+${score}`;
+  if (score < 0) return `\u2212${Math.abs(score)}`;
+  return '0';
 };
 
 const getHazardLabel = (type: HazardType): string =>
   HAZARD_TYPE_OPTIONS.find((opt) => opt.value === type)?.label ?? 'Hazard';
 
-type HazardAlertProps = {
+export type HazardAlertVoteState = 'idle' | 'pending';
+
+export interface HazardAlertProps {
   hazard: NearbyHazard;
   distanceMeters: number;
-  onConfirm: () => void;
-  onDeny: () => void;
-};
+  onUpvote: () => void;
+  onDownvote: () => void;
+  /** Current user's vote on this hazard, if any. Drives active-ring + filled icon. */
+  userVote?: HazardVoteDirection | null;
+  /** Override score display — defaults to `hazard.score`. */
+  score?: number;
+  /** When `pending`, buttons are disabled and dimmed. */
+  voteState?: HazardAlertVoteState;
+}
 
 export const HazardAlert = ({
   hazard,
   distanceMeters,
-  onConfirm,
-  onDeny,
+  onUpvote,
+  onDownvote,
+  userVote = null,
+  score,
+  voteState = 'idle',
 }: HazardAlertProps) => {
   const t = useT();
-  const iconName = HAZARD_ICONS[hazard.hazardType] ?? 'warning-outline';
+  const iconName = getHazardIcon(hazard.hazardType);
   const label = getHazardLabel(hazard.hazardType);
+  const displayScore = score ?? hazard.score ?? (hazard.confirmCount - hazard.denyCount);
   const distanceText =
     distanceMeters < 100
       ? t('common.mAhead', { distance: Math.round(distanceMeters) })
       : t('common.mAway', { distance: Math.round(distanceMeters) });
+
+  const isPending = voteState === 'pending';
+  const upActive = userVote === 'up';
+  const downActive = userVote === 'down';
 
   return (
     <View
@@ -52,36 +71,64 @@ export const HazardAlert = ({
       accessible={true}
       accessibilityRole="alert"
       accessibilityLiveRegion="assertive"
-      accessibilityLabel={`${t('hazard.warning')}: ${label}, ${distanceText}. ${t('hazard.stillThere')}`}
+      accessibilityLabel={`${t('hazard.warning')}: ${label}, ${distanceText}. ${t('hazard.stillHereNow')}`}
     >
       <View style={styles.header}>
         <Ionicons name={iconName as any} size={24} color={safetyColors.caution} />
         <View style={styles.headerText}>
-          <Text style={styles.title}>⚠️ {label}</Text>
+          <Text style={styles.title}>{label}</Text>
           <Text style={styles.distance}>{distanceText}</Text>
         </View>
       </View>
 
-      <View style={styles.promptRow}>
-        <Text style={styles.promptText}>{t('hazard.stillThere')}</Text>
-        <View style={styles.buttons}>
-          <Pressable
-            style={styles.yesButton}
-            onPress={onConfirm}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.yes') + ' — ' + label + ' ' + t('hazard.stillThere')}
-          >
-            <Text style={styles.yesText}>{t('common.yes')}</Text>
-          </Pressable>
-          <Pressable
-            style={styles.noButton}
-            onPress={onDeny}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.no') + ' — ' + label + ' ' + t('hazard.stillThere')}
-          >
-            <Text style={styles.noText}>{t('common.no')}</Text>
-          </Pressable>
+      <View style={styles.voteRow}>
+        <Pressable
+          onPress={onUpvote}
+          disabled={isPending}
+          style={[
+            styles.voteButton,
+            upActive ? styles.voteButtonActiveUp : null,
+            isPending ? styles.voteButtonDisabled : null,
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: upActive, disabled: isPending }}
+          accessibilityLabel={t('hazard.upvoteLabel')}
+          accessibilityHint={t('hazard.upvoteHint')}
+          hitSlop={4}
+        >
+          <Ionicons
+            name={(upActive ? 'thumbs-up' : 'thumbs-up-outline') as any}
+            size={22}
+            color={upActive ? safetyColors.safe : brandColors.textPrimary}
+          />
+        </Pressable>
+
+        <View style={styles.scorePill}>
+          <Text style={[styles.scoreText, { color: scoreColor(displayScore) }]}>
+            {formatScore(displayScore)}
+          </Text>
         </View>
+
+        <Pressable
+          onPress={onDownvote}
+          disabled={isPending}
+          style={[
+            styles.voteButton,
+            downActive ? styles.voteButtonActiveDown : null,
+            isPending ? styles.voteButtonDisabled : null,
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: downActive, disabled: isPending }}
+          accessibilityLabel={t('hazard.downvoteLabel')}
+          accessibilityHint={t('hazard.downvoteHint')}
+          hitSlop={4}
+        >
+          <Ionicons
+            name={(downActive ? 'thumbs-down' : 'thumbs-down-outline') as any}
+            size={22}
+            color={downActive ? safetyColors.danger : brandColors.textPrimary}
+          />
+        </Pressable>
       </View>
 
       {hazard.confirmCount > 0 ? (
@@ -123,49 +170,49 @@ const styles = StyleSheet.create({
     ...textXs,
     color: gray[400],
   },
-  promptRow: {
+  voteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: space[3],
     marginTop: space[1],
   },
-  promptText: {
-    ...textSm,
-    fontFamily: fontFamily.body.medium,
-    color: brandColors.textPrimary,
-  },
-  buttons: {
-    flexDirection: 'row',
-    gap: space[2],
-  },
-  yesButton: {
-    backgroundColor: safetyColors.safe,
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
+  voteButton: {
+    width: 44,
+    height: 44,
     borderRadius: radii.lg,
-    minWidth: 60,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
-  noButton: {
-    backgroundColor: safetyColors.danger,
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
-    borderRadius: radii.lg,
-    minWidth: 60,
+  voteButtonActiveUp: {
+    borderColor: safetyColors.safe,
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+  },
+  voteButtonActiveDown: {
+    borderColor: safetyColors.danger,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  voteButtonDisabled: {
+    opacity: 0.5,
+  },
+  scorePill: {
+    minWidth: 52,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: space[2],
+    paddingVertical: space[1],
   },
-  yesText: {
+  scoreText: {
     ...textSm,
     fontFamily: fontFamily.heading.bold,
-    color: brandColors.textInverse,
-  },
-  noText: {
-    ...textSm,
-    fontFamily: fontFamily.heading.bold,
-    color: brandColors.textPrimary,
+    fontSize: 18,
   },
   confirmCount: {
     ...textXs,
     color: gray[500],
+    textAlign: 'center',
   },
 });
