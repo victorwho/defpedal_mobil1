@@ -506,6 +506,7 @@ describe('GET /v1/hazards/nearby', () => {
       userVote: null,
       expiresAt: '2026-05-01T00:00:00.000Z',
       lastConfirmedAt: '2026-04-20T12:00:00.000Z',
+      description: null,
     });
     await app.close();
   });
@@ -602,7 +603,7 @@ describe('GET /v1/hazards/nearby', () => {
     const body = res.json();
     const allowed = new Set([
       'id', 'lat', 'lon', 'hazardType', 'createdAt', 'confirmCount', 'denyCount',
-      'score', 'userVote', 'expiresAt', 'lastConfirmedAt',
+      'score', 'userVote', 'expiresAt', 'lastConfirmedAt', 'description',
     ]);
     for (const key of Object.keys(body.hazards[0])) {
       expect(allowed.has(key)).toBe(true);

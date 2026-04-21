@@ -66,6 +66,7 @@ export const nearbyHazardItemSchema = {
     'expiresAt',
     'lastConfirmedAt',
     'createdAt',
+    'description',
   ],
   properties: {
     id: { type: 'string', format: 'uuid' },
@@ -79,6 +80,7 @@ export const nearbyHazardItemSchema = {
     expiresAt: { type: 'string', format: 'date-time' },
     lastConfirmedAt: { type: ['string', 'null'], format: 'date-time' },
     createdAt: { type: 'string' },
+    description: { type: ['string', 'null'], maxLength: 280 },
   },
 } as const;
 

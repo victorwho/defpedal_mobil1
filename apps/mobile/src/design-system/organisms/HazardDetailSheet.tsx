@@ -264,6 +264,14 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
             ) : null}
           </View>
 
+          {hazard.description ? (
+            <View style={[styles.descriptionCard, { backgroundColor: colors.bgSecondary }]}>
+              <Text style={[styles.descriptionText, { color: colors.textPrimary }]}>
+                {hazard.description}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={[styles.scoreCard, { backgroundColor: colors.bgSecondary }]}>
             <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
               {t('hazard.communityScore')}
@@ -395,6 +403,14 @@ const styles = StyleSheet.create({
     padding: space[4],
     borderRadius: radii.lg,
     gap: space[1],
+  },
+  descriptionCard: {
+    padding: space[3],
+    borderRadius: radii.lg,
+  },
+  descriptionText: {
+    ...textSm,
+    lineHeight: 20,
   },
   scoreLabel: {
     ...textXs,

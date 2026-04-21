@@ -3,7 +3,7 @@ import { hasStartOverride } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -240,6 +240,8 @@ export default function RoutePlanningScreen() {
   const [hazardPlacementMode, setHazardPlacementMode] = useState(false);
   const [selectedHazardType, setSelectedHazardType] = useState<HazardType | null>(null);
   const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
+  const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
+  const [hazardDescription, setHazardDescription] = useState('');
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string; coordinate?: Coordinate; hazardType?: string } | null>(null);
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
@@ -357,8 +359,29 @@ export default function RoutePlanningScreen() {
     }
   };
 
+  const submitHazardOther = (coordinate: Coordinate, source: 'armchair' | 'manual', description: string) => {
+    const trimmed = description.trim().slice(0, 280);
+    enqueueMutation('hazard', {
+      coordinate,
+      reportedAt: new Date().toISOString(),
+      source,
+      hazardType: 'other',
+      ...(trimmed.length > 0 ? { description: trimmed } : {}),
+    });
+    setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate, hazardType: 'other' });
+    if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
+    hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+  };
+
   const handleHazardTypeSelect = (hazardType: HazardType) => {
     browseActionCountRef.current += 1;
+
+    // "Other" routes through the describe stage for an optional free-text note.
+    if (hazardType === 'other') {
+      setHazardDescribeMode(true);
+      return;
+    }
+
     // If long-press initiated, submit directly at that coordinate
     if (pendingHazardCoordinate) {
       enqueueMutation('hazard', {
@@ -381,21 +404,46 @@ export default function RoutePlanningScreen() {
     setHazardPlacementMode(true);
   };
 
+  const handleHazardDescribeSubmit = () => {
+    // Long-press flow: fire immediately at the pinned coordinate.
+    if (pendingHazardCoordinate) {
+      submitHazardOther(pendingHazardCoordinate, 'armchair', hazardDescription);
+      setPendingHazardCoordinate(null);
+      setHazardPickerOpen(false);
+      setHazardDescribeMode(false);
+      setHazardDescription('');
+      return;
+    }
+
+    // FAB flow: carry description into placement mode. Confirm-button handler
+    // consumes it when the user positions the marker and taps Report.
+    setHazardPickerOpen(false);
+    setHazardDescribeMode(false);
+    setSelectedHazardType('other');
+    setHazardPlacementMode(true);
+    // `hazardDescription` intentionally retained in state until placement confirm.
+  };
+
   const handleHazardPlacementConfirm = () => {
     if (!selectedHazardType || !mapCenterCoordinate) return;
 
-    enqueueMutation('hazard', {
-      coordinate: mapCenterCoordinate,
-      reportedAt: new Date().toISOString(),
-      source: 'manual',
-      hazardType: selectedHazardType,
-    });
+    if (selectedHazardType === 'other') {
+      submitHazardOther(mapCenterCoordinate, 'manual', hazardDescription);
+    } else {
+      enqueueMutation('hazard', {
+        coordinate: mapCenterCoordinate,
+        reportedAt: new Date().toISOString(),
+        source: 'manual',
+        hazardType: selectedHazardType,
+      });
+      setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
+      if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
+      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+    }
 
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
-    setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
-    if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
-    hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+    setHazardDescription('');
   };
 
   const toggleHazardMode = () => {
@@ -1205,46 +1253,95 @@ export default function RoutePlanningScreen() {
     {hazardPickerOpen ? (
       <Pressable
         style={styles.hazardGridOverlay}
-        onPress={() => setHazardPickerOpen(false)}
+        onPress={() => {
+          setHazardPickerOpen(false);
+          setHazardDescribeMode(false);
+          setHazardDescription('');
+        }}
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel="Dismiss hazard picker"
       >
         <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()} accessible={false}>
-          <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
-          <View style={styles.hazardGrid}>
-            {([
-              { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
-              { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
-              { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
-              { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
-              { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
-              { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
-            ]).map((item) => (
+          {hazardDescribeMode ? (
+            <>
+              <Text style={styles.hazardGridTitle}>Describe the hazard</Text>
+              <Text style={styles.hazardGridSubtitle}>Optional — a short note helps other cyclists.</Text>
+              <TextInput
+                style={styles.hazardDescribeInput}
+                value={hazardDescription}
+                onChangeText={setHazardDescription}
+                placeholder="e.g. loose dog, glass shards, closed gate…"
+                placeholderTextColor={colors.textMuted}
+                multiline
+                maxLength={280}
+                autoFocus
+                accessibilityLabel="Hazard description, optional"
+                accessibilityHint="Type a short description of the hazard, or leave blank"
+              />
+              <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
               <Pressable
-                key={item.value}
                 style={({ pressed }) => [
-                  styles.hazardGridItem,
-                  pressed && styles.hazardGridItemPressed,
+                  styles.hazardDescribeSubmit,
+                  pressed && styles.hazardDescribeSubmitPressed,
                 ]}
-                onPress={() => handleHazardTypeSelect(item.value)}
+                onPress={handleHazardDescribeSubmit}
                 accessibilityRole="button"
-                accessibilityLabel={`Report ${item.label}`}
+                accessibilityLabel="Report hazard"
               >
-                <Ionicons name={item.icon} size={24} color={colors.accent} />
-                <Text style={styles.hazardGridLabel}>{item.label}</Text>
+                <Text style={styles.hazardDescribeSubmitText}>Report</Text>
               </Pressable>
-            ))}
-          </View>
-          <Pressable
-            style={styles.hazardGridCancel}
-            onPress={() => setHazardPickerOpen(false)}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel="Cancel hazard report"
-          >
-            <Text style={styles.hazardGridCancelText}>Cancel</Text>
-          </Pressable>
+              <Pressable
+                style={styles.hazardGridCancel}
+                onPress={() => {
+                  setHazardDescribeMode(false);
+                  setHazardDescription('');
+                }}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel="Back to hazard types"
+              >
+                <Text style={styles.hazardGridCancelText}>Back</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
+              <View style={styles.hazardGrid}>
+                {([
+                  { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
+                  { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
+                  { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
+                  { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
+                  { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
+                  { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+                ]).map((item) => (
+                  <Pressable
+                    key={item.value}
+                    style={({ pressed }) => [
+                      styles.hazardGridItem,
+                      pressed && styles.hazardGridItemPressed,
+                    ]}
+                    onPress={() => handleHazardTypeSelect(item.value)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Report ${item.label}`}
+                  >
+                    <Ionicons name={item.icon} size={24} color={colors.accent} />
+                    <Text style={styles.hazardGridLabel}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable
+                style={styles.hazardGridCancel}
+                onPress={() => setHazardPickerOpen(false)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel hazard report"
+              >
+                <Text style={styles.hazardGridCancelText}>Cancel</Text>
+              </Pressable>
+            </>
+          )}
         </Pressable>
       </Pressable>
     ) : null}
@@ -1568,6 +1665,48 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.body.medium,
       fontSize: 14,
       color: colors.textMuted,
+    },
+    hazardGridSubtitle: {
+      fontFamily: fontFamily.body.regular,
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: -space[1],
+      marginBottom: space[2],
+    },
+    hazardDescribeInput: {
+      backgroundColor: colors.bgSecondary,
+      color: colors.textPrimary,
+      borderRadius: radii.lg,
+      paddingHorizontal: space[3],
+      paddingVertical: space[3],
+      minHeight: 96,
+      textAlignVertical: 'top',
+      fontFamily: fontFamily.body.regular,
+      fontSize: 15,
+    },
+    hazardDescribeCounter: {
+      fontFamily: fontFamily.body.regular,
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'right',
+      marginTop: space[1],
+    },
+    hazardDescribeSubmit: {
+      backgroundColor: colors.accent,
+      borderRadius: radii.lg,
+      paddingVertical: space[3],
+      alignItems: 'center',
+      marginTop: space[2],
+    },
+    hazardDescribeSubmitPressed: {
+      opacity: 0.85,
+    },
+    hazardDescribeSubmitText: {
+      fontFamily: fontFamily.heading.semiBold,
+      fontSize: 14,
+      color: colors.bgDeep,
+      letterSpacing: 0.5,
     },
     // Waypoint styles
     waypointRow: {

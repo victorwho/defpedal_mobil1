@@ -180,8 +180,15 @@ export const useFeatureCollections = ({
         properties: {
           id: h.id,
           type: h.hazardType,
+          hazardType: h.hazardType,
           confirmCount: h.confirmCount,
           denyCount: h.denyCount,
+          score: h.score,
+          userVote: h.userVote,
+          createdAt: h.createdAt,
+          expiresAt: h.expiresAt,
+          lastConfirmedAt: h.lastConfirmedAt,
+          description: h.description,
         },
         geometry: {
           type: 'Point' as const,

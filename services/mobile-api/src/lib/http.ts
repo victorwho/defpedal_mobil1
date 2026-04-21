@@ -528,6 +528,10 @@ export const hazardReportRequestSchema = {
       type: 'string',
       enum: HAZARD_TYPE_OPTIONS.map((option) => option.value),
     },
+    description: {
+      type: 'string',
+      maxLength: 280,
+    },
   },
 } as const;
 
@@ -891,6 +895,7 @@ export const normalizeHazardReportRequest = (
   reportedAt: body.reportedAt,
   source: body.source ?? 'manual',
   hazardType: body.hazardType,
+  description: body.description,
 });
 
 export const normalizeTripStartRequest = (body: TripStartBody): TripStartRequest => ({

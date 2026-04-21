@@ -763,7 +763,7 @@ export const buildV1Routes = (
         const { data, error } = await supabaseAdmin
           .from('hazards')
           .select(
-            'id, location, hazard_type, created_at, confirm_count, deny_count, score, expires_at, last_confirmed_at',
+            'id, location, hazard_type, created_at, confirm_count, deny_count, score, expires_at, last_confirmed_at, description',
           )
           .gt('expires_at', new Date().toISOString())
           .gt('score', -3) // hide strongly downvoted hazards immediately
@@ -814,6 +814,7 @@ export const buildV1Routes = (
             userVote: userVoteById.get(id) ?? null,
             expiresAt: row.expires_at as string,
             lastConfirmedAt: (row.last_confirmed_at as string | null) ?? null,
+            description: (row.description as string | null) ?? null,
           };
         });
 

@@ -53,6 +53,14 @@ export const submitHazardReport = async (
 
   if (supabaseAdmin) {
     const now = new Date(request.reportedAt);
+    // Server-side length guard. The DB has a CHECK (char_length <= 280)
+    // but a truncate here keeps a misbehaving client from tripping the
+    // 502 UPSTREAM_ERROR path for a cosmetic overflow.
+    const trimmedDescription = request.description?.trim().slice(0, 280);
+    const descriptionOrNull = trimmedDescription && trimmedDescription.length > 0
+      ? trimmedDescription
+      : null;
+
     const baseInsert = {
       user_id: userId,
       location: {
@@ -63,6 +71,7 @@ export const submitHazardReport = async (
       day: now.toISOString().substring(0, 10),
       time_of_day: now.toTimeString().substring(0, 8),
       ...(request.source ? { source: request.source } : {}),
+      ...(descriptionOrNull !== null ? { description: descriptionOrNull } : {}),
     };
 
     let error: { message: string } | null = null;

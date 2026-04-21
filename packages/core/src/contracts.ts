@@ -223,6 +223,12 @@ export interface HazardReportRequest {
   reportedAt: string;
   source?: 'in_ride' | 'manual' | 'armchair';
   hazardType?: HazardType;
+  /**
+   * Optional free-text description. Primarily used with `hazardType='other'`
+   * to let riders describe unclassified hazards. Server-side length cap: 280
+   * chars (enforced by the `hazards_description_length_check` constraint).
+   */
+  description?: string;
 }
 
 export interface HazardReportResponse {
@@ -242,6 +248,7 @@ export interface NearbyHazard {
   readonly userVote: HazardVoteDirection | null;
   readonly expiresAt: string;
   readonly lastConfirmedAt: string | null;
+  readonly description: string | null;
   readonly distanceMeters?: number;
 }
 

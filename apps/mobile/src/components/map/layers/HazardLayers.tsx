@@ -207,6 +207,7 @@ export const HazardLayers = React.memo(
           userVote: (p.userVote ?? null) as NearbyHazard['userVote'],
           expiresAt: String(p.expiresAt ?? ''),
           lastConfirmedAt: (p.lastConfirmedAt ?? null) as NearbyHazard['lastConfirmedAt'],
+          description: (p.description ?? null) as NearbyHazard['description'],
         };
         onHazardPress(payload);
       },
