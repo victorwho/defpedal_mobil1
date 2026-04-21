@@ -1,10 +1,27 @@
 # Improved Hazard System — Implementation Plan
 
-**Status:** Final (QA-reviewed twice; round 1: 3 blockers + 11 ambers resolved; round 2: 3 critical + 3 high + 3 medium resolved inline)
+**Status:** Final (QA-reviewed twice; round 1: 3 blockers + 11 ambers resolved; round 2: 3 critical + 3 high + 3 medium resolved inline). Shipped 2026-04-21 as Cloud Run revision `defpedal-api-00062-s7m`, superseded by `00063-gjg` (addendum below).
 **Owner:** team-lead (hazard-system-plan team)
 **Date:** 2026-04-21
 **Target repo:** `C:\dev\defpedal`
 **Scope:** plan only — no code changes yet
+
+---
+
+## Addenda (post-ship)
+
+Changes made to the shipped system that override the specs below. Kept here so the plan body remains an accurate record of the original design while the current operational state is still discoverable.
+
+### 2026-04-21 — widen resurrection-guard + grace window from 7 → 45 days
+
+- **Trigger (`extend_hazard_on_confirm`):** the resurrection-guard IF branch is `v_expires_at < now() - interval '45 days'` (was `7 days`). Late offline votes arriving up to 45 days past `expires_at` still extend the TTL; past 45 days they only bump audit counters.
+- **Cron (`POST /v1/hazards/expire`):** the grace-cutoff is `now() - 45 days` (JS: `45 * 24 * 60 * 60 * 1000`). Rows where `expires_at < graceCutoff` are hard-deleted.
+- **Rationale:** tolerate long offline gaps (touring, poor coverage, app backgrounded for weeks). The two windows stay aligned so a hazard can never be hard-deleted while still inside the resurrection-guard window.
+- **Migration:** `supabase/migrations/202604210002_hazard_resurrection_grace_45d.sql` — `CREATE OR REPLACE FUNCTION extend_hazard_on_confirm()` with the updated IF. Applied to Supabase.
+- **Cloud Run revision:** `defpedal-api-00063-gjg`.
+- **Unaffected:** per-type baseline TTLs, downvote halving, 24h score-dwell before score-based deletes, 5/10min vote rate limit, flip-guard counter logic.
+
+Wherever the plan body below mentions "7 days" / "7d grace" / "7d window" in the context of the cron grace or the resurrection guard, read as **45 days**. Other 7-day references (pothole baseline TTL, 7-day account age mitigation) are unrelated and unchanged.
 
 ---
 
