@@ -203,8 +203,8 @@ export const HAZARD_TYPE_OPTIONS = [
     label: 'Dangerous intersection',
   },
   {
-    value: 'construction',
-    label: 'Construction',
+    value: 'aggro_dogs',
+    label: 'Aggro dogs',
   },
   {
     value: 'aggressive_traffic',

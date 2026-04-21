@@ -92,7 +92,7 @@ const HAZARD_ICONS: Record<HazardType, string> = {
   poor_surface: 'warning-outline',
   narrow_street: 'resize-outline',
   dangerous_intersection: 'git-branch-outline',
-  construction: 'construct-outline',
+  aggro_dogs: 'paw-outline',
   aggressive_traffic: 'speedometer-outline',
   other: 'help-circle-outline',
 };

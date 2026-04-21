@@ -89,7 +89,7 @@ describe('useNearbyHazards', () => {
         id: 'hz-2',
         lat: 44.432,
         lon: 26.102,
-        hazardType: 'construction',
+        hazardType: 'aggro_dogs',
         createdAt: '2026-04-02T10:00:00Z',
         confirmCount: 1,
         denyCount: 0,

@@ -381,7 +381,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Hazard proximity alerts during navigation with upvote/downvote (community trust signal)
 - Hazard detail sheet (tap any marker) with vote buttons, score, age, distance, auto-expiry countdown
 - Hazard marker clustering at zoom < 14 (dense areas collapse to count bubbles colored by worst severity)
-- Auto-expiry: hazards fade based on type TTL (debris 4h → construction 14d); upvotes extend, downvotes halve; `score <= -3` hides; daily 3 AM cron hard-deletes stale + score-dropped entries
+- Auto-expiry: hazards fade based on type TTL (`poor_surface`/`aggressive_traffic` 4h → `narrow_street`/`missing_bike_lane`/`dangerous_intersection` 30d; `aggro_dogs` 21d; `pothole` 14d); upvotes extend, downvotes halve; `score <= -3` hides; daily 3 AM cron hard-deletes stale + score-dropped entries
 - Striped red/black hazard zones on route
 - Community feed with trip sharing, likes, loves, comments
 - Trip history with GPS trail + planned route map replay

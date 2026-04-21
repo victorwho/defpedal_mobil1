@@ -23,11 +23,13 @@ User taps the hazard-report FAB (on the planning or navigation screen) → picks
 
 | Hazard type | Baseline TTL |
 |---|---|
-| `ice`, `accident`, `flood` | 4 hours |
-| `debris`, `obstacle` | 12 hours |
-| `pothole` | 7 days |
-| `construction` | 14 days |
-| *(anything else)* | 24 hours |
+| `poor_surface`, `aggressive_traffic` | 4 hours |
+| `illegally_parked_car` | 6 hours |
+| `blocked_bike_lane` | 12 hours |
+| `pothole` | 14 days |
+| `aggro_dogs` | 21 days |
+| `narrow_street`, `missing_bike_lane`, `dangerous_intersection` | 30 days |
+| *(anything else — e.g. `other`)* | 24 hours |
 
 Offline reports enqueue as a `hazard` mutation and drain when connectivity returns.
 
@@ -98,6 +100,8 @@ services/mobile-api/src/routes/v1.ts          # POST /v1/hazards/:id/vote, cron,
 packages/core/src/contracts.ts                # NearbyHazard, HazardVoteResponse, QueuedMutationType
 
 supabase/migrations/202604210001_hazard_score_index.sql
+supabase/migrations/202604210002_hazard_resurrection_grace_45d.sql
+supabase/migrations/202604210003_hazard_type_aggro_dogs.sql
 ```
 
 ## Why this shape

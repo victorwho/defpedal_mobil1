@@ -53,7 +53,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'How do I report a hazard?',
         answer:
-          'During active navigation, tap the hazard report button on the HUD. You can report potholes, construction, flooding, and other obstacles. Reports are shared with other riders. You can also long-press the map from the route planning screen to report hazards before you ride.',
+          'During active navigation, tap the hazard report button on the HUD. You can report potholes, aggressive dogs, flooding, and other obstacles. Reports are shared with other riders. You can also long-press the map from the route planning screen to report hazards before you ride.',
       },
       {
         question: 'Can I use the app offline?',

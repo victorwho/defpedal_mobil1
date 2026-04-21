@@ -232,7 +232,7 @@ describe('autoPublishHazardStandalone', () => {
 
     const result = await autoPublishHazardStandalone({
       userId: USER_ID,
-      hazardType: 'construction',
+      hazardType: 'aggro_dogs',
       lat: 44.45,
       lon: 26.15,
       reportedAt: '2026-04-17T09:00:00Z',

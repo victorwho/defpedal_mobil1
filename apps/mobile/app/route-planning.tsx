@@ -1217,7 +1217,7 @@ export default function RoutePlanningScreen() {
               { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
               { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
               { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
-              { value: 'construction' as HazardType, label: 'Construction', icon: 'construct-outline' as const },
+              { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
               { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
               { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
             ]).map((item) => (

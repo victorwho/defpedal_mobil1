@@ -97,7 +97,7 @@ const clusterProperties = {
         ['get', 'hazardType'],
         [
           'literal',
-          ['aggressive_traffic', 'poor_surface', 'construction'],
+          ['aggressive_traffic', 'poor_surface', 'aggro_dogs'],
         ],
       ],
       3,
