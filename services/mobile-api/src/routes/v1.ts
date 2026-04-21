@@ -1017,8 +1017,11 @@ export const buildV1Routes = (
 
     // ── Hazard expiry cron ──
     // Daily Cloud Scheduler hits this with Authorization: Bearer ${CRON_SECRET}.
-    // Deletes hazards past the 7d post-expiry grace window AND hazards that
+    // Deletes hazards past the 45d post-expiry grace window AND hazards that
     // have sat at score<=-3 for >=24h (enforced via last_confirmed_at dwell).
+    // The 45d grace is aligned with the trigger's resurrection-guard window
+    // in 202604210002_hazard_resurrection_grace_45d.sql — a hazard can never
+    // be hard-deleted while still inside the resurrection window.
 
     app.post<{
       Reply:
@@ -1058,7 +1061,7 @@ export const buildV1Routes = (
 
       const nowIso = new Date().toISOString();
       const dwellCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const graceCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const graceCutoff = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString();
 
       // Purge strongly-downvoted hazards that have dwelled at score<=-3 for
       // >=24h. Split the OR-condition into two separate DELETEs because
@@ -1096,7 +1099,7 @@ export const buildV1Routes = (
 
       const purgedRows = [...(purgedNullRows ?? []), ...(purgedDwelledRows ?? [])];
 
-      // Hard-delete hazards past the 7d post-expiry grace window.
+      // Hard-delete hazards past the 45d post-expiry grace window.
       const { data: deletedRows, error: deleteError } = await supabaseAdmin
         .from('hazards')
         .delete()

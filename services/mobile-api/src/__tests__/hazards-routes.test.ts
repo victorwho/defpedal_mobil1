@@ -399,7 +399,7 @@ describe('POST /v1/hazards/expire', () => {
     enqueueResult({ data: [{ id: 'p1' }], error: null });
     // Purge branch B (score<=-3, last_confirmed_at < dwellCutoff).
     enqueueResult({ data: [{ id: 'p2' }], error: null });
-    // Grace DELETE (expires_at < now-7d).
+    // Grace DELETE (expires_at < now-45d).
     enqueueResult({ data: [{ id: 'd1' }], error: null });
 
     const app = buildTestApp();

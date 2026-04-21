@@ -55,12 +55,12 @@ Two forces shrink the map over time:
 Daily Cloud Scheduler job (`hazards-expire-cron`, 03:00 Europe/Bucharest) with `Authorization: Bearer $CRON_SECRET`. It:
 
 1. **Hard-deletes** hazards where `score <= -3` has held for ≥24 hours.
-2. **Hard-deletes** hazards where `expires_at < now() - interval '7 days'` (week of grace period).
+2. **Hard-deletes** hazards where `expires_at < now() - interval '45 days'` (45-day grace period — aligned with the trigger's resurrection-guard window so a hazard can never be deleted while a late offline vote could still legitimately revive it).
 3. Returns `{ deletedScoreDrop: N, deletedStale: N }`.
 
 ### 5. Resurrection guard
 
-If a vote was queued offline two weeks ago and drains now, the `extend_hazard_on_confirm()` trigger checks: is `expires_at < now() - interval '7 days'`? If yes, the trigger still records the counter bump (for audit) but does **not** extend `expires_at` back into the future. A dead hazard cannot be resurrected by a stale queued vote.
+If a vote was queued offline a long time ago and drains now, the `extend_hazard_on_confirm()` trigger checks: is `expires_at < now() - interval '45 days'`? If yes, the trigger still records the counter bump (for audit) but does **not** extend `expires_at` back into the future. A dead hazard cannot be resurrected by a very stale queued vote. Within the 45-day window, late votes are honored and do extend the TTL.
 
 ## How hazards render on the map
 
