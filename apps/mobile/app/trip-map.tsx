@@ -58,6 +58,7 @@ export default function TripMapScreen() {
           showRouteOverlay={false}
           recenterKey={recenterKey}
           fullBleed
+          a11yContext={{ mode: 'historical' }}
         />
       </View>
 

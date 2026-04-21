@@ -504,6 +504,7 @@ export default function RoutePreviewScreen() {
           searchedPois={searchedPois}
           showBicycleLanes
           poiVisibility={poiVisibility}
+          a11yContext={{ mode: 'planning' }}
         />
       }
       topOverlay={topOverlay}

@@ -809,6 +809,32 @@ export default function NavigationScreen() {
 
   if (!guardPassed) return null;
 
+  // Screen-reader map summary context. HazardAlert is assertive and announces
+  // hazards within 70 m; this polite summary widens the window to 200 m so
+  // blind riders get earlier warning, and suppresses itself when HazardAlert
+  // is already speaking to avoid duplicate announcements.
+  const approachingHazard = (() => {
+    const userCoord = locationState.sample?.coordinate;
+    if (!userCoord || nearbyHazards.length === 0) return null;
+    let closest: { id: string; hazardType: HazardType; distanceMeters: number } | null =
+      null;
+    for (const hazard of nearbyHazards) {
+      const dist = haversineDistance(
+        [userCoord.lat, userCoord.lon],
+        [hazard.lat, hazard.lon],
+      );
+      if (dist > 200) continue;
+      if (!closest || dist < closest.distanceMeters) {
+        closest = {
+          id: hazard.id,
+          hazardType: hazard.hazardType,
+          distanceMeters: dist,
+        };
+      }
+    }
+    return closest;
+  })();
+
   return (
     <View style={styles.screen}>
       <RouteMap
@@ -828,6 +854,15 @@ export default function NavigationScreen() {
         showBicycleLanes
         poiVisibility={poiVisibility}
         nearbyHazards={nearbyHazards}
+        a11yContext={{
+          mode: 'navigating',
+          isOffRoute: offRouteDetails != null,
+          remainingDistanceMeters:
+            navigationSession.remainingDistanceMeters ?? selectedRoute?.distanceMeters,
+          hazardsOnRoute: nearbyHazards.length,
+          nearestApproachingHazard: approachingHazard,
+          suppressHazardLive: activeHazardAlert != null,
+        }}
       />
 
       <View style={[styles.overlayRoot, { paddingTop: insets.top, paddingBottom: insets.bottom }]} pointerEvents="box-none">

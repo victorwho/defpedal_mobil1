@@ -23,6 +23,7 @@ import { shadows } from '../../design-system/tokens/shadows';
 import { radii } from '../../design-system/tokens/radii';
 import { space } from '../../design-system/tokens/spacing';
 import { fontFamily, textSm } from '../../design-system/tokens/typography';
+import { useT } from '../../hooks/useTranslation';
 import { mobileEnv } from '../../lib/env';
 import { STANDARD_STYLE_URL } from './constants';
 import { HazardLayers } from './layers/HazardLayers';
@@ -35,9 +36,11 @@ import { VectorTileLayers } from './layers/VectorTileLayers';
 import { CrosshairOverlay } from './overlays/CrosshairOverlay';
 import { PoiCard, usePoiCardHandler } from './overlays/PoiCard';
 import { RouteInfoOverlay } from './overlays/RouteInfoOverlay';
+import { ScreenReaderMapSummary } from './ScreenReaderMapSummary';
 import type { RouteMapProps, SelectedPoiState } from './types';
 import { useCameraConfig } from './useCameraConfig';
 import { useFeatureCollections } from './useFeatureCollections';
+import { useMapA11ySummary } from './useMapA11ySummary';
 import { useShieldMode } from './useShieldMode';
 
 if (mobileEnv.mapboxPublicToken) {
@@ -83,7 +86,9 @@ export const RouteMap = ({
   historyTrails,
   riskOverlay,
   containerStyle,
+  a11yContext,
 }: RouteMapProps) => {
+  const t = useT();
   const mapViewRef = useRef<Mapbox.MapView | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<SelectedPoiState>(null);
   const [selectedHazard, setSelectedHazard] = useState<{
@@ -180,6 +185,22 @@ export const RouteMap = ({
   const rentalVisible = poiVisibility?.bikeRental ?? false;
   const repairVisible = poiVisibility?.repair ?? false;
 
+  const isDecorative = a11yContext?.decorative === true;
+  const a11ySummary = useMapA11ySummary({
+    mode: isDecorative || !a11yContext ? 'empty' : a11yContext.mode,
+    selectedRoute: selectedRoute?.route ?? null,
+    hazardsOnRoute: !isDecorative ? a11yContext?.hazardsOnRoute : undefined,
+    nearestApproachingHazard: !isDecorative
+      ? a11yContext?.nearestApproachingHazard
+      : null,
+    isOffRoute: !isDecorative ? a11yContext?.isOffRoute : false,
+    remainingDistanceMeters: !isDecorative
+      ? a11yContext?.remainingDistanceMeters
+      : undefined,
+    userLocationKnown: Boolean(userLocation),
+    suppressHazardLive: !isDecorative ? a11yContext?.suppressHazardLive : false,
+  });
+
   if (!mobileEnv.mapboxPublicToken) {
     return (
       <View
@@ -199,7 +220,11 @@ export const RouteMap = ({
   }
 
   return (
-    <View style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}>
+    <View
+      style={[styles.container, fullBleed ? styles.containerFullBleed : null, containerStyle]}
+      accessibilityElementsHidden={isDecorative}
+      importantForAccessibility={isDecorative ? 'no-hide-descendants' : 'auto'}
+    >
       <Mapbox.MapView
         ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
@@ -207,8 +232,8 @@ export const RouteMap = ({
         onCameraChanged={onCenterChange ? handleCameraChanged : undefined}
         onPress={onMapTap ? handleMapTap : undefined}
         onLongPress={onMapLongPress ? handleMapLongPress : undefined}
-        accessibilityLabel="Navigation map"
-        accessibilityHint="Map shows route, hazards, and points of interest. Use overlay controls above and below."
+        accessibilityLabel={a11ySummary.label}
+        accessibilityHint={t('mapA11y.hint')}
       >
         <Mapbox.StyleImport id="basemap" existing config={shieldModeConfig} />
 
@@ -331,6 +356,13 @@ export const RouteMap = ({
           routeCount={routes.length}
           followUser={followUser}
           userLocation={userLocation}
+        />
+      ) : null}
+
+      {!isDecorative ? (
+        <ScreenReaderMapSummary
+          label={a11ySummary.label}
+          liveRegionText={a11ySummary.liveRegionText}
         />
       ) : null}
     </View>

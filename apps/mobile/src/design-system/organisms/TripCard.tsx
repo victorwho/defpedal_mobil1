@@ -157,6 +157,7 @@ export const TripCard = memo(({ trip, expanded, onToggle, onSharePress, sharePen
             plannedRouteColor={plannedRouteColor}
             showRouteOverlay={false}
             containerStyle={styles.mapInner}
+            a11yContext={{ decorative: true }}
           />
         </View>
       ) : null}

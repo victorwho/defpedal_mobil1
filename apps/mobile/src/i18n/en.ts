@@ -338,6 +338,18 @@ export const en = {
     warning: 'Hazard ahead',
     confirm: 'Confirm',
     deny: 'Gone',
+    types: {
+      illegally_parked_car: 'Parked car',
+      blocked_bike_lane: 'Blocked bike lane',
+      missing_bike_lane: 'Missing bike lane',
+      pothole: 'Pothole',
+      poor_surface: 'Poor surface',
+      narrow_street: 'Narrow street',
+      dangerous_intersection: 'Dangerous intersection',
+      construction: 'Construction',
+      aggressive_traffic: 'Aggressive traffic',
+      other: 'Hazard',
+    },
   },
 
   // ── Search ──
@@ -678,6 +690,24 @@ export const en = {
   share: {
     shareRide: 'Share this ride',
     shareLevelUp: 'Share',
+  },
+
+  // ── Map accessibility summary (screen readers) ──
+  mapA11y: {
+    hint: 'Map shows route, hazards, and points of interest. Use overlay controls above and below.',
+    empty: 'Map view',
+    routeSummary: 'Route: {{distance}}, about {{duration}}.',
+    routeWithClimb: 'Route: {{distance}}, about {{duration}}, {{climb}} climb.',
+    riskBreakdown: 'Safety mix: {{breakdown}}.',
+    hazardsOnRoute_one: '1 hazard reported on this route.',
+    hazardsOnRoute_other: '{{count}} hazards reported on this route.',
+    hazardUpcoming: 'Hazard ahead: {{type}}, {{distance}} meters away.',
+    offRouteEntered: 'Off route. Rerouting in progress.',
+    offRouteCleared: 'Back on route.',
+    navigating: 'Navigating. {{remaining}} remaining.',
+    planning: 'Route preview.',
+    historical: 'Past ride. {{distance}} covered.',
+    userLocationKnown: 'Your location is shown on the map.',
   },
 } as const;
 

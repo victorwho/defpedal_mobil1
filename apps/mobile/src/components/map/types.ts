@@ -1,9 +1,39 @@
-import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
+import type { Coordinate, HazardType, NearbyHazard, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../../lib/bicycle-parking';
 import type { BicycleRentalLocation } from '../../lib/bicycle-rental';
 import type { BikeShopLocation } from '../../lib/bicycle-shops';
 import type { SearchedPoi } from '../../lib/poi-search';
 import type { StyleProp, ViewStyle } from 'react-native';
+import type { MapSummaryMode } from './useMapA11ySummary';
+
+/**
+ * Per-surface accessibility context for RouteMap.
+ *
+ * Surfaces that don't add textual information beyond what's already in their
+ * parent (e.g. FeedCard, which shows distance/duration/safety above the map)
+ * should pass `{ decorative: true }` — the map container is then hidden from
+ * AT so the screen reader doesn't read redundant content.
+ *
+ * Surfaces that need a live-updating summary (navigation.tsx) pass dynamic
+ * fields like `nearestApproachingHazard` and `isOffRoute` so the hidden
+ * summary element can announce state changes politely.
+ */
+export type RouteMapA11yContext =
+  | { decorative: true }
+  | {
+      decorative?: false;
+      mode: MapSummaryMode;
+      hazardsOnRoute?: number;
+      nearestApproachingHazard?: {
+        id: string;
+        hazardType: HazardType;
+        distanceMeters: number;
+      } | null;
+      isOffRoute?: boolean;
+      remainingDistanceMeters?: number;
+      /** Suppress polite hazard announcement when an assertive one is already speaking. */
+      suppressHazardLive?: boolean;
+    };
 
 export type PoiVisibility = {
   hydration: boolean;
@@ -56,6 +86,12 @@ export type RouteMapProps = {
   /** GeoJSON FeatureCollection of road risk segments to render as colored overlay */
   riskOverlay?: GeoJSON.FeatureCollection | null;
   containerStyle?: StyleProp<ViewStyle>;
+  /**
+   * Per-surface accessibility context. Drives the hidden
+   * `ScreenReaderMapSummary` sibling. Omit to fall back to a minimal generic
+   * summary (backwards-compatible with existing callers).
+   */
+  a11yContext?: RouteMapA11yContext;
 };
 
 export type DecodedRoute = {

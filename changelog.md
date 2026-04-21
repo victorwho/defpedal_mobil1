@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-04-21 — Screen-Reader Access to Mapbox Map State (P1-21 Phase 3)
+
+### Features
+- **Textual map summary for assistive tech** — Mapbox `SymbolLayer` / `CircleLayer` content is rendered natively and invisible to TalkBack and VoiceOver. Phase 3 adds a parallel text representation so screen readers can announce what's on the map.
+- **`useMapA11ySummary` hook** (`apps/mobile/src/components/map/useMapA11ySummary.ts`) — pure, memoized, i18n-aware. Inputs: mode (`planning` / `navigating` / `historical` / `feed` / `empty`), selected route, hazards on route, nearest approaching hazard, off-route flag, remaining distance. Outputs `{ label, liveRegionText }`. Live-region output is bucketed in 50 m steps to prevent 1 Hz GPS-tick spam.
+- **`ScreenReaderMapSummary` component** (`apps/mobile/src/components/map/ScreenReaderMapSummary.tsx`) — 1×1 transparent, `pointerEvents="none"` sibling of `Mapbox.MapView` with `accessibilityLiveRegion="polite"` + `accessibilityRole="summary"`. Uses a key-change pattern to force re-announce when the same transient text is emitted twice.
+- **`RouteMap` `a11yContext` prop** — replaces the hard-coded `accessibilityLabel="Navigation map"`. Surfaces that already carry full info in surrounding card text pass `{ decorative: true }` (container becomes `accessibilityElementsHidden`). Surfaces that add information pass `{ mode, hazardsOnRoute?, nearestApproachingHazard?, isOffRoute?, remainingDistanceMeters?, suppressHazardLive? }`.
+- **11 callsites specialized:**
+  - `decorative: true` — `FeedCard`, `community-trip.tsx`, `ActivityFeedCard`, `TripCard`, `onboarding/safety-score.tsx` (card-level text is already complete).
+  - `mode: 'planning'` — `route-preview.tsx`, `route-planning.tsx`, `onboarding/first-route.tsx`.
+  - `mode: 'historical'` — `trip-map.tsx`, `trip-compare.tsx`.
+  - `mode: 'navigating'` with live fields — `navigation.tsx`. Computes the closest hazard within 200 m, passes `isOffRoute` from `offRouteDetails`, `remainingDistanceMeters` from `navigationSession`, and `suppressHazardLive = activeHazardAlert != null` so the polite map summary yields to the assertive `HazardAlert` component and never double-announces.
+- **Live-region rules**
+  - Off-route transition → *"Off route. Rerouting in progress."* fires once. On recovery → *"Back on route."* fires once.
+  - Approaching hazard ≤ 200 m → *"Hazard ahead: `<type>`, `<distance>` meters away."* Re-announces only when the rider crosses a 50 m bucket (200→150→100→50), not every GPS update. Suppressed entirely while `HazardAlert` is mounted.
+  - Off-route has priority over hazards — no overlap.
+
+### i18n
+- **`mapA11y.*` keys** added to `en.ts` + `ro.ts` — `hint`, `empty`, `routeSummary`, `routeWithClimb`, `riskBreakdown`, `hazardsOnRoute_one` / `_other`, `hazardUpcoming`, `offRouteEntered`, `offRouteCleared`, `navigating`, `planning`, `historical`, `userLocationKnown`.
+- **`hazard.types.*`** added for all 10 hazard types so announcements read natural human labels in both locales.
+
+### Tests
+- **16 new unit tests** on `useMapA11ySummary` covering label composition, mode-specific prefixes, pluralization, risk-mix phrase, off-route priority, 50 m hazard bucket dedup, 200 m radius gate, and `suppressHazardLive` suppression. All green.
+- `npm run typecheck` passes across api + mobile + web.
+- `npm run check:bundle` HTTP 200.
+
+### Tracker
+- `issuefix.md` P1-21 flipped from OPEN → FIXED (pending device QA), repair log entry added.
+- `TODO.md` issuestofix updated with remaining physical-device TalkBack QA pass.
+
+### Known followups
+- Manual TalkBack QA on a physical Android device is the last merge gate. Five test cases documented in-session.
+
 ## 2026-04-20 — Branded Signup Email + Cross-Device Confirmation
 
 ### Features

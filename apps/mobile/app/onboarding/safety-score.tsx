@@ -151,6 +151,7 @@ export default function OnboardingSafetyScoreScreen() {
             showRouteOverlay={false}
             showBicycleLanes
             riskOverlay={riskGeoJson}
+            a11yContext={{ decorative: true }}
           />
         </View>
       ) : (

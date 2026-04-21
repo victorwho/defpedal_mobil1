@@ -107,14 +107,20 @@ export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUser
         </View>
       </View>
 
-      {/* Map (lazy-loaded) */}
-      <View style={styles.mapContainer}>
+      {/* Map (lazy-loaded) — decorative; the card's title/distance/safety text
+          carries all the info a screen reader needs. */}
+      <View
+        style={styles.mapContainer}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         {isVisible ? (
           <RouteMap
             routes={[syntheticRoute]}
             selectedRouteId={item.id}
             showRouteOverlay={false}
             containerStyle={styles.mapInner}
+            a11yContext={{ decorative: true }}
           />
         ) : (
           <View style={[styles.mapInner, styles.mapPlaceholder]}>

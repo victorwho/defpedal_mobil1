@@ -91,7 +91,7 @@
 
 ### UX/Accessibility
 20. **Reaction buttons below 44dp minimum tap target** — `LikeButton.tsx:109-116`. Total touch area ~32x32dp. Problematic with cycling gloves. **Status:** FIXED (2026-04-11) — Increased `minHeight: 44`, `paddingVertical: 10`, `paddingHorizontal: 12`.
-21. **Mapbox map elements invisible to screen readers** — `FeedCard.tsx:104`, `navigation.tsx`. TalkBack/VoiceOver cannot read SymbolLayer/CircleLayer content. **Status:** OPEN — requires architectural a11y work; deferred.
+21. **Mapbox map elements invisible to screen readers** — `FeedCard.tsx:104`, `navigation.tsx`. TalkBack/VoiceOver cannot read SymbolLayer/CircleLayer content. **Status:** FIXED (2026-04-20, phase 3) — Introduced `useMapA11ySummary` hook + `ScreenReaderMapSummary` component. `RouteMap` now accepts an `a11yContext` prop: surfaces with redundant card-level text pass `{ decorative: true }` (FeedCard, community-trip, ActivityFeedCard, TripCard, onboarding/safety-score); surfaces that add information pass `{ mode: 'planning' | 'navigating' | 'historical' }`. Navigation uses a polite live-region that announces off-route transitions and hazards within 200 m (bucketed at 50 m to prevent GPS-tick spam), suppressed when the assertive `HazardAlert` is already speaking. EN + RO i18n wired. 16 unit tests cover the hook, typecheck + bundle check pass. Manual TalkBack QA on a physical device is the remaining merge gate.
 
 ### Infrastructure
 22. **Dockerfile runs as root** — `services/mobile-api/Dockerfile`. No `USER` instruction. Compromised container has root access. **Status:** FIXED (2026-04-11) — Multi-stage build with `appuser` non-root user.
@@ -176,7 +176,7 @@
 
 | # | Issue | Status | Reason |
 |---|-------|--------|--------|
-| P1-21 | Mapbox map elements invisible to screen readers | PARTIAL | Phases 1-2 done (overlay a11y + live hazard alerts). Phase 3 (map contents list) deferred |
+| P1-21 | Mapbox map elements invisible to screen readers | FIXED (pending device QA) | Phase 3 shipped 2026-04-20: `useMapA11ySummary` hook + `ScreenReaderMapSummary` + `a11yContext` prop across 11 RouteMap callsites. 16 unit tests, EN + RO i18n. Manual TalkBack pass on device still required before final close-out |
 | P2-12 | `appStore.ts` 796 lines — near 800-line limit | FIXED | Extracted queue slice to `queueSlice.ts` (823→574 lines, -30%) |
 | P2-13 | `feed.ts` 1063 lines — exceeds 800-line limit | FIXED | Split into feed.ts + feed-helpers, feed-share, feed-reactions, feed-comments, feed-profile (6 files) |
 | P3-2 | Supabase anon key cannot be rotated per-release | ACCEPTED | Platform limitation; RLS policies are the active defense layer |
@@ -250,3 +250,4 @@
 | 2026-04-13 | P0-2 | Applied migration 202604110002 to Supabase — RLS policies live on trips/hazards/feedback | Claude |
 | 2026-04-13 | P1-4 | Applied migration 202604110003 to Supabase — award_xp auth check + anon revoke live | Claude |
 | 2026-04-13 | P2-1 | Applied migration 202604120001 to Supabase — search_path hardened on 8 SECURITY DEFINER functions | Claude |
+| 2026-04-20 | P1-21 | Phase 3: `useMapA11ySummary` + `ScreenReaderMapSummary` + `a11yContext` on RouteMap. 11 callsites specialized (decorative for card surfaces, mode-based summary for planning/navigating/historical). Polite live-region announces off-route + hazard proximity; suppressed when assertive HazardAlert speaks. EN + RO i18n. 16 unit tests green. Device TalkBack QA still pending | Claude |

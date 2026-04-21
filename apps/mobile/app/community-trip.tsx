@@ -201,13 +201,15 @@ export default function CommunityTripScreen() {
               </Pressable>
             </View>
 
-            {/* Map */}
+            {/* Map — decorative; the surrounding card text (title, user,
+                safety, distance) carries all the info for screen readers. */}
             {syntheticRoute ? (
               <RouteMap
                 routes={[syntheticRoute]}
                 selectedRouteId={item.id}
                 showRouteOverlay={false}
                 containerStyle={styles.map}
+                a11yContext={{ decorative: true }}
               />
             ) : null}
 

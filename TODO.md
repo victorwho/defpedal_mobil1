@@ -15,7 +15,7 @@ Two lists: **todo** (new features / enhancements) and **issuestofix** (bugs, blo
 
 ## issuestofix
 
-- [ ] **Mapbox elements invisible to screen readers** — TalkBack / VoiceOver cannot read SymbolLayer / CircleLayer content on `FeedCard.tsx` and `navigation.tsx`. P1-21 phases 1-2 done; phase 3 needs an architectural a11y pass that exposes a textual summary of the current map state. (`issuefix.md`, P1-21)
+- [ ] **P1-21 phase 3 — TalkBack device QA** — Code shipped 2026-04-20: `useMapA11ySummary` hook + `ScreenReaderMapSummary` component + `a11yContext` prop across all 11 `RouteMap` callsites. EN + RO i18n, 16 passing unit tests, typecheck + bundle check green. Only remaining step: physical-device TalkBack pass confirming FeedCard decorative mode, navigation live-region announcements, and no focus-trap regressions. Mark `issuefix.md` P1-21 fully done once QA signs off.
 - [ ] **GCP monitoring / alerting not configured** — No alerts for Cloud Run errors, latency spikes, OSRM downtime, or DB issues. P3-4 / `securityfix.md`. Blocks observability for production traffic.
 - [ ] **Redis activation** — `services/mobile-api/src/lib/redisStore.ts` is feature-complete but unused; needs GCP Memorystore provisioned and `REDIS_URL` set on Cloud Run. Without it, rate-limit and idempotency state are per-instance and lost on revision rollover.
 - [ ] **iPhone validation** — App has never been built or tested on iOS hardware. Blocked on macOS / Apple Developer seat. Several iOS-only code paths (Universal Links, ASWebAuthenticationSession callback) are unverified.

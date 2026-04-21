@@ -134,6 +134,7 @@ export default function TripCompareScreen() {
               followUser={false}
               trailCoordinates={trailA}
               fullBleed={false}
+              a11yContext={{ mode: 'historical' }}
             />
           </View>
         ) : null}

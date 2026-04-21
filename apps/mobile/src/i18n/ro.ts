@@ -340,6 +340,18 @@ export const ro: TranslationKeys = {
     warning: 'Pericol în față',
     confirm: 'Confirmă',
     deny: 'Dispărut',
+    types: {
+      illegally_parked_car: 'Mașină parcată',
+      blocked_bike_lane: 'Bandă de bicicletă blocată',
+      missing_bike_lane: 'Bandă de bicicletă lipsă',
+      pothole: 'Groapă',
+      poor_surface: 'Suprafață proastă',
+      narrow_street: 'Stradă îngustă',
+      dangerous_intersection: 'Intersecție periculoasă',
+      construction: 'Construcție',
+      aggressive_traffic: 'Trafic agresiv',
+      other: 'Pericol',
+    },
   },
 
   // ── Search ──
@@ -680,5 +692,23 @@ export const ro: TranslationKeys = {
   share: {
     shareRide: 'Distribuie această cursă',
     shareLevelUp: 'Distribuie',
+  },
+
+  // ── Map accessibility summary (screen readers) ──
+  mapA11y: {
+    hint: 'Harta afișează traseul, pericolele și punctele de interes. Folosește butoanele de deasupra și dedesubt.',
+    empty: 'Vizualizare hartă',
+    routeSummary: 'Traseu: {{distance}}, aproximativ {{duration}}.',
+    routeWithClimb: 'Traseu: {{distance}}, aproximativ {{duration}}, urcare de {{climb}}.',
+    riskBreakdown: 'Distribuția siguranței: {{breakdown}}.',
+    hazardsOnRoute_one: '1 pericol raportat pe acest traseu.',
+    hazardsOnRoute_other: '{{count}} pericole raportate pe acest traseu.',
+    hazardUpcoming: 'Pericol în față: {{type}}, la {{distance}} metri.',
+    offRouteEntered: 'În afara traseului. Recalculez.',
+    offRouteCleared: 'Din nou pe traseu.',
+    navigating: 'Navigare în curs. {{remaining}} rămași.',
+    planning: 'Previzualizare traseu.',
+    historical: 'Cursă anterioară. {{distance}} parcurși.',
+    userLocationKnown: 'Locația ta este afișată pe hartă.',
   },
 };

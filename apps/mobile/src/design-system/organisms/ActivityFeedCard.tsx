@@ -318,6 +318,7 @@ const RideContent = React.memo(function RideContent({
             selectedRouteId={item.id}
             showRouteOverlay={false}
             containerStyle={styles.mapInner}
+            a11yContext={{ decorative: true }}
           />
         ) : (
           <View style={[styles.mapInner, styles.mapPlaceholder]}>

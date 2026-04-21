@@ -258,6 +258,7 @@ export default function OnboardingFirstRouteScreen() {
             fullBleed
             showRouteOverlay={false}
             showBicycleLanes
+            a11yContext={{ mode: 'planning' }}
           />
         ) : !isLoading ? (
           <View style={styles.mapFallback}>

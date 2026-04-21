@@ -707,6 +707,7 @@ export default function RoutePlanningScreen() {
             onMapLongPress={handleMapLongPress}
             hazardPlacementMode={hazardPlacementMode}
             onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
+            a11yContext={{ mode: 'planning' }}
           />
           {showLongPressHint ? (
             <View style={styles.longPressHint} pointerEvents="none">
