@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-04-22 — Signup Gate Threshold + Hardware-Back Hardening
+
+### Behavior
+- **Mandatory signup now triggers at the 3rd anonymous app launch** (was 5th). The dismissible prompt at launch #2 is unchanged.
+- **Mandatory gate now survives hardware back / silent navigation.** The `OnboardingGuard` in `apps/mobile/app/_layout.tsx` previously short-circuited via `hasRedirectedRef` after the first redirect, so a user who hardware-backed out of the mandatory signup-prompt could land back on `/route-planning` and keep riding. The guard now re-evaluates the mandatory branch on every pathname change and re-redirects to `/onboarding/signup-prompt?mandatory=true` whenever `anonymousOpenCount >= 3` and the user is off the `/onboarding/*` subtree. The non-mandatory (count == 2) branch keeps the one-shot behavior so dismissing the dismissible prompt doesn't re-prompt mid-session.
+- Only real signup/sign-in (Google OAuth or email via `/auth`) clears the gate — both existing handlers already call `resetAnonymousOpenCount()`, so no store-layer change was needed.
+
+### Files
+- `apps/mobile/app/_layout.tsx` — threshold lowered, mandatory branch lifted above the `hasRedirectedRef` short-circuit, JSDoc updated.
+
+### Tests
+- `npm run check:bundle` HTTP 200.
+- `npx tsc --noEmit -p apps/mobile/tsconfig.json` clean.
+- No new automated tests: this is a threshold constant + re-ordering of an existing effect, both covered by existing onboarding flow tests.
+
+### Release
+- Ships in the next preview APK (version bump handled when distributed, not in this commit).
+
+## 2026-04-22 — Route Preview "Back" Label + Custom Start Label Fix (v0.2.4 + v0.2.5)
+
+### Changes
+- **v0.2.4**: "Back to planning" button on route preview shortened to "Back" (`apps/mobile/app/route-preview.tsx`). Paired version bump to `0.2.4` / versionCode 6.
+- **v0.2.5**: Route-planning origin card no longer shows the stale GPS-location label after the user changes to a custom start and returns from preview. `apps/mobile/app/route-planning.tsx` now (a) reverse-geocodes `routeRequest.startOverride` into `customStartLabel` via a dedicated TanStack query, (b) renders that label in the origin card subtitle when `customStartEnabled`, and (c) hydrates `startOverrideQuery` on first mount so tapping the pencil opens the edit field pre-filled with the current custom start instead of blank. Paired version bump to `0.2.5` / versionCode 7.
+
+### Release
+- Both builds already distributed via Firebase App Distribution to the `early-access-preview` group.
+
+## 2026-04-22 — Pre-Ride Checklist FAQ Entry
+
+### Content
+- **New FAQ item: "What should I check before every ride?"** — added as the second entry in the **Safety & Routing** section of `apps/mobile/app/faq.tsx`, immediately after the "What is Defensive Pedal?" intro. Provides a 60-second pre-ride checklist organised into four groups: **Bike (ABC)** — air, brakes, chain; **You** — helmet, lights, bell, phone, visibility; **Route** — destination set, risk distribution + elevation glance, weather/AQI check, hazards on route; **Mind** — hydration/energy, voice guidance, plan first turn. Closes with the rule "If anything fails the check, fix it before you ride — not at the first red light."
+- Renders inside the existing single-`Text` answer block using `\n` line breaks and `\u2022` bullet markers; em-dashes use `\u2014` to match the encoding style of surrounding answers.
+
+### Tests
+- `npx tsc --noEmit` on `apps/mobile` passes with zero errors. Pure data addition (one string entry into an existing `FAQ_SECTIONS` array) — no new imports, no native code, no schema or type changes.
+- Bundle check not run from sandbox (Metro lives on the Windows host); JS-only change cannot affect bundle compilation. User to run `npm run check:bundle` from `C:\dev\defpedal` before phone testing.
+
+### Build impact
+- Picked up automatically by the next APK build of any variant. Dev APK gets it via Metro hot reload; preview/production APKs embed the refreshed JS bundle during the existing Gradle bundling step. No clean, no cache reset, no native rebuild required.
+
 ## 2026-04-21 — Screen-Reader Access to Mapbox Map State (P1-21 Phase 3)
 
 ### Features

@@ -98,8 +98,8 @@ const AppOpenTelemetryObserver = () => {
  * Logic:
  * - Real account (Google): always pass through, no prompts.
  * - Anonymous, count 1, onboarding not done: onboarding flow.
- * - Anonymous, count 2-4, onboarding done: dismissible signup prompt.
- * - Anonymous, count >= 5: mandatory signup (no skip).
+ * - Anonymous, count == 2, onboarding done: dismissible signup prompt.
+ * - Anonymous, count >= 3: mandatory signup (no skip).
  *
  * The anonymousOpenCount is incremented once per app launch (via ref).
  */
@@ -128,14 +128,21 @@ const OnboardingGuard = () => {
     if (isLoading || hasRealAccount) return;
     if (pathname.startsWith('/onboarding')) return;
     if (pathname === '/feedback' || pathname === '/navigation') return;
+
+    // Mandatory gate: re-redirect on every escape attempt (e.g. hardware
+    // back). We intentionally bypass hasRedirectedRef here because "mandatory"
+    // must mean mandatory for the rest of the session.
+    if (onboardingCompleted !== false && anonymousOpenCount >= 3) {
+      hasRedirectedRef.current = true;
+      router.replace('/onboarding/signup-prompt?mandatory=true' as never);
+      return;
+    }
+
     if (hasRedirectedRef.current) return;
 
     if (onboardingCompleted === false) {
       hasRedirectedRef.current = true;
       router.replace('/onboarding/index' as never);
-    } else if (anonymousOpenCount >= 5) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/signup-prompt?mandatory=true' as never);
     } else if (anonymousOpenCount >= 2) {
       hasRedirectedRef.current = true;
       router.replace('/onboarding/signup-prompt' as never);

@@ -31,6 +31,11 @@ const FAQ_SECTIONS: FaqSection[] = [
           'Defensive Pedal is a cycling navigation app that prioritises rider safety. It calculates routes that avoid dangerous roads, busy intersections, and hazardous segments based on real-world risk data.',
       },
       {
+        question: 'What should I check before every ride?',
+        answer:
+          'A 60-second check before you roll out.\n\nBike (ABC):\n\u2022 Air \u2014 squeeze both tyres, pump if soft\n\u2022 Brakes \u2014 squeeze each lever, the wheel should stop firmly\n\u2022 Chain \u2014 spin the cranks, check it isn\u2019t dry or rusty; quick-releases and bolts tight\n\nYou:\n\u2022 Helmet on, strap clipped\n\u2022 Front white light + rear red light on (always, even in daytime)\n\u2022 Bell works\n\u2022 Phone charged, mounted or securely pocketed\n\u2022 Visible clothing or reflectives if dusk or night\n\nRoute:\n\u2022 Destination set in Defensive Pedal and Safe route selected\n\u2022 Glance at the risk distribution and elevation \u2014 know what\u2019s coming\n\u2022 Check the weather widget for rain, wind, or poor air quality\n\u2022 Note any hazards reported on your route\n\nMind:\n\u2022 Hydrated, not riding hungry or exhausted\n\u2022 Voice guidance on so your eyes stay on the road\n\u2022 Plan your first turn before you push off\n\nIf anything fails the check, fix it before you ride \u2014 not at the first red light.',
+      },
+      {
         question: 'How does "Safe" routing differ from "Fast"?',
         answer:
           'Safe mode uses our custom OSRM server with a safety-weighted profile that avoids high-risk road segments. Fast mode uses standard Mapbox cycling directions optimised for shortest travel time.',
