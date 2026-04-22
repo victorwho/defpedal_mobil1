@@ -522,7 +522,7 @@ export default function RoutePreviewScreen() {
           <View style={styles.footerSecondaryRow}>
             <View style={styles.footerSecondaryButton}>
               <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
-                Back to planning
+                Back
               </Button>
             </View>
             {selectedRoute ? (

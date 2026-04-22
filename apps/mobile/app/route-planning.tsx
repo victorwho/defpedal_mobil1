@@ -493,6 +493,22 @@ export default function RoutePlanningScreen() {
     retry: false,
   });
 
+  // Reverse-geocode custom start (when a startOverride is set, we need its label
+  // independently of the GPS-based currentLocationLabel — otherwise the subtitle
+  // keeps showing the GPS location after the user changes start and returns from
+  // route-preview).
+  const startOverrideLabelQuery = useQuery({
+    queryKey: ['reverse-geocode', 'start-override', routeRequest.startOverride],
+    queryFn: () =>
+      mobileApi.reverseGeocode({
+        coordinate: routeRequest.startOverride!,
+        locale: routeRequest.locale,
+        countryHint: routeRequest.countryHint,
+      }),
+    enabled: Boolean(mobileEnv.mapboxPublicToken) && Boolean(routeRequest.startOverride),
+    retry: false,
+  });
+
   // Hydrate destination label
   const destinationLabelQuery = useQuery({
     queryKey: ['reverse-geocode', 'destination', routeRequest.destination],
@@ -722,6 +738,24 @@ export default function RoutePlanningScreen() {
     return currentLocationLabelQuery.data?.label ?? (planningOrigin ? formatCoordinateLabel(planningOrigin) : 'Waiting for GPS...');
   }, [currentLocation, currentLocationLabelQuery.data?.label, isLocating, planningOrigin, permissionStatus]);
 
+  const customStartLabel = useMemo(() => {
+    if (!routeRequest.startOverride) return null;
+    return (
+      startOverrideLabelQuery.data?.label ??
+      formatCoordinateLabel(routeRequest.startOverride)
+    );
+  }, [routeRequest.startOverride, startOverrideLabelQuery.data?.label]);
+
+  // Keep the edit-field query value in sync with the resolved custom start label
+  // when the screen re-enters with an existing override (e.g. after returning
+  // from route-preview). Without this, the edit input would render empty when
+  // the user taps the pencil, even though the override is active.
+  useEffect(() => {
+    if (customStartLabel && startOverrideQuery === '') {
+      setStartOverrideQuery(customStartLabel);
+    }
+  }, [customStartLabel, startOverrideQuery]);
+
   const handleTabPress = (tab: TabKey) => {
     if (tab === 'history') router.push('/history');
     else if (tab === 'community') router.push('/community');
@@ -873,7 +907,7 @@ export default function RoutePlanningScreen() {
                     From: {customStartEnabled ? 'Custom Start' : 'Current Location'}
                   </Text>
                   <Text style={styles.originSubtitle} numberOfLines={1}>
-                    {currentLocationLabel}
+                    {customStartEnabled ? (customStartLabel ?? currentLocationLabel) : currentLocationLabel}
                   </Text>
                 </View>
               </View>
