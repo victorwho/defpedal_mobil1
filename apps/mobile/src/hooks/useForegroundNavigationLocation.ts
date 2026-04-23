@@ -34,12 +34,23 @@ const toNavigationSample = (position: Location.LocationObject): NavigationLocati
 export const useForegroundNavigationLocation = (
   enabled: boolean,
 ): ForegroundNavigationLocationState => {
-  const [sample, setSample] = useState<NavigationLocationSample | null>(
-    getPersistedNavigationLocation(),
-  );
+  const [sample, setSample] = useState<NavigationLocationSample | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('undetermined');
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+
+  // Hydrate the last persisted sample once the storage read resolves. Replaces
+  // the old sync `useState(getPersistedNavigationLocation())` which broke once
+  // the underlying storage became async.
+  useEffect(() => {
+    let cancelled = false;
+    void getPersistedNavigationLocation().then((persisted) => {
+      if (!cancelled && persisted != null) setSample(persisted);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const refreshLocation = async () => {
     setIsLoading(true);
@@ -66,7 +77,7 @@ export const useForegroundNavigationLocation = (
 
       const nextSample = toNavigationSample(position);
       setSample(nextSample);
-      persistNavigationLocationSample(nextSample);
+      void persistNavigationLocationSample(nextSample);
     } catch (locationError) {
       setError(getLocationErrorMessage(locationError));
     } finally {
@@ -118,7 +129,7 @@ export const useForegroundNavigationLocation = (
         }
 
         setSample(toNavigationSample(initialPosition));
-        persistNavigationLocationSample(toNavigationSample(initialPosition));
+        void persistNavigationLocationSample(toNavigationSample(initialPosition));
         setIsLoading(false);
 
         subscription = await Location.watchPositionAsync(
@@ -135,7 +146,7 @@ export const useForegroundNavigationLocation = (
 
             const nextSample = toNavigationSample(position);
             setSample(nextSample);
-            persistNavigationLocationSample(nextSample);
+            void persistNavigationLocationSample(nextSample);
             setError(null);
             setIsLoading(false);
           },

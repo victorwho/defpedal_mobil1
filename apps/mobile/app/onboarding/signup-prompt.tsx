@@ -53,8 +53,17 @@ export default function OnboardingSignupPromptScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const finishOnboarding = () => {
+    // Only reset the open-count on the *initial* onboarding completion (the
+    // user is finishing the 5-screen onboarding flow for the first time).
+    // When this screen is shown as a count-based re-prompt (`anonymousOpenCount >= 2`
+    // with `onboardingCompleted` already true), dismissing with "Maybe later"
+    // must NOT reset the count — otherwise the user loops at count 0↔2 forever
+    // and never reaches the count >= 3 mandatory gate.
+    const wasInitialOnboarding = useAppStore.getState().onboardingCompleted === false;
     setOnboardingCompleted(true);
-    resetAnonymousOpenCount();
+    if (wasInitialOnboarding) {
+      resetAnonymousOpenCount();
+    }
     // Navigate to route-preview if a loop route was generated, otherwise route-planning
     const hasRoute = routePreview != null && routePreview.routes.length > 0;
     router.replace(hasRoute ? '/route-preview' : '/route-planning');

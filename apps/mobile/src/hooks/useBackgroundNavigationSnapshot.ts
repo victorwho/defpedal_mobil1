@@ -1,5 +1,5 @@
 import type { NavigationLocationSample } from '@defensivepedal/core';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   type BackgroundNavigationStatus,
@@ -15,26 +15,37 @@ type BackgroundNavigationSnapshot = {
   refresh: () => void;
 };
 
-export const useBackgroundNavigationSnapshot = (): BackgroundNavigationSnapshot => {
-  const [status, setStatus] = useState<BackgroundNavigationStatus>(
-    getBackgroundNavigationStatus(),
-  );
-  const [latestLocation, setLatestLocation] = useState<NavigationLocationSample | null>(
-    getPersistedNavigationLocation(),
-  );
-  const [locationHistory, setLocationHistory] = useState<NavigationLocationSample[]>(
-    getPersistedNavigationLocationHistory(),
-  );
+const DEFAULT_STATUS: BackgroundNavigationStatus = {
+  status: 'idle',
+  updatedAt: new Date(0).toISOString(),
+  error: null,
+};
 
-  const refresh = () => {
-    setStatus(getBackgroundNavigationStatus());
-    setLatestLocation(getPersistedNavigationLocation());
-    setLocationHistory(getPersistedNavigationLocationHistory());
-  };
+export const useBackgroundNavigationSnapshot = (): BackgroundNavigationSnapshot => {
+  const [status, setStatus] = useState<BackgroundNavigationStatus>(DEFAULT_STATUS);
+  const [latestLocation, setLatestLocation] = useState<NavigationLocationSample | null>(null);
+  const [locationHistory, setLocationHistory] = useState<NavigationLocationSample[]>([]);
+
+  const refresh = useCallback(() => {
+    let cancelled = false;
+    void (async () => {
+      const [nextStatus, nextLocation, nextHistory] = await Promise.all([
+        getBackgroundNavigationStatus(),
+        getPersistedNavigationLocation(),
+        getPersistedNavigationLocationHistory(),
+      ]);
+      if (cancelled) return;
+      setStatus(nextStatus);
+      setLatestLocation(nextLocation);
+      setLocationHistory(nextHistory);
+    })();
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   return {
     status,

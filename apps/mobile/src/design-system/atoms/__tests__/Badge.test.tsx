@@ -45,6 +45,40 @@ describe('Badge', () => {
       );
       expect(screen.getByTestId('custom')).toBeTruthy();
     });
+
+    it('wraps mixed text + expression children in a Text element', () => {
+      // JSX like `<Badge>Route: {name}</Badge>` passes children as the array
+      // `['Route: ', name]`. Without Text-wrapping this produced the runtime
+      // error "Text strings must be rendered within a <Text> component." —
+      // diagnostics.tsx hit this regression because several cards used the
+      // mixed-content pattern. Assert the combined content is still
+      // rendered (via Text) and that the a11y label flattens it.
+      const name = 'granted';
+      const { container } = render(
+        <Badge variant="risk-safe">Route: {name}</Badge>,
+      );
+      expect(screen.getByText((t) => t.includes('Route: granted'))).toBeTruthy();
+      const badge = container.querySelector(
+        '[accessibilitylabel="Safe: Route: granted"]',
+      );
+      expect(badge).toBeTruthy();
+    });
+
+    it('wraps numeric children in a Text element', () => {
+      // `<Badge>{42}</Badge>` — number child, not string.
+      render(<Badge>{42}</Badge>);
+      expect(screen.getByText('42')).toBeTruthy();
+    });
+
+    it('wraps array of mixed text + number children in a Text element', () => {
+      // Worst case: `<Badge>Queue: {count}</Badge>` where count is a number.
+      const { container } = render(<Badge>Queue: {5}</Badge>);
+      expect(screen.getByText((t) => t.includes('Queue: 5'))).toBeTruthy();
+      const badge = container.querySelector(
+        '[accessibilitylabel="Queue: 5"]',
+      );
+      expect(badge).toBeTruthy();
+    });
   });
 
   describe('variants', () => {

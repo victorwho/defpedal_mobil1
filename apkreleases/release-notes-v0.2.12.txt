@@ -1,0 +1,7 @@
+v0.2.12 — Surface anonymous sign-in failure
+
+CHANGED
+- Diagnostics > Signup gate now shows "Session exists" and, if the anonymous sign-in failed on launch, a red "Auth error" line with the exact Supabase message. Previously the failure was swallowed and the app just silently became a guest with no session.
+
+WHY IT MATTERS
+- If Is anonymous shows false while the user is NOT signed-in, it means Supabase didn't give us a session at all. The new Auth error will tell you why. The most likely cause is "Anonymous sign-ins are disabled" at the Supabase project level — a dashboard setting on the Supabase side, not something the app can fix without toggling it.

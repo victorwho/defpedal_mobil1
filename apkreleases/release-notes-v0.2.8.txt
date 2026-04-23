@@ -1,0 +1,9 @@
+v0.2.8 — Signup gate race-condition fix
+
+FIXED
+- The signup gate counter now actually increments on each cold launch. In v0.2.7 and earlier, a race between the counter increment and the local data restore on app startup silently discarded every increment, so testers could open and close the app endlessly without the counter moving. The 3rd-launch mandatory prompt was unreachable as a result.
+- After installing this build, open/close should escalate the counter correctly: launch 1 → no prompt, launch 2 → dismissible signup prompt, launch 3+ → mandatory signup/sign-in.
+
+TESTING NOTE
+- "Open/close" means actually killing the app (swipe away from recents) before reopening, not just switching to another app and back. The counter ticks on cold start.
+- If you've previously dismissed the prompt many times on v0.2.6 or v0.2.7, your stored counter may already be high — you could land on the mandatory screen on the very first open after installing this build. That's expected.

@@ -1,0 +1,12 @@
+v0.2.6 — Accounts + pre-ride checklist
+
+CHANGED
+- Second time you open the app without an account, you'll see a signup prompt you can dismiss.
+- Third time onward, signup or sign-in is required to keep using the app. This lets us sync your rides, streaks, badges, and XP so you don't lose progress if you switch phones.
+
+NEW
+- FAQ: "What should I check before every ride?" — a 60-second ABC/You/Route/Mind checklist under Safety & Routing. Open from Profile > Help & FAQ.
+
+NOTES
+- Existing anonymous data carries over when you sign in — nothing is lost.
+- Sign-in options: Google (one-tap) or email.

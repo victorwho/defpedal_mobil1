@@ -1,0 +1,7 @@
+v0.2.5 — Start location label fix
+
+FIXED
+- Route planning screen now shows the correct label for a custom start after you return from the route preview. Before, it kept showing the GPS location text even after you'd changed the start point.
+- Tapping the pencil to edit a custom start now pre-fills the search field with the current custom start's name instead of opening blank.
+
+Small quality-of-life pass only. If you spot anything odd, reply to the invitation email or use Profile > Help & FAQ in the app.

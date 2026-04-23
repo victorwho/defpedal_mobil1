@@ -99,13 +99,38 @@ export const Badge: React.FC<BadgeProps> = ({
     color: v.text,
   };
 
+  // Flatten children to a plain string for a11y, best-effort. Arrays happen
+  // when JSX mixes text and expressions, e.g. `<Badge>Route: {name}</Badge>`
+  // — React passes children as `['Route: ', name]` in that case.
+  const flattenText = (node: React.ReactNode): string | undefined => {
+    if (node == null || node === false) return undefined;
+    if (typeof node === 'string' || typeof node === 'number') return String(node);
+    if (Array.isArray(node)) {
+      const parts = node
+        .map(flattenText)
+        .filter((s): s is string => s != null);
+      return parts.length ? parts.join('') : undefined;
+    }
+    return undefined;
+  };
+
   const label = variantLabel[variant];
-  const childText = typeof children === 'string' ? children : undefined;
+  const childText = flattenText(children);
   const a11yLabel = label
     ? childText
       ? `${label}: ${childText}`
       : label
     : childText;
+
+  // Detect whether `children` is text-ish (string, number, or array thereof)
+  // vs a standalone React element. Text-ish children MUST be wrapped in a
+  // single <Text> — bare strings inside a <View> trigger the RN red-screen
+  // "Text strings must be rendered within a <Text> component." error.
+  const isTextChild = (node: React.ReactNode): boolean => {
+    if (typeof node === 'string' || typeof node === 'number') return true;
+    if (Array.isArray(node)) return node.some(isTextChild);
+    return false;
+  };
 
   return (
     <View
@@ -114,7 +139,7 @@ export const Badge: React.FC<BadgeProps> = ({
       accessibilityLabel={a11yLabel}
     >
       {icon}
-      {typeof children === 'string' ? (
+      {isTextChild(children) ? (
         <Text style={textStyle}>{children}</Text>
       ) : (
         children

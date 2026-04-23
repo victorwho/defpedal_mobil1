@@ -19,6 +19,7 @@ import {
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { mobileEnv } from '../src/lib/env';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
+import { storageEngineKind } from '../src/lib/storage';
 import {
   summarizeBackgroundMovement,
   summarizeSelectedRouteOfflineReadiness,
@@ -250,13 +251,15 @@ function StatusBadge({
 
 export default function DiagnosticsScreen() {
   const { colors } = useTheme();
-  const { user, session } = useAuthSession();
+  const { user, session, isAnonymous, authError } = useAuthSession();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
   const queuedMutations = useAppStore((state) => state.queuedMutations);
   const offlineRegions = useAppStore((state) => state.offlineRegions);
   const navigationSession = useAppStore((state) => state.navigationSession);
   const routePreview = useAppStore((state) => state.routePreview);
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
+  const anonymousOpenCount = useAppStore((state) => state.anonymousOpenCount);
+  const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const queueDeveloperValidationWrites = useAppStore(
     (state) => state.queueDeveloperValidationWrites,
   );
@@ -445,8 +448,45 @@ export default function DiagnosticsScreen() {
         <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
           Validation source: <Text style={styles.monoValue}>{mobileEnv.validationSourceRoot || 'Not set'}</Text>
         </Text>
-        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>Signed in: <Text style={styles.monoValue}>{user ? user.email ?? user.id : 'No'}</Text></Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Signed in: <Text style={styles.monoValue}>{
+            user == null
+              ? 'No (no session)'
+              : isAnonymous
+                ? 'Anonymous'
+                : user.email ?? user.id
+          }</Text>
+        </Text>
         <Text style={[styles.bodyText, { color: colors.textSecondary }]}>Auth provider: <Text style={styles.monoValue}>{session?.provider ?? 'none'}</Text></Text>
+      </DiagnosticCard>
+
+      <DiagnosticCard title="Signup gate">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Anonymous open count: <Text style={styles.monoValue}>{anonymousOpenCount}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Onboarding completed: <Text style={styles.monoValue}>{String(onboardingCompleted)}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Is anonymous: <Text style={styles.monoValue}>{String(isAnonymous)}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Has real account: <Text style={styles.monoValue}>{String(user != null && !isAnonymous)}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Session exists: <Text style={styles.monoValue}>{String(session != null)}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: storageEngineKind === 'memory' ? colors.danger : colors.textSecondary }]}>
+          Storage engine: <Text style={styles.monoValue}>{storageEngineKind}</Text>
+        </Text>
+        {authError ? (
+          <Text style={[styles.bodyText, { color: colors.danger, marginTop: 8 }]}>
+            Auth error: <Text style={styles.monoValue}>{authError}</Text>
+          </Text>
+        ) : null}
+        <Text style={[styles.bodyText, { color: colors.textSecondary, marginTop: 8 }]}>
+          Gate fires at count{' '}=={' '}2 (dismissible) and count{' '}≥{' '}3 (mandatory), ONLY when Has real account is false.
+        </Text>
       </DiagnosticCard>
 
       <DiagnosticCard

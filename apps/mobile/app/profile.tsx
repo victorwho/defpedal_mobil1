@@ -52,7 +52,7 @@ export default function ProfileScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
-  const { user, signOut, signInAnonymously } = useAuthSession();
+  const { user, isAnonymous, signOut, signInAnonymously } = useAuthSession();
   const confirm = useConfirmation();
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
@@ -425,7 +425,7 @@ export default function ProfileScreen() {
           contentBottomPadding={insets.bottom + layout.bottomNavHeight + space[4]}
         >
           {/* ── User card (signed-in or guest prompt) ──────────── */}
-          {user ? (
+          {user && !isAnonymous ? (
             <View style={styles.userCard}>
               <Pressable
                 onPress={handleAvatarPick}
@@ -530,7 +530,7 @@ export default function ProfileScreen() {
             >
               <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{t('common.guest')}</Text>
+                <Text style={styles.userName}>{isAnonymous ? 'Anonymous' : t('common.guest')}</Text>
                 <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
               </View>
               <Ionicons name="log-in-outline" size={24} color={colors.accent} />
@@ -737,7 +737,22 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={gray[400]} />
             </Pressable>
 
-            {user ? (
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => router.push('/diagnostics' as any)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Diagnostics"
+            >
+              <Ionicons name="pulse-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>Diagnostics</Text>
+                <Text style={styles.settingDescription}>Signup-gate state, connectivity, and app internals for QA</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
+
+            {user && !isAnonymous ? (
               <Pressable
                 style={styles.signOutButton}
                 accessible={true}

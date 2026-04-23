@@ -1,0 +1,11 @@
+v0.2.17 — Onboarding redirect actually wins the race
+
+FIXED
+- On a truly fresh install you reported the onboarding flow and signup gate never fired, even though Diagnostics showed Is anonymous: true, Has real account: false, and the counter ticking up. Root cause: the gate used an imperative router.replace from a useEffect, which races with app/index.tsx's own Redirect to /route-planning. Whichever fires last wins — in practice the gate's target was silently overwritten and the user stayed on /route-planning.
+- Switched the gate to a declarative Redirect rendered from the root layout, and when a redirect is pending the Stack itself is skipped so app/index.tsx never even mounts. No race left — the gate always wins.
+
+EXPECTED
+- Fresh install (or reinstall) → first cold start → onboarding flow triggers.
+- After completing or dismissing onboarding → 2nd cold start → dismissible signup prompt.
+- 3rd cold start → mandatory signup.
+- Hardware back from the mandatory screen still re-redirects back (unchanged).

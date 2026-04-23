@@ -1,0 +1,8 @@
+v0.2.7 — Signup gate fix
+
+FIXED
+- The signup gate now escalates properly. In v0.2.6 it could loop at the dismissible prompt forever: tapping "Maybe later" was silently resetting the launch counter, so the mandatory screen at the 3rd launch was unreachable. Dismissals on the re-prompt no longer reset the counter — one more app open after dismissing takes you to the mandatory screen.
+- Initial onboarding (first install) is unchanged: completing the 5-screen flow still starts you at a clean counter.
+
+TESTING NOTE
+- Testers on v0.2.6 whose counter was stuck at 0 will need one more app open than they'd expect to reach the mandatory screen, since the fix takes effect starting from the install of v0.2.7.

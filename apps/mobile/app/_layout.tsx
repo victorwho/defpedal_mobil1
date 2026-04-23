@@ -25,6 +25,10 @@ import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import { useMiaJourney } from '../src/hooks/useMiaJourney';
+import {
+  computeOnboardingGateTarget,
+  useOnboardingGate,
+} from '../src/hooks/useOnboardingGate';
 import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
 
 // Keep splash screen visible while fonts load
@@ -103,51 +107,93 @@ const AppOpenTelemetryObserver = () => {
  *
  * The anonymousOpenCount is incremented once per app launch (via ref).
  */
+// Minimum time the app must spend in the background before a foreground
+// transition counts as a new "session" for signup-gate purposes. Chosen to
+// balance against accidental notification-shade swipes but still aggressive
+// enough to match a user's mental model of "opening the app again".
+const SESSION_IDLE_THRESHOLD_MS = 5 * 60 * 1000;
+
 const OnboardingGuard = () => {
-  const pathname = usePathname();
-  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
-  const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
+  const state = useOnboardingGate();
   const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
-  const authCtx = useAuthSessionOptional();
   const hasIncrementedRef = useRef(false);
+  // Tracks when the app last went to background so we can decide if a
+  // foreground transition should count as a new session.
+  const lastBackgroundAtRef = useRef<number | null>(null);
+  // One-shot guard for the initial-onboarding and count-2 dismissible-prompt
+  // redirects. The mandatory gate ignores this ref and fires on every render
+  // so hardware-back / nav-away can't escape it. `app/index.tsx` also runs
+  // the gate once when it mounts (covers cold start), but this effect is the
+  // authority for mid-session transitions and for any route reached without
+  // passing through index (deep links, state-driven navigation, etc.).
   const hasRedirectedRef = useRef(false);
 
-  const isLoading = authCtx?.isLoading ?? true;
-  const hasRealAccount = authCtx?.user != null && authCtx?.isAnonymous === false;
+  const { storeHydrated, isLoading, hasRealAccount } = state;
 
-  // Increment anonymous open count once per app launch
+  // Increment anonymous open count once per app launch.
+  // Gated on storeHydrated so the increment isn't clobbered by late hydration.
   useEffect(() => {
+    if (!storeHydrated) return;
     if (!hasIncrementedRef.current && !hasRealAccount && !isLoading) {
       hasIncrementedRef.current = true;
       incrementAnonymousOpenCount();
     }
-  }, [hasRealAccount, isLoading, incrementAnonymousOpenCount]);
+  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount]);
 
-  // Redirect logic — imperative to avoid render-loop from <Redirect>
+  // Secondary increment path: some Android OEMs keep the JS process alive
+  // when the user swipes away from recents. In that case `_layout.tsx` does
+  // not remount on the next "open" and the mount-based increment above only
+  // ever fires once per process lifetime. Counting background→active
+  // transitions (above an idle threshold) covers those cases.
   useEffect(() => {
-    if (isLoading || hasRealAccount) return;
-    if (pathname.startsWith('/onboarding')) return;
-    if (pathname === '/feedback' || pathname === '/navigation') return;
+    const subscription = RNAppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') {
+        lastBackgroundAtRef.current = Date.now();
+        return;
+      }
+      if (next !== 'active') return;
 
-    // Mandatory gate: re-redirect on every escape attempt (e.g. hardware
-    // back). We intentionally bypass hasRedirectedRef here because "mandatory"
-    // must mean mandatory for the rest of the session.
-    if (onboardingCompleted !== false && anonymousOpenCount >= 3) {
+      const lastBackground = lastBackgroundAtRef.current;
+      if (lastBackground == null) return; // initial foreground after mount — the mount effect already handled it
+      const idleMs = Date.now() - lastBackground;
+      lastBackgroundAtRef.current = null;
+      if (idleMs < SESSION_IDLE_THRESHOLD_MS) return;
+
+      if (!storeHydrated || hasRealAccount || isLoading) return;
+      incrementAnonymousOpenCount();
+    });
+    return () => subscription.remove();
+  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount]);
+
+  // Imperative enforcement of the gate. Previously this rendered a
+  // declarative `<Redirect>` that REPLACED the `<Stack>` while active —
+  // but `<Redirect>` is implemented with `useFocusEffect`, which only fires
+  // for a focused screen inside a navigator. Rendering it in place of the
+  // Stack meant it was never focused, so `router.replace` never ran and the
+  // user silently stayed on whatever screen `app/index.tsx` had redirected
+  // them to. Using `router.replace` directly from an effect sidesteps the
+  // focus-context requirement entirely.
+  useEffect(() => {
+    const target = computeOnboardingGateTarget(state, hasRedirectedRef.current);
+    if (!target) return;
+    if (!target.includes('mandatory=true')) {
       hasRedirectedRef.current = true;
-      router.replace('/onboarding/signup-prompt?mandatory=true' as never);
-      return;
     }
-
-    if (hasRedirectedRef.current) return;
-
-    if (onboardingCompleted === false) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/index' as never);
-    } else if (anonymousOpenCount >= 2) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/signup-prompt' as never);
-    }
-  }, [isLoading, hasRealAccount, pathname, onboardingCompleted, anonymousOpenCount]);
+    // Already on the target — nothing to do.
+    if (state.pathname === target.split('?')[0]) return;
+    router.replace(target as never);
+    // `state` is a fresh object every render (plain return from the hook),
+    // so including it in the dep array would cause an infinite effect loop.
+    // The primitives listed capture every field this effect reads.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    state.storeHydrated,
+    state.isLoading,
+    state.hasRealAccount,
+    state.onboardingCompleted,
+    state.anonymousOpenCount,
+    state.pathname,
+  ]);
 
   return null;
 };
@@ -412,6 +458,17 @@ const RootLayoutInner = () => {
           </Text>
         </View>
       ) : null}
+      {/*
+       * Stack is always mounted so:
+       * 1. `app/index.tsx` can render its own `<Redirect>` from within the
+       *    navigator (that's the only place `<Redirect>` actually works —
+       *    it's built on `useFocusEffect`, which requires a focused screen).
+       * 2. `OnboardingGuard`'s imperative `router.replace` has a navigator
+       *    to dispatch against when mid-session state changes trigger the
+       *    gate. Swapping this for a root-level `<Redirect>` was the cause
+       *    of GH issue #23 — the fresh-install onboarding redirect silently
+       *    dropped because the `<Redirect>` was never focused.
+       */}
       <Stack
         screenOptions={{
           headerShown: false,
