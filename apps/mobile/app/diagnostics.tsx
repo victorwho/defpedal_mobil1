@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -249,7 +250,21 @@ function StatusBadge({
   );
 }
 
+/**
+ * Exported default guards the QA-only diagnostics screen from production.
+ * The Profile/Settings entry points are already hidden there, but a deep
+ * link or stale route could still resolve here — this redirect catches
+ * that. Wrapping also keeps `DiagnosticsContent`'s hooks (including the
+ * network-hitting `refreshDiagnostics` effect) from running on production.
+ */
 export default function DiagnosticsScreen() {
+  if (mobileEnv.appEnv === 'production') {
+    return <Redirect href="/route-planning" />;
+  }
+  return <DiagnosticsContent />;
+}
+
+function DiagnosticsContent() {
   const { colors } = useTheme();
   const { user, session, isAnonymous, authError } = useAuthSession();
   const backgroundSnapshot = useBackgroundNavigationSnapshot();

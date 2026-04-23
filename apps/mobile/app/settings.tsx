@@ -107,20 +107,22 @@ export default function SettingsScreen() {
             />
           </Pressable>
         </Link>
-        <Link href="/diagnostics" asChild>
-          <Pressable>
-            <MenuItem
-              icon="pulse-outline"
-              label={t('settings.diagnostics')}
-              description={t('settings.diagnosticsSub')}
-              rightAccessory={
-                <Badge variant="info" size="sm">
-                  QA
-                </Badge>
-              }
-            />
-          </Pressable>
-        </Link>
+        {mobileEnv.appEnv !== 'production' ? (
+          <Link href="/diagnostics" asChild>
+            <Pressable>
+              <MenuItem
+                icon="pulse-outline"
+                label={t('settings.diagnostics')}
+                description={t('settings.diagnosticsSub')}
+                rightAccessory={
+                  <Badge variant="info" size="sm">
+                    QA
+                  </Badge>
+                }
+              />
+            </Pressable>
+          </Link>
+        ) : null}
         <Link href="/onboarding" asChild>
           <Pressable>
             <MenuItem
