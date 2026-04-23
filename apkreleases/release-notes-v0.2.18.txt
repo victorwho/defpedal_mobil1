@@ -1,0 +1,37 @@
+v0.2.18 — Signup gate + diagnostics visibility
+
+FIXED
+- GH issue #23: the fresh-install signup gate finally fires. Three
+  compounding bugs:
+    1. <Redirect> at root layout was never focused (it's built on
+       useFocusEffect, which needs a mounted navigator + focused screen),
+       so router.replace never ran and app/index.tsx won the race to
+       /route-planning.
+    2. Gate's redirect target was /onboarding/index — Expo Router
+       exposes app/onboarding/index.tsx as /onboarding, so the replace
+       silently no-op'd and, combined with an unstable effect dep, the
+       gate re-fired every render → "Maximum update depth exceeded" on
+       fresh install.
+    3. Diagnostics crashed with "Text strings must be rendered within
+       a <Text> component." because Badge didn't wrap mixed text +
+       expression children (e.g. "Foreground: {perm}") in <Text>.
+- Gate now runs from inside app/index.tsx on cold start (where
+  <Redirect> actually works) and is enforced imperatively via
+  router.replace from OnboardingGuard for mid-session state changes.
+- Badge wraps any text-ish children (strings, numbers, arrays of them)
+  in a single <Text>. Keeps standalone React elements untouched.
+
+CHANGED
+- Diagnostics is now hidden on the production variant (stays visible
+  on dev and preview). Even if a deep link reaches /diagnostics on
+  production, the screen redirects back to /route-planning before any
+  of its hooks run.
+
+EXPECTED
+- Fresh install (or reinstall) → first cold start → onboarding flow
+  fires, lands on /onboarding.
+- Completing or dismissing onboarding → 2nd cold start →
+  dismissible signup prompt.
+- 3rd cold start → mandatory signup; hardware back still re-redirects.
+- Diagnostics (Profile → Account, Settings → menu) is still available
+  on this preview build for QA.
