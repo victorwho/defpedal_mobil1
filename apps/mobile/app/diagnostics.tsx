@@ -256,9 +256,14 @@ function StatusBadge({
  * link or stale route could still resolve here — this redirect catches
  * that. Wrapping also keeps `DiagnosticsContent`'s hooks (including the
  * network-hitting `refreshDiagnostics` effect) from running on production.
+ *
+ * Gated on `appVariant` (from extra.appVariant, set at build time via
+ * APP_VARIANT) rather than `appEnv` — `appEnv` reads `EXPO_PUBLIC_APP_ENV`
+ * from the .env file, which is hardcoded to 'development' and is NOT
+ * updated by the build script when building preview/production.
  */
 export default function DiagnosticsScreen() {
-  if (mobileEnv.appEnv === 'production') {
+  if (mobileEnv.appVariant === 'production') {
     return <Redirect href="/route-planning" />;
   }
   return <DiagnosticsContent />;
@@ -628,7 +633,7 @@ function DiagnosticsContent() {
         </DiagnosticCard>
       ) : null}
 
-      {mobileEnv.appEnv !== 'production' ? (
+      {mobileEnv.appVariant !== 'production' ? (
         <DiagnosticCard title="Developer validation">
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
             Use this in development to queue authenticated sample writes, then toggle network off

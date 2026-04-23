@@ -737,7 +737,7 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={gray[400]} />
             </Pressable>
 
-            {mobileEnv.appEnv !== 'production' ? (
+            {mobileEnv.appVariant !== 'production' ? (
               <Pressable
                 style={styles.helpFaqRow}
                 onPress={() => router.push('/diagnostics' as any)}

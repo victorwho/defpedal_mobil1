@@ -107,7 +107,7 @@ export default function SettingsScreen() {
             />
           </Pressable>
         </Link>
-        {mobileEnv.appEnv !== 'production' ? (
+        {mobileEnv.appVariant !== 'production' ? (
           <Link href="/diagnostics" asChild>
             <Pressable>
               <MenuItem

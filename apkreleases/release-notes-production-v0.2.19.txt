@@ -1,0 +1,26 @@
+v0.2.19 production — Diagnostics actually hidden on production
+
+FIXED (in continuation of v0.2.18)
+- v0.2.18 production still showed the Diagnostics menu + screen. Root
+  cause: the gate was checking mobileEnv.appEnv === 'production', but
+  appEnv resolves through env.ts as:
+    publicEnv.EXPO_PUBLIC_APP_ENV ?? extra.appEnv ?? 'development'
+  The .env file has EXPO_PUBLIC_APP_ENV=development hardcoded, and
+  Expo bundles EXPO_PUBLIC_* vars into the JS at build time, so
+  publicEnv.EXPO_PUBLIC_APP_ENV always wins — returning 'development'
+  even on production builds. Build script updates APP_VARIANT but
+  not EXPO_PUBLIC_APP_ENV.
+- Switched all three gates to mobileEnv.appVariant ('production'),
+  which comes from extra.appVariant in app.config.ts (set reliably
+  at build time from APP_VARIANT).
+
+EXPECTED ON THIS BUILD
+- Profile → Account: Diagnostics row is NOT visible.
+- Settings → menu: Diagnostics entry is NOT visible.
+- Direct nav to /diagnostics redirects to /route-planning.
+
+REST OF v0.2.18 FIXES STILL IN EFFECT
+- GH #23 fresh-install signup gate fires on first cold start.
+- /onboarding target (was /onboarding/index — didn't resolve).
+- Badge wraps mixed text + expression children to prevent the Text
+  red-screen error.

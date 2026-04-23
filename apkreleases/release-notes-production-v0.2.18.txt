@@ -1,0 +1,39 @@
+v0.2.18 production — GH #23 fix + diagnostics hidden
+
+This is the PRODUCTION flavor (package com.defensivepedal.mobile), not
+preview. It installs side-by-side with the preview build without
+uninstalling it.
+
+WHAT TO VERIFY SPECIFICALLY ON PRODUCTION
+- Diagnostics is NOT visible in Profile → Account.
+- Diagnostics is NOT visible in Settings → menu.
+- Hitting /diagnostics directly (via a deep link or stale route)
+  should redirect to /route-planning instead of rendering the screen.
+
+REST OF WHAT SHIPPED (same as preview v0.2.18)
+- GH issue #23: fresh-install signup gate actually fires. Three
+  compounding bugs fixed:
+    1. <Redirect> at root layout was never focused (useFocusEffect
+       needs a mounted navigator + focused screen), so router.replace
+       silently dropped and app/index.tsx won the race to
+       /route-planning.
+    2. Gate was redirecting to /onboarding/index — the router
+       normalizes the route as /onboarding, so replace silently
+       no-op'd, combined with an unstable effect dep → "Maximum
+       update depth exceeded" on fresh install.
+    3. Badge component would crash with "Text strings must be
+       rendered within a <Text> component." when passed mixed
+       text + expression children (diagnostics was the only place
+       that triggered this, but the fix is in the shared atom).
+- Gate logic now runs from inside app/index.tsx on cold start and is
+  enforced imperatively via router.replace from OnboardingGuard for
+  mid-session state changes.
+- Badge wraps any text-ish children (strings, numbers, arrays of
+  them) in a single <Text>.
+
+EXPECTED BEHAVIOR
+- Fresh install → onboarding fires on first cold start.
+- Completing or dismissing onboarding → 2nd cold start → dismissible
+  signup prompt.
+- 3rd cold start → mandatory signup; hardware back re-redirects.
+- Diagnostics is hidden and blocked (this is the production gate).
