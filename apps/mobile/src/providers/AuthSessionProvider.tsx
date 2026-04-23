@@ -8,6 +8,7 @@ import { registerForPushNotifications } from '../lib/push-notifications';
 import {
   activateDeveloperBypassSession,
   getCurrentSession,
+  getLastAnonSignInError,
   isDeveloperAuthBypassAvailable,
   isOAuthInProgress,
   isSupabaseConfigured,
@@ -71,6 +72,16 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       if (!currentSession && allowAnonSignIn && !anonSignInAttempted && isSupabaseConfigured()) {
         anonSignInAttempted = true;
         currentSession = await signInAnonymously();
+        // Surface the failure reason so Diagnostics can show why the app
+        // landed in pure-guest mode (no session at all). Without this, the
+        // silent null return masks Supabase project misconfigurations (anon
+        // auth disabled) as ordinary guest state.
+        if (!currentSession) {
+          const reason = getLastAnonSignInError();
+          if (reason && isMounted) {
+            setAuthError(`Anonymous sign-in failed: ${reason}`);
+          }
+        }
       }
 
       if (isMounted) {

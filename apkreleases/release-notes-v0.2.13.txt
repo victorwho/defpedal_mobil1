@@ -1,0 +1,9 @@
+v0.2.13 — Persistence REALLY works this time
+
+FIXED
+- v0.2.11 had the MMKV package installed but Metro didn't bundle its JS code because the module was loaded via a dynamic require that Metro can't statically analyze. The native library was in the APK but the JS glue wasn't — so every read/write still fell through to the in-memory map that resets on every launch. That's why the open count kept returning to 1.
+- Switched to a plain top-level `import { MMKV } from 'react-native-mmkv'` so Metro actually bundles it. Verified locally that the bundle now carries MMKV's JS code, and all 96 existing store + hook tests still pass against a test-only in-memory mock.
+
+TESTING
+- After installing over v0.2.11/0.2.12, open/close the app and watch Profile > Diagnostics > Signup gate. Anonymous open count should now increase on each cold start: 1 → 2 (dismissible prompt) → 3 (mandatory).
+- The "Is anonymous: false for guest" issue is separate. v0.2.12 added an Auth error line that will show the reason if Supabase anonymous sign-in is failing (most likely cause: anonymous sign-ins disabled at the Supabase project level).

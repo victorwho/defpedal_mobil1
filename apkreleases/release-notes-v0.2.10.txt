@@ -1,0 +1,10 @@
+v0.2.10 — Diagnostics shortcut on Profile
+
+CHANGED
+- Diagnostics is now reachable from Profile (under Help & FAQ). Tap it to see the "Signup gate" card and screenshot the four values so I can tell what's happening on your install:
+  - Anonymous open count
+  - Onboarding completed
+  - Is anonymous
+  - Has real account
+
+No functional changes to the signup gate itself in this build — it's the same logic as v0.2.9, just easier to inspect.

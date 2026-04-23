@@ -1,0 +1,12 @@
+v0.2.11 — Persistence actually works now
+
+FIXED (large, affects more than the signup gate)
+- App state was not persisting across cold starts. The storage adapter tried to load react-native-mmkv, but the package was never installed, so it silently fell back to an in-memory Map that resets on every launch. This quietly broke the offline mutation queue, streak cache, impact cache, recent destinations, theme preference, Mia journey state, hazard votes, and the signup-gate counter — anything the app expected to keep between sessions.
+- react-native-mmkv (+ peer dep react-native-nitro-modules) now installed and wired as the storage engine. Zustand-persisted fields will actually survive an app kill.
+
+CONSEQUENCE FOR SIGNUP GATE
+- On the first launch of this build, the counter will begin at 0 (previous counter values never persisted). From the 2nd cold launch you should see the dismissible prompt. On the 3rd, mandatory.
+- If your local state from previous builds looks weird (onboarding says not completed, etc.), that's residue of the memory-only storage. One run through onboarding on this build will stabilize it.
+
+INSTALL
+- Must install over prior preview builds — this adds two native modules and cannot hot-reload in.

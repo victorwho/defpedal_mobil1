@@ -1,0 +1,14 @@
+v0.2.15 — AsyncStorage + anon sign-in DB fix
+
+FIXED
+- Persistence now uses @react-native-async-storage/async-storage. Earlier builds attempted MMKV (v2 didn't load under bridgeless, v4 couldn't compile under NDK 27). AsyncStorage works in all configs. Diagnostics > Signup gate > "Storage engine" should now read "async-storage".
+- Supabase "Database error creating anonymous user" fixed (server-side, already live). The handle_new_user trigger was inserting an explicit NULL into profiles.display_name (NOT NULL) because anonymous users have no email to derive a name from. Trigger now falls back to an empty string, matching the column default. No action required from testers — the fix is on the Supabase side and applies immediately.
+
+EXPECTED DIAGNOSTICS AFTER UPDATE
+- Storage engine: async-storage
+- Is anonymous: true (on a guest install; requires Supabase anon sign-ins enabled in the dashboard)
+- Session exists: true
+- Anonymous open count: increases by 1 on every cold launch
+
+GATE
+- Launch 1 → no prompt. Launch 2 → dismissible signup prompt. Launch 3+ → mandatory.

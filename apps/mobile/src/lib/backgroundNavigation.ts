@@ -26,8 +26,8 @@ const createStatus = (
   error: error ?? null,
 });
 
-const readJson = <T>(key: string): T | null => {
-  const rawValue = keyValueStorage.getString(key);
+const readJson = async <T>(key: string): Promise<T | null> => {
+  const rawValue = await keyValueStorage.getString(key);
 
   if (!rawValue) {
     return null;
@@ -40,37 +40,40 @@ const readJson = <T>(key: string): T | null => {
   }
 };
 
-const writeJson = (key: string, value: unknown) => {
-  keyValueStorage.setString(key, JSON.stringify(value));
+const writeJson = async (key: string, value: unknown): Promise<void> => {
+  await keyValueStorage.setString(key, JSON.stringify(value));
 };
 
-export const getPersistedNavigationLocation = (): NavigationLocationSample | null =>
+export const getPersistedNavigationLocation = (): Promise<NavigationLocationSample | null> =>
   readJson<NavigationLocationSample>(BACKGROUND_LOCATION_KEY);
 
-export const getPersistedNavigationLocationHistory = (): NavigationLocationSample[] =>
-  readJson<NavigationLocationSample[]>(BACKGROUND_LOCATION_HISTORY_KEY) ?? [];
+export const getPersistedNavigationLocationHistory = async (): Promise<
+  NavigationLocationSample[]
+> => (await readJson<NavigationLocationSample[]>(BACKGROUND_LOCATION_HISTORY_KEY)) ?? [];
 
-export const persistNavigationLocationSample = (sample: NavigationLocationSample) => {
-  writeJson(BACKGROUND_LOCATION_KEY, sample);
+export const persistNavigationLocationSample = async (
+  sample: NavigationLocationSample,
+): Promise<void> => {
+  await writeJson(BACKGROUND_LOCATION_KEY, sample);
 
-  const history = getPersistedNavigationLocationHistory();
+  const history = await getPersistedNavigationLocationHistory();
   const lastSample = history[history.length - 1];
   const nextHistory =
     lastSample?.timestamp === sample.timestamp
       ? history.map((entry, index) => (index === history.length - 1 ? sample : entry))
       : [...history, sample].slice(-MAX_BACKGROUND_LOCATION_HISTORY);
 
-  writeJson(BACKGROUND_LOCATION_HISTORY_KEY, nextHistory);
+  await writeJson(BACKGROUND_LOCATION_HISTORY_KEY, nextHistory);
 };
 
-export const getBackgroundNavigationStatus = (): BackgroundNavigationStatus =>
-  readJson<BackgroundNavigationStatus>(BACKGROUND_STATUS_KEY) ?? createStatus('idle');
+export const getBackgroundNavigationStatus = async (): Promise<BackgroundNavigationStatus> =>
+  (await readJson<BackgroundNavigationStatus>(BACKGROUND_STATUS_KEY)) ?? createStatus('idle');
 
-export const persistBackgroundNavigationStatus = (
+export const persistBackgroundNavigationStatus = async (
   status: BackgroundNavigationStatus['status'],
   error?: string | null,
-) => {
-  writeJson(BACKGROUND_STATUS_KEY, createStatus(status, error));
+): Promise<void> => {
+  await writeJson(BACKGROUND_STATUS_KEY, createStatus(status, error));
 };
 
 const formatLocationError = (error: unknown): string =>
@@ -79,7 +82,7 @@ const formatLocationError = (error: unknown): string =>
 if (!TaskManager.isTaskDefined(BACKGROUND_NAVIGATION_TASK)) {
   TaskManager.defineTask(BACKGROUND_NAVIGATION_TASK, async ({ data, error }) => {
     if (error) {
-      persistBackgroundNavigationStatus('error', error.message);
+      await persistBackgroundNavigationStatus('error', error.message);
       return;
     }
 
@@ -90,7 +93,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_NAVIGATION_TASK)) {
       return;
     }
 
-    persistNavigationLocationSample({
+    await persistNavigationLocationSample({
       coordinate: {
         lat: lastLocation.coords.latitude,
         lon: lastLocation.coords.longitude,
@@ -100,7 +103,7 @@ if (!TaskManager.isTaskDefined(BACKGROUND_NAVIGATION_TASK)) {
       heading: lastLocation.coords.heading ?? null,
       timestamp: lastLocation.timestamp,
     });
-    persistBackgroundNavigationStatus('active');
+    await persistBackgroundNavigationStatus('active');
   });
 }
 
@@ -127,7 +130,7 @@ const ensurePermissions = async () => {
 };
 
 export const startBackgroundNavigationUpdates = async () => {
-  persistBackgroundNavigationStatus('starting');
+  await persistBackgroundNavigationStatus('starting');
 
   try {
     await ensurePermissions();
@@ -154,9 +157,9 @@ export const startBackgroundNavigationUpdates = async () => {
       });
     }
 
-    persistBackgroundNavigationStatus('active');
+    await persistBackgroundNavigationStatus('active');
   } catch (error) {
-    persistBackgroundNavigationStatus('error', formatLocationError(error));
+    await persistBackgroundNavigationStatus('error', formatLocationError(error));
     throw error;
   }
 };
@@ -171,9 +174,9 @@ export const stopBackgroundNavigationUpdates = async () => {
       await Location.stopLocationUpdatesAsync(BACKGROUND_NAVIGATION_TASK);
     }
 
-    persistBackgroundNavigationStatus('idle');
+    await persistBackgroundNavigationStatus('idle');
   } catch (error) {
-    persistBackgroundNavigationStatus('error', formatLocationError(error));
+    await persistBackgroundNavigationStatus('error', formatLocationError(error));
     throw error;
   }
 };

@@ -1,0 +1,8 @@
+v0.2.4 — Small polish
+
+IMPROVED
+- "Back to planning" button on the route preview screen is now just "Back" (tighter, less visual noise on the action bar)
+
+No other changes since v0.2.3. If you spot anything odd — a crash, a slow screen, a weird map layer — reply to the invitation email or use Profile > Help & FAQ in the app.
+
+Thanks for testing. Ride safe.

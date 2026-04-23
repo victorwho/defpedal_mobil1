@@ -1,0 +1,8 @@
+v0.2.16 — Clearer anonymous labeling
+
+CHANGED
+- Profile: anonymous users now see a "Anonymous — tap to sign in" card instead of the full signed-in user card with avatar editor and username edit link. Sign-out button hidden for anon users (nothing to sign out of).
+- Diagnostics: "Signed in" field now reads "Anonymous" when the session is anon, "No (no session)" when there's no session at all, or the email/user-id when a real account is signed in. Makes the state immediately obvious.
+
+NOTE ON ONBOARDING
+- You reported the signup gate didn't fire on your first anonymous boot, only after signing out. Most likely explanation: your install history carried a real Google-OAuth session via expo-secure-store (which has always persisted correctly), so "hasRealAccount" was true and the gate correctly stayed silent. After sign-out, the app flipped to anonymous and the gate started applying. For future fresh installs the gate should apply immediately — but watch for the same pattern if you upgrade from a build where you were signed in.

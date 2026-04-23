@@ -1,4 +1,4 @@
-import { Stack, router, usePathname } from 'expo-router';
+import { Redirect, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
@@ -25,6 +25,7 @@ import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import { useMiaJourney } from '../src/hooks/useMiaJourney';
+import { useStoreHydrated } from '../src/hooks/useStoreHydrated';
 import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
 
 // Keep splash screen visible while fonts load
@@ -103,52 +104,112 @@ const AppOpenTelemetryObserver = () => {
  *
  * The anonymousOpenCount is incremented once per app launch (via ref).
  */
-const OnboardingGuard = () => {
+// Minimum time the app must spend in the background before a foreground
+// transition counts as a new "session" for signup-gate purposes. Chosen to
+// balance against accidental notification-shade swipes but still aggressive
+// enough to match a user's mental model of "opening the app again".
+const SESSION_IDLE_THRESHOLD_MS = 5 * 60 * 1000;
+
+/**
+ * Shared between OnboardingGuard (for its effects and `hasRedirectedRef`
+ * one-shot gating) and the root render, which decides between rendering
+ * `<Stack>` vs the `<Redirect>` — this avoids the race where `app/index.tsx`
+ * also renders its own `<Redirect href="/route-planning" />` and wins the
+ * navigation coin-flip on fresh installs, silently swallowing the
+ * onboarding redirect. When a redirect target is pending we don't render
+ * Stack at all, so `index.tsx` never mounts.
+ */
+const useOnboardingGateState = () => {
   const pathname = usePathname();
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
   const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
-  const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
   const authCtx = useAuthSessionOptional();
-  const hasIncrementedRef = useRef(false);
-  const hasRedirectedRef = useRef(false);
+  const storeHydrated = useStoreHydrated();
 
   const isLoading = authCtx?.isLoading ?? true;
   const hasRealAccount = authCtx?.user != null && authCtx?.isAnonymous === false;
 
-  // Increment anonymous open count once per app launch
+  return {
+    pathname,
+    onboardingCompleted,
+    anonymousOpenCount,
+    storeHydrated,
+    isLoading,
+    hasRealAccount,
+  };
+};
+
+const computeRedirectTarget = (
+  s: ReturnType<typeof useOnboardingGateState>,
+  hasRedirected: boolean,
+): string | null => {
+  if (!s.storeHydrated) return null;
+  if (s.isLoading || s.hasRealAccount) return null;
+  if (s.pathname.startsWith('/onboarding')) return null;
+  if (s.pathname === '/feedback' || s.pathname === '/navigation') return null;
+
+  // Mandatory gate — re-redirects on every attempt to escape it.
+  if (s.onboardingCompleted !== false && s.anonymousOpenCount >= 3) {
+    return '/onboarding/signup-prompt?mandatory=true';
+  }
+
+  // One-shot branches: once the user navigates away from the prompt/onboarding
+  // for a legit reason, don't spam redirects. Mandatory above ignores this.
+  if (hasRedirected) return null;
+
+  if (s.onboardingCompleted === false) return '/onboarding/index';
+  if (s.anonymousOpenCount >= 2) return '/onboarding/signup-prompt';
+  return null;
+};
+
+const OnboardingGuard = () => {
+  const state = useOnboardingGateState();
+  const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
+  const hasIncrementedRef = useRef(false);
+  // Tracks when the app last went to background so we can decide if a
+  // foreground transition should count as a new session.
+  const lastBackgroundAtRef = useRef<number | null>(null);
+
+  const { storeHydrated, isLoading, hasRealAccount } = state;
+
+  // Increment anonymous open count once per app launch.
+  // Gated on storeHydrated so the increment isn't clobbered by late hydration.
   useEffect(() => {
+    if (!storeHydrated) return;
     if (!hasIncrementedRef.current && !hasRealAccount && !isLoading) {
       hasIncrementedRef.current = true;
       incrementAnonymousOpenCount();
     }
-  }, [hasRealAccount, isLoading, incrementAnonymousOpenCount]);
+  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount]);
 
-  // Redirect logic — imperative to avoid render-loop from <Redirect>
+  // Secondary increment path: some Android OEMs keep the JS process alive
+  // when the user swipes away from recents. In that case `_layout.tsx` does
+  // not remount on the next "open" and the mount-based increment above only
+  // ever fires once per process lifetime. Counting background→active
+  // transitions (above an idle threshold) covers those cases.
   useEffect(() => {
-    if (isLoading || hasRealAccount) return;
-    if (pathname.startsWith('/onboarding')) return;
-    if (pathname === '/feedback' || pathname === '/navigation') return;
+    const subscription = RNAppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') {
+        lastBackgroundAtRef.current = Date.now();
+        return;
+      }
+      if (next !== 'active') return;
 
-    // Mandatory gate: re-redirect on every escape attempt (e.g. hardware
-    // back). We intentionally bypass hasRedirectedRef here because "mandatory"
-    // must mean mandatory for the rest of the session.
-    if (onboardingCompleted !== false && anonymousOpenCount >= 3) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/signup-prompt?mandatory=true' as never);
-      return;
-    }
+      const lastBackground = lastBackgroundAtRef.current;
+      if (lastBackground == null) return; // initial foreground after mount — the mount effect already handled it
+      const idleMs = Date.now() - lastBackground;
+      lastBackgroundAtRef.current = null;
+      if (idleMs < SESSION_IDLE_THRESHOLD_MS) return;
 
-    if (hasRedirectedRef.current) return;
+      if (!storeHydrated || hasRealAccount || isLoading) return;
+      incrementAnonymousOpenCount();
+    });
+    return () => subscription.remove();
+  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount]);
 
-    if (onboardingCompleted === false) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/index' as never);
-    } else if (anonymousOpenCount >= 2) {
-      hasRedirectedRef.current = true;
-      router.replace('/onboarding/signup-prompt' as never);
-    }
-  }, [isLoading, hasRealAccount, pathname, onboardingCompleted, anonymousOpenCount]);
-
+  // OnboardingGuard no longer renders the `<Redirect>` itself — that is
+  // handled at the RootLayoutInner level so it can replace the Stack while
+  // a redirect is pending. See the comment above `useOnboardingGateState`.
   return null;
 };
 
@@ -381,6 +442,20 @@ const RootLayoutInner = () => {
   const { colors } = useTheme();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
 
+  // Declarative redirect target for the signup gate. Computed once per render
+  // so we can replace the Stack with a Redirect while the gate is active —
+  // keeps `app/index.tsx`'s own redirect from winning the race on first boot.
+  const onboardingGateState = useOnboardingGateState();
+  const hasRedirectedRef = useRef(false);
+  const redirectTarget = computeRedirectTarget(onboardingGateState, hasRedirectedRef.current);
+  // One-shot branches (dismissible prompt, initial onboarding) should only
+  // fire once per session — otherwise dismissing them would just re-fire the
+  // same redirect forever. Mandatory keeps firing so hardware back can't
+  // escape it.
+  if (redirectTarget && !redirectTarget.includes('mandatory=true')) {
+    hasRedirectedRef.current = true;
+  }
+
   // Fire-and-forget offline pack cleanup on app launch
   useEffect(() => {
     void listOfflineRegions()
@@ -412,14 +487,18 @@ const RootLayoutInner = () => {
           </Text>
         </View>
       ) : null}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: colors.bgDeep,
-          },
-        }}
-      />
+      {redirectTarget ? (
+        <Redirect href={redirectTarget as never} />
+      ) : (
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {
+              backgroundColor: colors.bgDeep,
+            },
+          }}
+        />
+      )}
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
       <MiaLevelUpOverlayManager />

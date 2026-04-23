@@ -43,9 +43,9 @@ const makeCachedRoute = (overrides: Partial<CachedRouteData> = {}): CachedRouteD
 // ---------------------------------------------------------------------------
 
 describe('offlineRouteCache', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Clear storage between tests
-    keyValueStorage.delete(STORAGE_KEY);
+    await keyValueStorage.delete(STORAGE_KEY);
   });
 
   it('round-trips cached route data identically', async () => {
@@ -74,7 +74,7 @@ describe('offlineRouteCache', () => {
   });
 
   it('handles corrupted JSON gracefully (returns null, does not throw)', async () => {
-    keyValueStorage.setString(STORAGE_KEY, '{{not valid json}}');
+    await keyValueStorage.setString(STORAGE_KEY, '{{not valid json}}');
 
     const loaded = await loadCachedRoute();
 
@@ -83,13 +83,13 @@ describe('offlineRouteCache', () => {
 
   it('handles structurally invalid data gracefully (returns null, cleans up)', async () => {
     // Valid JSON but missing required fields
-    keyValueStorage.setString(STORAGE_KEY, JSON.stringify({ routeId: 'abc' }));
+    await keyValueStorage.setString(STORAGE_KEY, JSON.stringify({ routeId: 'abc' }));
 
     const loaded = await loadCachedRoute();
 
     expect(loaded).toBeNull();
     // Should have cleaned up the invalid entry
-    expect(keyValueStorage.getString(STORAGE_KEY)).toBeUndefined();
+    expect(await keyValueStorage.getString(STORAGE_KEY)).toBeNull();
   });
 
   it('validates routingMode is one of safe | fast | flat', async () => {
@@ -112,12 +112,12 @@ describe('offlineRouteCache', () => {
       ...makeCachedRoute(),
       routingMode: 'turbo',
     };
-    keyValueStorage.setString(STORAGE_KEY, JSON.stringify(invalidRoute));
+    await keyValueStorage.setString(STORAGE_KEY, JSON.stringify(invalidRoute));
 
     const loaded = await loadCachedRoute();
 
     expect(loaded).toBeNull();
     // Should have cleaned up the invalid entry
-    expect(keyValueStorage.getString(STORAGE_KEY)).toBeUndefined();
+    expect(await keyValueStorage.getString(STORAGE_KEY)).toBeNull();
   });
 });

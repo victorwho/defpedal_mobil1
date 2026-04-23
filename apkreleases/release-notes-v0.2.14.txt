@@ -1,0 +1,9 @@
+v0.2.14 — Storage engine indicator + action items
+
+CHANGED
+- Diagnostics > Signup gate now shows "Storage engine: mmkv" (persistence is wired) or "Storage engine: memory" (persistence is broken). If it's memory on a real device, something is wrong with MMKV native linking and the counter will never advance across cold starts.
+
+NEEDED (server-side, not app-side)
+- The Auth error line in v0.2.12+ revealed that anonymous sign-ins are disabled at the Supabase project level. That's a dashboard setting:
+  Supabase > Authentication > Providers > "Allow anonymous sign-ins" — enable it.
+  Once enabled, "Is anonymous" in Diagnostics will flip to true, "Session exists" will become true, and the signup gate will actually apply (before this, hasRealAccount was false but the guest never had a proper session — the gate still fires on hasRealAccount=false but the intended guest/anon distinction is broken without a session).

@@ -109,16 +109,40 @@ export const activateDeveloperBypassSession = async (): Promise<MobileAuthSessio
   return session;
 };
 
+// Keeps the most recent anonymous sign-in failure around so that Diagnostics
+// and auth-error UI can surface *why* the app dropped into guest mode. The
+// previous code returned null silently, leaving no way to tell the difference
+// between "anon auth is disabled at the Supabase project level" and a network
+// blip. Stored as a module-level value rather than React state because the
+// failure can originate from both the provider mount and explicit sign-out
+// paths (profile.tsx), and both should be able to surface it.
+let lastAnonSignInError: string | null = null;
+
+export const getLastAnonSignInError = (): string | null => lastAnonSignInError;
+
 export const signInAnonymously = async (): Promise<MobileAuthSession | null> => {
   const client = requireSupabaseClient();
-  const { data, error } = await client.auth.signInAnonymously();
 
-  if (error || !data.session) {
+  try {
+    const { data, error } = await client.auth.signInAnonymously();
+
+    if (error) {
+      lastAnonSignInError = error.message || 'Anonymous sign-in failed.';
+      return null;
+    }
+
+    if (!data.session) {
+      lastAnonSignInError = 'Anonymous sign-in returned no session.';
+      return null;
+    }
+
+    lastAnonSignInError = null;
+    emitAuthSessionChange();
+    return toMobileAuthSession(data.session.access_token, data.session.user);
+  } catch (err) {
+    lastAnonSignInError = err instanceof Error ? err.message : String(err);
     return null;
   }
-
-  emitAuthSessionChange();
-  return toMobileAuthSession(data.session.access_token, data.session.user);
 };
 
 export const signInWithEmail = async (email: string, password: string) => {

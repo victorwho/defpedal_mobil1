@@ -1,6 +1,6 @@
 /**
  * OfflineRouteCache — persists active route data using the project's
- * keyValueStorage (MMKV on device, memory fallback in tests).
+ * keyValueStorage (AsyncStorage on device, memory fallback in tests).
  *
  * Separate from the Zustand store to provide a dedicated, lightweight cache
  * for route recovery after app restart during navigation.
@@ -64,15 +64,10 @@ const isValidCachedRouteData = (data: unknown): data is CachedRouteData => {
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Synchronous write (MMKV) wrapped in a Promise for a consistent async API.
- * Callers use `void cacheActiveRoute(...)` so the sync vs async distinction
- * is invisible at the call site.
- */
 export async function cacheActiveRoute(data: CachedRouteData): Promise<void> {
   try {
     const json = JSON.stringify(data);
-    keyValueStorage.setString(STORAGE_KEY, json);
+    await keyValueStorage.setString(STORAGE_KEY, json);
   } catch {
     // Storage write failed — non-fatal, navigation continues without cache
   }
@@ -80,9 +75,9 @@ export async function cacheActiveRoute(data: CachedRouteData): Promise<void> {
 
 export async function loadCachedRoute(): Promise<CachedRouteData | null> {
   try {
-    const json = keyValueStorage.getString(STORAGE_KEY);
+    const json = await keyValueStorage.getString(STORAGE_KEY);
 
-    if (json === undefined) {
+    if (json === null) {
       return null;
     }
 
@@ -90,7 +85,7 @@ export async function loadCachedRoute(): Promise<CachedRouteData | null> {
 
     if (!isValidCachedRouteData(parsed)) {
       // Corrupted data — clean up and return null
-      keyValueStorage.delete(STORAGE_KEY);
+      await keyValueStorage.delete(STORAGE_KEY);
       return null;
     }
 
@@ -103,7 +98,7 @@ export async function loadCachedRoute(): Promise<CachedRouteData | null> {
 
 export async function clearCachedRoute(): Promise<void> {
   try {
-    keyValueStorage.delete(STORAGE_KEY);
+    await keyValueStorage.delete(STORAGE_KEY);
   } catch {
     // Storage removal failed — non-fatal
   }

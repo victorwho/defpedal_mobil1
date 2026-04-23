@@ -1,0 +1,14 @@
+v0.2.9 — Signup gate iteration 3 + diagnostics
+
+CHANGED
+- Signup-gate counter now also ticks when the app returns to foreground after 5+ minutes in the background. Previous builds only counted cold process starts, which on some Android devices never happens because the OS keeps the app alive between "open/close".
+- Diagnostics screen now has a "Signup gate" card showing the four variables that control prompting. Reach it from Profile > Diagnostics.
+
+TESTING ASK
+If the prompt still doesn't fire after a few open/close cycles, please open the Diagnostics screen and screenshot the "Signup gate" card. Report the four values back so I can pinpoint what's wrong:
+- Anonymous open count
+- Onboarding completed
+- Is anonymous
+- Has real account
+
+The most common reason the gate is silent is "Has real account: true" — it means you're already signed in, which intentionally skips all prompts.
