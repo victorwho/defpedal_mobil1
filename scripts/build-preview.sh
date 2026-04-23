@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────
-# build-preview.sh — Build a preview APK from C:\dpb
+# build-preview.sh — Build a preview APK (or AAB) from C:\dpb
 #
 # Handles: source sync, cache cleaning, bundle embedding,
 #          bundle verification, and APK installation.
 #
 # Usage:
-#   bash scripts/build-preview.sh              # preview flavor (default)
-#   bash scripts/build-preview.sh install      # preview + install via ADB
-#   bash scripts/build-preview.sh dev          # development flavor
-#   bash scripts/build-preview.sh dev install  # development + install
-#   bash scripts/build-preview.sh prod         # production flavor
+#   bash scripts/build-preview.sh                     # preview APK (default)
+#   bash scripts/build-preview.sh install             # preview + install via ADB
+#   bash scripts/build-preview.sh dev                 # development APK
+#   bash scripts/build-preview.sh dev install         # development + install
+#   bash scripts/build-preview.sh prod                # production APK
+#   bash scripts/build-preview.sh prod bundle         # production AAB (Play Store)
+#   bash scripts/build-preview.sh prod bundle apk     # production AAB + APK
 # ──────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -22,20 +24,32 @@ ADB_DEVICE="R5CX61E737J"
 # ── Parse arguments ──
 FLAVOR="preview"
 DO_INSTALL=false
+DO_BUNDLE=false
+DO_APK=true
 for arg in "$@"; do
   case "$arg" in
     dev|development) FLAVOR="development" ;;
     prod|production) FLAVOR="production" ;;
     preview)         FLAVOR="preview" ;;
     install)         DO_INSTALL=true ;;
+    bundle)          DO_BUNDLE=true; DO_APK=false ;;
+    apk)             DO_APK=true ;;
   esac
 done
 
 # Capitalize first letter for Gradle task name
 FLAVOR_CAP="$(echo "${FLAVOR:0:1}" | tr '[:lower:]' '[:upper:]')${FLAVOR:1}"
-GRADLE_TASK="assemble${FLAVOR_CAP}Release"
+GRADLE_TASKS=()
+if [ "$DO_APK" = true ]; then
+  GRADLE_TASKS+=("assemble${FLAVOR_CAP}Release")
+fi
+if [ "$DO_BUNDLE" = true ]; then
+  GRADLE_TASKS+=("bundle${FLAVOR_CAP}Release")
+fi
 APK_DIR="$DST/apps/mobile/android/app/build/outputs/apk/${FLAVOR}/release"
 APK_PATH="$APK_DIR/app-${FLAVOR}-release.apk"
+AAB_DIR="$DST/apps/mobile/android/app/build/outputs/bundle/${FLAVOR}Release"
+AAB_PATH="$AAB_DIR/app-${FLAVOR}-release.aab"
 
 # Marker string to verify bundle freshness — pick something unique to the current code
 VERIFY_STRING="XP earned"
@@ -151,13 +165,12 @@ rm -rf "$DST/apps/mobile/android/app/build/intermediates/assets/"
 rm -rf "$DST/apps/mobile/android/app/build/intermediates/merged_res/"
 rm -rf "$DST/apps/mobile/android/app/build/outputs/"
 
-echo "── Step 3: Build $FLAVOR release APK ──"
+echo "── Step 3: Build $FLAVOR release (${GRADLE_TASKS[*]}) ──"
 cd "$DST/apps/mobile/android"
-./gradlew "$GRADLE_TASK"
+./gradlew "${GRADLE_TASKS[@]}"
 
-# ── Step 4: Verify bundle freshness ──
-# Check that the APK exists
-if [ ! -f "$APK_PATH" ]; then
+# ── Step 4: Verify output artifacts ──
+if [ "$DO_APK" = true ] && [ ! -f "$APK_PATH" ]; then
   # Fall back to old non-flavored path (before product flavors were added)
   APK_PATH_FALLBACK="$DST/apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
   if [ -f "$APK_PATH_FALLBACK" ]; then
@@ -168,6 +181,12 @@ if [ ! -f "$APK_PATH" ]; then
     find "$DST/apps/mobile/android/app/build/outputs/apk/" -name "*.apk" 2>/dev/null || echo "  (none)"
     exit 1
   fi
+fi
+if [ "$DO_BUNDLE" = true ] && [ ! -f "$AAB_PATH" ]; then
+  echo "ERROR: AAB not found at $AAB_PATH"
+  echo "  Available AABs:"
+  find "$DST/apps/mobile/android/app/build/outputs/bundle/" -name "*.aab" 2>/dev/null || echo "  (none)"
+  exit 1
 fi
 
 echo ""
@@ -191,10 +210,15 @@ else
 fi
 
 echo ""
-echo "APK built: $APK_PATH"
+if [ "$DO_APK" = true ]; then
+  echo "APK built: $APK_PATH"
+fi
+if [ "$DO_BUNDLE" = true ]; then
+  echo "AAB built: $AAB_PATH"
+fi
 
-# ── Step 5: Install if requested ──
-if [ "$DO_INSTALL" = true ]; then
+# ── Step 5: Install if requested (APK only — AAB can't be installed directly) ──
+if [ "$DO_INSTALL" = true ] && [ "$DO_APK" = true ]; then
   echo "── Step 5: Installing on device ──"
   adb -s "$ADB_DEVICE" install -r "$APK_PATH"
   echo "Installed $FLAVOR on $ADB_DEVICE"

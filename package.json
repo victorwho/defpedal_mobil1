@@ -29,6 +29,9 @@
     "check:bundle": "bash ./scripts/check-bundle.sh",
     "build:preview": "bash ./scripts/build-preview.sh",
     "build:preview:install": "bash ./scripts/build-preview.sh install",
+    "build:production": "bash ./scripts/build-preview.sh prod",
+    "bundle:production": "bash ./scripts/build-preview.sh prod bundle",
+    "bundle:production:apk": "bash ./scripts/build-preview.sh prod bundle apk",
     "validate:mobile": "npm run typecheck && npm run build:api",
     "validate": "npm run validate:mobile"
   },
