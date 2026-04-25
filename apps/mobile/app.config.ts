@@ -133,7 +133,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.20',
+    version: '0.2.21',
     icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
@@ -186,6 +186,22 @@ export default () => ({
       associatedDomains: ['applinks:routes.defensivepedal.com'],
       infoPlist: {
         UIBackgroundModes: ['location', 'processing', 'remote-notification'],
+        // OSRM safety + flat routing servers run on plain HTTP at the GCP VM's
+        // public IP. iOS blocks HTTP by default via App Transport Security;
+        // without this exception every route request fails with NSURLErrorDomain.
+        // Android equivalent: plugins/withAndroidCleartextTraffic.js.
+        NSAppTransportSecurity: {
+          NSExceptionDomains: {
+            '34.116.139.172': {
+              NSExceptionAllowsInsecureHTTPLoads: true,
+              NSIncludesSubdomains: false,
+            },
+          },
+        },
+        NSPhotoLibraryUsageDescription:
+          'Defensive Pedal needs access to your photos so you can attach images to hazard reports and ride shares.',
+        NSPhotoLibraryAddUsageDescription:
+          'Defensive Pedal saves share cards to your photo library so you can post them later.',
       },
     },
     android: {
@@ -202,6 +218,9 @@ export default () => ({
         'RECEIVE_BOOT_COMPLETED',
         'WAKE_LOCK',
         'POST_NOTIFICATIONS',
+      ],
+      blockedPermissions: [
+        'com.google.android.gms.permission.AD_ID',
       ],
       intentFilters: [
         {
