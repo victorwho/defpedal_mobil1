@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-04-25 — Strip AD_ID Permission for Play Store Compliance (v0.2.21)
+
+### Behavior
+- **`com.google.android.gms.permission.AD_ID` removed from the shipped manifest.** The app does not run ads or read the Android advertising ID, so the permission was being added transitively by `play-services-measurement-api` (pulled in by Firebase Messaging) without justification. Keeping it would have forced a "Yes" answer in the Play Store **Data Safety → Advertising ID declaration** form. With the permission stripped, the app can declare "No" and pass review without an ads section.
+- `android.permission.ACCESS_ADSERVICES_AD_ID` is intentionally retained — it is the Android 13+ AdServices permission used by Firebase Messaging to mint IID tokens for FCM, and is *not* what triggers the Play Store advertising-id question. Removing it would risk breaking push tokens on certain devices.
+
+### Files
+- `apps/mobile/app.config.ts` — added `android.blockedPermissions: ['com.google.android.gms.permission.AD_ID']` so any future `expo prebuild` regenerates the manifest with the merge directive baked in. This is the durable source-of-truth fix.
+- `apps/mobile/android/app/src/main/AndroidManifest.xml` — added explicit `<uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>` so the merge directive applies for the current build (the project ships with a checked-in `android/` folder and the build pipeline does not run `expo prebuild`, so `blockedPermissions` alone would not have stripped the permission until a regeneration). Note: this file is gitignored and not in source control — the durable answer lives in `app.config.ts`.
+- `apps/mobile/android/app/build.gradle` — `versionCode 22 → 23`, `versionName "0.2.20" → "0.2.21"`.
+
+### Verification
+- `manifest-merger-preview-release-report.txt` shows the directive REJECTED 4 library contributions: `play-services-measurement-api`, `play-services-measurement-impl`, `play-services-ads-identifier`, `play-services-measurement-sdk-api`.
+- Final `packaged_manifests/.../AndroidManifest.xml` contains only the desired permission set (no `com.google.android.gms.permission.AD_ID`).
+- Bonus iOS additions in the same `app.config.ts` change: `NSAppTransportSecurity` exception for the OSRM IP `34.116.139.172` (HTTP-only routing endpoints) and `NSPhotoLibraryUsageDescription` / `NSPhotoLibraryAddUsageDescription` for the image-based share-card flow shipped in session 25. These were already staged in the working tree from prior iOS prep and are now committed alongside.
+- `npm run typecheck` clean across mobile + web + api workspaces.
+
+### Release
+- AAB built via `npm run bundle:production` → `C:\dev\defpedal\apkreleases\DefensivePedal-Production-v0.2.21.aab` (103 MB).
+- Signing cert verified: `Owner: CN=Victor Rotariu, OU=Defensive Pedal, ...` (upload keystore, valid through 2056). Not debug-signed.
+- Target track: Google Play closed testing.
+- Commit `93eb93c` on `main`.
+
 ## 2026-04-22 — Signup Gate Threshold + Hardware-Back Hardening
 
 ### Behavior
