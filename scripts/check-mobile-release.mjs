@@ -143,6 +143,18 @@ if (platform === 'android' && profile === 'production') {
       `Production Android submits must keep releaseStatus=draft. Found ${submitConfig.releaseStatus ?? 'undefined'}.`,
     );
   }
+
+  // Compliance: Play Store rejects APK uploads for new apps. Production builds
+  // must produce an AAB. EAS defaults to app-bundle when buildType is omitted,
+  // but we require it explicitly so accidental drift is loud.
+  const buildType = easConfig.build?.production?.android?.buildType;
+
+  if (buildType !== 'app-bundle') {
+    fail(
+      `Production Android builds must set android.buildType="app-bundle" in eas.json. ` +
+        `Found ${buildType ?? 'undefined'}. APK uploads are rejected by Google Play.`,
+    );
+  }
 }
 
 if (profile === 'production' && !nativeValidationRef) {

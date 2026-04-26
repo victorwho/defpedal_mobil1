@@ -146,8 +146,26 @@ packagingOptions {
         }
         release {
             // Sign with upload keystore when DEFPEDAL_UPLOAD_STORE_FILE is set
-            // (~/.gradle/gradle.properties). Falls back to debug keystore for
-            // local tester builds without those credentials configured.
+            // (~/.gradle/gradle.properties). For preview/production release
+            // tasks, the upload keystore is REQUIRED — silent fallback to the
+            // debug keystore on a Play Store upload permanently locks us out
+            // from updating with the real key.
+            //
+            // Debug-keystore fallback is only allowed for developmentRelease
+            // builds (e.g. local tester APKs of the dev variant). Preview and
+            // production must fail loudly when the property is missing.
+            def isPlayStoreFlavor = gradle.startParameter.taskNames.any { task ->
+                def lower = task.toLowerCase()
+                lower.contains('preview') || lower.contains('production')
+            }
+            if (isPlayStoreFlavor && !project.hasProperty("DEFPEDAL_UPLOAD_STORE_FILE")) {
+                throw new GradleException(
+                    "Release build for preview/production requires DEFPEDAL_UPLOAD_STORE_FILE " +
+                    "in ~/.gradle/gradle.properties (along with DEFPEDAL_UPLOAD_STORE_PASSWORD, " +
+                    "DEFPEDAL_UPLOAD_KEY_ALIAS, DEFPEDAL_UPLOAD_KEY_PASSWORD). " +
+                    "See mobile_release_runbook.md for setup."
+                )
+            }
             signingConfig project.hasProperty("DEFPEDAL_UPLOAD_STORE_FILE") ? signingConfigs.release : signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()

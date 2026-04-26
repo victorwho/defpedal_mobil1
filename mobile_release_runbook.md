@@ -84,6 +84,29 @@ Recommended store credentials outside git:
 
 If those store credentials are not configured, the build can still run, but auto-submit will fail.
 
+## Required Gradle Properties (Android Release Signing)
+
+Preview and production release builds must be signed with the upload keystore. The following four properties must be set in `~/.gradle/gradle.properties` (NOT committed to the repo):
+
+```properties
+DEFPEDAL_UPLOAD_STORE_FILE=C:/path/to/upload.keystore
+DEFPEDAL_UPLOAD_STORE_PASSWORD=...
+DEFPEDAL_UPLOAD_KEY_ALIAS=defpedal-upload
+DEFPEDAL_UPLOAD_KEY_PASSWORD=...
+```
+
+`apps/mobile/android/app/build.gradle` enforces this: any task that contains `preview` or `production` (case-insensitive) **fails fast** with a clear error message when `DEFPEDAL_UPLOAD_STORE_FILE` is missing. Debug-keystore fallback is allowed only for `developmentRelease` (local tester builds of the dev variant).
+
+A backup of the keystore lives in `C:\Users\Victor\keystore-backups\`. Compromise or loss of this keystore means losing the ability to update the app on the Play Store, since Play permanently binds the package name to the upload-key fingerprint.
+
+Verify a built APK/AAB carries the upload signature:
+
+```bash
+apksigner verify --print-certs <path-to-app-production-release.aab>
+```
+
+The SHA-256 must match the documented upload-keystore fingerprint (see project memory).
+
 ## Workflow Guardrails
 
 The release workflow now fails fast when:
@@ -97,6 +120,7 @@ The release workflow now fails fast when:
 - Android submit defaults drift away from:
   - preview -> `internal`
   - production -> `production` with `draft` release status
+- Android `production` build profile drifts away from `buildType=app-bundle` (Play Store rejects APK uploads for new apps)
 - `apps/mobile/.env.example` no longer documents the required mobile release env keys
 
 ## How To Trigger A Release
