@@ -98,8 +98,11 @@ const appEnv =
   resolveExpoExtraValue(['EXPO_PUBLIC_APP_ENV'], appVariant === 'preview' ? 'staging' : appVariant);
 const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
 // OSRM server uses plain HTTP (34.116.139.172:5000/5001), so cleartext is
-// required for all variants — not just when the API URL is HTTP.
-const usesCleartextTraffic = true;
+// required for those specific endpoints. The Android network_security_config
+// plugin (./plugins/withAndroidNetworkSecurityConfig) scopes the cleartext
+// allowance to that exact host so the rest of the app stays HTTPS-only.
+// iOS uses the matching ATS exception in the iOS config below.
+const cleartextAllowedDomains = ['34.116.139.172'];
 
 const mapboxDownloadToken = resolveMapboxDownloadToken();
 
@@ -153,7 +156,10 @@ export default () => ({
           color: '#FACC15',
         },
       ],
-      ['./plugins/withAndroidCleartextTraffic', { enabled: usesCleartextTraffic }],
+      [
+        './plugins/withAndroidNetworkSecurityConfig',
+        { allowedCleartextDomains: cleartextAllowedDomains },
+      ],
       [
         'expo-location',
         {
@@ -165,6 +171,9 @@ export default () => ({
           isAndroidBackgroundLocationEnabled: true,
         },
       ],
+      // Must run after expo-location so it operates on the service node the
+      // autolinker just produced. Asserts foregroundServiceType="location".
+      './plugins/withAndroidForegroundServiceLocation',
       [
         'expo-secure-store',
         {
@@ -189,7 +198,7 @@ export default () => ({
         // OSRM safety + flat routing servers run on plain HTTP at the GCP VM's
         // public IP. iOS blocks HTTP by default via App Transport Security;
         // without this exception every route request fails with NSURLErrorDomain.
-        // Android equivalent: plugins/withAndroidCleartextTraffic.js.
+        // Android equivalent: plugins/withAndroidNetworkSecurityConfig.js.
         NSAppTransportSecurity: {
           NSExceptionDomains: {
             '34.116.139.172': {
@@ -215,6 +224,12 @@ export default () => ({
         'ACCESS_FINE_LOCATION',
         'ACCESS_BACKGROUND_LOCATION',
         'FOREGROUND_SERVICE',
+        // Android 14+ (API 34): foreground services that use location must
+        // declare both this permission and the foregroundServiceType="location"
+        // attribute on the service node. expo-location autolinks the service
+        // attribute on LocationTaskService; the plugin
+        // ./plugins/withAndroidForegroundServiceLocation.js asserts both.
+        'FOREGROUND_SERVICE_LOCATION',
         'RECEIVE_BOOT_COMPLETED',
         'WAKE_LOCK',
         'POST_NOTIFICATIONS',
