@@ -62,7 +62,10 @@ export const safetyTints = {
   safeMedium: 'rgba(34, 197, 94, 0.15)',
 
   /** Safe green — border accent */
-  safeBorder: 'rgba(74, 222, 128, 0.2)',
+  safeBorder: 'rgba(34, 197, 94, 0.3)',
+
+  /** Safe green — strong border for emphasis (e.g. switch-to-safer-route CTA) */
+  safeBorderStrong: 'rgba(34, 197, 94, 0.4)',
 
   /** Caution amber — subtle background */
   cautionSubtle: 'rgba(245, 158, 11, 0.05)',
@@ -72,6 +75,9 @@ export const safetyTints = {
 
   /** Caution amber — medium emphasis */
   cautionMedium: 'rgba(245, 158, 11, 0.15)',
+
+  /** Caution amber — border accent */
+  cautionBorder: 'rgba(245, 158, 11, 0.3)',
 
   /** Danger red — subtle background */
   dangerSubtle: 'rgba(239, 68, 68, 0.05)',
@@ -117,6 +123,9 @@ export const surfaceTints = {
 
   /** White subtle — light mode overlays */
   whiteSubtle: 'rgba(255, 255, 255, 0.05)',
+
+  /** Track dim — subtle dark stripe for progress-bar tracks on either-theme card surfaces */
+  trackDim: 'rgba(15, 23, 42, 0.12)',
 } as const;
 
 // ---------------------------------------------------------------------------

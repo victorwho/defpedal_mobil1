@@ -112,7 +112,7 @@ export const Button: React.FC<ButtonProps> = ({
   const v = variantStyles[variant];
 
   const handlePress = () => {
-    haptics.light();
+    haptics.confirm();
     onPress?.();
   };
 

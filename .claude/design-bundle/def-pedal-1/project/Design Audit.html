@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Defensive Pedal — Design Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Roboto:wght@400;500;600;700&family=Roboto+Mono:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* pulled straight from apps/mobile/src/design-system/tokens */
+    --bg-deep:#111827;
+    --bg-primary:#1F2937;
+    --bg-secondary:#374151;
+    --bg-tertiary:#4B5563;
+    --accent:#FACC15;
+    --accent-hover:#EAB308;
+    --accent-text:#CA8A04;
+    --text-primary:#FFFFFF;
+    --text-secondary:#B0B8C1;
+    --text-muted:#A0A8B0;
+    --border-default:#374151;
+    --border-strong:#4B5563;
+
+    --safe:#22C55E;
+    --caution:#F59E0B;
+    --danger:#EF4444;
+    --info:#3B82F6;
+
+    --heading:'Montserrat', system-ui, sans-serif;
+    --body:'Roboto', system-ui, sans-serif;
+    --mono:'Roboto Mono', ui-monospace, monospace;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg-deep);color:var(--text-primary);font-family:var(--body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{line-height:1.5;font-size:16px}
+
+  .shell{max-width:1080px;margin:0 auto;padding:72px 40px 160px;}
+
+  /* -------- top identity strip -------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-bottom:40px;border-bottom:1px solid var(--border-default);margin-bottom:56px}
+  .mark{display:flex;align-items:center;gap:14px}
+  .mark .dot{width:28px;height:28px;border-radius:999px;background:var(--accent);box-shadow:0 0 0 4px rgba(250,204,21,0.12)}
+  .mark .name{font-family:var(--heading);font-weight:800;letter-spacing:-0.01em;font-size:18px}
+  .mark .name em{font-style:normal;color:var(--accent)}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--text-muted);display:flex;gap:24px;text-transform:uppercase;letter-spacing:0.08em}
+  .meta span b{color:var(--text-secondary);font-weight:500}
+
+  /* -------- hero -------- */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);margin-bottom:20px}
+  h1{font-family:var(--heading);font-weight:800;font-size:clamp(40px, 5.4vw, 68px);line-height:1.02;letter-spacing:-0.02em;margin:0 0 20px;text-wrap:balance}
+  h1 .accent{color:var(--accent)}
+  .lede{font-size:20px;line-height:1.5;color:var(--text-secondary);max-width:760px;text-wrap:pretty}
+
+  /* -------- verdict row -------- */
+  .verdict{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr;gap:1px;background:var(--border-default);border:1px solid var(--border-default);border-radius:16px;overflow:hidden;margin:56px 0 88px}
+  .verdict > div{background:var(--bg-primary);padding:24px 28px}
+  .verdict .label{font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
+  .verdict .value{font-family:var(--heading);font-weight:700;font-size:32px;line-height:1.1}
+  .verdict .value .unit{font-family:var(--mono);font-size:14px;color:var(--text-muted);margin-left:6px;font-weight:500}
+  .verdict .value.big{font-size:44px;letter-spacing:-0.02em}
+  .pillrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;background:rgba(250,204,21,0.1);color:var(--accent);border:1px solid rgba(250,204,21,0.25)}
+  .pill.safe{background:rgba(34,197,94,0.1);color:var(--safe);border-color:rgba(34,197,94,0.25)}
+  .pill.danger{background:rgba(239,68,68,0.1);color:var(--danger);border-color:rgba(239,68,68,0.25)}
+
+  /* -------- section -------- */
+  section{margin:0 0 96px}
+  .section-head{display:flex;align-items:baseline;gap:20px;margin-bottom:28px;padding-bottom:18px;border-bottom:1px solid var(--border-default)}
+  .section-num{font-family:var(--mono);font-size:14px;color:var(--text-muted)}
+  .section-title{font-family:var(--heading);font-weight:700;font-size:34px;letter-spacing:-0.015em;margin:0}
+  .section-kicker{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em}
+
+  .intro{color:var(--text-secondary);font-size:17px;max-width:780px;margin:0 0 32px;text-wrap:pretty}
+
+  /* -------- SWOT grid -------- */
+  .swot{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .swot-card{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:16px;padding:28px 28px 24px;position:relative;overflow:hidden}
+  .swot-card .tag{position:absolute;top:20px;right:20px;font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted)}
+  .swot-card h3{font-family:var(--heading);font-weight:700;font-size:22px;margin:0 0 6px;letter-spacing:-0.01em}
+  .swot-card .sub{font-size:14px;color:var(--text-muted);margin-bottom:20px}
+  .swot-card.strength{border-top:3px solid var(--safe)}
+  .swot-card.weakness{border-top:3px solid var(--danger)}
+  .swot-card.opportunity{border-top:3px solid var(--accent)}
+  .swot-card.threat{border-top:3px solid var(--caution)}
+  .swot-card ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:14px}
+  .swot-card li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;font-size:14.5px;line-height:1.5;color:var(--text-secondary)}
+  .swot-card li b{color:var(--text-primary);font-weight:600;display:block;margin-bottom:2px}
+  .swot-card li .marker{font-family:var(--mono);font-size:11px;color:var(--text-muted);padding-top:2px}
+  .swot-card .evidence{margin-top:16px;padding:12px 14px;background:var(--bg-deep);border-radius:10px;font-family:var(--mono);font-size:12px;color:var(--text-muted);line-height:1.7;border:1px solid var(--border-default)}
+  .swot-card .evidence b{color:var(--text-secondary);font-weight:600}
+
+  /* -------- recommendations -------- */
+  .rec-list{display:flex;flex-direction:column;gap:16px}
+  .rec{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:16px;padding:28px 32px;display:grid;grid-template-columns:110px 1fr 140px;gap:28px;align-items:start}
+  .rec .idx{font-family:var(--mono);font-size:12px;color:var(--text-muted);letter-spacing:0.12em;text-transform:uppercase}
+  .rec .idx .num{display:block;font-family:var(--heading);font-size:36px;color:var(--accent);font-weight:800;margin-top:4px;letter-spacing:-0.02em}
+  .rec h4{font-family:var(--heading);font-weight:700;font-size:22px;margin:0 0 12px;letter-spacing:-0.01em;text-wrap:balance}
+  .rec .argument{color:var(--text-secondary);font-size:15px;line-height:1.55;margin:0 0 14px;text-wrap:pretty}
+  .rec .argument strong{color:var(--text-primary);font-weight:600}
+  .rec .howto{font-family:var(--mono);font-size:12.5px;color:var(--accent);background:rgba(250,204,21,0.06);border:1px solid rgba(250,204,21,0.2);border-radius:10px;padding:12px 14px;line-height:1.6}
+  .rec .howto::before{content:"→ ";color:var(--accent)}
+  .rec .chips{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .chip{font-family:var(--mono);font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;padding:5px 10px;border-radius:999px;border:1px solid var(--border-strong);color:var(--text-secondary);white-space:nowrap}
+  .chip.impact-high{color:var(--safe);border-color:rgba(34,197,94,0.35)}
+  .chip.impact-med{color:var(--accent);border-color:rgba(250,204,21,0.35)}
+  .chip.effort-s{background:rgba(34,197,94,0.07)}
+  .chip.effort-m{background:rgba(250,204,21,0.07)}
+  .chip.effort-l{background:rgba(239,68,68,0.07);color:var(--danger);border-color:rgba(239,68,68,0.35)}
+
+  /* -------- principle callout -------- */
+  .principle{background:linear-gradient(180deg, var(--bg-primary), var(--bg-deep));border:1px solid var(--border-default);border-radius:20px;padding:44px 48px;margin:88px 0;position:relative;overflow:hidden}
+  .principle::before{content:"";position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent)}
+  .principle .q{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:0.2em;text-transform:uppercase;margin-bottom:14px}
+  .principle p{font-family:var(--heading);font-weight:700;font-size:clamp(24px, 2.6vw, 32px);line-height:1.3;margin:0;letter-spacing:-0.01em;text-wrap:balance;max-width:860px}
+  .principle p em{font-style:normal;color:var(--accent)}
+
+  /* -------- metric strip (drift) -------- */
+  .drift{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:28px}
+  .drift .m{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:14px;padding:20px}
+  .drift .m .label{font-family:var(--mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em}
+  .drift .m .val{font-family:var(--mono);font-weight:700;font-size:30px;margin-top:6px;color:var(--text-primary)}
+  .drift .m .val.bad{color:var(--danger)}
+  .drift .m .val.warn{color:var(--caution)}
+  .drift .m .note{font-size:13px;color:var(--text-secondary);margin-top:6px;line-height:1.4}
+
+  /* -------- footer -------- */
+  footer{margin-top:40px;padding-top:32px;border-top:1px solid var(--border-default);display:flex;justify-content:space-between;gap:20px;font-family:var(--mono);font-size:12px;color:var(--text-muted);letter-spacing:0.04em}
+  footer a{color:var(--accent);text-decoration:none}
+
+  code{font-family:var(--mono);font-size:0.9em;color:var(--accent);background:rgba(250,204,21,0.08);padding:1px 6px;border-radius:4px}
+
+  /* -------- compare section -------- */
+  .compare-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px;background:var(--bg-primary);border:1px solid var(--border-default);border-radius:16px;overflow:hidden;font-size:13.5px}
+  .compare-table th,.compare-table td{padding:16px 18px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border-default);color:var(--text-secondary);line-height:1.5}
+  .compare-table tr:last-child td{border-bottom:none}
+  .compare-table th{font-family:var(--mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;background:var(--bg-deep);font-weight:500;border-bottom:1px solid var(--border-default)}
+  .compare-table td:first-child,.compare-table th:first-child{font-family:var(--heading);font-weight:700;color:var(--text-primary);font-size:14px;width:140px;background:var(--bg-deep)}
+  .compare-table .us{background:rgba(250,204,21,0.05)}
+  .compare-table .us td:first-child{color:var(--accent)}
+  .compare-table .good{color:var(--safe);font-family:var(--mono);font-size:12px}
+  .compare-table .bad{color:var(--danger);font-family:var(--mono);font-size:12px}
+  .compare-table .mid{color:var(--caution);font-family:var(--mono);font-size:12px}
+
+  .peer-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:28px}
+  .peer{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;gap:14px}
+  .peer header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .peer .ptitle{font-family:var(--heading);font-weight:700;font-size:20px;letter-spacing:-0.01em}
+  .peer .ptag{font-family:var(--mono);font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em}
+  .peer .ppos{color:var(--safe);font-size:13.5px;line-height:1.55}
+  .peer .pneg{color:var(--text-secondary);font-size:13.5px;line-height:1.55}
+  .peer .ppos b,.peer .pneg b{color:var(--text-primary);font-weight:600;display:block;margin-bottom:2px}
+  .peer .plearn{margin-top:6px;padding:12px 14px;background:var(--bg-deep);border-radius:10px;border:1px solid var(--border-default);font-family:var(--mono);font-size:12px;color:var(--accent);line-height:1.6}
+  .peer .plearn b{color:var(--text-secondary);font-weight:600}
+  .peer .bar{display:flex;gap:4px;margin-top:4px}
+  .peer .bar span{height:6px;flex:1;border-radius:3px;background:var(--bg-secondary)}
+  .peer .bar span.f{background:var(--accent)}
+
+  /* -------- refinement section -------- */
+  .refine-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
+  .refine-card{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:16px;padding:28px 30px;position:relative}
+  .refine-card .badge{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);background:rgba(250,204,21,0.08);padding:4px 10px;border-radius:999px;margin-bottom:14px;border:1px solid rgba(250,204,21,0.2)}
+  .refine-card h4{font-family:var(--heading);font-weight:700;font-size:22px;margin:0 0 10px;letter-spacing:-0.01em;text-wrap:balance}
+  .refine-card p{color:var(--text-secondary);font-size:15px;line-height:1.55;margin:0 0 14px;text-wrap:pretty}
+  .refine-card .move{font-family:var(--mono);font-size:12px;color:var(--text-muted);line-height:1.7;padding-top:14px;border-top:1px dashed var(--border-default)}
+  .refine-card .move b{color:var(--text-secondary);font-weight:600}
+
+  /* -------- tweaks panel -------- */
+  #tweaks-panel{position:fixed;right:24px;bottom:24px;width:320px;max-height:min(640px,calc(100vh - 48px));background:var(--bg-primary);border:1px solid var(--border-strong);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(250,204,21,0.08);z-index:9999;display:none;flex-direction:column;overflow:hidden;font-family:var(--body)}
+  #tweaks-panel.active{display:flex}
+  #tweaks-panel header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border-default)}
+  #tweaks-panel header .t{font-family:var(--heading);font-weight:700;font-size:14px;letter-spacing:0.02em}
+  #tweaks-panel header .hint{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase}
+  #tweaks-panel .body{overflow-y:auto;padding:8px 0 12px}
+  #tweaks-panel .group{padding:14px 18px 10px;border-bottom:1px solid var(--border-default)}
+  #tweaks-panel .group:last-child{border-bottom:none}
+  #tweaks-panel .group > .gname{font-family:var(--mono);font-size:10.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px}
+  #tweaks-panel label.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;font-size:13px;color:var(--text-secondary)}
+  #tweaks-panel label.row .k{color:var(--text-primary);font-weight:500}
+  #tweaks-panel input[type="color"]{width:32px;height:24px;border-radius:6px;border:1px solid var(--border-strong);background:transparent;padding:0;cursor:pointer}
+  #tweaks-panel input[type="range"]{width:140px;accent-color:var(--accent)}
+  #tweaks-panel select{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-strong);border-radius:8px;padding:5px 8px;font-size:12px;font-family:var(--body)}
+  #tweaks-panel .swatch{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:6px;vertical-align:-2px;border:1px solid rgba(255,255,255,0.1)}
+  #tweaks-panel .val{font-family:var(--mono);font-size:11px;color:var(--text-muted);min-width:38px;text-align:right}
+  #tweaks-panel .reset{margin:10px 18px 14px;padding:8px 12px;background:transparent;color:var(--text-secondary);border:1px solid var(--border-strong);border-radius:8px;font-family:var(--mono);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer}
+  #tweaks-panel .reset:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* variant: serif display */
+  body.variant-serif{--heading:'Fraunces','Source Serif 4', Georgia, serif}
+  body.variant-serif h1,body.variant-serif .section-title,body.variant-serif h3,body.variant-serif h4{letter-spacing:-0.025em;font-weight:600}
+  /* variant: humanist */
+  body.variant-humanist{--heading:'Inter Tight','Inter',system-ui,sans-serif;--body:'Inter',system-ui,sans-serif}
+  /* density */
+  body.density-cozy .shell{padding:56px 40px 120px}
+  body.density-cozy section{margin-bottom:72px}
+  body.density-cozy .rec{padding:22px 26px}
+  body.density-airy .shell{padding:96px 40px 200px}
+  body.density-airy section{margin-bottom:128px}
+  body.density-airy .rec{padding:36px 40px}
+
+  @media (max-width:860px){
+    .shell{padding:48px 20px 120px}
+    .verdict{grid-template-columns:1fr 1fr}
+    .swot{grid-template-columns:1fr}
+    .rec{grid-template-columns:1fr;gap:16px}
+    .rec .chips{flex-direction:row;align-items:flex-start;flex-wrap:wrap}
+    .drift{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- top strip -->
+  <header class="topbar">
+    <div class="mark">
+      <div class="dot"></div>
+      <div class="name">Defensive <em>Pedal</em> — Design Audit</div>
+    </div>
+    <div class="meta">
+      <span><b>SCOPE</b> apps/mobile</span>
+      <span><b>DATE</b> 2026-04-18</span>
+      <span><b>VERSION</b> v1.0 tokens</span>
+    </div>
+  </header>
+
+  <!-- hero -->
+  <div class="eyebrow">SWOT · Constructive critique · Prioritised recommendations</div>
+  <h1>A <span class="accent">strong safety-first system</span>, undermined by uneven adoption across screens.</h1>
+  <p class="lede">
+    The token layer, theme provider and atomic component library are well-conceived and safety-literate.
+    The friction sits one layer up: screens routinely bypass the system — hardcoded hex values, inline
+    <code>rgba()</code>, re-implemented toggles, and direct token imports that defeat theming. The result
+    is a design that looks coherent from five metres and increasingly inconsistent up close.
+  </p>
+
+  <!-- verdict grid -->
+  <div class="verdict">
+    <div>
+      <div class="label">Overall health</div>
+      <div class="value big">6.4<span class="unit">/10</span></div>
+      <div class="pillrow">
+        <span class="pill safe">Foundation solid</span>
+        <span class="pill danger">Adoption drifting</span>
+      </div>
+    </div>
+    <div>
+      <div class="label">Tokens</div>
+      <div class="value">Excellent <span class="unit">8/10</span></div>
+      <div class="pillrow"><span class="pill">semantic safety palette</span></div>
+    </div>
+    <div>
+      <div class="label">Components</div>
+      <div class="value">Good <span class="unit">7/10</span></div>
+      <div class="pillrow"><span class="pill">atoms → organisms</span></div>
+    </div>
+    <div>
+      <div class="label">Screen adoption</div>
+      <div class="value">Weak <span class="unit">4/10</span></div>
+      <div class="pillrow"><span class="pill danger">27/31 bypass theme</span></div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 1 · SWOT -->
+  <!-- ============================================================ -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2 class="section-title">SWOT analysis</h2>
+      <span class="section-kicker">Evidence-based</span>
+    </div>
+    <p class="intro">
+      Grounded in the code in <code>apps/mobile/src/design-system/</code> and the 31 screens under
+      <code>apps/mobile/app/</code>. Each quadrant is backed by specific files and counts —
+      not vibes.
+    </p>
+
+    <div class="swot">
+
+      <!-- STRENGTHS -->
+      <div class="swot-card strength">
+        <div class="tag">Positive · Internal</div>
+        <h3>Strengths</h3>
+        <div class="sub">What is genuinely working</div>
+        <ul>
+          <li>
+            <span class="marker">S1</span>
+            <div>
+              <b>Semantic safety palette is disciplined.</b>
+              <code>safe</code> / <code>caution</code> / <code>danger</code> / <code>info</code> are kept
+              separate from brand colour and documented as "never decorative". This is exactly the right
+              instinct for a life-safety product.
+            </div>
+          </li>
+          <li>
+            <span class="marker">S2</span>
+            <div>
+              <b>Coherent token layer.</b>
+              Typography scale, 4-px spacing, platform-aware shadows, motion with reduced-motion hooks,
+              z-index and icon-size tokens — the taxonomy is almost complete.
+            </div>
+          </li>
+          <li>
+            <span class="marker">S3</span>
+            <div>
+              <b>Clean atomic architecture.</b>
+              25 atoms, 18 molecules, 29 organisms with TypeScript props and JSDoc headers.
+              Accessibility is pre-wired into <code>Button</code>, <code>Badge</code>, <code>BottomNav</code>.
+            </div>
+          </li>
+          <li>
+            <span class="marker">S4</span>
+            <div>
+              <b>Domain-specific organisms.</b>
+              <code>NavigationHUD</code>, <code>RouteComparisonPanel</code>, <code>HazardAlertPill</code>,
+              <code>ElevationProgressCard</code> — these are not a generic kit dressed in yellow; they
+              actually encode the product's safety logic.
+            </div>
+          </li>
+          <li>
+            <span class="marker">S5</span>
+            <div>
+              <b>Glanceability rules are codified.</b>
+              Forced dark mode during navigation, monospace for distances and ETAs, haptic suppression
+              while riding. These are written down, not accidental.
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- WEAKNESSES -->
+      <div class="swot-card weakness">
+        <div class="tag">Negative · Internal</div>
+        <h3>Weaknesses</h3>
+        <div class="sub">Where the system is being fought, not used</div>
+        <ul>
+          <li>
+            <span class="marker">W1</span>
+            <div>
+              <b>Theme bypass at scale.</b>
+              Only 4 of 31 screens use <code>useTheme()</code>. 27 import tokens directly. Light theme
+              is effectively dead code — and the escape hatch ("we force dark anyway") is an excuse,
+              not a design.
+            </div>
+          </li>
+          <li>
+            <span class="marker">W2</span>
+            <div>
+              <b>50+ hardcoded hex values in screens.</b>
+              <code>#F2C30F</code>, <code>#60A5FA</code>, <code>#EF4444</code>, <code>#22C55E</code> —
+              each one a silent fork that breaks when the palette evolves.
+            </div>
+          </li>
+          <li>
+            <span class="marker">W3</span>
+            <div>
+              <b>Orphaned components.</b>
+              <code>Toggle</code> atom has <em>zero</em> imports — <code>profile.tsx</code> ships its own
+              inline version. The kit is growing faster than it's being adopted.
+            </div>
+          </li>
+          <li>
+            <span class="marker">W4</span>
+            <div>
+              <b>Screens are monolithic.</b>
+              <code>route-planning.tsx</code> is 1,715 lines; <code>navigation.tsx</code> 1,257;
+              <code>route-preview.tsx</code> 1,088. That's a strong signal that molecules like
+              <code>SettingRow</code>, <code>SectionTitle</code>, <code>StatTile</code> aren't being used.
+            </div>
+          </li>
+          <li>
+            <span class="marker">W5</span>
+            <div>
+              <b>Missing primitives.</b>
+              No opacity scale, no glass/surface tint tokens fully adopted, no card-chrome primitive used
+              consistently. The same "dark card with 16 px radius and a hairline border" is re-typed
+              dozens of times.
+            </div>
+          </li>
+        </ul>
+        <div class="evidence">
+          <b>Evidence:</b> design-work/design-system-analysis.md lists 50+ hardcoded hexes, 30+ inline
+          rgba calls, 3 custom toggle re-implementations and 20+ direct token imports across screens.
+        </div>
+      </div>
+
+      <!-- OPPORTUNITIES -->
+      <div class="swot-card opportunity">
+        <div class="tag">Positive · External</div>
+        <h3>Opportunities</h3>
+        <div class="sub">Where small moves unlock big consistency</div>
+        <ul>
+          <li>
+            <span class="marker">O1</span>
+            <div>
+              <b>A single "Surface" primitive.</b>
+              One <code>&lt;Surface variant="glass|solid|outline" elevation="sm|md"&gt;</code> would
+              replace ~30 inline card styles and collapse the glass/frosted pattern into a token.
+            </div>
+          </li>
+          <li>
+            <span class="marker">O2</span>
+            <div>
+              <b>Lint as the forcing function.</b>
+              ESLint rules banning hex literals and raw <code>rgba()</code> in <code>app/**</code> would
+              stop drift at the PR boundary — the cheapest durable fix available.
+            </div>
+          </li>
+          <li>
+            <span class="marker">O3</span>
+            <div>
+              <b>Style-factory pattern, documented once.</b>
+              <code>navigation.tsx</code> already uses
+              <code>useMemo(() =&gt; createThemedStyles(colors))</code> — canonise that pattern,
+              put it in a snippet, migrate the remaining 27 screens mechanically.
+            </div>
+          </li>
+          <li>
+            <span class="marker">O4</span>
+            <div>
+              <b>A component catalog inside the app.</b>
+              A hidden "/design" route that renders every atom/molecule against both themes would catch
+              drift visually and double as onboarding for new engineers.
+            </div>
+          </li>
+          <li>
+            <span class="marker">O5</span>
+            <div>
+              <b>Mia persona as a design cue, not just copy.</b>
+              Persona branching exists in logic but the visual system doesn't mode-shift. A persona-aware
+              accent-tint could make the "knowledgeable friend" voice visible at a glance.
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- THREATS -->
+      <div class="swot-card threat">
+        <div class="tag">Negative · External</div>
+        <h3>Threats</h3>
+        <div class="sub">What will hurt if left alone</div>
+        <ul>
+          <li>
+            <span class="marker">T1</span>
+            <div>
+              <b>Drift compounds.</b>
+              Every hardcoded colour today is a merge-conflict, regression or a11y bug tomorrow. At 50+
+              instances, the cost of a palette change is already non-trivial.
+            </div>
+          </li>
+          <li>
+            <span class="marker">T2</span>
+            <div>
+              <b>Safety semantics can leak into decoration.</b>
+              With red/amber/green hexes floating through screen code, nothing structurally prevents a
+              "green stats card" from reading as a safety signal to a glancing cyclist.
+            </div>
+          </li>
+          <li>
+            <span class="marker">T3</span>
+            <div>
+              <b>Light mode becomes a liability.</b>
+              Shipped-but-broken light tokens are worse than no light mode. An OS-driven switch will
+              expose the forked colours as visual bugs.
+            </div>
+          </li>
+          <li>
+            <span class="marker">T4</span>
+            <div>
+              <b>Component sprawl without governance.</b>
+              Mia, tiers, badges, streaks and community each added their own organisms. Without a
+              retirement lane, the kit turns into a museum.
+            </div>
+          </li>
+          <li>
+            <span class="marker">T5</span>
+            <div>
+              <b>HUD readability regressions are invisible in staging.</b>
+              "Glanceable at 25 km/h" is a principle, but there's no contrast audit or outdoor-sunlight
+              QA check gating releases.
+            </div>
+          </li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- drift metric strip -->
+    <div class="drift">
+      <div class="m">
+        <div class="label">Hardcoded hex in screens</div>
+        <div class="val bad">50+</div>
+        <div class="note">Should be zero. Catchable with a regex lint rule.</div>
+      </div>
+      <div class="m">
+        <div class="label">Inline rgba() values</div>
+        <div class="val bad">30+</div>
+        <div class="note">Opacity and tint scales exist but aren't enforced.</div>
+      </div>
+      <div class="m">
+        <div class="label">Screens using useTheme()</div>
+        <div class="val warn">4 / 31</div>
+        <div class="note">The theme system is built and untrusted.</div>
+      </div>
+      <div class="m">
+        <div class="label">Toggle atom imports</div>
+        <div class="val bad">0</div>
+        <div class="note">Atom exists, screens rebuild it by hand.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- principle callout -->
+  <div class="principle">
+    <div class="q">Core diagnosis</div>
+    <p>
+      The design system isn't <em>under-built</em> — it's <em>under-trusted</em>.
+      Fix adoption and governance, and the score jumps from 6.4 to 8+ without shipping a single new
+      token.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 2 · RECOMMENDATIONS -->
+  <!-- ============================================================ -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">02</span>
+      <h2 class="section-title">Recommendations</h2>
+      <span class="section-kicker">Ordered by ROI</span>
+    </div>
+    <p class="intro">
+      Each item names the problem it solves, the argument for fixing it, and the first concrete step.
+      Ranked by impact ÷ effort. Nothing here requires a design refresh — only governance and a handful
+      of small primitives.
+    </p>
+
+    <div class="rec-list">
+
+      <!-- R1 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">01</span></div>
+        <div>
+          <h4>Make the design system the only legal source of colour.</h4>
+          <p class="argument">
+            The single biggest drag on consistency is that raw hex values and <code>rgba()</code> literals
+            ship inside screen code. Every one of them is a future palette-change bug and a potential
+            safety-semantics leak. This is a <strong>governance</strong> problem, not a design problem —
+            and it's cheap to fix once, expensive to fix forever by hand.
+          </p>
+          <div class="howto">
+            Add an ESLint rule banning <code>/#[0-9a-f]{3,8}/</code> and <code>/rgba?\(/</code> in
+            <code>apps/mobile/app/**</code>. Allow an exception list for the three <code>tokens/*.ts</code>
+            files. Block merges on violations.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-high">Impact · High</span>
+          <span class="chip effort-s">Effort · S</span>
+          <span class="chip">P0</span>
+        </div>
+      </div>
+
+      <!-- R2 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">02</span></div>
+        <div>
+          <h4>Canonise the style-factory pattern and migrate screens mechanically.</h4>
+          <p class="argument">
+            <code>StyleSheet.create()</code> is static, which is why engineers reach for direct token
+            imports — and that's how light theme gets killed. <code>navigation.tsx</code> already shows
+            the correct pattern:
+            <code>const styles = useMemo(() =&gt; createThemedStyles(colors), [colors])</code>.
+            Document it, ship a codemod, move on.
+          </p>
+          <div class="howto">
+            Write a <code>jscodeshift</code> script that: (1) wraps each <code>StyleSheet.create</code>
+            in a <code>createThemedStyles(colors)</code> factory, (2) rewrites direct
+            <code>darkTheme.X</code> refs to <code>colors.X</code>, (3) inserts the <code>useTheme()</code>
+            + <code>useMemo</code> pair. One screen a day = three weeks to full theme compliance.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-high">Impact · High</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P0</span>
+        </div>
+      </div>
+
+      <!-- R3 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">03</span></div>
+        <div>
+          <h4>Introduce a <code>&lt;Surface&gt;</code> primitive and delete card chrome everywhere.</h4>
+          <p class="argument">
+            The "dark card, 16 px radius, hairline border, optional glass tint" pattern is re-typed in
+            most of the large screens. A single primitive — <code>&lt;Surface variant="solid | glass |
+            outline" elevation="sm | md | lg"&gt;</code> — collapses dozens of style objects and makes
+            the glass/frosted look a token instead of a folklore.
+          </p>
+          <div class="howto">
+            Extend the existing <code>Card.tsx</code> atom (already shipped per the audit) with an
+            <code>elevation</code> prop mapped to <code>shadows</code> tokens. Add a Storybook-style
+            catalog entry. Codemod finds <code>borderRadius: radii.xl</code> + <code>backgroundColor</code>
+            pairs and replaces with <code>&lt;Surface&gt;</code>.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-high">Impact · High</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P1</span>
+        </div>
+      </div>
+
+      <!-- R4 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">04</span></div>
+        <div>
+          <h4>Ship a live component catalog at <code>/design</code> (dev-only).</h4>
+          <p class="argument">
+            The team has 25 atoms and 29 organisms with zero visual index. New engineers find components
+            by <code>grep</code>, which is how inline toggles get born. A hidden catalog route — rendered
+            against both themes and both personas — makes the kit <strong>discoverable</strong> and doubles
+            as a visual regression target.
+          </p>
+          <div class="howto">
+            Add <code>app/design/index.tsx</code> behind <code>__DEV__</code>. For each atom/molecule,
+            render a card of every variant/state. Tag each with its import path. Add screenshots to CI via
+            Detox or a snapshot test — failures catch drift before users do.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-med">Impact · Medium</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P1</span>
+        </div>
+      </div>
+
+      <!-- R5 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">05</span></div>
+        <div>
+          <h4>Add a contrast + HUD-readability gate to CI.</h4>
+          <p class="argument">
+            "Glanceable at 25 km/h" is a beautiful principle with no teeth. The HUD renders distances,
+            ETAs and hazard pills over a live map — the one place where a contrast regression is genuinely
+            dangerous. Automate the check.
+          </p>
+          <div class="howto">
+            Write a test that renders <code>NavigationHUD</code> and <code>HazardAlertPill</code> against
+            three map-tile samples (bright, mixed, night), runs a WCAG contrast-ratio calculation on
+            rendered text/background pairs, and fails below 4.5:1 for body, 3:1 for large. Gate releases
+            on it.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-high">Impact · High</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P1</span>
+        </div>
+      </div>
+
+      <!-- R6 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">06</span></div>
+        <div>
+          <h4>Decompose the three monolith screens.</h4>
+          <p class="argument">
+            <code>route-planning.tsx</code> (1,715 lines), <code>navigation.tsx</code> (1,257) and
+            <code>route-preview.tsx</code> (1,088) are where the system most visibly fails. They're also
+            the safety-critical surfaces where regressions hurt most. Smaller files force reuse and make
+            review actually possible.
+          </p>
+          <div class="howto">
+            Extract <code>PlannerHeader</code>, <code>DestinationPanel</code>,
+            <code>NearbyPoiStrip</code> from route-planning. Extract
+            <code>RoutePreviewBottomSheet</code>, <code>ElevationBlock</code>,
+            <code>RiskBreakdownBlock</code> from route-preview. Target: every screen file &lt; 400 lines.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-med">Impact · Medium</span>
+          <span class="chip effort-l">Effort · L</span>
+          <span class="chip">P2</span>
+        </div>
+      </div>
+
+      <!-- R7 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">07</span></div>
+        <div>
+          <h4>Retire the orphans — <code>Toggle</code>, unused tiers, stale molecules.</h4>
+          <p class="argument">
+            Either ship the <code>Toggle</code> atom into every setting row, or delete it. A component
+            kit without a retirement policy grows into a museum — which is how three custom toggles
+            ended up in <code>profile.tsx</code> when the canonical one was sitting unused in the atoms
+            folder.
+          </p>
+          <div class="howto">
+            Quarterly sweep: any atom/molecule with <code>grep</code> count of 0 in <code>app/**</code>
+            goes on a "ship or sink" list. Two-week grace period, then delete. Automate the
+            usage-count report.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-med">Impact · Medium</span>
+          <span class="chip effort-s">Effort · S</span>
+          <span class="chip">P2</span>
+        </div>
+      </div>
+
+      <!-- R8 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">08</span></div>
+        <div>
+          <h4>Make the safety palette <strong>non-bypassable</strong>.</h4>
+          <p class="argument">
+            The principle "safety is semantic, never decorative" is honoured in the token file and
+            violated in the screens — every hardcoded <code>#22C55E</code> is a latent safety-signal leak.
+            Structurally prevent it.
+          </p>
+          <div class="howto">
+            Move <code>safetyColors</code> behind a <code>useSafetyColor(level)</code> hook that logs a
+            telemetry event every time it's called from outside a hazard/risk/route context (via a call
+            stack check in dev). Export <em>only</em> through this hook from the public design-system
+            index. Raw imports flagged at review.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-high">Impact · High</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P2</span>
+        </div>
+      </div>
+
+      <!-- R9 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">09</span></div>
+        <div>
+          <h4>Codify a density + hit-target audit.</h4>
+          <p class="argument">
+            The spacing scale exists; the 44 px minimum hit target is stated. Whether screens honour both
+            is unverified. Given that users interact one-handed, at speed, with gloves, the cost of a
+            36×36 icon button is real.
+          </p>
+          <div class="howto">
+            Add a Detox integration test that walks every screen, measures bounding boxes of
+            <code>Pressable</code>, <code>Button</code>, <code>IconButton</code> and fails any under 44×44.
+            Pair with a per-screen density snapshot so reviewers see info-per-viewport trends.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-med">Impact · Medium</span>
+          <span class="chip effort-m">Effort · M</span>
+          <span class="chip">P3</span>
+        </div>
+      </div>
+
+      <!-- R10 -->
+      <div class="rec">
+        <div class="idx">Priority<span class="num">10</span></div>
+        <div>
+          <h4>Commit to dark-only, explicitly — or finish light mode.</h4>
+          <p class="argument">
+            Light tokens exist, light theme is effectively unreachable, and the app forces dark during
+            the safety-critical path. That's a half-built option masquerading as a feature. Either delete
+            the light tokens and own the decision ("dark, always — cyclist glare reduction"), or finish
+            the migration so the OS-level switch works. The worst option is the current one.
+          </p>
+          <div class="howto">
+            Decide in a 30-minute design meeting. If dark-only: delete <code>lightTheme</code> export,
+            remove the <code>useColorScheme()</code> branch, document the rationale in
+            <code>design-context.md</code>. If both: ship Recommendation 02 and audit every screen in
+            light.
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip impact-med">Impact · Medium</span>
+          <span class="chip effort-s">Effort · S</span>
+          <span class="chip">P3</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 3 · Refinement -->
+  <!-- ============================================================ -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Refinement — smart, friendly, safe</h2>
+      <span class="section-kicker">Aesthetic direction</span>
+    </div>
+
+    <p class="intro">
+      The current system reads as <em>competent</em>. To read as <strong>refined and smart</strong>
+      while preserving the <strong>friendly, protective</strong> voice, the moves aren't a rebrand —
+      they're micro-decisions in type, colour, surface and motion. Each one below is argued, and each
+      one is a Tweak you can toggle live in the panel at the bottom-right.
+    </p>
+
+    <div class="refine-grid">
+
+      <div class="refine-card">
+        <span class="badge">01 · Typography</span>
+        <h4>Pair a humanist display with a monospaced data voice.</h4>
+        <p>
+          Montserrat is geometric and a touch generic — it says "app", not "thoughtful companion".
+          A humanist serif (Fraunces, Source Serif) at display sizes reads as <em>editorial and
+          trustworthy</em>, while keeping Roboto Mono for data keeps the glanceable, engineered
+          feel that safety requires. Warmth up top, precision at the numbers.
+        </p>
+        <div class="move">
+          <b>Move:</b> Serif only at <code>text3xl</code> and above; body stays Roboto.
+          Mono stays mono. Try the "Serif display" variant in Tweaks.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">02 · Colour</span>
+        <h4>Warm the neutrals; cool the accent.</h4>
+        <p>
+          Pure <code>#111827</code> neutrals feel clinical. Nudge the dark surfaces two steps toward
+          a warm slate (hint of brown, <code>oklch(0.17 0.02 60)</code>). It reads as
+          <em>a leather-bound notebook, not a server room</em> — instantly friendlier without
+          touching the safety palette. Keep yellow as signature; reserve red/amber/green strictly for
+          semantic safety.
+        </p>
+        <div class="move">
+          <b>Move:</b> Tweak "Warm neutrals" shifts bg by +5° hue. Notice how the yellow feels
+          calmer against it.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">03 · Surface</span>
+        <h4>One elevation system, softly used.</h4>
+        <p>
+          Right now the hierarchy is communicated by hairline borders. Refined interfaces use
+          <em>gentle elevation</em>: inner shadow on lowered surfaces, soft ambient shadow on cards,
+          a 1 px top highlight for the accent cards. It signals craft without adding noise — and it's
+          what distinguishes "app" from "tool".
+        </p>
+        <div class="move">
+          <b>Move:</b> A <code>&lt;Surface&gt;</code> atom with <code>elevation="inset | flat |
+          raised"</code>. Toggle "Soft elevation" to preview.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">04 · Radius &amp; density</span>
+        <h4>Slightly larger radii, slightly more air.</h4>
+        <p>
+          16 px is safe; 20 px feels <em>held, considered, human</em>. Combined with +8 px of vertical
+          breathing room between sections, the interface gains authority — it's not trying so hard.
+          Dense UIs read as busy; airy UIs read as confident.
+        </p>
+        <div class="move">
+          <b>Move:</b> Radius slider + density toggle (cozy/default/airy). Watch the cards "settle".
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">05 · Motion</span>
+        <h4>Motion as reassurance, never as flourish.</h4>
+        <p>
+          Friendly products feel <em>alive but not busy</em>. A 250–300 ms soft-spring on surface
+          entrance, a subtle 1–2 px settle on focus, a slow pulse on safety glyphs only — and
+          <strong>nothing moves during active navigation</strong>. This is the difference between
+          "playful" (distracting at 25 km/h) and "warm" (calming in hand).
+        </p>
+        <div class="move">
+          <b>Move:</b> Adopt spring easing tokens (<code>stiffness 180, damping 22</code>). Turn
+          "Ambient motion" on to see them.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">06 · Accent discipline</span>
+        <h4>Treat yellow as punctuation, not paragraphs.</h4>
+        <p>
+          The yellow currently does a lot of work: active states, highlights, icons, dividers, tag
+          colours. Refined systems use the brand colour <em>sparingly</em> — one accented element per
+          viewport, usually the primary action. Everything else relaxes into warm greys. The yellow
+          then carries real meaning when it appears.
+        </p>
+        <div class="move">
+          <b>Move:</b> Slider "Accent intensity" dims non-primary yellow usage. Watch hierarchy
+          snap into place.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">07 · Copy &amp; micro-voice</span>
+        <h4>Warm the labels, tighten the data.</h4>
+        <p>
+          "Route Preview" is correct. "Your safer route" is <em>friendlier</em> without losing
+          authority. Swap title-case UI labels for sentence-case; use first-person-plural where it
+          fits ("We found…"); keep units and numbers terse and monospaced. Voice carries more
+          personality than any pixel.
+        </p>
+        <div class="move">
+          <b>Move:</b> No tweak for this — it's a copy pass. But rename
+          <code>Route Preview</code> → <code>Your route</code> as a test.
+        </div>
+      </div>
+
+      <div class="refine-card">
+        <span class="badge">08 · Iconography</span>
+        <h4>Duotone safety glyphs, neutral utility glyphs.</h4>
+        <p>
+          Ionicons are fine as utility. The <em>safety</em> set (hazards, risk, caution) deserves a
+          bespoke duotone treatment — solid fill for the shape, 40% overlay for the pattern.
+          This sub-language visually separates "information you can ignore" from "information you
+          must act on", a distinction the glanceability principle demands.
+        </p>
+        <div class="move">
+          <b>Move:</b> Commission 8–12 custom safety glyphs. Keep system icons for everything else.
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 4 · Competitive comparison -->
+  <!-- ============================================================ -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">04</span>
+      <h2 class="section-title">How the design stacks up</h2>
+      <span class="section-kicker">vs. Google Maps · Strava · Komoot · Bikemap</span>
+    </div>
+
+    <p class="intro">
+      Defensive Pedal competes in a crowded corner of the map: some peers are utilities, some are
+      communities, some are planners. Each has solved a slice of the problem beautifully — and each has
+      a weakness Defensive Pedal can exploit. Comparison is across six design dimensions that matter for
+      a safety-first cycling app.
+    </p>
+
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>Defensive Pedal</th>
+          <th>Google Maps</th>
+          <th>Strava</th>
+          <th>Komoot</th>
+          <th>Bikemap</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="us">
+          <td>Safety semantics</td>
+          <td><span class="good">◉ Best-in-class</span><br>Dedicated risk palette, per-segment scoring, hazard overlays.</td>
+          <td><span class="bad">◯ Absent</span><br>No cycling-risk layer; bike lanes shown but not weighted.</td>
+          <td><span class="mid">◐ Implicit</span><br>Heatmaps imply safety via popularity — not the same thing.</td>
+          <td><span class="mid">◐ Surface-only</span><br>Surface &amp; gradient, not traffic-risk.</td>
+          <td><span class="mid">◐ Crowd-sourced</span><br>Community hazard pins, unscored.</td>
+        </tr>
+        <tr class="us">
+          <td>Glanceability at speed</td>
+          <td><span class="good">◉ Explicit principle</span><br>Mono data, forced dark HUD, reduced motion.</td>
+          <td><span class="good">◉ Strong</span><br>Industry-leading turn cards, voice prompts.</td>
+          <td><span class="bad">◯ Poor</span><br>Dense metric stack, small type; built for post-ride review.</td>
+          <td><span class="mid">◐ Decent</span><br>Large HUD numbers but cluttered planning screens.</td>
+          <td><span class="bad">◯ Poor</span><br>Map-first, HUD is an afterthought.</td>
+        </tr>
+        <tr class="us">
+          <td>Visual warmth / friendliness</td>
+          <td><span class="mid">◐ Emerging</span><br>Yellow + dark is distinctive; neutrals still clinical.</td>
+          <td><span class="bad">◯ Clinical</span><br>Utility-first, no personality.</td>
+          <td><span class="mid">◐ Achievement-warm</span><br>Orange energy, but competitive tone.</td>
+          <td><span class="good">◉ Editorial &amp; warm</span><br>Storytelling-led, serif accents, photography.</td>
+          <td><span class="bad">◯ Generic</span><br>Looks like a map widget, not a product.</td>
+        </tr>
+        <tr class="us">
+          <td>Progress &amp; gamification</td>
+          <td><span class="good">◉ Non-punitive</span><br>Streaks with freeze, badges, no leaderboards.</td>
+          <td><span class="bad">◯ None</span></td>
+          <td><span class="mid">◐ Competitive</span><br>Segments, kudos, leaderboards — motivating but pressuring.</td>
+          <td><span class="mid">◐ Sparse</span><br>Collection-style but underdeveloped.</td>
+          <td><span class="bad">◯ Minimal</span></td>
+        </tr>
+        <tr class="us">
+          <td>Route-planning clarity</td>
+          <td><span class="good">◉ Strong</span><br>Safe / fast / shortest tabs, elevation, risk bar.</td>
+          <td><span class="mid">◐ Generic</span><br>Same UI as driving — not cycling-native.</td>
+          <td><span class="bad">◯ Weak</span><br>Routing is secondary to tracking.</td>
+          <td><span class="good">◉ Best-in-class</span><br>Rich surface/gradient data, multi-day planning.</td>
+          <td><span class="mid">◐ Decent</span><br>Route library is the hero; planner is average.</td>
+        </tr>
+        <tr class="us">
+          <td>Community &amp; social</td>
+          <td><span class="mid">◐ Cooperative</span><br>Feed without leaderboards — hazards &amp; shared trips.</td>
+          <td><span class="bad">◯ None</span></td>
+          <td><span class="good">◉ Dominant</span><br>The social graph <em>is</em> the product.</td>
+          <td><span class="mid">◐ Content-led</span><br>Tours &amp; collections, low engagement.</td>
+          <td><span class="mid">◐ Route-library</span><br>Social-by-proxy through shared routes.</td>
+        </tr>
+        <tr class="us">
+          <td>Visual system maturity</td>
+          <td><span class="mid">◐ 6.4/10</span><br>Strong tokens, uneven adoption.</td>
+          <td><span class="good">◉ 9/10</span><br>Material, industrial-grade consistency.</td>
+          <td><span class="good">◉ 8/10</span><br>Confident brand, strong type.</td>
+          <td><span class="good">◉ 8.5/10</span><br>Editorial craft, custom illustrations.</td>
+          <td><span class="mid">◐ 6/10</span><br>Functional, unremarkable.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="peer-grid">
+
+      <div class="peer">
+        <header>
+          <div class="ptitle">Google Maps</div>
+          <div class="ptag">Utility · Scale</div>
+        </header>
+        <div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div>
+        <div class="ppos"><b>What it does well</b>The gold standard for turn-by-turn HUD, lane guidance and offline robustness. Typography hierarchy is textbook — you always know what to do next.</div>
+        <div class="pneg"><b>Where it's exposed</b>Treats cycling as a second-class mode. No risk semantics, no cyclist-specific warmth, no sense that the app is <em>for you</em> as a cyclist.</div>
+        <div class="plearn"><b>Steal:</b> the maneuver-card hierarchy. Distance-up, instruction-down, street name tertiary. Defensive Pedal's HUD is close; tighten the scale ratio.</div>
+      </div>
+
+      <div class="peer">
+        <header>
+          <div class="ptitle">Strava</div>
+          <div class="ptag">Social · Performance</div>
+        </header>
+        <div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span></span><span></span></div>
+        <div class="ppos"><b>What it does well</b>Unmatched social gravity. Bold type, confident orange, ride-as-achievement framing. The post-ride screen is a masterclass in celebration design.</div>
+        <div class="pneg"><b>Where it's exposed</b>The competitive tone excludes cautious cyclists, beginners and commuters. Safety is nowhere in its vocabulary — and it knows it.</div>
+        <div class="plearn"><b>Steal:</b> the post-ride celebration moment. Borrow the energy, strip the competition. Defensive Pedal's badge unlock already hints at this — go bigger.</div>
+      </div>
+
+      <div class="peer">
+        <header>
+          <div class="ptitle">Komoot</div>
+          <div class="ptag">Planner · Editorial</div>
+        </header>
+        <div class="bar"><span class="f"></span><span class="f"></span><span class="f"></span><span class="f"></span><span></span></div>
+        <div class="ppos"><b>What it does well</b>The visual benchmark for the whole category. Warm greens, editorial type, surface &amp; gradient iconography that's genuinely informative. Feels like a guidebook.</div>
+        <div class="pneg"><b>Where it's exposed</b>No real-time safety layer; planning is excellent, navigation is mid. Dense planning screens can overwhelm casual urban riders.</div>
+        <div class="plearn"><b>Steal:</b> the editorial warmth — that's exactly the "friendly and refined" target. Serif display type, duotone glyphs, calmer accent usage.</div>
+      </div>
+
+      <div class="peer">
+        <header>
+          <div class="ptitle">Bikemap</div>
+          <div class="ptag">Library · Community</div>
+        </header>
+        <div class="bar"><span class="f"></span><span class="f"></span><span></span><span></span><span></span></div>
+        <div class="ppos"><b>What it does well</b>Enormous crowdsourced route library. Hazard pins are the closest peer to Defensive Pedal's safety model.</div>
+        <div class="pneg"><b>Where it's exposed</b>Generic visual language, weak HUD, hazard data unscored. Feels utilitarian rather than protective.</div>
+        <div class="plearn"><b>Steal:</b> almost nothing on the visual side. On the data side, study how they handle unverified hazard reports — trust signalling is their one strong pattern.</div>
+      </div>
+
+    </div>
+
+    <div class="principle" style="margin-top:56px">
+      <div class="q">Positioning call</div>
+      <p>
+        Google owns utility. Strava owns performance. Komoot owns planning.
+        Defensive Pedal's wedge is <em>protective intelligence</em> — the only one of the five that
+        treats real-time cyclist safety as a first-class design language. Lean into it:
+        <em>"the route your partner would choose for you"</em>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION 5 · Roadmap view -->
+  <!-- ============================================================ -->
+  <section>
+    <div class="section-head">
+      <span class="section-num">05</span>
+      <h2 class="section-title">Suggested sequencing</h2>
+      <span class="section-kicker">6-week path</span>
+    </div>
+
+    <p class="intro">
+      A pragmatic order that front-loads governance (stops the bleeding), then mechanises migration,
+      then adds the primitives that prevent the next round of drift.
+    </p>
+
+    <div class="rec-list">
+      <div class="rec">
+        <div class="idx">Week<span class="num">1</span></div>
+        <div>
+          <h4>Stop the bleeding.</h4>
+          <p class="argument">
+            Ship the lint rule (R1). Decide dark-only vs full light (R10). Publish the style-factory
+            recipe (R2 doc). No more colour drift lands after this week.
+          </p>
+        </div>
+        <div class="chips"><span class="chip">Governance</span></div>
+      </div>
+
+      <div class="rec">
+        <div class="idx">Weeks<span class="num">2-3</span></div>
+        <div>
+          <h4>Mechanise migration.</h4>
+          <p class="argument">
+            Codemod for theme adoption (R2). Retire orphans (R7). First <code>&lt;Surface&gt;</code> rollout
+            on the three biggest screens (R3).
+          </p>
+        </div>
+        <div class="chips"><span class="chip">Migration</span></div>
+      </div>
+
+      <div class="rec">
+        <div class="idx">Weeks<span class="num">4-5</span></div>
+        <div>
+          <h4>Add the guardrails.</h4>
+          <p class="argument">
+            Component catalog (R4). Contrast + HUD gate in CI (R5). Safety-palette hook (R8). Hit-target
+            audit (R9). The system is now self-defending.
+          </p>
+        </div>
+        <div class="chips"><span class="chip">Guardrails</span></div>
+      </div>
+
+      <div class="rec">
+        <div class="idx">Week<span class="num">6</span></div>
+        <div>
+          <h4>Decompose & document.</h4>
+          <p class="argument">
+            Split the monolith screens (R6). Update <code>design-context.md</code> with the new canonical
+            patterns. Re-score — target ≥ 8.0/10.
+          </p>
+        </div>
+        <div class="chips"><span class="chip">Polish</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>DESIGN AUDIT · DEFENSIVE PEDAL MOBILE · 2026-04-18</span>
+    <span>Scored against <b style="color:var(--text-secondary)">design-system v1.0</b></span>
+  </footer>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- Tweaks panel -->
+<!-- ============================================================ -->
+<aside id="tweaks-panel" aria-label="Tweaks">
+  <header>
+    <span class="t">Tweaks</span>
+    <span class="hint">Refinement controls</span>
+  </header>
+  <div class="body">
+    <div class="group">
+      <div class="gname">Typography</div>
+      <label class="row">
+        <span class="k">Display family</span>
+        <select data-tweak="displayFamily">
+          <option value="montserrat">Montserrat (current)</option>
+          <option value="serif">Fraunces (serif)</option>
+          <option value="humanist">Inter Tight (humanist)</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <div class="gname">Colour</div>
+      <label class="row">
+        <span class="k"><span class="swatch" id="sw-bg"></span>Background</span>
+        <input type="color" data-tweak="bgDeep">
+      </label>
+      <label class="row">
+        <span class="k"><span class="swatch" id="sw-surface"></span>Surface</span>
+        <input type="color" data-tweak="bgPrimary">
+      </label>
+      <label class="row">
+        <span class="k"><span class="swatch" id="sw-accent"></span>Accent</span>
+        <input type="color" data-tweak="accent">
+      </label>
+      <label class="row">
+        <span class="k">Warm neutrals</span>
+        <input type="checkbox" data-tweak="warmNeutrals">
+      </label>
+      <label class="row">
+        <span class="k">Accent intensity</span>
+        <input type="range" min="0.3" max="1" step="0.05" data-tweak="accentIntensity">
+        <span class="val" data-val="accentIntensity"></span>
+      </label>
+    </div>
+
+    <div class="group">
+      <div class="gname">Surface &amp; rhythm</div>
+      <label class="row">
+        <span class="k">Radius</span>
+        <input type="range" min="8" max="28" step="1" data-tweak="radius">
+        <span class="val" data-val="radius"></span>
+      </label>
+      <label class="row">
+        <span class="k">Density</span>
+        <select data-tweak="density">
+          <option value="cozy">Cozy</option>
+          <option value="default">Default</option>
+          <option value="airy">Airy</option>
+        </select>
+      </label>
+      <label class="row">
+        <span class="k">Soft elevation</span>
+        <input type="checkbox" data-tweak="softElevation">
+      </label>
+    </div>
+
+    <div class="group">
+      <div class="gname">Motion &amp; voice</div>
+      <label class="row">
+        <span class="k">Ambient motion</span>
+        <input type="checkbox" data-tweak="ambientMotion">
+      </label>
+      <label class="row">
+        <span class="k">Hero headline</span>
+      </label>
+      <label class="row" style="padding-top:0">
+        <input type="text" data-tweak="heroHeadline" style="flex:1;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-strong);border-radius:8px;padding:6px 8px;font-size:12px;font-family:var(--body)">
+      </label>
+    </div>
+
+    <button class="reset" data-tweak-reset>Reset to defaults</button>
+  </div>
+</aside>
+
+<script>
+(() => {
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "displayFamily": "serif",
+    "bgDeep": "#111827",
+    "bgPrimary": "#1F2937",
+    "accent": "#FACC15",
+    "warmNeutrals": false,
+    "accentIntensity": 1,
+    "radius": 20,
+    "density": "cozy",
+    "softElevation": true,
+    "ambientMotion": true,
+    "heroHeadline": "A strong safety-first system, undermined by uneven  adoption across screens."
+  }/*EDITMODE-END*/;
+
+  let state = { ...TWEAK_DEFAULTS };
+  const panel = document.getElementById('tweaks-panel');
+
+  function hexToRgb(h){
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+    if(!m) return null;
+    return [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)];
+  }
+  function mix(h, target, t){
+    const a = hexToRgb(h); const b = hexToRgb(target);
+    if(!a||!b) return h;
+    const r = a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+    return '#' + r.map(v=>v.toString(16).padStart(2,'0')).join('');
+  }
+
+  function apply(s){
+    const root = document.documentElement;
+    const body = document.body;
+
+    // colours
+    let bgDeep = s.bgDeep, bgPrimary = s.bgPrimary;
+    if (s.warmNeutrals) {
+      bgDeep = mix(bgDeep, '#3a2a1a', 0.12);
+      bgPrimary = mix(bgPrimary, '#3a2a1a', 0.1);
+    }
+    root.style.setProperty('--bg-deep', bgDeep);
+    root.style.setProperty('--bg-primary', bgPrimary);
+    root.style.setProperty('--bg-secondary', mix(bgPrimary, '#ffffff', 0.08));
+    root.style.setProperty('--accent', s.accent);
+
+    // accent intensity — dim non-primary yellow by mixing toward textSecondary
+    const dimmed = mix(s.accent, '#B0B8C1', 1 - s.accentIntensity);
+    root.style.setProperty('--accent-dimmed', dimmed);
+
+    // typography variant
+    body.classList.remove('variant-serif','variant-humanist');
+    if (s.displayFamily === 'serif') body.classList.add('variant-serif');
+    else if (s.displayFamily === 'humanist') body.classList.add('variant-humanist');
+
+    // density
+    body.classList.remove('density-cozy','density-airy');
+    if (s.density === 'cozy') body.classList.add('density-cozy');
+    else if (s.density === 'airy') body.classList.add('density-airy');
+
+    // radius — adjust the main card-like elements
+    const r = s.radius + 'px';
+    document.querySelectorAll('.swot-card,.rec,.refine-card,.verdict,.principle,.drift .m').forEach(el=>{
+      el.style.borderRadius = r;
+    });
+
+    // soft elevation
+    document.querySelectorAll('.swot-card,.rec,.refine-card').forEach(el=>{
+      el.style.boxShadow = s.softElevation
+        ? '0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 32px rgba(0,0,0,0.35)'
+        : 'none';
+    });
+
+    // ambient motion
+    if (s.ambientMotion) {
+      document.querySelectorAll('.mark .dot').forEach(el=>{
+        el.style.animation = 'pulseDot 2.8s ease-in-out infinite';
+      });
+    } else {
+      document.querySelectorAll('.mark .dot').forEach(el=>{ el.style.animation=''; });
+    }
+
+    // headline
+    const h1 = document.querySelector('h1');
+    if (h1 && s.heroHeadline) {
+      // preserve the accent span on the key phrase if present
+      const parts = s.heroHeadline.split(/,(.+)/);
+      if (parts.length >= 2) {
+        h1.innerHTML = `<span class="accent">${parts[0].trim()}</span>, ${parts[1].trim()}`;
+      } else {
+        h1.textContent = s.heroHeadline;
+      }
+    }
+
+    // swatches + value labels
+    const getVar = v => getComputedStyle(root).getPropertyValue(v).trim();
+    document.getElementById('sw-bg').style.background = getVar('--bg-deep');
+    document.getElementById('sw-surface').style.background = getVar('--bg-primary');
+    document.getElementById('sw-accent').style.background = getVar('--accent');
+    panel.querySelectorAll('[data-val]').forEach(el=>{
+      const k = el.dataset.val;
+      el.textContent = typeof s[k] === 'number' ? (k==='radius' ? s[k]+'px' : s[k].toFixed(2)) : s[k];
+    });
+  }
+
+  function bindInputs(){
+    panel.querySelectorAll('[data-tweak]').forEach(input=>{
+      const k = input.dataset.tweak;
+      // init value
+      const v = state[k];
+      if (input.type === 'checkbox') input.checked = !!v;
+      else input.value = v;
+
+      input.addEventListener('input', ()=>{
+        let nv;
+        if (input.type === 'checkbox') nv = input.checked;
+        else if (input.type === 'range') nv = parseFloat(input.value);
+        else nv = input.value;
+        state[k] = nv;
+        apply(state);
+        window.parent.postMessage({type:'__edit_mode_set_keys', edits:{[k]:nv}}, '*');
+      });
+    });
+
+    panel.querySelector('[data-tweak-reset]').addEventListener('click', ()=>{
+      state = { ...TWEAK_DEFAULTS };
+      bindInputs();
+      apply(state);
+      window.parent.postMessage({type:'__edit_mode_set_keys', edits: state}, '*');
+    });
+  }
+
+  // style injected for ambient dot pulse
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `@keyframes pulseDot{0%,100%{box-shadow:0 0 0 4px rgba(250,204,21,0.12)}50%{box-shadow:0 0 0 10px rgba(250,204,21,0.04)}}`;
+  document.head.appendChild(styleEl);
+
+  // listener FIRST
+  window.addEventListener('message', (e)=>{
+    const d = e.data || {};
+    if (d.type === '__activate_edit_mode') panel.classList.add('active');
+    else if (d.type === '__deactivate_edit_mode') panel.classList.remove('active');
+  });
+
+  // then announce
+  window.parent.postMessage({type:'__edit_mode_available'}, '*');
+
+  bindInputs();
+  apply(state);
+})();
+</script>
+
+</body>
+</html>

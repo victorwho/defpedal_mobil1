@@ -17,12 +17,13 @@ import {
 
 import { Screen } from '../src/components/Screen';
 import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
-import { Card } from '../src/design-system/atoms/Card';
+import { Surface } from '../src/design-system/atoms/Card';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { ActivityChart } from '../src/design-system/organisms/ActivityChart';
 import { LeaderboardSection } from '../src/design-system/organisms/LeaderboardSection';
 import { PulseHeader } from '../src/design-system/organisms/PulseHeader';
 import { useTheme, type ThemeColors } from '../src/design-system';
+import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
@@ -113,7 +114,7 @@ export default function CityHeartbeatScreen() {
 
         {/* Today's live stats */}
         <FadeSlideIn delay={100}>
-          <View style={styles.todayCard}>
+          <Surface>
             <Text style={styles.sectionLabel}>TODAY'S PULSE</Text>
             <View style={styles.statGrid}>
               <StatCell
@@ -149,7 +150,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
             </View>
-          </View>
+          </Surface>
         </FadeSlideIn>
 
         {/* 7-day activity chart */}
@@ -159,7 +160,7 @@ export default function CityHeartbeatScreen() {
 
         {/* Cumulative totals */}
         <FadeSlideIn delay={300}>
-          <View style={styles.totalsCard}>
+          <Surface>
             <Text style={styles.sectionLabel}>ALL TIME</Text>
             <View style={styles.statGrid}>
               <StatCell
@@ -195,13 +196,13 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
             </View>
-          </View>
+          </Surface>
         </FadeSlideIn>
 
         {/* Hazard hotspots */}
         {heartbeat.hazardHotspots.length > 0 && (
           <FadeSlideIn delay={400}>
-            <View style={styles.sectionCard}>
+            <Surface style={{ gap: space[2] }}>
               <Text style={styles.sectionLabel}>HAZARD HOTSPOTS</Text>
               <Text style={styles.sectionSub}>Most reported in the last 7 days</Text>
               {heartbeat.hazardHotspots.map((h, i) => (
@@ -212,14 +213,14 @@ export default function CityHeartbeatScreen() {
                   <Text style={styles.hazardLabel}>{hazardLabel(h.hazardType)}</Text>
                 </View>
               ))}
-            </View>
+            </Surface>
           </FadeSlideIn>
         )}
 
         {/* Top contributors */}
         {heartbeat.topContributors.length > 0 && (
           <FadeSlideIn delay={500}>
-            <View style={styles.sectionCard}>
+            <Surface style={{ gap: space[2] }}>
               <Text style={styles.sectionLabel}>TOP CONTRIBUTORS</Text>
               {heartbeat.topContributors.map((c, i) => (
                 <View key={`contributor-${i}`} style={styles.contributorRow}>
@@ -248,7 +249,7 @@ export default function CityHeartbeatScreen() {
                   </View>
                 </View>
               ))}
-            </View>
+            </Surface>
           </FadeSlideIn>
         )}
 
@@ -318,34 +319,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       textAlign: 'center',
     },
 
-    // Section cards
-    todayCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      gap: space[3],
-      ...shadows.md,
-    },
-    totalsCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      gap: space[3],
-      ...shadows.md,
-    },
-    sectionCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      gap: space[2],
-      ...shadows.md,
-    },
     sectionLabel: {
       ...textXs,
       fontFamily: fontFamily.body.semiBold,
@@ -399,7 +372,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     hazardBadgeText: {
       ...textXs,
       fontFamily: fontFamily.mono.bold,
-      color: '#FFFFFF',
+      color: gray[50],
       fontSize: 11,
     },
     hazardLabel: {

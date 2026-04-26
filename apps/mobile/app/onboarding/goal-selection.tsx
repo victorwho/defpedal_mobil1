@@ -5,10 +5,12 @@ import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { Surface } from '../../src/design-system/atoms/Card';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
+import { brandTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
@@ -97,15 +99,12 @@ export default function OnboardingGoalSelectionScreen() {
 
       <View style={styles.cardList}>
         {GOAL_OPTIONS.map((option) => (
-          <Pressable
+          <Surface
             key={option.goal}
-            style={({ pressed }) => [
-              styles.goalCard,
-              pressed && styles.goalCardPressed,
-            ]}
             onPress={() => handleSelect(option.goal)}
-            accessibilityRole="button"
             accessibilityLabel={option.title}
+            style={styles.goalCard}
+            pressedStyle={styles.goalCardPressed}
           >
             <View style={styles.goalIconWrap}>
               <Ionicons name={option.icon} size={24} color={colors.accent} />
@@ -115,7 +114,7 @@ export default function OnboardingGoalSelectionScreen() {
               <Text style={styles.goalDesc}>{option.description}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
         ))}
       </View>
 
@@ -149,7 +148,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 220,
       height: 220,
       borderRadius: 9999,
-      backgroundColor: 'rgba(250, 204, 21, 0.14)',
+      backgroundColor: brandTints.accentMedium,
       opacity: 0.6,
     },
     headerSection: {
@@ -184,12 +183,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: space[3],
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      ...shadows.md,
     },
     goalCardPressed: {
       backgroundColor: colors.bgSecondary,
@@ -199,7 +192,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 48,
       height: 48,
       borderRadius: radii.lg,
-      backgroundColor: 'rgba(250, 204, 21, 0.1)',
+      backgroundColor: brandTints.accentLight,
       alignItems: 'center',
       justifyContent: 'center',
     },

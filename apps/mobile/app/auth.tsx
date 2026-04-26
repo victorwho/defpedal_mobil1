@@ -10,12 +10,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { Button, TextInput, ScreenHeader } from '../src/design-system/atoms';
+import { Button, Surface, TextInput, ScreenHeader } from '../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
+import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
@@ -35,6 +36,11 @@ export default function AuthScreen() {
 
   const session = authCtx?.session ?? null;
   const user = authCtx?.user ?? null;
+  // Anonymous Supabase users are an implementation detail (they have a session
+  // so we can read /risk-map etc.). For all UX purposes — what's shown on this
+  // screen, what the Sign-out button does — they should be treated as guests.
+  const isAnonymous = authCtx?.isAnonymous ?? false;
+  const hasRealAccount = user !== null && !isAnonymous;
   const isSupabaseConfigured = authCtx?.isSupabaseConfigured ?? false;
   const isDeveloperBypassAvailable = authCtx?.isDeveloperBypassAvailable ?? false;
   const contextAuthError = authCtx?.authError ?? null;
@@ -155,9 +161,9 @@ export default function AuthScreen() {
           <Text style={styles.brandName}>{t('common.appName')}</Text>
         </View>
 
-        {/* ── Signed-in state ── */}
-        {user ? (
-          <View style={styles.card}>
+        {/* ── Signed-in state (real account only — anonymous shows the form) ── */}
+        {hasRealAccount ? (
+          <Surface radius="2xl" elevation="lg" style={styles.card}>
             <View style={styles.signedInHeader}>
               <Ionicons name="checkmark-circle" size={20} color={colors.safe} />
               <Text style={styles.signedInLabel}>Logged in as</Text>
@@ -181,10 +187,10 @@ export default function AuthScreen() {
             {statusMessage ? (
               <Text style={styles.successText}>{statusMessage}</Text>
             ) : null}
-          </View>
+          </Surface>
         ) : (
           /* ── Sign-in / Sign-up form ── */
-          <View style={styles.card}>
+          <Surface radius="2xl" elevation="lg" style={styles.card}>
             {/* Mode toggle */}
             <View style={styles.segmentedRow}>
               <Pressable
@@ -333,11 +339,11 @@ export default function AuthScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
+          </Surface>
         )}
 
         {/* Developer bypass (only in dev) */}
-        {isDeveloperBypassAvailable && !user ? (
+        {isDeveloperBypassAvailable && !hasRealAccount ? (
           <View style={styles.devCard}>
             <View style={styles.devHeader}>
               <Ionicons name="code-slash-outline" size={16} color={gray[400]} />
@@ -415,15 +421,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textPrimary,
       letterSpacing: -0.3,
     },
-    // Card
+    // Card layout (chrome from Surface)
     card: {
-      borderRadius: radii['2xl'],
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      backgroundColor: colors.bgPrimary,
       padding: space[5],
       gap: space[4],
-      ...shadows.lg,
     },
     // Signed-in state
     signedInHeader: {
@@ -479,15 +480,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
       borderRadius: radii.md,
       borderWidth: 1,
-      borderColor: 'rgba(234, 179, 8, 0.35)',
-      backgroundColor: 'rgba(234, 179, 8, 0.10)',
+      borderColor: safetyTints.cautionBorder,
+      backgroundColor: safetyTints.cautionLight,
       paddingHorizontal: space[3],
       paddingVertical: space[3],
     },
     warningText: {
       ...textXs,
       flex: 1,
-      color: '#fef3c7',
+      color: colors.textPrimary,
       lineHeight: 18,
     },
     // Google button
@@ -506,13 +507,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 24,
       height: 24,
       borderRadius: 12,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: gray[50],
       alignItems: 'center',
       justifyContent: 'center',
     },
     googleG: {
       fontFamily: fontFamily.body.bold,
       fontSize: 14,
+      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
       color: '#4285F4',
       marginTop: -1,
     },
@@ -545,12 +547,12 @@ const createThemedStyles = (colors: ThemeColors) =>
     // Messages
     successText: {
       ...textSm,
-      color: '#4ADE80',
+      color: colors.safe,
       lineHeight: 20,
     },
     errorText: {
       ...textSm,
-      color: '#F87171',
+      color: colors.danger,
       lineHeight: 20,
     },
     // Toggle
@@ -574,7 +576,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.lg,
       borderWidth: 1,
       borderColor: colors.borderDefault,
-      backgroundColor: 'rgba(255, 255, 255, 0.04)',
+      backgroundColor: surfaceTints.whiteSubtle,
       padding: space[4],
       gap: space[2],
     },

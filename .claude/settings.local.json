@@ -15,7 +15,12 @@
       "Bash(npx expo:*)",
       "Bash(npm uninstall:*)",
       "Bash(npx tsc:*)",
-      "WebFetch(domain:expo.dev)"
+      "WebFetch(domain:expo.dev)",
+      "Bash(mkdir -p C:/dev/defpedal/.claude/design-bundle)",
+      "Bash(cp -r /tmp/design-audit/def-pedal-1 C:/dev/defpedal/.claude/design-bundle/)",
+      "Bash(mkdir -p .claude/design-bundle)",
+      "Bash(mv /c/dev/defpedal/.claude/design-bundle/def-pedal-1 .claude/design-bundle/def-pedal-1)",
+      "Read(//c/dev/defpedal/.claude/design-bundle//**)"
     ],
     "deny": []
   }

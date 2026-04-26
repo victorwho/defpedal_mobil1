@@ -126,10 +126,9 @@ export const HazardAlertPill: React.FC<HazardAlertPillProps> = ({
 
   // Entrance animation — always show the pill (safety-critical), skip motion if reduced
   useEffect(() => {
-    // Haptic feedback scaled by severity — always fires (even with reduced motion)
-    if (severity === 'danger') haptics.heavy();
-    else if (severity === 'caution') haptics.warning();
-    else haptics.medium();
+    // Safety-critical haptic: fires during NAVIGATING and overrides reduced-motion
+    // (see design-system/tokens/haptics.ts §warning).
+    haptics.warning();
 
     if (reducedMotion) {
       translateY.setValue(0);

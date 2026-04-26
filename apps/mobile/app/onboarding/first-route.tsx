@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
-import { Button } from '../../src/design-system/atoms';
+import { Button, Surface } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { zIndex } from '../../src/design-system/tokens/zIndex';
 import { space } from '../../src/design-system/tokens/spacing';
+import { surfaceTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
@@ -270,7 +271,7 @@ export default function OnboardingFirstRouteScreen() {
       </View>
 
       {/* Route card */}
-      <View style={styles.routeCard}>
+      <Surface>
         <View style={styles.routeStats}>
           <View style={styles.routeStat}>
             <Text style={styles.routeStatValue}>{distanceKm} km</Text>
@@ -289,7 +290,7 @@ export default function OnboardingFirstRouteScreen() {
             <Text style={styles.routeStatLabel}>Safety</Text>
           </View>
         </View>
-      </View>
+      </Surface>
 
       {/* Impact counters */}
       <View style={styles.impactRow}>
@@ -359,14 +360,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderColor: colors.borderDefault,
       overflow: 'hidden',
       marginVertical: space[3],
-      backgroundColor: '#0d1a2d',
+      backgroundColor: colors.bgDeep,
     },
     mapLoadingOverlay: {
       ...StyleSheet.absoluteFillObject,
       zIndex: zIndex.overlay,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: 'rgba(17, 24, 39, 0.7)',
+      backgroundColor: surfaceTints.scrim,
       gap: space[2],
     },
     mapLoadingText: {
@@ -383,14 +384,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       color: colors.textMuted,
       textAlign: 'center',
-    },
-    routeCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      ...shadows.md,
     },
     routeStats: {
       flexDirection: 'row',

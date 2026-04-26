@@ -16,6 +16,13 @@ export const brandColors = {
   bgSecondary: '#374151',
   bgTertiary: '#4B5563',
 
+  /**
+   * Form surface — "warm paper" card against the dark UI (e.g. feedback rating step).
+   * Theme-aware: cream on dark, white-with-elevation on light. Always renders dark text
+   * (use gray[700–900]) regardless of active theme.
+   */
+  bgForm: '#FFFDF5',
+
   /** Accent (yellow — brand signature) */
   accent: '#FACC15',
   accentHover: '#EAB308',
@@ -78,6 +85,12 @@ export const lightTheme = {
   bgPrimary: '#FFFFFF',
   bgSecondary: '#F3F4F6',
   bgTertiary: '#E5E7EB',
+
+  /**
+   * Form surface — pure white in light theme so the card reads as elevated against
+   * the near-white bgDeep. Counterpart to dark-theme cream paper. Pair with shadows.md.
+   */
+  bgForm: '#FFFFFF',
 
   /** Accent — darker for contrast against white */
   accent: '#CA8A04',

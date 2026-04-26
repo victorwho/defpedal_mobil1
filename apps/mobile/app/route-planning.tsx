@@ -33,6 +33,7 @@ import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
 import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
 import { Button } from '../src/design-system/atoms/Button';
+import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -1211,7 +1212,7 @@ export default function RoutePlanningScreen() {
             <Ionicons
               name={hazardPlacementMode ? 'close' : 'warning'}
               size={22}
-              color={hazardPlacementMode ? '#000' : colors.accent}
+              color={hazardPlacementMode ? gray[900] : colors.accent}
             />
           </Pressable>
           <Pressable
@@ -1296,7 +1297,14 @@ export default function RoutePlanningScreen() {
         accessibilityRole="button"
         accessibilityLabel="Dismiss hazard picker"
       >
-        <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()} accessible={false}>
+        <Surface
+          variant="panel"
+          radius="2xl"
+          elevation="lg"
+          onPress={(e) => e.stopPropagation()}
+          accessible={false}
+          style={styles.hazardGridCard}
+        >
           {hazardDescribeMode ? (
             <>
               <Text style={styles.hazardGridTitle}>Describe the hazard</Text>
@@ -1376,7 +1384,7 @@ export default function RoutePlanningScreen() {
               </Pressable>
             </>
           )}
-        </Pressable>
+        </Surface>
       </Pressable>
     ) : null}
 
@@ -1462,6 +1470,15 @@ export default function RoutePlanningScreen() {
 // Themed style factory — colors come from useTheme(), layout stays static
 // ---------------------------------------------------------------------------
 
+/**
+ * Map overlay surfaces (origin/destination/search/FAB/waypoint cards) intentionally
+ * use white regardless of theme — they sit on the dark Mapbox style and rely on
+ * shadows.md for elevation against light-mode bgDeep too.
+ * See docs/design-context.md §2 (token rules — exception #1).
+ */
+// eslint-disable-next-line no-restricted-syntax
+const MAP_OVERLAY_BG = '#FFFFFF';
+
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     rootWrapper: {
@@ -1471,7 +1488,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
     },
     cachedRouteCard: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       borderRadius: radii.xl,
       paddingHorizontal: space[4],
       paddingVertical: space[3],
@@ -1496,7 +1513,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontSize: 12,
     },
     originCard: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       borderRadius: radii.xl,
       paddingHorizontal: space[4],
       paddingVertical: space[3],
@@ -1558,7 +1575,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontSize: 13,
     },
     destinationCard: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       borderRadius: radii.xl,
       paddingHorizontal: space[4],
       paddingVertical: space[3],
@@ -1599,7 +1616,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.safe,
     },
     searchOverlay: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       borderRadius: radii.xl,
       padding: space[3],
       ...shadows.md,
@@ -1611,7 +1628,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.md,
@@ -1655,11 +1672,8 @@ const createThemedStyles = (colors: ThemeColors) =>
       zIndex: zIndex.modal,
     },
     hazardGridCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii['2xl'],
       padding: space[4],
       gap: space[3],
-      ...shadows.lg,
     },
     hazardGridTitle: {
       fontFamily: fontFamily.heading.semiBold,
@@ -1760,14 +1774,14 @@ const createThemedStyles = (colors: ThemeColors) =>
     waypointDotText: {
       fontSize: 11,
       fontFamily: fontFamily.mono.bold,
-      color: '#FFFFFF',
+      color: gray[50],
     },
     waypointSearchWrap: {
       flex: 1,
     },
     waypointLabel: {
       flex: 1,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       borderRadius: radii.lg,
       paddingHorizontal: space[3],
       paddingVertical: space[2],
@@ -1861,7 +1875,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: space[2],
-      backgroundColor: 'rgba(0, 0, 0, 0.62)',
+      backgroundColor: surfaceTints.overlay,
       borderRadius: radii.full,
       paddingVertical: space[2],
       paddingHorizontal: space[4],

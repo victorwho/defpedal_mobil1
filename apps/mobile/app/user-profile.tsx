@@ -8,10 +8,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { Button } from '../src/design-system/atoms/Button';
+import { Surface } from '../src/design-system/atoms/Card';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
-import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
 import { fontFamily, text2xl, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
@@ -95,7 +95,7 @@ export default function UserProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space[6] }]} showsVerticalScrollIndicator={false}>
           {/* User card */}
-          <View style={styles.userCard}>
+          <Surface radius="2xl" style={styles.userCard}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>
                 {(profile.username ?? profile.displayName).charAt(0).toUpperCase()}
@@ -135,10 +135,10 @@ export default function UserProfileScreen() {
                 {profile.isFollowedByMe ? 'Unfollow' : 'Follow'}
               </Button>
             ) : null}
-          </View>
+          </Surface>
 
           {/* Stats */}
-          <View style={styles.statsCard}>
+          <Surface>
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>{profile.totalTrips}</Text>
@@ -161,7 +161,7 @@ export default function UserProfileScreen() {
                 <Text style={styles.statLabel}>Hazards</Text>
               </View>
             </View>
-          </View>
+          </Surface>
 
           {/* Recent trips */}
           <SectionTitle variant="muted">Recent Trips</SectionTitle>
@@ -211,9 +211,8 @@ const createThemedStyles = (colors: ThemeColors) =>
     errorText: { ...textBase, color: colors.textSecondary },
     scrollContent: { paddingHorizontal: space[4], gap: space[4] },
     userCard: {
-      alignItems: 'center', gap: space[3],
-      backgroundColor: colors.bgPrimary, borderRadius: radii['2xl'], borderWidth: 1,
-      borderColor: colors.borderDefault, padding: space[5], ...shadows.md,
+      alignItems: 'center',
+      padding: space[5],
     },
     avatar: {
       width: 64, height: 64, borderRadius: 32, backgroundColor: colors.accent,
@@ -226,10 +225,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     followCount: { fontFamily: fontFamily.mono.bold, fontSize: 18, color: colors.textPrimary },
     followLabel: { ...textXs, color: colors.textSecondary },
     followDivider: { width: 1, height: 24, backgroundColor: colors.borderDefault },
-    statsCard: {
-      backgroundColor: colors.bgPrimary, borderRadius: radii.xl, borderWidth: 1,
-      borderColor: colors.borderDefault, padding: space[4], ...shadows.md,
-    },
     statsRow: { flexDirection: 'row', justifyContent: 'space-around' },
     statItem: { alignItems: 'center', gap: 2 },
     statValue: { fontFamily: fontFamily.mono.bold, fontSize: 16, color: colors.textPrimary },

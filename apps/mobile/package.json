@@ -7,7 +7,12 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app --ext .ts,.tsx --max-warnings=0",
+    "lint:fix": "eslint app --ext .ts,.tsx --fix",
+    "lint:check": "node scripts/lint-ratchet.mjs",
+    "lint:baseline": "node scripts/lint-ratchet.mjs --write",
+    "check:contrast": "vitest run src/design-system/tokens/__tests__/contrast.test.ts"
   },
   "dependencies": {
     "@defensivepedal/core": "file:../../packages/core",
@@ -54,7 +59,9 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/react-native": "^13.3.3",
     "@types/react": "^19.2.2",
+    "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^8.57.1",
     "happy-dom": "^20.8.9",
     "jsdom": "^25.0.1",
     "react-native-web": "^0.21.2",

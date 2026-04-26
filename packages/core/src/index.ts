@@ -1,6 +1,7 @@
 export * from './co2';
 export * from './microlives';
 export * from './contracts';
+export * from './contrast';
 export * from './distance';
 export * from './formatters';
 export * from './mapboxStaticImageUrl';

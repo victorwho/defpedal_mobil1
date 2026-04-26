@@ -61,8 +61,11 @@ export const Modal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      if (variant === 'critical') haptics.error();
-      else haptics.medium();
+      // Critical modals use the safety-critical `warning` token so they fire
+      // even during NAVIGATING (rider needs to feel the alert). Regular modals
+      // use `snap` which respects NAVIGATING suppression.
+      if (variant === 'critical') haptics.warning();
+      else haptics.snap();
 
       if (reducedMotion) {
         scale.setValue(1);

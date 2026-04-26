@@ -17,6 +17,8 @@ import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
 import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
+import { tierColors } from '../src/design-system/tokens/badgeColors';
+import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 import { MiaInvitationPrompt } from '../src/design-system/organisms/MiaInvitationPrompt';
@@ -185,7 +187,6 @@ const OnboardingGuard = () => {
     // `state` is a fresh object every render (plain return from the hook),
     // so including it in the dep array would cause an infinite effect loop.
     // The primitives listed capture every field this effect reads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.storeHydrated,
     state.isLoading,
@@ -502,7 +503,7 @@ const RankUpOverlayManager = () => {
       newTier={promotion.newTier}
       tierDisplayName={promotion.tierDisplayName ?? promotion.newTier}
       tagline={promotion.tierTagline ?? ''}
-      tierColor={promotion.tierColor ?? '#F2C30F'}
+      tierColor={promotion.tierColor ?? tierColors.gold.primary}
       perkDescription={promotion.tierPerk ?? ''}
       onDismiss={clearPromotion}
     />
@@ -544,7 +545,7 @@ const styles = StyleSheet.create({
     right: 12,
     zIndex: zIndex.popover,
     borderRadius: 12,
-    backgroundColor: 'rgba(11, 16, 32, 0.94)',
+    backgroundColor: surfaceTints.glass,
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 2,
@@ -557,7 +558,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   validationValue: {
-    color: '#cbd5e1',
+    color: darkTheme.textSecondary,
     fontSize: 11,
   },
 });

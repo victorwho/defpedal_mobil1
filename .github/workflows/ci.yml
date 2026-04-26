@@ -29,5 +29,14 @@ jobs:
       - name: Security audit
         run: npm audit --audit-level=high
 
+      - name: Lint ratchet (mobile)
+        # Phase 1 R1 / R7 — fails only on regressions vs apps/mobile/.eslint-baseline.json.
+        # See apps/mobile/LINT.md.
+        run: npm run lint:mobile:check
+
+      - name: Contrast check (mobile)
+        # Phase 1 R5 — WCAG contrast assertions for design-system token pairs.
+        run: npm run check:contrast
+
       - name: Run validation suite
         run: npm run validate

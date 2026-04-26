@@ -50,6 +50,41 @@ const classifyRiskScore = (score: number): RiskBucket => {
 
 type RiskFeatureProperties = {
   risk_score?: number;
+  riskScore?: number;
+};
+
+/**
+ * Enrich a raw road-risk GeoJSON FeatureCollection (as returned by the
+ * `get_road_risk_geojson` Supabase RPC, which only carries `riskScore` per
+ * feature) with the same server-side bucket mapping used for `/risk-segments`:
+ * a quantized score, a category label, and the display colour.
+ *
+ * This keeps the score thresholds server-side only (security principle from
+ * the 2026-04-13 hardening) while giving the client everything it needs to
+ * paint the map directly via `lineColor: ['get', 'color']`.
+ */
+export const enrichRiskGeoJson = (
+  raw: GeoJsonFeatureCollection<any, RiskFeatureProperties> | null | undefined,
+): GeoJsonFeatureCollection<any, { riskScore: number; riskCategory: string; color: string }> => {
+  if (!raw || !Array.isArray(raw.features)) {
+    return { type: 'FeatureCollection', features: [] };
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features: raw.features.map((feature) => {
+      const rawScore = Number(feature.properties?.riskScore ?? feature.properties?.risk_score ?? 0);
+      const bucket = classifyRiskScore(rawScore);
+      return {
+        ...feature,
+        properties: {
+          riskScore: bucket.midpoint,
+          riskCategory: bucket.label,
+          color: bucket.color,
+        },
+      };
+    }),
+  };
 };
 
 export const fetchRiskSegments = async (

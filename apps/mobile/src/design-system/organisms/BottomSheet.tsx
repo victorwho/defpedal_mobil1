@@ -79,7 +79,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   // Animate to snap point
   const animateTo = useCallback(
     (index: SnapIndex) => {
-      haptics.medium();
+      haptics.snap();
       currentSnap.current = index;
       if (reducedMotion) {
         sheetHeight.setValue(snapHeights[index]);

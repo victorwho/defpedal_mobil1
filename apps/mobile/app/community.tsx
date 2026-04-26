@@ -1,15 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { CommunityStatsCard } from '../src/design-system/organisms/CommunityStatsCard';
 import { Button } from '../src/design-system/atoms/Button';
+import { Surface } from '../src/design-system/atoms/Card';
 import { useTheme, type ThemeColors } from '../src/design-system';
-import { radii } from '../src/design-system/tokens/radii';
-import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { space } from '../src/design-system/tokens/spacing';
 import { useCommunityStats } from '../src/hooks/useCommunityStats';
@@ -29,11 +28,11 @@ export default function CommunityScreen() {
           <CommunityStatsCard stats={stats} isLoading={isLoading} error={error} />
 
           {/* City Heartbeat card */}
-          <Pressable
-            style={styles.heartbeatCard}
+          <Surface
+            variant="accent"
             onPress={() => router.push('/city-heartbeat')}
-            accessibilityRole="button"
             accessibilityLabel="Open City Heartbeat dashboard"
+            style={styles.heartbeatCard}
           >
             <View style={styles.heartbeatIcon}>
               <Ionicons name="pulse" size={22} color={colors.accent} />
@@ -45,7 +44,7 @@ export default function CommunityScreen() {
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
 
           <View style={styles.placeholder}>
             <Text style={styles.placeholderText}>{t('communityScreen.feedTitle')}</Text>
@@ -74,13 +73,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     heartbeatCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderAccent,
-      padding: space[4],
-      gap: space[3],
-      ...shadows.md,
     },
     heartbeatIcon: {
       width: 40,
