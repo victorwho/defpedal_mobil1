@@ -435,6 +435,36 @@ export const mobileApi = {
       body: JSON.stringify({ confirmation: 'DELETE' }),
     }),
 
+  // ── UGC moderation (compliance plan item 7) ─────────────────────────────
+  reportContent: (payload: {
+    targetType: 'comment' | 'hazard' | 'trip_share' | 'profile';
+    targetId: string;
+    reason: 'spam' | 'harassment' | 'hate' | 'sexual' | 'violence' | 'illegal' | 'other';
+    details?: string;
+  }) =>
+    requestJson<{ acceptedAt: string }>('/v1/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  blockUser: (userId: string) =>
+    requestJson<{ acceptedAt: string }>(`/v1/users/${userId}/block`, {
+      method: 'POST',
+    }),
+  unblockUser: (userId: string) =>
+    requestJson<{ acceptedAt: string }>(`/v1/users/${userId}/block`, {
+      method: 'DELETE',
+    }),
+  getBlockedUsers: () =>
+    requestJson<{
+      blocked: Array<{
+        userId: string;
+        displayName: string;
+        username: string | null;
+        avatarUrl: string | null;
+        blockedAt: string;
+      }>;
+    }>('/v1/users/blocked'),
+
   // Push notifications
   registerPushToken: (expoPushToken: string, deviceId: string, platform: string) =>
     requestJson<WriteAckResponse>('/v1/push-token', {

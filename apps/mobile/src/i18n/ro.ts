@@ -212,6 +212,44 @@ export const ro: TranslationKeys = {
     deleteAccountSub: 'Elimină definitiv contul tău și toate datele tale',
   },
 
+  // ── Report sheet ──
+  report: {
+    title: 'Raportează conținut',
+    subtitle: 'Ajută-ne să menținem comunitatea în siguranță. Rapoartele merg la moderatorul nostru și rămân private.',
+    reasonLabel: 'De ce raportezi?',
+    reasonSpam: 'Spam',
+    reasonHarassment: 'Hărțuire',
+    reasonHate: 'Discurs instigator la ură',
+    reasonSexual: 'Conținut sexual',
+    reasonViolence: 'Violență sau amenințări',
+    reasonIllegal: 'Activitate ilegală',
+    reasonOther: 'Altceva',
+    detailsLabel: 'Detalii suplimentare (opțional)',
+    detailsPlaceholder: 'Ce ar trebui să știm despre acest raport?',
+    submit: 'Trimite raportul',
+    successTitle: 'Raport primit',
+    successMessage: 'Mulțumim — vom analiza în 48 de ore.',
+    errorTitle: 'Trimiterea a eșuat',
+    errorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+    alreadyReported: 'Ai raportat deja acest conținut.',
+  },
+
+  // ── Blocked users screen ──
+  blockedUsers: {
+    title: 'Utilizatori blocați',
+    profileRowSub: 'Gestionează utilizatorii blocați din feed',
+    loading: 'Se încarcă…',
+    loadError: 'Nu s-a putut încărca lista de utilizatori blocați.',
+    emptyTitle: 'Niciun utilizator blocat',
+    emptyMessage: 'Când blochezi pe cineva, postările, pericolele și comentariile sale vor fi ascunse de tine aici și în aplicație.',
+    blockedAt: 'Blocat la {{date}}',
+    unblock: 'Deblochează',
+    unblockConfirmTitle: 'Deblochezi acest utilizator?',
+    unblockConfirmMessage: 'Conținutul lui {{name}} va reapărea în feed-ul tău.',
+    errorTitle: 'Deblocarea a eșuat',
+    errorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+  },
+
   // ── Onboarding analytics consent ──
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
@@ -378,6 +416,16 @@ export const ro: TranslationKeys = {
     minsAgo: 'acum {{count}}m',
     hoursAgo: 'acum {{count}}h',
     daysAgo: 'acum {{count}}z',
+    // Meniu moderare (apăsare lungă) — compliance plan item 7
+    moderationMenu: 'Ce vrei să faci?',
+    report: 'Raportează',
+    blockUser: 'Blochează utilizator',
+    longPressHint: 'Apasă lung pentru mai multe opțiuni',
+    blockConfirmTitle: 'Blochezi acest utilizator?',
+    blockConfirmMessage: 'Nu vei mai vedea postări, pericole sau comentarii de la {{name}}.',
+    blockErrorTitle: 'Blocarea a eșuat',
+    blockErrorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+    hiddenAfterAction: 'Ascuns — reîmprospătează feed-ul pentru alte postări.',
   },
 
   // ── Hazard Reporting ──

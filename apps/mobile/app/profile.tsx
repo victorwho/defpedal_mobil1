@@ -737,6 +737,23 @@ export default function ProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color={gray[400]} />
             </Pressable>
 
+            {user && !isAnonymous ? (
+              <Pressable
+                style={styles.helpFaqRow}
+                onPress={() => router.push('/blocked-users' as any)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('blockedUsers.title')}
+              >
+                <Ionicons name="ban-outline" size={22} color={colors.accent} />
+                <View style={styles.settingTextCol}>
+                  <Text style={styles.settingLabel}>{t('blockedUsers.title')}</Text>
+                  <Text style={styles.settingDescription}>{t('blockedUsers.profileRowSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+              </Pressable>
+            ) : null}
+
             <Pressable
               style={styles.helpFaqRow}
               onPress={() => router.push('/faq' as any)}

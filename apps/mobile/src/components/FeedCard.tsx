@@ -2,15 +2,18 @@ import type { FeedItem, RouteOption } from '@defensivepedal/core';
 import { formatCo2Saved, formatDistance, formatDuration } from '@defensivepedal/core';
 import { Ionicons } from '@expo/vector-icons';
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTheme, type ThemeColors } from '../design-system';
+import { ReportSheet } from '../design-system/molecules/ReportSheet';
 import { safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 import { textBase, textLg, textSm, textXs } from '../design-system/tokens/typography';
 import { TierPill } from '../design-system/atoms/TierPill';
 import { riderTiers, type RiderTierKey } from '../design-system/tokens/tierColors';
+import { useBlockUser } from '../hooks/useBlockUser';
+import { useT } from '../hooks/useTranslation';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
 
@@ -21,6 +24,12 @@ type FeedCardProps = {
   onLove: (id: string, loved: boolean) => void;
   onPress: (id: string) => void;
   onUserPress?: (userId: string) => void;
+  /**
+   * Currently authenticated user's id. Used to suppress moderation actions on
+   * the user's own cards (you can't usefully report or block yourself).
+   * Compliance plan item 7.
+   */
+  currentUserId?: string | null;
 };
 
 const formatRelativeTime = (isoDate: string): string => {
@@ -58,10 +67,14 @@ const getSafetyColor = (rating: number): string => {
   return safetyColors.danger;
 };
 
-export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUserPress }: FeedCardProps) => {
+export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUserPress, currentUserId }: FeedCardProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
+  const [optimisticallyHidden, setOptimisticallyHidden] = useState(false);
+  const blockMutation = useBlockUser();
   const syntheticRoute = useMemo(() => buildSyntheticRoute(item), [item]);
   const initials = item.user.displayName
     .split(' ')
@@ -76,8 +89,76 @@ export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUser
   const handleUserPress = useCallback(() => onUserPress?.(item.user.id), [item.user.id, onUserPress]);
   const handleToggleExpanded = useCallback(() => setExpanded((prev) => !prev), []);
 
+  // Moderation: long-press opens an action sheet (Alert with buttons works on
+  // both iOS + Android without an extra dep). Hidden when this card is the
+  // current user's own post — moderating yourself isn't useful.
+  const isOwnCard = currentUserId != null && currentUserId === item.user.id;
+  const handleLongPress = useCallback(() => {
+    if (isOwnCard) return;
+    Alert.alert(
+      item.user.displayName,
+      t('feedCard.moderationMenu'),
+      [
+        { text: t('feedCard.report'), onPress: () => setReportSheetVisible(true) },
+        {
+          text: t('feedCard.blockUser'),
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              t('feedCard.blockConfirmTitle'),
+              t('feedCard.blockConfirmMessage', { name: item.user.displayName }),
+              [
+                { text: t('common.cancel'), style: 'cancel' },
+                {
+                  text: t('feedCard.blockUser'),
+                  style: 'destructive',
+                  onPress: () => {
+                    setOptimisticallyHidden(true);
+                    blockMutation.mutate(item.user.id, {
+                      onError: () => {
+                        setOptimisticallyHidden(false);
+                        Alert.alert(t('feedCard.blockErrorTitle'), t('feedCard.blockErrorMessage'));
+                      },
+                    });
+                  },
+                },
+              ],
+            );
+          },
+        },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
+  }, [isOwnCard, item.user.displayName, item.user.id, t, blockMutation]);
+
+  // Once optimistically hidden (user just blocked the author or just reported),
+  // collapse the card to a single-line "hidden" notice so the action feels real
+  // immediately — the cache invalidation happens asynchronously.
+  if (optimisticallyHidden) {
+    return (
+      <View style={styles.hiddenCard} accessibilityRole="text" accessibilityLabel={t('feedCard.hiddenAfterAction')}>
+        <Ionicons name="eye-off-outline" size={18} color={colors.textSecondary} />
+        <Text style={styles.hiddenText}>{t('feedCard.hiddenAfterAction')}</Text>
+      </View>
+    );
+  }
+
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
+    <Pressable
+      style={styles.card}
+      onPress={handlePress}
+      onLongPress={isOwnCard ? undefined : handleLongPress}
+      accessibilityHint={isOwnCard ? undefined : t('feedCard.longPressHint')}
+    >
+      {!isOwnCard ? (
+        <ReportSheet
+          visible={reportSheetVisible}
+          onClose={() => setReportSheetVisible(false)}
+          targetType="trip_share"
+          targetId={item.id}
+          onReported={() => setOptimisticallyHidden(true)}
+        />
+      ) : null}
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.avatar}>
@@ -193,6 +274,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       backgroundColor: colors.bgSecondary,
       padding: space[4],
       gap: 10,
+    },
+    hiddenCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      borderRadius: radii.xl,
+      borderCurve: 'continuous',
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    hiddenText: {
+      ...textSm,
+      color: colors.textSecondary,
+      flex: 1,
     },
     header: {
       flexDirection: 'row',

@@ -210,6 +210,44 @@ export const en = {
     deleteAccountSub: 'Permanently remove your account and all your data',
   },
 
+  // ── Report sheet ──
+  report: {
+    title: 'Report content',
+    subtitle: 'Help us keep the community safe. Reports go to our moderator and stay private.',
+    reasonLabel: 'Why are you reporting this?',
+    reasonSpam: 'Spam',
+    reasonHarassment: 'Harassment',
+    reasonHate: 'Hate speech',
+    reasonSexual: 'Sexual content',
+    reasonViolence: 'Violence or threats',
+    reasonIllegal: 'Illegal activity',
+    reasonOther: 'Other',
+    detailsLabel: 'Additional details (optional)',
+    detailsPlaceholder: 'What should we know about this report?',
+    submit: 'Submit report',
+    successTitle: 'Report received',
+    successMessage: 'Thanks — we\'ll review this within 48 hours.',
+    errorTitle: 'Could not send report',
+    errorMessage: 'Please try again in a moment.',
+    alreadyReported: 'You have already reported this content.',
+  },
+
+  // ── Blocked users screen ──
+  blockedUsers: {
+    title: 'Blocked users',
+    profileRowSub: 'Manage who you have blocked from your feed',
+    loading: 'Loading…',
+    loadError: 'Could not load your blocked users.',
+    emptyTitle: 'No blocked users',
+    emptyMessage: 'When you block someone, their posts, hazards, and comments will be hidden from you here and across the app.',
+    blockedAt: 'Blocked {{date}}',
+    unblock: 'Unblock',
+    unblockConfirmTitle: 'Unblock this user?',
+    unblockConfirmMessage: '{{name}}\'s content will reappear in your feed.',
+    errorTitle: 'Could not unblock',
+    errorMessage: 'Please try again in a moment.',
+  },
+
   // ── Onboarding analytics consent ──
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
@@ -376,6 +414,16 @@ export const en = {
     minsAgo: '{{count}}m ago',
     hoursAgo: '{{count}}h ago',
     daysAgo: '{{count}}d ago',
+    // Moderation menu (long-press) — compliance plan item 7
+    moderationMenu: 'What would you like to do?',
+    report: 'Report',
+    blockUser: 'Block user',
+    longPressHint: 'Long-press for more options',
+    blockConfirmTitle: 'Block this user?',
+    blockConfirmMessage: 'You won\'t see posts, hazards, or comments from {{name}} anymore.',
+    blockErrorTitle: 'Could not block',
+    blockErrorMessage: 'Please try again in a moment.',
+    hiddenAfterAction: 'Hidden — refresh the feed to see other content.',
   },
 
   // ── Hazard Reporting ──
