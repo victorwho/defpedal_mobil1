@@ -2,7 +2,34 @@
 
 **Source plan:** `.claude/drafts/complianceplan.md` (442 lines, 14 items in 3 phases)
 **Audit date:** 2026-04-26
+**Last revised:** 2026-04-26 after pulling `origin/main` (PR #24 — design-system Phase 1+2 quality pass merged at `7b678ee`).
 **Audit scope:** all 14 items cross-referenced against current `main` branch state.
+
+## Revision notes (2026-04-26 second pass)
+
+PR #24 did not touch any compliance item directly, but:
+
+- **New building blocks now exist** that simplify 4 of the 14 items (see *Reusable building blocks* below).
+- **Two new lint rules** (`R1` no raw hex, `R7` no direct `Toggle` import in screens) and a **lint ratchet** (`apps/mobile/scripts/lint-ratchet.mjs` + `.eslint-baseline.json`) apply to every new file the plan adds. New compliance screens must use theme tokens and `SettingRow`, not raw hex / direct `Toggle`.
+- **Line-number drift** in `apps/mobile/app/profile.tsx`: Account section now starts at line 674 (was ~670), Sign out button at lines 763–786 (was 757–780).
+- **Compliance source branch unchanged** since 2026-04-25 (`b23eb24 docs(compliance): incorporate team answers`); the source plan we audited is current.
+- **`appStore.resetUserScopedState` semantics changed** (`appStore.ts:713–731`): `onboardingCompleted` now persists across sign-out (device-scoped, not user-scoped). The new `analyticsConsent` field for item 8 should make the same device-vs-user decision explicitly — see item 8 update.
+
+## Reusable building blocks (new since plan v1)
+
+These should be composed instead of building from scratch:
+
+| Building block | Path | Used by which item |
+|---|---|---|
+| `BottomSheet` organism | `apps/mobile/src/design-system/organisms/BottomSheet.tsx` | Item 7 (`ReportSheet` composes this) |
+| `Modal` organism | `apps/mobile/src/design-system/organisms/Modal.tsx` | Item 1 (delete-account confirm); item 7 (unblock confirm) |
+| `useHaptics` hook | `apps/mobile/src/design-system/hooks/useHaptics.ts` | Item 1 (destructive haptic on delete confirm); item 7 (report submit, block toggle) |
+| `useReducedMotion` hook | `apps/mobile/src/design-system/hooks/useReducedMotion.ts` | Item 7 (`ReportSheet` enter/exit) |
+| `SettingRow` molecule | `apps/mobile/src/design-system/molecules/SettingRow.tsx` | Item 8 (consent toggles in profile); item 13 (`keepFullGpsHistory` toggle) — **mandatory** under R7 |
+| ESLint R1 (no raw hex in `apps/mobile/app/**`) | `apps/mobile/.eslintrc.cjs` | All new screens — use `useTheme().colors.*`, never `'#FF…'` |
+| ESLint R7 (no direct `Toggle` in screens) | `apps/mobile/.eslintrc.cjs` | All new screens that need a boolean — use `SettingRow` |
+| Lint ratchet | `apps/mobile/scripts/lint-ratchet.mjs` + `.eslint-baseline.json` | Every new file must not add baseline entries — fix lint at write-time |
+
 
 ---
 
@@ -42,7 +69,7 @@
 **Already in place:**
 - `supabase/migrations/202604200001_cascade_user_fks.sql` adds `ON DELETE CASCADE` to 14 user-owned FKs. Calling `supabaseAdmin.auth.admin.deleteUser(uid)` will already cascade-delete `trips`, `hazard_validations`, `ride_impacts`, `streak_state`, `user_badges`, `user_quiz_history`, `user_follows` (both sides), `quiz_answers`, `xp_events`, `leaderboard_snapshots`, `mia_journey_events`, plus profile and push token FKs the migration covers.
 - `requireFullUser` middleware in `services/mobile-api/src/lib/auth.ts:109` already rejects anonymous users.
-- `app/profile.tsx:757–780` has the "Sign out" Account row that the new "Delete account" row will sit beneath.
+- `app/profile.tsx:763–786` has the "Sign out" Account row that the new "Delete account" row will sit beneath. Account section header at line 674. *(Updated post-PR-#24.)*
 
 **Missing:**
 - DB migration to verify cascade coverage for tables not in `202604200001_cascade_user_fks.sql`: `trip_tracks`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `hazards`, `rider_xp_log`, `push_tokens`, `profiles`. **Audit each** — some already cascade via FK to `profiles(user_id)`, others do not. Add missing constraints in **new migration** `supabase/migrations/202604260001_account_deletion_coverage.sql` (or fold into the cascade function below).
@@ -50,8 +77,8 @@
 - API route: `services/mobile-api/src/routes/v1.ts` — new `DELETE /v1/profile` with `requireFullUser`, body `{ confirmation: 'DELETE' }`, calls `delete_user_cascade(user.id)` then `supabaseAdmin.auth.admin.deleteUser(user.id)`.
 - API tests: new file `services/mobile-api/src/__tests__/account-deletion.test.ts` — success, anonymous → 403, missing confirmation → 400, RPC failure → 500 with no orphaned rows.
 - Mobile API client: extend `apps/mobile/src/lib/api.ts` with `deleteAccount({ confirmation })`.
-- Mobile screen: `apps/mobile/app/delete-account.tsx` — explanation + "type DELETE to confirm" + on success: `signOut()`, clear AsyncStorage + MMKV (the app uses both), route to `/auth`.
-- Mobile profile entry: `apps/mobile/app/profile.tsx` — add `SettingRow` "Delete account" (red `colors.danger`) inside Account section, after Sign out.
+- Mobile screen: `apps/mobile/app/delete-account.tsx` — explanation + "type DELETE to confirm" + on success: `signOut()`, clear AsyncStorage + MMKV (the app uses both), route to `/auth`. Compose `Modal` organism for the final confirm step; use `useHaptics().notificationAsync('warning')` on the confirm tap. Theme tokens only (R1). The `signOut()` call must trigger `appStore.resetUserScopedState()` — note that `onboardingCompleted` will *not* reset post-PR-#24, which is fine for delete-account (the user is leaving anyway, not re-onboarding).
+- Mobile profile entry: `apps/mobile/app/profile.tsx` — add `SettingRow` "Delete account" (red, via theme `colors.danger`) inside Account section. Insert immediately before line 763 (above Sign out) or after — UX call. **Must be `SettingRow`, not raw `<Pressable>` with hex** (R1, R7).
 - FAQ entry: `apps/mobile/app/faq.tsx` — new Q&A in Privacy & Data section (delivered together with item 3 below).
 - i18n strings: `apps/mobile/src/i18n/en.ts` + `ro.ts` — `profile.deleteAccount`, `profile.deleteAccountWarning`, `profile.deleteAccountConfirm`, etc.
 - Web fallback: `apps/web/app/account-deletion/page.tsx` — static page describing the same flow with screenshots, contact mailbox for users who can't open the app.
@@ -168,7 +195,7 @@
 - `apps/mobile/app/faq.tsx:140–147` — rewrite the answer to truthfully describe: GPS breadcrumbs uploaded for trip history & community sharing; hazard reports include coordinate + optional text + visible username; account deletion (link to item 1) removes everything.
 - New FAQ Q&A: "How do I delete my account?" — link to in-app delete flow.
 - New screen: `apps/mobile/app/legal.tsx` — list of "Privacy policy", "Terms", "Cookie policy" rows that open the web URLs in `expo-web-browser`. Use `useLocale()` to choose `…/ro/privacy` vs `…/privacy`.
-- `apps/mobile/app/profile.tsx` Account section — add two rows ("Privacy policy", "Terms") above the "Help & FAQ" row at line 725.
+- `apps/mobile/app/profile.tsx` Account section — add two rows ("Privacy policy", "Terms") inside the section that begins at line 674. (The "Help & FAQ" row was at ~725 pre-PR-#24; recheck after the design-pass shifts before placing.)
 - `apps/mobile/app/auth.tsx` — add a footer "By continuing you agree to our Terms and Privacy Policy" with two `Pressable` linkified phrases that open `expo-web-browser` **before** the sign-in button (currently no such footer per Grep audit).
 - `apps/mobile/app/onboarding/index.tsx` (location permission screen) — add inline link to privacy policy.
 - i18n keys: `legal.privacyTitle`, `legal.termsTitle`, `auth.legalAgreement`, `auth.privacyLink`, `auth.termsLink`, `faq.privacyShared.question`, `faq.privacyShared.answer`, `faq.deleteAccount.question`, `faq.deleteAccount.answer` — all in `en.ts` + `ro.ts`.
@@ -257,7 +284,7 @@
 - API tests: `services/mobile-api/src/__tests__/moderation.test.ts` — report flow, block flow, filter visibility, anonymous rejection.
 
 **Missing — mobile:**
-- `apps/mobile/src/design-system/molecules/ReportSheet.tsx` — bottom sheet with reason picker (spam, harassment, hate, sexual, violence, illegal, other) + free-text details (≤500 chars).
+- `apps/mobile/src/design-system/molecules/ReportSheet.tsx` — bottom sheet with reason picker (spam, harassment, hate, sexual, violence, illegal, other) + free-text details (≤500 chars). **Compose the new `BottomSheet` organism** at `apps/mobile/src/design-system/organisms/BottomSheet.tsx` (added by PR #24) instead of building PanResponder-based dismiss logic from scratch. Use `useReducedMotion` for enter/exit. Use `useHaptics().selectionAsync()` on reason pick and `notificationAsync('success')` on submit.
 - `apps/mobile/src/components/FeedCard.tsx` — long-press → overflow menu with "Report" / "Block user".
 - Same overflow on comment row in `apps/mobile/app/community-trip.tsx`.
 - Same overflow on `apps/mobile/src/design-system/organisms/HazardDetailSheet.tsx`.
@@ -295,7 +322,7 @@
 
 **Missing:**
 - New onboarding screen `apps/mobile/app/onboarding/consent.tsx` — two toggles ("Share crash reports" → Sentry, "Share product analytics" → PostHog), default off in EU. Insert in `apps/mobile/app/onboarding/_layout.tsx` flow between location and signup.
-- Zustand: extend `apps/mobile/src/store/appStore.ts` with `analyticsConsent: { sentry: boolean; posthog: boolean; capturedAt: string | null }`. Persist it.
+- Zustand: extend `apps/mobile/src/store/appStore.ts` with `analyticsConsent: { sentry: boolean; posthog: boolean; capturedAt: string | null }`. Persist it. **Decide explicitly: device-scoped or user-scoped.** Per the PR-#24 update to `resetUserScopedState` (lines 713–731), `onboardingCompleted` is now device-scoped (does not reset on sign-out). Recommend `analyticsConsent` follow the same pattern (device-scoped — analytics consent is about the install, not the account) — exclude from `resetUserScopedState`. Document the choice in the same comment block.
 - `apps/mobile/src/lib/telemetry.ts` — wrap `Sentry.init` and `createPostHogClient()` in consent checks. Read Zustand state synchronously inside `initializeTelemetry`. Re-evaluate whenever the consent toggles change (provider effect).
 - `apps/mobile/src/providers/TelemetryProvider.tsx` — subscribe to Zustand consent slice; init/teardown when toggles flip.
 - New screen `apps/mobile/app/privacy-analytics.tsx` (linked from Profile → Account) — surface the same toggles post-onboarding.
@@ -505,6 +532,17 @@
 ---
 
 ## Cross-cutting concerns
+
+### ESLint baseline + ratchet (new since PR #24)
+
+Every new screen / molecule / hook this plan adds must pass the lint ratchet — i.e. **must not add new entries to `apps/mobile/.eslint-baseline.json`**. Two rules to watch:
+
+- **R1 (`no-restricted-syntax` for raw hex):** No `'#FFFFFF'`, `'#fff'`, `rgba(…)`, `rgb(…)` literals in `apps/mobile/app/**`. Use `useTheme().colors.*`, `useSafetyColor('danger')`, or `surfaceTints`. Exceptions only for Mapbox layer style objects and intentional white-on-dark map overlay cards (with inline `// eslint-disable-next-line` + rationale).
+- **R7 (no direct `Toggle` import in screens):** All screen-level boolean settings must use `<SettingRow>` from `apps/mobile/src/design-system/molecules/SettingRow.tsx`. Rules in `apps/mobile/.eslintrc.cjs`; doc in `apps/mobile/LINT.md`.
+
+Items affected: 1 (delete-account screen), 3 (legal screen), 7 (blocked-users screen, ReportSheet molecule), 8 (consent screen, privacy-analytics screen), 13 (full-GPS-history toggle in profile).
+
+Run `cd apps/mobile && npm run lint:ratchet` after every new file to confirm baseline is not regressed.
 
 ### Locale (`ro` translations)
 
