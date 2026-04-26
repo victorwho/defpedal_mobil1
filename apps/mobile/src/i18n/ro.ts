@@ -212,6 +212,34 @@ export const ro: TranslationKeys = {
     deleteAccountSub: 'Elimină definitiv contul tău și toate datele tale',
   },
 
+  // ── Onboarding analytics consent ──
+  onboardingConsent: {
+    eyebrow: 'Defensive Pedal',
+    title: 'Ajută-ne să ne îmbunătățim, în condițiile tale',
+    subtitle: 'Aceste opțiuni sunt opționale și dezactivate implicit. Le poți schimba oricând din Profil → Confidențialitate & analiză.',
+    crashLabel: 'Trimite rapoarte de eroare',
+    crashDescription: 'Ne ajută să remediem erorile mai rapid. Fără date personale — doar urmele stivei și informații despre dispozitiv.',
+    analyticsLabel: 'Trimite analize de produs',
+    analyticsDescription: 'Date agregate de utilizare pentru a prioritiza funcționalitățile potrivite. Fără urmărire de locație.',
+    assurance: 'Nicio urmărire până când nu alegi tu. Nu vindem niciodată datele tale.',
+    continue: 'Continuă',
+    changeLater: 'Poți schimba mai târziu din Profil.',
+  },
+
+  // ── Privacy & Analytics settings screen ──
+  privacyAnalytics: {
+    title: 'Confidențialitate & analiză',
+    profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
+    intro: 'Ambele opțiuni sunt dezactivate implicit. Comută independent — dezactivarea oricăreia oprește imediat evenimentele noi.',
+    crashLabel: 'Trimite rapoarte de eroare',
+    crashDescription: 'Urme ale stivei și informații despre dispozitiv când aplicația se blochează. Fără date de locație.',
+    analyticsLabel: 'Trimite analize de produs',
+    analyticsDescription: 'Evenimente de utilizare anonime pentru a livra ce contează. Fără trasee GPS.',
+    crashUnavailable: 'Raportarea erorilor nu este configurată în acest build.',
+    analyticsUnavailable: 'Analiza produsului nu este configurată în acest build.',
+    assurance: 'Când un comutator este oprit, nu se trimit evenimente pe acel canal. Nu vindem niciodată datele tale.',
+  },
+
   // ── Delete account screen ──
   deleteAccount: {
     title: 'Șterge contul',

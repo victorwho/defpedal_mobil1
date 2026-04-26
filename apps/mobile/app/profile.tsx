@@ -724,6 +724,21 @@ export default function ProfileScreen() {
 
             <Pressable
               style={styles.helpFaqRow}
+              onPress={() => router.push('/privacy-analytics' as any)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('privacyAnalytics.title')}
+            >
+              <Ionicons name="analytics-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>{t('privacyAnalytics.title')}</Text>
+                <Text style={styles.settingDescription}>{t('privacyAnalytics.profileRowSub')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
+
+            <Pressable
+              style={styles.helpFaqRow}
               onPress={() => router.push('/faq' as any)}
               accessible={true}
               accessibilityRole="button"

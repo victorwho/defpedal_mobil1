@@ -148,6 +148,11 @@ const FAQ_SECTIONS: FaqSection[] = [
         answer:
           'Open Profile, scroll to the Account section, and tap Delete account. You\'ll be asked to type DELETE to confirm. On confirmation, we permanently remove your trips, GPS history, hazard reports, comments, likes, badges, XP and profile from our servers. Community-visible content you posted (such as a hazard you flagged or a comment you wrote) is anonymised \u2014 the post stays so the community signal is preserved, but your name and account are gone.',
       },
+      {
+        question: 'Do you collect crash reports or product analytics?',
+        answer:
+          'Only if you opt in. During onboarding we ask whether you want to share crash reports and product analytics \u2014 both default off. You can change these toggles anytime in Profile \u2192 Privacy & analytics; turning either off stops new events immediately. Crash reports include stack traces and device info but never your location. Product analytics is aggregated usage data with no GPS tracks. We never sell your data.',
+      },
     ],
   },
 ];

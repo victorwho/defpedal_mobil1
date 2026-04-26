@@ -210,6 +210,34 @@ export const en = {
     deleteAccountSub: 'Permanently remove your account and all your data',
   },
 
+  // ── Onboarding analytics consent ──
+  onboardingConsent: {
+    eyebrow: 'Defensive Pedal',
+    title: 'Help us improve, on your terms',
+    subtitle: 'These are optional and off by default. You can change them anytime in Profile → Privacy & analytics.',
+    crashLabel: 'Share crash reports',
+    crashDescription: 'Helps us fix bugs faster. No personal data — just stack traces and device info.',
+    analyticsLabel: 'Share product analytics',
+    analyticsDescription: 'Aggregated usage data so we can prioritise the right features. No location tracking.',
+    assurance: 'No tracking until you choose. We never sell your data.',
+    continue: 'Continue',
+    changeLater: 'You can change these later in Profile.',
+  },
+
+  // ── Privacy & Analytics settings screen ──
+  privacyAnalytics: {
+    title: 'Privacy & analytics',
+    profileRowSub: 'Crash reports and product analytics preferences',
+    intro: 'Both options are off by default. Toggle each one independently — turning either off stops new events immediately.',
+    crashLabel: 'Share crash reports',
+    crashDescription: 'Stack traces and device info when the app crashes. No location data.',
+    analyticsLabel: 'Share product analytics',
+    analyticsDescription: 'Anonymised usage events so we can ship the right things. No GPS tracks.',
+    crashUnavailable: 'Crash reporting is not configured in this build.',
+    analyticsUnavailable: 'Product analytics is not configured in this build.',
+    assurance: 'When a switch is off, no events are sent for that channel. We never sell your data.',
+  },
+
   // ── Delete account screen ──
   deleteAccount: {
     title: 'Delete account',

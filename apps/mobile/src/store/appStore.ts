@@ -89,6 +89,17 @@ type AppStore = QueueSlice & {
   quietHoursStart: string;
   quietHoursEnd: string;
   onboardingCompleted: boolean;
+  // Analytics consent — captured during onboarding, surfaceable post-onboarding
+  // via Profile → Privacy & Analytics. Device-scoped (not reset on signOut)
+  // because the consent decision is about this install, not this account.
+  // capturedAt = null means the user has not been asked yet (default: telemetry
+  // off, no events fire). Once captured, both flags are independent.
+  analyticsConsent: {
+    sentry: boolean;
+    posthog: boolean;
+    capturedAt: string | null;
+  };
+  setAnalyticsConsent: (consent: { sentry: boolean; posthog: boolean }) => void;
   cyclingGoal: CyclingGoal | null;
   cachedStreak: StreakState | null;
   cachedImpact: {
@@ -258,6 +269,7 @@ export const useAppStore = create<AppStore>()(
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
       onboardingCompleted: false,
+      analyticsConsent: { sentry: false, posthog: false, capturedAt: null },
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
@@ -390,6 +402,14 @@ export const useAppStore = create<AppStore>()(
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
+      setAnalyticsConsent: (consent) =>
+        set(() => ({
+          analyticsConsent: {
+            sentry: consent.sentry,
+            posthog: consent.posthog,
+            capturedAt: new Date().toISOString(),
+          },
+        })),
       incrementAnonymousOpenCount: () =>
         set((state) => ({ anonymousOpenCount: state.anonymousOpenCount + 1 })),
       resetAnonymousOpenCount: () =>
@@ -775,6 +795,7 @@ export const useAppStore = create<AppStore>()(
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
         onboardingCompleted: state.onboardingCompleted,
+        analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,
         cachedStreak: state.cachedStreak,
         cachedImpact: state.cachedImpact,
