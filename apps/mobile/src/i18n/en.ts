@@ -128,6 +128,8 @@ export const en = {
     sectionDisplay: 'Display',
     sectionAccount: 'Account',
     tapToSignIn: 'Tap to sign in',
+    signInOrUp: 'Sign in or create account',
+    signInOrUpSub: 'Save your rides, badges, and progress',
     signOut: 'Sign Out',
     setUsername: 'Set username',
     changeUsername: 'Change username',

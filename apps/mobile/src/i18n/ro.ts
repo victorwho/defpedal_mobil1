@@ -130,6 +130,8 @@ export const ro: TranslationKeys = {
     sectionDisplay: 'Afișare',
     sectionAccount: 'Cont',
     tapToSignIn: 'Apasă pentru a te conecta',
+    signInOrUp: 'Conectează-te sau creează cont',
+    signInOrUpSub: 'Salvează cursele, insignele și progresul',
     signOut: 'Deconectare',
     setUsername: 'Setează nume utilizator',
     changeUsername: 'Schimbă nume utilizator',

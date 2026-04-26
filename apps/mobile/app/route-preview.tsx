@@ -41,7 +41,7 @@ import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useTheme, type ThemeColors } from '../src/design-system';
-import { surfaceTints } from '../src/design-system/tokens/tints';
+import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -939,20 +939,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingVertical: space[3],
       borderRadius: radii.lg,
       borderWidth: 1,
-      borderColor: 'rgba(34, 197, 94, 0.3)',
-      backgroundColor: 'rgba(34, 197, 94, 0.08)',
+      borderColor: safetyTints.safeBorder,
+      backgroundColor: safetyTints.safeLight,
     },
     comparisonText: {
       ...textSm,
       fontFamily: fontFamily.heading.bold,
-      color: '#22C55E',
+      color: colors.safe,
     },
     comparisonBadgeWarning: {
-      borderColor: 'rgba(245, 158, 11, 0.3)',
-      backgroundColor: 'rgba(245, 158, 11, 0.08)',
+      borderColor: safetyTints.cautionBorder,
+      backgroundColor: safetyTints.cautionLight,
     },
     comparisonTextWarning: {
-      color: '#F59E0B',
+      color: colors.caution,
     },
     switchToSafeButton: {
       flexDirection: 'row',
@@ -963,13 +963,13 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingVertical: space[3],
       borderRadius: radii.lg,
       borderWidth: 1,
-      borderColor: 'rgba(34, 197, 94, 0.4)',
-      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+      borderColor: safetyTints.safeBorderStrong,
+      backgroundColor: safetyTints.safeLight,
     },
     switchToSafeText: {
       ...textSm,
       fontFamily: fontFamily.heading.bold,
-      color: '#22C55E',
+      color: colors.safe,
     },
     warningPanel: {
       borderRadius: radii['2xl'],
@@ -1149,7 +1149,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     offlineProgressTrack: {
       height: 6,
       borderRadius: radii.full,
-      backgroundColor: 'rgba(15, 23, 42, 0.12)',
+      backgroundColor: surfaceTints.trackDim,
       overflow: 'hidden',
     },
     offlineProgressFill: {

@@ -15,9 +15,11 @@ import { useAppStore } from '../src/store/appStore';
 
 import { useTheme } from '../src/design-system/ThemeContext';
 import { Button, Badge } from '../src/design-system/atoms';
+import { safetyColors } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
+import { brandTints, surfaceTints } from '../src/design-system/tokens/tints';
 import {
   fontFamily,
   textBase,
@@ -55,9 +57,9 @@ const formatTimeAgo = (date: Date): string => {
 
 /** Get storage bar color based on usage fraction. */
 const getStorageColor = (fraction: number): string => {
-  if (fraction < 0.5) return '#22C55E'; // green
-  if (fraction < 0.8) return '#F59E0B'; // amber
-  return '#EF4444'; // red
+  if (fraction < 0.5) return safetyColors.safe;
+  if (fraction < 0.8) return safetyColors.caution;
+  return safetyColors.danger;
 };
 
 function MetricBlock({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
@@ -67,13 +69,13 @@ function MetricBlock({ label, value, emphasis = false }: { label: string; value:
     <View
       style={[
         styles.metricBlock,
-        { backgroundColor: emphasis ? 'rgba(250, 204, 21, 0.14)' : 'rgba(15, 23, 42, 0.08)' },
+        { backgroundColor: emphasis ? brandTints.accentMedium : surfaceTints.trackDim },
       ]}
     >
       <Text
         style={[
           styles.metricLabel,
-          { color: emphasis ? '#fef3c7' : colors.textMuted },
+          { color: emphasis ? colors.accentText : colors.textMuted },
         ]}
       >
         {label}
@@ -444,7 +446,7 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: space[2] + 2, // 10
     borderRadius: radii.full,
-    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+    backgroundColor: surfaceTints.trackDim,
     overflow: 'hidden',
   },
   progressFill: {
@@ -471,7 +473,7 @@ const styles = StyleSheet.create({
   storageBarTrack: {
     height: space[2] + 2,
     borderRadius: radii.full,
-    backgroundColor: 'rgba(15, 23, 42, 0.12)',
+    backgroundColor: surfaceTints.trackDim,
     overflow: 'hidden',
   },
   storageBarFill: {

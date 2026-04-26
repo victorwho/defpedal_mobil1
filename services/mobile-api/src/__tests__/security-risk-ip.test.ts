@@ -240,6 +240,60 @@ describe('Unauthenticated access blocked on risk endpoints', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 1b. Anonymous Supabase users may read /v1/risk-map (onboarding exception)
+//     The other 3 risk endpoints still require a full OAuth user.
+// ---------------------------------------------------------------------------
+
+describe('Anonymous user access on /v1/risk-map (onboarding preview)', () => {
+  const anonAuthHeaders = { authorization: `Bearer ${TEST_TOKEN}` };
+
+  it('GET /v1/risk-map: anonymous Supabase user passes the auth gate', async () => {
+    // Anonymous users have a Supabase user id but no email. The handler must
+    // accept them — the safety-score onboarding screen renders BEFORE signup.
+    const app = buildTestApp({
+      authenticateUser: vi.fn().mockResolvedValue({ id: 'anon-user-1', email: null }),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/risk-map?lat=44.4&lon=26.1',
+      headers: anonAuthHeaders,
+    });
+
+    // In the test env supabaseAdmin is null, so the handler throws 502 after
+    // passing auth. The relevant assertion is that we DON'T get 403
+    // ("Full account required") — that would indicate auth was rejecting
+    // anonymous users, which is the bug this test guards against.
+    expect(response.statusCode).not.toBe(403);
+    expect(response.statusCode).not.toBe(401);
+    expect([200, 502]).toContain(response.statusCode);
+
+    await app.close();
+  });
+
+  it('POST /v1/routes/preview: anonymous user is still rejected (403)', async () => {
+    // Read-only risk-map relaxation MUST NOT leak to the other risk endpoints.
+    const app = buildTestApp({
+      authenticateUser: vi.fn().mockResolvedValue({ id: 'anon-user-1', email: null }),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/routes/preview',
+      headers: anonAuthHeaders,
+      payload: { origin: { lat: 44.4, lon: 26.1 }, destination: { lat: 44.5, lon: 26.2 }, mode: 'safe' },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().code).toBe('UNAUTHORIZED');
+
+    await app.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 2. Authenticated access works correctly
 // ---------------------------------------------------------------------------
 

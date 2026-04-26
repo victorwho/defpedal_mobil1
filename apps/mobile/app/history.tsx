@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { StatsDashboard } from '../src/components/StatsDashboard';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { TripCard } from '../src/design-system/organisms/TripCard';
+import { Surface } from '../src/design-system/atoms/Card';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -240,11 +241,11 @@ export default function HistoryScreen() {
 
         {/* Your Impact link */}
         {user ? (
-          <Pressable
-            style={styles.impactCard}
+          <Surface
+            variant="accent"
             onPress={() => router.push('/impact-dashboard')}
-            accessibilityRole="button"
             accessibilityLabel={t('history.yourImpact') ?? 'Your Impact'}
+            style={styles.impactCard}
           >
             <View style={styles.quizCardLeft}>
               <Ionicons name="trending-up-outline" size={22} color={colors.accent} />
@@ -254,17 +255,15 @@ export default function HistoryScreen() {
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
         ) : null}
 
         {/* Help & FAQ */}
         {user ? (
-          <Pressable
-            style={styles.quizCard}
+          <Surface
             onPress={() => router.push('/faq')}
-            accessible={true}
-            accessibilityRole="button"
             accessibilityLabel={t('settings.helpFaq')}
+            style={styles.quizCard}
           >
             <View style={styles.quizCardLeft}>
               <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
@@ -274,17 +273,15 @@ export default function HistoryScreen() {
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
         ) : null}
 
         {/* Daily Safety Quiz */}
         {user ? (
-          <Pressable
-            style={styles.quizCard}
+          <Surface
             onPress={() => router.push('/daily-quiz')}
-            accessible={true}
-            accessibilityRole="button"
             accessibilityLabel={t('history.dailyQuiz')}
+            style={styles.quizCard}
           >
             <View style={styles.quizCardLeft}>
               <Ionicons name="help-circle-outline" size={22} color={colors.accent} />
@@ -294,7 +291,7 @@ export default function HistoryScreen() {
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
         ) : null}
 
         {/* Stats Dashboard (route mode split, etc.) */}
@@ -508,23 +505,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.accent,
-      padding: space[4],
-      ...shadows.md,
     },
     quizCard: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      ...shadows.md,
     },
     quizCardLeft: {
       flexDirection: 'row',

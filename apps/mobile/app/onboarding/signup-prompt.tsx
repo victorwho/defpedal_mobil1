@@ -10,6 +10,7 @@ import { gray } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
+import { brandTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
@@ -216,7 +217,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 220,
       height: 220,
       borderRadius: 9999,
-      backgroundColor: 'rgba(250, 204, 21, 0.14)',
+      backgroundColor: brandTints.accentMedium,
       opacity: 0.6,
     },
     headerSection: {
@@ -300,13 +301,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 24,
       height: 24,
       borderRadius: 12,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: gray[50],
       alignItems: 'center',
       justifyContent: 'center',
     },
     googleG: {
       fontFamily: fontFamily.body.bold,
       fontSize: 14,
+      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
       color: '#4285F4',
       marginTop: -1,
     },
@@ -333,7 +335,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     errorText: {
       ...textSm,
-      color: '#F87171',
+      color: colors.danger,
       textAlign: 'center',
       lineHeight: 20,
     },

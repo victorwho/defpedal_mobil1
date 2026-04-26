@@ -261,6 +261,8 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - Right overlay for floating control buttons
 
 ### Design System
+- **Rules of the road:** [`docs/design-context.md`](../docs/design-context.md) — theme direction, token rules, motion rules, haptic map, accent discipline, accessibility gates, explicit drops. Read this before any visual change.
+- **Active plan:** [`docs/plans/design-audit-implementation.md`](../docs/plans/design-audit-implementation.md) — P1-30 Design Quality Pass, 8-week phased sequencing.
 - Dark/light/system theme via `ThemeProvider` + `useTheme()` hook. User picks in Profile > Display (3-pill picker: Dark / Light / System). Persisted in Zustand as `themePreference`
 - All 30 screens + key components (Screen, MapStageScreen, SettingRow, Toggle, TripCard, FeedCard, CommunityStatsCard, ElevationChart) use `createThemedStyles(colors)` factory pattern
 - Forces dark theme during NAVIGATING state (glare reduction, battery, safety contrast)

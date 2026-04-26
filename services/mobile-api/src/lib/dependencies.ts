@@ -12,7 +12,7 @@ import {
   type RateLimitPolicies,
 } from './rateLimit';
 import { createRedisSharedStore } from './redisStore';
-import { fetchRiskSegments } from './risk';
+import { enrichRiskGeoJson, fetchRiskSegments } from './risk';
 import {
   finishTripRecord,
   getTripHistory,
@@ -35,6 +35,7 @@ export type MobileApiDependencies = {
   getElevationProfile: typeof getElevationProfile;
   getElevationGain: typeof getElevationGain;
   fetchRiskSegments: typeof fetchRiskSegments;
+  enrichRiskGeoJson: typeof enrichRiskGeoJson;
   normalizeRoutePreviewResponse: typeof normalizeRoutePreviewResponse;
   submitHazardReport: typeof submitHazardReport;
   startTripRecord: typeof startTripRecord;
@@ -82,6 +83,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     getElevationProfile,
     getElevationGain,
     fetchRiskSegments,
+    enrichRiskGeoJson,
     normalizeRoutePreviewResponse,
     submitHazardReport,
     startTripRecord,

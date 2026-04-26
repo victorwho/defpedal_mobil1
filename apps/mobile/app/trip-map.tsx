@@ -9,6 +9,7 @@ import { BackButton } from '../src/design-system/atoms/BackButton';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
+import { surfaceTints } from '../src/design-system/tokens/tints';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
@@ -87,6 +88,15 @@ export default function TripMapScreen() {
   );
 }
 
+/**
+ * Map overlay surfaces (recenter FAB) intentionally use white regardless of theme —
+ * they sit on the dark Mapbox style and rely on shadows for elevation against
+ * light-mode bgDeep too.
+ * See docs/design-context.md §2 (token rules — exception #1).
+ */
+// eslint-disable-next-line no-restricted-syntax
+const MAP_OVERLAY_BG = '#FFFFFF';
+
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     root: {
@@ -106,11 +116,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: MAP_OVERLAY_BG,
       alignItems: 'center',
       justifyContent: 'center',
       elevation: 4,
-      shadowColor: '#000',
+      shadowColor: gray[900],
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.25,
       shadowRadius: 4,
@@ -123,7 +133,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       fontFamily: fontFamily.body.bold,
       color: colors.textPrimary,
-      backgroundColor: 'rgba(17, 24, 39, 0.8)',
+      backgroundColor: surfaceTints.glass,
       paddingHorizontal: space[3],
       paddingVertical: space[1],
       borderRadius: 12,

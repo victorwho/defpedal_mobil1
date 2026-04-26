@@ -11,6 +11,7 @@ import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
+import { brandTints, surfaceTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   textBase,
@@ -191,22 +192,22 @@ export default function OnboardingSafetyScoreScreen() {
 
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#4CAF50' }]}>{safeCount}</Text>
+                <Text style={[styles.statValue, { color: colors.safe }]}>{safeCount}</Text>
                 <Text style={styles.statLabel}>safe</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#FFEB3B' }]}>{averageCount}</Text>
+                <Text style={[styles.statValue, { color: colors.accent }]}>{averageCount}</Text>
                 <Text style={styles.statLabel}>average</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#FF9800' }]}>{riskyCount}</Text>
+                <Text style={[styles.statValue, { color: colors.caution }]}>{riskyCount}</Text>
                 <Text style={styles.statLabel}>risky</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: '#F44336' }]}>{veryRiskyCount}</Text>
+                <Text style={[styles.statValue, { color: colors.danger }]}>{veryRiskyCount}</Text>
                 <Text style={styles.statLabel}>v.risky</Text>
               </View>
             </View>
@@ -237,7 +238,7 @@ const createThemedStyles = (colors: ThemeColors) =>
   },
   mapPlaceholder: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0d1a2d',
+    backgroundColor: colors.bgDeep,
   },
   mapGrid: {
     flex: 1,
@@ -246,7 +247,7 @@ const createThemedStyles = (colors: ThemeColors) =>
   },
   mapStreet: {
     height: 2,
-    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    backgroundColor: brandTints.accentLight,
     borderRadius: 1,
   },
   loadingContainer: {
@@ -266,7 +267,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     right: space[4],
   },
   card: {
-    backgroundColor: 'rgba(31, 41, 55, 0.92)',
+    backgroundColor: surfaceTints.glass,
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.borderDefault,

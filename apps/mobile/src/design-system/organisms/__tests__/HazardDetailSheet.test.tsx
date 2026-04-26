@@ -39,12 +39,19 @@ vi.mock('../../hooks/useReducedMotion', () => ({
 
 vi.mock('../../hooks/useHaptics', () => ({
   useHaptics: () => ({
+    // Semantic tokens
+    confirm: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn(),
+    celebration: vi.fn(),
+    destructiveConfirm: vi.fn(),
+    snap: vi.fn(),
+    fire: vi.fn(),
+    // Legacy shortcuts
     light: vi.fn(),
     medium: vi.fn(),
     heavy: vi.fn(),
-    warning: vi.fn(),
     error: vi.fn(),
-    success: vi.fn(),
   }),
 }));
 

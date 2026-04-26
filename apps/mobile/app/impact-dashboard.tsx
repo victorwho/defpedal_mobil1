@@ -20,6 +20,7 @@ import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
 import { BadgeIcon } from '../src/design-system/atoms/BadgeIcon';
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { Button } from '../src/design-system/atoms/Button';
+import { Surface } from '../src/design-system/atoms/Card';
 import { useBadges } from '../src/hooks/useBadges';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -333,11 +334,11 @@ export default function ImpactDashboardScreen() {
           </View>
 
           {/* 5. Daily Quiz */}
-          <Pressable
-            style={({ pressed }) => [styles.quizCard, pressed && styles.quizCardPressed]}
+          <Surface
             onPress={() => router.push('/daily-quiz')}
-            accessibilityRole="button"
             accessibilityLabel="Take today's daily quiz"
+            style={styles.quizCard}
+            pressedStyle={styles.quizCardPressed}
           >
             <View style={styles.quizIconWrap}>
               <Ionicons name="school-outline" size={24} color={colors.accent} />
@@ -347,7 +348,7 @@ export default function ImpactDashboardScreen() {
               <Text style={styles.quizSubtext}>Answer to maintain your streak</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Pressable>
+          </Surface>
         </ScrollView>
       ) : null}
     </SafeAreaView>
@@ -502,12 +503,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: space[3],
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      ...shadows.md,
     },
     quizCardPressed: {
       backgroundColor: colors.bgSecondary,

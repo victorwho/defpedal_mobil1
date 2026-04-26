@@ -11,7 +11,11 @@ vi.mock("../../hooks/useLeaderboard", () => ({
 
 vi.mock("../../hooks/useReducedMotion", () => ({ useReducedMotion: () => false }));
 vi.mock("../../hooks/useHaptics", () => ({
-  useHaptics: () => ({ light: vi.fn(), medium: vi.fn(), heavy: vi.fn(), warning: vi.fn(), error: vi.fn(), success: vi.fn() }),
+  useHaptics: () => ({
+    confirm: vi.fn(), success: vi.fn(), warning: vi.fn(), celebration: vi.fn(),
+    destructiveConfirm: vi.fn(), snap: vi.fn(), fire: vi.fn(),
+    light: vi.fn(), medium: vi.fn(), heavy: vi.fn(), error: vi.fn(),
+  }),
 }));
 vi.mock("../../ThemeContext", () => ({
   useTheme: () => ({

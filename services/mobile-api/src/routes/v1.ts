@@ -1805,7 +1805,22 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireOAuthUser(request, dependencies);
+        // PRODUCT REQUIREMENT: anonymous users must see the risk map during
+        // the safety-score onboarding screen — that's the first impression of
+        // the product's value. The other 3 risk endpoints (/routes/preview,
+        // /routes/reroute, /risk-segments) stay full-OAuth.
+        //
+        // Defences in depth, even for anonymous reads:
+        //   1. Score thresholds remain server-side only (see lib/risk.ts);
+        //      response carries colour + category label, never raw scores.
+        //   2. Per-user rate limiting (`write` bucket, user-keyed including
+        //      anonymous Supabase user ids) — bounded scrape rate.
+        //   3. Schema-capped radius (≤ 5km) and Supabase RPC caps (200
+        //      features/response, ordered by risk_score DESC).
+        //   4. Anonymous users still need a valid Supabase access token,
+        //      which requires creating an anonymous Supabase user — not
+        //      free traffic.
+        const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
         if (!supabaseAdmin) {
@@ -1826,7 +1841,12 @@ export const buildV1Routes = (
           throw new HttpError('Risk map query failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
         }
 
-        return data ?? { type: 'FeatureCollection', features: [] };
+        // The Postgres RPC returns features carrying only `riskScore`. Enrich
+        // each feature with the bucket-derived `color` and `riskCategory` so
+        // the client can paint the map directly via `lineColor: ['get', 'color']`
+        // without ever seeing the score thresholds (security: thresholds are
+        // server-side only — see lib/risk.ts §RISK_BUCKETS).
+        return dependencies.enrichRiskGeoJson(data as Parameters<typeof dependencies.enrichRiskGeoJson>[0]);
       },
     );
 

@@ -57,6 +57,7 @@ import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
+import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
@@ -64,7 +65,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { gray, safetyColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
-import { surfaceTints } from '../src/design-system/tokens/tints';
+import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useTheme, type ThemeColors } from '../src/design-system';
 
@@ -415,7 +416,9 @@ export default function NavigationScreen() {
     }
 
     const trimmed = description?.trim().slice(0, 280);
-    haptics.medium();
+    // Non-safety haptic — suppressed during NAVIGATING (see docs/haptic-map.md).
+    // The visual "Hazard reported" banner provides confirmation during a ride.
+    haptics.confirm();
     setHazardPickerOpen(false);
     setHazardDescribeMode(false);
     setHazardDescription('');
@@ -1035,7 +1038,7 @@ export default function NavigationScreen() {
           {/* End ride — distinct danger-styled stop button */}
           <View style={styles.endRideButton}>
             <IconButton
-              icon={<Ionicons name="stop-circle" size={24} color="#FFFFFF" />}
+              icon={<Ionicons name="stop-circle" size={24} color={gray[50]} />}
               onPress={() => {
                 confirm({
                   title: t('nav.endRideConfirmTitle'),
@@ -1143,7 +1146,14 @@ export default function NavigationScreen() {
           accessibilityRole="button"
           accessibilityLabel="Dismiss hazard picker"
         >
-          <Pressable style={styles.hazardGridCard} onPress={(e) => e.stopPropagation()} accessible={false}>
+          <Surface
+            variant="panel"
+            radius="2xl"
+            elevation="lg"
+            onPress={(e) => e.stopPropagation()}
+            accessible={false}
+            style={styles.hazardGridCard}
+          >
             {hazardDescribeMode ? (
               <>
                 <Text style={styles.hazardGridTitle}>Describe the hazard</Text>
@@ -1223,7 +1233,7 @@ export default function NavigationScreen() {
                 </Pressable>
               </>
             )}
-          </Pressable>
+          </Surface>
         </Pressable>
       ) : null}
 
@@ -1252,7 +1262,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     warningBanner: {
       borderRadius: radii.xl,
-      backgroundColor: 'rgba(245, 158, 11, 0.18)',
+      backgroundColor: safetyTints.cautionMedium,
       paddingHorizontal: space[4],
       paddingVertical: space[3],
       gap: space[3],
@@ -1286,11 +1296,8 @@ const createThemedStyles = (colors: ThemeColors) =>
       zIndex: zIndex.sticky,
     },
     hazardGridCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii['2xl'],
       padding: space[4],
       gap: space[3],
-      ...shadows.lg,
     },
     hazardGridTitle: {
       ...textSm,

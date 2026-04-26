@@ -10,7 +10,6 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,13 +28,14 @@ import {
   MILESTONE_CONFIGS,
   detectNewMilestones,
 } from '../src/components/MilestoneShareCard';
-import { Button } from '../src/design-system/atoms';
+import { Button, Surface } from '../src/design-system/atoms';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
+import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
@@ -216,7 +216,7 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
   if (submitted) {
     return (
       <View style={styles.cardContainer}>
-        <View style={styles.card}>
+        <Surface variant="form" style={styles.card}>
           <Text style={styles.title}>{t('feedback.thankYou')}</Text>
           <Text style={styles.subtitle}>
             {t('feedback.thankYouSub')}
@@ -227,7 +227,7 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
           >
             <Text style={styles.doneButtonText}>{t('common.done')}</Text>
           </Pressable>
-        </View>
+        </Surface>
       </View>
     );
   }
@@ -238,7 +238,7 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.cardContainer}>
-        <View style={styles.card}>
+        <Surface variant="form" style={styles.card}>
           <Text style={styles.title}>{t('feedback.howSafe')}</Text>
           <Text style={styles.subtitle}>
             {t('feedback.safetyHelps')}
@@ -253,7 +253,7 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
             multiline
             numberOfLines={4}
             placeholder={t('feedback.commentsPlaceholder')}
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={gray[400]}
             value={comments}
             onChangeText={setComments}
             textAlignVertical="top"
@@ -286,7 +286,7 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
               </Text>
             </Pressable>
           </View>
-        </View>
+        </Surface>
       </View>
     </KeyboardAvoidingView>
   );
@@ -358,7 +358,6 @@ export default function FeedbackScreen() {
   const [step, setStep] = useState<FeedbackStep>('impact');
   const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
-  const [impactLoading, setImpactLoading] = useState(false);
 
   // Ride share (image-based, Surface A)
   const shareRide = useShareRide();
@@ -704,11 +703,6 @@ const createThemedStyles = (colors: ThemeColors) =>
     safeArea: {
       flex: 1,
     },
-    loadingContainer: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     // Impact step
     impactScrollContent: {
       paddingHorizontal: space[5],
@@ -731,7 +725,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[3],
       paddingTop: space[2],
     },
-    // Rating step (preserved — light-themed card hex values intentionally kept)
+    // Rating step — "warm paper" form card. bgForm is theme-aware (cream on dark,
+    // white on light); text always renders dark gray so the card stays readable in
+    // both themes regardless of the surrounding bgDeep.
     keyboardView: {
       flex: 1,
     },
@@ -741,32 +737,25 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingHorizontal: space[5],
     },
     card: {
-      backgroundColor: '#FFFDF5',
-      borderRadius: radii.xl,
       padding: space[6],
       gap: space[4],
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 8,
     },
     title: {
       ...text2xl,
       fontFamily: fontFamily.heading.extraBold,
-      color: '#111827',
+      color: gray[900],
       textAlign: 'center',
     },
     subtitle: {
       ...textBase,
-      color: '#6B7280',
+      color: gray[500],
       textAlign: 'center',
       marginTop: -space[2],
     },
     sectionLabel: {
       ...textSm,
       fontFamily: fontFamily.body.bold,
-      color: '#374151',
+      color: gray[700],
       textAlign: 'center',
     },
     starRow: {
@@ -779,14 +768,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       lineHeight: STAR_SIZE + 8,
     },
     commentInput: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: gray[50],
       borderRadius: radii.lg,
       borderWidth: 1,
-      borderColor: '#E5E7EB',
+      borderColor: gray[200],
       padding: space[3],
       minHeight: 100,
       fontSize: 15,
-      color: '#111827',
+      color: gray[900],
       fontFamily: fontFamily.body.regular,
     },
     buttonRow: {
@@ -802,15 +791,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     cancelButton: {
-      backgroundColor: '#D1D5DB',
+      backgroundColor: gray[300],
     },
     cancelButtonText: {
       fontSize: 16,
       fontFamily: fontFamily.body.bold,
-      color: '#374151',
+      color: gray[700],
     },
     submitButton: {
-      backgroundColor: '#6B7280',
+      backgroundColor: gray[500],
     },
     submitButtonDisabled: {
       opacity: 0.5,
@@ -818,13 +807,13 @@ const createThemedStyles = (colors: ThemeColors) =>
     submitButtonText: {
       fontSize: 16,
       fontFamily: fontFamily.body.bold,
-      color: '#FFFFFF',
+      color: gray[50],
     },
     submitButtonTextDisabled: {
-      color: '#D1D5DB',
+      color: gray[300],
     },
     doneButton: {
-      backgroundColor: '#FDD700',
+      backgroundColor: colors.accent,
       marginTop: space[2],
       paddingVertical: space[4],
       minHeight: 52,
@@ -832,7 +821,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     doneButtonText: {
       fontSize: 16,
       fontFamily: fontFamily.body.bold,
-      color: '#111827',
+      color: gray[900],
     },
     milestoneFooter: {
       gap: space[2],
@@ -865,13 +854,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 24,
       height: 24,
       borderRadius: 12,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: gray[50],
       alignItems: 'center',
       justifyContent: 'center',
     },
     signupGoogleG: {
       fontFamily: fontFamily.body.bold,
       fontSize: 14,
+      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
       color: '#4285F4',
       marginTop: -1,
     },

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '../../src/design-system/atoms';
+import { Button, Surface } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { gray, safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
@@ -71,7 +71,7 @@ export default function ChooseUsernameScreen() {
         </Text>
       </View>
 
-      <View style={styles.inputCard}>
+      <Surface style={{ gap: space[2] }}>
         <View style={styles.inputRow}>
           <Text style={styles.atSign}>@</Text>
           <TextInput
@@ -93,7 +93,7 @@ export default function ChooseUsernameScreen() {
           <Text style={styles.hintText}>Min 3 characters. Letters, numbers, underscore only.</Text>
         ) : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      </View>
+      </Surface>
 
       <View style={styles.footer}>
         <Button
@@ -143,15 +143,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textBase,
       color: colors.textSecondary,
       lineHeight: 22,
-    },
-    inputCard: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[4],
-      gap: space[2],
-      ...shadows.md,
     },
     inputRow: {
       flexDirection: 'row',

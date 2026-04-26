@@ -25,7 +25,6 @@ import React, {
   useState,
 } from 'react';
 import {
-  InteractionManager,
   NativeModules,
   StyleSheet,
   TurboModuleRegistry,
@@ -121,17 +120,15 @@ const CaptureHostContext = createContext<CaptureHost | null>(null);
 
 /**
  * Resolves once the view has been measured + painted at least twice. Two
- * `requestAnimationFrame` ticks is the canonical "wait for paint" pattern for
- * RN; we also run inside `InteractionManager.runAfterInteractions` so a
- * capture kicked off mid-transition waits for the transition to settle.
+ * `requestAnimationFrame` ticks is the canonical "wait for paint" pattern in
+ * RN. The captured view is mounted off-screen, so on-screen gestures/scrolls
+ * cannot affect its layout — no `InteractionManager` settle is required.
  */
 const waitForPaint = (): Promise<void> =>
   new Promise((resolve) => {
-    InteractionManager.runAfterInteractions(() => {
+    requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          resolve();
-        });
+        resolve();
       });
     });
   });

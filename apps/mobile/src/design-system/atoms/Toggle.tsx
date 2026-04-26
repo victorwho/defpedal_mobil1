@@ -82,7 +82,7 @@ export const Toggle: React.FC<ToggleProps> = ({
     <Pressable
       onPress={() => {
         if (disabled) return;
-        haptics.light();
+        haptics.confirm();
         onChange(!checked);
       }}
       disabled={disabled}

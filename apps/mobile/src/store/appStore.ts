@@ -713,6 +713,14 @@ export const useAppStore = create<AppStore>()(
       // in lockstep with the React-Query cache. Device preferences are kept
       // intentionally so the next sign-in doesn't re-surface onboarding
       // questions like dark-mode and language.
+      //
+      // `onboardingCompleted` is intentionally NOT reset here. Onboarding is a
+      // one-time introduction to the app, scoped to the device — not the user.
+      // A real-user sign-out (or anonymous-user re-roll) on the same device
+      // should drop you back into the app, not force you back through the
+      // 5-screen onboarding flow you already completed. The signup-prompt
+      // gate (see computeOnboardingGateTarget) still surfaces the
+      // sign-up CTA on subsequent anonymous opens.
       resetUserScopedState: () =>
         set(() => ({
           appState: 'IDLE',
@@ -723,7 +731,7 @@ export const useAppStore = create<AppStore>()(
           queuedMutations: [],
           tripServerIds: {},
           activeTripClientId: null,
-          onboardingCompleted: false,
+          // onboardingCompleted intentionally NOT reset — see comment above.
           cyclingGoal: null,
           cachedStreak: null,
           cachedImpact: null,

@@ -10,6 +10,7 @@ import { useTheme } from '../src/design-system/ThemeContext';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
+import { brandTints, safetyTints } from '../src/design-system/tokens/tints';
 import {
   fontFamily,
   textDataSm,
@@ -162,7 +163,7 @@ function MetricBlock({
       style={[
         styles.metricTile,
         { backgroundColor: colors.bgSecondary },
-        emphasis && { backgroundColor: 'rgba(250, 204, 21, 0.14)' },
+        emphasis && { backgroundColor: brandTints.accentMedium },
       ]}
     >
       <Text
@@ -202,7 +203,7 @@ function DiagnosticCard({
     tone === 'accent'
       ? colors.bgSecondary
       : tone === 'warning'
-        ? 'rgba(245, 158, 11, 0.08)'
+        ? safetyTints.cautionLight
         : colors.bgPrimary;
 
   const borderColor =

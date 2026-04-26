@@ -68,7 +68,8 @@ export default function ProfileScreen() {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    // Lazy require so the bundle doesn't pull native imports on devices without
+    // the expo-image-picker binary linked. See CLAUDE.md gotcha #2.
     const ImagePicker = require('expo-image-picker') as typeof import('expo-image-picker');
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -317,7 +318,7 @@ export default function ProfileScreen() {
       return (
         <View style={styles.achievementsCard}>
           <View style={styles.achievementsRow}>
-            <Ionicons name="checkmark-circle" size={24} color="#22C55E" />
+            <Ionicons name="checkmark-circle" size={24} color={colors.safe} />
             <View style={styles.achievementsTextCol}>
               <Text style={styles.achievementsCount}>Confident Cyclist</Text>
             </View>
@@ -521,17 +522,20 @@ export default function ProfileScreen() {
               </View>
             </View>
           ) : (
+            // Anonymous Supabase users see the same friendly Sign-in/Sign-up
+            // CTA as a fully signed-out guest. The "anonymous account" is an
+            // implementation detail — never surface it as a UI label.
             <Pressable
               style={styles.userCard}
               onPress={() => router.push('/auth')}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel={t('profile.tapToSignIn')}
+              accessibilityLabel={t('profile.signInOrUp')}
             >
               <Ionicons name="person-circle-outline" size={48} color={gray[500]} />
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{isAnonymous ? 'Anonymous' : t('common.guest')}</Text>
-                <Text style={styles.userSub}>{t('profile.tapToSignIn')}</Text>
+                <Text style={styles.userName}>{t('profile.signInOrUp')}</Text>
+                <Text style={styles.userSub}>{t('profile.signInOrUpSub')}</Text>
               </View>
               <Ionicons name="log-in-outline" size={24} color={colors.accent} />
             </Pressable>
@@ -766,10 +770,14 @@ export default function ProfileScreen() {
                     message: t('profile.signOutConfirm'),
                     confirmLabel: t('profile.signOut'),
                     onConfirm: async () => {
-                      useAppStore.getState().setOnboardingCompleted(false);
+                      // Sign out → fall through to anonymous (handled by
+                      // AuthSessionProvider's initial-mount path). Do NOT
+                      // reset onboardingCompleted or redirect to /onboarding —
+                      // the user has already been through the onboarding flow
+                      // on this device. They land back on Profile, which now
+                      // shows the Sign-in CTA card.
                       await signOut();
                       await signInAnonymously();
-                      router.replace('/onboarding' as any);
                     },
                   });
                 }}
@@ -1046,7 +1054,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.lg,
       borderWidth: 1,
       borderColor: safetyTints.dangerBorder,
-      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+      backgroundColor: safetyTints.dangerLight,
     },
     signOutText: {
       ...textBase,

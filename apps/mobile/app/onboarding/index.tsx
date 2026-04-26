@@ -11,6 +11,7 @@ import { useTheme, type ThemeColors } from '../../src/design-system';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
+import { brandTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
@@ -160,7 +161,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 220,
       height: 220,
       borderRadius: 9999,
-      backgroundColor: 'rgba(250, 204, 21, 0.14)',
+      backgroundColor: brandTints.accentMedium,
       opacity: 0.6,
     },
     topSection: {
@@ -212,7 +213,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 40,
       height: 40,
       borderRadius: radii.lg,
-      backgroundColor: 'rgba(250, 204, 21, 0.1)',
+      backgroundColor: brandTints.accentLight,
       alignItems: 'center',
       justifyContent: 'center',
     },

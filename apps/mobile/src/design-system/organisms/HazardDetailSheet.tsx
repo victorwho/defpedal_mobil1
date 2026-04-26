@@ -184,12 +184,12 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
 
   const handleUpvote = () => {
     if (isPending) return;
-    haptics.light();
+    haptics.confirm();
     onVote('up');
   };
   const handleDownvote = () => {
     if (isPending) return;
-    haptics.light();
+    haptics.confirm();
     onVote('down');
   };
 

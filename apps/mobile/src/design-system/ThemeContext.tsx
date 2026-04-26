@@ -2,7 +2,9 @@
  * Design System v1.0 — Theme Provider
  *
  * Provides resolved color tokens via React context.
- * Defaults to dark theme. Forces dark during active navigation (spec rule).
+ * Defaults to dark theme. Forces dark during active navigation AND route preview
+ * — last stop before the ride; the device is likely already on a handlebar mount
+ * (see docs/design-context.md §1 D1).
  * Exposes useTheme() hook.
  */
 import React, { createContext, useContext, useMemo } from 'react';
@@ -52,9 +54,10 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ forcedMode, childr
   const themePreference = useAppStore((s) => s.themePreference);
 
   const value = useMemo<ThemeContextValue>(() => {
-    // Rule from spec: during active navigation, force dark theme
-    // (glare reduction, battery, safety contrast)
-    if (appState === 'NAVIGATING') {
+    // Rule from spec (§1 D1): force dark theme during active navigation AND
+    // route preview — glare reduction, battery, contrast, and the realistic
+    // assumption that the device is already on a handlebar mount.
+    if (appState === 'NAVIGATING' || appState === 'ROUTE_PREVIEW') {
       return { mode: 'dark', colors: darkTheme };
     }
 
