@@ -207,6 +207,32 @@ export const ro: TranslationKeys = {
     rebuildRequired: 'Rebuild necesar',
     rebuildMessage: 'Selectorul de fotografii necesită rebuild nativ.',
     photoUploadFailed: 'Încărcarea fotografiei a eșuat',
+    // Delete account
+    deleteAccount: 'Șterge contul',
+    deleteAccountSub: 'Elimină definitiv contul tău și toate datele tale',
+  },
+
+  // ── Delete account screen ──
+  deleteAccount: {
+    title: 'Șterge contul',
+    intro: 'Această acțiune este permanentă. Vom elimina următoarele de pe serverele noastre în 24 de ore:',
+    bulletTrips: 'Istoricul curselor, traseele GPS și statisticile tale de cursă',
+    bulletShares: 'Cursele pe care le-ai partajat în feed-ul comunității',
+    bulletHazards: 'Pericolele pe care le-ai raportat (raportul rămâne pentru siguranța comunității, dar numele tău este eliminat)',
+    bulletSocial: 'Aprecierile, iubirile, comentariile și relațiile de urmărire',
+    bulletProgress: 'XP-ul, insignele, streak-ul și progresul de nivel',
+    bulletProfile: 'Profilul, numele de utilizator, avatarul și credențialele de cont',
+    confirmInstruction: 'Pentru a confirma, scrie DELETE mai jos.',
+    confirmPlaceholder: 'Scrie DELETE',
+    cancelButton: 'Anulează',
+    confirmButton: 'Șterge contul meu',
+    confirming: 'Se șterge…',
+    successTitle: 'Cont șters',
+    successMessage: 'Contul tău și toate datele asociate au fost eliminate. Vei fi deconectat acum.',
+    errorTitle: 'Ștergerea a eșuat',
+    errorMessage: 'Nu am putut șterge contul tău. Te rugăm să încerci din nou sau să contactezi suportul dacă problema persistă.',
+    anonymousNotice: 'Ești conectat anonim. Nu există un cont de șters — închiderea aplicației sau ștergerea datelor aplicației îți va elimina starea locală.',
+    signInRequired: 'Conectează-te cu Google pentru a gestiona ștergerea contului.',
   },
 
   // ── History ──

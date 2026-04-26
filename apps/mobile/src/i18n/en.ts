@@ -205,6 +205,32 @@ export const en = {
     rebuildRequired: 'Rebuild required',
     rebuildMessage: 'Photo picker needs a native rebuild.',
     photoUploadFailed: 'Photo upload failed',
+    // Delete account
+    deleteAccount: 'Delete account',
+    deleteAccountSub: 'Permanently remove your account and all your data',
+  },
+
+  // ── Delete account screen ──
+  deleteAccount: {
+    title: 'Delete account',
+    intro: 'This action is permanent. We will remove the following from our servers within 24 hours:',
+    bulletTrips: 'Your trip history, GPS tracks, and ride statistics',
+    bulletShares: 'Trips you shared to the community feed',
+    bulletHazards: 'Hazards you reported (the report stays for community safety, but your name is removed)',
+    bulletSocial: 'Your likes, loves, comments, and follow relationships',
+    bulletProgress: 'Your XP, badges, streak, and tier progression',
+    bulletProfile: 'Your profile, username, avatar, and account credentials',
+    confirmInstruction: 'To confirm, type DELETE below.',
+    confirmPlaceholder: 'Type DELETE',
+    cancelButton: 'Cancel',
+    confirmButton: 'Delete my account',
+    confirming: 'Deleting…',
+    successTitle: 'Account deleted',
+    successMessage: 'Your account and all associated data have been removed. You will be signed out now.',
+    errorTitle: 'Deletion failed',
+    errorMessage: 'We could not delete your account. Please try again, or contact support if the problem persists.',
+    anonymousNotice: 'You are signed in anonymously. There is no account to delete — closing the app or clearing app data will remove your local state.',
+    signInRequired: 'Sign in with Google to manage account deletion.',
   },
 
   // ── History ──

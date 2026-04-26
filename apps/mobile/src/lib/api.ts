@@ -427,6 +427,13 @@ export const mobileApi = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  // Irreversible account deletion. Body must contain { confirmation: 'DELETE' }
+  // (verbatim) so accidental calls are rejected with 400.
+  deleteAccount: () =>
+    requestJson<{ deletedAt: string }>('/v1/profile', {
+      method: 'DELETE',
+      body: JSON.stringify({ confirmation: 'DELETE' }),
+    }),
 
   // Push notifications
   registerPushToken: (expoPushToken: string, deviceId: string, platform: string) =>

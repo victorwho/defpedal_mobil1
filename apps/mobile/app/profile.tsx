@@ -778,6 +778,30 @@ export default function ProfileScreen() {
                 <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
               </Pressable>
             ) : null}
+
+            {/* Compliance: Play Store User Data policy + GDPR Art. 17 require
+                an in-app account deletion path. The destination screen handles
+                the typed-DELETE confirmation, the API call, and the post-delete
+                sign-out + redirect. Visible to authenticated (non-anonymous)
+                users only — anonymous accounts have nothing server-side to delete. */}
+            {user && !isAnonymous ? (
+              <Pressable
+                style={styles.helpFaqRow}
+                onPress={() => router.push('/delete-account' as any)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.deleteAccount')}
+              >
+                <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                <View style={styles.settingTextCol}>
+                  <Text style={[styles.settingLabel, { color: colors.danger }]}>
+                    {t('profile.deleteAccount')}
+                  </Text>
+                  <Text style={styles.settingDescription}>{t('profile.deleteAccountSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+              </Pressable>
+            ) : null}
           </View>
         </Screen>
       </View>
