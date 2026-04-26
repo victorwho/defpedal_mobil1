@@ -8,6 +8,10 @@ export type RateLimitPolicies = {
   routeReroute: RateLimitPolicy;
   write: RateLimitPolicy;
   hazardVote: RateLimitPolicy;
+  // UGC moderation buckets (compliance plan item 7).
+  report: RateLimitPolicy;
+  block: RateLimitPolicy;
+  comment: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {
