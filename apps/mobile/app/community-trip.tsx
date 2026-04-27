@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { Toast } from '../src/design-system/molecules/Toast';
+import { ReportSheet } from '../src/design-system/molecules/ReportSheet';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 
 import { LikeButton } from '../src/components/LikeButton';
@@ -29,9 +31,11 @@ import {
   useLikeToggle,
   usePostComment,
 } from '../src/hooks/useFeed';
+import { useBlockUser } from '../src/hooks/useBlockUser';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
+import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 
@@ -65,6 +69,24 @@ export default function CommunityTripScreen() {
   const commentsQuery = useComments(id ?? null);
   const postComment = usePostComment();
   const shareRide = useShareRide();
+
+  // Compliance plan item 7 — comment moderation. Long-press a comment to
+  // open Report / Block. Suppressed for own comments. Hidden state is
+  // optimistic + per-screen-instance (no global cache update needed; the
+  // server filters blocked-user content on next fetch).
+  const authCtx = useAuthSessionOptional();
+  const currentUserId = authCtx?.user?.id ?? null;
+  const blockMutation = useBlockUser();
+  const [reportTargetCommentId, setReportTargetCommentId] = useState<string | null>(null);
+  const [hiddenCommentIds, setHiddenCommentIds] = useState<Set<string>>(() => new Set());
+
+  const hideComment = useCallback((commentId: string) => {
+    setHiddenCommentIds((prev) => {
+      const next = new Set(prev);
+      next.add(commentId);
+      return next;
+    });
+  }, []);
 
   // Find the item from the feed cache
   const item: FeedItem | undefined = useMemo(
@@ -138,23 +160,91 @@ export default function CommunityTripScreen() {
 
   // Memoized renderItem for FlatList - prevents recreation on every render
   const renderCommentItem = useCallback(
-    ({ item: comment }: { item: FeedComment }) => (
-      <View style={styles.commentRow}>
-        <View style={styles.commentAvatar}>
-          <Text style={styles.commentAvatarText}>
-            {comment.user.displayName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
-        <View style={styles.commentBody}>
-          <Text style={styles.commentUser}>{comment.user.displayName}</Text>
-          <Text style={styles.commentText}>{comment.body}</Text>
-          <Text style={styles.commentTime}>
-            {new Date(comment.createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-      </View>
-    ),
-    [styles],
+    ({ item: comment }: { item: FeedComment }) => {
+      // Optimistic hide after report or block — replaces the row with a small
+      // "Hidden" placeholder. Same pattern as ActivityFeedCard.
+      if (hiddenCommentIds.has(comment.id)) {
+        return (
+          <View
+            style={styles.commentHiddenRow}
+            accessibilityRole="text"
+            accessibilityLabel={t('feedCard.hiddenAfterAction')}
+          >
+            <Ionicons name="eye-off-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.commentHiddenText}>{t('feedCard.hiddenAfterAction')}</Text>
+          </View>
+        );
+      }
+
+      const isOwnComment = currentUserId != null && currentUserId === comment.user.id;
+
+      const handleLongPress = () => {
+        if (isOwnComment) return;
+        Alert.alert(comment.user.displayName, t('feedCard.moderationMenu'), [
+          {
+            text: t('feedCard.report'),
+            onPress: () => setReportTargetCommentId(comment.id),
+          },
+          {
+            text: t('feedCard.blockUser'),
+            style: 'destructive',
+            onPress: () => {
+              Alert.alert(
+                t('feedCard.blockConfirmTitle'),
+                t('feedCard.blockConfirmMessage', { name: comment.user.displayName }),
+                [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  {
+                    text: t('feedCard.blockUser'),
+                    style: 'destructive',
+                    onPress: () => {
+                      hideComment(comment.id);
+                      blockMutation.mutate(comment.user.id, {
+                        onError: () => {
+                          // Roll back the hide if the server rejected.
+                          setHiddenCommentIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(comment.id);
+                            return next;
+                          });
+                          Alert.alert(
+                            t('feedCard.blockErrorTitle'),
+                            t('feedCard.blockErrorMessage'),
+                          );
+                        },
+                      });
+                    },
+                  },
+                ],
+              );
+            },
+          },
+          { text: t('common.cancel'), style: 'cancel' },
+        ]);
+      };
+
+      return (
+        <Pressable
+          style={styles.commentRow}
+          onLongPress={isOwnComment ? undefined : handleLongPress}
+          accessibilityHint={isOwnComment ? undefined : t('feedCard.longPressHint')}
+        >
+          <View style={styles.commentAvatar}>
+            <Text style={styles.commentAvatarText}>
+              {comment.user.displayName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.commentBody}>
+            <Text style={styles.commentUser}>{comment.user.displayName}</Text>
+            <Text style={styles.commentText}>{comment.body}</Text>
+            <Text style={styles.commentTime}>
+              {new Date(comment.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    },
+    [styles, t, colors.textSecondary, currentUserId, blockMutation, hiddenCommentIds, hideComment],
   );
 
   if (!item) {
@@ -287,6 +377,16 @@ export default function CommunityTripScreen() {
         />
       </View>
     ) : null}
+    <ReportSheet
+      visible={reportTargetCommentId !== null}
+      onClose={() => setReportTargetCommentId(null)}
+      targetType="comment"
+      targetId={reportTargetCommentId ?? ''}
+      onReported={() => {
+        if (reportTargetCommentId) hideComment(reportTargetCommentId);
+        setReportTargetCommentId(null);
+      }}
+    />
     </View>
   );
 }
@@ -431,6 +531,20 @@ const createThemedStyles = (colors: ThemeColors) => StyleSheet.create({
   commentTime: {
     color: colors.textSecondary,
     fontSize: 11,
+  },
+  commentHiddenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: colors.bgSecondary,
+  },
+  commentHiddenText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontStyle: 'italic',
   },
   noComments: {
     color: colors.textSecondary,
