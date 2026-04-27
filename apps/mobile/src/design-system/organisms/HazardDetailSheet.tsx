@@ -20,8 +20,9 @@
 import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
 import { HAZARD_TYPE_OPTIONS } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Modal,
   PanResponder,
@@ -35,6 +36,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext';
 import { useHaptics } from '../hooks/useHaptics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { ReportSheet } from '../molecules/ReportSheet';
 import { getHazardIcon } from '../tokens/hazardIcons';
 import { radii } from '../tokens/radii';
 import { safetyColors, gray } from '../tokens/colors';
@@ -105,6 +107,8 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
   const reducedMotion = useReducedMotion();
   const haptics = useHaptics();
   const t = useT();
+
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
   const translateY = useRef(new Animated.Value(280)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -192,6 +196,12 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
     haptics.confirm();
     onVote('down');
   };
+  const handleOverflow = () => {
+    Alert.alert(label, t('feedCard.moderationMenu'), [
+      { text: t('feedCard.report'), onPress: () => setReportSheetVisible(true) },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  };
 
   return (
     <Modal
@@ -235,6 +245,15 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
             <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={1}>
               {label}
             </Text>
+            <Pressable
+              onPress={handleOverflow}
+              accessibilityRole="button"
+              accessibilityLabel={t('feedCard.moderationMenu')}
+              hitSlop={8}
+              style={styles.overflowButton}
+            >
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
+            </Pressable>
             <Pressable
               onPress={onDismiss}
               accessibilityRole="button"
@@ -342,6 +361,19 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
           </View>
         </Animated.View>
       </View>
+      <ReportSheet
+        visible={reportSheetVisible}
+        onClose={() => setReportSheetVisible(false)}
+        targetType="hazard"
+        targetId={hazard.id}
+        onReported={() => {
+          setReportSheetVisible(false);
+          // Auto-dismiss the detail sheet after a successful report — the
+          // user no longer wants to interact with this hazard. The map
+          // marker stays put until moderation hides it server-side.
+          onDismissRef.current();
+        }}
+      />
     </Modal>
   );
 };
@@ -383,6 +415,12 @@ const styles = StyleSheet.create({
     ...textBase,
     fontFamily: fontFamily.heading.bold,
     fontSize: 18,
+  },
+  overflowButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeButton: {
     width: 32,
