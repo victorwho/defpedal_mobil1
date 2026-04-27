@@ -41,11 +41,22 @@ export default function OnboardingConsentScreen() {
   const setAnalyticsConsent = useAppStore((s) => s.setAnalyticsConsent);
   const persistedSentry = useAppStore((s) => s.analyticsConsent.sentry);
   const persistedPosthog = useAppStore((s) => s.analyticsConsent.posthog);
+  const persistedCapturedAt = useAppStore((s) => s.analyticsConsent.capturedAt);
 
-  // Local mirror — only writes to the store on Continue, so a user who taps
-  // a toggle then backs out doesn't accidentally save partial consent.
+  // First-time defaults vs returning visitor:
+  // - Product analytics defaults ON for first-time onboarding (capturedAt is
+  //   null). Anonymized PostHog events; user can turn off here or later in
+  //   Profile → Privacy & analytics. Decision recorded in the plan + needs
+  //   legal counsel review for ANSPDCP / Law 506/2004 compliance.
+  // - Crash reports stay OFF by default in all cases — actual error payloads
+  //   are higher-sensitivity than aggregated usage events.
+  // - Returning users always see their previously-saved choice; we never
+  //   silently flip a setting they already opted out of.
+  const isFirstTimeConsent = persistedCapturedAt === null;
   const [crashReports, setCrashReports] = useState(persistedSentry);
-  const [productAnalytics, setProductAnalytics] = useState(persistedPosthog);
+  const [productAnalytics, setProductAnalytics] = useState(
+    isFirstTimeConsent ? true : persistedPosthog,
+  );
 
   const handleContinue = () => {
     setAnalyticsConsent({

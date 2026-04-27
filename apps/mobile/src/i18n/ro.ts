@@ -254,21 +254,21 @@ export const ro: TranslationKeys = {
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
     title: 'Ajută-ne să ne îmbunătățim, în condițiile tale',
-    subtitle: 'Aceste opțiuni sunt opționale și dezactivate implicit. Le poți schimba oricând din Profil → Confidențialitate & analiză.',
+    subtitle: 'Rapoartele de eroare rămân dezactivate până când le activezi tu. Analiza produsului este activă implicit — dezactiveaz-o dacă preferi.',
     crashLabel: 'Trimite rapoarte de eroare',
     crashDescription: 'Ne ajută să remediem erorile mai rapid. Fără date personale — doar urmele stivei și informații despre dispozitiv.',
     analyticsLabel: 'Trimite analize de produs',
-    analyticsDescription: 'Date agregate de utilizare pentru a prioritiza funcționalitățile potrivite. Fără urmărire de locație.',
-    assurance: 'Nicio urmărire până când nu alegi tu. Nu vindem niciodată datele tale.',
+    analyticsDescription: 'Activă implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație — dezactivează oricând.',
+    assurance: 'Tu deții controlul. Nu vindem niciodată datele tale.',
     continue: 'Continuă',
-    changeLater: 'Poți schimba mai târziu din Profil.',
+    changeLater: 'Poți schimba oricând din Profil → Confidențialitate & analiză.',
   },
 
   // ── Privacy & Analytics settings screen ──
   privacyAnalytics: {
     title: 'Confidențialitate & analiză',
     profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
-    intro: 'Ambele opțiuni sunt dezactivate implicit. Comută independent — dezactivarea oricăreia oprește imediat evenimentele noi.',
+    intro: 'Rapoartele de eroare sunt dezactivate până când le activezi. Analiza produsului este activă implicit. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
     crashLabel: 'Trimite rapoarte de eroare',
     crashDescription: 'Urme ale stivei și informații despre dispozitiv când aplicația se blochează. Fără date de locație.',
     analyticsLabel: 'Trimite analize de produs',

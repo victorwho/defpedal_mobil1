@@ -314,6 +314,16 @@ These should be composed instead of building from scratch:
 
 **Status:** **partially done** — telemetry plumbing exists; consent gating absent.
 
+> **2026-04-27 deviation from source plan §7:** Per user decision, **product analytics (PostHog) defaults ON** for first-time onboarding, with an explicit opt-out toggle on the same screen and again in Profile → Privacy & analytics. Crash reports (Sentry) keep the original **default OFF** — actual error payloads are higher-sensitivity than aggregated usage events. Returning users always see their previously-saved choice; we never silently flip a setting they already opted out of.
+>
+> **Legal risk this introduces:** ANSPDCP / Romania Law 506/2004 + EDPB guidance generally treat non-essential product analytics as opt-in. PostHog's anonymized-event posture is a partial defence but not airtight. Mitigation:
+> - Toggle is prominent on the consent screen (not buried)
+> - Continue button is explicit (not implied consent by app launch)
+> - Privacy policy (item 3) MUST disclose default-ON for analytics + how to opt out
+> - Counsel review recommended before production rollout
+>
+> Code: `apps/mobile/app/onboarding/consent.tsx` reads `persistedCapturedAt` and defaults `productAnalytics` to `true` when no decision exists yet (`capturedAt === null`). `crashReports` defaults to `persistedSentry` (effectively false until manually enabled).
+
 **Already in place:**
 - `apps/mobile/src/providers/TelemetryProvider.tsx:11` calls `initializeTelemetry()` unconditionally on mount.
 - `apps/mobile/src/lib/telemetry.ts:55–80` calls `Sentry.init(...)` and `createPostHogClient()` whenever the SDK keys are present.

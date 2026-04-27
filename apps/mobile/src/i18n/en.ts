@@ -252,21 +252,21 @@ export const en = {
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
     title: 'Help us improve, on your terms',
-    subtitle: 'These are optional and off by default. You can change them anytime in Profile → Privacy & analytics.',
+    subtitle: 'Crash reports stay off until you turn them on. Product analytics is on by default — turn it off if you prefer.',
     crashLabel: 'Share crash reports',
     crashDescription: 'Helps us fix bugs faster. No personal data — just stack traces and device info.',
     analyticsLabel: 'Share product analytics',
-    analyticsDescription: 'Aggregated usage data so we can prioritise the right features. No location tracking.',
-    assurance: 'No tracking until you choose. We never sell your data.',
+    analyticsDescription: 'On by default. Anonymous usage events so we can ship the right features. No location tracking — turn off anytime.',
+    assurance: 'You\'re in control. We never sell your data.',
     continue: 'Continue',
-    changeLater: 'You can change these later in Profile.',
+    changeLater: 'You can change these anytime in Profile → Privacy & analytics.',
   },
 
   // ── Privacy & Analytics settings screen ──
   privacyAnalytics: {
     title: 'Privacy & analytics',
     profileRowSub: 'Crash reports and product analytics preferences',
-    intro: 'Both options are off by default. Toggle each one independently — turning either off stops new events immediately.',
+    intro: 'Crash reports are off until you turn them on. Product analytics is on by default. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
     crashLabel: 'Share crash reports',
     crashDescription: 'Stack traces and device info when the app crashes. No location data.',
     analyticsLabel: 'Share product analytics',
