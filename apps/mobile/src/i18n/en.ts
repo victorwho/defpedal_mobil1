@@ -533,6 +533,15 @@ export const en = {
     devSignInFailed: 'Developer sign-in failed.',
   },
 
+  // ── Legal ──
+  legal: {
+    signupAgreePrefix: 'By continuing you agree to our ',
+    termsOfService: 'Terms of Service',
+    signupAgreeAnd: ' and ',
+    privacyPolicy: 'Privacy Policy',
+    signupAgreeSuffix: '.',
+  },
+
   // ── Settings ──
   settings: {
     title: 'Menu',

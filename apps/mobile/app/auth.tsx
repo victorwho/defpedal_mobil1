@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,7 @@ import {
   textSm,
   textXs,
 } from '../src/design-system/tokens/typography';
+import { PRIVACY_URL, TERMS_URL } from '../src/lib/legal-urls';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 
@@ -342,6 +344,32 @@ export default function AuthScreen() {
           </Surface>
         )}
 
+        {/* Legal footer — quietly discloses ToS + Privacy acceptance.
+            Only when the user is not yet signed in (the form is visible). */}
+        {!hasRealAccount ? (
+          <View style={styles.legalFooter}>
+            <Text style={styles.legalText}>
+              {t('legal.signupAgreePrefix')}
+              <Text
+                style={styles.legalLink}
+                onPress={() => void Linking.openURL(TERMS_URL)}
+                accessibilityRole="link"
+              >
+                {t('legal.termsOfService')}
+              </Text>
+              {t('legal.signupAgreeAnd')}
+              <Text
+                style={styles.legalLink}
+                onPress={() => void Linking.openURL(PRIVACY_URL)}
+                accessibilityRole="link"
+              >
+                {t('legal.privacyPolicy')}
+              </Text>
+              {t('legal.signupAgreeSuffix')}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Developer bypass (only in dev) */}
         {isDeveloperBypassAvailable && !hasRealAccount ? (
           <View style={styles.devCard}>
@@ -610,5 +638,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       flex: 1,
       color: gray[500],
       lineHeight: 20,
+    },
+    // Legal footer
+    legalFooter: {
+      paddingHorizontal: space[4],
+    },
+    legalText: {
+      ...textXs,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 16,
+    },
+    legalLink: {
+      ...textXs,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
   });

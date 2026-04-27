@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -18,6 +18,8 @@ import {
   textSm,
   textXs,
 } from '../../src/design-system/tokens/typography';
+import { useT } from '../../src/hooks/useTranslation';
+import { PRIVACY_URL, TERMS_URL } from '../../src/lib/legal-urls';
 import { useAuthSessionOptional } from '../../src/providers/AuthSessionProvider';
 import { useAppStore } from '../../src/store/appStore';
 
@@ -44,6 +46,7 @@ export default function OnboardingSignupPromptScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const authCtx = useAuthSessionOptional();
   const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
   const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
@@ -182,6 +185,29 @@ export default function OnboardingSignupPromptScreen() {
         {errorMessage ? (
           <Text style={styles.errorText}>{errorMessage}</Text>
         ) : null}
+      </View>
+
+      {/* Legal footer — quietly discloses ToS + Privacy acceptance. */}
+      <View style={styles.legalFooter}>
+        <Text style={styles.legalText}>
+          {t('legal.signupAgreePrefix')}
+          <Text
+            style={styles.legalLink}
+            onPress={() => void Linking.openURL(TERMS_URL)}
+            accessibilityRole="link"
+          >
+            {t('legal.termsOfService')}
+          </Text>
+          {t('legal.signupAgreeAnd')}
+          <Text
+            style={styles.legalLink}
+            onPress={() => void Linking.openURL(PRIVACY_URL)}
+            accessibilityRole="link"
+          >
+            {t('legal.privacyPolicy')}
+          </Text>
+          {t('legal.signupAgreeSuffix')}
+        </Text>
       </View>
 
       {/* Dismiss — hidden when mandatory */}
@@ -347,5 +373,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       fontFamily: fontFamily.body.medium,
       color: colors.textMuted,
+    },
+    legalFooter: {
+      paddingHorizontal: space[4],
+      paddingTop: space[3],
+    },
+    legalText: {
+      ...textXs,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 16,
+    },
+    legalLink: {
+      ...textXs,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
   });
