@@ -55,7 +55,7 @@ export default function BlockedUsersScreen() {
   const renderRow = useCallback(
     ({ item }: { item: BlockedUser }) => (
       <View style={styles.row}>
-        <View style={styles.avatar}>
+        <View style={styles.avatar} importantForAccessibility="no" accessibilityElementsHidden>
           <Text style={styles.avatarText}>
             {item.displayName.slice(0, 2).toUpperCase()}
           </Text>
@@ -71,6 +71,7 @@ export default function BlockedUsersScreen() {
         <Pressable
           style={styles.unblockButton}
           onPress={() => handleUnblock(item)}
+          hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
           accessibilityRole="button"
           accessibilityLabel={t('blockedUsers.unblock')}
         >
@@ -85,19 +86,40 @@ export default function BlockedUsersScreen() {
     <Screen title={t('blockedUsers.title')} headerVariant="back" onBack={handleBack}>
       <View style={styles.body}>
         {isLoading ? (
-          <Text style={styles.statusText}>{t('blockedUsers.loading')}</Text>
+          <Text style={styles.statusText} accessibilityLiveRegion="polite">
+            {t('blockedUsers.loading')}
+          </Text>
         ) : isError ? (
-          <View style={styles.statusBox}>
-            <Ionicons name="alert-circle-outline" size={20} color={colors.danger} />
+          <View style={styles.statusBox} accessibilityLiveRegion="polite">
+            <Ionicons
+              name="alert-circle-outline"
+              size={20}
+              color={colors.danger}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+            />
             <Text style={styles.statusText}>{t('blockedUsers.loadError')}</Text>
-            <Pressable onPress={() => refetch()} accessibilityRole="button">
+            <Pressable
+              onPress={() => refetch()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
               <Text style={styles.retryText}>{t('common.retry')}</Text>
             </Pressable>
           </View>
         ) : !blocked || blocked.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Ionicons name="happy-outline" size={32} color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>{t('blockedUsers.emptyTitle')}</Text>
+            <Ionicons
+              name="happy-outline"
+              size={32}
+              color={colors.textSecondary}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+            />
+            <Text style={styles.emptyTitle} accessibilityRole="header">
+              {t('blockedUsers.emptyTitle')}
+            </Text>
             <Text style={styles.emptyMessage}>{t('blockedUsers.emptyMessage')}</Text>
           </View>
         ) : (

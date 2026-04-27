@@ -296,6 +296,7 @@ export const ro: TranslationKeys = {
     bulletProfile: 'Profilul, numele de utilizator, avatarul și credențialele de cont',
     confirmInstruction: 'Pentru a confirma, scrie DELETE mai jos.',
     confirmPlaceholder: 'Scrie DELETE',
+    confirmHint: 'Scrie cuvântul DELETE cu majuscule pentru a activa butonul de ștergere.',
     cancelButton: 'Anulează',
     confirmButton: 'Șterge contul meu',
     confirming: 'Se șterge…',

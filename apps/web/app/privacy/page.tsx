@@ -170,10 +170,12 @@ export default function PrivacyPage() {
         <h2 style={styles.h2}>Your rights under GDPR</h2>
         <p style={styles.body}>
           You have the right to access your data, correct it, request deletion,
-          and object to specific processing. Account deletion is available
-          directly in the app at Profile → Account → Delete account; this
-          immediately removes all your personal data and cascades through
-          related records. For other rights, contact{' '}
+          and object to specific processing. See{' '}
+          <a href="/account-deletion" style={styles.link}>
+            how to delete your account
+          </a>{' '}
+          for the in-app and email-based deletion paths and what gets removed.
+          For other rights, contact{' '}
           <a href="mailto:privacy@defensivepedal.com" style={styles.link}>
             privacy@defensivepedal.com
           </a>

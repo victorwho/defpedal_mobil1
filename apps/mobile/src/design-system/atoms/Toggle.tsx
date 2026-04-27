@@ -25,6 +25,13 @@ export interface ToggleProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   accessibilityLabel: string;
+  /**
+   * When false, the toggle is hidden from screen readers — use when nested
+   * inside another switch-role surface (e.g. SettingRow) that already exposes
+   * the toggle state, so screen readers don't announce two switches per row.
+   * Tap interaction still fires for sighted users.
+   */
+  accessible?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +52,7 @@ export const Toggle: React.FC<ToggleProps> = ({
   onChange,
   disabled = false,
   accessibilityLabel,
+  accessible = true,
 }) => {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
@@ -86,9 +94,11 @@ export const Toggle: React.FC<ToggleProps> = ({
         onChange(!checked);
       }}
       disabled={disabled}
-      accessibilityRole="switch"
-      accessibilityState={{ checked, disabled }}
-      accessibilityLabel={accessibilityLabel}
+      accessible={accessible}
+      accessibilityRole={accessible ? 'switch' : undefined}
+      accessibilityState={accessible ? { checked, disabled } : undefined}
+      accessibilityLabel={accessible ? accessibilityLabel : undefined}
+      importantForAccessibility={accessible ? 'auto' : 'no-hide-descendants'}
       style={{ opacity: disabled ? 0.4 : 1 }}
     >
       <Animated.View style={[styles.track, { backgroundColor: trackColor }]}>

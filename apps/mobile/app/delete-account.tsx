@@ -82,8 +82,16 @@ export default function DeleteAccountScreen() {
     <Screen title={t('deleteAccount.title')} headerVariant="back" onBack={handleCancel}>
       <View style={styles.body}>
         <View style={styles.warningCard}>
-          <Ionicons name="warning-outline" size={28} color={colors.danger} />
-          <Text style={styles.warningTitle}>{t('deleteAccount.title')}</Text>
+          <Ionicons
+            name="warning-outline"
+            size={28}
+            color={colors.danger}
+            importantForAccessibility="no"
+            accessibilityElementsHidden
+          />
+          <Text style={styles.warningTitle} accessibilityRole="header">
+            {t('deleteAccount.title')}
+          </Text>
         </View>
 
         <Text style={styles.intro}>{t('deleteAccount.intro')}</Text>
@@ -98,7 +106,14 @@ export default function DeleteAccountScreen() {
             t('deleteAccount.bulletProfile'),
           ].map((bullet, index) => (
             <View key={index} style={styles.bulletRow}>
-              <Ionicons name="ellipse" size={6} color={colors.textPrimary} style={styles.bulletDot} />
+              <Ionicons
+                name="ellipse"
+                size={6}
+                color={colors.textPrimary}
+                style={styles.bulletDot}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              />
               <Text style={styles.bulletText}>{bullet}</Text>
             </View>
           ))}
@@ -115,7 +130,8 @@ export default function DeleteAccountScreen() {
           autoCapitalize="characters"
           autoCorrect={false}
           editable={!submitting}
-          accessibilityLabel={t('deleteAccount.confirmPlaceholder')}
+          accessibilityLabel={t('deleteAccount.confirmInstruction')}
+          accessibilityHint={t('deleteAccount.confirmHint')}
         />
 
         <View style={styles.buttonRow}>
@@ -125,6 +141,7 @@ export default function DeleteAccountScreen() {
             disabled={submitting}
             accessibilityRole="button"
             accessibilityLabel={t('deleteAccount.cancelButton')}
+            accessibilityState={{ disabled: submitting }}
           >
             <Text style={styles.cancelButtonText}>{t('deleteAccount.cancelButton')}</Text>
           </Pressable>

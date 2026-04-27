@@ -66,7 +66,13 @@ export default function PrivacyAnalyticsScreen() {
             />
           ) : (
             <View style={styles.unavailableRow}>
-              <Ionicons name="alert-circle-outline" size={18} color={colors.textSecondary} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={colors.textSecondary}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              />
               <Text style={styles.unavailableText}>{t('privacyAnalytics.crashUnavailable')}</Text>
             </View>
           )}
@@ -79,14 +85,26 @@ export default function PrivacyAnalyticsScreen() {
             />
           ) : (
             <View style={styles.unavailableRow}>
-              <Ionicons name="alert-circle-outline" size={18} color={colors.textSecondary} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={colors.textSecondary}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              />
               <Text style={styles.unavailableText}>{t('privacyAnalytics.analyticsUnavailable')}</Text>
             </View>
           )}
         </View>
 
         <View style={styles.assuranceCard}>
-          <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />
+          <Ionicons
+            name="lock-closed-outline"
+            size={18}
+            color={colors.textSecondary}
+            importantForAccessibility="no"
+            accessibilityElementsHidden
+          />
           <Text style={styles.assuranceText}>{t('privacyAnalytics.assurance')}</Text>
         </View>
       </ScrollView>

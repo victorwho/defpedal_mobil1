@@ -74,13 +74,17 @@ export default function OnboardingConsentScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
-      <View style={styles.glowTop} />
+      <View style={styles.glowTop} importantForAccessibility="no" accessibilityElementsHidden />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.topSection}>
-          <BrandLogo size={48} />
+          <View importantForAccessibility="no" accessibilityElementsHidden>
+            <BrandLogo size={48} />
+          </View>
           <Text style={styles.eyebrow}>{t('onboardingConsent.eyebrow')}</Text>
-          <Text style={styles.title}>{t('onboardingConsent.title')}</Text>
+          <Text style={styles.title} accessibilityRole="header">
+            {t('onboardingConsent.title')}
+          </Text>
           <Text style={styles.subtitle}>{t('onboardingConsent.subtitle')}</Text>
         </View>
 
@@ -102,7 +106,13 @@ export default function OnboardingConsentScreen() {
             />
           ) : null}
           <View style={styles.assuranceRow}>
-            <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
+            <Ionicons
+              name="lock-closed-outline"
+              size={16}
+              color={colors.textSecondary}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+            />
             <Text style={styles.assuranceText}>{t('onboardingConsent.assurance')}</Text>
           </View>
         </View>

@@ -294,6 +294,7 @@ export const en = {
     bulletProfile: 'Your profile, username, avatar, and account credentials',
     confirmInstruction: 'To confirm, type DELETE below.',
     confirmPlaceholder: 'Type DELETE',
+    confirmHint: 'Type the word DELETE in capital letters to enable the delete button.',
     cancelButton: 'Cancel',
     confirmButton: 'Delete my account',
     confirming: 'Deleting…',
