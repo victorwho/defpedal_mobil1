@@ -207,6 +207,102 @@ export const en = {
     rebuildRequired: 'Rebuild required',
     rebuildMessage: 'Photo picker needs a native rebuild.',
     photoUploadFailed: 'Photo upload failed',
+    // Delete account
+    deleteAccount: 'Delete account',
+    deleteAccountSub: 'Permanently remove your account and all your data',
+    // Compliance plan item 13: GPS retention opt-out
+    keepFullGpsHistory: 'Keep full GPS history',
+    keepFullGpsHistoryOn: 'Raw GPS breadcrumbs are kept for every ride until you delete your account.',
+    keepFullGpsHistoryOff: 'Trip summaries are kept forever; raw GPS breadcrumbs are auto-truncated after 90 days. Distance, CO2 and badges are unaffected.',
+  },
+
+  // ── Report sheet ──
+  report: {
+    title: 'Report content',
+    subtitle: 'Help us keep the community safe. Reports go to our moderator and stay private.',
+    reasonLabel: 'Why are you reporting this?',
+    reasonSpam: 'Spam',
+    reasonHarassment: 'Harassment',
+    reasonHate: 'Hate speech',
+    reasonSexual: 'Sexual content',
+    reasonViolence: 'Violence or threats',
+    reasonIllegal: 'Illegal activity',
+    reasonOther: 'Other',
+    detailsLabel: 'Additional details (optional)',
+    detailsPlaceholder: 'What should we know about this report?',
+    submit: 'Submit report',
+    successTitle: 'Report received',
+    successMessage: 'Thanks — we\'ll review this within 48 hours.',
+    errorTitle: 'Could not send report',
+    errorMessage: 'Please try again in a moment.',
+    alreadyReported: 'You have already reported this content.',
+  },
+
+  // ── Blocked users screen ──
+  blockedUsers: {
+    title: 'Blocked users',
+    profileRowSub: 'Manage who you have blocked from your feed',
+    loading: 'Loading…',
+    loadError: 'Could not load your blocked users.',
+    emptyTitle: 'No blocked users',
+    emptyMessage: 'When you block someone, their posts, hazards, and comments will be hidden from you here and across the app.',
+    blockedAt: 'Blocked {{date}}',
+    unblock: 'Unblock',
+    unblockConfirmTitle: 'Unblock this user?',
+    unblockConfirmMessage: '{{name}}\'s content will reappear in your feed.',
+    errorTitle: 'Could not unblock',
+    errorMessage: 'Please try again in a moment.',
+  },
+
+  // ── Onboarding analytics consent ──
+  onboardingConsent: {
+    eyebrow: 'Defensive Pedal',
+    title: 'Help us improve, on your terms',
+    subtitle: 'Both options are on by default. Turn either off if you prefer not to share.',
+    crashLabel: 'Share crash reports',
+    crashDescription: 'On by default. Stack traces and device info when the app crashes — no location, no personal data. Helps us fix bugs faster.',
+    analyticsLabel: 'Share product analytics',
+    analyticsDescription: 'On by default. Anonymous usage events so we can ship the right features. No location tracking — turn off anytime.',
+    assurance: 'You\'re in control.',
+    continue: 'Continue',
+    changeLater: 'You can change these anytime in Profile → Privacy & analytics.',
+  },
+
+  // ── Privacy & Analytics settings screen ──
+  privacyAnalytics: {
+    title: 'Privacy & analytics',
+    profileRowSub: 'Crash reports and product analytics preferences',
+    intro: 'Both options are on by default. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
+    crashLabel: 'Share crash reports',
+    crashDescription: 'Stack traces and device info when the app crashes. No location data.',
+    analyticsLabel: 'Share product analytics',
+    analyticsDescription: 'Anonymised usage events so we can ship the right things. No GPS tracks.',
+    crashUnavailable: 'Crash reporting is not configured in this build.',
+    analyticsUnavailable: 'Product analytics is not configured in this build.',
+    assurance: 'When a switch is off, no events are sent for that channel. We never sell your data.',
+  },
+
+  // ── Delete account screen ──
+  deleteAccount: {
+    title: 'Delete account',
+    intro: 'This action is permanent. We will remove the following from our servers within 24 hours:',
+    bulletTrips: 'Your trip history, GPS tracks, and ride statistics',
+    bulletShares: 'Trips you shared to the community feed',
+    bulletHazards: 'Hazards you reported (the report stays for community safety, but your name is removed)',
+    bulletSocial: 'Your likes, loves, comments, and follow relationships',
+    bulletProgress: 'Your XP, badges, streak, and tier progression',
+    bulletProfile: 'Your profile, username, avatar, and account credentials',
+    confirmInstruction: 'To confirm, type DELETE below.',
+    confirmPlaceholder: 'Type DELETE',
+    cancelButton: 'Cancel',
+    confirmButton: 'Delete my account',
+    confirming: 'Deleting…',
+    successTitle: 'Account deleted',
+    successMessage: 'Your account and all associated data have been removed. You will be signed out now.',
+    errorTitle: 'Deletion failed',
+    errorMessage: 'We could not delete your account. Please try again, or contact support if the problem persists.',
+    anonymousNotice: 'You are signed in anonymously. There is no account to delete — closing the app or clearing app data will remove your local state.',
+    signInRequired: 'Sign in with Google to manage account deletion.',
   },
 
   // ── History ──
@@ -324,6 +420,16 @@ export const en = {
     minsAgo: '{{count}}m ago',
     hoursAgo: '{{count}}h ago',
     daysAgo: '{{count}}d ago',
+    // Moderation menu (long-press) — compliance plan item 7
+    moderationMenu: 'What would you like to do?',
+    report: 'Report',
+    blockUser: 'Block user',
+    longPressHint: 'Long-press for more options',
+    blockConfirmTitle: 'Block this user?',
+    blockConfirmMessage: 'You won\'t see posts, hazards, or comments from {{name}} anymore.',
+    blockErrorTitle: 'Could not block',
+    blockErrorMessage: 'Please try again in a moment.',
+    hiddenAfterAction: 'Hidden — refresh the feed to see other content.',
   },
 
   // ── Hazard Reporting ──

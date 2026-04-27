@@ -1,6 +1,8 @@
 import type { ErrorResponse, FeedComment, WriteAckResponse } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { requireFullUser } from '../lib/auth';
+import { sanitiseComment } from '../lib/commentSanitize';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import {
   errorResponseSchema,
@@ -10,6 +12,8 @@ import {
   type TripShareIdParams,
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { checkContentAgainstFilter } from '../lib/moderationFilter';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { XP_VALUES } from '../lib/xp';
 import { ensureSupabase, requireUser } from './feed-helpers';
@@ -126,19 +130,50 @@ export const buildFeedCommentRoutes = (
           },
         },
       },
-      async (request) => {
-        const user = await requireUser(request, dependencies);
+      async (request, reply) => {
+        // Compliance plan item 7: anonymous Supabase sessions cannot post
+        // comments. Switched from requireUser → requireFullUser. Tester
+        // accounts that were anonymous-only will need to sign in with Google.
+        const user = await requireFullUser(request, dependencies.authenticateUser);
+
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: 'comment',
+          key: buildRateLimitIdentity({ userId: user.id }),
+          limit: dependencies.rateLimitPolicies.comment.limit,
+          windowMs: dependencies.rateLimitPolicies.comment.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rl.limit);
+        reply.header('x-ratelimit-remaining', rl.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rl.resetAt / 1000));
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for comments.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
+        const sanitised = sanitiseComment(request.body.body);
+        const filterResult = checkContentAgainstFilter(sanitised.body);
+        // Auto-hide if either gate flagged. The post still lands so the user
+        // doesn't see it disappear silently — filtering is per-row via
+        // is_hidden so it's invisible to everyone except the moderator.
+        const autoHide = sanitised.flagged || filterResult.flagged;
+
         const db = ensureSupabase();
 
-        const { error } = await db
+        const { data: insertedRows, error } = await db
           .from('feed_comments')
           .insert([
             {
               trip_share_id: request.params.id,
               user_id: user.id,
-              body: request.body.body.trim(),
+              body: sanitised.body,
+              is_hidden: autoHide,
             },
-          ]);
+          ])
+          .select('id')
+          .single();
 
         if (error) {
           throw new HttpError('Comment failed.', {
@@ -146,6 +181,34 @@ export const buildFeedCommentRoutes = (
             code: 'UPSTREAM_ERROR',
             details: [error.message],
           });
+        }
+
+        // Auto-filter hit — queue a content_reports row so Victor reviews it
+        // (fire-and-forget; the comment posted successfully).
+        if (autoHide && insertedRows) {
+          void (async () => {
+            try {
+              await db.from('content_reports').insert([
+                {
+                  reporter_user_id: user.id, // self-reported via auto-filter
+                  target_type: 'comment',
+                  target_id: insertedRows.id as string,
+                  reason: filterResult.flagged ? 'hate' : 'spam',
+                  details: filterResult.pattern
+                    ? `auto-filter pattern: ${filterResult.pattern}`
+                    : sanitised.reason
+                      ? `auto-filter: ${sanitised.reason}`
+                      : null,
+                  auto_filter: true,
+                },
+              ]);
+            } catch (autoFilterError) {
+              request.log.warn(
+                { event: 'auto_filter_report_insert_failed', err: autoFilterError },
+                'failed to insert auto-filter content_reports row',
+              );
+            }
+          })();
         }
 
         // Fire-and-forget community notification to trip owner

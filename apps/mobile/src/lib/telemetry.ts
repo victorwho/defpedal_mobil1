@@ -9,7 +9,14 @@ type TelemetryProperties = Record<
   TelemetryValue | Array<string | number | boolean>
 >;
 
-let telemetryInitialized = false;
+// Module-level state for the two clients. Both start `false` and only flip
+// when the consent provider calls enableSentry/enablePostHog. Disable calls
+// tear them back down. The telemetry helpers (capture, screen, identify,
+// captureError) are no-ops when their corresponding client isn't enabled.
+//
+// This is the runtime gate that backs item 8 of the compliance plan: no
+// telemetry events can fire before the user has explicitly consented.
+let sentryEnabled = false;
 let posthogClient: PostHog | null = null;
 
 const sanitizeProperties = (
@@ -31,53 +38,75 @@ const sanitizeProperties = (
   }, {});
 };
 
-const sentryEnabled = Boolean(mobileEnv.sentryDsn);
-const posthogEnabled = Boolean(mobileEnv.posthogApiKey);
+/** Whether the Sentry DSN is configured at build time (not whether consent was granted). */
+export const sentryConfigured = Boolean(mobileEnv.sentryDsn);
+/** Whether the PostHog API key is configured at build time. */
+export const posthogConfigured = Boolean(mobileEnv.posthogApiKey);
 
-const createPostHogClient = () => {
-  if (!posthogEnabled || posthogClient) {
-    return posthogClient;
+export const telemetryStatus = {
+  /** @deprecated Use sentryConfigured + the consent flag in appStore. */
+  sentryEnabled: sentryConfigured,
+  /** @deprecated Use posthogConfigured + the consent flag in appStore. */
+  posthogEnabled: posthogConfigured,
+} as const;
+
+export const enableSentry = () => {
+  if (sentryEnabled || !sentryConfigured) {
+    return;
+  }
+
+  Sentry.init({
+    dsn: mobileEnv.sentryDsn,
+    environment: mobileEnv.sentryEnvironment,
+    enabled: true,
+    tracesSampleRate: Number.isFinite(mobileEnv.sentryTracesSampleRate)
+      ? mobileEnv.sentryTracesSampleRate
+      : 0.2,
+    sendDefaultPii: false,
+    initialScope: {
+      tags: {
+        app_env: mobileEnv.appEnv,
+        app_variant: mobileEnv.appVariant,
+      },
+    },
+  });
+  sentryEnabled = true;
+};
+
+export const disableSentry = () => {
+  if (!sentryEnabled) {
+    return;
+  }
+  // Sentry.close() flushes pending events then prevents further capture.
+  // We don't await — fire-and-forget, the user just wants events to stop.
+  void Sentry.close();
+  sentryEnabled = false;
+};
+
+export const enablePostHog = () => {
+  if (posthogClient || !posthogConfigured) {
+    return;
   }
 
   posthogClient = new PostHog(mobileEnv.posthogApiKey, {
     host: mobileEnv.posthogHost,
-    disabled: !posthogEnabled,
+    disabled: false,
   });
-
-  return posthogClient;
 };
 
-export const telemetryStatus = {
-  sentryEnabled,
-  posthogEnabled,
-} as const;
-
-export const initializeTelemetry = () => {
-  if (telemetryInitialized) {
+export const disablePostHog = () => {
+  if (!posthogClient) {
     return;
   }
-
-  if (sentryEnabled) {
-    Sentry.init({
-      dsn: mobileEnv.sentryDsn,
-      environment: mobileEnv.sentryEnvironment,
-      enabled: true,
-      tracesSampleRate: Number.isFinite(mobileEnv.sentryTracesSampleRate)
-        ? mobileEnv.sentryTracesSampleRate
-        : 0.2,
-      sendDefaultPii: false,
-      initialScope: {
-        tags: {
-          app_env: mobileEnv.appEnv,
-          app_variant: mobileEnv.appVariant,
-        },
-      },
-    });
-  }
-
-  createPostHogClient();
-  telemetryInitialized = true;
+  // reset() clears the in-memory user identity and pending queue, then we
+  // drop the reference. Future capture/identify/screen calls become no-ops
+  // because posthogClient is null.
+  posthogClient.reset();
+  posthogClient = null;
 };
+
+export const isSentryEnabled = () => sentryEnabled;
+export const isPostHogEnabled = () => posthogClient !== null;
 
 export const telemetry = {
   identify: (
@@ -86,30 +115,33 @@ export const telemetry = {
       email?: string | null;
     } | null,
   ) => {
-    initializeTelemetry();
-
     if (!user) {
-      Sentry.setUser(null);
+      if (sentryEnabled) Sentry.setUser(null);
       posthogClient?.reset();
       return;
     }
 
-    Sentry.setUser({
-      id: user.id,
-      email: user.email ?? undefined,
-    });
+    if (sentryEnabled) {
+      Sentry.setUser({
+        id: user.id,
+        // Anonymous users have no email — Sentry receives id only.
+        ...(user.email ? { email: user.email } : {}),
+      });
+    }
 
-    posthogClient?.identify(
-      user.id,
-      sanitizeProperties({
-        email: user.email ?? null,
-        app_env: mobileEnv.appEnv,
-        app_variant: mobileEnv.appVariant,
-      }),
-    );
+    if (posthogClient) {
+      posthogClient.identify(
+        user.id,
+        sanitizeProperties({
+          // Anonymous users have no email — PostHog receives id-only profile.
+          email: user.email ?? null,
+          app_env: mobileEnv.appEnv,
+          app_variant: mobileEnv.appVariant,
+        }),
+      );
+    }
   },
   screen: (name: string, properties?: TelemetryProperties) => {
-    initializeTelemetry();
     const nextProperties = sanitizeProperties(properties);
 
     if (sentryEnabled) {
@@ -125,7 +157,6 @@ export const telemetry = {
     posthogClient?.screen(name, nextProperties);
   },
   capture: (event: string, properties?: TelemetryProperties) => {
-    initializeTelemetry();
     const nextProperties = sanitizeProperties(properties);
 
     if (sentryEnabled) {
@@ -141,7 +172,6 @@ export const telemetry = {
     posthogClient?.capture(event, nextProperties);
   },
   captureError: (error: unknown, context?: TelemetryProperties) => {
-    initializeTelemetry();
     const nextError =
       error instanceof Error ? error : new Error(typeof error === 'string' ? error : 'Unknown error');
     const nextContext = sanitizeProperties(context);
@@ -166,4 +196,33 @@ export const telemetry = {
       posthogClient ? posthogClient.flush() : Promise.resolve(undefined),
     ]);
   },
+};
+
+/**
+ * Apply the user's consent decision. Idempotent — calling repeatedly with the
+ * same flags is a no-op, calling with new flags initializes/tears-down the
+ * affected client. Designed to be invoked from a useEffect that subscribes to
+ * the appStore.analyticsConsent slice.
+ */
+export const applyTelemetryConsent = (consent: { sentry: boolean; posthog: boolean }) => {
+  if (consent.sentry) {
+    enableSentry();
+  } else {
+    disableSentry();
+  }
+
+  if (consent.posthog) {
+    enablePostHog();
+  } else {
+    disablePostHog();
+  }
+};
+
+/**
+ * @deprecated Kept temporarily for callers that still reach for explicit init.
+ * The TelemetryProvider now drives lifecycle via applyTelemetryConsent. New code
+ * should not call this — events fired before consent silently no-op anyway.
+ */
+export const initializeTelemetry = () => {
+  // Intentional no-op. Telemetry is gated by user consent now.
 };

@@ -14,7 +14,7 @@
  *   - ReactionBar (like/love) + comment count
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import type {
@@ -35,12 +35,16 @@ import { TierPill } from '../atoms/TierPill';
 import { BadgeIcon } from '../atoms/BadgeIcon';
 import { ReactionBar } from '../../components/LikeButton';
 import { RouteMap } from '../../components/map';
+import { useBlockUser } from '../../hooks/useBlockUser';
+import { useT } from '../../hooks/useTranslation';
+import { ReportSheet } from '../molecules/ReportSheet';
 import { riderTiers, type RiderTierKey } from '../tokens/tierColors';
 import { tierImages } from '../tokens/tierImages';
 import { safetyColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
+import type { ReportTargetType } from '../../hooks/useReportContent';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -55,7 +59,20 @@ export interface ActivityFeedCardProps {
   onSharePress?: (item: ActivityFeedItem) => void;
   /** Whether the card is visible in viewport (for lazy map loading) */
   isVisible?: boolean;
+  /** Currently authenticated user's id — suppresses moderation menu on own posts.
+   *  Compliance plan item 7. */
+  currentUserId?: string | null;
 }
+
+// Map ActivityFeedItem.type to a moderation report target_type.
+const REPORT_TARGET_BY_ITEM_TYPE: Record<ActivityFeedItem['type'], ReportTargetType> = {
+  ride: 'trip_share',
+  hazard_batch: 'hazard',
+  hazard_standalone: 'hazard',
+  tier_up: 'profile',
+  badge_unlock: 'profile',
+  route_share_signup: 'trip_share',
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -143,9 +160,15 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
   onUserPress,
   onSharePress,
   isVisible = true,
+  currentUserId,
 }: ActivityFeedCardProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
+
+  const [reportSheetVisible, setReportSheetVisible] = useState(false);
+  const [optimisticallyHidden, setOptimisticallyHidden] = useState(false);
+  const blockMutation = useBlockUser();
 
   const initials = useMemo(
     () => getInitials(item.user.displayName),
@@ -174,8 +197,70 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
   );
   const canShare = onSharePress != null && item.type === 'ride';
 
+  // Moderation menu — suppressed on own posts. Plan §7.
+  const isOwnCard = currentUserId != null && currentUserId === item.user.id;
+  const handleLongPress = useCallback(() => {
+    if (isOwnCard) return;
+    Alert.alert(item.user.displayName, t('feedCard.moderationMenu'), [
+      { text: t('feedCard.report'), onPress: () => setReportSheetVisible(true) },
+      {
+        text: t('feedCard.blockUser'),
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            t('feedCard.blockConfirmTitle'),
+            t('feedCard.blockConfirmMessage', { name: item.user.displayName }),
+            [
+              { text: t('common.cancel'), style: 'cancel' },
+              {
+                text: t('feedCard.blockUser'),
+                style: 'destructive',
+                onPress: () => {
+                  setOptimisticallyHidden(true);
+                  blockMutation.mutate(item.user.id, {
+                    onError: () => {
+                      setOptimisticallyHidden(false);
+                      Alert.alert(t('feedCard.blockErrorTitle'), t('feedCard.blockErrorMessage'));
+                    },
+                  });
+                },
+              },
+            ],
+          );
+        },
+      },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+  }, [isOwnCard, item.user.displayName, item.user.id, t, blockMutation]);
+
+  if (optimisticallyHidden) {
+    return (
+      <View
+        style={styles.hiddenCard}
+        accessibilityRole="text"
+        accessibilityLabel={t('feedCard.hiddenAfterAction')}
+      >
+        <Ionicons name="eye-off-outline" size={18} color={colors.textSecondary} />
+        <Text style={styles.hiddenText}>{t('feedCard.hiddenAfterAction')}</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.card}>
+    <Pressable
+      style={styles.card}
+      onLongPress={isOwnCard ? undefined : handleLongPress}
+      accessibilityHint={isOwnCard ? undefined : t('feedCard.longPressHint')}
+    >
+      {!isOwnCard ? (
+        <ReportSheet
+          visible={reportSheetVisible}
+          onClose={() => setReportSheetVisible(false)}
+          targetType={REPORT_TARGET_BY_ITEM_TYPE[item.type]}
+          targetId={item.id}
+          onReported={() => setOptimisticallyHidden(true)}
+        />
+      ) : null}
       {/* User header */}
       <CardHeader
         displayName={item.user.displayName}
@@ -233,7 +318,7 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
           </Pressable>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 });
 
@@ -574,6 +659,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       backgroundColor: colors.bgSecondary,
       padding: space[4],
       gap: 10,
+    },
+    hiddenCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      borderRadius: radii.xl,
+      borderCurve: 'continuous',
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgSecondary,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+    },
+    hiddenText: {
+      ...textSm,
+      color: colors.textSecondary,
+      flex: 1,
     },
 
     // Header

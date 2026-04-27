@@ -139,9 +139,19 @@ const FAQ_SECTIONS: FaqSection[] = [
     icon: 'lock-closed-outline',
     items: [
       {
-        question: 'Is my location data shared?',
+        question: 'What happens to my location data?',
         answer:
-          'Your location is only used locally for navigation and route planning. We do not store or share your GPS tracks. Hazard reports are anonymised. If you share a trip to the community feed, only the planned route and summary statistics are visible \u2014 not your raw GPS trail.',
+          'GPS breadcrumbs from your trips are uploaded to our servers so you can replay rides in your trip history, see your impact stats, and share routes to the community feed. Hazard reports include the exact coordinate where you tapped, plus your username so other riders can see who flagged it. If you share a trip to the feed, your username, route summary and full polyline are visible to other users.\n\nYou can delete your account at any time from Profile \u2192 Account \u2192 Delete account, which removes all of this data permanently.',
+      },
+      {
+        question: 'How do I delete my account?',
+        answer:
+          'Open Profile, scroll to the Account section, and tap Delete account. You\'ll be asked to type DELETE to confirm. On confirmation, we permanently remove your trips, GPS history, hazard reports, comments, likes, badges, XP and profile from our servers. Community-visible content you posted (such as a hazard you flagged or a comment you wrote) is anonymised \u2014 the post stays so the community signal is preserved, but your name and account are gone.',
+      },
+      {
+        question: 'Do you collect crash reports or product analytics?',
+        answer:
+          'Both default ON during onboarding, but you can turn either off on the same screen or anytime later in Profile \u2192 Privacy & analytics; turning a switch off stops new events for that channel immediately. Crash reports include stack traces and device info to help us fix bugs faster \u2014 never your location and no personal data. Product analytics is anonymous, aggregated usage data with no GPS tracks. We never sell your data.',
       },
     ],
   },

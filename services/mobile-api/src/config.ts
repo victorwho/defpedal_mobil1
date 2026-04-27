@@ -123,6 +123,29 @@ export const config = {
         600000,
       ),
     },
+    // UGC moderation: tighter than 'write' so a malicious user can't flood the
+    // moderation queue. Defaults aligned with compliance plan §7.
+    report: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_REPORT_MAX'], '5'), 5),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_REPORT_WINDOW_MS'], '600000'),
+        600000,
+      ),
+    },
+    block: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_BLOCK_MAX'], '20'), 20),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_BLOCK_WINDOW_MS'], '3600000'),
+        3600000,
+      ),
+    },
+    comment: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_COMMENT_MAX'], '3'), 3),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_COMMENT_WINDOW_MS'], '900000'),
+        900000,
+      ),
+    },
   },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),

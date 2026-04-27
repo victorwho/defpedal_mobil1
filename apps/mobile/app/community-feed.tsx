@@ -28,6 +28,7 @@ import { useActivityFeedQuery, useActivityReaction } from '../src/hooks/useActiv
 import { useSuggestedUsers, useFollowUser } from '../src/hooks/useFollow';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
+import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
 // ---------------------------------------------------------------------------
 // Merged list item type: either a feed item or a "suggested users" separator
@@ -49,6 +50,8 @@ export default function CommunityFeedScreen() {
     refreshLocation,
   } = useCurrentLocation();
   const insets = useSafeAreaInsets();
+  const { user } = useAuthSession();
+  const currentUserId = user?.id ?? null;
   const lat = currentLocation?.lat ?? null;
   const lon = currentLocation?.lon ?? null;
 
@@ -181,11 +184,12 @@ export default function CommunityFeedScreen() {
             onComment={handleComment}
             onUserPress={handleUserPress}
             onSharePress={handleSharePress}
+            currentUserId={currentUserId}
           />
         </FadeSlideIn>
       );
     },
-    [visibleIds, handleReact, handleComment, handleUserPress, handleSharePress, handleFollow, suggestedUsers],
+    [visibleIds, handleReact, handleComment, handleUserPress, handleSharePress, handleFollow, suggestedUsers, currentUserId],
   );
 
   const keyExtractor = useCallback(

@@ -747,6 +747,11 @@ export interface ProfileUpdateRequest {
   // Slice 8: sharer controls whether claimed-shares publish to the
   // activity feed. Default true. Claim rewards/XP/badges ship regardless.
   shareConversionFeedOptin?: boolean;
+  // Compliance plan item 13: opt-in to keep raw GPS breadcrumbs longer
+  // than the 90-day default. When false (default), the daily retention
+  // cron truncates trip_tracks.gps_trail on rides older than 90d.
+  // Trip summaries (distance, duration, CO2, badges) are unaffected.
+  keepFullGpsHistory?: boolean;
 }
 
 export interface ProfileResponse {
@@ -759,6 +764,7 @@ export interface ProfileResponse {
   cyclingGoal: CyclingGoal | null;
   isPrivate: boolean;
   shareConversionFeedOptin: boolean;
+  keepFullGpsHistory: boolean;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────

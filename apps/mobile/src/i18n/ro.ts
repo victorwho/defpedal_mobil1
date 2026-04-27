@@ -209,6 +209,102 @@ export const ro: TranslationKeys = {
     rebuildRequired: 'Rebuild necesar',
     rebuildMessage: 'Selectorul de fotografii necesită rebuild nativ.',
     photoUploadFailed: 'Încărcarea fotografiei a eșuat',
+    // Delete account
+    deleteAccount: 'Șterge contul',
+    deleteAccountSub: 'Elimină definitiv contul tău și toate datele tale',
+    // Compliance plan item 13: GPS retention opt-out
+    keepFullGpsHistory: 'Păstrează istoricul GPS complet',
+    keepFullGpsHistoryOn: 'Urmele GPS brute sunt păstrate pentru fiecare cursă până când îți ștergi contul.',
+    keepFullGpsHistoryOff: 'Rezumatele curselor sunt păstrate pentru totdeauna; urmele GPS brute sunt eliminate automat după 90 de zile. Distanța, CO2 și insignele nu sunt afectate.',
+  },
+
+  // ── Report sheet ──
+  report: {
+    title: 'Raportează conținut',
+    subtitle: 'Ajută-ne să menținem comunitatea în siguranță. Rapoartele merg la moderatorul nostru și rămân private.',
+    reasonLabel: 'De ce raportezi?',
+    reasonSpam: 'Spam',
+    reasonHarassment: 'Hărțuire',
+    reasonHate: 'Discurs instigator la ură',
+    reasonSexual: 'Conținut sexual',
+    reasonViolence: 'Violență sau amenințări',
+    reasonIllegal: 'Activitate ilegală',
+    reasonOther: 'Altceva',
+    detailsLabel: 'Detalii suplimentare (opțional)',
+    detailsPlaceholder: 'Ce ar trebui să știm despre acest raport?',
+    submit: 'Trimite raportul',
+    successTitle: 'Raport primit',
+    successMessage: 'Mulțumim — vom analiza în 48 de ore.',
+    errorTitle: 'Trimiterea a eșuat',
+    errorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+    alreadyReported: 'Ai raportat deja acest conținut.',
+  },
+
+  // ── Blocked users screen ──
+  blockedUsers: {
+    title: 'Utilizatori blocați',
+    profileRowSub: 'Gestionează utilizatorii blocați din feed',
+    loading: 'Se încarcă…',
+    loadError: 'Nu s-a putut încărca lista de utilizatori blocați.',
+    emptyTitle: 'Niciun utilizator blocat',
+    emptyMessage: 'Când blochezi pe cineva, postările, pericolele și comentariile sale vor fi ascunse de tine aici și în aplicație.',
+    blockedAt: 'Blocat la {{date}}',
+    unblock: 'Deblochează',
+    unblockConfirmTitle: 'Deblochezi acest utilizator?',
+    unblockConfirmMessage: 'Conținutul lui {{name}} va reapărea în feed-ul tău.',
+    errorTitle: 'Deblocarea a eșuat',
+    errorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+  },
+
+  // ── Onboarding analytics consent ──
+  onboardingConsent: {
+    eyebrow: 'Defensive Pedal',
+    title: 'Ajută-ne să ne îmbunătățim, în condițiile tale',
+    subtitle: 'Ambele opțiuni sunt active implicit. Dezactivează oricare dacă preferi să nu partajezi.',
+    crashLabel: 'Trimite rapoarte de eroare',
+    crashDescription: 'Activă implicit. Urme ale stivei și informații despre dispozitiv când aplicația se blochează — fără locație, fără date personale. Ne ajută să remediem erorile mai rapid.',
+    analyticsLabel: 'Trimite analize de produs',
+    analyticsDescription: 'Activă implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație — dezactivează oricând.',
+    assurance: 'Tu deții controlul.',
+    continue: 'Continuă',
+    changeLater: 'Poți schimba oricând din Profil → Confidențialitate & analiză.',
+  },
+
+  // ── Privacy & Analytics settings screen ──
+  privacyAnalytics: {
+    title: 'Confidențialitate & analiză',
+    profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
+    intro: 'Ambele opțiuni sunt active implicit. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
+    crashLabel: 'Trimite rapoarte de eroare',
+    crashDescription: 'Urme ale stivei și informații despre dispozitiv când aplicația se blochează. Fără date de locație.',
+    analyticsLabel: 'Trimite analize de produs',
+    analyticsDescription: 'Evenimente de utilizare anonime pentru a livra ce contează. Fără trasee GPS.',
+    crashUnavailable: 'Raportarea erorilor nu este configurată în acest build.',
+    analyticsUnavailable: 'Analiza produsului nu este configurată în acest build.',
+    assurance: 'Când un comutator este oprit, nu se trimit evenimente pe acel canal. Nu vindem niciodată datele tale.',
+  },
+
+  // ── Delete account screen ──
+  deleteAccount: {
+    title: 'Șterge contul',
+    intro: 'Această acțiune este permanentă. Vom elimina următoarele de pe serverele noastre în 24 de ore:',
+    bulletTrips: 'Istoricul curselor, traseele GPS și statisticile tale de cursă',
+    bulletShares: 'Cursele pe care le-ai partajat în feed-ul comunității',
+    bulletHazards: 'Pericolele pe care le-ai raportat (raportul rămâne pentru siguranța comunității, dar numele tău este eliminat)',
+    bulletSocial: 'Aprecierile, iubirile, comentariile și relațiile de urmărire',
+    bulletProgress: 'XP-ul, insignele, streak-ul și progresul de nivel',
+    bulletProfile: 'Profilul, numele de utilizator, avatarul și credențialele de cont',
+    confirmInstruction: 'Pentru a confirma, scrie DELETE mai jos.',
+    confirmPlaceholder: 'Scrie DELETE',
+    cancelButton: 'Anulează',
+    confirmButton: 'Șterge contul meu',
+    confirming: 'Se șterge…',
+    successTitle: 'Cont șters',
+    successMessage: 'Contul tău și toate datele asociate au fost eliminate. Vei fi deconectat acum.',
+    errorTitle: 'Ștergerea a eșuat',
+    errorMessage: 'Nu am putut șterge contul tău. Te rugăm să încerci din nou sau să contactezi suportul dacă problema persistă.',
+    anonymousNotice: 'Ești conectat anonim. Nu există un cont de șters — închiderea aplicației sau ștergerea datelor aplicației îți va elimina starea locală.',
+    signInRequired: 'Conectează-te cu Google pentru a gestiona ștergerea contului.',
   },
 
   // ── History ──
@@ -326,6 +422,16 @@ export const ro: TranslationKeys = {
     minsAgo: 'acum {{count}}m',
     hoursAgo: 'acum {{count}}h',
     daysAgo: 'acum {{count}}z',
+    // Meniu moderare (apăsare lungă) — compliance plan item 7
+    moderationMenu: 'Ce vrei să faci?',
+    report: 'Raportează',
+    blockUser: 'Blochează utilizator',
+    longPressHint: 'Apasă lung pentru mai multe opțiuni',
+    blockConfirmTitle: 'Blochezi acest utilizator?',
+    blockConfirmMessage: 'Nu vei mai vedea postări, pericole sau comentarii de la {{name}}.',
+    blockErrorTitle: 'Blocarea a eșuat',
+    blockErrorMessage: 'Te rugăm să încerci din nou într-o clipă.',
+    hiddenAfterAction: 'Ascuns — reîmprospătează feed-ul pentru alte postări.',
   },
 
   // ── Hazard Reporting ──

@@ -701,6 +701,27 @@ export default function ProfileScreen() {
               }}
             />
 
+            {/* Compliance plan item 13: by default we auto-truncate raw GPS
+                breadcrumbs from rides older than 90 days. This toggle opts
+                the user into keeping the full breadcrumb stream forever
+                (until account deletion). Trip summaries — distance, CO2,
+                badges, XP — are unaffected either way. */}
+            <SettingRow
+              label={t('profile.keepFullGpsHistory')}
+              description={
+                profile?.keepFullGpsHistory
+                  ? t('profile.keepFullGpsHistoryOn')
+                  : t('profile.keepFullGpsHistoryOff')
+              }
+              checked={Boolean(profile?.keepFullGpsHistory)}
+              onChange={(checked) => {
+                void mobileApi
+                  .updateProfile({ keepFullGpsHistory: checked })
+                  .then(() => refetchProfile())
+                  .catch(() => {/* best-effort */});
+              }}
+            />
+
             <Pressable
               style={styles.helpFaqRow}
               onPress={() => router.push('/my-shares' as any)}
@@ -725,6 +746,38 @@ export default function ProfileScreen() {
               styles={styles}
               colors={colors}
             />
+
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => router.push('/privacy-analytics' as any)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('privacyAnalytics.title')}
+            >
+              <Ionicons name="analytics-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>{t('privacyAnalytics.title')}</Text>
+                <Text style={styles.settingDescription}>{t('privacyAnalytics.profileRowSub')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
+
+            {user && !isAnonymous ? (
+              <Pressable
+                style={styles.helpFaqRow}
+                onPress={() => router.push('/blocked-users' as any)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('blockedUsers.title')}
+              >
+                <Ionicons name="ban-outline" size={22} color={colors.accent} />
+                <View style={styles.settingTextCol}>
+                  <Text style={styles.settingLabel}>{t('blockedUsers.title')}</Text>
+                  <Text style={styles.settingDescription}>{t('blockedUsers.profileRowSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+              </Pressable>
+            ) : null}
 
             <Pressable
               style={styles.helpFaqRow}
@@ -784,6 +837,30 @@ export default function ProfileScreen() {
               >
                 <Ionicons name="log-out-outline" size={20} color={colors.danger} />
                 <Text style={styles.signOutText}>{t('profile.signOut')}</Text>
+              </Pressable>
+            ) : null}
+
+            {/* Compliance: Play Store User Data policy + GDPR Art. 17 require
+                an in-app account deletion path. The destination screen handles
+                the typed-DELETE confirmation, the API call, and the post-delete
+                sign-out + redirect. Visible to authenticated (non-anonymous)
+                users only — anonymous accounts have nothing server-side to delete. */}
+            {user && !isAnonymous ? (
+              <Pressable
+                style={styles.helpFaqRow}
+                onPress={() => router.push('/delete-account' as any)}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile.deleteAccount')}
+              >
+                <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                <View style={styles.settingTextCol}>
+                  <Text style={[styles.settingLabel, { color: colors.danger }]}>
+                    {t('profile.deleteAccount')}
+                  </Text>
+                  <Text style={styles.settingDescription}>{t('profile.deleteAccountSub')}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={gray[400]} />
               </Pressable>
             ) : null}
           </View>

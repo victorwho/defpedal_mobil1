@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Sentry from '@sentry/react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState as RNAppState, StyleSheet, Text, View } from 'react-native';
 
@@ -510,7 +511,7 @@ const RankUpOverlayManager = () => {
   );
 };
 
-export default function RootLayout() {
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
 
   const onLayoutRootView = useCallback(async () => {
@@ -533,6 +534,12 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+// Sentry.wrap captures unhandled promise rejections and React component
+// breadcrumbs even before Sentry.init() is called. The wrap is a no-op
+// when the SDK isn't initialised (e.g. user hasn't consented yet, or no
+// DSN configured), so it's safe to always apply.
+export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
   root: {

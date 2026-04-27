@@ -1,6 +1,7 @@
 import type { CyclingGoal, ErrorResponse, ProfileResponse } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { requireFullUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import {
   errorResponseSchema,
@@ -71,6 +72,8 @@ export const buildFeedProfileRoutes = (
         if (request.body.quietHoursTimezone !== undefined) updates.quiet_hours_timezone = request.body.quietHoursTimezone;
         if (request.body.shareConversionFeedOptin !== undefined)
           updates.share_conversion_feed_optin = request.body.shareConversionFeedOptin;
+        if (request.body.keepFullGpsHistory !== undefined)
+          updates.keep_full_gps_history = request.body.keepFullGpsHistory;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db
@@ -96,7 +99,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
           .eq('id', user.id)
           .single();
 
@@ -122,6 +125,7 @@ export const buildFeedProfileRoutes = (
             data.share_conversion_feed_optin === null
               ? true
               : Boolean(data.share_conversion_feed_optin),
+          keepFullGpsHistory: Boolean(data.keep_full_gps_history),
         };
       },
     );
@@ -144,7 +148,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
           .eq('id', user.id)
           .single();
 
@@ -155,7 +159,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
             .single();
 
           if (createError || !created) {
@@ -180,6 +184,7 @@ export const buildFeedProfileRoutes = (
               created.share_conversion_feed_optin === null
                 ? true
                 : Boolean(created.share_conversion_feed_optin),
+            keepFullGpsHistory: Boolean(created.keep_full_gps_history),
           };
         }
 
@@ -197,6 +202,7 @@ export const buildFeedProfileRoutes = (
             data.share_conversion_feed_optin === null
               ? true
               : Boolean(data.share_conversion_feed_optin),
+          keepFullGpsHistory: Boolean(data.keep_full_gps_history),
         };
       },
     );
@@ -334,6 +340,102 @@ export const buildFeedProfileRoutes = (
         }
 
         return data;
+      },
+    );
+
+    // DELETE /profile — irreversible account deletion (Play Store User Data
+    // policy + GDPR Art. 17 right to erasure).
+    //
+    // Requires `confirmation: 'DELETE'` in the body to prevent accidents.
+    // `requireFullUser` rejects anonymous Supabase sessions (they have no
+    // email and no account-bound data to delete — the anon row will be
+    // recycled by Supabase's anonymous user GC).
+    //
+    // Mechanism: a single call to supabaseAdmin.auth.admin.deleteUser(uid)
+    // cascades through all FKs in supabase/migrations/202604200001_cascade_user_fks.sql
+    // and the related community-feed schema (trip_shares, feed_likes, feed_comments,
+    // trip_loves all FK to auth.users ON DELETE CASCADE). Tables that anonymise
+    // user_id rather than delete (hazards, navigation_feedback, notifications)
+    // do so via ON DELETE SET NULL — preserving community trust signals while
+    // removing the user's PII.
+    app.delete<{ Body: { confirmation: string }; Reply: ErrorResponse | { deletedAt: string } }>(
+      '/profile',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['confirmation'],
+            properties: {
+              confirmation: {
+                type: 'string',
+                enum: ['DELETE'],
+                description: 'Must be the literal string "DELETE" to confirm intent.',
+              },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['deletedAt'],
+              properties: {
+                deletedAt: { type: 'string', format: 'date-time' },
+              },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            429: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireFullUser(request, dependencies.authenticateUser);
+
+        const rlDecision = await dependencies.rateLimiter.consume({
+          bucket: 'write',
+          key: buildRateLimitIdentity({ userId: user.id }),
+          limit: dependencies.rateLimitPolicies.write.limit,
+          windowMs: dependencies.rateLimitPolicies.write.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rlDecision.limit);
+        reply.header('x-ratelimit-remaining', rlDecision.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rlDecision.resetAt / 1000));
+        if (!rlDecision.allowed) {
+          throw new HttpError('Rate limit exceeded for this endpoint.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rlDecision.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
+        if (request.body.confirmation !== 'DELETE') {
+          throw new HttpError('Confirmation token is invalid.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['confirmation must be the literal string "DELETE".'],
+          });
+        }
+
+        const db = ensureSupabase();
+
+        // Delete from auth.users — cascades remove the rest.
+        const { error } = await db.auth.admin.deleteUser(user.id);
+
+        if (error) {
+          request.log.error({ err: error, userId: user.id }, 'account deletion failed');
+          throw new HttpError('Account deletion failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error.message],
+          });
+        }
+
+        request.log.info({ userId: user.id }, 'account deleted by user request');
+
+        return { deletedAt: new Date().toISOString() };
       },
     );
 

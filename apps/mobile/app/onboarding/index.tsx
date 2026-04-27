@@ -28,14 +28,16 @@ export default function OnboardingPermissionScreen() {
   const [isRequesting, setIsRequesting] = useState(false);
 
   // If location is already granted (returning user / cleared data but kept permission),
-  // auto-advance to safety score screen
+  // auto-advance to the analytics consent step (compliance plan item 8 — consent
+  // must be captured before any telemetry fires, regardless of how the user
+  // entered the flow).
   useEffect(() => {
     let cancelled = false;
     const checkExisting = async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (!cancelled && status === 'granted') {
-          router.replace('/onboarding/safety-score');
+          router.replace('/onboarding/consent' as any);
         }
       } catch {
         // Ignore — user will tap the button
@@ -52,7 +54,7 @@ export default function OnboardingPermissionScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status === 'granted') {
-        router.push('/onboarding/safety-score');
+        router.push('/onboarding/consent' as any);
       } else {
         setDenied(true);
       }
@@ -64,7 +66,9 @@ export default function OnboardingPermissionScreen() {
   };
 
   const handleSkip = () => {
-    router.push('/onboarding/goal-selection');
+    // Even when location is denied, route through consent so analytics gating
+    // is captured before the user reaches goal-selection / first-route.
+    router.push('/onboarding/consent' as any);
   };
 
   return (

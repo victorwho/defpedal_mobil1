@@ -26,16 +26,26 @@ FLAVOR="preview"
 DO_INSTALL=false
 DO_BUNDLE=false
 DO_APK=true
+EXPLICIT_ARTIFACT=false
 for arg in "$@"; do
   case "$arg" in
     dev|development) FLAVOR="development" ;;
     prod|production) FLAVOR="production" ;;
     preview)         FLAVOR="preview" ;;
     install)         DO_INSTALL=true ;;
-    bundle)          DO_BUNDLE=true; DO_APK=false ;;
-    apk)             DO_APK=true ;;
+    bundle)          DO_BUNDLE=true; DO_APK=false; EXPLICIT_ARTIFACT=true ;;
+    apk)             DO_APK=true; DO_BUNDLE=false; EXPLICIT_ARTIFACT=true ;;
   esac
 done
+
+# Compliance guard: production builds default to AAB (Play Store accepts AAB only
+# for new apps). Caller can still opt back to APK via explicit `apk` arg, or both
+# via `bundle apk`.
+if [ "$FLAVOR" = "production" ] && [ "$EXPLICIT_ARTIFACT" = false ]; then
+  echo "── production flavor: defaulting to AAB (Play Store) ──"
+  DO_BUNDLE=true
+  DO_APK=false
+fi
 
 # Capitalize first letter for Gradle task name
 FLAVOR_CAP="$(echo "${FLAVOR:0:1}" | tr '[:lower:]' '[:upper:]')${FLAVOR:1}"
@@ -142,6 +152,36 @@ else
   echo "  Scheme $TARGET_SCHEME already present"
 fi
 
+echo "── Step 1c2: Apply network_security_config (cleartext only for OSRM) ──"
+# The Android network_security_config plugin is the source of truth, but we
+# don't run `expo prebuild` on $DST (it overwrites source). Patch the synced
+# manifest + write the resource file in place so the AAB picks it up.
+NETSEC_XML_DIR="$DST/apps/mobile/android/app/src/main/res/xml"
+NETSEC_XML="$NETSEC_XML_DIR/network_security_config.xml"
+mkdir -p "$NETSEC_XML_DIR"
+cat > "$NETSEC_XML" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">34.116.139.172</domain>
+    </domain-config>
+</network-security-config>
+XML
+echo "  Wrote $NETSEC_XML"
+# Add android:networkSecurityConfig to <application> if missing.
+if ! grep -q 'android:networkSecurityConfig=' "$MANIFEST" 2>/dev/null; then
+  sed -i 's|<application |<application android:networkSecurityConfig="@xml/network_security_config" |' "$MANIFEST"
+  echo "  Added android:networkSecurityConfig to <application>"
+else
+  echo "  android:networkSecurityConfig already on <application>"
+fi
+# Remove the legacy app-wide cleartext flag — the XML scopes it now.
+if grep -q 'android:usesCleartextTraffic="true"' "$MANIFEST" 2>/dev/null; then
+  sed -i 's| android:usesCleartextTraffic="true"||g' "$MANIFEST"
+  echo "  Removed legacy android:usesCleartextTraffic flag"
+fi
+
 echo "── Step 1d: Ensure route-share universal link intent filter ──"
 # Slice 0 of the route-share PRD: the app must advertise itself as the
 # handler for https://routes.defensivepedal.com/r/*. Expo's intentFilters
@@ -187,6 +227,25 @@ if [ "$DO_BUNDLE" = true ] && [ ! -f "$AAB_PATH" ]; then
   echo "  Available AABs:"
   find "$DST/apps/mobile/android/app/build/outputs/bundle/" -name "*.aab" 2>/dev/null || echo "  (none)"
   exit 1
+fi
+
+# Compliance audit — only for preview/production release artefacts.
+# Scans the AAB/APK for dev-only artefacts (devAuthBypass, dev-bypass token,
+# debuggable=true, EX_DEV_CLIENT_NETWORK_INSPECTOR=true). Fails the build on leak.
+if [ "$FLAVOR" != "development" ]; then
+  echo ""
+  echo "── Step 4b: Audit release artefact for dev-only leaks ──"
+  AUDIT_SCRIPT="$SRC/scripts/audit-release-artifacts.sh"
+  if [ -f "$AUDIT_SCRIPT" ]; then
+    if [ "$DO_BUNDLE" = true ] && [ -f "$AAB_PATH" ]; then
+      bash "$AUDIT_SCRIPT" "$AAB_PATH"
+    fi
+    if [ "$DO_APK" = true ] && [ -f "$APK_PATH" ]; then
+      bash "$AUDIT_SCRIPT" "$APK_PATH"
+    fi
+  else
+    echo "WARNING: audit script not found at $AUDIT_SCRIPT — skipping"
+  fi
 fi
 
 echo ""
