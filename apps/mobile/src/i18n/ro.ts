@@ -535,6 +535,15 @@ export const ro: TranslationKeys = {
     devSignInFailed: 'Autentificarea dezvoltator a eșuat.',
   },
 
+  // ── Legal ──
+  legal: {
+    signupAgreePrefix: 'Continuând, ești de acord cu ',
+    termsOfService: 'Termenii Serviciului',
+    signupAgreeAnd: ' și ',
+    privacyPolicy: 'Politica de Confidențialitate',
+    signupAgreeSuffix: '.',
+  },
+
   // ── Settings ──
   settings: {
     title: 'Meniu',
