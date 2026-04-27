@@ -2,8 +2,45 @@
 
 **Source plan:** `.claude/drafts/complianceplan.md` (442 lines, 14 items in 3 phases)
 **Audit date:** 2026-04-26
-**Last revised:** 2026-04-26 after pulling `origin/main` (PR #24 — design-system Phase 1+2 quality pass merged at `7b678ee`).
+**Last revised:** 2026-04-27 after merging worktree branch to main (`1bbf67c`) and deploying to production.
 **Audit scope:** all 14 items cross-referenced against current `main` branch state.
+
+## Status as of 2026-04-27
+
+**8 of 14 items shipped to production** in commit `1bbf67c` and Cloud Run revision `defpedal-api-00068-blq`:
+
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 1 | Account deletion | ✅ Shipped | `DELETE /v1/profile` + `app/delete-account.tsx`. Web fallback page at `/account-deletion` still TODO. |
+| 4 | Foreground service type | ✅ Shipped | `FOREGROUND_SERVICE_LOCATION` + `withAndroidForegroundServiceLocation.js` plugin. Dev APK rebuild needed for native config. |
+| 5 | Release signing fail-fast | ✅ Shipped | `build.gradle` throws on missing `DEFPEDAL_UPLOAD_STORE_FILE` for preview/production. |
+| 6 short | Network security config | ✅ Shipped | Per-domain XML, OSRM IP scoped. APK rebuild needed for native config. |
+| 6 long | TLS for OSRM | ⏳ Open | Needs GCP HTTPS LB + Let's Encrypt. ~$20/mo. |
+| 7 | UGC moderation | ✅ Shipped | Schema + API + ReportSheet + auto-filter + ops runbook. Comment endpoint now requires full account. |
+| 8 | Pre-collection consent + Sentry | ✅ Shipped | Both default ON for first-time onboarding (counsel review flagged). DSN live, source-map upload via EAS secret. |
+| 9 | Data Safety form | ⏳ Open | UNBLOCKED by items 1+7+8+13. Pure Play Console paste. |
+| 10 | AAB default | ✅ Shipped | `build:production` defaults to AAB; CI guard active. |
+| 11 | Dev artefact audit | ✅ Shipped | `audit-release-artifacts.sh` runs on every release build. |
+| 13 | GDPR retention | ✅ Shipped | 4 RPCs + 3 cron endpoints + 4 Cloud Scheduler jobs. Email mailer TODO (Resend via Supabase Edge Function recommended). |
+| 3 | Privacy policy + terms | ⏳ Open | Needs legal counsel for RO + EN copy. Web pages on `apps/web`. |
+| 12 | A11y audit + RO listing | ⏳ Open | Mostly out-of-repo (Play Console + screenshots). Repo-side a11y pass partially done via PR #24. |
+| 14 | RO-specific paperwork | ⏳ Open | DPIA, ToS forum clauses, OUG 34/2014 signup checkbox. Mostly out-of-repo. |
+
+**Production infrastructure live:**
+- Supabase migrations `202604270001_ugc_moderation` + `202604280001_retention_policies` applied to project `uobubaulcdcuggnetzei`.
+- Cloud Run revision `defpedal-api-00068-blq` serving 100 percent traffic.
+- 4 Cloud Scheduler jobs ENABLED in `europe-central2`: `moderation-auto-filter-sweep-cron`, `retention-gps-truncate-cron`, `retention-flag-inactive-cron`, `retention-purge-inactive-cron`.
+- Sentry project `defensive-pedal/defensive-pedal-mobile` registered in EU region. DSN in `apps/mobile/.env`. EAS secret `SENTRY_AUTH_TOKEN` set for source-map upload.
+
+**Deferred TODOs (engineering, not legal):**
+- Account-deletion web fallback page (`apps/web/app/account-deletion/page.tsx`)
+- Inactive-warning email mailer (Resend via Supabase Edge Function)
+- Comment-row long-press in `community-trip.tsx` (lower-volume surface)
+- HazardDetailSheet overflow menu for moderation
+- Email alert when reports land (Supabase Edge Function pushing to webhook → email)
+- Admin queue UI (currently SQL-only)
+- DPIA document (1-page Data Protection Impact Assessment)
+- Sentry token rotation (current token was pasted in chat — recommend re-issuing with narrow scopes)
 
 ## Revision notes (2026-04-26 second pass)
 
