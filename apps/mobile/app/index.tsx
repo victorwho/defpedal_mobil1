@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Redirect } from 'expo-router';
 
 import {
@@ -11,7 +12,9 @@ export default function Index() {
   const appState = useAppStore((state) => state.appState);
   const navigationSession = useAppStore((state) => state.navigationSession);
   const routePreview = useAppStore((state) => state.routePreview);
+  const resetFlow = useAppStore((state) => state.resetFlow);
   const gate = useOnboardingGate();
+  const hasClearedPreviewRef = useRef(false);
 
   // Gate the initial-route redirect so an anonymous user on a fresh install
   // lands on /onboarding/index instead of /route-planning. This evaluation
@@ -26,6 +29,26 @@ export default function Index() {
   // gate effect, which manages its own ref across the app lifetime.
   const gateTarget = computeOnboardingGateTarget(gate, false);
 
+  // Real-account cold starts always land on a clean route-planning screen.
+  // Drop any persisted ROUTE_PREVIEW / AWAITING_FEEDBACK so the user picks
+  // a fresh destination instead of resuming where they left off. Anonymous
+  // sessions are intentionally untouched (their open count drives the signup
+  // gate, and resuming a half-built route nudges them toward signing up).
+  // NAVIGATING is also untouched — that's the active-ride recovery path
+  // owned by NavigationResumeGuard.
+  const shouldClearStalePreview =
+    gate.storeHydrated &&
+    !gate.isLoading &&
+    gate.hasRealAccount &&
+    (appState === 'ROUTE_PREVIEW' || appState === 'AWAITING_FEEDBACK');
+
+  useEffect(() => {
+    if (hasClearedPreviewRef.current) return;
+    if (!shouldClearStalePreview) return;
+    hasClearedPreviewRef.current = true;
+    resetFlow();
+  }, [shouldClearStalePreview, resetFlow]);
+
   // Pre-hydration / pre-auth we can't safely redirect yet. `null` keeps the
   // splash screen up until the gate decides.
   if (!gate.storeHydrated || gate.isLoading) {
@@ -38,6 +61,7 @@ export default function Index() {
       hasNavigationSession: Boolean(navigationSession),
       routeCount: routePreview?.routes.length ?? 0,
       gateTarget,
+      shouldClearStalePreview,
     });
   }
 
@@ -49,12 +73,18 @@ export default function Index() {
     return <Redirect href="/navigation" />;
   }
 
-  if (appState === 'ROUTE_PREVIEW' && routePreview?.routes.length) {
-    return <Redirect href="/route-preview" />;
-  }
+  // For real-account users we suppress the persisted ROUTE_PREVIEW /
+  // AWAITING_FEEDBACK redirects this render — the effect above is clearing
+  // them so the next render falls through to /route-planning naturally,
+  // and we want to avoid a one-frame flash of /route-preview or /feedback.
+  if (!shouldClearStalePreview) {
+    if (appState === 'ROUTE_PREVIEW' && routePreview?.routes.length) {
+      return <Redirect href="/route-preview" />;
+    }
 
-  if (appState === 'AWAITING_FEEDBACK') {
-    return <Redirect href="/feedback" />;
+    if (appState === 'AWAITING_FEEDBACK') {
+      return <Redirect href="/feedback" />;
+    }
   }
 
   return <Redirect href="/route-planning" />;
