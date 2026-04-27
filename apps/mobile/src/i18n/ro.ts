@@ -259,7 +259,7 @@ export const ro: TranslationKeys = {
     crashDescription: 'Ne ajută să remediem erorile mai rapid. Fără date personale — doar urmele stivei și informații despre dispozitiv.',
     analyticsLabel: 'Trimite analize de produs',
     analyticsDescription: 'Activă implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație — dezactivează oricând.',
-    assurance: 'Tu deții controlul. Nu vindem niciodată datele tale.',
+    assurance: 'Tu deții controlul.',
     continue: 'Continuă',
     changeLater: 'Poți schimba oricând din Profil → Confidențialitate & analiză.',
   },

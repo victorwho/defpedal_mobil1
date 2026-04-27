@@ -104,6 +104,26 @@ const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
 // iOS uses the matching ATS exception in the iOS config below.
 const cleartextAllowedDomains = ['34.116.139.172'];
 
+// Sentry config plugin slugs. Read from env so we never commit org/project
+// values; activate the plugin only when both are set. SENTRY_AUTH_TOKEN is
+// expected to be an EAS secret (set via `eas secret:create`) for source-map
+// uploads — never put it in .env. See docs/ops/sentry-setup.md for full
+// setup steps.
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const sentryPluginEntries =
+  sentryOrg && sentryProject
+    ? [
+        [
+          '@sentry/react-native/expo',
+          {
+            organization: sentryOrg,
+            project: sentryProject,
+          },
+        ] as [string, Record<string, unknown>],
+      ]
+    : [];
+
 const mapboxDownloadToken = resolveMapboxDownloadToken();
 
 if (mapboxDownloadToken) {
@@ -150,6 +170,7 @@ export default () => ({
       'expo-router',
       'expo-font',
       '@rnmapbox/maps',
+      ...sentryPluginEntries,
       [
         'expo-notifications',
         {

@@ -257,7 +257,7 @@ export const en = {
     crashDescription: 'Helps us fix bugs faster. No personal data — just stack traces and device info.',
     analyticsLabel: 'Share product analytics',
     analyticsDescription: 'On by default. Anonymous usage events so we can ship the right features. No location tracking — turn off anytime.',
-    assurance: 'You\'re in control. We never sell your data.',
+    assurance: 'You\'re in control.',
     continue: 'Continue',
     changeLater: 'You can change these anytime in Profile → Privacy & analytics.',
   },
