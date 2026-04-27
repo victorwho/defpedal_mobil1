@@ -197,7 +197,7 @@ export default function AccountDeletionPage() {
           </p>
           <p style={styles.body}>
             Include the subject line{' '}
-            <span style={styles.bodyStrong}>"Account deletion request"</span>.
+            <span style={styles.bodyStrong}>&ldquo;Account deletion request&rdquo;</span>.
             We will verify ownership of the account and complete the deletion
             within 30 days, in line with GDPR Article 17.
           </p>
@@ -259,7 +259,7 @@ export default function AccountDeletionPage() {
           <li>
             <span style={styles.bodyStrong}>Crash reports</span> sent to
             Sentry while you had analytics enabled are retained according to
-            Sentry's default 90-day policy and are not linked to your account
+            Sentry&rsquo;s default 90-day policy and are not linked to your account
             after deletion.
           </li>
         </ul>
@@ -294,7 +294,7 @@ export default function AccountDeletionPage() {
             privacy@defensivepedal.com
           </a>
           . If you are unhappy with our response, you can lodge a complaint
-          with Romania's data-protection authority, ANSPDCP, at{' '}
+          with Romania&rsquo;s data-protection authority, ANSPDCP, at{' '}
           <a
             href="https://www.dataprotection.ro/"
             style={styles.link}
