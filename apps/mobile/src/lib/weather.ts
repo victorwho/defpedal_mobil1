@@ -35,7 +35,7 @@ export interface WeatherData {
 }
 
 export interface WeatherWarning {
-  readonly type: 'rain' | 'freezing' | 'temp_drop' | 'wind' | 'air_quality' | 'pm25';
+  readonly type: 'rain' | 'freezing' | 'heat' | 'temp_drop' | 'wind' | 'air_quality' | 'pm25';
   readonly icon: string;
   readonly message: string;
 }
@@ -227,8 +227,17 @@ export const fetchWeather = async (
 };
 
 const RAIN_THRESHOLD = 50;
-const FREEZE_THRESHOLD = 0;
-const TEMP_DROP_THRESHOLD = 5;
+// Temperature comfort zone — when min/max stay within these bounds we issue
+// no temperature warning at all. Cold/heat/swing rules below only fire when
+// the day exits this zone.
+const COMFORT_TEMP_MIN = 10;
+const COMFORT_TEMP_MAX = 27;
+// Cold warning fires when any hour remaining today drops below this.
+const COLD_TEMP_THRESHOLD = 5;
+// Heat warning fires when any hour remaining today exceeds this.
+const HOT_TEMP_THRESHOLD = 30;
+// Swing warning fires when (max - min) across remaining hours exceeds this.
+const TEMP_SWING_THRESHOLD = 13;
 const WIND_THRESHOLD = 25;
 const AQI_MODERATE_THRESHOLD = 50;
 const AQI_POOR_THRESHOLD = 100;
@@ -236,7 +245,9 @@ const PM25_THRESHOLD = 25;
 
 /**
  * Check weather data against cycling safety thresholds.
- * Returns an array of warnings (empty = safe to ride).
+ * Returns an array of warnings (empty = nothing to flag). The wording is
+ * advisory — surfaces ride-with-caution guidance rather than discouraging
+ * the ride.
  */
 export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[] => {
   const warnings: WeatherWarning[] = [];
@@ -245,31 +256,47 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
     warnings.push({
       type: 'rain',
       icon: 'rainy',
-      message: `High chance of rain later today (${data.remainingPrecipMax}%)`,
+      message: `High chance of rain later today (${data.remainingPrecipMax}%) — pack rain gear and ride with caution`,
     });
   }
 
-  if (data.remainingTempMin < FREEZE_THRESHOLD) {
-    warnings.push({
-      type: 'freezing',
-      icon: 'snow',
-      message: `Freezing expected: ${data.remainingTempMin}°C`,
-    });
-  }
+  // Skip every temperature warning when the day stays in the comfort zone.
+  // Outside it, fire any of cold / heat / swing that applies.
+  const inComfortZone =
+    data.remainingTempMin >= COMFORT_TEMP_MIN &&
+    data.remainingTempMax <= COMFORT_TEMP_MAX;
 
-  if (data.remainingTempMax - data.remainingTempMin > TEMP_DROP_THRESHOLD) {
-    warnings.push({
-      type: 'temp_drop',
-      icon: 'thermometer',
-      message: `Temperature swing remaining: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C`,
-    });
+  if (!inComfortZone) {
+    if (data.remainingTempMin < COLD_TEMP_THRESHOLD) {
+      warnings.push({
+        type: 'freezing',
+        icon: 'snow',
+        message: `Cold conditions: ${data.remainingTempMin}°C — dress warmly and ride with caution`,
+      });
+    }
+
+    if (data.remainingTempMax > HOT_TEMP_THRESHOLD) {
+      warnings.push({
+        type: 'heat',
+        icon: 'thermometer',
+        message: `Hot conditions: ${data.remainingTempMax}°C — hydrate and ride with caution`,
+      });
+    }
+
+    if (data.remainingTempMax - data.remainingTempMin > TEMP_SWING_THRESHOLD) {
+      warnings.push({
+        type: 'temp_drop',
+        icon: 'thermometer',
+        message: `Big temperature swing: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C — layer up and ride with caution`,
+      });
+    }
   }
 
   if (data.remainingWindMax > WIND_THRESHOLD) {
     warnings.push({
       type: 'wind',
       icon: 'flag',
-      message: `Strong wind expected: ${data.remainingWindMax} km/h`,
+      message: `Strong wind expected: ${data.remainingWindMax} km/h — ride with caution`,
     });
   }
 
@@ -278,13 +305,13 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'air_quality',
         icon: 'cloud',
-        message: `Poor air quality (AQI ${data.airQuality.europeanAqi}) — consider postponing your ride`,
+        message: `Poor air quality (AQI ${data.airQuality.europeanAqi}) — limit exertion and ride with caution`,
       });
     } else if (data.airQuality.europeanAqi > AQI_MODERATE_THRESHOLD) {
       warnings.push({
         type: 'air_quality',
         icon: 'cloud',
-        message: `Moderate air quality (AQI ${data.airQuality.europeanAqi}) — sensitive groups should limit outdoor exertion`,
+        message: `Moderate air quality (AQI ${data.airQuality.europeanAqi}) — sensitive groups should ride with caution`,
       });
     }
 
@@ -292,7 +319,7 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'pm25',
         icon: 'alert-circle',
-        message: `High fine particulate matter: PM2.5 ${data.airQuality.pm25} μg/m³`,
+        message: `High fine particulate matter: PM2.5 ${data.airQuality.pm25} μg/m³ — ride with caution`,
       });
     }
   }

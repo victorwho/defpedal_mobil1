@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-04-27 — Pre-Ride Weather Warning: Comfort Zone + Cautionary Wording
+
+### Behavior
+- **Temperature warnings now respect a 10–27°C comfort zone.** When `remainingTempMin >= 10` and `remainingTempMax <= 27`, no temperature warning is issued. Outside that band, three independent rules can fire:
+  - **Cold**: `remainingTempMin < 5°C` → "Cold conditions: X°C — dress warmly and ride with caution".
+  - **Heat (new)**: `remainingTempMax > 30°C` → "Hot conditions: X°C — hydrate and ride with caution". Adds a new `'heat'` member to the `WeatherWarning['type']` union.
+  - **Swing**: `remainingTempMax − remainingTempMin > 13°C` (up from the previous 5°C) → "Big temperature swing: X°C → Y°C — layer up and ride with caution".
+- Net effect: a day that stays between 5–10°C with a small swing (e.g. 6°C → 12°C) now goes warning-free, where previously the 5°C swing rule would have flagged it. A day above 30°C is now flagged where previously it was not.
+- **All warning copy was rewritten to advise caution rather than discourage the ride.** The poor-AQI line dropped "consider postponing your ride" in favour of "limit exertion and ride with caution"; rain/wind/cold/heat/swing/PM2.5 messages all gained "ride with caution" guidance. The `WeatherWarningModal` footer changed from "Consider postponing your ride or take extra precautions." to "Stay alert and ride with caution."
+- The `'freezing'` warning type name is retained for binary-compat with existing consumers; only its threshold (now <5°C) and copy (now "Cold conditions") changed.
+
+### Files
+- `apps/mobile/src/lib/weather.ts` — replaced `FREEZE_THRESHOLD = 0` and `TEMP_DROP_THRESHOLD = 5` with `COMFORT_TEMP_MIN/MAX = 10/27`, `COLD_TEMP_THRESHOLD = 5`, `HOT_TEMP_THRESHOLD = 30`, `TEMP_SWING_THRESHOLD = 13`. Restructured `getWeatherWarnings` so all temperature rules sit inside an `if (!inComfortZone)` branch. Added `'heat'` warning emission. Rewrote every warning message to add cautionary phrasing.
+- `apps/mobile/src/design-system/molecules/WeatherWarningModal.tsx` — modal subtitle rewritten ("Stay alert and ride with caution.").
+- `apps/mobile/src/lib/weather.test.ts` — replaced the now-stale "postponing" assertion on the poor-AQI test with explicit caution / not-postpon assertions, and added five new cases: comfort-zone silence (10–27°C), 5–10°C quiet zone, cold-warning wording, heat-warning trigger, no-heat at exactly 30°C.
+
+### Tests
+- `apps/mobile/src/lib/weather.test.ts` — 24/24 passing (was 19, added 5).
+- `npm run typecheck:mobile` clean.
+- `npm run check:bundle` HTTP 200.
+
+### Release
+- Ships in the next preview APK / next dev-build install. No native rebuild required.
+
 ## 2026-04-25 — Strip AD_ID Permission for Play Store Compliance (v0.2.21)
 
 ### Behavior

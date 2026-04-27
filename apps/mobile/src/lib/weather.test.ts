@@ -262,6 +262,61 @@ describe('getWeatherWarnings', () => {
     expect(warnings.some((w) => w.type === 'temp_drop')).toBe(false);
   });
 
+  it('issues no temperature warning when the day stays in 10–27°C comfort zone', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 10,
+      remainingTempMax: 27,
+    }));
+
+    const tempTypes: ReadonlyArray<string> = ['freezing', 'heat', 'temp_drop'];
+    expect(warnings.some((w) => tempTypes.includes(w.type))).toBe(false);
+  });
+
+  it('issues no temperature warning between 5–10°C with a small swing', () => {
+    // Outside comfort zone (min < 10) but min ≥ 5 and swing ≤ 13 — should
+    // stay quiet per the "above 5°C, only warn on >13°C swing or drop below 5"
+    // rule.
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 6,
+      remainingTempMax: 12,
+    }));
+
+    const tempTypes: ReadonlyArray<string> = ['freezing', 'heat', 'temp_drop'];
+    expect(warnings.some((w) => tempTypes.includes(w.type))).toBe(false);
+  });
+
+  it('warns about cold below 5°C with cautionary wording (not freezing wording)', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 4,
+      remainingTempMax: 9,
+    }));
+
+    const cold = warnings.find((w) => w.type === 'freezing');
+    expect(cold).toBeDefined();
+    expect(cold!.message).toContain('caution');
+  });
+
+  it('warns about heat above 30°C', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 25,
+      remainingTempMax: 32,
+    }));
+
+    const heat = warnings.find((w) => w.type === 'heat');
+    expect(heat).toBeDefined();
+    expect(heat!.message).toContain('32');
+    expect(heat!.message).toContain('caution');
+  });
+
+  it('does not warn about heat at or below 30°C', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 25,
+      remainingTempMax: 30,
+    }));
+
+    expect(warnings.some((w) => w.type === 'heat')).toBe(false);
+  });
+
   it('warns about strong wind', () => {
     const warnings = getWeatherWarnings(makeWeatherData({ remainingWindMax: 30 }));
 
@@ -269,7 +324,7 @@ describe('getWeatherWarnings', () => {
     expect(warnings.find((w) => w.type === 'wind')!.message).toContain('30');
   });
 
-  it('warns about poor air quality', () => {
+  it('warns about poor air quality with cautionary wording', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       airQuality: {
         europeanAqi: 110,
@@ -282,8 +337,11 @@ describe('getWeatherWarnings', () => {
       },
     }));
 
-    expect(warnings.some((w) => w.type === 'air_quality')).toBe(true);
-    expect(warnings.find((w) => w.type === 'air_quality')!.message).toContain('postponing');
+    const aqWarning = warnings.find((w) => w.type === 'air_quality');
+    expect(aqWarning).toBeDefined();
+    expect(aqWarning!.message).toContain('caution');
+    // Wording must advise caution, not discourage the ride.
+    expect(aqWarning!.message).not.toContain('postpon');
   });
 
   it('warns about moderate air quality', () => {

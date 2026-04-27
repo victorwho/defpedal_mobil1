@@ -44,7 +44,7 @@ export const WeatherWarningModal = ({
           </View>
 
           <Text style={styles.subtitle}>
-            Consider postponing your ride or take extra precautions.
+            Stay alert and ride with caution.
           </Text>
 
           <Pressable style={styles.button} onPress={onDismiss}>
