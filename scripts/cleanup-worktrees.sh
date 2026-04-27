@@ -69,8 +69,28 @@ fi
 # Step 1 — let git release any worktrees whose disk dirs are already gone
 git worktree prune
 
-# Step 2 — collect the list git still calls "active" so we don't nuke them
-ACTIVE_PATHS=$(git worktree list --porcelain | awk '/^worktree /{print $2}')
+# Step 2 — collect the list git still calls "active" so we don't nuke them.
+#
+# Critical bug fix (2026-04-27 hotfix): the previous version compared `pwd`
+# output (POSIX-style `/c/dev/...`) against `git worktree list --porcelain`
+# (Windows-style `C:/dev/...`) and never matched. Result: every worktree
+# was treated as inactive, every worktree got deleted. We lost some
+# uncommitted work in older worktrees from prior sessions before catching
+# the bug. Branch refs survived (committed work was recoverable) but
+# untracked / dirty files in those worktrees were not.
+#
+# Fix: normalize both sides to lower-case Windows-with-forward-slashes
+# form via `cygpath -m` before grep-comparing.
+normalize_path() {
+  local p="$1"
+  if command -v cygpath >/dev/null 2>&1; then
+    p=$(cygpath -m "$p" 2>/dev/null || printf "%s" "$p")
+  fi
+  printf "%s" "$p" | tr '[:upper:]' '[:lower:]'
+}
+
+ACTIVE_PATHS=$(git worktree list --porcelain | awk '/^worktree /{print $2}' \
+  | while IFS= read -r p; do normalize_path "$p"; done)
 
 remove_junctions_in() {
   local dir="$1"
@@ -99,8 +119,9 @@ for dir in "$WORKTREES_DIR"/*/; do
   dir="${dir%/}"
 
   abs_path=$(cd "$dir" && pwd)
+  norm_path=$(normalize_path "$abs_path")
 
-  if echo "$ACTIVE_PATHS" | grep -qF "$abs_path"; then
+  if echo "$ACTIVE_PATHS" | grep -qF "$norm_path"; then
     echo "→ skipping (active worktree): $dir"
     SKIPPED+=1
     continue
