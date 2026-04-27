@@ -8,9 +8,10 @@ Operational guide for the GDPR Art. 5(1)(e) "storage limitation" pipeline. Imple
 |---|---|---|---|
 | `retention-gps-truncate-cron` | `0 3 * * *` Europe/Bucharest (daily 3 AM) | `POST /v1/retention/truncate-gps` | NULL out `trip_tracks.gps_trail` for rides >90 days old (unless author opted into full history) |
 | `retention-flag-inactive-cron` | `0 5 * * MON` Europe/Bucharest (weekly Mon 5 AM) | `POST /v1/retention/flag-inactive` | Mark accounts >=23 months inactive for the warning email |
+| `retention-inactive-mailer-cron` | `30 5 * * MON` Europe/Bucharest (weekly Mon 5:30 AM) | Edge Function `inactive-warning` | Send the 23-month warning email via Resend; idempotent |
 | `retention-purge-inactive-cron` | `0 6 * * MON` Europe/Bucharest (weekly Mon 6 AM) | `POST /v1/retention/purge-inactive` | Delete accounts flagged >=30 days ago AND still inactive |
 
-All three require `Authorization: Bearer ${CRON_SECRET}` (same secret already used by the hazards-expire cron). Each job is **batched** (LIMIT 100–200 per call) and **idempotent** — backlog drains over multiple ticks.
+All four require `Authorization: Bearer ${CRON_SECRET}` (same secret already used by the hazards-expire cron). Each job is **batched** (LIMIT 50–200 per call) and **idempotent** — backlog drains over multiple ticks. The mailer's idempotency relies on `profiles.inactive_warning_email_sent_at` (added in migration `202604280002_inactive_warning_email_audit.sql`); successfully-delivered rows leave the queue.
 
 ## Retention table — what's actually kept and for how long
 
@@ -61,47 +62,54 @@ gcloud scheduler jobs create http retention-purge-inactive-cron \
   --headers="Authorization=Bearer ${CRON_SECRET}"
 ```
 
-## Inactive-warning email pipeline (TODO)
+## Inactive-warning email pipeline
 
-Right now `flag-inactive` *marks* users (sets `profiles.inactive_warning_sent_at = now()`) and **logs** the email addresses to the API logs:
+Implemented as a Supabase Edge Function at `supabase/functions/inactive-warning/`. Triggered by Cloud Scheduler on a 30-min lag after `retention-flag-inactive-cron`, so the flag commit has settled before the mailer reads. Both `clear_inactive_warning(uid)` (called from the auth refresh path) and the mailer's idempotency column (`profiles.inactive_warning_email_sent_at`) are managed by migration `202604280002_inactive_warning_email_audit.sql`.
 
-```
-event=retention_inactive_warning_pending userId=<uuid> email=<address>
-```
+### Setup once per environment
 
-It does **not** actually send the warning email yet. Pick a mailer and wire it up before the first weekly run after launch:
+See [`supabase/functions/inactive-warning/README.md`](../../supabase/functions/inactive-warning/README.md) for:
 
-| Option | Cost | Pros | Cons |
-|---|---|---|---|
-| **Supabase Edge Function** + Resend / SendGrid | $0 (free tiers) | Stays in Supabase ecosystem, no new infra | Cold starts, harder to template emails |
-| **SendGrid direct** from `services/mobile-api` | $0 / 100 emails per day free; $20/mo otherwise | Simple API, good deliverability | Account setup |
-| **Mailgun** from `services/mobile-api` | Similar to SendGrid | EU servers, RO-friendly | Same setup overhead |
-| **AWS SES** | ~$0 for low volume | Cheapest at scale | Setup is heaviest |
+- `supabase functions deploy inactive-warning --project-ref uobubaulcdcuggnetzei`
+- `supabase secrets set CRON_SECRET=… RESEND_API_KEY=…`
+- Cloud Scheduler `gcloud scheduler jobs create http retention-inactive-mailer-cron …`
 
-**Recommended path:** Resend via a Supabase Edge Function. Edge Functions can read `profiles.inactive_warning_sent_at` directly + send via Resend's REST API. Stays inside the EU residency we already chose for Supabase + Sentry.
+### Email template
 
-Until the mailer is wired, **manual workflow** for the first few cron ticks:
-1. SSH / open Cloud Run logs filtered by `event=retention_inactive_warning_pending`
-2. Copy the email addresses
-3. Send a templated warning manually from the founder mailbox
+The function picks one of two templates based on `profiles.locale`:
 
-This keeps the legal posture defensible (warning is sent, just not automated) while we get to launch.
+- `ro` → Romanian template
+- anything else (including `NULL`) → English fallback
 
-## Email template (English — translate to RO before send)
+Both templates render the deletion date in the user's locale + Europe/Bucharest timezone, computed as `inactive_warning_sent_at + GRACE_DAYS (30)` to match `select_purgeable_inactive_users()`.
 
-> Subject: Your Defensive Pedal account hasn't been used in 23 months
+> **Subject (EN):** Your Defensive Pedal account hasn't been used in 23 months
 >
 > Hi,
 >
-> We haven't seen activity on your Defensive Pedal account in 23 months. To respect data-minimization rules, accounts that stay inactive for 24 months total are automatically deleted along with all their data — trip history, badges, XP, profile, everything.
+> We haven't seen activity on your Defensive Pedal account in 23 months. To respect GDPR data-minimization rules, accounts that stay inactive for 24 months are automatically deleted along with all their data — trip history, badges, XP, profile, everything.
 >
-> If you'd like to keep your account, just open the app once before [DATE = warning_sent_at + 30 days]. That counts as activity and resets the timer.
+> If you'd like to keep your account, just open the app once before [DATE]. That counts as activity and resets the timer.
 >
-> If you'd rather we delete your account now, you can do that yourself from Profile → Account → Delete account in the app.
+> If you'd rather we delete your account now, you can do that yourself from Profile → Account → Delete account in the app, or on the web at https://routes.defensivepedal.com/account-deletion.
 >
 > Questions: privacy@defensivepedal.com
 >
 > Defensive Pedal
+
+### Manual reconciliation (rare)
+
+If the mailer cron is paused for any reason, the queue is observable via SQL:
+
+```sql
+SELECT id, email, inactive_warning_sent_at
+  FROM profiles
+ WHERE inactive_warning_sent_at IS NOT NULL
+   AND inactive_warning_email_sent_at IS NULL
+ ORDER BY inactive_warning_sent_at;
+```
+
+Resume by re-enabling the Cloud Scheduler job. The next tick drains the queue.
 
 ## Verification
 
@@ -154,6 +162,5 @@ Keep these logs for 12 months minimum. Romania's audit-trail expectation for GDP
 ## What's NOT covered yet
 
 - **`mia_journey_events` 12-month retention** — separate cron not implemented. Low priority (Mia events aren't precise location). Add to backlog.
-- **Inactive-warning email send.** Mailer pending — see TODO above.
 - **`leaderboard_snapshots` 24-month rolling DELETE.** Today nothing actually deletes old snapshots; the table just accumulates. Manual `delete from leaderboard_snapshots where snapshot_period_end < now() - interval '24 months'` is fine for now; add a cron after launch if storage becomes an issue.
 - **DSAR (data subject access request) export.** A user requesting "give me everything you have on me" needs an export endpoint. Account deletion (item 1) is the reverse path; the export is a separate item not yet planned.

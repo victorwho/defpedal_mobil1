@@ -22,10 +22,14 @@ import { ensureSupabase } from './feed-helpers';
  *   - POST /v1/retention/flag-inactive     Weekly Mon 5am Bucharest. Marks
  *                                          users >=23 months inactive so
  *                                          the warning-email pipeline can
- *                                          pick them up. Returns the list
- *                                          of (user_id, email) flagged.
- *                                          Currently logs them for the
- *                                          mailer TODO; no email sent yet.
+ *                                          pick them up. The mailer is
+ *                                          the `inactive-warning` Supabase
+ *                                          Edge Function, triggered 30 min
+ *                                          later. Returns the list of
+ *                                          flagged user IDs (no emails in
+ *                                          the response — the mailer reads
+ *                                          them straight from the profiles
+ *                                          table).
  *
  *   - POST /v1/retention/purge-inactive    Weekly Mon 6am Bucharest. Calls
  *                                          supabaseAdmin.auth.admin.deleteUser
@@ -169,15 +173,16 @@ export const buildRetentionRoutes = (
         const rows = (data ?? []) as Array<{ user_id: string; email: string }>;
         const flaggedUserIds = rows.map((r) => r.user_id);
 
-        // Log each flagged email for the mailer pipeline. NOT sending email
-        // in this PR — the email mailer (SendGrid / Mailgun / Supabase Edge
-        // Function) is a separate config decision tracked in the runbook.
-        // Until that lands, Victor can grep these lines from the API logs
-        // and send emails manually.
+        // Log each flagged user. The actual email send happens in the
+        // separate `inactive-warning` Supabase Edge Function, triggered by
+        // its own Cloud Scheduler job 30 minutes after this one. The mailer
+        // reads `profiles.inactive_warning_sent_at` directly and writes
+        // `profiles.inactive_warning_email_sent_at` for idempotency.
+        // See supabase/functions/inactive-warning/README.md.
         for (const row of rows) {
           request.log.info(
-            { event: 'retention_inactive_warning_pending', userId: row.user_id, email: row.email },
-            'user flagged for inactive-warning email (mailer TODO)',
+            { event: 'retention_inactive_flagged', userId: row.user_id },
+            'user flagged for inactive-warning email (mailer cron picks up at 5:30am Mon)',
           );
         }
 
