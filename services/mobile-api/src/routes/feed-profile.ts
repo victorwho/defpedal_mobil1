@@ -72,6 +72,8 @@ export const buildFeedProfileRoutes = (
         if (request.body.quietHoursTimezone !== undefined) updates.quiet_hours_timezone = request.body.quietHoursTimezone;
         if (request.body.shareConversionFeedOptin !== undefined)
           updates.share_conversion_feed_optin = request.body.shareConversionFeedOptin;
+        if (request.body.keepFullGpsHistory !== undefined)
+          updates.keep_full_gps_history = request.body.keepFullGpsHistory;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db
@@ -97,7 +99,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
           .eq('id', user.id)
           .single();
 
@@ -123,6 +125,7 @@ export const buildFeedProfileRoutes = (
             data.share_conversion_feed_optin === null
               ? true
               : Boolean(data.share_conversion_feed_optin),
+          keepFullGpsHistory: Boolean(data.keep_full_gps_history),
         };
       },
     );
@@ -145,7 +148,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
           .eq('id', user.id)
           .single();
 
@@ -156,7 +159,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
             .single();
 
           if (createError || !created) {
@@ -181,6 +184,7 @@ export const buildFeedProfileRoutes = (
               created.share_conversion_feed_optin === null
                 ? true
                 : Boolean(created.share_conversion_feed_optin),
+            keepFullGpsHistory: Boolean(created.keep_full_gps_history),
           };
         }
 
@@ -198,6 +202,7 @@ export const buildFeedProfileRoutes = (
             data.share_conversion_feed_optin === null
               ? true
               : Boolean(data.share_conversion_feed_optin),
+          keepFullGpsHistory: Boolean(data.keep_full_gps_history),
         };
       },
     );

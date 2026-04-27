@@ -11,6 +11,7 @@ import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
 import { buildMiaRoutes } from './routes/mia';
 import { buildModerationRoutes } from './routes/moderation';
+import { buildRetentionRoutes } from './routes/retention';
 import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
 import { buildV1Routes } from './routes/v1';
 
@@ -141,6 +142,10 @@ export const buildApp = (options: {
   });
 
   void app.register(buildModerationRoutes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildRetentionRoutes(dependencies), {
     prefix: '/v1',
   });
 

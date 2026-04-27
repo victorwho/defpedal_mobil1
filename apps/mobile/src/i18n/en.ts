@@ -208,6 +208,10 @@ export const en = {
     // Delete account
     deleteAccount: 'Delete account',
     deleteAccountSub: 'Permanently remove your account and all your data',
+    // Compliance plan item 13: GPS retention opt-out
+    keepFullGpsHistory: 'Keep full GPS history',
+    keepFullGpsHistoryOn: 'Raw GPS breadcrumbs are kept for every ride until you delete your account.',
+    keepFullGpsHistoryOff: 'Trip summaries are kept forever; raw GPS breadcrumbs are auto-truncated after 90 days. Distance, CO2 and badges are unaffected.',
   },
 
   // ── Report sheet ──

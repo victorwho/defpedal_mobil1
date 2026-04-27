@@ -210,6 +210,10 @@ export const ro: TranslationKeys = {
     // Delete account
     deleteAccount: 'Șterge contul',
     deleteAccountSub: 'Elimină definitiv contul tău și toate datele tale',
+    // Compliance plan item 13: GPS retention opt-out
+    keepFullGpsHistory: 'Păstrează istoricul GPS complet',
+    keepFullGpsHistoryOn: 'Urmele GPS brute sunt păstrate pentru fiecare cursă până când îți ștergi contul.',
+    keepFullGpsHistoryOff: 'Rezumatele curselor sunt păstrate pentru totdeauna; urmele GPS brute sunt eliminate automat după 90 de zile. Distanța, CO2 și insignele nu sunt afectate.',
   },
 
   // ── Report sheet ──

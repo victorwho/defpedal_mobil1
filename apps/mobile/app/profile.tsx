@@ -697,6 +697,27 @@ export default function ProfileScreen() {
               }}
             />
 
+            {/* Compliance plan item 13: by default we auto-truncate raw GPS
+                breadcrumbs from rides older than 90 days. This toggle opts
+                the user into keeping the full breadcrumb stream forever
+                (until account deletion). Trip summaries — distance, CO2,
+                badges, XP — are unaffected either way. */}
+            <SettingRow
+              label={t('profile.keepFullGpsHistory')}
+              description={
+                profile?.keepFullGpsHistory
+                  ? t('profile.keepFullGpsHistoryOn')
+                  : t('profile.keepFullGpsHistoryOff')
+              }
+              checked={Boolean(profile?.keepFullGpsHistory)}
+              onChange={(checked) => {
+                void mobileApi
+                  .updateProfile({ keepFullGpsHistory: checked })
+                  .then(() => refetchProfile())
+                  .catch(() => {/* best-effort */});
+              }}
+            />
+
             <Pressable
               style={styles.helpFaqRow}
               onPress={() => router.push('/my-shares' as any)}

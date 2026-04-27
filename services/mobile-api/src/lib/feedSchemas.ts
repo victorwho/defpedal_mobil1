@@ -97,6 +97,7 @@ export const profileUpdateRequestSchema = {
     quietHoursEnd: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
     quietHoursTimezone: { type: ['string', 'null'] },
     shareConversionFeedOptin: { type: 'boolean' },
+    keepFullGpsHistory: { type: 'boolean' },
   },
 } as const;
 
@@ -196,6 +197,7 @@ export const profileResponseSchema = {
     'username',
     'isPrivate',
     'shareConversionFeedOptin',
+    'keepFullGpsHistory',
   ],
   properties: {
     id: { type: 'string' },
@@ -207,6 +209,7 @@ export const profileResponseSchema = {
     cyclingGoal: { type: ['string', 'null'] },
     isPrivate: { type: 'boolean' },
     shareConversionFeedOptin: { type: 'boolean' },
+    keepFullGpsHistory: { type: 'boolean' },
   },
 } as const;
 
