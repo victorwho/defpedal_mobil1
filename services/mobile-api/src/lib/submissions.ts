@@ -115,23 +115,31 @@ export const startTripRecord = async (
   userId: string,
 ): Promise<TripStartResponse> => {
   if (supabaseAdmin) {
+    // Idempotent on (user_id, client_trip_id). A retry from the offline queue
+    // (timeout, kill-recovery, dropped response) returns the existing trip's
+    // id instead of creating a duplicate. Migration 202604270002 enforces the
+    // partial UNIQUE index that makes this safe.
     const { data, error } = await supabaseAdmin
       .from('trips')
-      .insert([
-        {
-          user_id: userId,
-          start_location_text: request.startLocationText,
-          start_location: toPointWkt(request.startCoordinate.lat, request.startCoordinate.lon),
-          destination_text: request.destinationText,
-          destination_location: toPointWkt(
-            request.destinationCoordinate.lat,
-            request.destinationCoordinate.lon,
-          ),
-          distance_meters: request.distanceMeters,
-          started_at: request.startedAt,
-          end_reason: 'in_progress',
-        },
-      ])
+      .upsert(
+        [
+          {
+            user_id: userId,
+            client_trip_id: request.clientTripId,
+            start_location_text: request.startLocationText,
+            start_location: toPointWkt(request.startCoordinate.lat, request.startCoordinate.lon),
+            destination_text: request.destinationText,
+            destination_location: toPointWkt(
+              request.destinationCoordinate.lat,
+              request.destinationCoordinate.lon,
+            ),
+            distance_meters: request.distanceMeters,
+            started_at: request.startedAt,
+            end_reason: 'in_progress',
+          },
+        ],
+        { onConflict: 'user_id,client_trip_id' },
+      )
       .select('id')
       .single();
 
@@ -239,22 +247,28 @@ export const saveTripTrack = async (
       ? calculateTrailDistanceMeters(request.gpsBreadcrumbs)
       : null;
 
-    const { error } = await supabaseAdmin.from('trip_tracks').insert([
-      {
-        trip_id: request.tripId,
-        user_id: userId,
-        routing_mode: request.routingMode,
-        planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
-        planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
-        actual_distance_meters: actualDistance,
-        gps_trail: request.gpsBreadcrumbs,
-        end_reason: request.endReason,
-        started_at: request.startedAt,
-        ended_at: request.endedAt,
-        bike_type: request.bikeType ?? null,
-        aqi_at_start: request.aqiAtStart ?? null,
-      },
-    ]);
+    // Idempotent on trip_id (one trip → one track). Retries upsert the latest
+    // GPS trail rather than inserting a duplicate row that would show up as a
+    // second trip in history. Migration 202604270002 enforces UNIQUE(trip_id).
+    const { error } = await supabaseAdmin.from('trip_tracks').upsert(
+      [
+        {
+          trip_id: request.tripId,
+          user_id: userId,
+          routing_mode: request.routingMode,
+          planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
+          planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
+          actual_distance_meters: actualDistance,
+          gps_trail: request.gpsBreadcrumbs,
+          end_reason: request.endReason,
+          started_at: request.startedAt,
+          ended_at: request.endedAt,
+          bike_type: request.bikeType ?? null,
+          aqi_at_start: request.aqiAtStart ?? null,
+        },
+      ],
+      { onConflict: 'trip_id' },
+    );
 
     if (error) {
       throw new Error(error.message);
