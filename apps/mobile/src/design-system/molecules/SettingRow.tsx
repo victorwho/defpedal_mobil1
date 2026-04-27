@@ -60,11 +60,15 @@ export const SettingRow: React.FC<SettingRowProps> = ({
         <Text style={styles.label}>{label}</Text>
         <Text style={styles.description}>{description}</Text>
       </View>
+      {/* The wrapping Pressable already exposes the switch role + state to
+          screen readers; hide the inner Toggle's a11y so SR doesn't announce
+          two switches per row. Sighted-user tap on the toggle still works. */}
       <Toggle
         checked={checked}
         onChange={onChange}
         disabled={disabled}
         accessibilityLabel={accessibilityLabel ?? label}
+        accessible={false}
       />
     </Pressable>
   );
