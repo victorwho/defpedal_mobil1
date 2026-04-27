@@ -24,6 +24,73 @@
 ### Release
 - Ships in the next preview APK / next dev-build install. No native rebuild required.
 
+## 2026-04-27 — Real-Account Cold Start Always Lands on /route-planning
+
+### Behavior
+- Persisted `appState=ROUTE_PREVIEW` (and `AWAITING_FEEDBACK`) was reviving a prior route on next cold start — the Zustand persist slice rehydrated `routePreview` and `app/index.tsx` redirected to `/route-preview`, so a signed-in user who exited mid-planning kept finding their old route on the next launch instead of starting fresh.
+- Real-account (non-anonymous) cold starts now always land on `/route-planning` with no destination selected. A one-shot `useEffect` calls `resetFlow()` (clears `routePreview`, `selectedRouteId`, `routeRequest`, sets `appState=IDLE`, prunes orphaned `tripServerIds`) when `gate.hasRealAccount && (appState === 'ROUTE_PREVIEW' || appState === 'AWAITING_FEEDBACK')`, and the same render suppresses the matching `<Redirect>` branches to avoid a one-frame flash of `/route-preview` or `/feedback`.
+- Anonymous sessions are intentionally untouched — their open count drives the signup gate, and resuming a half-built route is part of the conversion nudge.
+- Active `NAVIGATING` is also untouched — `NavigationResumeGuard` owns the active-ride recovery flow (auto-resume <15min, prompt otherwise).
+
+### Files
+- `apps/mobile/app/index.tsx` — added `resetFlow` selector, `hasClearedPreviewRef` guard, the cleanup effect, and the suppression branch on the redirect ladder.
+
+### Tests
+- `npm run typecheck:mobile` clean.
+- `npm run check:bundle` HTTP 200.
+- No new automated tests — covered by manual cold-start QA on next dev build.
+
+### Release
+- Ships in the next preview APK / dev-build install. No native rebuild required.
+
+## 2026-04-27 — Hide Anonymous Users From Top Contributors and Leaderboard
+
+### Behavior
+- Anonymous (pre-signup) sessions were appearing on City Heartbeat **Top Contributors** and the **Neighborhood Safety Leaderboard** with empty `display_name`. The `handle_new_user` trigger seeded `auto_share_rides = true` for every new account — including anon — so they slipped through the existing `auto_share_rides = true` filter.
+- Their trips still count in **community-wide totals** (`today` / `daily` / `totals` blocks of `get_city_heartbeat`, plus `get_community_stats`). Only the named, ranked surfaces are filtered.
+- When an anonymous session upgrades to a real account (Supabase preserves the same `auth.users.id` and flips `is_anonymous` to `false`), an `AFTER UPDATE OF is_anonymous` trigger on `auth.users` syncs the profile flag — they immediately become eligible for ranking with their backfilled trip history.
+
+### Files
+- `supabase/migrations/202604280003_exclude_anon_from_leaderboards.sql` — new migration:
+  - `ALTER TABLE profiles ADD COLUMN is_anonymous BOOLEAN NOT NULL DEFAULT false`, backfilled from `auth.users.is_anonymous`.
+  - Updated `handle_new_user` to populate `is_anonymous` on profile creation.
+  - New `sync_profile_is_anonymous` SECURITY DEFINER function + `AFTER UPDATE OF is_anonymous` trigger on `auth.users` that flips the profile flag on upgrade.
+  - Replaced `get_city_heartbeat` so the `topContributors` subquery filters `AND p.is_anonymous = false`. The `today` / `daily` / `totals` / `hazardHotspots` blocks are unchanged so anon trips still aggregate into community-wide numbers.
+  - Replaced `get_neighborhood_leaderboard` so both UNION branches (CO2 and hazards metrics) filter `AND p.is_anonymous = false`.
+
+### Tests
+- Migration applied via Supabase MCP. Backfill verified: 35 anon profiles, 6 real profiles, 0 mismatches across 41 rows. Sync trigger present.
+- Smoke test on Bucharest center / 15km radius: `totals.rides = 11` (anon trips counted) but `topContributors.length = 0` (anon hidden). Both leaderboard RPCs executed without error.
+- API typecheck clean. No API code changes — RPCs are called via `supabaseAdmin.rpc(...)`, contract unchanged.
+
+### Release
+- DB-only change. No Cloud Run redeploy required. Live immediately for all clients hitting the City Heartbeat dashboard or the Leaderboard tab.
+
+## 2026-04-27 — Trip-Record Idempotency to Stop Duplicate History Entries
+
+### Behavior
+- Server had no idempotency on `POST /trips/start` or `POST /trips/track` — both were plain `INSERT`s. Several client paths could replay a trip write for the same logical ride: the offline-queue 10s timeout shorter than slow-uplink commit time, an app kill mid-sync (`recoverSyncingMutations` resets `syncing` → `failed` on next launch), a dropped response packet, the `useAppKilledRecovery` re-enqueue. Every replay inserted a fresh row.
+- `getTripHistory` reads from `trip_tracks`, so the duplicate `trip_tracks` rows surfaced as the same trip listed multiple times in History.
+- Fix is server-side because the network is unreliable. Migration adds:
+  - `UNIQUE (trip_id)` on `trip_tracks` so retries upsert the latest GPS trail rather than insert. Last-write-wins is correct since the client always uploads the full breadcrumb list.
+  - `trips.client_trip_id` column + partial `UNIQUE (user_id, client_trip_id) WHERE client_trip_id IS NOT NULL` so retries of `trip_start` return the existing trip's id instead of inserting a duplicate. Partial WHERE clause keeps legacy NULL rows valid.
+- `finishTripRecord` (`POST /trips/end`) was already idempotent (UPDATE by id). No change there.
+
+### Files
+- `supabase/migrations/202604270002_trip_idempotency.sql` — new migration:
+  - Dedupes existing `trip_tracks` (keeps the row with the longest GPS trail per `trip_id`, tie-break `created_at DESC`, then `id DESC`).
+  - Adds `UNIQUE (trip_id)` index on `trip_tracks`.
+  - Adds `trips.client_trip_id TEXT` column and partial unique index on `(user_id, client_trip_id)`.
+- `services/mobile-api/src/lib/submissions.ts` — `startTripRecord` now upserts with `onConflict: 'user_id,client_trip_id'`; `saveTripTrack` now upserts with `onConflict: 'trip_id'`. Both still echo `clientTripId` back in the response.
+
+### Tests
+- Migration applied via Supabase MCP. Verified: both indexes live, 140 trip_tracks survived dedupe (0 duplicates remaining), 259 trips total.
+- API typecheck clean. Test suite 455/457 — the 2 failures are in `routes-feed.test.ts > POST /v1/feed/:id/comments`, pre-existing fallout from session 31's `requireFullUser` tightening, unrelated to this change.
+
+### Release
+- Cloud Run revision `defpedal-api-00069-p7t` serving 100% traffic. `/health` 200.
+- Mobile recovery paths (`useAppKilledRecovery`, the `queueTripEnd` stale-closure check) are now safe by construction — every retry hits the unique index and upserts. No client changes required.
+
 ## 2026-04-25 — Strip AD_ID Permission for Play Store Compliance (v0.2.21)
 
 ### Behavior
