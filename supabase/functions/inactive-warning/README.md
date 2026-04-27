@@ -18,41 +18,36 @@ Sends the 23-month inactivity warning email to users flagged by the
   Romania-only launch, but the cron tick is weekly so any backlog drains
   over multiple weeks if it ever grows.
 
-## Deploy
+## Deploy (one command)
 
-From repo root, after `npm install` (Supabase CLI is local-installed
-already, see other functions). Project ref `uobubaulcdcuggnetzei`:
+The full deploy — migration push + function deploy + secrets + Cloud Scheduler upsert + smoke test — is wrapped in `scripts/deploy-inactive-warning.sh`. From repo root, after authenticating once with `supabase login` and `gcloud auth login`:
 
 ```bash
+CRON_SECRET="<same value used by Cloud Run retention crons>" \
+RESEND_API_KEY="re_..." \
+  ./scripts/deploy-inactive-warning.sh
+```
+
+The script is **idempotent** — re-running upgrades the function in place, overwrites secrets, upserts the scheduler job. Pass `SKIP_MIGRATION=1` if the migration was already applied via Supabase MCP.
+
+## Manual deploy (if you cannot run the script)
+
+```bash
+# 1. Apply migration (or use Supabase MCP apply_migration)
+supabase db push --project-ref uobubaulcdcuggnetzei
+
+# 2. Deploy the function
 supabase functions deploy inactive-warning --project-ref uobubaulcdcuggnetzei
-```
 
-## Configure secrets
-
-The function reads three env vars at runtime; all must be set on Supabase:
-
-```bash
+# 3. Set secrets (auto-injected SUPABASE_URL + SERVICE_ROLE_KEY don't need
+#    to be set manually — only these two)
 supabase secrets set --project-ref uobubaulcdcuggnetzei \
-  CRON_SECRET="<same value used by Cloud Run retention crons>" \
-  RESEND_API_KEY="<from resend.com -> API Keys>"
+  CRON_SECRET="..." \
+  RESEND_API_KEY="re_..."
 
-# SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected by Supabase
-# Edge Functions runtime — do NOT set them manually.
-```
-
-To rotate the Resend key:
-
-```bash
-# Issue new key at resend.com -> API Keys
-supabase secrets set --project-ref uobubaulcdcuggnetzei RESEND_API_KEY="<new>"
-# Test the function manually (see "Manual test" below) before revoking the
-# old key in Resend's dashboard.
-```
-
-## Cloud Scheduler setup (one-time)
-
-```bash
+# 4. Create Cloud Scheduler job
 gcloud scheduler jobs create http retention-inactive-mailer-cron \
+  --project=gen-lang-client-0895796477 \
   --location=europe-central2 \
   --schedule="30 5 * * 1" \
   --time-zone="Europe/Bucharest" \
@@ -61,7 +56,16 @@ gcloud scheduler jobs create http retention-inactive-mailer-cron \
   --headers="Authorization=Bearer ${CRON_SECRET}"
 ```
 
-This complements the existing four retention jobs:
+To rotate the Resend key (no re-deploy needed):
+
+```bash
+supabase secrets set --project-ref uobubaulcdcuggnetzei RESEND_API_KEY="re_<new>"
+# Smoke-test before revoking the old key in Resend's dashboard.
+```
+
+## Schedule context
+
+The mailer fits between `flag-inactive` and `purge-inactive` in the weekly retention sequence:
 
 | Job | Schedule (Bucharest) | Endpoint |
 |---|---|---|
@@ -70,9 +74,7 @@ This complements the existing four retention jobs:
 | `retention-inactive-mailer-cron` | **05:30 Mon** | **Edge Function (this one)** |
 | `retention-purge-inactive-cron` | 06:00 Mon | Cloud Run API |
 
-Order matters: flag → mailer → purge. The 30-min gap after flag-inactive
-ensures the mark commits before the mailer reads, and the 30-min gap before
-purge-inactive lets the mailer drain its first batch.
+Order matters: flag → mailer → purge. The 30-min gap after flag-inactive ensures the mark commits before the mailer reads, and the 30-min gap before purge-inactive lets the mailer drain its first batch.
 
 ## Manual test
 
