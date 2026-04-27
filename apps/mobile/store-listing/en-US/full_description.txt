@@ -1,0 +1,29 @@
+Defensive Pedal is the cycling navigation app for riders who want safer routes — not just the fastest ones.
+
+Most navigation apps were built for cars. The bike profiles they offer are usually a thin afterthought: shortest path, regardless of how busy or dangerous the road is. Defensive Pedal does it differently. We score every road segment for cycling safety using real road-risk data, then route you around the high-risk ones.
+
+KEY FEATURES
+
+• SAFETY-SCORED ROUTING. Every street is graded for cycling risk. Choose Safe (avoids high-risk roads), Fast (shortest), or Flat (avoids hills) — see exactly how the three options compare before you ride.
+
+• REAL-TIME HAZARD ALERTS. Other riders flag potholes, dangerous intersections, aggressive traffic, dog hotspots, and bad surfaces. The app warns you about anything on your route, with up/down voting so the community keeps it accurate.
+
+• TURN-BY-TURN NAVIGATION. 3D follow camera, voice guidance, automatic re-routing when you go off-path, GPS signal indicator. Designed to be readable at a glance, not buried in menus.
+
+• OFFLINE-CAPABLE. Download a city pack, your saved routes work without signal. Trip data syncs as soon as you are back online.
+
+• YOUR IMPACT. Track distance ridden, time saved, CO₂ kept out of the air, and money saved versus driving. Daily streaks, badges, and a 10-tier rider progression system turn every ride into progress.
+
+• COMMUNITY. See what other cyclists in your city rode this week. Share routes worth doing, comment, react, and learn from each other.
+
+• WEATHER & AIR QUALITY. Current conditions, wind, European AQI, and a daily 9 AM forecast notification so you know what to expect before you head out.
+
+PRIVACY-FIRST
+
+Defensive Pedal is built for European cyclists, with EU data residency where it matters. We do not sell your data. We do not use it for advertising. You can use the app anonymously, sign in only when you want to sync across devices. Account and data deletion are one tap away in Profile → Account, or via web at routes.defensivepedal.com/account-deletion.
+
+ROMANIA-FOCUSED FOR LAUNCH
+
+Defensive Pedal is launching first in Romania with full Romanian translation. Romanian users get the daily safety quiz in Romanian, with questions tailored to Romanian road law and cycling etiquette.
+
+Made for daily commuters, weekend explorers, and anyone who wants the bike to feel less like a calculated risk.

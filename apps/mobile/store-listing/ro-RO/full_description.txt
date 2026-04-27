@@ -1,0 +1,29 @@
+Defensive Pedal este aplicația de navigație ciclistă pentru bicicliștii care vor rute mai sigure — nu doar cele mai rapide.
+
+Cele mai multe aplicații de navigație au fost construite pentru mașini. Profilurile pentru bicicletă pe care le oferă sunt, de obicei, o gândire ulterioară superficială: cea mai scurtă cale, indiferent cât de aglomerat sau periculos este drumul. Defensive Pedal face altfel. Evaluăm fiecare segment de drum din punctul de vedere al siguranței pentru ciclism folosind date reale de risc rutier, apoi te ghidăm să eviți drumurile cu risc ridicat.
+
+CARACTERISTICI PRINCIPALE
+
+• RUTARE EVALUATĂ DUPĂ SIGURANȚĂ. Fiecare stradă primește o notă de risc pentru ciclism. Alege Sigur (evită drumurile cu risc ridicat), Rapid (cel mai scurt) sau Plat (evită dealurile) — vezi exact cum se compară cele trei opțiuni înainte să pornești.
+
+• ALERTE DE PERICOL ÎN TIMP REAL. Alți bicicliști semnalează gropi, intersecții periculoase, trafic agresiv, zone cu câini și suprafețe proaste. Aplicația te avertizează despre orice este pe traseul tău, cu vot pozitiv/negativ, astfel încât comunitatea menține informațiile la zi.
+
+• NAVIGAȚIE PAS CU PAS. Cameră 3D care urmărește direcția, ghidare vocală, re-rutare automată când ieși de pe traseu, indicator de semnal GPS. Concepută să fie citită dintr-o privire, nu îngropată în meniuri.
+
+• FUNCȚIONEAZĂ OFFLINE. Descarcă un pachet de oraș și rutele tale salvate funcționează fără semnal. Datele se sincronizează imediat ce revii online.
+
+• IMPACTUL TĂU. Urmărește distanța parcursă, timpul economisit, CO₂ evitat și banii economisiți față de mașină. Streak-uri zilnice, insigne și un sistem de progresie pe 10 niveluri transformă fiecare cursă în progres.
+
+• COMUNITATE. Vezi ce au pedalat alți bicicliști din orașul tău săptămâna aceasta. Partajează rute care merită făcute, comentează, reacționează și învață de la ceilalți.
+
+• VREMEA ȘI CALITATEA AERULUI. Condiții actuale, vânt, indice european de calitate a aerului (AQI) și o notificare zilnică la ora 9 dimineața cu prognoza, ca să știi la ce să te aștepți înainte să pornești.
+
+CONFIDENȚIALITATE PE PRIMUL LOC
+
+Defensive Pedal este construită pentru bicicliștii europeni, cu rezidență a datelor în UE acolo unde contează. Nu vindem datele tale. Nu le folosim pentru publicitate. Poți folosi aplicația anonim și te conectezi doar când vrei să sincronizezi între dispozitive. Ștergerea contului și a datelor este la o singură atingere în Profil → Cont, sau prin web la routes.defensivepedal.com/account-deletion.
+
+LANSARE FOCALIZATĂ PE ROMÂNIA
+
+Defensive Pedal se lansează mai întâi în România, cu traducere completă în limba română. Utilizatorii români primesc quiz-ul zilnic de siguranță în română, cu întrebări adaptate la legislația rutieră românească și la eticheta ciclistă locală.
+
+Făcută pentru navetiștii zilnici, exploratorii de weekend și pentru oricine vrea ca bicicleta să se simtă mai puțin ca un risc calculat.
