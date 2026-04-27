@@ -252,9 +252,9 @@ export const en = {
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
     title: 'Help us improve, on your terms',
-    subtitle: 'Crash reports stay off until you turn them on. Product analytics is on by default — turn it off if you prefer.',
+    subtitle: 'Both options are on by default. Turn either off if you prefer not to share.',
     crashLabel: 'Share crash reports',
-    crashDescription: 'Helps us fix bugs faster. No personal data — just stack traces and device info.',
+    crashDescription: 'On by default. Stack traces and device info when the app crashes — no location, no personal data. Helps us fix bugs faster.',
     analyticsLabel: 'Share product analytics',
     analyticsDescription: 'On by default. Anonymous usage events so we can ship the right features. No location tracking — turn off anytime.',
     assurance: 'You\'re in control.',
@@ -266,7 +266,7 @@ export const en = {
   privacyAnalytics: {
     title: 'Privacy & analytics',
     profileRowSub: 'Crash reports and product analytics preferences',
-    intro: 'Crash reports are off until you turn them on. Product analytics is on by default. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
+    intro: 'Both options are on by default. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
     crashLabel: 'Share crash reports',
     crashDescription: 'Stack traces and device info when the app crashes. No location data.',
     analyticsLabel: 'Share product analytics',

@@ -314,15 +314,22 @@ These should be composed instead of building from scratch:
 
 **Status:** **partially done** — telemetry plumbing exists; consent gating absent.
 
-> **2026-04-27 deviation from source plan §7:** Per user decision, **product analytics (PostHog) defaults ON** for first-time onboarding, with an explicit opt-out toggle on the same screen and again in Profile → Privacy & analytics. Crash reports (Sentry) keep the original **default OFF** — actual error payloads are higher-sensitivity than aggregated usage events. Returning users always see their previously-saved choice; we never silently flip a setting they already opted out of.
+> **2026-04-27 deviation from source plan §7:** Per user decision, **both crash reports (Sentry) and product analytics (PostHog) default ON** for first-time onboarding, with explicit opt-out toggles on the same screen and again in Profile → Privacy & analytics. Returning users always see their previously-saved choice; we never silently flip a setting they already opted out of.
 >
-> **Legal risk this introduces:** ANSPDCP / Romania Law 506/2004 + EDPB guidance generally treat non-essential product analytics as opt-in. PostHog's anonymized-event posture is a partial defence but not airtight. Mitigation:
-> - Toggle is prominent on the consent screen (not buried)
+> **Legal posture per channel:**
+>
+> - **Crash reports (Sentry):** Default-on defensible under GDPR Art. 6(1)(f) "legitimate interest" with `sendDefaultPii: false` (no IP / no user-agent / no cookies). Standard industry posture for product crash diagnostics. Lower risk than analytics default-on.
+> - **Product analytics (PostHog):** Default-on is on the contested edge. ANSPDCP / Romania Law 506/2004 + EDPB guidance generally treat non-essential product analytics as opt-in. PostHog's anonymized-event posture is a partial defence but not airtight.
+>
+> **Mitigations applied:**
+> - Both toggles are prominent on the consent screen (not buried)
 > - Continue button is explicit (not implied consent by app launch)
-> - Privacy policy (item 3) MUST disclose default-ON for analytics + how to opt out
+> - Privacy policy (item 3) MUST disclose default-ON for both channels + how to opt out
+> - `Sentry.init` is called with `sendDefaultPii: false`
+> - PostHog client is gated behind consent — no events fire if user toggles off
 > - Counsel review recommended before production rollout
 >
-> Code: `apps/mobile/app/onboarding/consent.tsx` reads `persistedCapturedAt` and defaults `productAnalytics` to `true` when no decision exists yet (`capturedAt === null`). `crashReports` defaults to `persistedSentry` (effectively false until manually enabled).
+> Code: `apps/mobile/app/onboarding/consent.tsx` reads `persistedCapturedAt` and defaults both `crashReports` and `productAnalytics` to `true` when no decision exists yet (`capturedAt === null`).
 
 **Already in place:**
 - `apps/mobile/src/providers/TelemetryProvider.tsx:11` calls `initializeTelemetry()` unconditionally on mount.

@@ -44,16 +44,22 @@ export default function OnboardingConsentScreen() {
   const persistedCapturedAt = useAppStore((s) => s.analyticsConsent.capturedAt);
 
   // First-time defaults vs returning visitor:
-  // - Product analytics defaults ON for first-time onboarding (capturedAt is
-  //   null). Anonymized PostHog events; user can turn off here or later in
-  //   Profile → Privacy & analytics. Decision recorded in the plan + needs
-  //   legal counsel review for ANSPDCP / Law 506/2004 compliance.
-  // - Crash reports stay OFF by default in all cases — actual error payloads
-  //   are higher-sensitivity than aggregated usage events.
+  // - Both crash reports (Sentry) and product analytics (PostHog) default ON
+  //   for first-time onboarding (capturedAt is null). User opts out from the
+  //   same screen or anytime later in Profile → Privacy & analytics.
+  // - Crash reports defense: GDPR Art. 6(1)(f) "legitimate interest" with
+  //   sendDefaultPii=false (no IP / no user-agent / no cookies). Standard
+  //   posture for product crash diagnostics.
+  // - Product analytics defense: thinner — ANSPDCP / Law 506/2004 generally
+  //   treats this as opt-in. PostHog's anonymous-event posture is partial
+  //   mitigation. Privacy policy (item 3) MUST disclose both defaults +
+  //   how to opt out. Counsel review recommended before production rollout.
   // - Returning users always see their previously-saved choice; we never
   //   silently flip a setting they already opted out of.
   const isFirstTimeConsent = persistedCapturedAt === null;
-  const [crashReports, setCrashReports] = useState(persistedSentry);
+  const [crashReports, setCrashReports] = useState(
+    isFirstTimeConsent ? true : persistedSentry,
+  );
   const [productAnalytics, setProductAnalytics] = useState(
     isFirstTimeConsent ? true : persistedPosthog,
   );

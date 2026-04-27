@@ -151,7 +151,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Do you collect crash reports or product analytics?',
         answer:
-          'During onboarding we ask about both. Crash reports default OFF \u2014 we only collect them if you turn the switch on. Product analytics defaults ON, but you can turn it off in the same screen or anytime later in Profile \u2192 Privacy & analytics; turning a switch off stops new events for that channel immediately. Crash reports include stack traces and device info but never your location. Product analytics is anonymous, aggregated usage data with no GPS tracks. We never sell your data.',
+          'Both default ON during onboarding, but you can turn either off on the same screen or anytime later in Profile \u2192 Privacy & analytics; turning a switch off stops new events for that channel immediately. Crash reports include stack traces and device info to help us fix bugs faster \u2014 never your location and no personal data. Product analytics is anonymous, aggregated usage data with no GPS tracks. We never sell your data.',
       },
     ],
   },

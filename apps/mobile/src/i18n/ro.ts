@@ -254,9 +254,9 @@ export const ro: TranslationKeys = {
   onboardingConsent: {
     eyebrow: 'Defensive Pedal',
     title: 'Ajută-ne să ne îmbunătățim, în condițiile tale',
-    subtitle: 'Rapoartele de eroare rămân dezactivate până când le activezi tu. Analiza produsului este activă implicit — dezactiveaz-o dacă preferi.',
+    subtitle: 'Ambele opțiuni sunt active implicit. Dezactivează oricare dacă preferi să nu partajezi.',
     crashLabel: 'Trimite rapoarte de eroare',
-    crashDescription: 'Ne ajută să remediem erorile mai rapid. Fără date personale — doar urmele stivei și informații despre dispozitiv.',
+    crashDescription: 'Activă implicit. Urme ale stivei și informații despre dispozitiv când aplicația se blochează — fără locație, fără date personale. Ne ajută să remediem erorile mai rapid.',
     analyticsLabel: 'Trimite analize de produs',
     analyticsDescription: 'Activă implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație — dezactivează oricând.',
     assurance: 'Tu deții controlul.',
@@ -268,7 +268,7 @@ export const ro: TranslationKeys = {
   privacyAnalytics: {
     title: 'Confidențialitate & analiză',
     profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
-    intro: 'Rapoartele de eroare sunt dezactivate până când le activezi. Analiza produsului este activă implicit. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
+    intro: 'Ambele opțiuni sunt active implicit. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
     crashLabel: 'Trimite rapoarte de eroare',
     crashDescription: 'Urme ale stivei și informații despre dispozitiv când aplicația se blochează. Fără date de locație.',
     analyticsLabel: 'Trimite analize de produs',
