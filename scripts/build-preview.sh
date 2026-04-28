@@ -159,36 +159,6 @@ else
   echo "  Scheme $TARGET_SCHEME already present"
 fi
 
-echo "── Step 1c2: Apply network_security_config (cleartext only for OSRM) ──"
-# The Android network_security_config plugin is the source of truth, but we
-# don't run `expo prebuild` on $DST (it overwrites source). Patch the synced
-# manifest + write the resource file in place so the AAB picks it up.
-NETSEC_XML_DIR="$DST/apps/mobile/android/app/src/main/res/xml"
-NETSEC_XML="$NETSEC_XML_DIR/network_security_config.xml"
-mkdir -p "$NETSEC_XML_DIR"
-cat > "$NETSEC_XML" <<'XML'
-<?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">34.116.139.172</domain>
-    </domain-config>
-</network-security-config>
-XML
-echo "  Wrote $NETSEC_XML"
-# Add android:networkSecurityConfig to <application> if missing.
-if ! grep -q 'android:networkSecurityConfig=' "$MANIFEST" 2>/dev/null; then
-  sed -i 's|<application |<application android:networkSecurityConfig="@xml/network_security_config" |' "$MANIFEST"
-  echo "  Added android:networkSecurityConfig to <application>"
-else
-  echo "  android:networkSecurityConfig already on <application>"
-fi
-# Remove the legacy app-wide cleartext flag — the XML scopes it now.
-if grep -q 'android:usesCleartextTraffic="true"' "$MANIFEST" 2>/dev/null; then
-  sed -i 's| android:usesCleartextTraffic="true"||g' "$MANIFEST"
-  echo "  Removed legacy android:usesCleartextTraffic flag"
-fi
-
 echo "── Step 1d: Ensure route-share universal link intent filter ──"
 # Slice 0 of the route-share PRD: the app must advertise itself as the
 # handler for https://routes.defensivepedal.com/r/*. Expo's intentFilters

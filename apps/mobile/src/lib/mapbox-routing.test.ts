@@ -297,8 +297,8 @@ describe('directPreviewRoute', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('bicycle-flat');
-    expect(firstCallUrl).not.toContain('/bicycle/');
+    expect(firstCallUrl).toContain('osrm-flat.defensivepedal.com');
+    expect(firstCallUrl).toContain('/route/v1/bicycle/');
   });
 
   it('uses standard OSRM endpoint when avoidHills is false', async () => {
@@ -317,8 +317,9 @@ describe('directPreviewRoute', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-flat.defensivepedal.com');
     expect(firstCallUrl).toContain('/route/v1/bicycle/');
-    expect(firstCallUrl).not.toContain('bicycle-flat');
   });
 
   it('composes avoidHills and avoidUnpaved correctly', async () => {
@@ -337,7 +338,7 @@ describe('directPreviewRoute', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('bicycle-flat');
+    expect(firstCallUrl).toContain('osrm-flat.defensivepedal.com');
     expect(firstCallUrl).toContain('exclude=unpaved');
   });
 

@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-04-28 — OSRM HTTPS Migration (Caddy + Let's Encrypt, Cleartext Exceptions Removed)
+
+### Behavior
+- The mobile app now reaches the OSRM safety routing engine over HTTPS via two subdomains backed by Caddy + Let's Encrypt:
+  - **Standard / safe**: `https://osrm.defensivepedal.com/route/v1/bicycle/...` (Caddy in front of port 5000).
+  - **Flat (avoid hills)**: `https://osrm-flat.defensivepedal.com/route/v1/bicycle/...` (Caddy in front of port 5001).
+- Subdomain alone selects the container. The path is the same `/route/v1/bicycle/...` on both — the prior `/route/v1/bicycle-flat` URL token was cosmetic; OSRM ignores the profile label in the URL and matches by binary container.
+- Replaces the prior plaintext direct-IP endpoints `http://34.116.139.172:5000` and `http://34.116.139.172:5001` introduced in the 2026-04-15 migration. No app behavior changes — same routes, same response shape.
+- **Closes compliance plan item 6 long-term.** All app traffic is now HTTPS-only.
+
+### Files
+- `apps/mobile/src/lib/mapbox-routing.ts` — `OSRM_API_BASE` / `OSRM_FLAT_API_BASE` swapped to the new HTTPS subdomains.
+- `services/mobile-api/src/config.ts` — `safeOsrmBaseUrl` / `safeOsrmFlatBaseUrl` default values updated to match (env override still respected via `SAFE_OSRM_BASE_URL` / `SAFE_OSRM_FLAT_BASE_URL`).
+- `apps/mobile/src/lib/mapbox-routing.test.ts` — three assertions migrated from path-based (`bicycle-flat`) to host-based (`osrm-flat.defensivepedal.com`). 19/19 tests green.
+- `apps/mobile/app.config.ts` — removed `cleartextAllowedDomains` const + comment, removed the `withAndroidNetworkSecurityConfig` plugin entry, removed the iOS `NSAppTransportSecurity.NSExceptionDomains.34.116.139.172` block. iOS `infoPlist` now has no ATS overrides.
+- `apps/mobile/plugins/withAndroidNetworkSecurityConfig.js` — **deleted**. No longer referenced from `app.config.ts`. Modern Android (`targetSdk` ≥ 28) disallows cleartext by default with no explicit XML required.
+- `scripts/build-preview.sh` — removed Step 1c2 (manual `network_security_config.xml` injection into `$DST/apps/mobile/android/app/src/main/res/xml/`). The legacy `usesCleartextTraffic` strip is also gone — the source manifest no longer carries that flag.
+
+### Tests
+- `apps/mobile/src/lib/mapbox-routing.test.ts` — 19/19 passing.
+- `npm run typecheck` — clean across `@defensivepedal/mobile-api`, `@defensivepedal/mobile`, and `@defensivepedal/web`.
+- `npm run check:bundle` — HTTP 200.
+- Manual phone verification (Galaxy S23, dev build): planning a route in safe mode and toggling the Flat pill both succeeded; routes loaded from the new HTTPS subdomains.
+
+### Release
+- **Mobile (dev)**: rebuilt and installed on phone via `./gradlew installDevelopmentDebug`. The app picks up the new URLs immediately (JS-side change, Metro hot-reload also works without a native rebuild).
+- **Mobile (preview / production)**: requires a fresh build to ship. The plugin/ATS removals only take effect on the next `expo prebuild` (or fresh EAS build) that regenerates the manifest + `Info.plist`. HTTPS works regardless of the stale manifest attribute, so this is a "clean state" follow-up rather than a blocker.
+- **API server**: deploys via Cloud Run on next push. Existing Cloud Run revisions still honour the old IP if their env vars override the defaults — verify `SAFE_OSRM_BASE_URL` and `SAFE_OSRM_FLAT_BASE_URL` aren't pinned to `http://34.116.139.172` on the live revision before considering this fully shipped server-side.
+- **`C:\dpb` preview-build cache**: may carry a stale `network_security_config.xml` until the next robocopy `/MIR` (or manual `rm`). Harmless — that XML disables cleartext globally, which is exactly the intended state.
+
 ## 2026-04-28 — Stats Dashboard: Period-Scoped Totals + Mode Splits
 
 ### Behavior

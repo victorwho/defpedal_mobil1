@@ -26,8 +26,8 @@ import { getAccessToken } from './supabase';
 // Constants
 // ---------------------------------------------------------------------------
 
-const OSRM_API_BASE = 'http://34.116.139.172:5000/route/v1/bicycle';
-const OSRM_FLAT_API_BASE = 'http://34.116.139.172:5001/route/v1/bicycle-flat';
+const OSRM_API_BASE = 'https://osrm.defensivepedal.com/route/v1/bicycle';
+const OSRM_FLAT_API_BASE = 'https://osrm-flat.defensivepedal.com/route/v1/bicycle';
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
 const REQUEST_TIMEOUT_MS = 15_000;
