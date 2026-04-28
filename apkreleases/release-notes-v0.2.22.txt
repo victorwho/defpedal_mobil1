@@ -1,0 +1,39 @@
+Defensive Pedal Preview v0.2.22
+
+WHAT'S NEW
+
+1. Fewer pre-ride weather warnings.
+   - No warning when temperature stays between 10 and 27 C.
+   - Warns about cold (under 5 C), heat (over 30 C, NEW), or big swings (over 13 C in the day).
+   - All warning copy now advises caution instead of telling you to postpone the ride.
+
+2. Top Contributors and the Neighborhood Leaderboard now hide anonymous (not-signed-up) riders.
+   Their trips still count toward community-wide totals on City Heartbeat — they just don't
+   appear in the named ranking until they sign up with Google or email.
+
+3. Signed-in users always start on a clean route-planning screen on cold start.
+   No more reopening the app to a stale route preview from yesterday.
+   (Anonymous users keep the resume flow as part of the signup prompt.)
+
+4. Trip duplicates fixed. The same ride no longer appears multiple times in History.
+   Server-side idempotency: any retry from the offline queue (timeout, app kill,
+   dropped response) now upserts instead of inserting a duplicate row.
+
+WHAT TO TEST
+
+- Open the app fresh after force-closing on a route preview — should land on
+  route planning with no destination.
+- City Heartbeat tab — Top Contributors and Leaderboard should not show riders
+  with empty names anymore.
+- Weather warning modal — try planning a route in mild weather (15-25 C, calm).
+  No modal should appear.
+- History tab — any duplicate trips from prior sessions should already be gone
+  (cleaned up server-side on Apr 27).
+- Anonymous users: app behavior should be unchanged from prior preview.
+
+KNOWN
+
+- Offline navigation real NetInfo activates only after a fresh dev-build install.
+  Preview keeps the safe fallback (treats device as online).
+
+Thanks for testing.

@@ -125,6 +125,13 @@ for f in build.gradle settings.gradle gradle.properties; do
   cp -f "$SRC/apps/mobile/android/$f" "$DST/apps/mobile/android/$f" 2>/dev/null || true
 done
 
+# Sync the Expo config plugins directory. `app.config.ts` references plugins by
+# relative path (./plugins/...), and a missing or stale plugin file breaks the
+# `:expo-constants:createExpoConfig` Gradle task with an opaque PLUGIN_NOT_FOUND.
+# //MIR mirrors deletes too — so a plugin removed in SRC (e.g. the legacy
+# withAndroidCleartextTraffic.js) gets pruned from DST.
+robocopy "$SRC/apps/mobile/plugins" "$DST/apps/mobile/plugins" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
+
 echo "── Step 1b: Set APP_VARIANT in .env ──"
 # The JS bundle reads APP_VARIANT to determine the scheme, package name,
 # and API URLs. Must match the Gradle flavor being built.

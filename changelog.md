@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-04-28 — Stats Dashboard: Period-Scoped Totals + Mode Splits
+
+### Behavior
+- The History tab's stats dashboard now shows **different numbers for the Week / Month / All Time tabs**. Previously every chip rendered identical lifetime totals because `get_trip_stats_dashboard` only returned lifetime `totals` + `modeSplit` and the frontend had nowhere else to read from.
+- Per-period totals are timezone-aware via `date_trunc('week' | 'month', NOW() AT TIME ZONE time_zone)` — Monday-aligned weeks, calendar-aligned months.
+- Lifetime streak (`currentStreakDays`, `longestStreakDays`) is intentionally unchanged — streaks are an inherently lifetime concept.
+- Historical bucket arrays (`weekly` / `monthly`) — the chart inputs — are unchanged. The chart still uses the same buckets per tab.
+
+### Files
+- `supabase/migrations/202604280004_trip_stats_dashboard_per_period.sql` — replaces `get_trip_stats_dashboard` with a version that additionally emits `weeklyTotals`, `monthlyTotals`, `weeklyModeSplit`, `monthlyModeSplit` alongside the existing fields. `STABLE SECURITY DEFINER SET search_path = public`. Streak block lifted verbatim from prior version.
+- `packages/core/src/contracts.ts` — `TripStatsDashboard` extended with the four new fields (`UserStats` shape for totals, `TripStatsModeSplit` shape for splits).
+- `services/mobile-api/src/lib/submissions.ts` — `getTripStatsDashboard` factored out `mapTotals` / `mapModeSplit` helpers; per-period `totalCo2SavedKg` is derived from per-period distance via `calculateCo2SavedKg`. Empty-dashboard fallback now zeros all four new fields.
+- `services/mobile-api/src/routes/v1.ts` — JSON schema for `GET /v1/stats/dashboard` extended with the new required fields. Without this Fastify silently strips them (the long-standing `additionalProperties: false` gotcha — error #9). Refactored to share a single `totalsSchema` / `bucketsSchema` / `modeSplitSchema` rather than duplicating.
+- `apps/mobile/src/components/StatsDashboard.tsx` — `DashboardContent` picks `weeklyTotals` / `monthlyTotals` / `totals` and the matching mode split based on the selected period chip. `??` fallbacks to lifetime totals + lifetime mode split so an older API response (deployed-only-server) does not render empty cards.
+
+### Tests
+- `services/mobile-api/src/lib/submissions.test.ts` — primary test rewritten to assert per-period totals, per-period CO2 derivation (e.g. 18 000 m × 120 g/km → 2.16 kg), and per-period mode splits. Empty-dashboard test asserts the new fields zero. Stale-server test confirms `weeklyTotals`/`monthlyTotals` default to zero when the RPC omits them.
+- `services/mobile-api/src/routes/v1.test.ts` — dashboard-route mock + assertions extended with the new fields.
+- 31/31 dashboard-related tests passing. Mobile + web + API typecheck clean. `npm run check:bundle` HTTP 200.
+- Live verification on top user (Bucharest TZ): lifetime 29 trips / 161 km, this month 27 trips / 159 km, this week 3 trips / 7.98 km — three distinct figures, mode splits diverge similarly.
+
+### Release
+- Cloud Run revision `defpedal-api-00070-xbq` — 100% traffic. `/health` 200.
+- Mobile change ships in the next preview APK / dev install. Old preview clients on the new server still work because the contract additions are non-breaking (the new fields just don't render until the client picks them up).
+
 ## 2026-04-27 — Pre-Ride Weather Warning: Comfort Zone + Cautionary Wording
 
 ### Behavior

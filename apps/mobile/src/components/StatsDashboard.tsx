@@ -374,6 +374,21 @@ function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
 
 function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly dashboard: TripStatsDashboard; readonly period: StatsPeriod; readonly hazardsReported?: number }) {
   const t = useT();
+
+  // Pick the period-appropriate totals + mode split. The chart still uses the
+  // bucket arrays (weekly/monthly) — those drive the bars; the cards drive
+  // the headline numbers. `weeklyTotals` / `monthlyTotals` may be missing on
+  // older API responses; fall back to lifetime totals to avoid empty cards.
+  const totals = (() => {
+    if (period === 'week') return dashboard.weeklyTotals ?? dashboard.totals;
+    if (period === 'month') return dashboard.monthlyTotals ?? dashboard.totals;
+    return dashboard.totals;
+  })();
+  const modeSplit = (() => {
+    if (period === 'week') return dashboard.weeklyModeSplit ?? dashboard.modeSplit;
+    if (period === 'month') return dashboard.monthlyModeSplit ?? dashboard.modeSplit;
+    return dashboard.modeSplit;
+  })();
   const buckets = period === 'all' ? dashboard.monthly : dashboard.weekly;
 
   return (
@@ -383,31 +398,31 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
           icon="bicycle-outline"
           iconColor={brandColors.accent}
           label={t('stats.trips')}
-          value={String(dashboard.totals.totalTrips)}
+          value={String(totals.totalTrips)}
         />
         <SummaryCard
           icon="speedometer-outline"
           iconColor={safetyColors.info}
           label={t('stats.distance')}
-          value={formatDistance(dashboard.totals.totalDistanceMeters)}
+          value={formatDistance(totals.totalDistanceMeters)}
         />
         <SummaryCard
           icon="time-outline"
           iconColor={safetyColors.caution}
           label={t('stats.duration')}
-          value={formatDuration(dashboard.totals.totalDurationSeconds)}
+          value={formatDuration(totals.totalDurationSeconds)}
         />
         <SummaryCard
           icon="leaf-outline"
           iconColor={safetyColors.safe}
           label={t('stats.co2Saved')}
-          value={formatCo2Saved(dashboard.totals.totalCo2SavedKg)}
+          value={formatCo2Saved(totals.totalCo2SavedKg)}
         />
         <SummaryCard
           icon="cash-outline"
           iconColor={brandColors.accent}
           label={t('history.eurSaved')}
-          value={`€${(dashboard.totals.totalDistanceMeters / 1000 * 0.35).toFixed(0)}`}
+          value={`€${(totals.totalDistanceMeters / 1000 * 0.35).toFixed(0)}`}
         />
         <SummaryCard
           icon="warning-outline"
@@ -419,13 +434,13 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
           icon="heart-outline"
           iconColor="#F2C30F"
           label={t('microlives.lifeEarned')}
-          value={`${Math.round(dashboard.totals.totalDistanceMeters / 1000 * 0.4 * 30)}m`}
+          value={`${Math.round(totals.totalDistanceMeters / 1000 * 0.4 * 30)}m`}
         />
         <SummaryCard
           icon="people-outline"
           iconColor="#60A5FA"
           label={t('microlives.donatedToCity')}
-          value={`${Math.round(dashboard.totals.totalDistanceMeters / 1000 * 4.5)}s`}
+          value={`${Math.round(totals.totalDistanceMeters / 1000 * 4.5)}s`}
         />
       </View>
 
@@ -437,8 +452,8 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
       <RideFrequencyChart buckets={buckets ?? []} period={period} />
 
       <ModeSplit
-        safeTrips={dashboard.modeSplit.safeTrips}
-        fastTrips={dashboard.modeSplit.fastTrips}
+        safeTrips={modeSplit.safeTrips}
+        fastTrips={modeSplit.fastTrips}
       />
     </>
   );

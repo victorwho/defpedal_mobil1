@@ -1499,66 +1499,64 @@ export const buildV1Routes = (
           },
         },
         response: {
-          200: {
-            type: 'object',
-            additionalProperties: false,
-            required: [
-              'totals', 'weekly', 'monthly',
-              'currentStreakDays', 'longestStreakDays', 'modeSplit',
-            ],
-            properties: {
-              totals: {
+          200: (() => {
+            const totalsSchema = {
+              type: 'object',
+              additionalProperties: false,
+              required: ['totalTrips', 'totalDistanceMeters', 'totalCo2SavedKg', 'totalDurationSeconds'],
+              properties: {
+                totalTrips: { type: 'integer' },
+                totalDistanceMeters: { type: 'number' },
+                totalCo2SavedKg: { type: 'number' },
+                totalDurationSeconds: { type: 'number' },
+              },
+            } as const;
+            const bucketsSchema = {
+              type: 'array',
+              items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['totalTrips', 'totalDistanceMeters', 'totalCo2SavedKg', 'totalDurationSeconds'],
+                required: ['periodStart', 'trips', 'distanceMeters', 'durationSeconds'],
                 properties: {
-                  totalTrips: { type: 'integer' },
-                  totalDistanceMeters: { type: 'number' },
-                  totalCo2SavedKg: { type: 'number' },
-                  totalDurationSeconds: { type: 'number' },
+                  periodStart: { type: 'string' },
+                  trips: { type: 'integer' },
+                  distanceMeters: { type: 'number' },
+                  durationSeconds: { type: 'number' },
                 },
               },
-              weekly: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  additionalProperties: false,
-                  required: ['periodStart', 'trips', 'distanceMeters', 'durationSeconds'],
-                  properties: {
-                    periodStart: { type: 'string' },
-                    trips: { type: 'integer' },
-                    distanceMeters: { type: 'number' },
-                    durationSeconds: { type: 'number' },
-                  },
-                },
+            } as const;
+            const modeSplitSchema = {
+              type: 'object',
+              additionalProperties: false,
+              required: ['safeTrips', 'fastTrips'],
+              properties: {
+                safeTrips: { type: 'integer' },
+                fastTrips: { type: 'integer' },
               },
-              monthly: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  additionalProperties: false,
-                  required: ['periodStart', 'trips', 'distanceMeters', 'durationSeconds'],
-                  properties: {
-                    periodStart: { type: 'string' },
-                    trips: { type: 'integer' },
-                    distanceMeters: { type: 'number' },
-                    durationSeconds: { type: 'number' },
-                  },
-                },
+            } as const;
+            return {
+              type: 'object',
+              additionalProperties: false,
+              required: [
+                'totals', 'weeklyTotals', 'monthlyTotals',
+                'weekly', 'monthly',
+                'currentStreakDays', 'longestStreakDays',
+                'modeSplit', 'weeklyModeSplit', 'monthlyModeSplit',
+              ],
+              properties: {
+                totals: totalsSchema,
+                weeklyTotals: totalsSchema,
+                monthlyTotals: totalsSchema,
+                weekly: bucketsSchema,
+                monthly: bucketsSchema,
+                currentStreakDays: { type: 'integer' },
+                longestStreakDays: { type: 'integer' },
+                modeSplit: modeSplitSchema,
+                weeklyModeSplit: modeSplitSchema,
+                monthlyModeSplit: modeSplitSchema,
               },
-              currentStreakDays: { type: 'integer' },
-              longestStreakDays: { type: 'integer' },
-              modeSplit: {
-                type: 'object',
-                additionalProperties: false,
-                required: ['safeTrips', 'fastTrips'],
-                properties: {
-                  safeTrips: { type: 'integer' },
-                  fastTrips: { type: 'integer' },
-                },
-              },
-            },
-          },
+            };
+          })(),
           401: errorResponseSchema,
           429: errorResponseSchema,
           502: errorResponseSchema,

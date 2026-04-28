@@ -677,12 +677,22 @@ export interface TripStatsModeSplit {
 }
 
 export interface TripStatsDashboard {
+  /** Lifetime totals — rendered when the user picks the All-Time tab. */
   readonly totals: UserStats;
+  /** Totals scoped to the current calendar week (timezone-aware). */
+  readonly weeklyTotals: UserStats;
+  /** Totals scoped to the current calendar month (timezone-aware). */
+  readonly monthlyTotals: UserStats;
   readonly weekly: readonly TripStatsBucket[];
   readonly monthly: readonly TripStatsBucket[];
   readonly currentStreakDays: number;
   readonly longestStreakDays: number;
+  /** Lifetime safe-vs-fast split — pairs with `totals`. */
   readonly modeSplit: TripStatsModeSplit;
+  /** Safe-vs-fast split for the current week — pairs with `weeklyTotals`. */
+  readonly weeklyModeSplit: TripStatsModeSplit;
+  /** Safe-vs-fast split for the current month — pairs with `monthlyTotals`. */
+  readonly monthlyModeSplit: TripStatsModeSplit;
 }
 
 // ── Community Stats ──

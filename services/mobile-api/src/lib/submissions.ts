@@ -347,13 +347,19 @@ export const getTripStatsDashboard = async (
   userId: string,
   timeZone: string = 'UTC',
 ): Promise<TripStatsDashboard> => {
+  const emptyUserStats = { totalTrips: 0, totalDistanceMeters: 0, totalCo2SavedKg: 0, totalDurationSeconds: 0 };
+  const emptyModeSplit = { safeTrips: 0, fastTrips: 0 };
   const emptyDashboard: TripStatsDashboard = {
-    totals: { totalTrips: 0, totalDistanceMeters: 0, totalCo2SavedKg: 0, totalDurationSeconds: 0 },
+    totals: emptyUserStats,
+    weeklyTotals: emptyUserStats,
+    monthlyTotals: emptyUserStats,
     weekly: [],
     monthly: [],
     currentStreakDays: 0,
     longestStreakDays: 0,
-    modeSplit: { safeTrips: 0, fastTrips: 0 },
+    modeSplit: emptyModeSplit,
+    weeklyModeSplit: emptyModeSplit,
+    monthlyModeSplit: emptyModeSplit,
   };
 
   if (!supabaseAdmin) {
@@ -369,28 +375,44 @@ export const getTripStatsDashboard = async (
     throw new Error(error.message);
   }
 
+  type RawTotals = { totalTrips?: number; totalDistanceMeters?: number; totalDurationSeconds?: number } | null | undefined;
+  type RawModeSplit = { safeTrips?: number; fastTrips?: number } | null | undefined;
   const raw = data as {
-    totals: { totalTrips: number; totalDistanceMeters: number; totalDurationSeconds: number };
+    totals: RawTotals;
+    weeklyTotals?: RawTotals;
+    monthlyTotals?: RawTotals;
     weekly: Array<{ period_start: string; trips: number; distance_meters: number; duration_seconds: number }>;
     monthly: Array<{ period_start: string; trips: number; distance_meters: number; duration_seconds: number }>;
     currentStreakDays: number;
     longestStreakDays: number;
-    modeSplit: { safeTrips: number; fastTrips: number };
+    modeSplit: RawModeSplit;
+    weeklyModeSplit?: RawModeSplit;
+    monthlyModeSplit?: RawModeSplit;
   } | null;
 
   if (!raw) {
     return emptyDashboard;
   }
 
-  const totalDistanceMeters = Number(raw.totals.totalDistanceMeters ?? 0);
+  const mapTotals = (row: RawTotals) => {
+    const distance = Number(row?.totalDistanceMeters ?? 0);
+    return {
+      totalTrips: Number(row?.totalTrips ?? 0),
+      totalDistanceMeters: distance,
+      totalCo2SavedKg: calculateCo2SavedKg(distance),
+      totalDurationSeconds: Number(row?.totalDurationSeconds ?? 0),
+    };
+  };
+
+  const mapModeSplit = (row: RawModeSplit) => ({
+    safeTrips: Number(row?.safeTrips ?? 0),
+    fastTrips: Number(row?.fastTrips ?? 0),
+  });
 
   return {
-    totals: {
-      totalTrips: Number(raw.totals.totalTrips ?? 0),
-      totalDistanceMeters,
-      totalCo2SavedKg: calculateCo2SavedKg(totalDistanceMeters),
-      totalDurationSeconds: Number(raw.totals.totalDurationSeconds ?? 0),
-    },
+    totals: mapTotals(raw.totals),
+    weeklyTotals: mapTotals(raw.weeklyTotals),
+    monthlyTotals: mapTotals(raw.monthlyTotals),
     weekly: (raw.weekly ?? []).map((b) => ({
       periodStart: b.period_start,
       trips: b.trips,
@@ -405,9 +427,8 @@ export const getTripStatsDashboard = async (
     })),
     currentStreakDays: raw.currentStreakDays ?? 0,
     longestStreakDays: raw.longestStreakDays ?? 0,
-    modeSplit: {
-      safeTrips: raw.modeSplit?.safeTrips ?? 0,
-      fastTrips: raw.modeSplit?.fastTrips ?? 0,
-    },
+    modeSplit: mapModeSplit(raw.modeSplit),
+    weeklyModeSplit: mapModeSplit(raw.weeklyModeSplit),
+    monthlyModeSplit: mapModeSplit(raw.monthlyModeSplit),
   };
 };

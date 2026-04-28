@@ -878,6 +878,18 @@ describe('mobile-api v1 routes', () => {
         totalCo2SavedKg: 13.44,
         totalDurationSeconds: 36000,
       },
+      weeklyTotals: {
+        totalTrips: 4,
+        totalDistanceMeters: 18000,
+        totalCo2SavedKg: 2.16,
+        totalDurationSeconds: 5400,
+      },
+      monthlyTotals: {
+        totalTrips: 10,
+        totalDistanceMeters: 48000,
+        totalCo2SavedKg: 5.76,
+        totalDurationSeconds: 14400,
+      },
       weekly: [
         { periodStart: '2026-03-30', trips: 3, distanceMeters: 15000, durationSeconds: 5400 },
         { periodStart: '2026-03-31', trips: 1, distanceMeters: 4200, durationSeconds: 1800 },
@@ -888,6 +900,8 @@ describe('mobile-api v1 routes', () => {
       currentStreakDays: 4,
       longestStreakDays: 12,
       modeSplit: { safeTrips: 18, fastTrips: 7 },
+      weeklyModeSplit: { safeTrips: 3, fastTrips: 1 },
+      monthlyModeSplit: { safeTrips: 7, fastTrips: 3 },
     };
     const getTripStatsDashboard = vi.fn().mockResolvedValue(dashboardData);
     const app = createApp({
@@ -920,19 +934,39 @@ describe('mobile-api v1 routes', () => {
       expect(payload.currentStreakDays).toBe(4);
       expect(payload.longestStreakDays).toBe(12);
       expect(payload.modeSplit).toEqual({ safeTrips: 18, fastTrips: 7 });
+      expect(payload.weeklyTotals).toEqual({
+        totalTrips: 4,
+        totalDistanceMeters: 18000,
+        totalCo2SavedKg: 2.16,
+        totalDurationSeconds: 5400,
+      });
+      expect(payload.monthlyTotals).toEqual({
+        totalTrips: 10,
+        totalDistanceMeters: 48000,
+        totalCo2SavedKg: 5.76,
+        totalDurationSeconds: 14400,
+      });
+      expect(payload.weeklyModeSplit).toEqual({ safeTrips: 3, fastTrips: 1 });
+      expect(payload.monthlyModeSplit).toEqual({ safeTrips: 7, fastTrips: 3 });
     } finally {
       await app.close();
     }
   });
 
   it('forwards the tz query parameter to the dashboard dependency', async () => {
+    const emptyTotals = { totalTrips: 0, totalDistanceMeters: 0, totalCo2SavedKg: 0, totalDurationSeconds: 0 };
+    const emptyModeSplit = { safeTrips: 0, fastTrips: 0 };
     const getTripStatsDashboard = vi.fn().mockResolvedValue({
-      totals: { totalTrips: 0, totalDistanceMeters: 0, totalCo2SavedKg: 0, totalDurationSeconds: 0 },
+      totals: emptyTotals,
+      weeklyTotals: emptyTotals,
+      monthlyTotals: emptyTotals,
       weekly: [],
       monthly: [],
       currentStreakDays: 0,
       longestStreakDays: 0,
-      modeSplit: { safeTrips: 0, fastTrips: 0 },
+      modeSplit: emptyModeSplit,
+      weeklyModeSplit: emptyModeSplit,
+      monthlyModeSplit: emptyModeSplit,
     });
     const app = createApp({
       authenticateUser: vi.fn().mockResolvedValue({
