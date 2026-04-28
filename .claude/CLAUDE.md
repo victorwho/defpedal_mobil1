@@ -247,6 +247,15 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - Queue survives app restart (persisted)
 - `trip_end` and `trip_track` wait for `trip_start` to resolve (trip server ID mapping)
 
+### Trip Data Flow (Critical for Deletion / Privacy)
+A completed ride writes to **four** Supabase tables, each read by a different surface — the History row is not the source of truth for the community surfaces:
+- `trip_tracks` → History tab, per-period Stats Dashboard (RPC `get_trip_stats_dashboard`)
+- `trip_shares` → City Heartbeat (RPC `get_city_heartbeat`), Community Stats (`get_community_stats`), Community Feed (`get_nearby_feed`), Neighborhood Leaderboard ride counts (`get_neighborhood_leaderboard`)
+- `activity_feed` with `payload->>tripId` → unified social feed (RPC `get_ranked_feed`: own profile, follower feeds, suggested users)
+- `trips` → lifecycle metadata only; not read by any user-facing screen
+
+Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention policy) must touch **all three user-visible tables**, not just `trip_tracks`. Pattern is captured in `services/mobile-api/src/lib/submissions.ts` `deleteTripTrack`: capture the parent `trip_id` atomically via `.delete().select('id, trip_id')` on `trip_tracks`, then delete from `trip_shares` (cascades `feed_likes`/`feed_comments`/`trip_loves`) and `activity_feed` (cascades `activity_reactions`/`activity_comments`). Profile totals, `ride_impacts`, `ride_microlives`, badges, XP, and immutable `leaderboard_snapshots` are NOT unwound — the confirm dialog explicitly preserves "past achievements and impact totals". See error-log #34 for the trap.
+
 ### Map Architecture (RouteMap.tsx)
 - Single `RouteMap` component used by ALL screens (planning, preview, navigation, trips, community)
 - Layers stacked in order: route alternatives → risk segments → hazard zones → bicycle parking/rental/shops → POI layers → route markers → hazard markers → user location puck
