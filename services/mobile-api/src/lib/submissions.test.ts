@@ -201,46 +201,156 @@ describe('getTripStatsDashboard', () => {
 });
 
 describe('deleteTripTrack', () => {
-  const buildChain = (result: { data: Array<{ id: string }> | null; error: { message: string } | null }) => {
-    const select = vi.fn().mockResolvedValue(result);
-    const eqUser = vi.fn().mockReturnValue({ select });
-    const eqId = vi.fn().mockReturnValue({ eq: eqUser });
-    const del = vi.fn().mockReturnValue({ eq: eqId });
-    mockFrom.mockReturnValue({ delete: del });
-    return { del, eqId, eqUser, select };
+  /**
+   * The function does up to three `from(...).delete().eq().eq()...` chains in
+   * sequence: trip_tracks (with .select), trip_shares, and activity_feed.
+   * The helper wires `mockFrom` to dispatch by table name and records every
+   * `.eq()` call against each table.
+   */
+  type ChainResult = { data: Array<Record<string, unknown>> | null; error: { message: string } | null };
+
+  const buildChains = (results: {
+    trip_tracks: ChainResult;
+    trip_shares?: ChainResult;
+    activity_feed?: ChainResult;
+  }) => {
+    const calls: Record<string, Array<{ field: string; value: unknown }>> = {
+      trip_tracks: [],
+      trip_shares: [],
+      activity_feed: [],
+    };
+
+    const buildTripTracksChain = () => {
+      const select = vi.fn().mockResolvedValue(results.trip_tracks);
+      const eqUser = vi.fn((field: string, value: unknown) => {
+        calls.trip_tracks.push({ field, value });
+        return { select };
+      });
+      const eqId = vi.fn((field: string, value: unknown) => {
+        calls.trip_tracks.push({ field, value });
+        return { eq: eqUser };
+      });
+      const del = vi.fn(() => ({ eq: eqId }));
+      return { delete: del };
+    };
+
+    const buildSimpleDeleteChain = (table: 'trip_shares' | 'activity_feed') => {
+      const final = Promise.resolve(results[table] ?? { data: [], error: null });
+      const eq3: Record<string, unknown> = { ...final, then: final.then.bind(final) };
+      const eq2 = vi.fn((field: string, value: unknown) => {
+        calls[table].push({ field, value });
+        // For trip_shares (2 eq calls) the second eq is terminal; for
+        // activity_feed (3 eq calls) we hand back another eq.
+        return table === 'trip_shares' ? final : { eq: vi.fn((f: string, v: unknown) => { calls[table].push({ field: f, value: v }); return final; }) };
+      });
+      const _eq1 = eq2;
+      const eq1 = vi.fn((field: string, value: unknown) => {
+        calls[table].push({ field, value });
+        return { eq: _eq1 };
+      });
+      const del = vi.fn(() => ({ eq: eq1 }));
+      // Suppress unused-warning for eq3
+      void eq3;
+      return { delete: del };
+    };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'trip_tracks') return buildTripTracksChain();
+      if (table === 'trip_shares') return buildSimpleDeleteChain('trip_shares');
+      if (table === 'activity_feed') return buildSimpleDeleteChain('activity_feed');
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    return { calls };
   };
 
-  it('returns deleted when a row matching id and user_id is removed', async () => {
-    const { del, eqId, eqUser } = buildChain({ data: [{ id: 'track-1' }], error: null });
+  it('deletes trip_tracks, trip_shares, and activity_feed entries for the same trip', async () => {
+    const { calls } = buildChains({
+      trip_tracks: { data: [{ id: 'track-1', trip_id: 'trip-A' }], error: null },
+    });
 
     const result = await deleteTripTrack('track-1', 'user-1');
 
-    expect(mockFrom).toHaveBeenCalledWith('trip_tracks');
-    expect(del).toHaveBeenCalledTimes(1);
-    expect(eqId).toHaveBeenCalledWith('id', 'track-1');
-    expect(eqUser).toHaveBeenCalledWith('user_id', 'user-1');
     expect(result).toEqual({ status: 'deleted' });
+    // trip_tracks scoped on id + user_id
+    expect(calls.trip_tracks).toEqual([
+      { field: 'id', value: 'track-1' },
+      { field: 'user_id', value: 'user-1' },
+    ]);
+    // trip_shares scoped on user_id + parent trip_id
+    expect(calls.trip_shares).toEqual([
+      { field: 'user_id', value: 'user-1' },
+      { field: 'trip_id', value: 'trip-A' },
+    ]);
+    // activity_feed scoped on user_id + type='ride' + payload->>tripId
+    expect(calls.activity_feed).toEqual([
+      { field: 'user_id', value: 'user-1' },
+      { field: 'type', value: 'ride' },
+      { field: 'payload->>tripId', value: 'trip-A' },
+    ]);
   });
 
-  it('returns not_found when no row matches (e.g. wrong user)', async () => {
-    buildChain({ data: [], error: null });
+  it('returns not_found when no trip_tracks row matches (e.g. wrong user)', async () => {
+    const { calls } = buildChains({
+      trip_tracks: { data: [], error: null },
+    });
 
     const result = await deleteTripTrack('track-2', 'user-2');
 
     expect(result).toEqual({ status: 'not_found' });
+    // Skip the share + activity_feed cleanup when the trip isn't ours.
+    expect(calls.trip_shares).toEqual([]);
+    expect(calls.activity_feed).toEqual([]);
   });
 
-  it('treats null data as not_found', async () => {
-    buildChain({ data: null, error: null });
+  it('treats null data as not_found and skips downstream cleanups', async () => {
+    const { calls } = buildChains({
+      trip_tracks: { data: null, error: null },
+    });
 
     const result = await deleteTripTrack('track-3', 'user-3');
 
     expect(result).toEqual({ status: 'not_found' });
+    expect(calls.trip_shares).toEqual([]);
+    expect(calls.activity_feed).toEqual([]);
   });
 
-  it('throws when the database returns an error', async () => {
-    buildChain({ data: null, error: { message: 'connection refused' } });
+  it('throws when the trip_tracks delete returns an error', async () => {
+    buildChains({
+      trip_tracks: { data: null, error: { message: 'connection refused' } },
+    });
 
     await expect(deleteTripTrack('track-4', 'user-4')).rejects.toThrow('connection refused');
+  });
+
+  it('throws (502 surface) when the trip_shares cleanup fails', async () => {
+    buildChains({
+      trip_tracks: { data: [{ id: 'track-5', trip_id: 'trip-B' }], error: null },
+      trip_shares: { data: null, error: { message: 'fk violation' } },
+    });
+
+    await expect(deleteTripTrack('track-5', 'user-5')).rejects.toThrow(/trip_shares cleanup failed/);
+  });
+
+  it('throws (502 surface) when the activity_feed cleanup fails', async () => {
+    buildChains({
+      trip_tracks: { data: [{ id: 'track-6', trip_id: 'trip-C' }], error: null },
+      activity_feed: { data: null, error: { message: 'permission denied' } },
+    });
+
+    await expect(deleteTripTrack('track-6', 'user-6')).rejects.toThrow(/activity_feed cleanup failed/);
+  });
+
+  it('skips share and activity cleanup when the deleted row has a null trip_id (legacy data)', async () => {
+    const { calls } = buildChains({
+      trip_tracks: { data: [{ id: 'track-legacy', trip_id: null }], error: null },
+    });
+
+    const result = await deleteTripTrack('track-legacy', 'user-legacy');
+
+    expect(result).toEqual({ status: 'deleted' });
+    // No parent trip_id ⇒ nothing to clean up downstream.
+    expect(calls.trip_shares).toEqual([]);
+    expect(calls.activity_feed).toEqual([]);
   });
 });

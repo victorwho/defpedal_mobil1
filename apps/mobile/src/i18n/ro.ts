@@ -359,7 +359,7 @@ export const ro: TranslationKeys = {
     appKilled: 'Aplicație închisă',
     deleteAction: 'Șterge cursa',
     deleteTitle: 'Ștergi această cursă?',
-    deleteMessage: 'Cursa va fi eliminată din istoric. Realizările și totalul impactului rămân.',
+    deleteMessage: 'Cursa va fi eliminată din istoric și din feed-ul comunității. Realizările și totalul impactului rămân.',
     deleteCancel: 'Anulează',
     deleteConfirm: 'Șterge',
     deleteFailed: 'Cursa nu a putut fi ștearsă. Încearcă din nou.',

@@ -354,10 +354,19 @@ export type DeleteTripResult =
  * a 404 so a missing trip and a foreign trip are indistinguishable from the
  * caller's perspective.
  *
+ * Also clears the user's matching trip_shares row (+ cascaded feed_likes,
+ * feed_comments, trip_loves) and any activity_feed `ride` entry whose
+ * `payload.tripId` references the same parent trip (+ cascaded
+ * activity_reactions, activity_comments). This keeps the City Heartbeat,
+ * Community Stats, Neighborhood Leaderboard, Community Feed, and the social
+ * Activity Feed in sync with what History shows. Without this, a deleted ride
+ * lingered in every community surface because they all read from trip_shares /
+ * activity_feed instead of trip_tracks.
+ *
  * Profile counters, ride_impacts, ride_microlives, badges, XP, and leaderboard
  * snapshots are intentionally left untouched: deleting a trip removes it from
- * History (and from the per-period stats dashboard, which reads trip_tracks),
- * but does not unwind already-awarded achievements.
+ * the user-visible surfaces, but does not unwind already-awarded achievements
+ * or rewrite immutable historical snapshots.
  */
 export const deleteTripTrack = async (
   trackId: string,
@@ -365,18 +374,57 @@ export const deleteTripTrack = async (
 ): Promise<DeleteTripResult> => {
   if (!supabaseAdmin) return { status: 'not_found' };
 
+  // `.select('id, trip_id')` after a DELETE returns the row that was deleted,
+  // so we capture the parent trip_id (which the share + activity_feed rows are
+  // keyed on) atomically. If no row matches, data is empty and we early-return
+  // before touching the other tables.
   const { data, error } = await supabaseAdmin
     .from('trip_tracks')
     .delete()
     .eq('id', trackId)
     .eq('user_id', userId)
-    .select('id');
+    .select('id, trip_id');
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return (data?.length ?? 0) > 0 ? { status: 'deleted' } : { status: 'not_found' };
+  if ((data?.length ?? 0) === 0) {
+    return { status: 'not_found' };
+  }
+
+  const parentTripId = data?.[0]?.trip_id as string | null | undefined;
+
+  // Clean up the auto-shared community-feed entry (cascades to feed_likes /
+  // feed_comments / trip_loves via existing FK rules) and the activity_feed
+  // ride entry (cascades to activity_reactions / activity_comments). Both
+  // queries are user-scoped as defence-in-depth; failures here are non-fatal
+  // because the History row is already gone — we log the upstream error to
+  // the caller through a thrown Error so the route layer surfaces a 502.
+  if (parentTripId) {
+    const { error: shareError } = await supabaseAdmin
+      .from('trip_shares')
+      .delete()
+      .eq('user_id', userId)
+      .eq('trip_id', parentTripId);
+
+    if (shareError) {
+      throw new Error(`trip_shares cleanup failed: ${shareError.message}`);
+    }
+
+    const { error: activityError } = await supabaseAdmin
+      .from('activity_feed')
+      .delete()
+      .eq('user_id', userId)
+      .eq('type', 'ride')
+      .eq('payload->>tripId', parentTripId);
+
+    if (activityError) {
+      throw new Error(`activity_feed cleanup failed: ${activityError.message}`);
+    }
+  }
+
+  return { status: 'deleted' };
 };
 
 export const getTripStatsDashboard = async (

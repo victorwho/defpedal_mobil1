@@ -357,7 +357,7 @@ export const en = {
     appKilled: 'App closed',
     deleteAction: 'Delete trip',
     deleteTitle: 'Delete this trip?',
-    deleteMessage: 'This will remove the trip from your history. Past achievements and impact totals are kept.',
+    deleteMessage: 'This will remove the trip from your history and from the community feed. Past achievements and impact totals are kept.',
     deleteCancel: 'Cancel',
     deleteConfirm: 'Delete',
     deleteFailed: 'Could not delete the trip. Please try again.',
