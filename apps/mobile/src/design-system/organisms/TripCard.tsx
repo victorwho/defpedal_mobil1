@@ -20,6 +20,12 @@ type TripCardProps = {
   readonly onSharePress?: (trip: TripHistoryItem) => void;
   /** Disable the share button while a share is in flight. */
   readonly sharePending?: boolean;
+  /** Invoked when the user taps the delete button. Button is only rendered when set. */
+  readonly onDeletePress?: (trip: TripHistoryItem) => void;
+  /** Disable the delete button while a delete is in flight. */
+  readonly deletePending?: boolean;
+  /** Optional label for the delete button — falls back to "Delete trip" if omitted. */
+  readonly deleteLabel?: string;
 };
 
 const formatDate = (iso: string): string => {
@@ -63,7 +69,16 @@ const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; 
   }
 };
 
-export const TripCard = memo(({ trip, expanded, onToggle, onSharePress, sharePending = false }: TripCardProps) => {
+export const TripCard = memo(({
+  trip,
+  expanded,
+  onToggle,
+  onSharePress,
+  sharePending = false,
+  onDeletePress,
+  deletePending = false,
+  deleteLabel = 'Delete trip',
+}: TripCardProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
@@ -162,6 +177,38 @@ export const TripCard = memo(({ trip, expanded, onToggle, onSharePress, sharePen
         </View>
       ) : null}
 
+      {expanded && onDeletePress ? (
+        <View style={styles.actionsRow}>
+          <Pressable
+            onPress={() => onDeletePress(trip)}
+            disabled={deletePending}
+            accessibilityRole="button"
+            accessibilityLabel={deleteLabel}
+            accessibilityState={{ disabled: deletePending }}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.deleteButton,
+              pressed && !deletePending && styles.deleteButtonPressed,
+              deletePending && styles.deleteButtonDisabled,
+            ]}
+          >
+            <Ionicons
+              name="trash-outline"
+              size={16}
+              color={deletePending ? gray[500] : colors.danger}
+            />
+            <Text
+              style={[
+                styles.deleteButtonText,
+                deletePending && styles.deleteButtonTextDisabled,
+              ]}
+            >
+              {deleteLabel}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
     </View>
   );
 });
@@ -239,5 +286,39 @@ const createThemedStyles = (colors: ThemeColors) =>
     shareIconButton: {
       padding: space[1],
       borderRadius: radii.full,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDefault,
+    },
+    deleteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      backgroundColor: 'transparent',
+    },
+    deleteButtonPressed: {
+      opacity: 0.7,
+    },
+    deleteButtonDisabled: {
+      borderColor: gray[400],
+      opacity: 0.6,
+    },
+    deleteButtonText: {
+      ...textSm,
+      color: colors.danger,
+      fontFamily: fontFamily.body.bold,
+    },
+    deleteButtonTextDisabled: {
+      color: gray[500],
     },
   });

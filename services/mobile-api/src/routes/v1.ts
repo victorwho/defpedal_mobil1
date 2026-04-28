@@ -646,6 +646,59 @@ export const buildV1Routes = (
       },
     );
 
+    app.delete<{ Params: { id: string }; Reply: { deletedAt: string } | ErrorResponse }>(
+      '/trips/:id',
+      {
+        schema: {
+          params: {
+            type: 'object',
+            required: ['id'],
+            properties: {
+              id: { type: 'string', minLength: 1, maxLength: 64 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['deletedAt'],
+              properties: { deletedAt: { type: 'string', format: 'date-time' } },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
+
+        try {
+          const result = await dependencies.deleteTripTrack(request.params.id, user.id);
+          if (result.status === 'not_found') {
+            throw new HttpError('Trip not found.', {
+              statusCode: 404,
+              code: 'NOT_FOUND',
+            });
+          }
+          return { deletedAt: new Date().toISOString() };
+        } catch (error) {
+          if (error instanceof HttpError) throw error;
+          throw new HttpError('Trip delete failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+      },
+    );
+
     app.post<{ Body: HazardReportBody; Reply: HazardReportResponse | ErrorResponse }>(
       '/hazards',
       {

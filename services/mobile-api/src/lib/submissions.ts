@@ -343,6 +343,42 @@ export const getTripHistory = async (
   }));
 };
 
+export type DeleteTripResult =
+  | { status: 'deleted' }
+  | { status: 'not_found' };
+
+/**
+ * Hard-deletes a trip_tracks row owned by the user. The user-scoped match
+ * (`id` + `user_id`) prevents deleting another user's row even with a guessed
+ * UUID. Returns 'not_found' when no row matches — the route layer maps that to
+ * a 404 so a missing trip and a foreign trip are indistinguishable from the
+ * caller's perspective.
+ *
+ * Profile counters, ride_impacts, ride_microlives, badges, XP, and leaderboard
+ * snapshots are intentionally left untouched: deleting a trip removes it from
+ * History (and from the per-period stats dashboard, which reads trip_tracks),
+ * but does not unwind already-awarded achievements.
+ */
+export const deleteTripTrack = async (
+  trackId: string,
+  userId: string,
+): Promise<DeleteTripResult> => {
+  if (!supabaseAdmin) return { status: 'not_found' };
+
+  const { data, error } = await supabaseAdmin
+    .from('trip_tracks')
+    .delete()
+    .eq('id', trackId)
+    .eq('user_id', userId)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data?.length ?? 0) > 0 ? { status: 'deleted' } : { status: 'not_found' };
+};
+
 export const getTripStatsDashboard = async (
   userId: string,
   timeZone: string = 'UTC',

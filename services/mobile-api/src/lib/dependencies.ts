@@ -14,6 +14,7 @@ import {
 import { createRedisSharedStore } from './redisStore';
 import { enrichRiskGeoJson, fetchRiskSegments } from './risk';
 import {
+  deleteTripTrack,
   finishTripRecord,
   getTripHistory,
   getTripStatsDashboard,
@@ -42,6 +43,7 @@ export type MobileApiDependencies = {
   finishTripRecord: typeof finishTripRecord;
   saveTripTrack: typeof saveTripTrack;
   getTripHistory: typeof getTripHistory;
+  deleteTripTrack: typeof deleteTripTrack;
   getUserStats: typeof getUserStats;
   getTripStatsDashboard: typeof getTripStatsDashboard;
   submitNavigationFeedback: typeof submitNavigationFeedback;
@@ -90,6 +92,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     finishTripRecord,
     saveTripTrack,
     getTripHistory,
+    deleteTripTrack,
     getUserStats,
     getTripStatsDashboard,
     submitNavigationFeedback,

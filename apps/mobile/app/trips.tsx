@@ -5,9 +5,9 @@ import {
   decodePolyline,
 } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
@@ -30,9 +30,12 @@ export default function TripsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const queryClient = useQueryClient();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteToast, setDeleteToast] = useState<string | null>(null);
   const shareRide = useShareRide();
 
   const handleShareTrip = useCallback((trip: TripHistoryItem) => {
@@ -78,6 +81,48 @@ export default function TripsScreen() {
     enabled: Boolean(user),
     staleTime: 60_000,
   });
+
+  const deleteTripMutation = useMutation({
+    mutationFn: (tripId: string) => mobileApi.deleteTrip(tripId),
+    onMutate: (tripId) => {
+      setDeletingId(tripId);
+    },
+    onSuccess: async (_data, tripId) => {
+      // Optimistically prune from the cache so the row disappears immediately;
+      // then invalidate so any aggregate views refetch fresh.
+      queryClient.setQueryData<TripHistoryItem[] | undefined>(
+        ['trip-history'],
+        (prev) => prev?.filter((t) => t.id !== tripId),
+      );
+      if (expandedId === tripId) setExpandedId(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['trip-history'] }),
+        queryClient.invalidateQueries({ queryKey: ['stats-dashboard'] }),
+      ]);
+    },
+    onError: () => {
+      setDeleteToast(t('tripsScreen.deleteFailed'));
+    },
+    onSettled: () => {
+      setDeletingId(null);
+    },
+  });
+
+  const handleDeleteTrip = useCallback((trip: TripHistoryItem) => {
+    Alert.alert(
+      t('tripsScreen.deleteTitle'),
+      t('tripsScreen.deleteMessage'),
+      [
+        { text: t('tripsScreen.deleteCancel'), style: 'cancel' },
+        {
+          text: t('tripsScreen.deleteConfirm'),
+          style: 'destructive',
+          onPress: () => deleteTripMutation.mutate(trip.id),
+        },
+      ],
+      { cancelable: true },
+    );
+  }, [deleteTripMutation, t]);
 
   const handleToggle = useCallback((tripId: string) => {
     if (compareMode) {
@@ -131,6 +176,9 @@ export default function TripsScreen() {
               trip={item}
               expanded={expandedId === item.id}
               onToggle={() => handleToggle(item.id)}
+              onDeletePress={handleDeleteTrip}
+              deletePending={deletingId === item.id}
+              deleteLabel={t('tripsScreen.deleteAction')}
             />
             <Pressable
               style={styles.shareTripButton}
@@ -150,7 +198,7 @@ export default function TripsScreen() {
         )}
       </View>
     ),
-    [expandedId, handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, t],
+    [expandedId, handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, handleDeleteTrip, deletingId, t],
   );
 
   return (
@@ -233,6 +281,15 @@ export default function TripsScreen() {
             message={shareRide.toastMessage}
             variant="warning"
             onDismiss={shareRide.consumeToast}
+          />
+        </View>
+      ) : null}
+      {deleteToast ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={deleteToast}
+            variant="warning"
+            onDismiss={() => setDeleteToast(null)}
           />
         </View>
       ) : null}

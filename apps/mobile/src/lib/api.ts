@@ -343,6 +343,10 @@ export const mobileApi = {
     }),
   getTripHistory: () =>
     requestJson<TripHistoryItem[]>('/v1/trips/history'),
+  deleteTrip: (tripId: string) =>
+    requestJson<{ deletedAt: string }>(`/v1/trips/${encodeURIComponent(tripId)}`, {
+      method: 'DELETE',
+    }),
   getUserStats: () =>
     requestJson<UserStats>('/v1/stats'),
   getStatsDashboard: (tz?: string) =>

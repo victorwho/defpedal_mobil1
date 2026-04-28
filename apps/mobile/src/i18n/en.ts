@@ -79,6 +79,10 @@ export const en = {
     endRide: 'End ride',
     endRideConfirmTitle: 'End ride?',
     endRideConfirmMessage: 'Are you sure you want to end your ride? Your progress will be saved.',
+    endRideSaveTitle: 'Save this ride?',
+    endRideSaveMessage: 'Save it to your history, or discard it. If you discard, no impact, XP, or badges will be recorded.',
+    endRideSave: 'Save',
+    endRideDiscard: 'Discard',
     recenter: 'Recenter',
     offRoute: 'You are off route',
     offRouteCountdown: 'Off route. Automatic reroute will fire in {{seconds}}s.',
@@ -351,6 +355,12 @@ export const en = {
     completed: 'Completed',
     stopped: 'Stopped',
     appKilled: 'App closed',
+    deleteAction: 'Delete trip',
+    deleteTitle: 'Delete this trip?',
+    deleteMessage: 'This will remove the trip from your history. Past achievements and impact totals are kept.',
+    deleteCancel: 'Cancel',
+    deleteConfirm: 'Delete',
+    deleteFailed: 'Could not delete the trip. Please try again.',
   },
 
   // ── Community ──

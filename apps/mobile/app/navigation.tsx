@@ -19,12 +19,11 @@ import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
-import { useConfirmation } from '../src/hooks/useConfirmation';
 import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
@@ -126,7 +125,6 @@ export default function NavigationScreen() {
 
   const { isOnline } = useConnectivity();
   const t = useT();
-  const confirm = useConfirmation();
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
@@ -346,7 +344,11 @@ export default function NavigationScreen() {
     }, 3000);
   };
 
-  const queueTripEnd = useCallback((reason: 'completed' | 'stopped') => {
+  const queueTripEnd = useCallback((
+    reason: 'completed' | 'stopped',
+    options?: { readonly discard?: boolean },
+  ) => {
+    const discard = options?.discard === true;
     const store = useAppStore.getState();
     const currentActiveTripClientId = store.activeTripClientId;
     const currentSession = store.navigationSession;
@@ -365,6 +367,21 @@ export default function NavigationScreen() {
       endedAt,
       reason,
     });
+
+    // Discarded rides skip the trip_track + trip_share writes. The trip lifecycle
+    // is closed server-side (above), but with no trip_tracks row the ride never
+    // surfaces in History or in the per-period stats dashboard, and nothing is
+    // posted to the community feed. /feedback is also skipped by the caller, so
+    // no XP / badges / microlives are awarded.
+    if (discard) {
+      telemetry.capture('trip_end_queued', {
+        reason,
+        signed_in: Boolean(user),
+        breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
+        discarded: true,
+      });
+      return;
+    }
 
     // Queue GPS trail + route recording
     if (currentSession && selectedRoute) {
@@ -1040,21 +1057,49 @@ export default function NavigationScreen() {
             <IconButton
               icon={<Ionicons name="stop-circle" size={24} color={gray[50]} />}
               onPress={() => {
-                confirm({
-                  title: t('nav.endRideConfirmTitle'),
-                  message: t('nav.endRideConfirmMessage'),
-                  confirmLabel: t('nav.endRide'),
-                  onConfirm: () => {
-                    queueTripEnd('stopped');
-                    telemetry.capture('navigation_stopped', {
-                      route_id: selectedRoute.id,
-                      session_id: navigationSession.sessionId,
-                    });
-                    void clearCachedRoute();
-                    finishNavigation();
-                    router.push('/feedback');
-                  },
-                });
+                const saveAndEnd = () => {
+                  queueTripEnd('stopped');
+                  telemetry.capture('navigation_stopped', {
+                    route_id: selectedRoute.id,
+                    session_id: navigationSession.sessionId,
+                    outcome: 'saved',
+                  });
+                  void clearCachedRoute();
+                  finishNavigation();
+                  router.push('/feedback');
+                };
+                const discardAndEnd = () => {
+                  queueTripEnd('stopped', { discard: true });
+                  telemetry.capture('navigation_stopped', {
+                    route_id: selectedRoute.id,
+                    session_id: navigationSession.sessionId,
+                    outcome: 'discarded',
+                  });
+                  void clearCachedRoute();
+                  finishNavigation();
+                  // Skip /feedback so no XP/badges/microlives are awarded.
+                  router.replace('/route-planning');
+                };
+                Alert.alert(
+                  t('nav.endRideSaveTitle'),
+                  t('nav.endRideSaveMessage'),
+                  [
+                    {
+                      text: t('nav.endRideDiscard'),
+                      style: 'destructive',
+                      onPress: discardAndEnd,
+                    },
+                    {
+                      text: t('nav.endRideSave'),
+                      style: 'default',
+                      onPress: saveAndEnd,
+                    },
+                  ],
+                  // Android: tapping outside / system-back dismisses the dialog
+                  // and we treat that as "save by default" per product spec.
+                  // iOS: Alert.alert can't be dismissed without tapping a button.
+                  { cancelable: true, onDismiss: saveAndEnd },
+                );
               }}
               accessibilityLabel={t('nav.endRide')}
               variant="danger"

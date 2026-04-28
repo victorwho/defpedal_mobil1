@@ -601,6 +601,74 @@ describe('mobile-api v1 routes', () => {
     }
   });
 
+  it('deletes a trip via DELETE /v1/trips/:id when the row exists', async () => {
+    const deleteTripTrack = vi.fn().mockResolvedValue({ status: 'deleted' });
+    const app = createApp({
+      authenticateUser: vi.fn().mockResolvedValue({
+        id: 'user-del',
+        email: 'rider@example.com',
+      }),
+      deleteTripTrack,
+    });
+
+    try {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/v1/trips/track-abc',
+        headers: authHeader,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(deleteTripTrack).toHaveBeenCalledWith('track-abc', 'user-del');
+      const body = response.json();
+      expect(typeof body.deletedAt).toBe('string');
+      expect(Number.isNaN(new Date(body.deletedAt).getTime())).toBe(false);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('returns 404 from DELETE /v1/trips/:id when the trip is not owned by the caller', async () => {
+    const deleteTripTrack = vi.fn().mockResolvedValue({ status: 'not_found' });
+    const app = createApp({
+      authenticateUser: vi.fn().mockResolvedValue({
+        id: 'user-del',
+        email: 'rider@example.com',
+      }),
+      deleteTripTrack,
+    });
+
+    try {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/v1/trips/track-missing',
+        headers: authHeader,
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ code: 'NOT_FOUND' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('rejects DELETE /v1/trips/:id without authentication', async () => {
+    const deleteTripTrack = vi.fn();
+    const app = createApp({ deleteTripTrack });
+
+    try {
+      const response = await app.inject({
+        method: 'DELETE',
+        url: '/v1/trips/track-1',
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(deleteTripTrack).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  });
+
   it('accepts hazard and feedback submissions through injected persistence dependencies', async () => {
     const submitHazardReport = vi.fn().mockResolvedValue({
       reportId: 'hazard-1',

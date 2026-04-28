@@ -81,6 +81,10 @@ export const ro: TranslationKeys = {
     endRide: 'Termină cursa',
     endRideConfirmTitle: 'Termină cursa?',
     endRideConfirmMessage: 'Ești sigur că vrei să termini cursa? Progresul va fi salvat.',
+    endRideSaveTitle: 'Salvezi această cursă?',
+    endRideSaveMessage: 'Salveaz-o în istoric sau renunță. Dacă renunți, nu se înregistrează impact, XP sau insigne.',
+    endRideSave: 'Salvează',
+    endRideDiscard: 'Renunță',
     recenter: 'Recentrează',
     offRoute: 'Ești în afara traseului',
     offRouteCountdown: 'În afara traseului. Redirecționare automată în {{seconds}}s.',
@@ -353,6 +357,12 @@ export const ro: TranslationKeys = {
     completed: 'Finalizată',
     stopped: 'Oprită',
     appKilled: 'Aplicație închisă',
+    deleteAction: 'Șterge cursa',
+    deleteTitle: 'Ștergi această cursă?',
+    deleteMessage: 'Cursa va fi eliminată din istoric. Realizările și totalul impactului rămân.',
+    deleteCancel: 'Anulează',
+    deleteConfirm: 'Șterge',
+    deleteFailed: 'Cursa nu a putut fi ștearsă. Încearcă din nou.',
   },
 
   // ── Community ──

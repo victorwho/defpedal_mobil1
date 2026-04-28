@@ -12,7 +12,7 @@ vi.mock('./supabaseAdmin', () => ({
   },
 }));
 
-const { getUserStats, getTripStatsDashboard } = await import('./submissions');
+const { getUserStats, getTripStatsDashboard, deleteTripTrack } = await import('./submissions');
 
 afterEach(() => {
   mockRpc.mockReset();
@@ -197,5 +197,50 @@ describe('getTripStatsDashboard', () => {
     });
 
     await expect(getTripStatsDashboard('user-4')).rejects.toThrow('function not found');
+  });
+});
+
+describe('deleteTripTrack', () => {
+  const buildChain = (result: { data: Array<{ id: string }> | null; error: { message: string } | null }) => {
+    const select = vi.fn().mockResolvedValue(result);
+    const eqUser = vi.fn().mockReturnValue({ select });
+    const eqId = vi.fn().mockReturnValue({ eq: eqUser });
+    const del = vi.fn().mockReturnValue({ eq: eqId });
+    mockFrom.mockReturnValue({ delete: del });
+    return { del, eqId, eqUser, select };
+  };
+
+  it('returns deleted when a row matching id and user_id is removed', async () => {
+    const { del, eqId, eqUser } = buildChain({ data: [{ id: 'track-1' }], error: null });
+
+    const result = await deleteTripTrack('track-1', 'user-1');
+
+    expect(mockFrom).toHaveBeenCalledWith('trip_tracks');
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(eqId).toHaveBeenCalledWith('id', 'track-1');
+    expect(eqUser).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(result).toEqual({ status: 'deleted' });
+  });
+
+  it('returns not_found when no row matches (e.g. wrong user)', async () => {
+    buildChain({ data: [], error: null });
+
+    const result = await deleteTripTrack('track-2', 'user-2');
+
+    expect(result).toEqual({ status: 'not_found' });
+  });
+
+  it('treats null data as not_found', async () => {
+    buildChain({ data: null, error: null });
+
+    const result = await deleteTripTrack('track-3', 'user-3');
+
+    expect(result).toEqual({ status: 'not_found' });
+  });
+
+  it('throws when the database returns an error', async () => {
+    buildChain({ data: null, error: { message: 'connection refused' } });
+
+    await expect(deleteTripTrack('track-4', 'user-4')).rejects.toThrow('connection refused');
   });
 });
