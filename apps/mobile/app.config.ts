@@ -169,6 +169,14 @@ export default () => ({
         'expo-notifications',
         {
           color: '#FACC15',
+          // TODO(play-store): add `icon: './assets/notification-icon.png'`
+          // once a 96×96 (or larger) transparent silhouette PNG exists at
+          // that path. Without it, Android falls back to the multi-color
+          // launcher icon and renders FCM notifications as a solid white
+          // square in the shade — Play pre-launch report flags this on
+          // every modern device. Asset must be white-on-transparent only
+          // (no colour, no background); tinting is then applied via the
+          // `color` field above.
         },
       ],
       [
@@ -235,6 +243,10 @@ export default () => ({
       ],
       blockedPermissions: [
         'com.google.android.gms.permission.AD_ID',
+        // SYSTEM_ALERT_WINDOW gets injected transitively by some debugging
+        // libraries; Play rejects apps drawing over other apps without
+        // justification, and a navigation app has no use for it.
+        'android.permission.SYSTEM_ALERT_WINDOW',
       ],
       intentFilters: [
         {

@@ -26,8 +26,9 @@ import {
 
 /**
  * Item 8 of the compliance plan: pre-collection consent screen. Shown during
- * onboarding before any analytics events fire. Both toggles default OFF
- * (Romania-only launch + GDPR posture). User must explicitly opt in to each.
+ * onboarding before any analytics events fire. Both toggles default ON for
+ * first-time users (counsel-flagged for ANSPDCP review — see in-line comment
+ * on the useState initializers below for the legal-basis breakdown).
  *
  * The decision is persisted device-scoped (not user-scoped) — see appStore
  * resetUserScopedState comment block for the rationale.

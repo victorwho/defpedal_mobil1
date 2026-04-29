@@ -813,11 +813,15 @@ export const buildV1Routes = (
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
 
         // location is JSONB with { latitude, longitude }; we filter by bbox in JS below.
+        // is_hidden filter is mandatory: API uses the service-role client which
+        // bypasses the RLS policy from migration 202604270001, so the filter
+        // must be applied here in code.
         const { data, error } = await supabaseAdmin
           .from('hazards')
           .select(
             'id, location, hazard_type, created_at, confirm_count, deny_count, score, expires_at, last_confirmed_at, description',
           )
+          .eq('is_hidden', false)
           .gt('expires_at', new Date().toISOString())
           .gt('score', -3) // hide strongly downvoted hazards immediately
           .order('created_at', { ascending: false })

@@ -175,6 +175,23 @@ else
   echo "  Route-share intent filter already present"
 fi
 
+echo "── Step 1e: Strip SYSTEM_ALERT_WINDOW (Play Store P0) ──"
+# Some debugging libraries inject SYSTEM_ALERT_WINDOW transitively. Play Store
+# rejects apps drawing over other apps without an approved declaration, and a
+# navigation app has no use for it. Force the manifest to mark the permission
+# as removed (`tools:node="remove"`) regardless of upstream source state. This
+# parallels the AD_ID stripping (line 15 of the manifest in source).
+if grep -q 'android:name="android.permission.SYSTEM_ALERT_WINDOW"' "$MANIFEST" 2>/dev/null; then
+  if ! grep -q 'android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"' "$MANIFEST" 2>/dev/null; then
+    sed -i 's|<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>|<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"/>|' "$MANIFEST"
+    echo "  Stripped SYSTEM_ALERT_WINDOW (added tools:node=\"remove\")"
+  else
+    echo "  SYSTEM_ALERT_WINDOW already stripped"
+  fi
+else
+  echo "  SYSTEM_ALERT_WINDOW not present (no action needed)"
+fi
+
 echo "── Step 2: Clean Gradle bundle cache ──"
 # Forces Gradle to re-run the Metro bundle task instead of reusing stale output.
 rm -rf "$DST/apps/mobile/android/app/build/generated/assets/"

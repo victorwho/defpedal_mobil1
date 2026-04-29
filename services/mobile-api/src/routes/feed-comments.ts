@@ -50,6 +50,7 @@ export const buildFeedCommentRoutes = (
           .from('feed_comments')
           .select('id, user_id, body, created_at')
           .eq('trip_share_id', request.params.id)
+          .eq('is_hidden', false)
           .order('created_at', { ascending: true });
 
         if (error) {
