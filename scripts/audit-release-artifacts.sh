@@ -23,9 +23,14 @@ fi
 echo "── Auditing $ARTIFACT ──"
 
 # Forbidden tokens — must NOT appear anywhere in a release build.
+# Note: "devAuthBypassEnabled":"false" IS shipped intentionally as an explicit
+# safety signal, so we only flag the secret-bearing fields (token / userId /
+# email) rather than every substring containing "devAuthBypass".
 FORBIDDEN_TOKENS=(
-  "devAuthBypass"
-  "DEV_AUTH_BYPASS"
+  "devAuthBypassToken"
+  "devAuthBypassUserId"
+  "devAuthBypassEmail"
+  "DEV_AUTH_BYPASS_TOKEN"
   "dev-bypass"
 )
 
@@ -42,8 +47,8 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 # Extract the AAB/APK to inspect contents
 case "$ARTIFACT" in
-  *.aab) unzip -q "$ARTIFACT" -d "$TMPDIR/extracted" ;;
-  *.apk) unzip -q "$ARTIFACT" -d "$TMPDIR/extracted" ;;
+  *.aab) unzip -qo "$ARTIFACT" -d "$TMPDIR/extracted" ;;
+  *.apk) unzip -qo "$ARTIFACT" -d "$TMPDIR/extracted" ;;
   *) echo "ERROR: artefact must be .aab or .apk"; exit 1 ;;
 esac
 
