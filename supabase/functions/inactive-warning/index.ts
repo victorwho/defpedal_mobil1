@@ -216,14 +216,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     auth: { persistSession: false },
   });
 
-  // Pull this tick's batch from the queue
+  // Pull this tick's batch from the queue. We use an RPC because email lives
+  // on auth.users (not public.profiles), and PostgREST does not expose the
+  // auth schema for cross-schema joins. The RPC is service-role only.
   const { data: queue, error: queueError } = await supabase
-    .from('profiles')
-    .select('id, email, locale, inactive_warning_sent_at')
-    .not('inactive_warning_sent_at', 'is', null)
-    .is('inactive_warning_email_sent_at', null)
-    .order('inactive_warning_sent_at', { ascending: true })
-    .limit(BATCH_SIZE);
+    .rpc('get_inactive_warning_queue', { batch_size: BATCH_SIZE });
 
   if (queueError) {
     console.error('[inactive-warning] queue read failed', queueError);

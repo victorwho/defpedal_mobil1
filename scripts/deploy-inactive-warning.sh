@@ -102,7 +102,11 @@ fi
 # ---------------------------------------------------------------------------
 
 step "Deploying Edge Function: $FUNCTION_NAME"
-supabase functions deploy "$FUNCTION_NAME" --project-ref "$PROJECT_REF"
+# --no-verify-jwt: this function is called by Cloud Scheduler with a Bearer
+# CRON_SECRET (not a Supabase JWT). The function does its own auth check.
+# Without this flag, Supabase's platform-level JWT gate returns 401 before
+# our handler runs.
+supabase functions deploy "$FUNCTION_NAME" --no-verify-jwt --project-ref "$PROJECT_REF"
 ok "Function deployed: $FUNCTION_URL"
 
 # ---------------------------------------------------------------------------
