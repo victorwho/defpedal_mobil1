@@ -45,6 +45,7 @@ const sampleWeatherData: WeatherData = {
   dailyWindMax: 18,
   remainingPrecipMax: 25,
   remainingWindMax: 15,
+  remainingGustMax: 18,
   remainingTempMin: 18,
   remainingTempMax: 24,
   airQuality: null,

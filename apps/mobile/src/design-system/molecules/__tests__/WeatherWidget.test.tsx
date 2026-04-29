@@ -48,6 +48,7 @@ const createWeatherData = (overrides: Record<string, unknown> = {}) => ({
   dailyWindMax: 18,
   remainingPrecipMax: 15,
   remainingWindMax: 14,
+  remainingGustMax: 17,
   remainingTempMin: 16,
   remainingTempMax: 24,
   airQuality: null,

@@ -10,16 +10,19 @@ const createOpenMeteoResponse = (overrides?: Partial<{
   temperature: number;
   weatherCode: number;
   windSpeed: number;
+  gustSpeed: number;
   precipitationProbability: number;
   tempMax: number;
   tempMin: number;
   precipMax: number;
   windMax: number;
+  gustMax: number;
 }>) => ({
   current: {
     temperature_2m: overrides?.temperature ?? 22,
     weather_code: overrides?.weatherCode ?? 0,
     wind_speed_10m: overrides?.windSpeed ?? 10,
+    wind_gusts_10m: overrides?.gustSpeed ?? 15,
     precipitation_probability: overrides?.precipitationProbability ?? 5,
   },
   daily: {
@@ -27,6 +30,7 @@ const createOpenMeteoResponse = (overrides?: Partial<{
     temperature_2m_min: [overrides?.tempMin ?? 15],
     precipitation_probability_max: [overrides?.precipMax ?? 10],
     wind_speed_10m_max: [overrides?.windMax ?? 15],
+    wind_gusts_10m_max: [overrides?.gustMax ?? 20],
     weather_code: [overrides?.weatherCode ?? 0],
   },
   hourly: {
@@ -38,6 +42,7 @@ const createOpenMeteoResponse = (overrides?: Partial<{
     temperature_2m: Array.from({ length: 24 }, () => overrides?.temperature ?? 22),
     precipitation_probability: Array.from({ length: 24 }, () => overrides?.precipitationProbability ?? 5),
     wind_speed_10m: Array.from({ length: 24 }, () => overrides?.windSpeed ?? 10),
+    wind_gusts_10m: Array.from({ length: 24 }, () => overrides?.gustSpeed ?? 15),
   },
 });
 
@@ -180,6 +185,46 @@ describe('fetchWeather', () => {
     expect(result!.airQuality!.aqiLabel).toBe('Hazardous');
   });
 
+  it('exposes remainingGustMax from the daily/hourly gust forecast', async () => {
+    mockFetchResponses(
+      createOpenMeteoResponse({ windSpeed: 18, gustSpeed: 42, windMax: 22, gustMax: 45 }),
+      createAirQualityResponse(),
+    );
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    expect(result).not.toBeNull();
+    // Math.ceil over the candidate set: max gust across current + hourly + daily.
+    expect(result!.remainingGustMax).toBeGreaterThanOrEqual(42);
+  });
+
+  it('folds the live current wind into remainingWindMax (closes evening-window gap)', async () => {
+    // Hourly forecast says calm, but the live current reading is 33 km/h.
+    // remainingWindMax must reflect the live reading, not the (lower) hourly slice.
+    const response = createOpenMeteoResponse({ windSpeed: 33, gustSpeed: 38, windMax: 20, gustMax: 24 });
+    response.hourly.wind_speed_10m = Array.from({ length: 24 }, () => 5);
+    response.hourly.wind_gusts_10m = Array.from({ length: 24 }, () => 8);
+    mockFetchResponses(response, createAirQualityResponse());
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingWindMax).toBeGreaterThanOrEqual(33);
+    expect(result!.remainingGustMax).toBeGreaterThanOrEqual(38);
+  });
+
+  it('uses Math.ceil so a 25.4 km/h day no longer rounds into the no-warning band', async () => {
+    const response = createOpenMeteoResponse({ windSpeed: 25.4, gustSpeed: 28, windMax: 25.4, gustMax: 28 });
+    response.hourly.wind_speed_10m = Array.from({ length: 24 }, () => 25.4);
+    response.hourly.wind_gusts_10m = Array.from({ length: 24 }, () => 28);
+    mockFetchResponses(response, createAirQualityResponse());
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingWindMax).toBe(26);
+  });
+
   it('rounds temperature values', async () => {
     mockFetchResponses(
       createOpenMeteoResponse({ temperature: 22.7, tempMax: 25.3, tempMin: 14.6 }),
@@ -208,6 +253,7 @@ describe('getWeatherWarnings', () => {
     dailyWindMax: 15,
     remainingPrecipMax: 10,
     remainingWindMax: 15,
+    remainingGustMax: 18,
     remainingTempMin: 15,
     remainingTempMax: 25,
     airQuality: null,
@@ -317,11 +363,87 @@ describe('getWeatherWarnings', () => {
     expect(warnings.some((w) => w.type === 'heat')).toBe(false);
   });
 
-  it('warns about strong wind', () => {
-    const warnings = getWeatherWarnings(makeWeatherData({ remainingWindMax: 30 }));
+  it('issues no wind warning below the breezy threshold (19 km/h)', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 19,
+      remainingGustMax: 22,
+    }));
 
-    expect(warnings.some((w) => w.type === 'wind')).toBe(true);
-    expect(warnings.find((w) => w.type === 'wind')!.message).toContain('30');
+    expect(warnings.some((w) => w.type === 'wind')).toBe(false);
+  });
+
+  it('warns at the breezy tier (20 km/h)', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 20,
+      remainingGustMax: 22,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message.toLowerCase()).toContain('breezy');
+    expect(wind!.message).toContain('20');
+  });
+
+  it('warns at the strong tier (30 km/h)', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 30,
+      remainingGustMax: 22,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message.toLowerCase()).toContain('strong wind');
+    expect(wind!.message).toContain('30');
+  });
+
+  it('warns at the hazardous tier (45 km/h) with cautionary wording', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 45,
+      remainingGustMax: 50,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message.toLowerCase()).toContain('hazardous');
+    expect(wind!.message).toContain('caution');
+  });
+
+  it('elevates a low-mean / high-gust day into the strong tier', () => {
+    // Mean 18 km/h would normally land below the breezy floor, but a 40 km/h
+    // gust must still trip a strong warning — gusts are what knock cyclists
+    // off line.
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 18,
+      remainingGustMax: 40,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message.toLowerCase()).toContain('strong wind');
+    expect(wind!.message).toContain('gusts to 40');
+  });
+
+  it('elevates a calm-mean / extreme-gust day into the hazardous tier', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 22,
+      remainingGustMax: 60,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message.toLowerCase()).toContain('hazardous');
+    expect(wind!.message).toContain('gusts to 60');
+  });
+
+  it('omits gust suffix when gusts are below the notable threshold', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingWindMax: 30,
+      remainingGustMax: 30,
+    }));
+
+    const wind = warnings.find((w) => w.type === 'wind');
+    expect(wind).toBeDefined();
+    expect(wind!.message).not.toContain('gusts to');
   });
 
   it('warns about poor air quality with cautionary wording', () => {

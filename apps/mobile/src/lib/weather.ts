@@ -27,6 +27,8 @@ export interface WeatherData {
   readonly remainingPrecipMax: number;
   /** Max wind speed from current hour to end of day */
   readonly remainingWindMax: number;
+  /** Max wind gust speed from current hour to end of day */
+  readonly remainingGustMax: number;
   /** Min temperature from current hour to end of day */
   readonly remainingTempMin: number;
   /** Max temperature from current hour to end of day */
@@ -136,6 +138,7 @@ type OpenMeteoResponse = {
     temperature_2m: number;
     weather_code: number;
     wind_speed_10m: number;
+    wind_gusts_10m?: number;
     precipitation_probability: number;
   };
   daily: {
@@ -143,6 +146,7 @@ type OpenMeteoResponse = {
     temperature_2m_min: number[];
     precipitation_probability_max: number[];
     wind_speed_10m_max: number[];
+    wind_gusts_10m_max?: number[];
     weather_code: number[];
   };
   hourly?: {
@@ -150,6 +154,7 @@ type OpenMeteoResponse = {
     temperature_2m: number[];
     precipitation_probability: number[];
     wind_speed_10m: number[];
+    wind_gusts_10m?: number[];
   };
 };
 
@@ -165,9 +170,9 @@ export const fetchWeather = async (
     const params = new URLSearchParams({
       latitude: lat.toFixed(4),
       longitude: lon.toFixed(4),
-      current: 'temperature_2m,weather_code,wind_speed_10m,precipitation_probability',
-      daily: 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max',
-      hourly: 'temperature_2m,precipitation_probability,wind_speed_10m',
+      current: 'temperature_2m,weather_code,wind_speed_10m,wind_gusts_10m,precipitation_probability',
+      daily: 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max',
+      hourly: 'temperature_2m,precipitation_probability,wind_speed_10m,wind_gusts_10m',
       timezone: 'auto',
       forecast_days: '1',
     });
@@ -198,9 +203,26 @@ export const fetchWeather = async (
     const remainingTemps = startIdx >= 0 ? (data.hourly?.temperature_2m ?? []).slice(startIdx) : [];
     const remainingPrecips = startIdx >= 0 ? (data.hourly?.precipitation_probability ?? []).slice(startIdx) : [];
     const remainingWinds = startIdx >= 0 ? (data.hourly?.wind_speed_10m ?? []).slice(startIdx) : [];
+    const remainingGusts = startIdx >= 0 ? (data.hourly?.wind_gusts_10m ?? []).slice(startIdx) : [];
 
     const remainingPrecipMax = remainingPrecips.length > 0 ? Math.max(...remainingPrecips) : (data.daily.precipitation_probability_max[0] ?? 0);
-    const remainingWindMax = remainingWinds.length > 0 ? Math.round(Math.max(...remainingWinds)) : Math.round(data.daily.wind_speed_10m_max[0]);
+
+    // Always fold the live current reading and the daily peak into the wind/gust
+    // candidate set. Without this, late-evening windows shrink to one or two
+    // hours and drop the warning even when the wind is blasting RIGHT NOW.
+    // Math.ceil rather than Math.round closes the round-then-strict-compare
+    // dead zone (a real 25.4 km/h day no longer rounds down to 25 and slips
+    // under a > 25 threshold).
+    const liveWind = data.current.wind_speed_10m ?? 0;
+    const liveGust = data.current.wind_gusts_10m ?? 0;
+    const dailyWindPeak = data.daily.wind_speed_10m_max[0] ?? 0;
+    const dailyGustPeak = data.daily.wind_gusts_10m_max?.[0] ?? 0;
+
+    const windCandidates = [liveWind, ...remainingWinds, dailyWindPeak].filter((n) => Number.isFinite(n));
+    const gustCandidates = [liveGust, ...remainingGusts, dailyGustPeak].filter((n) => Number.isFinite(n));
+    const remainingWindMax = windCandidates.length > 0 ? Math.ceil(Math.max(...windCandidates)) : 0;
+    const remainingGustMax = gustCandidates.length > 0 ? Math.ceil(Math.max(...gustCandidates)) : 0;
+
     const remainingTempMin = remainingTemps.length > 0 ? Math.round(Math.min(...remainingTemps)) : Math.round(data.daily.temperature_2m_min[0]);
     const remainingTempMax = remainingTemps.length > 0 ? Math.round(Math.max(...remainingTemps)) : Math.round(data.daily.temperature_2m_max[0]);
 
@@ -217,6 +239,7 @@ export const fetchWeather = async (
       dailyWindMax: Math.round(data.daily.wind_speed_10m_max[0]),
       remainingPrecipMax,
       remainingWindMax,
+      remainingGustMax,
       remainingTempMin,
       remainingTempMax,
       airQuality,
@@ -238,7 +261,14 @@ const COLD_TEMP_THRESHOLD = 5;
 const HOT_TEMP_THRESHOLD = 30;
 // Swing warning fires when (max - min) across remaining hours exceeds this.
 const TEMP_SWING_THRESHOLD = 13;
-const WIND_THRESHOLD = 25;
+// Wind tiers (km/h, mean wind at 10m AGL). Effective wind also folds in 60% of
+// the gust speed, so a low-mean / high-gust day still surfaces a warning.
+const WIND_BREEZY_THRESHOLD = 20;
+const WIND_STRONG_THRESHOLD = 30;
+const WIND_HAZARDOUS_THRESHOLD = 45;
+// Gust speeds that bump the tier up regardless of mean wind.
+const GUST_NOTABLE_THRESHOLD = 35;
+const GUST_HAZARDOUS_THRESHOLD = 55;
 const AQI_MODERATE_THRESHOLD = 50;
 const AQI_POOR_THRESHOLD = 100;
 const PM25_THRESHOLD = 25;
@@ -292,11 +322,42 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
     }
   }
 
-  if (data.remainingWindMax > WIND_THRESHOLD) {
+  // Tiered wind warning. Effective wind = max(mean, ceil(gust * 0.6)) so a
+  // gusty 18 km/h-mean / 40 km/h-gust day still trips the breezy tier.
+  const effectiveWindKmh = Math.max(
+    data.remainingWindMax,
+    Math.ceil(data.remainingGustMax * 0.6),
+  );
+
+  let windTier: 'breezy' | 'strong' | 'hazardous' | null = null;
+  if (
+    effectiveWindKmh >= WIND_HAZARDOUS_THRESHOLD ||
+    data.remainingGustMax >= GUST_HAZARDOUS_THRESHOLD
+  ) {
+    windTier = 'hazardous';
+  } else if (
+    effectiveWindKmh >= WIND_STRONG_THRESHOLD ||
+    data.remainingGustMax >= GUST_NOTABLE_THRESHOLD
+  ) {
+    windTier = 'strong';
+  } else if (effectiveWindKmh >= WIND_BREEZY_THRESHOLD) {
+    windTier = 'breezy';
+  }
+
+  if (windTier !== null) {
+    const gustSuffix =
+      data.remainingGustMax >= GUST_NOTABLE_THRESHOLD
+        ? `, gusts to ${data.remainingGustMax} km/h`
+        : '';
+    const windCopy: Record<typeof windTier, string> = {
+      breezy: `Breezy: ${data.remainingWindMax} km/h${gustSuffix} — ride with caution`,
+      strong: `Strong wind: ${data.remainingWindMax} km/h${gustSuffix} — ride with caution`,
+      hazardous: `Hazardous wind: ${data.remainingWindMax} km/h${gustSuffix} — extreme caution, prefer sheltered routes`,
+    };
     warnings.push({
       type: 'wind',
       icon: 'flag',
-      message: `Strong wind expected: ${data.remainingWindMax} km/h — ride with caution`,
+      message: windCopy[windTier],
     });
   }
 
