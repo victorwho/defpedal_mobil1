@@ -4,7 +4,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.defensivepedal.mobile",
-      "sha256_cert_fingerprints": ["FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"]
+      "sha256_cert_fingerprints": [
+        "82:7C:FD:44:D3:58:88:C5:7E:35:37:6D:17:70:81:CE:84:61:13:49:BD:06:80:E0:3D:9D:6E:D2:A9:6F:35:73"
+      ]
     }
   },
   {
@@ -12,7 +14,10 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.defensivepedal.mobile.preview",
-      "sha256_cert_fingerprints": ["FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"]
+      "sha256_cert_fingerprints": [
+        "82:7C:FD:44:D3:58:88:C5:7E:35:37:6D:17:70:81:CE:84:61:13:49:BD:06:80:E0:3D:9D:6E:D2:A9:6F:35:73",
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+      ]
     }
   },
   {
@@ -20,7 +25,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.defensivepedal.mobile.dev",
-      "sha256_cert_fingerprints": ["FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"]
+      "sha256_cert_fingerprints": [
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+      ]
     }
   }
 ]
