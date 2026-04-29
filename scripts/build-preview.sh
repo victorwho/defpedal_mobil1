@@ -175,6 +175,48 @@ else
   echo "  Route-share intent filter already present"
 fi
 
+echo "── Step 1d2: Notification icon — generate drawables + manifest tags ──"
+# Source-of-truth icon lives in apps/mobile/assets/notification-icon.png
+# (white-on-transparent silhouette PNG). The android/ tree is gitignored so
+# the per-density drawables can't be tracked — generate them from source.
+# Required because this codebase deliberately avoids `expo prebuild`
+# (error-log #27), which is what would normally do this work.
+NOTIF_SRC="$DST/apps/mobile/assets/notification-icon.png"
+if [ -f "$NOTIF_SRC" ]; then
+  if command -v python >/dev/null 2>&1; then
+    python - <<PYEOF
+from PIL import Image
+import os
+src = r"$NOTIF_SRC"
+out_dir = r"$DST/apps/mobile/android/app/src/main/res"
+densities = {'mdpi': 24, 'hdpi': 36, 'xhdpi': 48, 'xxhdpi': 72, 'xxxhdpi': 96}
+img = Image.open(src)
+for density, size in densities.items():
+    bucket = os.path.join(out_dir, f'drawable-{density}')
+    os.makedirs(bucket, exist_ok=True)
+    img.resize((size, size), Image.LANCZOS).save(
+        os.path.join(bucket, 'notification_icon.png'), 'PNG', optimize=True
+    )
+PYEOF
+    echo "  Generated notification_icon.png across 5 density buckets"
+  else
+    echo "  WARNING: python not on PATH — skipping drawable generation."
+    echo "  If the manifest references @drawable/notification_icon and the file"
+    echo "  is missing, gradle will fail with an aapt error."
+  fi
+
+  # Patch manifest: add the FCM + expo notification-icon meta-data tags.
+  # Idempotent — only inserts if not already present.
+  if ! grep -q 'default_notification_icon' "$MANIFEST" 2>/dev/null; then
+    sed -i 's|<meta-data android:name="com.google.firebase.messaging.default_notification_color"|<meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/notification_icon"/>\n    <meta-data android:name="expo.modules.notifications.default_notification_icon" android:resource="@drawable/notification_icon"/>\n    <meta-data android:name="com.google.firebase.messaging.default_notification_color"|' "$MANIFEST"
+    echo "  Added default_notification_icon meta-data tags to manifest"
+  else
+    echo "  Notification icon meta-data tags already present"
+  fi
+else
+  echo "  WARNING: $NOTIF_SRC not found. Notification icon will fall back to launcher."
+fi
+
 echo "── Step 1e: Strip SYSTEM_ALERT_WINDOW (Play Store P0) ──"
 # Some debugging libraries inject SYSTEM_ALERT_WINDOW transitively. Play Store
 # rejects apps drawing over other apps without an approved declaration, and a

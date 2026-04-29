@@ -150,7 +150,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.23',
+    version: '0.2.24',
     icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
@@ -168,15 +168,8 @@ export default () => ({
       [
         'expo-notifications',
         {
+          icon: './assets/notification-icon.png',
           color: '#FACC15',
-          // TODO(play-store): add `icon: './assets/notification-icon.png'`
-          // once a 96×96 (or larger) transparent silhouette PNG exists at
-          // that path. Without it, Android falls back to the multi-color
-          // launcher icon and renders FCM notifications as a solid white
-          // square in the shade — Play pre-launch report flags this on
-          // every modern device. Asset must be white-on-transparent only
-          // (no colour, no background); tinting is then applied via the
-          // `color` field above.
         },
       ],
       [
