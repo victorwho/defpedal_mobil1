@@ -113,13 +113,16 @@ export default function PrivacyPage() {
         <h1 style={styles.h1}>Privacy Policy</h1>
         <p style={styles.meta}>Last updated: 27 April 2026</p>
 
-        <div style={styles.notice} role="note">
-          <span style={styles.noticeLabel}>Placeholder</span>
-          A comprehensive GDPR-compliant Privacy Policy is being prepared with
-          legal counsel. The summary below describes the data practices that
-          apply today; the full document will replace this page before
-          additional categories of data are collected.
-        </div>
+        <h2 style={styles.h2}>Who we are</h2>
+        <p style={styles.body}>
+          Defensive Pedal is operated by{' '}
+          <strong>Victor Rotariu</strong>, sole proprietor, based in Brașov,
+          Romania. For privacy and data-subject requests, contact{' '}
+          <a href="mailto:privacy@defensivepedal.com" style={styles.link}>
+            privacy@defensivepedal.com
+          </a>
+          .
+        </p>
 
         <h2 style={styles.h2}>What we collect</h2>
         <ul style={styles.list}>

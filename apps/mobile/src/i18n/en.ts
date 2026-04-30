@@ -574,6 +574,8 @@ export const en = {
     welcomeFlowSub: 'Restart the onboarding experience',
     helpFaq: 'Help & FAQ',
     helpFaqSub: 'Answers to common questions',
+    privacyPolicy: 'Privacy Policy',
+    privacyPolicySub: 'View our privacy policy',
     environment: 'Environment:',
     variant: 'Variant:',
   },

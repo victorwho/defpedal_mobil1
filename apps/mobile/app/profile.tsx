@@ -24,6 +24,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { mobileApi } from '../src/lib/api';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
+import { PRIVACY_URL } from '../src/lib/legal-urls';
 import { useAppStore } from '../src/store/appStore';
 import { useShallow } from 'zustand/shallow';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
@@ -792,6 +793,21 @@ export default function ProfileScreen() {
                 <Text style={styles.settingDescription}>{t('settings.helpFaqSub')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
+
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => void Linking.openURL(PRIVACY_URL)}
+              accessible={true}
+              accessibilityRole="link"
+              accessibilityLabel={t('settings.privacyPolicy')}
+            >
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>{t('settings.privacyPolicy')}</Text>
+                <Text style={styles.settingDescription}>{t('settings.privacyPolicySub')}</Text>
+              </View>
+              <Ionicons name="open-outline" size={18} color={gray[400]} />
             </Pressable>
 
             {mobileEnv.appVariant !== 'production' ? (

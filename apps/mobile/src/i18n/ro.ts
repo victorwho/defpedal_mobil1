@@ -576,6 +576,8 @@ export const ro: TranslationKeys = {
     welcomeFlowSub: 'Repornește experiența de introducere',
     helpFaq: 'Ajutor & FAQ',
     helpFaqSub: 'Răspunsuri la întrebările frecvente',
+    privacyPolicy: 'Politica de Confidențialitate',
+    privacyPolicySub: 'Vezi politica noastră de confidențialitate',
     environment: 'Mediu:',
     variant: 'Variantă:',
   },
