@@ -76,8 +76,11 @@ robocopy "$SRC/apps/mobile/assets"    "$DST/apps/mobile/assets"    //MIR //NFL /
 robocopy "$SRC/packages/core/src"     "$DST/packages/core/src"     //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
 robocopy "$SRC/services/mobile-api/src" "$DST/services/mobile-api/src" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
 
-# Sync config files that affect bundling and native build
-for f in app.config.ts metro.config.js tsconfig.json package.json; do
+# Sync config files that affect bundling and native build.
+# .env carries EXPO_PUBLIC_* keys (Sentry DSN, PostHog API key, etc.) read at
+# bundle time. Without it, telemetry-gated UI like the onboarding consent card
+# hides its rows because *Configured flags resolve false.
+for f in app.config.ts metro.config.js tsconfig.json package.json .env; do
   cp -f "$SRC/apps/mobile/$f" "$DST/apps/mobile/$f" 2>/dev/null || true
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
