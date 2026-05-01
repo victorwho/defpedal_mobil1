@@ -55,9 +55,9 @@ export default function ChooseUsernameScreen() {
     return () => {
       cancelled = true;
     };
-    // routePreview deliberately excluded — capture initial value, this effect
-    // runs once per mount as a guard.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Mount-only guard. routePreview is read live via useAppStore.getState
+    // inside the IIFE if needed in the future; capturing the closure value
+    // is fine here because navigation away unmounts the screen.
   }, []);
 
   const handleSubmit = async () => {
