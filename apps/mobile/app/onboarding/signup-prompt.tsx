@@ -19,6 +19,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useT } from '../../src/hooks/useTranslation';
+import { mobileApi } from '../../src/lib/api';
 import { PRIVACY_URL, TERMS_URL } from '../../src/lib/legal-urls';
 import { useAuthSessionOptional } from '../../src/providers/AuthSessionProvider';
 import { useAppStore } from '../../src/store/appStore';
@@ -86,10 +87,26 @@ export default function OnboardingSignupPromptScreen() {
         return;
       }
 
-      // After sign-up, prompt for username
       setOnboardingCompleted(true);
       resetAnonymousOpenCount();
-      router.replace('/onboarding/choose-username');
+
+      // Returning users keep their existing username; only first-time sign-ups
+      // (profile.username === null) need the choose-username step.
+      let alreadyHasUsername = false;
+      try {
+        const profile = await mobileApi.getProfile();
+        alreadyHasUsername = profile.username != null && profile.username.length > 0;
+      } catch {
+        // Network/profile fetch failure: fall back to the prompt rather than
+        // dropping the user into the app with a half-known account state.
+      }
+
+      if (alreadyHasUsername) {
+        const hasRoute = routePreview != null && routePreview.routes.length > 0;
+        router.replace(hasRoute ? '/route-preview' : '/route-planning');
+      } else {
+        router.replace('/onboarding/choose-username');
+      }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {

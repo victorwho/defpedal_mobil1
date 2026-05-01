@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Surface } from '../../src/design-system/atoms';
@@ -29,8 +29,36 @@ export default function ChooseUsernameScreen() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Defensive guard: if a returning user lands here (e.g. via deep link or
+  // any future caller that forgot to check), skip the prompt instead of
+  // letting them overwrite an existing username.
+  const [isCheckingExisting, setIsCheckingExisting] = useState(true);
 
   const isValid = USERNAME_REGEX.test(username);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await mobileApi.getProfile();
+        if (cancelled) return;
+        if (profile.username != null && profile.username.length > 0) {
+          const hasRoute = routePreview != null && routePreview.routes.length > 0;
+          router.replace(hasRoute ? '/route-preview' : '/route-planning');
+          return;
+        }
+      } catch {
+        // Network/profile failure → show the prompt rather than block the user.
+      }
+      if (!cancelled) setIsCheckingExisting(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // routePreview deliberately excluded — capture initial value, this effect
+    // runs once per mount as a guard.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async () => {
     if (!isValid) {
@@ -60,6 +88,14 @@ export default function ChooseUsernameScreen() {
     const hasRoute = routePreview != null && routePreview.routes.length > 0;
     router.replace(hasRoute ? '/route-preview' : '/route-planning');
   };
+
+  if (isCheckingExisting) {
+    return (
+      <View style={[styles.root, styles.loadingRoot, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
@@ -120,6 +156,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       flex: 1,
       backgroundColor: colors.bgDeep,
       paddingHorizontal: space[5],
+    },
+    loadingRoot: {
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     headerSection: {
       gap: space[2],
