@@ -150,13 +150,20 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.24',
+    version: '0.2.25',
     icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
     // Disable new architecture for development — bridgeless mode fails to load
     // the Metro JS bundle over USB on Windows. Preview/production use new arch.
     newArchEnabled: appVariant !== 'development',
+    // EAS Update OTA. runtimeVersion=appVersion ties OTA bundles to versionName,
+    // so a versionName bump (this file's `version`) forces a new native build.
+    // Channels in eas.json (preview / production) route OTAs to the right cohort.
+    runtimeVersion: { policy: 'appVersion' },
+    updates: {
+      url: 'https://u.expo.dev/f8bcd740-c785-47a3-beed-26891c89425a',
+    },
     experiments: {
       typedRoutes: true,
     },

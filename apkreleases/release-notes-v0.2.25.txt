@@ -1,0 +1,37 @@
+Defensive Pedal Preview v0.2.25
+
+WHAT'S NEW
+
+1. Fixed: signing in on a new device no longer asks you to set a username again.
+   If your account already has a username (saved server-side in your profile),
+   the choose-username step is now skipped on Google sign-in. Returning users
+   keep their existing handle. Only first-time sign-ups still see the prompt.
+
+2. Defensive guard on the choose-username screen itself: if you somehow land
+   on it with an existing username (e.g. via a deep link), it auto-skips
+   forward to the app instead of letting you overwrite your handle.
+
+3. Over-the-air updates enabled (expo-updates).
+   From this build onward, JavaScript-only fixes can be pushed directly to
+   the app without a Play Store release. Native changes (new permissions,
+   new SDKs, version bumps) still require a normal release.
+
+WHAT TO TEST
+
+- Sign out, then sign in again with the same Google account: you should
+  land directly in the app, NOT on the "Choose a username" screen.
+- Fresh install + first-time Google sign-up: the username prompt should
+  still appear (only first-timers see it).
+- Normal use of Map / Navigation / Community / History — should be
+  unchanged from v0.2.24.
+
+KNOWN LIMITATIONS
+
+- This is the first build with expo-updates baked in, so OTA itself
+  cannot be tested until the next JS-only fix ships via `eas update`.
+
+VERSION
+- versionName: 0.2.25
+- versionCode: 27
+- runtime version: 0.2.25 (appVersion policy)
+- channel: preview
