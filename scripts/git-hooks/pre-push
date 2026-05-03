@@ -1,0 +1,32 @@
+#!/bin/bash
+# Pre-push hook: run TypeScript typecheck + mobile lint-ratchet before
+# allowing push. Mirrors what CI runs, so failures surface here instead of
+# a few minutes after push lands on origin.
+#
+# Source of truth lives at scripts/git-hooks/pre-push (tracked in git).
+# Installed into .git/hooks/pre-push (untracked) by scripts/install-git-hooks.sh.
+# If you edit this file, re-run the installer.
+
+echo "Running typecheck before push..."
+npm run typecheck 2>&1
+TYPECHECK_RESULT=$?
+if [ $TYPECHECK_RESULT -ne 0 ]; then
+  echo ""
+  echo "PUSH BLOCKED: TypeScript typecheck failed."
+  echo "Fix the errors above, then try pushing again."
+  exit 1
+fi
+
+echo "Running mobile lint-ratchet before push..."
+npm run lint:mobile:check 2>&1
+LINT_RESULT=$?
+if [ $LINT_RESULT -ne 0 ]; then
+  echo ""
+  echo "PUSH BLOCKED: lint:mobile:check failed."
+  echo "Either fix the new violations, or run 'npm run lint:baseline'"
+  echo "from apps/mobile/ if the regression is intentional."
+  exit 1
+fi
+
+echo "Typecheck + lint passed. Pushing..."
+exit 0

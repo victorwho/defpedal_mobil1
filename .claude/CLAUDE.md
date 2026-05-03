@@ -369,6 +369,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 
 ### Before pushing:
 - A **git pre-push hook** (`.git/hooks/pre-push`) automatically runs `npm run typecheck` AND `npm run lint:mobile:check` before every push (mirrors CI). If either fails, the push is blocked. Do NOT skip it with `--no-verify`. The lint step uses a ratchet — it fails on +1 violation above the per-file baseline. To intentionally accept new violations, run `npm run lint:baseline` from `apps/mobile/`.
+- The hook source of truth is tracked at `scripts/git-hooks/pre-push`. On fresh clones the file isn't yet copied into `.git/hooks/` (git ignores that directory), so run `bash scripts/install-git-hooks.sh` once to install. Re-run the installer any time `scripts/git-hooks/*` changes.
 - ESLint disable directives (`// eslint-disable-next-line some-rule`) must reference rules that are actually registered. This repo doesn't ship `eslint-plugin-react-hooks`, so disables for `react-hooks/exhaustive-deps` will themselves become lint errors. See `.claude/error-log.md` Error #35.
 
 ### Never:

@@ -26,4 +26,4 @@ Run `npm run check:bundle` to verify the bundle builds before testing on phone.
 
 ## Before pushing to GitHub
 
-The pre-push hook (`.git/hooks/pre-push`) runs both `npm run typecheck` AND `npm run lint:mobile:check` — mirrors CI. If the hook is missing (fresh clone, worktree), reinstall it. If lint fails, either fix the new violations or run `npm run lint:baseline` from `apps/mobile/` if the regression is intentional. Never bypass with `--no-verify` (Error #35).
+The pre-push hook (`.git/hooks/pre-push`) runs both `npm run typecheck` AND `npm run lint:mobile:check` — mirrors CI. The hook source of truth is `scripts/git-hooks/pre-push`; install on a fresh clone or worktree with `bash scripts/install-git-hooks.sh` (idempotent). If lint fails, either fix the new violations or run `npm run lint:baseline` from `apps/mobile/` if the regression is intentional. Never bypass with `--no-verify` (Error #35).
