@@ -34,6 +34,19 @@ Recurring mistakes and lessons learned during development. Reference this file b
 **Fix:** Run `npm install react-refresh react-dom --legacy-peer-deps` after copying to a new path.
 **Occurrences:** After moving project to C:\dev\defpedal
 
+### 35. ESLint `eslint-disable-next-line` directive referencing an unregistered rule fails CI lint-ratchet
+**Pattern:** Writing an inline directive like `// eslint-disable-next-line react-hooks/exhaustive-deps` for a rule that is **not** registered in this project's ESLint config produces an ESLint error of its own (`Definition for rule 'react-hooks/exhaustive-deps' was not found`). The repo runs a `lint-ratchet` script (`apps/mobile/scripts/lint-ratchet.mjs`) in CI that compares each file's violation count against a baseline; one extra violation = `+1 regression` and CI fails. The local pre-push hook (until 2026-05-01) only ran `npm run typecheck`, so the bad directive shipped to origin and only blew up minutes later in GitHub Actions.
+
+This repo's ESLint config does **not** include `eslint-plugin-react-hooks` — both `react-hooks/exhaustive-deps` AND `react-hooks/rules-of-hooks` are unregistered. A disable directive for either becomes its own lint error.
+
+**Fix:**
+1. **Don't add disable directives for rules you haven't confirmed are active.** Before writing `// eslint-disable-next-line some-rule`, run `npx eslint <the-file>` first — if no violation appears for that rule, the rule isn't on, so don't write the directive (it'll error on its own).
+2. **An empty `useEffect` dep array doesn't need silencing in this project.** Without `react-hooks/exhaustive-deps`, ESLint won't warn about missing deps. Just write a plain comment explaining the intent if needed.
+3. **Run `npm run lint:mobile:check` from the repo root before pushing.** The pre-push hook (`.git/hooks/pre-push`) was extended on 2026-05-01 to run lint alongside typecheck, mirroring what CI does. If the hook is missing on a fresh clone, reinstall it from this commit's version.
+4. **Recovery path if CI has already failed:** edit the file to remove the directive, run `npm run lint:mobile:check` to confirm green, commit + push.
+
+**Occurrences:** Commit `146b205` (2026-05-01) — `// eslint-disable-next-line react-hooks/exhaustive-deps` in `apps/mobile/app/onboarding/choose-username.tsx` failed CI; pre-push hook only ran typecheck so the bad directive landed on origin/main. Fixed in `a73845f` by dropping the directive (kept the explanatory comment about the empty dep array). Hook extended to also run `npm run lint:mobile:check` in the same session.
+
 ## State & Data Errors
 
 ### 6. Zustand persist hydration race condition

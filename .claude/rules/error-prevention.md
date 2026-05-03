@@ -18,7 +18,12 @@ Before making any code changes, consult `.claude/error-log.md` for known pitfall
 12. **Detecting Expo native modules?** Use `requireOptionalNativeModule()` from `expo-modules-core`, NOT `NativeModules` from React Native (Error #21)
 13. **Installing Expo native packages?** Must be in `apps/mobile/package.json`, not just root — autolinking only reads the workspace (Error #22)
 14. **Using community native modules (non-Expo)?** Check `NativeModules.<BridgeName>` BEFORE `require()` — the module's invariant throw can escape try/catch (Error #23)
+15. **Adding `// eslint-disable-next-line some-rule`?** Confirm the rule is actually registered first by running `npx eslint <the-file>`. This repo does NOT ship `eslint-plugin-react-hooks`, so disables for `react-hooks/exhaustive-deps` and `react-hooks/rules-of-hooks` will themselves error and fail CI's lint-ratchet (Error #35)
 
 ## After every code change
 
 Run `npm run check:bundle` to verify the bundle builds before testing on phone.
+
+## Before pushing to GitHub
+
+The pre-push hook (`.git/hooks/pre-push`) runs both `npm run typecheck` AND `npm run lint:mobile:check` — mirrors CI. If the hook is missing (fresh clone, worktree), reinstall it. If lint fails, either fix the new violations or run `npm run lint:baseline` from `apps/mobile/` if the regression is intentional. Never bypass with `--no-verify` (Error #35).

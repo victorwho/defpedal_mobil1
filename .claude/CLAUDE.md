@@ -368,7 +368,8 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 5. Descriptive commit message
 
 ### Before pushing:
-- A **git pre-push hook** (`.git/hooks/pre-push`) automatically runs `npm run typecheck` before every push. If it fails, the push is blocked. Do NOT skip it with `--no-verify`.
+- A **git pre-push hook** (`.git/hooks/pre-push`) automatically runs `npm run typecheck` AND `npm run lint:mobile:check` before every push (mirrors CI). If either fails, the push is blocked. Do NOT skip it with `--no-verify`. The lint step uses a ratchet — it fails on +1 violation above the per-file baseline. To intentionally accept new violations, run `npm run lint:baseline` from `apps/mobile/`.
+- ESLint disable directives (`// eslint-disable-next-line some-rule`) must reference rules that are actually registered. This repo doesn't ship `eslint-plugin-react-hooks`, so disables for `react-hooks/exhaustive-deps` will themselves become lint errors. See `.claude/error-log.md` Error #35.
 
 ### Never:
 - Use `SafeAreaView` from `react-native` (use `react-native-safe-area-context`)
