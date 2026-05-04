@@ -584,14 +584,29 @@ export const useAppStore = create<AppStore>()(
           selectedRouteId: routeId,
         })),
       startNavigation: (route, sessionId) =>
-        set((state) => ({
-          navigationSession: setSessionMute(
-            createNavigationSession(route.id, new Date().toISOString(), sessionId),
-            !state.voiceGuidanceEnabled,
-          ),
-          selectedRouteId: route.id,
-          appState: 'NAVIGATING',
-        })),
+        set((state) => {
+          // Re-entry guard: a double-tap on "Start Navigation" (or any caller
+          // racing the state transition) would otherwise blow away the live
+          // session — including its accumulated GPS breadcrumbs and step
+          // index — and force a fresh sessionId. If the caller is starting
+          // navigation for the same route that's already active, no-op.
+          // Switching to a different route mid-navigation falls through and
+          // creates the new session as before.
+          if (
+            state.appState === 'NAVIGATING' &&
+            state.navigationSession?.routeId === route.id
+          ) {
+            return state;
+          }
+          return {
+            navigationSession: setSessionMute(
+              createNavigationSession(route.id, new Date().toISOString(), sessionId),
+              !state.voiceGuidanceEnabled,
+            ),
+            selectedRouteId: route.id,
+            appState: 'NAVIGATING',
+          };
+        }),
       advanceNavigation: (totalSteps) =>
         set((state) => ({
           navigationSession: state.navigationSession
@@ -657,13 +672,22 @@ export const useAppStore = create<AppStore>()(
       finishNavigation: () =>
         set((state) => {
           const session = state.navigationSession;
-          const isActive = session && session.state === 'navigating';
-          return {
-            navigationSession: isActive
-              ? completeNavigationSession(session)
-              : session,
-            appState: isActive ? 'AWAITING_FEEDBACK' : state.appState,
-          };
+          if (!session) return state;
+          // Happy path: navigating → awaiting_feedback, advance appState.
+          if (session.state === 'navigating') {
+            return {
+              navigationSession: completeNavigationSession(session),
+              appState: 'AWAITING_FEEDBACK',
+            };
+          }
+          // Idempotent reconciliation: if the session is already terminal but
+          // appState drifted (e.g. partial rehydration, external mutation),
+          // realign appState so route guards see a coherent state. No-op for
+          // 'idle' / 'preview' — those legitimately aren't finishable.
+          if (session.state === 'awaiting_feedback' && state.appState !== 'AWAITING_FEEDBACK') {
+            return { appState: 'AWAITING_FEEDBACK' };
+          }
+          return state;
         }),
       setMuted: (isMuted) =>
         set((state) => ({

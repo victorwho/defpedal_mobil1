@@ -251,6 +251,12 @@ export const createQueueSlice = (
       ),
     })),
 
+  // Idempotent: re-killing an already-dead mutation is a no-op for status
+  // (stays 'dead'). retryCount and lastAttemptAt still update, but those
+  // fields are inert once status is 'dead' (the sync loop skips dead
+  // mutations). OfflineMutationSyncManager's cascade-kill relies on this —
+  // if a future change makes killMutation throw on dead mutations, wrap the
+  // cascade loop in per-id try/catch to preserve correctness.
   killMutation: (mutationId, errorMessage) =>
     set((state) => ({
       queuedMutations: state.queuedMutations.map((mutation) =>

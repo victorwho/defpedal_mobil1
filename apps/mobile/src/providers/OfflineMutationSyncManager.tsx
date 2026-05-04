@@ -235,10 +235,20 @@ export const OfflineMutationSyncManager = () => {
           state.markMutationSyncing(mutation.id);
 
           try {
+            // Re-read state after markMutationSyncing so submitQueuedMutation
+            // sees the freshest tripServerIds (defends against any future code
+            // that mutates the map between the snapshot and the await).
+            const preSubmitState = useAppStore.getState();
             const response = await withMutationTimeout(
-              submitQueuedMutation(mutation, state.tripServerIds),
+              submitQueuedMutation(mutation, preSubmitState.tripServerIds),
               mutation.type,
             );
+
+            // Re-read again after the await — the queue and serverIds may have
+            // changed during the network round-trip. Bound store actions are
+            // safe on the old snapshot, but data fields like queuedMutations
+            // length must come from the live store.
+            const postAwaitState = useAppStore.getState();
 
             if (
               mutation.type === 'trip_start' &&
@@ -247,16 +257,19 @@ export const OfflineMutationSyncManager = () => {
               'tripId' in response
             ) {
               const tripStartPayload = mutation.payload as QueuedMutationPayloadByType['trip_start'];
-              state.setTripServerId(
+              postAwaitState.setTripServerId(
                 tripStartPayload.clientTripId,
                 (response as { tripId: string }).tripId,
               );
             }
 
-            state.resolveMutation(mutation.id);
+            postAwaitState.resolveMutation(mutation.id);
             telemetry.capture('offline_sync_succeeded', {
               mutation_type: mutation.type,
-              remaining_queue_count: Math.max(state.queuedMutations.length - 1, 0),
+              remaining_queue_count: Math.max(
+                useAppStore.getState().queuedMutations.length - 1,
+                0,
+              ),
             });
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Offline sync failed.';

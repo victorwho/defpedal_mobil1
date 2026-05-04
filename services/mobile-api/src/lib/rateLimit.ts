@@ -8,6 +8,10 @@ export type RateLimitPolicies = {
   routeReroute: RateLimitPolicy;
   write: RateLimitPolicy;
   hazardVote: RateLimitPolicy;
+  // Read-heavy social surface bucket — separate from routePreview so heavy
+  // tab-switching on the leaderboard / City Heartbeat doesn't starve a
+  // rider's actual route preview budget (and vice versa).
+  leaderboard: RateLimitPolicy;
   // UGC moderation buckets (compliance plan item 7).
   report: RateLimitPolicy;
   block: RateLimitPolicy;

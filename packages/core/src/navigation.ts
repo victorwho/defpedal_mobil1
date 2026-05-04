@@ -420,21 +420,48 @@ export const getNavigationProgress = (
   const alreadyAnnouncedApproach = session.lastApproachAnnouncementStepId === currentStep.id;
   const arrivedAtManeuver = hasArrived(distanceToManeuverMeters);
 
+  // Independent destination-distance check: closestPointIndex can snap past
+  // the penultimate maneuver on a parallel street (the "missed turn" branch),
+  // which advances currentStepIndex to the last step and zeroes
+  // distanceToManeuverMeters even though the rider is meters from the actual
+  // destination. Gating completion on physical haversine distance to the
+  // route's last vertex prevents that premature completion.
+  // GPS-accuracy buffer matches the off-route check direction so a fuzzy
+  // GPS reading near the destination still resolves as arrived.
+  const destinationCoord = routeCoordinates[routeCoordinates.length - 1];
+  const distanceToDestinationMeters = haversineDistance(
+    [location.lat, location.lon],
+    [destinationCoord[1], destinationCoord[0]],
+  );
+  const reachedDestination =
+    distanceToDestinationMeters <= ARRIVAL_THRESHOLD_METERS + gpsAccuracyMeters;
+  const onLastStep = currentStepIndex >= totalSteps - 1;
+  const completeNavigation = arrivedAtManeuver && onLastStep && reachedDestination;
+
+  // When the rider is on the last step with closestPointIndex pinned to the
+  // destination vertex (along-polyline distance = 0) but they're physically
+  // still meters away from the destination, the polyline-derived
+  // remainingDistanceMeters reads 0 — which is wrong on the FooterCard. Floor
+  // it to the haversine remaining so the display matches reality.
+  const displayedRemainingDistance =
+    onLastStep && !reachedDestination
+      ? Math.max(remainingDistanceMeters, distanceToDestinationMeters)
+      : remainingDistanceMeters;
+
   return {
     currentStepIndex,
     snappedCoordinate,
     distanceToRouteMeters,
     distanceToManeuverMeters,
-    remainingDistanceMeters: arrivedAtManeuver && currentStepIndex >= totalSteps - 1 ? 0 : remainingDistanceMeters,
-    remainingDurationSeconds:
-      arrivedAtManeuver && currentStepIndex >= totalSteps - 1 ? 0 : remainingDurationSeconds,
+    remainingDistanceMeters: completeNavigation ? 0 : displayedRemainingDistance,
+    remainingDurationSeconds: completeNavigation ? 0 : remainingDurationSeconds,
     shouldPreAnnounce: shouldPreAnnounce(distanceToManeuverMeters, alreadyPreAnnounced),
     shouldAnnounceApproach: shouldAnnounceApproach(
       distanceToManeuverMeters,
       alreadyAnnouncedApproach,
     ),
-    shouldAdvanceStep: arrivedAtManeuver && currentStepIndex < totalSteps - 1,
-    shouldCompleteNavigation: arrivedAtManeuver && currentStepIndex >= totalSteps - 1,
+    shouldAdvanceStep: arrivedAtManeuver && !onLastStep,
+    shouldCompleteNavigation: completeNavigation,
     isOffRoute: offRoute,
   };
 };

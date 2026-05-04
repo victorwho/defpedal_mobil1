@@ -123,6 +123,16 @@ export const config = {
         600000,
       ),
     },
+    // Leaderboard reads — generous since users tab-switch between metrics
+    // and time windows. Default 30/min mirrors routePreview but in its own
+    // bucket so the two cannot starve each other.
+    leaderboard: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_LEADERBOARD_MAX'], '30'), 30),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_LEADERBOARD_WINDOW_MS'], '60000'),
+        60000,
+      ),
+    },
     // UGC moderation: tighter than 'write' so a malicious user can't flood the
     // moderation queue. Defaults aligned with compliance plan §7.
     report: {

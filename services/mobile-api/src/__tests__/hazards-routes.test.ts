@@ -562,20 +562,19 @@ describe('GET /v1/hazards/nearby', () => {
     await app.close();
   });
 
-  it('filters hazards outside the bbox radius client-side', async () => {
-    // Two hazards — one at centre, one ~5000m north (outside default 1000m radius).
+  it('returns whatever the get_nearby_hazards RPC produces (spatial filter is server-side)', async () => {
+    // Spatial filtering moved into the get_nearby_hazards Postgres RPC
+    // (migration 202605040001) — the route is now a thin pass-through and
+    // returns exactly what the RPC returns. Out-of-radius rows are filtered
+    // by ST_DWithin in the DB, not in JS, so this test mocks the RPC with
+    // only the in-radius row. Anything in the response beyond what the RPC
+    // returns would be a regression.
     enqueueResult({
       data: [
         hazardRow({ id: HAZARD_ID, location: { latitude: 44.4, longitude: 26.1 } }),
-        hazardRow({
-          id: OTHER_HAZARD_ID,
-          location: { latitude: 44.45, longitude: 26.1 },
-        }),
       ],
       error: null,
     });
-    // No user → no second query, but for safety enqueue an empty vote list.
-    // (The handler short-circuits if caller=null so this stays unread.)
 
     const app = buildTestApp({ authenticateUser: vi.fn().mockResolvedValue(null) });
     await app.ready();

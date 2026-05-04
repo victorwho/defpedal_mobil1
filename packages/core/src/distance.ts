@@ -24,8 +24,15 @@ export function haversineDistance(
 
 /**
  * Computes the along-route distance between two indices on a polyline.
- * Points are [lon, lat] (GeoJSON order). Returns 0 if fromIndex >= toIndex
- * or the array has fewer than 2 points.
+ * Points are [lon, lat] (GeoJSON order). Returns 0 when there is no segment
+ * to measure: array has <2 points, fromIndex >= toIndex, fromIndex is past
+ * the last vertex, or toIndex is at/before the first vertex.
+ *
+ * Negative fromIndex is clamped to 0 (treated as "from start"). toIndex past
+ * the last vertex is clamped to the last vertex (treated as "to end"). A
+ * fromIndex that is past the last vertex is NOT clamped — it returns 0
+ * because the rider has run out of polyline. Callers that need to detect
+ * this stale-index condition should validate the index before calling.
  */
 export const polylineSegmentDistance = (
   points: readonly [number, number][],
@@ -35,6 +42,10 @@ export const polylineSegmentDistance = (
   if (points.length < 2 || fromIndex >= toIndex) return 0;
 
   const start = Math.max(0, fromIndex);
+  // fromIndex past the last vertex means the rider/cursor is off the end of
+  // the polyline. There is no remaining segment to measure — return 0
+  // explicitly rather than relying on the loop bounds incidentally collapsing.
+  if (start >= points.length - 1) return 0;
   const end = Math.min(points.length - 1, toIndex);
 
   let distance = 0;

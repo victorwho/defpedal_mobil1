@@ -48,6 +48,7 @@ const rateLimitPolicies: RateLimitPolicies = {
   routeReroute: { limit: 100, windowMs: 60_000 },
   write: { limit: 100, windowMs: 60_000 },
   hazardVote: { limit: 100, windowMs: 600_000 },
+  leaderboard: { limit: 100, windowMs: 60_000 },
 };
 
 const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) => buildApp({

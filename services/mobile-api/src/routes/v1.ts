@@ -598,7 +598,6 @@ export const buildV1Routes = (
                 properties: {
                   id: { type: 'string' },
                   tripId: { type: 'string' },
-                  clientTripId: { type: 'string' },
                   routingMode: { type: 'string', enum: ['safe', 'fast', 'flat'] },
                   startedAt: { type: 'string', format: 'date-time' },
                   endedAt: { type: ['string', 'null'], format: 'date-time' },
@@ -809,41 +808,28 @@ export const buildV1Routes = (
       const caller = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
 
       try {
-        const degDelta = radiusMeters / 111_000;
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
 
-        // location is JSONB with { latitude, longitude }; we filter by bbox in JS below.
-        // is_hidden filter is mandatory: API uses the service-role client which
-        // bypasses the RLS policy from migration 202604270001, so the filter
-        // must be applied here in code.
-        const { data, error } = await supabaseAdmin
-          .from('hazards')
-          .select(
-            'id, location, hazard_type, created_at, confirm_count, deny_count, score, expires_at, last_confirmed_at, description',
-          )
-          .eq('is_hidden', false)
-          .gt('expires_at', new Date().toISOString())
-          .gt('score', -3) // hide strongly downvoted hazards immediately
-          .order('created_at', { ascending: false })
-          .limit(200);
+        // PostGIS spatial filter via RPC. Replaces the previous "fetch 200
+        // most-recent then filter by JS degree-bbox" pattern, which silently
+        // dropped older hazards inside the radius once any city had >200
+        // active hazards, and drifted at high latitudes. The RPC applies
+        // is_hidden / expires_at / score gates and ST_DWithin server-side,
+        // so the LIMIT now lands AFTER the radius filter.
+        const { data, error } = await supabaseAdmin.rpc('get_nearby_hazards', {
+          p_user_lat: lat,
+          p_user_lon: lon,
+          p_radius_meters: radiusMeters,
+        });
 
         if (error) throw error;
 
-        const filtered = (data ?? []).filter((row: Record<string, unknown>) => {
-          const loc = row.location as { latitude?: number; longitude?: number } | null;
-          if (!loc || typeof loc.latitude !== 'number' || typeof loc.longitude !== 'number') return false;
-          return (
-            loc.latitude >= lat - degDelta &&
-            loc.latitude <= lat + degDelta &&
-            loc.longitude >= lon - degDelta &&
-            loc.longitude <= lon + degDelta
-          );
-        });
+        const rows = (data ?? []) as Record<string, unknown>[];
 
         // Batch-fetch caller's votes so we can attach `userVote`.
         const userVoteById = new Map<string, 'up' | 'down'>();
-        if (caller?.id && filtered.length > 0) {
-          const hazardIds = filtered.map((row) => row.id as string);
+        if (caller?.id && rows.length > 0) {
+          const hazardIds = rows.map((row) => row.id as string);
           const { data: voteRows } = await supabaseAdmin
             .from('hazard_validations')
             .select('hazard_id, response')
@@ -856,7 +842,7 @@ export const buildV1Routes = (
           }
         }
 
-        const hazards = filtered.map((row: Record<string, unknown>) => {
+        const hazards = rows.map((row) => {
           const loc = row.location as { latitude: number; longitude: number };
           const id = row.id as string;
           return {
@@ -922,7 +908,11 @@ export const buildV1Routes = (
         });
       }
 
-      await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+      // Use the dedicated hazardVote bucket (same as /vote). Both endpoints
+      // write to the same hazard_validations table — sharing 'write' would let
+      // a malicious user bypass the 5-per-10min vote throttle by routing
+      // through this legacy /validate endpoint instead.
+      await applyRateLimit(request, reply, dependencies, 'hazardVote', { userId: user.id });
 
       const { hazardId } = request.params;
       const { response: validationResponse } = request.body;

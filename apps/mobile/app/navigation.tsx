@@ -299,11 +299,6 @@ export default function NavigationScreen() {
           snapped: navigationSession.lastSnappedCoordinate,
         }
       : null;
-  const hasQueuedTripEnd = queuedMutations.some(
-    (mutation) =>
-      mutation.type === 'trip_end' &&
-      (mutation.payload as { clientTripId?: string }).clientTripId === activeTripClientId,
-  );
   const pendingQueueCount = queuedMutations.length;
   const [hazardBanner, setHazardBanner] = useState<{
     tone: 'success' | 'warning' | 'error';
@@ -356,7 +351,20 @@ export default function NavigationScreen() {
     const currentRouteRequest = store.routeRequest;
     const currentRoutePreview = store.routePreview;
 
-    if (!currentActiveTripClientId || hasQueuedTripEnd) {
+    // Read the queue directly from the live store (not a closure-captured
+    // derived value) so two callers in the same render tick — e.g. the
+    // auto-completion effect and an unmount cleanup firing back-to-back —
+    // both observe the first call's enqueue and bail. A React-state-derived
+    // boolean would still be `false` for both because the re-render that
+    // would flip it hasn't run yet.
+    const alreadyQueuedTripEnd = store.queuedMutations.some(
+      (mutation) =>
+        mutation.type === 'trip_end' &&
+        (mutation.payload as { clientTripId?: string }).clientTripId ===
+          currentActiveTripClientId,
+    );
+
+    if (!currentActiveTripClientId || alreadyQueuedTripEnd) {
       return;
     }
 
@@ -424,7 +432,7 @@ export default function NavigationScreen() {
       signed_in: Boolean(user),
       breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
     });
-  }, [enqueueMutation, hasQueuedTripEnd, selectedRoute, user]);
+  }, [enqueueMutation, selectedRoute, user]);
 
   const queueHazardReport = (hazardType: HazardType, description?: string) => {
     if (!mapUserCoordinate) {

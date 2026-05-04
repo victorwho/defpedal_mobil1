@@ -15,7 +15,7 @@ import {
   type UserIdParams,
 } from '../lib/followSchemas';
 import { HttpError } from '../lib/http';
-import { ensureSupabase, requireUser } from './feed-helpers';
+import { ensureSupabase, requireFullUser, requireUser } from './feed-helpers';
 
 // ---------------------------------------------------------------------------
 // Plugin
@@ -38,12 +38,15 @@ export const buildFollowRoutes = (
             200: followActionResponseSchema,
             400: errorResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
       async (request) => {
-        const user = await requireUser(request, dependencies);
+        // Anonymous sessions cannot create follows — they'd appear in target
+        // users' follow_requests / followers without an attributable identity.
+        const user = await requireFullUser(request, dependencies);
         const db = ensureSupabase();
         const targetId = request.params.id;
 
@@ -141,11 +144,12 @@ export const buildFollowRoutes = (
           response: {
             200: unfollowResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
           },
         },
       },
       async (request) => {
-        const user = await requireUser(request, dependencies);
+        const user = await requireFullUser(request, dependencies);
         const db = ensureSupabase();
 
         await db
@@ -169,13 +173,14 @@ export const buildFollowRoutes = (
           response: {
             200: approveDeclineResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             404: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
       async (request) => {
-        const user = await requireUser(request, dependencies);
+        const user = await requireFullUser(request, dependencies);
         const db = ensureSupabase();
         const requesterId = request.params.id;
 
@@ -211,12 +216,13 @@ export const buildFollowRoutes = (
           response: {
             200: approveDeclineResponseSchema,
             401: errorResponseSchema,
+            403: errorResponseSchema,
             404: errorResponseSchema,
           },
         },
       },
       async (request) => {
-        const user = await requireUser(request, dependencies);
+        const user = await requireFullUser(request, dependencies);
         const db = ensureSupabase();
         const requesterId = request.params.id;
 

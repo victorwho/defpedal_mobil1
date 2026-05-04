@@ -201,7 +201,7 @@ export const buildLeaderboardRoutes = (
       },
       async (request, reply) => {
         const user = await requireOAuthUser(request, dependencies);
-        await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
+        await applyRateLimit(request, reply, dependencies, 'leaderboard', { userId: user.id });
 
         const db = ensureSupabase();
 

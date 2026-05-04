@@ -1,7 +1,7 @@
 import type { FeedItem, SafetyTag } from '@defensivepedal/core';
 import { calculateCo2SavedKg } from '@defensivepedal/core';
 
-import { requireAuthenticatedUser } from '../lib/auth';
+import { requireAuthenticatedUser, requireFullUser as requireFullUserAuth } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
@@ -10,6 +10,15 @@ export const requireUser = (
   request: Parameters<typeof requireAuthenticatedUser>[0],
   dependencies: MobileApiDependencies,
 ) => requireAuthenticatedUser(request, dependencies.authenticateUser);
+
+// Same shape as requireUser but rejects anonymous Supabase sessions (no email).
+// Use for social actions that produce content attributable to a real account
+// (follow/unfollow, comment, hazard vote) — anonymous riders should not show
+// up in another user's followers, follow requests, or activity feed.
+export const requireFullUser = (
+  request: Parameters<typeof requireFullUserAuth>[0],
+  dependencies: MobileApiDependencies,
+) => requireFullUserAuth(request, dependencies.authenticateUser);
 
 export const ensureSupabase = () => {
   if (!supabaseAdmin) {

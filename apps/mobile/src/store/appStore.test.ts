@@ -177,6 +177,30 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().appState).toBe('NAVIGATING');
     });
 
+    it('startNavigation is a no-op if already navigating the same route (double-tap guard)', () => {
+      const route = createRoute('safe-1');
+      useAppStore.getState().startNavigation(route);
+      const firstSessionId = useAppStore.getState().navigationSession?.sessionId;
+      expect(firstSessionId).toBeDefined();
+
+      // Second call with the same route — should NOT mint a new session,
+      // because a fresh session would discard accumulated breadcrumbs and
+      // step index from the live ride.
+      useAppStore.getState().startNavigation(route);
+      const secondSessionId = useAppStore.getState().navigationSession?.sessionId;
+      expect(secondSessionId).toBe(firstSessionId);
+    });
+
+    it('startNavigation creates a fresh session when switching to a different route mid-nav', () => {
+      useAppStore.getState().startNavigation(createRoute('safe-1'));
+      const firstSessionId = useAppStore.getState().navigationSession?.sessionId;
+
+      useAppStore.getState().startNavigation(createRoute('safe-2'));
+      const secondSession = useAppStore.getState().navigationSession;
+      expect(secondSession?.routeId).toBe('safe-2');
+      expect(secondSession?.sessionId).not.toBe(firstSessionId);
+    });
+
     it('transitions to AWAITING_FEEDBACK when navigation finishes', () => {
       useAppStore.getState().startNavigation(createRoute('safe-1'));
       useAppStore.getState().finishNavigation();
@@ -571,6 +595,26 @@ describe('useAppStore', () => {
       const mutation = useAppStore.getState().queuedMutations.find((m) => m.id === id);
       expect(mutation?.status).toBe('dead');
       expect(mutation?.lastError).toContain('[MAX RETRIES]');
+    });
+
+    it('killMutation is idempotent — re-killing keeps status dead (cascade-kill safety)', () => {
+      // OfflineMutationSyncManager's cascade-kill loop calls killMutation on
+      // each dependent of a dead trip_start. If a dependent is somehow already
+      // dead (concurrent flush, replay), the second kill must not flip its
+      // status or throw — otherwise the cascade leaves orphans in 'syncing'.
+      const id = useAppStore.getState().enqueueMutation('hazard', {
+        coordinate: { lat: 44.42, lon: 26.10 },
+        reportedAt: new Date().toISOString(),
+        source: 'manual',
+      });
+      useAppStore.getState().killMutation(id, 'first');
+      expect(() => {
+        useAppStore.getState().killMutation(id, 'second');
+      }).not.toThrow();
+
+      const mutation = useAppStore.getState().queuedMutations.find((m) => m.id === id);
+      expect(mutation?.status).toBe('dead');
+      expect(mutation?.lastError).toContain('second');
     });
 
     it('retryDeadMutations resets dead mutations to queued', () => {

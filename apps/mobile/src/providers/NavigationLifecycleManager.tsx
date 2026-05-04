@@ -37,10 +37,13 @@ const useAppKilledRecovery = () => {
         reason: 'stopped',
       });
 
-      // Queue trip track with app_killed reason
+      // Queue trip track with app_killed reason. routeRequest.mode is in the
+      // persist whitelist so the mode survives the kill — read it from the
+      // rehydrated store rather than defaulting to 'fast' (which silently
+      // mislabeled every kill-recovered safe ride).
       state.enqueueMutation('trip_track', {
         clientTripId: state.activeTripClientId,
-        routingMode: 'fast', // fallback — actual mode not available after rehydration
+        routingMode: state.routeRequest?.mode ?? 'fast',
         gpsBreadcrumbs: session.gpsBreadcrumbs,
         endReason: 'app_killed',
         startedAt: session.startedAt,

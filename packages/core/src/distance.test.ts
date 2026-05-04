@@ -219,6 +219,33 @@ describe('polylineSegmentDistance', () => {
     expect(polylineSegmentDistance([[26.1, 44.4]], 0, 0)).toBe(0);
     expect(polylineSegmentDistance([[26.1, 44.4]], 0, 1)).toBe(0);
   });
+
+  it('returns 0 when fromIndex is past the last vertex (stale-index case)', () => {
+    // A 4-point polyline with a stale fromIndex from a longer previous polyline.
+    // Without the explicit guard, the loop bounds incidentally produce 0; the
+    // guard makes this case intentional rather than coincidental.
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+      [26.1100, 44.4300],
+      [26.1150, 44.4300],
+    ];
+    expect(polylineSegmentDistance(points, 4, 10)).toBe(0);
+    expect(polylineSegmentDistance(points, 5, 10)).toBe(0);
+    expect(polylineSegmentDistance(points, points.length - 1, 10)).toBe(0);
+  });
+
+  it('clamps negative fromIndex to start of polyline', () => {
+    const points: [number, number][] = [
+      [26.1000, 44.4300],
+      [26.1050, 44.4300],
+    ];
+    const expected = haversineDistance(
+      [points[0][1], points[0][0]],
+      [points[1][1], points[1][0]],
+    );
+    expect(polylineSegmentDistance(points, -5, 1)).toBeCloseTo(expected, 2);
+  });
 });
 
 // ---------------------------------------------------------------------------

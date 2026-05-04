@@ -366,6 +366,14 @@ export default function RoutePreviewScreen() {
     if (!selectedRoute) {
       return;
     }
+    // Double-tap guard. A second tap before React re-renders would otherwise
+    // enqueue a duplicate trip_start with a fresh clientTripId, orphaning the
+    // first one (server-side idempotency keys on user_id+client_trip_id, so
+    // distinct clientTripIds = distinct trips even though the rider perceives
+    // a single ride). This ref is set before any side effect below.
+    if (navigationStartedRef.current) {
+      return;
+    }
     navigationStartedRef.current = true;
 
     const sessionId =

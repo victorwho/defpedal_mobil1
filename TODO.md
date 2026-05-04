@@ -4,7 +4,6 @@ Two lists: **todo** (new features / enhancements) and **issuestofix** (bugs, blo
 
 ## todo
 
-- [ ] **Real Google Play link on /r/&lt;code&gt; viewer** — `ShareCtas.tsx` currently points at the canonical package ID `com.defensivepedal.mobile` as a placeholder. Before production launch, replace with the live Play Store listing URL and verify the `referrer=share=<code>` param survives the store redirect into the installed app (`installReferrer.ts` parser reads `share` key). File: `apps/web/components/ShareCtas.tsx:19`.
 - [ ] **Anonymous → real account upgrade** — `apps/mobile/src/lib/supabase.ts` `signUpWithEmail` (L167) and `signInWithGoogle` (L242) currently call `auth.signUp()` / `auth.signInWithOAuth()` for everyone, which orphans an anonymous user's data on signup (early trips, hazards, votes, XP, badges, streak, Mia journey state). Branch on `is_anonymous` and call `supabaseClient.auth.updateUser({ email, password })` / `supabaseClient.auth.linkIdentity({ provider: 'google' })` for anon sessions — both preserve `auth.users.id` so `UserCacheResetBridge` keeps the same id and TanStack/Zustand state survives the upgrade. Keep the current calls as fallback for fully-signed-out users. (`changestoimplement.md:106`)
 - [ ] **Phase 7 endgame — Neighborhood safety challenge** — Invite 3 cyclists to form a safety challenge group. (`changestoimplement.md:12`, deferred)
 - [ ] **Phase 7 endgame — Safety Wrapped** — Spotify-style annual / monthly summary. (`changestoimplement.md:13`, target Dec)
@@ -26,6 +25,7 @@ Two lists: **todo** (new features / enhancements) and **issuestofix** (bugs, blo
 
 ## Completed
 
+- [x] **Real Google Play link on /r/&lt;code&gt; viewer** — App is live on Play Store at `https://play.google.com/store/apps/details?id=com.defensivepedal.mobile`. The placeholder URL in `ShareCtas.tsx:19` was already pointing at the canonical package ID, so just removed the TODO comment marking it as a placeholder. The `referrer=share=<code>` param format matches what `installReferrer.ts` reads via `params.get('share')` — no parser change needed. (2026-05-04)
 - [x] **Improved Hazard System** — Upvote/downvote voting, auto-expiry by hazard type, marker clustering, dedicated rate limiting. Shipped session 28 (2026-04-21), Cloud Run revision `defpedal-api-00063-gjg`. Plan doc `docs/plans/improved-hazard-system.md`, user guide `docs/hazardinfo.md`.
 - [x] **CO2 Savings Calculator** — Track environmental impact per trip (distance-based CO2 saved vs driving).
 - [x] **Push Notifications** — EAS project wired (`f8bcd740...`), server-side send via Expo API (`services/mobile-api/src/lib/push.ts`), per-user prefs + quiet hours + daily budget.

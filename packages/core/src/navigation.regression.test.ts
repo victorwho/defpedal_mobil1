@@ -277,6 +277,38 @@ describe('remaining distance edge cases', () => {
     expect(progress.remainingDurationSeconds).toBe(0);
   });
 
+  it('does not complete prematurely when closest vertex is destination but rider is still ~40m away', () => {
+    // Repro for the "premature completion" bug: rider is on a parallel street
+    // about 40m perpendicular from the route's last segment. closestPointOnPolyline
+    // projects them onto the last segment and pickCloserVertex selects the
+    // destination vertex. closestPointIndex == arrival maneuver index → the
+    // along-polyline distance to the maneuver is 0, so arrivedAtManeuver fires.
+    // Before the fix this was enough to complete navigation while the rider
+    // was still ~40m from the actual destination point.
+    const polyline = buildEastPolyline(3);
+    const route = buildRoute({
+      id: 'near-dest-off-perpendicular',
+      polyline,
+      steps: [
+        { id: 's0', distanceMeters: 160, durationSeconds: 60, maneuverLon: 26.1000, type: 'depart' },
+        { id: 's1', distanceMeters: 0, durationSeconds: 0, maneuverLon: 26.1020, type: 'arrive' },
+      ],
+    });
+
+    const session = { ...createNavigationSession(route.id), currentStepIndex: 1 };
+    // 40m north of the destination (still under 50m off-route threshold so the
+    // engine keeps processing rather than bailing out as off-route).
+    const progress = getNavigationProgress(
+      route,
+      session,
+      { lat: BASE_LAT + 0.00036, lon: 26.1020 },
+    );
+
+    expect(progress.isOffRoute).toBe(false);
+    expect(progress.shouldCompleteNavigation).toBe(false);
+    expect(progress.remainingDistanceMeters).toBeGreaterThan(0);
+  });
+
   it('empty polyline returns route-level defaults safely', () => {
     const route = buildRoute({
       id: 'empty-polyline',

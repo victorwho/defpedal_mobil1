@@ -13,9 +13,7 @@ const COLORS = {
   bgDeep: '#111827',
 } as const;
 
-// TODO(slice-1): replace with real Play Store listing once the app ships to production.
-// Canonical production package ID used as placeholder — if tapped before launch, Play Store shows
-// an "unavailable in your region" screen rather than a broken link.
+// Live Play Store listing for the production package.
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.defensivepedal.mobile';
 
 const styles: Record<string, CSSProperties> = {
