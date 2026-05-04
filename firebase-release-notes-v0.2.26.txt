@@ -1,0 +1,39 @@
+v0.2.26 — Bug-fix sweep (focus on offline reliability + navigation accuracy)
+
+Backend (already live):
+• Anonymous accounts can no longer follow other users
+• Hazards near you now use a proper PostGIS spatial filter — fixes missing hazards in dense areas
+• Leaderboard reads on their own rate-limit budget so heavy tab-switching doesn't starve route previews
+• /hazards/validate shares the same throttle as /vote (closes a vote-throttle bypass)
+
+Mobile (this build):
+
+Offline + navigation reliability
+• App-kill recovery now records the actual routing mode (safe / fast / flat) — previously every
+  recovered ride was mis-labeled as "fast" in your history
+• Offline mutation queue: post-await state is always re-read from the live store, so trip_end and
+  trip_track no longer occasionally drop their server trip mapping
+• "Stop ride" is now safe against double-taps and stale callbacks — no more duplicate ride entries
+• Polyline distance helper guards stale indices after a reroute (prevents premature "arrived" fires)
+
+Navigation completion
+• Ride no longer completes prematurely when the closest polyline vertex snaps past the final
+  maneuver but the rider is still ~40m off the actual destination
+• FooterCard remaining distance now reflects real haversine-to-destination instead of zero in that
+  edge case
+• Same-route double-tap on Start Navigation preserves the live session's breadcrumbs and step index
+• Different-route mid-nav still creates a fresh session as expected
+
+Auth
+• Cold-start flicker fix: anonymous sign-in and onAuthStateChange listeners no longer race —
+  no more brief "logged out" flash that bounced route guards
+• finishNavigation reconciles app state coherently after rehydration drift
+
+Test plan
+• Start a safe ride, kill the app mid-ride, reopen → ride should complete with correct safe mode
+• Approach destination from a parallel street ~40m off → completion only fires when actually at
+  destination
+• Background then foreground the app on the auth screen → no logged-out flash
+• Double-tap Start Navigation rapidly → only one ride registered
+
+Known issues unchanged from 0.2.25.

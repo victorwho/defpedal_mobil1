@@ -150,7 +150,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.25',
+    version: '0.2.26',
     icon: './assets/icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
