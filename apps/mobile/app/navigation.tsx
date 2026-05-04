@@ -13,7 +13,7 @@ import {
   haversineDistance,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
@@ -68,8 +68,37 @@ import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useTheme, type ThemeColors } from '../src/design-system';
 
+// Stable tag for the screen-keep-awake lock so the activate/deactivate pair
+// can't drift across renders or accidentally collide with anyone else's lock.
+const KEEP_AWAKE_TAG = 'defensivepedal-navigation';
+
 export default function NavigationScreen() {
-  useKeepAwake();
+  // Keep the screen on during the entire ride. Replaces the previous
+  // useKeepAwake() hook with an explicit activate/deactivate pair so the
+  // activation is observably tied to NavigationScreen mount and any native
+  // failure surfaces in logs instead of silently letting the screen sleep.
+  // Tag is stable per-screen so duplicate activations are deduped at the
+  // expo-keep-awake layer.
+  useEffect(() => {
+    let active = true;
+    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch((error: unknown) => {
+      // Native module not bound, or activation rejected. Log so the dev
+      // overlay shows it; the screen will fall back to OS timeout settings.
+      // This is the same defensive pattern we use for other native modules
+      // (error-log #21, #23) — we surface the failure rather than fail soft.
+      console.warn('[navigation] activateKeepAwake failed', error);
+      active = false;
+    });
+    return () => {
+      if (!active) return;
+      try {
+        deactivateKeepAwake(KEEP_AWAKE_TAG);
+      } catch {
+        // Already deactivated or native module gone — nothing to do.
+      }
+    };
+  }, []);
+
   const insets = useSafeAreaInsets();
   const haptics = useHaptics();
   const { colors } = useTheme();

@@ -50,70 +50,43 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     let isMounted = true;
     let anonSignInAttempted = false;
-    // Serialize sync calls. Without this, the mount-time `syncCurrentSession(true)`
-    // can race with `onAuthStateChange` listeners firing during the anonymous
-    // sign-in: a second concurrent sync sees `getCurrentSession() == null`
-    // (the anon session hasn't committed yet), fires `setSession(null)` and
-    // produces a brief logged-out flash that bounces route guards. The mutex
-    // dedupes concurrent triggers; `pendingRerun` ensures we still run a
-    // follow-up sync if a state change arrived mid-flight, so we never drop a
-    // legitimate transition.
-    let syncInFlight = false;
-    let pendingRerun = false;
 
     const syncCurrentSession = async (allowAnonSignIn: boolean) => {
-      if (syncInFlight) {
-        pendingRerun = true;
-        return;
-      }
-      syncInFlight = true;
+      let currentSession: MobileAuthSession | null = null;
 
       try {
-        let currentSession: MobileAuthSession | null = null;
-
+        currentSession = await getCurrentSession();
+      } catch {
+        // Stale/invalid refresh token — clear only the local session so the
+        // app falls through to anonymous sign-in. Avoid signOut() here because
+        // it calls the server (which fails on an invalid token) and emits
+        // onAuthStateChange events that re-enter this function.
         try {
-          currentSession = await getCurrentSession();
+          await supabaseClient?.auth.signOut({ scope: 'local' });
         } catch {
-          // Stale/invalid refresh token — clear only the local session so the
-          // app falls through to anonymous sign-in. Avoid signOut() here because
-          // it calls the server (which fails on an invalid token) and emits
-          // onAuthStateChange events that re-enter this function.
-          try {
-            await supabaseClient?.auth.signOut({ scope: 'local' });
-          } catch {
-            // Ignore — the session may already be gone
+          // Ignore — the session may already be gone
+        }
+      }
+
+      // Auto-sign-in anonymously on first launch only (not on auth state changes)
+      if (!currentSession && allowAnonSignIn && !anonSignInAttempted && isSupabaseConfigured()) {
+        anonSignInAttempted = true;
+        currentSession = await signInAnonymously();
+        // Surface the failure reason so Diagnostics can show why the app
+        // landed in pure-guest mode (no session at all). Without this, the
+        // silent null return masks Supabase project misconfigurations (anon
+        // auth disabled) as ordinary guest state.
+        if (!currentSession) {
+          const reason = getLastAnonSignInError();
+          if (reason && isMounted) {
+            setAuthError(`Anonymous sign-in failed: ${reason}`);
           }
         }
+      }
 
-        // Auto-sign-in anonymously on first launch only (not on auth state changes)
-        if (!currentSession && allowAnonSignIn && !anonSignInAttempted && isSupabaseConfigured()) {
-          anonSignInAttempted = true;
-          currentSession = await signInAnonymously();
-          // Surface the failure reason so Diagnostics can show why the app
-          // landed in pure-guest mode (no session at all). Without this, the
-          // silent null return masks Supabase project misconfigurations (anon
-          // auth disabled) as ordinary guest state.
-          if (!currentSession) {
-            const reason = getLastAnonSignInError();
-            if (reason && isMounted) {
-              setAuthError(`Anonymous sign-in failed: ${reason}`);
-            }
-          }
-        }
-
-        if (isMounted) {
-          setSession(currentSession);
-          setIsLoading(false);
-        }
-      } finally {
-        syncInFlight = false;
-        // If any listener fired while we were in-flight, run one follow-up
-        // sync so we don't miss the trigger. Always with allowAnonSignIn=false:
-        // the initial anon sign-in is owned by the mount call only.
-        if (pendingRerun && isMounted) {
-          pendingRerun = false;
-          void syncCurrentSession(false);
-        }
+      if (isMounted) {
+        setSession(currentSession);
+        setIsLoading(false);
       }
     };
 

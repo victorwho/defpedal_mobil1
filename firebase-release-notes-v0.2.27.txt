@@ -1,0 +1,32 @@
+v0.2.27 — Hotfix: cold-start sign-in + screen-on during navigation
+
+Fixes
+
+• Cold-start no longer drops your signed-in session. v0.2.26 introduced an
+  auth mutex that, in some cases, deterministically wiped a real Google
+  session on app reopen and bounced users to onboarding. Reverted that
+  change; the original "rare logged-out flash" P1 stays open as a known
+  cosmetic issue.
+
+• Screen now stays on during navigation. Replaced the previous
+  useKeepAwake() hook with an explicit activate/deactivate pair tied to
+  NavigationScreen lifecycle, with a tagged lock and visible logging if
+  the native module ever fails to activate. If the screen still sleeps,
+  check Settings → Display → Smart stay / Adaptive screen timeout — those
+  device-level overrides can ignore app keep-awake locks.
+
+Test plan
+
+1. Sign in with Google. Close the app (swipe away in recents). Reopen.
+   You should land on /route-planning, NOT onboarding. Repeat 2-3 times.
+
+2. Start a ride. Don't touch the phone. Watch for screen dim/sleep —
+   it should stay fully bright through the entire ride. Background
+   the app, foreground it: screen should still wake bright.
+
+3. Same checks for fresh anonymous users (no sign-in) on first install.
+
+Carries forward all backend work from v0.2.26 (Phases 3, 4 already live
+on Cloud Run revision defpedal-api-00073-ftt). Mobile bug fixes from
+Phases 1, 2 are unchanged. Phase 5 (auth flicker mutex) is reverted
+pending a safer approach.
