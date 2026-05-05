@@ -1,0 +1,32 @@
+v0.2.31 — Landscape on non-map screens
+
+Profile, History, Community, Trophy Case, Settings, FAQ, Diagnostics,
+Onboarding and Auth now rotate when the OS auto-rotate is on. Tilt your
+phone or use it on a stand and the layout follows.
+
+Map and navigation screens stay portrait — they're built for handlebar
+mounts and locked deliberately. Tilting the phone mid-ride won't flip
+the route, the camera, or the maneuver card.
+
+Other improvements:
+
+  - Trophy Case grid expands from 3 columns to 5 in landscape, so badges
+    fill the screen instead of leaving big gutters.
+
+  - The intermittent "Invalid Refresh Token" log/yellowbox you may have
+    seen on app open is now silent. The recovery (anonymous sign-in
+    falls through) was always working — just the noisy log message is
+    suppressed at the source.
+
+  - Cleanup follow-ups from v0.2.30: every fix in that release ships in
+    this build too, so this is a strict superset.
+
+Note for testers running v0.2.30: the rotation behavior is a native
+change, so you must install this APK to see it — hot reload alone can't
+ship it. Once installed, make sure your phone's auto-rotate setting is
+on (system shade), and the rotatable screens will follow.
+
+If you mount the phone sideways for any reason and want a screen to
+stay landscape, that's tier-2 territory: map screens still need a
+landscape redesign before they support it. Let us know if that matters
+to you and we'll prioritize it.
