@@ -11,7 +11,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
-  Dimensions,
   Pressable,
   StyleSheet,
   Text,
@@ -45,7 +44,6 @@ export interface MiaInvitationPromptProps {
 // Component
 // ---------------------------------------------------------------------------
 
-const { height: SCREEN_H } = Dimensions.get('window');
 const CARD_TRANSLATE_START = 400;
 
 export const MiaInvitationPrompt: React.FC<MiaInvitationPromptProps> = ({

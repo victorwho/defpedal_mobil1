@@ -30,6 +30,27 @@ const emitAuthSessionChange = () => {
   });
 };
 
+// supabase-js logs `AuthApiError: Invalid Refresh Token: Refresh Token not
+// found` to console.error whenever a stored session's refresh token has
+// expired. The library still gracefully returns `{ session: null }` and our
+// AuthSessionProvider falls through to anonymous sign-in — so the message
+// is purely cosmetic noise. In dev mode this triggers RN's LogBox overlay,
+// and in production it spams Sentry. Filter just this one message at
+// console.error; everything else is passed through unchanged.
+const REFRESH_TOKEN_NOISE_PATTERNS = [
+  'Invalid Refresh Token: Refresh Token not found',
+  'Invalid Refresh Token: Already Used',
+];
+const originalConsoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  const first = args[0];
+  const message = first instanceof Error ? first.message : typeof first === 'string' ? first : '';
+  if (REFRESH_TOKEN_NOISE_PATTERNS.some((p) => message.includes(p))) {
+    return;
+  }
+  originalConsoleError(...args);
+};
+
 export const supabaseClient =
   mobileEnv.supabaseUrl && mobileEnv.supabaseAnonKey
     ? createClient(mobileEnv.supabaseUrl, mobileEnv.supabaseAnonKey, {

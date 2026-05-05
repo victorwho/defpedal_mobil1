@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useCallback } from 'react';
-import { Dimensions, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { brandColors, gray } from '../../../design-system/tokens/colors';
 import { radii } from '../../../design-system/tokens/radii';
 import { space } from '../../../design-system/tokens/spacing';
@@ -15,8 +15,7 @@ type PoiCardProps = {
 };
 
 export const PoiCard = React.memo(({ selectedPoi, onDismiss }: PoiCardProps) => {
-  const screenW = Dimensions.get('window').width;
-  const screenH = Dimensions.get('window').height;
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const cardW = screenW * 0.44;
   const cardH = 60;
   const toRight = selectedPoi.screenX < screenW * 0.55;

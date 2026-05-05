@@ -10,11 +10,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,10 +37,12 @@ import { space, layout } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { useBadges } from '../src/hooks/useBadges';
 
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const GRID_COLUMNS = 3;
-const CELL_WIDTH =
-  (SCREEN_WIDTH - 2 * layout.screenHorizontalPadding - 2 * badgeSpace.gridGap) / GRID_COLUMNS;
+// Grid sizing reacts to rotation via useWindowDimensions inside the component.
+// 3 columns in portrait, 5 columns once the viewport is wide enough — covers
+// landscape on phones (~720dp+) and tablets without a separate breakpoint.
+const LANDSCAPE_BREAKPOINT_DP = 600;
+const PORTRAIT_GRID_COLUMNS = 3;
+const LANDSCAPE_GRID_COLUMNS = 5;
 const LOCKED_COLLAPSE_LIMIT = 6;
 
 const TIER_FROM_LEVEL: Record<number, BadgeTier> = {
@@ -146,6 +148,12 @@ export default function AchievementsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const { width: screenWidth } = useWindowDimensions();
+  const numColumns =
+    screenWidth >= LANDSCAPE_BREAKPOINT_DP ? LANDSCAPE_GRID_COLUMNS : PORTRAIT_GRID_COLUMNS;
+  const cellWidth =
+    (screenWidth - 2 * layout.screenHorizontalPadding - (numColumns - 1) * badgeSpace.gridGap) /
+    numColumns;
   const { data, isLoading } = useBadges();
 
   const [selectedTab, setSelectedTab] = useState<BadgeCategory | 'all'>('all');
@@ -238,7 +246,7 @@ export default function AchievementsScreen() {
 
   const renderItem = useCallback(
     ({ item }: { item: SortedBadge }) => (
-      <View style={{ width: CELL_WIDTH }}>
+      <View style={{ width: cellWidth }}>
         <BadgeCard
           badge={item.badge}
           earned={item.earned}
@@ -250,7 +258,7 @@ export default function AchievementsScreen() {
         />
       </View>
     ),
-    [handleBadgePress],
+    [handleBadgePress, cellWidth],
   );
 
   const keyExtractor = useCallback(
@@ -282,10 +290,12 @@ export default function AchievementsScreen() {
         </View>
       ) : (
         <FlatList
+          // FlatList rejects mid-life numColumns changes — remount on rotation.
+          key={`grid-${numColumns}`}
           data={displayItems}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          numColumns={GRID_COLUMNS}
+          numColumns={numColumns}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: insets.bottom + space[6] },

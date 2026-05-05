@@ -12,6 +12,7 @@ import { useBicycleParking } from '../src/hooks/useBicycleParking';
 import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
+import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useWeather } from '../src/hooks/useWeather';
 import { BrandLogo } from '../src/components/BrandLogo';
@@ -77,6 +78,7 @@ export default function RoutePreviewScreen() {
   const guardPassed = useRouteGuard({
     requiredStates: ['IDLE', 'ROUTE_PREVIEW', 'NAVIGATING'],
   });
+  useLockOrientation();
   const routeRequest = useAppStore((state) => state.routeRequest);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);

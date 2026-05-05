@@ -8,7 +8,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
   Pressable,
   StyleSheet,
   Text,
@@ -27,8 +26,6 @@ import { brandColors } from '../tokens/colors';
 import { space } from '../tokens/spacing';
 import { fontFamily, textXl, textSm, textBase, textXs } from '../tokens/typography';
 import { zIndex } from '../tokens/zIndex';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 const TIER_FROM_NAME: Record<string, BadgeTier> = {
   bronze: 'bronze',
@@ -346,9 +343,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   particleContainer: {
-    position: 'absolute',
-    width: SCREEN_W,
-    height: SCREEN_H,
+    // Fills the parent (which fills the screen via styles.container) so
+    // particles emanate from the centre regardless of orientation.
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },

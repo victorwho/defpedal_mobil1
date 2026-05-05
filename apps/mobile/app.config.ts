@@ -152,7 +152,12 @@ export default () => ({
     scheme: appSchemeByVariant[appVariant],
     version: '0.2.30',
     icon: './assets/icon.png',
-    orientation: 'portrait',
+    // Global default is unlocked so non-map screens (history, community,
+    // profile, settings, trophy case, onboarding) follow the OS auto-rotate
+    // setting. Map / navigation screens lock themselves to portrait at the
+    // screen level via useLockOrientation() — they're designed for handlebar
+    // mounts and a landscape variant would need a side-panel redesign.
+    orientation: 'default',
     userInterfaceStyle: 'automatic',
     // Disable new architecture for development — bridgeless mode fails to load
     // the Metro JS bundle over USB on Windows. Preview/production use new arch.

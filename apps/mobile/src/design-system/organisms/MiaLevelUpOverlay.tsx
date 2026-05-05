@@ -12,7 +12,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Pressable,
   StyleSheet,
   Text,
@@ -38,8 +37,6 @@ import {
   textXs,
 } from '../tokens/typography';
 import { zIndex } from '../tokens/zIndex';
-
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
 // ---------------------------------------------------------------------------
 // Level variant config
@@ -451,9 +448,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   particleContainer: {
-    position: 'absolute',
-    width: SCREEN_W,
-    height: SCREEN_H,
+    // Fills the parent (which fills the screen) so particles emanate from
+    // the centre regardless of orientation.
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -507,7 +504,11 @@ const styles = StyleSheet.create({
   },
   testimonialWrap: {
     marginTop: space[4],
-    width: SCREEN_W - space[8] * 2,
+    // Stretches to the parent width minus the standard horizontal inset on
+    // each side, so it reflows correctly on rotation instead of locking to
+    // a portrait-width snapshot.
+    alignSelf: 'stretch',
+    marginHorizontal: space[8],
     gap: space[2],
   },
   testimonialPrompt: {

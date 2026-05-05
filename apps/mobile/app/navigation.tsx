@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
 import { RouteMap } from '../src/components/map';
@@ -108,6 +109,7 @@ export default function NavigationScreen() {
     requiredStates: ['NAVIGATING'],
     condition: () => Boolean(useAppStore.getState().navigationSession),
   });
+  useLockOrientation();
 
   const {
     routeRequest,

@@ -19,6 +19,7 @@ import { useBikeShops } from '../src/hooks/useBikeShops';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
+import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useWeather } from '../src/hooks/useWeather';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -80,6 +81,7 @@ const coordinatesMatch = (left: Coordinate, right: Coordinate, precision = 0.000
 export default function RoutePlanningScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  useLockOrientation();
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
