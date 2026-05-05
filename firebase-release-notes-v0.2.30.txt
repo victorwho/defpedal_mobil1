@@ -1,0 +1,38 @@
+v0.2.30 — UX cleanup sweep
+
+Six small fixes from this week's tester pass:
+
+1. Preview Route is now disabled until you've entered a destination.
+   Helper text "Enter a destination to continue" shows below the button
+   instead of letting you tap into a (0,0) ghost route.
+
+2. Map tooltip now reads "Longpress to set as destination" — describes
+   what the long-press actually does.
+
+3. The Weather Warning popup no longer appears on top of the Profile
+   screen after sign-out. It now only shows while you're on the route
+   preview screen, where it belongs.
+
+4. Temperature swing warning now matches reality. Previously every
+   temperature swing said "layer up" regardless of whether the day was
+   warming up or cooling down. Now:
+     • Warming day → "Warming up later today, start in light layers and
+       pack water"
+     • Cooling day → "Cooling down later today, pack a layer"
+     • Bumpy day → neutral wording
+   The trend is read from your *remaining* hours (first vs last), so
+   evening forecasts that drop into the night classify correctly.
+
+5. Sign-out no longer bounces you into onboarding. If you signed in
+   directly via the Profile sign-in button (skipping the onboarding
+   flow), signing out used to dump you back into onboarding. Now any
+   real-account sign-in marks onboarding complete, so sign-out keeps
+   you on Profile with the "Sign in" CTA — as intended.
+
+6. Sign-in (or finishing onboarding) no longer auto-routes you into
+   the demo circuit route. You now always land on a fresh
+   route-planning screen after creating or signing into an account.
+
+If you upgrade from v0.2.29 you may briefly see a one-time onboarding
+prompt on the next launch only if you're currently anonymous and have
+opened the app several times — sign in once and that goes away.
