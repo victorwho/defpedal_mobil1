@@ -4,7 +4,7 @@ import {
   calculateTrailDistanceMeters,
   decodePolyline,
 } from '@defensivepedal/core';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -75,12 +75,30 @@ export default function TripsScreen() {
     });
   }, [shareRide]);
 
-  const { data: trips, isLoading, error } = useQuery({
+  const { data: trips, isLoading, error, refetch } = useQuery({
     queryKey: ['trip-history'],
     queryFn: () => mobileApi.getTripHistory(),
     enabled: Boolean(user),
-    staleTime: 60_000,
+    // 10s staleness — short enough that a ride saved in feedback doesn't
+    // sit invisible behind the cache for a minute, long enough to dedupe
+    // back-to-back focus events.
+    staleTime: 10_000,
   });
+
+  // Refetch every time the trips screen gains focus. Tabs in this app are
+  // implemented via expo-router screens that REMAIN MOUNTED across switches,
+  // so a default refetchOnMount alone wouldn't fire when the user navigates
+  // away to Profile and back. This is also the recovery path for the
+  // 2026-05-05 trip-recording incident: queued trips that synced AFTER the
+  // user last looked at History become visible the moment they re-open the
+  // tab, without needing a force-quit.
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        void refetch();
+      }
+    }, [refetch, user]),
+  );
 
   const deleteTripMutation = useMutation({
     mutationFn: (tripId: string) => mobileApi.deleteTrip(tripId),

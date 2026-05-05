@@ -1,0 +1,24 @@
+v0.2.29 — Trips now refresh on focus
+
+Fixes
+
+The DB partial-index bug from session 33 was fixed yesterday (server-side
+migration), so trip_start / trip_end / trip_track now succeed. But the
+History screen's React Query cache had `staleTime: 60s` and didn't
+refetch on tab switch, so trips synced AFTER you last looked at History
+stayed invisible until the cache went stale.
+
+Now the History screen calls refetch() every time it gains focus.
+Switching to Profile and back, or coming out of feedback, immediately
+shows the latest trips.
+
+Recovery for trips lost in the 2026-04-27 → 2026-05-05 window:
+
+- Open Diagnostics → tap "Retry dead mutations" (you already did this).
+- Then go to History — the orphaned trips will appear once the queue
+  drains (within ~15 seconds; tab away and back to force a refetch).
+- Force-quit the app and reopen if any trips still don't show.
+
+New rides going forward: complete a ride, watch the queue in
+Diagnostics drain to zero (~15s), then check History — the trip
+appears immediately when the screen gains focus.
