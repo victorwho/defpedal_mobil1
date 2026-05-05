@@ -40,10 +40,12 @@ import { useAuthSessionOptional } from './AuthSessionProvider';
 export const UserCacheResetBridge = () => {
   const auth = useAuthSessionOptional();
   const userId = auth?.user?.id ?? null;
+  const isAnonymous = auth?.isAnonymous ?? true;
   const isLoading = auth?.isLoading ?? true;
 
   const queryClient = useQueryClient();
   const resetUserScopedState = useAppStore((s) => s.resetUserScopedState);
+  const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
   const previousUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +62,18 @@ export const UserCacheResetBridge = () => {
     queryClient.clear();
     resetUserScopedState();
   }, [userId, isLoading, queryClient, resetUserScopedState]);
+
+  // Whenever the user holds a real (non-anonymous) account, mark onboarding
+  // as completed. This covers every sign-in path — /auth (direct), the
+  // /onboarding/signup-prompt screen, and OAuth deep-link callbacks — so a
+  // subsequent sign-out doesn't bounce the user back into the onboarding
+  // flow they already implicitly completed by creating an account.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!userId || isAnonymous) return;
+    if (useAppStore.getState().onboardingCompleted) return;
+    setOnboardingCompleted(true);
+  }, [userId, isAnonymous, isLoading, setOnboardingCompleted]);
 
   return null;
 };

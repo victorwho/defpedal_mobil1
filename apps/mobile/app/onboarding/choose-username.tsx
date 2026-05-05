@@ -25,7 +25,7 @@ export default function ChooseUsernameScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const routePreview = useAppStore((s) => s.routePreview);
+  const resetFlow = useAppStore((s) => s.resetFlow);
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,8 +43,10 @@ export default function ChooseUsernameScreen() {
         const profile = await mobileApi.getProfile();
         if (cancelled) return;
         if (profile.username != null && profile.username.length > 0) {
-          const hasRoute = routePreview != null && routePreview.routes.length > 0;
-          router.replace(hasRoute ? '/route-preview' : '/route-planning');
+          // Drop the demo circuit route from /onboarding/first-route so the
+          // user lands on a fresh route-planning screen, not auto-routed.
+          resetFlow();
+          router.replace('/route-planning');
           return;
         }
       } catch {
@@ -55,9 +57,7 @@ export default function ChooseUsernameScreen() {
     return () => {
       cancelled = true;
     };
-    // Mount-only guard. routePreview is read live via useAppStore.getState
-    // inside the IIFE if needed in the future; capturing the closure value
-    // is fine here because navigation away unmounts the screen.
+    // Mount-only guard — runs once when the screen lands.
   }, []);
 
   const handleSubmit = async () => {
@@ -85,8 +85,10 @@ export default function ChooseUsernameScreen() {
   };
 
   const navigateToApp = () => {
-    const hasRoute = routePreview != null && routePreview.routes.length > 0;
-    router.replace(hasRoute ? '/route-preview' : '/route-planning');
+    // Drop the demo circuit route from /onboarding/first-route so the user
+    // lands on a fresh route-planning screen, not auto-routed.
+    resetFlow();
+    router.replace('/route-planning');
   };
 
   if (isCheckingExisting) {

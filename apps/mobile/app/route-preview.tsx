@@ -1,6 +1,6 @@
 import type { RiskSegment } from '@defensivepedal/core';
 import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -156,6 +156,7 @@ export default function RoutePreviewScreen() {
   );
   const [weatherWarningDismissed, setWeatherWarningDismissed] = useState(false);
   const [switchingToSafe, setSwitchingToSafe] = useState(false);
+  const isFocused = useIsFocused();
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
 
@@ -465,7 +466,7 @@ export default function RoutePreviewScreen() {
     <>
     <WeatherWarningModal
       warnings={weatherWarnings}
-      visible={weatherWarnings.length > 0 && !weatherWarningDismissed}
+      visible={isFocused && weatherWarnings.length > 0 && !weatherWarningDismissed}
       onDismiss={() => setWeatherWarningDismissed(true)}
     />
     <ShareOptionsModal

@@ -44,6 +44,7 @@ export const ro: TranslationKeys = {
     searchDestination: 'Unde mergi?',
     addStop: 'Adaugă oprire',
     previewRoute: 'Previzualizare traseu',
+    enterDestinationFirst: 'Introdu o destinație pentru a continua',
     safe: 'Sigur',
     fast: 'Rapid',
     flat: 'Plat',

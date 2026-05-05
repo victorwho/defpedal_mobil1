@@ -237,6 +237,64 @@ describe('fetchWeather', () => {
     expect(result!.dailyTempMax).toBe(25);
     expect(result!.dailyTempMin).toBe(15);
   });
+
+  it('classifies a falling-evening hourly forecast as trend=falling', async () => {
+    // Pin the clock to 19:00 so the slice always starts at index 19 and the
+    // trend output is independent of when this test runs.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 5, 19, 0, 0));
+
+    const response = createOpenMeteoResponse();
+    // Fill remaining-day hours (19→23) with a clear cooling curve.
+    // Earlier hours (0→18) are kept hot so the FULL day's argmin/argmax
+    // would land in the morning (idx 0) and afternoon (idx 14) — the kind
+    // of bumpy shape that fooled the old argmin/maxIdx logic.
+    response.hourly.temperature_2m = Array.from({ length: 24 }, (_, h) => {
+      if (h < 19) return 24 - Math.abs(14 - h) * 0.3;
+      return [22, 18, 14, 11, 9][h - 19] ?? 9;
+    });
+    mockFetchResponses(response, createAirQualityResponse());
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    vi.useRealTimers();
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingTempTrend).toBe('falling');
+    // Sanity: the slice min/max reflect the cooling tail, not the morning.
+    expect(result!.remainingTempMin).toBe(9);
+    expect(result!.remainingTempMax).toBe(22);
+  });
+
+  it('classifies a warming-morning hourly forecast as trend=rising', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 5, 8, 0, 0));
+
+    const response = createOpenMeteoResponse();
+    // Hour 8 starts at 12°C, climbs to 28°C by mid-afternoon, then plateaus.
+    response.hourly.temperature_2m = Array.from({ length: 24 }, (_, h) => {
+      if (h < 8) return 10;
+      if (h <= 14) return 12 + (h - 8) * 2.5;
+      return 27;
+    });
+    mockFetchResponses(response, createAirQualityResponse());
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    vi.useRealTimers();
+
+    expect(result).not.toBeNull();
+    expect(result!.remainingTempTrend).toBe('rising');
+  });
+
+  it('classifies a flat hourly forecast as trend=mixed', async () => {
+    // createOpenMeteoResponse defaults to all-22°C hourly, so end - start = 0.
+    mockFetchResponses(createOpenMeteoResponse(), createAirQualityResponse());
+
+    const result = await fetchWeather(44.43, 26.1);
+
+    expect(result!.remainingTempTrend).toBe('mixed');
+  });
 });
 
 describe('getWeatherWarnings', () => {
@@ -256,6 +314,7 @@ describe('getWeatherWarnings', () => {
     remainingGustMax: 18,
     remainingTempMin: 15,
     remainingTempMax: 25,
+    remainingTempTrend: 'mixed',
     airQuality: null,
     ...overrides,
   });
@@ -297,6 +356,49 @@ describe('getWeatherWarnings', () => {
     }));
 
     expect(warnings.some((w) => w.type === 'temp_drop')).toBe(true);
+  });
+
+  it('uses warming-up copy for a rising-temperature swing', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 14,
+      remainingTempMax: 32,
+      remainingTempTrend: 'rising',
+    }));
+
+    const swing = warnings.find((w) => w.type === 'temp_drop');
+    expect(swing).toBeDefined();
+    expect(swing!.message).toContain('Warming up');
+    expect(swing!.message).toContain('14°C → 32°C');
+    expect(swing!.message).not.toContain('layer up');
+  });
+
+  it('uses cooling-down copy for a falling-temperature swing', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 8,
+      remainingTempMax: 24,
+      remainingTempTrend: 'falling',
+    }));
+
+    const swing = warnings.find((w) => w.type === 'temp_drop');
+    expect(swing).toBeDefined();
+    expect(swing!.message).toContain('Cooling down');
+    // Falling-trend wording shows max → min so the listed sequence reads like
+    // the user's actual experience over the day.
+    expect(swing!.message).toContain('24°C → 8°C');
+    expect(swing!.message).toContain('pack a layer');
+  });
+
+  it('falls back to neutral swing copy when trend is mixed', () => {
+    const warnings = getWeatherWarnings(makeWeatherData({
+      remainingTempMin: 6,
+      remainingTempMax: 22,
+      remainingTempTrend: 'mixed',
+    }));
+
+    const swing = warnings.find((w) => w.type === 'temp_drop');
+    expect(swing).toBeDefined();
+    expect(swing!.message).toContain('Big temperature swing');
+    expect(swing!.message).toContain('6°C – 22°C');
   });
 
   it('does not warn about small temperature swing', () => {

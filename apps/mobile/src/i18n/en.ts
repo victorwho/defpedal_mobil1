@@ -42,6 +42,7 @@ export const en = {
     searchDestination: 'Where are you going?',
     addStop: 'Add stop',
     previewRoute: 'Preview route',
+    enterDestinationFirst: 'Enter a destination to continue',
     safe: 'Safe',
     fast: 'Fast',
     flat: 'Flat',

@@ -33,6 +33,17 @@ export interface WeatherData {
   readonly remainingTempMin: number;
   /** Max temperature from current hour to end of day */
   readonly remainingTempMax: number;
+  /**
+   * Direction of the remaining-day temperature swing, derived from the
+   * chronological order of the min/max in the hourly forecast:
+   *
+   *   'rising'  — min is earlier in the day, max is later (warming up)
+   *   'falling' — max is earlier, min is later (cooling down)
+   *   'mixed'   — non-monotonic (peak in the middle, or dataset too short)
+   *
+   * Drives copy in the swing warning ('layer up' is wrong on a warming day).
+   */
+  readonly remainingTempTrend: 'rising' | 'falling' | 'mixed';
   readonly airQuality: AirQualityData | null;
 }
 
@@ -226,6 +237,24 @@ export const fetchWeather = async (
     const remainingTempMin = remainingTemps.length > 0 ? Math.round(Math.min(...remainingTemps)) : Math.round(data.daily.temperature_2m_min[0]);
     const remainingTempMax = remainingTemps.length > 0 ? Math.round(Math.max(...remainingTemps)) : Math.round(data.daily.temperature_2m_max[0]);
 
+    // Derive trend by comparing the first remaining hour to the last so the
+    // swing warning's copy ("layer up" vs "warming up") matches the rider's
+    // actual experience. An earlier argmin/maxIdx approach mis-classified
+    // evening forecasts like [18, 22, 20, 18, 16] as 'rising' because the
+    // absolute min landed at the END of the window while the start happened
+    // to also be a local low — even though the rider is clearly heading into
+    // a cooling period. End-vs-start ignores transient bumps and is robust
+    // to non-monotonic data.
+    const TREND_DIFF_THRESHOLD = 3; // °C: below this we call it 'mixed'
+    let remainingTempTrend: WeatherData['remainingTempTrend'] = 'mixed';
+    if (remainingTemps.length >= 2) {
+      const firstHour = remainingTemps[0];
+      const lastHour = remainingTemps[remainingTemps.length - 1];
+      const diff = lastHour - firstHour;
+      if (diff >= TREND_DIFF_THRESHOLD) remainingTempTrend = 'rising';
+      else if (diff <= -TREND_DIFF_THRESHOLD) remainingTempTrend = 'falling';
+    }
+
     return {
       temperature: Math.round(data.current.temperature_2m),
       weatherCode: data.current.weather_code,
@@ -242,6 +271,7 @@ export const fetchWeather = async (
       remainingGustMax,
       remainingTempMin,
       remainingTempMax,
+      remainingTempTrend,
       airQuality,
     };
   } catch {
@@ -314,10 +344,18 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
     }
 
     if (data.remainingTempMax - data.remainingTempMin > TEMP_SWING_THRESHOLD) {
+      let message: string;
+      if (data.remainingTempTrend === 'rising') {
+        message = `Warming up later today: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C — start in light layers and pack water`;
+      } else if (data.remainingTempTrend === 'falling') {
+        message = `Cooling down later today: ${data.remainingTempMax}°C → ${data.remainingTempMin}°C — pack a layer and ride with caution`;
+      } else {
+        message = `Big temperature swing: ${data.remainingTempMin}°C – ${data.remainingTempMax}°C — dress in layers and ride with caution`;
+      }
       warnings.push({
         type: 'temp_drop',
         icon: 'thermometer',
-        message: `Big temperature swing: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C — layer up and ride with caution`,
+        message,
       });
     }
   }

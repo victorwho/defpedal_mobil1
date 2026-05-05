@@ -795,7 +795,7 @@ export default function RoutePlanningScreen() {
           {showLongPressHint ? (
             <View style={styles.longPressHint} pointerEvents="none">
               <Ionicons name="hand-left-outline" size={14} color="white" />
-              <Text style={styles.longPressHintText}>Long-press map to drop a pin</Text>
+              <Text style={styles.longPressHintText}>Longpress to set as destination</Text>
             </View>
           ) : null}
         </View>
@@ -1260,6 +1260,7 @@ export default function RoutePlanningScreen() {
               variant="primary"
               size="lg"
               fullWidth
+              disabled={!hasValidDestination}
               onPress={() => {
                 browseActionCountRef.current += 1;
                 setActiveField(null);
@@ -1268,6 +1269,11 @@ export default function RoutePlanningScreen() {
             >
               {t('planning.previewRoute')}
             </Button>
+            {!hasValidDestination ? (
+              <Text style={styles.previewHelperText}>
+                {t('planning.enterDestinationFirst')}
+              </Text>
+            ) : null}
           </View>
         ) : null
       }
@@ -1638,6 +1644,13 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     footerCollapsed: {
       marginBottom: layout.bottomNavHeight,
+    },
+    previewHelperText: {
+      ...textXs,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: space[2],
     },
     hazardPlacementFooter: {
       gap: space[2],
