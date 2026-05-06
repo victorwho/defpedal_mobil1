@@ -114,11 +114,13 @@ const CollapsibleSheet = ({
           <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
             <View style={[styles.handle, { backgroundColor: handleColor }]} />
           </Pressable>
+          {/* Peek row — only visible when collapsed. Lives inside the pan-responder
+              wrapper so swipes from the visible summary strip drive the sheet, not
+              just the narrow handle. */}
+          {peekContent && !expanded ? (
+            <View style={styles.peekRow}>{peekContent}</View>
+          ) : null}
         </View>
-        {/* Peek row — only visible when collapsed, shows a summary strip */}
-        {peekContent && !expanded ? (
-          <View style={styles.peekRow}>{peekContent}</View>
-        ) : null}
         {expanded ? (
           <ScrollView
             contentContainerStyle={styles.content}
