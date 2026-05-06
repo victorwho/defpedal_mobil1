@@ -6,18 +6,28 @@
 > code mismatch (P0-NEW). This is the operational checklist for the Play
 > Console form change that closes that gap.
 
+## Account context
+
+This Play Console belongs to an **organizational (business) developer
+account**. That means the Nov-2023 mandatory closed-test rule (12 testers
+for 14 days before production access) does NOT apply
+(https://support.google.com/googleplay/android-developer/answer/14151465).
+You can publish directly to the Production track. The "wait until live"
+step below still matters — it's about ensuring the new AAB is rolling
+before the form change submits — but it's *minutes*, not days.
+
 ## ⚠️ TIMING RULE — read this before you click anything in Play Console
 
-**Apply this checklist AFTER, not before, the new production AAB is live in
-Open Testing.** The exact order:
+**Apply this checklist AFTER, not before, the new production AAB is live.**
+The exact order:
 
 1. Build production AAB (`npm run bundle:production`).
 2. Verify cert owner is `CN=Victor Rotariu, …`, NOT `CN=Android Debug, …` —
    `keytool -printcert -jarfile apkreleases/DefensivePedal-Production-v*.aab | grep -i owner`.
-3. Upload AAB to Play Console → Open Testing track.
-4. **Wait** until the rollout reaches your tester pool (≈5–10 min after
-   upload; the rollout indicator on the release page will say "Available
-   to testers").
+3. Upload AAB to Play Console → Production track (or Open Testing if you
+   want a 24 h sanity check first).
+4. **Wait** until the rollout indicator says the build is being served
+   (≈5–10 min after upload). On staged rollouts, "5% live" is enough.
 5. Apply the table in §2 below to Play Console → App content → Data safety.
 6. Submit. Play re-reviews in 24–48 h.
 
@@ -29,9 +39,24 @@ form before the build only flips which side of the mismatch is wrong.
 
 **Skip-list during the wait.** While the AAB rolls out, do NOT touch:
 - The Privacy Policy URL (already updated in commit 7e51ff0; live).
-- Tester opt-out lists (the new build needs to reach actual testers to
-  validate the consent-default-OFF behaviour change).
 - Any other Play Console field — Data Safety is the only thing changing.
+
+## Recommended staged rollout (quality, not policy)
+
+The business account skips Google's 14-day rule, but staged rollout is
+still the right way to catch a Vitals regression without nuking the whole
+user base. Suggested cadence: **5% → 20% → 50% → 100%**, ≥24–48 h per
+step, watching Play Console → Quality → Android vitals each gate. Hold
+on a step (or roll back) if any of the following degrade:
+
+- Crash-free user rate drops below **99.5%**
+- ANR rate exceeds **0.47%** (Play's Bad Behavior Threshold)
+- Sentry surfaces a new error class affecting >1% of sessions
+
+End-to-end this is ~5–7 days, not 14+14. Don't compress to "1% → 100%
+same day" — staged rollout is the only good way to catch a regression
+in the firebase-analytics drop / consent-default flip / Mapbox-telemetry
+off / NODE_ENV gate before it hits everyone.
 
 ## Where to apply
 
