@@ -5,12 +5,33 @@
 > single biggest current risk as a Data Safety / Privacy Policy / shipped-
 > code mismatch (P0-NEW). This is the operational checklist for the Play
 > Console form change that closes that gap.
->
-> Apply this AFTER you have built and rolled out the next AAB (which drops
-> `firebase-analytics`, disables Mapbox SDK telemetry, defaults consent OFF,
-> and ships the Privacy Policy update). Doing it before the new build is
-> deployed creates a temporary mismatch in the OTHER direction (form says
-> "no Firebase Analytics", code still ships it) — about as bad.
+
+## ⚠️ TIMING RULE — read this before you click anything in Play Console
+
+**Apply this checklist AFTER, not before, the new production AAB is live in
+Open Testing.** The exact order:
+
+1. Build production AAB (`npm run bundle:production`).
+2. Verify cert owner is `CN=Victor Rotariu, …`, NOT `CN=Android Debug, …` —
+   `keytool -printcert -jarfile apkreleases/DefensivePedal-Production-v*.aab | grep -i owner`.
+3. Upload AAB to Play Console → Open Testing track.
+4. **Wait** until the rollout reaches your tester pool (≈5–10 min after
+   upload; the rollout indicator on the release page will say "Available
+   to testers").
+5. Apply the table in §2 below to Play Console → App content → Data safety.
+6. Submit. Play re-reviews in 24–48 h.
+
+**Why "after".** Play's re-review can cross-reference the latest live AAB
+against the form. If you update the form FIRST while the still-live AAB
+ships `firebase-analytics`, you create a mismatch in the opposite direction
+(form claims clean, AAB dirty) — same enforcement risk. Submitting the
+form before the build only flips which side of the mismatch is wrong.
+
+**Skip-list during the wait.** While the AAB rolls out, do NOT touch:
+- The Privacy Policy URL (already updated in commit 7e51ff0; live).
+- Tester opt-out lists (the new build needs to reach actual testers to
+  validate the consent-default-OFF behaviour change).
+- Any other Play Console field — Data Safety is the only thing changing.
 
 ## Where to apply
 

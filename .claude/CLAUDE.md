@@ -38,7 +38,17 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - Build image: `gcloud builds submit --config cloudbuild.yaml --timeout=600`
 - Deploy new revision: `gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated`
 - **Important:** `gcloud builds submit` only pushes the image. You MUST also run `gcloud run deploy` to create a new revision, otherwise Cloud Run keeps serving the old code.
-- **Security:** `DEV_AUTH_BYPASS_ENABLED=false` on Cloud Run (disabled 2026-04-11, revision 00044). Do NOT re-enable in production.
+- **Security:** `DEV_AUTH_BYPASS_ENABLED=false` on Cloud Run (disabled 2026-04-11, revision 00044). Do NOT re-enable in production. Defense-in-depth: as of revision 00074-dzg (2026-05-06), `services/mobile-api/src/lib/auth.ts` also refuses bypass when `process.env.NODE_ENV === 'production'`, and the Dockerfile bakes `ENV NODE_ENV=production` so the gate fires regardless of Cloud Run env config.
+- **Startup validation:** Server boots through `validateConfig()` in `config.ts`. Required env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `MAPBOX_ACCESS_TOKEN`. In production, missing vars → `process.exit(1)` before `app.listen()`. Avoids the "boots with null clients, fails per-request as confusing 401s" failure mode.
+
+## Play Store Release
+
+- **Audit source-of-truth:** `docs/reviews/playstore-readiness-2026-05-06-revised.md`. Stage A + B fixes shipped in commit `7e51ff0` (2026-05-06). Stage C (14-day observation + 1→10→50→100% rollout) is calendar-bound and tester-driven.
+- **Data Safety form checklist:** `docs/legal/counsel-review-2026-04-29/16-data-safety-reconciliation-2026-05-06.md`. **HARD RULE:** apply the form change *after* the matching production AAB is live in Open Testing — never before. Play's re-review cross-references the live AAB; a form-first update creates a mismatch in the opposite direction (form claims clean, live AAB still ships firebase-analytics) and is just as bad as the current mismatch.
+- **EAS Sentry token:** `SENTRY_AUTH_TOKEN` is set as a `secret` env var in EAS production/preview/development environments (set 2026-05-06). Production EAS builds without it now fail-fast at `app.config.ts` so source-maps are guaranteed to upload.
+- **Mapbox SDK telemetry** is disabled at module load (`Mapbox.setTelemetryEnabled(false)` in `RouteMap.tsx` and `offlinePacks.ts`). The Privacy Policy at `apps/web/app/privacy/page.tsx` explicitly states "Mapbox SDK telemetry is disabled" — keep this in sync if the call is ever removed.
+- **firebase-analytics intentionally NOT shipped.** Dropped from `apps/mobile/android/app/build.gradle` 2026-05-06. Belt-and-suspenders flag injected via Expo config plugin `apps/mobile/plugins/withAndroidFirebaseAnalyticsDisabled.js` so the inert flag survives `expo prebuild`. If a future Firebase product is added, update Privacy Policy + Data Safety form *before* the AAB ships.
+- **Consent toggles default OFF** for first-time users (`apps/mobile/app/onboarding/consent.tsx`). Returning users keep their saved choice. Don't flip the default back to ON without an ANSPDCP/ePrivacy review.
 
 ## App Variants
 
