@@ -45,24 +45,22 @@ export default function OnboardingConsentScreen() {
   const persistedCapturedAt = useAppStore((s) => s.analyticsConsent.capturedAt);
 
   // First-time defaults vs returning visitor:
-  // - Both crash reports (Sentry) and product analytics (PostHog) default ON
-  //   for first-time onboarding (capturedAt is null). User opts out from the
+  // - Both crash reports (Sentry) and product analytics (PostHog) default OFF
+  //   for first-time onboarding (capturedAt is null). User opts in from the
   //   same screen or anytime later in Profile → Privacy & analytics.
-  // - Crash reports defense: GDPR Art. 6(1)(f) "legitimate interest" with
-  //   sendDefaultPii=false (no IP / no user-agent / no cookies). Standard
-  //   posture for product crash diagnostics.
-  // - Product analytics defense: thinner — ANSPDCP / Law 506/2004 generally
-  //   treats this as opt-in. PostHog's anonymous-event posture is partial
-  //   mitigation. Privacy policy (item 3) MUST disclose both defaults +
-  //   how to opt out. Counsel review recommended before production rollout.
+  // - Defense: ANSPDCP / Law 506/2004 (Romania transposition of ePrivacy)
+  //   treats both crash diagnostics and product analytics as requiring
+  //   informed opt-in. Defaulting OFF is the safe posture for a Romanian-
+  //   resident controller; it also matches the Play Console Data Safety
+  //   posture once the form is reconciled with shipped sub-processors.
   // - Returning users always see their previously-saved choice; we never
-  //   silently flip a setting they already opted out of.
+  //   silently flip a setting they already opted in or out of.
   const isFirstTimeConsent = persistedCapturedAt === null;
   const [crashReports, setCrashReports] = useState(
-    isFirstTimeConsent ? true : persistedSentry,
+    isFirstTimeConsent ? false : persistedSentry,
   );
   const [productAnalytics, setProductAnalytics] = useState(
-    isFirstTimeConsent ? true : persistedPosthog,
+    isFirstTimeConsent ? false : persistedPosthog,
   );
 
   const handleContinue = () => {

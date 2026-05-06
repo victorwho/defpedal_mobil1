@@ -32,6 +32,14 @@ export const authenticateDeveloperBypassToken = (
   accessToken: string,
   developerAuthBypass: DeveloperAuthBypassConfig = config.devAuthBypass,
 ): AuthenticatedUser | null => {
+  // Defense-in-depth: even if DEV_AUTH_BYPASS_ENABLED is mistakenly true on a
+  // production Cloud Run revision, refuse to honour the bypass when NODE_ENV
+  // is production. Prevents a single env-var misconfiguration from silently
+  // re-opening the bypass.
+  if (process.env.NODE_ENV === 'production') {
+    return null;
+  }
+
   const expectedToken = developerAuthBypass.token.trim();
   const userId = developerAuthBypass.userId.trim();
   const email = developerAuthBypass.email.trim();

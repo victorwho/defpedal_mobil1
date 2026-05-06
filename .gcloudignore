@@ -1,10 +1,27 @@
 .git
 .claude
+.kiro
+.agents
 node_modules
+# Mobile app source — Dockerfile only needs apps/mobile/package.json, but
+# excluding the whole directory breaks that COPY. Exclude heavy subtrees only.
 apps/mobile/android
 apps/mobile/ios
 apps/mobile/.expo
+apps/mobile/app
+apps/mobile/src
+apps/mobile/assets
+apps/mobile/__tests__
+apps/web
+packages/core/dist
 dist
 output
 tmp
+# Release artefacts (each AAB/APK is 100–200 MB; pre-fix tarballs were ~1 GB)
 *.apk
+*.aab
+*.docx
+apkreleases/
+LaunchPR/
+docs/
+design-work/

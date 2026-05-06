@@ -1,7 +1,26 @@
 import { buildApp } from './app';
-import { config } from './config';
+import { config, validateConfig } from './config';
 
 const start = async () => {
+  // Fail fast on missing required env. Without this, the server boots with
+  // null Supabase clients and every request fails as a confusing 401 instead
+  // of an obvious deploy-time error.
+  const missing = validateConfig();
+  if (missing.length > 0) {
+    if (process.env.NODE_ENV === 'production') {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[mobile-api] FATAL: required env vars missing in production: ${missing.join(', ')}`,
+      );
+      process.exit(1);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mobile-api] WARNING: env vars missing (non-production, continuing): ${missing.join(', ')}`,
+      );
+    }
+  }
+
   const app = buildApp();
 
   const shutdown = async (signal: string) => {

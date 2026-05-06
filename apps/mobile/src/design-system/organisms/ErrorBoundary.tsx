@@ -8,10 +8,27 @@ import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { telemetry } from '../../lib/telemetry';
 import { darkTheme } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, text2xl, textBase, textSm } from '../tokens/typography';
+
+// Lazy-loaded so a missing expo-updates native module (e.g. local dev build
+// without the package linked) cannot crash the error UI itself. Mirrors the
+// guard discipline used for expo-notifications / expo-sharing.
+type ExpoUpdatesModule = {
+  reloadAsync: () => Promise<void>;
+};
+
+const loadExpoUpdates = async (): Promise<ExpoUpdatesModule | null> => {
+  try {
+    const mod = (await import('expo-updates')) as unknown as ExpoUpdatesModule;
+    return typeof mod.reloadAsync === 'function' ? mod : null;
+  } catch {
+    return null;
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,9 +58,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // Log error for debugging (could integrate with crash reporting service)
-    console.error('ErrorBoundary caught an error:', error);
-    console.error('Component stack:', errorInfo.componentStack);
+    telemetry.captureError(error, {
+      component_stack: errorInfo.componentStack ?? null,
+      source: 'ErrorBoundary',
+    });
   }
 
   handleRetry = (): void => {
@@ -51,9 +69,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   };
 
   handleRestart = (): void => {
-    // Reset error state — this gives the app a fresh chance
-    // In most cases, this is sufficient to recover from transient errors
-    this.setState({ hasError: false, error: null });
+    // Force a full JS reload so persistent errors don't trap users on the
+    // boundary screen. Falls back to a state-only reset if the native module
+    // is unavailable (e.g. dev build without the package linked).
+    void (async () => {
+      const updates = await loadExpoUpdates();
+      if (updates) {
+        try {
+          await updates.reloadAsync();
+          return;
+        } catch (error) {
+          telemetry.captureError(error, { source: 'ErrorBoundary.reloadAsync' });
+        }
+      }
+      this.setState({ hasError: false, error: null });
+    })();
   };
 
   render(): ReactNode {

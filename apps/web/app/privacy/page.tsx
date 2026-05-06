@@ -111,7 +111,7 @@ export default function PrivacyPage() {
       <div style={styles.container}>
         <p style={styles.brand}>Defensive Pedal</p>
         <h1 style={styles.h1}>Privacy Policy</h1>
-        <p style={styles.meta}>Last updated: 27 April 2026</p>
+        <p style={styles.meta}>Last updated: 6 May 2026</p>
 
         <h2 style={styles.h2}>Who we are</h2>
         <p style={styles.body}>
@@ -173,24 +173,83 @@ export default function PrivacyPage() {
         <h2 style={styles.h2}>Your rights under GDPR</h2>
         <p style={styles.body}>
           You have the right to access your data, correct it, request deletion,
-          and object to specific processing. See{' '}
+          object to specific processing, and{' '}
+          <strong>receive a portable copy</strong> of the data you have
+          provided to us in a commonly used machine-readable format
+          (Article 20). See{' '}
           <a href="/account-deletion" style={styles.link}>
             how to delete your account
           </a>{' '}
           for the in-app and email-based deletion paths and what gets removed.
-          For other rights, contact{' '}
+          For data export or other rights, contact{' '}
           <a href="mailto:privacy@defensivepedal.com" style={styles.link}>
             privacy@defensivepedal.com
           </a>
-          .
+          {' '}— we respond within 30 days.
         </p>
 
-        <h2 style={styles.h2}>Sub-processors</h2>
+        <h2 style={styles.h2}>Sub-processors and third-party services</h2>
         <p style={styles.body}>
-          We use Supabase (database and authentication, currently US region),
-          Google Cloud Run (API hosting, EU region), Mapbox (maps and
-          terrain), and Sentry (crash reports, EU region, only if you opt in).
+          The app and its backend rely on the following providers to deliver
+          the service. Each receives only the minimum data needed for its
+          function.
         </p>
+        <ul style={styles.list}>
+          <li>
+            <strong>Supabase</strong> — database, anonymous and email-based
+            authentication. Currently US region; we plan to migrate to EU.
+          </li>
+          <li>
+            <strong>Google Cloud Run</strong> — API hosting, EU region
+            (europe-central2 / Warsaw).
+          </li>
+          <li>
+            <strong>Mapbox</strong> — map tiles, geocoding, terrain elevation,
+            and the standard cycling routing engine. The Mapbox SDK&apos;s own
+            anonymous-usage telemetry is <strong>disabled</strong> in our
+            builds.
+          </li>
+          <li>
+            <strong>OpenStreetMap (OSRM &amp; Overpass)</strong> — our custom
+            safety-scored routing server (osrm.defensivepedal.com,
+            self-hosted on Google Cloud) and the Overpass API for bicycle
+            parking, rental, and bike-shop locations. Receives the GPS
+            coordinates needed to compute the request.
+          </li>
+          <li>
+            <strong>Open-Meteo</strong> — weather and air-quality data shown
+            in the route preview and 9 a.m. weather notification. Receives
+            the GPS coordinates of the location being queried.
+          </li>
+          <li>
+            <strong>Google OAuth</strong> — used only when you choose
+            &ldquo;Sign in with Google&rdquo;. Google sees your email and
+            display name as part of the identity exchange.
+          </li>
+          <li>
+            <strong>Expo Push Service</strong> (exp.host) — relays push
+            notifications (hazard alerts, weather warnings, streak nudges) to
+            your device. Receives the push token and notification payload.
+          </li>
+          <li>
+            <strong>Google Play Install Referrer</strong> — Android system
+            service that tells us which install campaign brought you to the
+            app. No PII is collected.
+          </li>
+          <li>
+            <strong>Sentry</strong> — anonymised crash reports, EU region.
+            Only if you opt in (off by default).
+          </li>
+          <li>
+            <strong>PostHog</strong> — anonymised product analytics, EU host
+            (eu.i.posthog.com). Only if you opt in (off by default).
+          </li>
+          <li>
+            <strong>Firebase App Distribution</strong> — used for tester
+            preview builds only (not production). Firebase Analytics is{' '}
+            <strong>not</strong> shipped in our builds.
+          </li>
+        </ul>
 
         <h2 style={styles.h2}>Contact</h2>
         <p style={styles.body}>

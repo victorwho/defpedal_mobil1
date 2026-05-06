@@ -189,3 +189,23 @@ export const config = {
     riskModelVersion: resolveConfigValue(['RISK_MODEL_VERSION'], 'risk-model-v1'),
   },
 } as const;
+
+/**
+ * Asserts that env vars required for production routing/auth are present.
+ *
+ * Returns the list of missing keys (empty array means OK). In production
+ * (NODE_ENV === 'production') the caller should `process.exit(1)` if any
+ * are missing — booting with empty Supabase clients only surfaces as
+ * confusing 401s from each per-request lookup. In dev/test we just warn so
+ * partial setups (e.g. running OSRM without Supabase) keep working.
+ */
+export const validateConfig = (): string[] => {
+  const missing: string[] = [];
+
+  if (!config.supabaseUrl) missing.push('SUPABASE_URL');
+  if (!config.supabaseServiceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!config.supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
+  if (!config.mapboxAccessToken) missing.push('MAPBOX_ACCESS_TOKEN');
+
+  return missing;
+};

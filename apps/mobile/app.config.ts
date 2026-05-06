@@ -105,6 +105,27 @@ const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
 // setup steps.
 const sentryOrg = process.env.SENTRY_ORG;
 const sentryProject = process.env.SENTRY_PROJECT;
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+
+// Production builds MUST upload source-maps; otherwise Sentry crash reports
+// are unreadable Hermes minified stacks. Fail the build instead of silently
+// shipping unreadable telemetry. EAS profiles set EAS_BUILD_PROFILE; CI sets
+// CI=true. Anything else (local dev, preview from a fresh checkout) is fine.
+const easBuildProfile = process.env.EAS_BUILD_PROFILE;
+if (
+  appVariant === 'production' &&
+  easBuildProfile === 'production' &&
+  sentryOrg &&
+  sentryProject &&
+  !sentryAuthToken
+) {
+  throw new Error(
+    'SENTRY_AUTH_TOKEN missing. Production builds require it for source-map upload. ' +
+      'Set it as an EAS secret: `eas secret:create --scope project --name SENTRY_AUTH_TOKEN --value <token>`. ' +
+      'See docs/ops/sentry-setup.md.',
+  );
+}
+
 const sentryPluginEntries =
   sentryOrg && sentryProject
     ? [
@@ -198,6 +219,10 @@ export default () => ({
       // Must run after expo-location so it operates on the service node the
       // autolinker just produced. Asserts foregroundServiceType="location".
       './plugins/withAndroidForegroundServiceLocation',
+      // Belt-and-suspenders: keep Firebase Analytics inert even if a
+      // transitive dep ever pulls it in. firebase-analytics is intentionally
+      // NOT declared in app/build.gradle.
+      './plugins/withAndroidFirebaseAnalyticsDisabled',
       [
         'expo-secure-store',
         {

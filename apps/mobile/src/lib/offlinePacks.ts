@@ -19,6 +19,13 @@ type OfflinePackMetadata = {
 if (mobileEnv.mapboxPublicToken) {
   Mapbox.setAccessToken(mobileEnv.mapboxPublicToken);
 }
+// See RouteMap.tsx for context — both modules can win the import race so the
+// telemetry flag must be set in either path.
+try {
+  Mapbox.setTelemetryEnabled(false);
+} catch {
+  // Older SDK builds without the API — fall through.
+}
 
 const toStatus = (
   metadata: OfflinePackMetadata,

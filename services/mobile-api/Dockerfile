@@ -16,6 +16,10 @@ RUN npm run build --workspace @defensivepedal/mobile-api
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
+# Set NODE_ENV so the dev-auth-bypass gate (lib/auth.ts) refuses to honour
+# DEV_AUTH_BYPASS_ENABLED on Cloud Run even if it's set by mistake.
+ENV NODE_ENV=production
+
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
 COPY --from=builder /app/package.json ./package.json

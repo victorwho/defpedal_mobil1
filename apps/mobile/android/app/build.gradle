@@ -210,10 +210,15 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
-    // Import the Firebase BoM
+    // Import the Firebase BoM. Pins versions for any transitive Firebase
+    // libraries autolinked by expo modules (e.g. expo-notifications →
+    // firebase-messaging). Keep this even with firebase-analytics dropped.
     implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
-    // Firebase Analytics (required by Firebase App Distribution)
-    implementation("com.google.firebase:firebase-analytics")
+    // firebase-analytics intentionally NOT imported. App Distribution does
+    // not require it (it uses a separate identifier), and shipping it would
+    // misalign the Privacy Policy / Data Safety form. The
+    // firebase_analytics_collection_enabled=false meta-data in the source
+    // AndroidManifest.xml is belt-and-suspenders for any transitive pull.
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

@@ -47,6 +47,16 @@ import { useShieldMode } from './useShieldMode';
 if (mobileEnv.mapboxPublicToken) {
   Mapbox.setAccessToken(mobileEnv.mapboxPublicToken);
 }
+// Disable Mapbox SDK anonymous-usage telemetry. Default ON ships GPS-tagged
+// events to Mapbox servers; our Privacy Policy lists Mapbox as a sub-processor
+// for "maps and terrain" only. Idempotent — safe to call alongside the same
+// guard in offlinePacks.ts.
+try {
+  Mapbox.setTelemetryEnabled(false);
+} catch {
+  // Older SDK builds without the API — fall through. Telemetry remains on
+  // until the SDK is upgraded; not worth crashing for.
+}
 
 /** Hoisted Mapbox layer style — avoids re-creating the object on every render. */
 const riskOverlayLineStyle = {
