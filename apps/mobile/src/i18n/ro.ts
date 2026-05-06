@@ -444,6 +444,14 @@ export const ro: TranslationKeys = {
     blockErrorTitle: 'Blocarea a eșuat',
     blockErrorMessage: 'Te rugăm să încerci din nou într-o clipă.',
     hiddenAfterAction: 'Ascuns — reîmprospătează feed-ul pentru alte postări.',
+    commentsTitle: 'Comentarii',
+    commentPlaceholder: 'Adaugă un comentariu…',
+    sendComment: 'Trimite comentariul',
+    dismissComments: 'Închide comentariile',
+    noCommentsYet: 'Niciun comentariu. Fii primul!',
+    openComments: 'Deschide comentariile ({{count}})',
+    viewMoreComments_one: 'Vezi 1 comentariu anterior',
+    viewMoreComments_other: 'Vezi {{count}} comentarii anterioare',
   },
 
   // ── Hazard Reporting ──

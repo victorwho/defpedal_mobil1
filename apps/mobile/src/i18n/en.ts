@@ -442,6 +442,14 @@ export const en = {
     blockErrorTitle: 'Could not block',
     blockErrorMessage: 'Please try again in a moment.',
     hiddenAfterAction: 'Hidden — refresh the feed to see other content.',
+    commentsTitle: 'Comments',
+    commentPlaceholder: 'Add a comment…',
+    sendComment: 'Send comment',
+    dismissComments: 'Dismiss comments',
+    noCommentsYet: 'No comments yet. Be the first!',
+    openComments: 'Open comments ({{count}})',
+    viewMoreComments_one: 'View 1 earlier comment',
+    viewMoreComments_other: 'View {{count}} earlier comments',
   },
 
   // ── Hazard Reporting ──

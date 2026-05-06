@@ -1,4 +1,9 @@
-import type { FeedComment, FeedItem, RouteOption } from '@defensivepedal/core';
+import type {
+  FeedComment,
+  FeedItem,
+  RideActivity,
+  RouteOption,
+} from '@defensivepedal/core';
 import { decodePolyline, formatDistance, formatDuration, formatSpeed } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -27,10 +32,19 @@ import { SafetyBadge } from '../src/components/SafetyBadge';
 import { SafetyTagChips } from '../src/components/SafetyTagChips';
 import {
   useComments,
+  useFeedItemFromCache,
   useFeedQuery,
   useLikeToggle,
   usePostComment,
+  useProfile,
 } from '../src/hooks/useFeed';
+import {
+  useActivityComments,
+  useActivityFeedItemFromCache,
+  useActivityFeedQuery,
+  useActivityReaction,
+  usePostActivityComment,
+} from '../src/hooks/useActivityFeed';
 import { useBlockUser } from '../src/hooks/useBlockUser';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useShareRide } from '../src/hooks/useShareRide';
@@ -38,6 +52,46 @@ import { useT } from '../src/hooks/useTranslation';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
+
+// ---------------------------------------------------------------------------
+// Schema bridge — RideActivity → FeedItem
+// ---------------------------------------------------------------------------
+//
+// community-trip.tsx was originally written against the trip-share feed
+// (FeedItem). The community feed (community-feed.tsx) now displays the
+// activity feed (ActivityFeedItem) and navigates here passing an activity
+// id. Rather than duplicate the entire render block, we project a
+// RideActivity into the FeedItem shape so existing JSX keeps working.
+// The reverse direction is not needed — feed → activity navigation
+// doesn't exist.
+
+const rideActivityToFeedItem = (activity: RideActivity): FeedItem => ({
+  id: activity.id,
+  user: {
+    id: activity.user.id,
+    displayName: activity.user.displayName,
+    avatarUrl: activity.user.avatarUrl ?? null,
+    ...(activity.user.riderTier ? { riderTier: activity.user.riderTier } : {}),
+  },
+  title: activity.payload.title,
+  startLocationText: activity.payload.startLocationText,
+  destinationText: activity.payload.destinationText,
+  distanceMeters: activity.payload.distanceMeters,
+  durationSeconds: activity.payload.durationSeconds,
+  elevationGainMeters: activity.payload.elevationGainMeters,
+  averageSpeedMps: activity.payload.averageSpeedMps,
+  safetyRating: activity.payload.safetyRating,
+  safetyTags: activity.payload.safetyTags,
+  geometryPolyline6: activity.payload.geometryPolyline6,
+  note: activity.payload.note,
+  sharedAt: activity.createdAt,
+  likeCount: activity.likeCount,
+  loveCount: activity.loveCount,
+  co2SavedKg: activity.payload.co2SavedKg,
+  commentCount: activity.commentCount,
+  likedByMe: activity.likedByMe,
+  lovedByMe: activity.lovedByMe,
+});
 
 // ---------------------------------------------------------------------------
 // Extracted components for list memoization
@@ -64,10 +118,40 @@ export default function CommunityTripScreen() {
   const [commentText, setCommentText] = useState('');
 
   const location = useCurrentLocation();
-  const feedQuery = useFeedQuery(location?.location?.lat ?? null, location?.location?.lon ?? null);
-  const likeToggle = useLikeToggle();
-  const commentsQuery = useComments(id ?? null);
-  const postComment = usePostComment();
+
+  // Two parallel data sources — the screen handles either:
+  //   1. ActivityFeedItem (the *active* feed system; community-feed.tsx
+  //      navigates here passing an activity-feed row id).
+  //   2. FeedItem (the legacy trip-share feed; kept as a fallback in case
+  //      something still navigates here with a trip_shares.id).
+  // Hooks must be called unconditionally on every render, so we always run
+  // both and discriminate downstream by which cache produced the hit.
+  const activityCached = useActivityFeedItemFromCache(id ?? null);
+  const feedItemCached = useFeedItemFromCache(id ?? null);
+  const activityFeedQuery = useActivityFeedQuery(
+    location?.location?.lat ?? null,
+    location?.location?.lon ?? null,
+  );
+  const feedQuery = useFeedQuery(
+    location?.location?.lat ?? null,
+    location?.location?.lon ?? null,
+  );
+
+  // Activity-feed comment/reaction stack (used when the id resolves to an
+  // ActivityFeedItem — the common case).
+  const activityCommentsQuery = useActivityComments(activityCached ? id ?? null : null);
+  const postActivityComment = usePostActivityComment();
+  const activityReaction = useActivityReaction();
+  const profileQuery = useProfile();
+
+  // Legacy trip-share stack (used only if the id resolved to a FeedItem
+  // and not an activity).
+  const legacyCommentsQuery = useComments(
+    !activityCached && feedItemCached ? id ?? null : null,
+  );
+  const legacyPostComment = usePostComment();
+  const legacyLikeToggle = useLikeToggle();
+
   const shareRide = useShareRide();
 
   // Compliance plan item 7 — comment moderation. Long-press a comment to
@@ -88,14 +172,28 @@ export default function CommunityTripScreen() {
     });
   }, []);
 
-  // Find the item from the feed cache
-  const item: FeedItem | undefined = useMemo(
-    () =>
-      feedQuery.data?.pages
-        .flatMap((page) => page.items)
-        .find((i) => i.id === id),
-    [feedQuery.data, id],
-  );
+  // Project whichever schema we hit into the FeedItem-shaped value the
+  // existing render code consumes. RideActivity stores its trip data in
+  // `payload`; everything else ActivityFeedItemBase carries directly.
+  // Returns undefined when neither cache has the id; the screen branches
+  // on that to show a "loading" or "no longer available" state.
+  const itemSource: 'activity' | 'feed' | null = activityCached
+    ? 'activity'
+    : feedItemCached
+      ? 'feed'
+      : null;
+
+  const item: FeedItem | undefined = useMemo(() => {
+    if (activityCached && activityCached.type === 'ride') {
+      return rideActivityToFeedItem(activityCached);
+    }
+    if (feedItemCached) return feedItemCached;
+    // Fallback: feedQuery may still be populating on first render with
+    // resolved location. Try its current data.
+    return feedQuery.data?.pages
+      .flatMap((page) => page.items)
+      .find((i) => i.id === id);
+  }, [activityCached, feedItemCached, feedQuery.data, id]);
 
   const syntheticRoute: RouteOption | null = useMemo(() => {
     if (!item) return null;
@@ -118,10 +216,15 @@ export default function CommunityTripScreen() {
   }, [item]);
 
   const handleLike = useCallback(() => {
-    if (item) {
-      likeToggle.mutate({ id: item.id, liked: item.likedByMe });
+    if (!item || !id) return;
+    if (itemSource === 'activity') {
+      // active === !liked: useActivityReaction toggles the reaction state
+      // by sending the desired final state.
+      activityReaction.mutate({ id, type: 'like', active: !item.likedByMe });
+    } else {
+      legacyLikeToggle.mutate({ id: item.id, liked: item.likedByMe });
     }
-  }, [item, likeToggle]);
+  }, [item, id, itemSource, activityReaction, legacyLikeToggle]);
 
   const handleShare = useCallback(() => {
     if (!item) return;
@@ -150,11 +253,32 @@ export default function CommunityTripScreen() {
 
   const handleSubmitComment = useCallback(() => {
     if (!id || !commentText.trim()) return;
-    postComment.mutate(
-      { tripShareId: id, body: commentText.trim() },
-      { onSuccess: () => setCommentText('') },
-    );
-  }, [id, commentText, postComment]);
+    const onSuccess = () => setCommentText('');
+    if (itemSource === 'activity') {
+      const profile = profileQuery.data;
+      // Fall back to the resolved item's user (the activity row) if profile
+      // is still loading — prevents a missing displayName on the optimistic
+      // comment row. The server overwrites with the canonical entry on
+      // refetch anyway.
+      postActivityComment.mutate(
+        {
+          activityId: id,
+          body: commentText.trim(),
+          optimisticAuthor: {
+            id: profile?.id ?? currentUserId ?? '',
+            displayName: profile?.displayName ?? 'You',
+            avatarUrl: profile?.avatarUrl ?? null,
+          },
+        },
+        { onSuccess },
+      );
+    } else {
+      legacyPostComment.mutate(
+        { tripShareId: id, body: commentText.trim() },
+        { onSuccess },
+      );
+    }
+  }, [id, commentText, itemSource, postActivityComment, legacyPostComment, profileQuery.data, currentUserId]);
 
   const insets = useSafeAreaInsets();
 
@@ -248,14 +372,42 @@ export default function CommunityTripScreen() {
   );
 
   if (!item) {
+    // Two distinct cases:
+    //   - one of the feed queries is fetching → genuine loading
+    //   - both settled (success or error) and still no match → item is no
+    //     longer in any visible feed window (rotated out, deleted, blocked
+    //     author, etc.). Don't strand the user; offer a recovery.
+    const isStillLoading =
+      activityFeedQuery.isPending ||
+      activityFeedQuery.isLoading ||
+      activityFeedQuery.isFetching ||
+      feedQuery.isPending ||
+      feedQuery.isLoading ||
+      feedQuery.isFetching;
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Text style={styles.loadingText}>Loading trip details...</Text>
+        {isStillLoading ? (
+          <Text style={styles.loadingText}>Loading trip details...</Text>
+        ) : (
+          <View style={styles.notFoundBlock}>
+            <Text style={styles.loadingText}>This trip is no longer available.</Text>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <Text style={styles.backText}>{'←'} Back to feed</Text>
+            </Pressable>
+          </View>
+        )}
         <BottomNav activeTab="community" onTabPress={handleTabPress} />
       </View>
     );
   }
 
+  // Pick the comments + post-comment hook output for the active source.
+  // Whichever query was disabled (its `enabled` flag is null) returns
+  // `undefined` data and an idle status, so this is safe.
+  const commentsQuery =
+    itemSource === 'activity' ? activityCommentsQuery : legacyCommentsQuery;
+  const postComment =
+    itemSource === 'activity' ? postActivityComment : legacyPostComment;
   const comments = commentsQuery.data?.comments ?? [];
 
   return (
@@ -409,6 +561,10 @@ const createThemedStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     marginTop: 60,
+  },
+  notFoundBlock: {
+    alignItems: 'center',
+    gap: 12,
   },
   topBar: {
     flexDirection: 'row',

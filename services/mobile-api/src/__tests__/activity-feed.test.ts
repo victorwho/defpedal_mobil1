@@ -493,6 +493,7 @@ describe('GET /v1/v2/feed/:id/comments', () => {
   });
 
   it('returns 200 with comments array on success', async () => {
+    // Step 1: comment rows (no embedded profiles join — see route comment).
     enqueueResult({
       data: [
         {
@@ -500,13 +501,20 @@ describe('GET /v1/v2/feed/:id/comments', () => {
           body: 'Great ride!',
           created_at: '2026-04-17T10:00:00Z',
           user_id: 'user-c',
-          profiles: {
-            id: 'user-c',
-            display_name: 'Charlie',
-            username: 'charlie',
-            avatar_url: 'https://example.com/charlie.jpg',
-            rider_tier: 'Explorer',
-          },
+        },
+      ],
+      error: null,
+    });
+    // Step 2: batch profile lookup keyed on the user_ids extracted from
+    // the comment rows.
+    enqueueResult({
+      data: [
+        {
+          id: 'user-c',
+          display_name: 'Charlie',
+          username: 'charlie',
+          avatar_url: 'https://example.com/charlie.jpg',
+          rider_tier: 'Explorer',
         },
       ],
       error: null,

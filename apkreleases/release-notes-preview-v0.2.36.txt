@@ -1,0 +1,34 @@
+v0.2.36 — inline comment preview + scrollable history
+
+Two follow-ups to v0.2.35's inline comment composer.
+
+WHAT CHANGED:
+
+• Each community feed card now shows the latest 1–2 comments inline,
+  right below the card content. If there are more, you'll see "View N
+  earlier comments" as a tap target. Tapping the preview opens the full
+  composer + history sheet (same as the comment icon).
+• In the comment sheet, the previous-comments list is now properly
+  scrollable when there are more than fit on screen. The sheet is now
+  a stable 85% height so the list has a bounded parent and FlatList
+  can scroll its content.
+
+NOTHING ELSE FROM v0.2.35 CHANGED. Cache is shared, so a comment posted
+from the sheet shows up in the inline preview immediately (same
+optimistic-update path).
+
+WHAT TO TRY:
+
+• Open the community feed. Cards with comments should show a small
+  preview directly under the card body (above the like/love/comment
+  row).
+• Tap Comment on a card with many comments → sheet opens. Scroll the
+  comments list with a finger. Should scroll smoothly within the sheet.
+  Type a new comment, hit Send. Sheet should auto-show the new
+  comment at the bottom.
+• On a card with no comments yet, the preview block is hidden — only
+  the comment icon shows the count (0).
+
+EVERYTHING FROM v0.2.32-v0.2.35 STILL APPLIES.
+
+Backend: Cloud Run revision defpedal-api-00074-dzg (unchanged).

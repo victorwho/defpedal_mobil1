@@ -35,6 +35,7 @@ import { TierPill } from '../atoms/TierPill';
 import { BadgeIcon } from '../atoms/BadgeIcon';
 import { ReactionBar } from '../../components/LikeButton';
 import { RouteMap } from '../../components/map';
+import { useActivityComments } from '../../hooks/useActivityFeed';
 import { useBlockUser } from '../../hooks/useBlockUser';
 import { useT } from '../../hooks/useTranslation';
 import { ReportSheet } from '../molecules/ReportSheet';
@@ -187,6 +188,24 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
     () => onComment(item.id),
     [item.id, onComment],
   );
+
+  // Inline comment preview. Fetched whenever the card claims any comments
+  // exist — gating on `isVisible` (the FlatList viewability flag) was a
+  // mistake because that flag is `false` on first render until the
+  // FlatList completes its initial measurement pass, leaving every card
+  // without a preview until the user scrolled. Hits the same
+  // `[ACTIVITY_COMMENTS_KEY, id]` cache the sheet uses, so a comment
+  // posted from the sheet flows back into the card via optimistic update
+  // + invalidation. TanStack staleTime (set in useActivityComments)
+  // prevents refetch storms when scrolling back through old cards.
+  const previewEnabled = item.commentCount > 0;
+  const commentsPreviewQuery = useActivityComments(previewEnabled ? item.id : null);
+  const previewComments = useMemo(() => {
+    const all = commentsPreviewQuery.data?.comments ?? [];
+    // Show the most recent 2; comments come back oldest-first from the API.
+    return all.slice(-2);
+  }, [commentsPreviewQuery.data]);
+  const remainingCommentCount = Math.max(0, item.commentCount - previewComments.length);
   const handleUserPress = useCallback(
     () => onUserPress(item.user.id),
     [item.user.id, onUserPress],
@@ -291,6 +310,35 @@ export const ActivityFeedCard = React.memo(function ActivityFeedCard({
       {item.type === 'route_share_signup' && (
         <RouteShareSignupContent styles={styles} colors={colors} />
       )}
+
+      {/* Inline comment preview — shows the latest 1-2 comments under the
+          card content. Tap anywhere on the block (or the comment icon in
+          the reaction bar below) to open the full composer + scrollable
+          history sheet. */}
+      {previewComments.length > 0 ? (
+        <Pressable
+          onPress={handleComment}
+          accessibilityRole="button"
+          accessibilityLabel={t('feedCard.openComments', { count: item.commentCount })}
+          style={styles.commentsPreview}
+        >
+          {remainingCommentCount > 0 ? (
+            <Text style={styles.commentsPreviewMore}>
+              {t('feedCard.viewMoreComments', { count: remainingCommentCount })}
+            </Text>
+          ) : null}
+          {previewComments.map((c) => (
+            <View key={c.id} style={styles.commentsPreviewRow}>
+              <Text style={styles.commentsPreviewAuthor} numberOfLines={1}>
+                {c.user.displayName}
+              </Text>
+              <Text style={styles.commentsPreviewBody} numberOfLines={2}>
+                {c.body}
+              </Text>
+            </View>
+          ))}
+        </Pressable>
+      ) : null}
 
       {/* Reaction bar */}
       <View style={styles.actionBar}>
@@ -919,5 +967,35 @@ const createThemedStyles = (colors: ThemeColors) =>
     shareButton: {
       padding: space[2],
       borderRadius: radii.full,
+    },
+
+    // Inline comment preview (above the action bar)
+    commentsPreview: {
+      gap: space[2],
+      paddingTop: space[2],
+      paddingBottom: space[1],
+    },
+    commentsPreviewMore: {
+      ...textXs,
+      color: colors.textSecondary,
+      fontFamily: fontFamily.body.medium,
+    },
+    commentsPreviewRow: {
+      flexDirection: 'row',
+      gap: space[2],
+      alignItems: 'flex-start',
+    },
+    commentsPreviewAuthor: {
+      ...textSm,
+      color: colors.textPrimary,
+      fontFamily: fontFamily.body.semiBold,
+      flexShrink: 0,
+      maxWidth: 140,
+    },
+    commentsPreviewBody: {
+      ...textSm,
+      color: colors.textSecondary,
+      flex: 1,
+      lineHeight: 18,
     },
   });

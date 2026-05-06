@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { ActivityCommentSheet } from '../src/design-system/organisms/ActivityCommentSheet';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { ActivityFeedCard } from '../src/design-system/organisms/ActivityFeedCard';
 import { SuggestedUsersRow } from '../src/design-system/organisms/SuggestedUsersRow';
@@ -117,8 +118,18 @@ export default function CommunityFeedScreen() {
     [reaction],
   );
 
+  // Inline comment sheet — opens in-place on the feed instead of routing
+  // to /community-trip. Works for any activity type (rides, hazards,
+  // badges, tier-ups) because comments live on activity_feed, not on
+  // trip-shares. Replaces the per-item dedicated screen that was breaking
+  // for non-rides and showing "trip is no longer available" for cards
+  // outside the local GPS feed window.
+  const [commentSheetActivityId, setCommentSheetActivityId] = useState<string | null>(null);
   const handleComment = useCallback((id: string) => {
-    router.push({ pathname: '/community-trip', params: { id } });
+    setCommentSheetActivityId(id);
+  }, []);
+  const handleCloseCommentSheet = useCallback(() => {
+    setCommentSheetActivityId(null);
   }, []);
 
   const handleUserPress = useCallback((userId: string) => {
@@ -301,6 +312,10 @@ export default function CommunityFeedScreen() {
         />
       </View>
     ) : null}
+    <ActivityCommentSheet
+      activityId={commentSheetActivityId}
+      onClose={handleCloseCommentSheet}
+    />
     </View>
   );
 }

@@ -1,0 +1,40 @@
+v0.2.37 — fix inline preview + actually-scrollable comment history
+
+Two fixes for what v0.2.36 promised but didn't deliver.
+
+1) INLINE COMMENT PREVIEW NOW VISIBLE
+
+  Bug: the preview was gated on a "card is in viewport" flag that started
+  out false on every card and only flipped true after the FlatList ran
+  its first viewability pass. By then, the user had already concluded
+  "preview is broken" and moved on. Removed the gate — comments fetch
+  whenever a card has commentCount > 0. Cheap because the same TanStack
+  cache backs the inline preview AND the sheet, with 60s staleTime to
+  prevent refetch storms when scrolling.
+
+  Result: cards with prior comments now show the latest 1–2 directly
+  under the card body on first render, no scroll needed.
+
+2) COMMENT HISTORY IS ACTUALLY SCROLLABLE
+
+  Bug: the sheet had `height: '85%'`, but `%` heights only resolve when
+  every ancestor in the layout chain has a defined height. Modal +
+  Pressable + KeyboardAvoidingView don't, so the sheet collapsed to its
+  content size and the FlatList inside had no bounded parent — meaning
+  the FlatList's internal ScrollView couldn't scroll. Restructured: the
+  backdrop is now a separate absolute-fill tap target, and the sheet's
+  height is computed as `windowHeight * 0.85` from useWindowDimensions.
+  Bounded → FlatList can scroll the comment list as expected.
+
+WHAT TO TRY:
+
+• Open the community feed. Cards with prior comments should show the
+  latest 1–2 directly under the body, immediately on load.
+• Tap Comment on a card with many comments → sheet opens. Drag the
+  comment list with a finger — should scroll smoothly.
+• Post a new comment → appears at the bottom of the list AND in the
+  card preview, instantly.
+
+EVERYTHING FROM v0.2.32-v0.2.36 STILL APPLIES.
+
+Backend: Cloud Run revision defpedal-api-00074-dzg (unchanged).

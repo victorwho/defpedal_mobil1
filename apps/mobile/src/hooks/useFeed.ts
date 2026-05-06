@@ -35,6 +35,39 @@ export const useFeedQuery = (lat: number | null, lon: number | null) =>
     staleTime: 60_000,
   });
 
+/**
+ * Look up a feed item by id across ALL cached feed pages, regardless of
+ * which `[FEED_KEY, lat, lon]` cache key holds them.
+ *
+ * Why we need this: `useCurrentLocation` reads fresh GPS on every screen
+ * mount, so navigating from `/community-feed` to `/community-trip?id=…`
+ * usually produces a slightly different lat/lon and therefore a fresh
+ * `useFeedQuery` cache entry that doesn't yet contain the item the user
+ * just tapped. Searching the full feed-cache space lets the destination
+ * screen render immediately from cached data instead of stalling on
+ * "Loading trip details..." while the new query refetches (and possibly
+ * paginates past the requested item).
+ */
+export const useFeedItemFromCache = (id: string | null): FeedItem | null => {
+  const queryClient = useQueryClient();
+
+  if (!id) return null;
+
+  const cached = queryClient.getQueriesData<{ pages: FeedResponse[] }>({
+    queryKey: [FEED_KEY],
+  });
+
+  for (const [, data] of cached) {
+    if (!data?.pages) continue;
+    for (const page of data.pages) {
+      const match = page.items.find((entry) => entry.id === id);
+      if (match) return match;
+    }
+  }
+
+  return null;
+};
+
 // ---------------------------------------------------------------------------
 // Share trip
 // ---------------------------------------------------------------------------

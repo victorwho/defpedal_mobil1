@@ -1,0 +1,52 @@
+v0.2.33 — Play Store readiness audit + community feed fix
+
+This is the v0.2.32 build (Play Store audit Stages A + B) with one bug fix
+on top.
+
+NEW: community-trip "Loading trip details..." stuck-spinner fix
+• Tapping Comment on a community feed card sometimes opened a screen that
+  stuck on "Loading trip details..." and never showed the trip. Root
+  cause: the destination screen reads fresh GPS on mount and ended up
+  looking in a different feed cache than the one the feed itself
+  populated. Fixed by searching all cached feed pages by id, not just
+  the current location's cache. The screen now also distinguishes
+  "actively fetching" from "trip no longer available" and offers a
+  back-to-feed action instead of an infinite spinner.
+
+(also in this build, from v0.2.32):
+• Firebase Analytics dependency removed (it was undisclosed in the
+  Privacy Policy and not actually used). Belt-and-suspenders manifest
+  flag inserted in case anything pulls it back transitively.
+• Mapbox SDK anonymous-usage telemetry disabled at boot.
+• First-time consent toggles now default OFF (Sentry crash reports +
+  PostHog product analytics). Returning users keep their saved choice.
+• Production crash reports now actually reach Sentry. The ErrorBoundary
+  was previously logging to console only.
+• "Restart App" on the crash-recovery screen now does a real JS reload
+  (expo-updates Updates.reloadAsync), not just a state reset.
+• Mobile API: refuses dev-auth-bypass when NODE_ENV=production
+  (defense-in-depth) + fail-fast startup if Supabase/Mapbox env vars
+  missing.
+• Privacy Policy at routes.defensivepedal.com/privacy expanded to
+  disclose every sub-processor (Open-Meteo, OSRM, Overpass, Google
+  OAuth, Expo Push, Install Referrer, Mapbox-telemetry-off note,
+  PostHog, Firebase App Distribution-but-not-Analytics) plus a GDPR
+  Article 20 portability paragraph.
+
+What we'd love you to verify:
+
+• Community feed → tap Comment on a card. Should jump straight to the
+  trip detail screen with the map and stats visible. Try this on a
+  feed item from a different city (different GPS area) too — that's
+  the path that broke before.
+• Anything you normally use — route planning, safe vs fast vs flat
+  routing, navigation, hazard reporting, trip history, community feed.
+  We're looking for regressions, not new visible behaviour.
+• On a fresh install (or after clearing app data): the consent screen
+  during onboarding should show both toggles unchecked. Toggle them on
+  if you want to opt in.
+• If you somehow trigger a crash → red boundary screen → tap
+  "Restart App". It should reload the app to a fresh state (not just
+  dismiss the error and put you back where you were).
+
+Backend: Cloud Run revision defpedal-api-00074-dzg (deployed 2026-05-06).

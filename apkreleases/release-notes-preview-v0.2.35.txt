@@ -1,0 +1,44 @@
+v0.2.35 — inline comments for the community feed
+
+Big UX change to comments. Plus a fix for the silent post failure.
+
+WHAT CHANGED:
+
+• Tapping Comment on a community feed card no longer pushes a separate
+  trip-detail screen. Instead, a bottom-sheet slides up over the feed
+  with the existing comments and an inline composer. Works the same way
+  for ride posts, hazard reports, badge unlocks, tier-ups, route-share
+  signups — anything that appears in the feed.
+• Posting a comment now appears INSTANTLY in the list (optimistic
+  update). If the server rejects it for any reason, the row rolls back
+  and you get a visible "Comment failed" alert with the reason. Silent
+  failures are gone.
+• The dedicated trip-detail screen is still reachable, but the feed no
+  longer routes there. Cleaner because that screen was tied to ride-only
+  data and was breaking for hazard / badge / tier-up cards.
+
+WHAT TO TRY:
+
+• Open the community feed.
+• Tap the comment icon on ANY card — ride, hazard, badge, anything.
+  Sheet should slide up.
+• Type a comment, hit the up-arrow Send button. Should appear at the
+  bottom of the comment list immediately. Comment count on the card
+  should bump.
+• Swipe the sheet down to dismiss, or tap outside it.
+• Try cards from different cities. They should all work — no "trip is
+  no longer available" anymore.
+
+EVERYTHING ELSE FROM v0.2.32-v0.2.34 STILL APPLIES:
+
+• Firebase Analytics dependency dropped + manifest belt-and-suspenders
+  flag.
+• Mapbox SDK telemetry disabled at boot.
+• First-time consent toggles default OFF.
+• ErrorBoundary now reports caught errors to Sentry; "Restart App"
+  does a real reload.
+• Mobile API: NODE_ENV=production gate on dev-bypass + fail-fast
+  startup config validation.
+• Privacy Policy expanded with full sub-processor list + GDPR Art. 20.
+
+Backend: Cloud Run revision defpedal-api-00074-dzg (unchanged).

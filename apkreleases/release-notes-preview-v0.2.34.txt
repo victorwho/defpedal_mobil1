@@ -1,0 +1,36 @@
+v0.2.34 — community feed comment fix (proper)
+
+Continuation of v0.2.33's attempted fix. v0.2.33 stopped the infinite
+"Loading trip details..." spinner but replaced it with "This trip is no
+longer available" for most trips. Root cause was deeper than expected:
+
+The community feed and the trip detail screen were using two different
+data systems. The community feed shows ActivityFeedItem rows from
+/v2/feed (the active social feed), and the trip detail screen was
+written for the legacy FeedItem schema from /v1/feed (trip shares).
+Tapping Comment passed an activity-feed id to a screen looking up
+trip-share ids — different rows in different tables, never a match.
+
+Fixed: the trip detail screen now reads from the activity-feed cache
+first, projects the ride payload into the existing render shape, and
+routes comment + reaction calls to the matching activity-feed
+endpoints. The legacy FeedItem path is still there as a fallback for
+any caller that does pass a trip-share id.
+
+What we'd love you to verify:
+
+• Community feed → tap Comment on a card. Should jump straight to the
+  trip detail screen with the map and stats visible.
+• Try several different cards (different cities, different riders).
+  Especially try a card from a city different from where you are
+  right now.
+• Post a comment. Should appear in the list and increment the count.
+• Like the trip from the detail screen. Should toggle and the count
+  updates.
+
+Everything else from v0.2.32 / v0.2.33 still applies (firebase-analytics
+drop, Mapbox telemetry off, consent default OFF, ErrorBoundary→Sentry,
+Restart App→reload, Privacy Policy expansion, NODE_ENV gate on the
+mobile API).
+
+Backend: Cloud Run revision defpedal-api-00074-dzg (unchanged).

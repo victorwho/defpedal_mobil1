@@ -117,6 +117,36 @@ export const useActivityReaction = () => {
   });
 };
 
+/**
+ * Look up an activity-feed item by id across ALL cached
+ * `[ACTIVITY_FEED_KEY, lat, lon]` pages, not just the current screen's
+ * location-keyed query. Same motivation as `useFeedItemFromCache`:
+ * `useCurrentLocation` re-reads GPS on every screen mount, producing a
+ * fresh cache key that may not yet contain the item the caller's feed
+ * already had.
+ */
+export const useActivityFeedItemFromCache = (
+  id: string | null,
+): ActivityFeedItem | null => {
+  const queryClient = useQueryClient();
+
+  if (!id) return null;
+
+  const cached = queryClient.getQueriesData<{ pages: ActivityFeedResponse[] }>({
+    queryKey: [ACTIVITY_FEED_KEY],
+  });
+
+  for (const [, data] of cached) {
+    if (!data?.pages) continue;
+    for (const page of data.pages) {
+      const match = page.items.find((entry) => entry.id === id);
+      if (match) return match;
+    }
+  }
+
+  return null;
+};
+
 // ---------------------------------------------------------------------------
 // Comments
 // ---------------------------------------------------------------------------
@@ -126,19 +156,54 @@ export const useActivityComments = (activityId: string | null) =>
     queryKey: [ACTIVITY_COMMENTS_KEY, activityId],
     queryFn: () => mobileApi.getActivityComments(activityId!),
     enabled: activityId != null,
+    // 60s tolerance — the inline-on-card preview hits the same cache as
+    // the comment sheet, so dozens of cards may subscribe to this query
+    // simultaneously while scrolling. Without staleTime, every card mount
+    // fires a refetch.
+    staleTime: 60_000,
   });
+
+/**
+ * Hook input for `usePostActivityComment` — needs the current user so the
+ * optimistic comment row can render with the right author. Pulled from the
+ * AuthSession context at the call site.
+ */
+export interface PostActivityCommentVars {
+  activityId: string;
+  body: string;
+  optimisticAuthor: { id: string; displayName: string; avatarUrl: string | null };
+}
 
 export const usePostActivityComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ activityId, body }: { activityId: string; body: string }) =>
+    mutationFn: ({ activityId, body }: PostActivityCommentVars) =>
       mobileApi.postActivityComment(activityId, body),
-    onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({
-        queryKey: [ACTIVITY_COMMENTS_KEY, vars.activityId],
-      });
-      // Optimistically increment commentCount
+    // Optimistic update — push the comment into the comments list immediately
+    // so it shows up in the sheet without waiting for refetch. Roll back if
+    // the server rejects.
+    onMutate: async (vars) => {
+      const commentsKey = [ACTIVITY_COMMENTS_KEY, vars.activityId];
+      await queryClient.cancelQueries({ queryKey: commentsKey });
+      const previousComments = queryClient.getQueryData<{ comments: FeedComment[] }>(commentsKey);
+
+      const tempComment: FeedComment = {
+        id: `optimistic-${Date.now()}`,
+        user: {
+          id: vars.optimisticAuthor.id,
+          displayName: vars.optimisticAuthor.displayName,
+          avatarUrl: vars.optimisticAuthor.avatarUrl,
+        },
+        body: vars.body,
+        createdAt: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData<{ comments: FeedComment[] }>(commentsKey, (old) => ({
+        comments: [...(old?.comments ?? []), tempComment],
+      }));
+
+      // Bump commentCount on the feed card too.
       queryClient.setQueriesData<{ pages: ActivityFeedResponse[]; pageParams: unknown[] }>(
         { queryKey: [ACTIVITY_FEED_KEY] },
         (old) => {
@@ -156,6 +221,38 @@ export const usePostActivityComment = () => {
           };
         },
       );
+
+      return { previousComments, commentsKey };
+    },
+    onError: (_err, vars, context) => {
+      if (context?.previousComments !== undefined) {
+        queryClient.setQueryData(context.commentsKey, context.previousComments);
+      }
+      // Roll back commentCount.
+      queryClient.setQueriesData<{ pages: ActivityFeedResponse[]; pageParams: unknown[] }>(
+        { queryKey: [ACTIVITY_FEED_KEY] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) =>
+                item.id === vars.activityId
+                  ? { ...item, commentCount: Math.max(0, item.commentCount - 1) }
+                  : item,
+              ),
+            })),
+          };
+        },
+      );
+    },
+    onSettled: (_data, _err, vars) => {
+      // Refetch the authoritative comments list (replaces the optimistic
+      // entry with the server-issued row + real id).
+      void queryClient.invalidateQueries({
+        queryKey: [ACTIVITY_COMMENTS_KEY, vars.activityId],
+      });
     },
   });
 };
