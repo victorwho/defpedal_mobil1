@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -18,6 +18,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useAppStore } from '../../src/store/appStore';
+import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 import { useT } from '../../src/hooks/useTranslation';
 import {
   posthogConfigured,
@@ -40,6 +41,7 @@ export default function OnboardingConsentScreen() {
   const t = useT();
 
   const setAnalyticsConsent = useAppStore((s) => s.setAnalyticsConsent);
+  const skipOnboarding = useSkipOnboarding();
   const persistedSentry = useAppStore((s) => s.analyticsConsent.sentry);
   const persistedPosthog = useAppStore((s) => s.analyticsConsent.posthog);
   const persistedCapturedAt = useAppStore((s) => s.analyticsConsent.capturedAt);
@@ -74,6 +76,16 @@ export default function OnboardingConsentScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.glowTop} importantForAccessibility="no" accessibilityElementsHidden />
+
+      <Pressable
+        style={styles.skipPill}
+        onPress={skipOnboarding}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+      >
+        <Text style={styles.skipPillText}>Skip</Text>
+      </Pressable>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.topSection}>
@@ -206,5 +218,22 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    skipPill: {
+      position: 'absolute',
+      top: space[4],
+      right: space[5],
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+      zIndex: 10,
+    },
+    skipPillText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textSecondary,
     },
   });

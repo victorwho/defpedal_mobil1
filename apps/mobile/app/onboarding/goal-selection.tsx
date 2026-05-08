@@ -1,6 +1,6 @@
 import type { CyclingGoal } from '@defensivepedal/core';
-import { router } from 'expo-router';
-import { useMemo, useRef } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef } from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -19,6 +19,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useAppStore } from '../../src/store/appStore';
+import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 import { mobileApi } from '../../src/lib/api';
 
 type GoalOption = {
@@ -54,8 +55,19 @@ export default function OnboardingGoalSelectionScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const setCyclingGoal = useAppStore((s) => s.setCyclingGoal);
+  const skipOnboarding = useSkipOnboarding();
 
+  // One-shot guard against double navigation from a single tap. Reset on every
+  // focus so that returning to this screen via system back (Goal → first-route
+  // is a `router.push`, so Goal is preserved underneath) re-arms goal selection
+  // — otherwise the lock survives and every goal card tap silently no-ops,
+  // which presents to the user as a frozen screen.
   const hasNavigatedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      hasNavigatedRef.current = false;
+    }, []),
+  );
 
   const handleSelect = (goal: CyclingGoal) => {
     if (hasNavigatedRef.current) return;
@@ -85,9 +97,20 @@ export default function OnboardingGoalSelectionScreen() {
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.glowTop} />
 
-      <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-      </Pressable>
+      <View style={styles.headerRow}>
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Pressable
+          style={styles.skipPill}
+          onPress={skipOnboarding}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
+        >
+          <Text style={styles.skipPillText}>Skip</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.headerSection}>
         <Text style={styles.eyebrow}>Your cycling goal</Text>
@@ -219,5 +242,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       fontFamily: fontFamily.body.medium,
       color: colors.textMuted,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    skipPill: {
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+    },
+    skipPillText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textSecondary,
     },
   });

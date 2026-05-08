@@ -19,6 +19,7 @@ import {
   textSm,
   textXs,
 } from '../../src/design-system/tokens/typography';
+import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 
 export default function OnboardingPermissionScreen() {
   const insets = useSafeAreaInsets();
@@ -26,6 +27,7 @@ export default function OnboardingPermissionScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const [denied, setDenied] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+  const skipOnboarding = useSkipOnboarding();
 
   // If location is already granted (returning user / cleared data but kept permission),
   // auto-advance to the analytics consent step (compliance plan item 8 — consent
@@ -74,6 +76,16 @@ export default function OnboardingPermissionScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.glowTop} />
+
+      <Pressable
+        style={styles.skipPill}
+        onPress={skipOnboarding}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+      >
+        <Text style={styles.skipPillText}>Skip</Text>
+      </Pressable>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -244,6 +256,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       fontFamily: fontFamily.body.medium,
       color: colors.textMuted,
+    },
+    skipPill: {
+      position: 'absolute',
+      top: space[4],
+      right: space[5],
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+      zIndex: 10,
+    },
+    skipPillText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textSecondary,
     },
     deniedText: {
       ...textSm,

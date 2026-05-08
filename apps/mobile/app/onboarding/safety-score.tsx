@@ -1,5 +1,5 @@
 import type { NeighborhoodSafetyScore } from '@defensivepedal/core';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +20,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useCurrentLocation } from '../../src/hooks/useCurrentLocation';
+import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 import { mobileApi } from '../../src/lib/api';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,7 @@ export default function OnboardingSafetyScoreScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { location } = useCurrentLocation();
 
+  const skipOnboarding = useSkipOnboarding();
   const [scoreData, setScoreData] = useState<NeighborhoodSafetyScore | null>(null);
   const [pendingRiskGeoJson, setPendingRiskGeoJson] = useState<GeoJSON.FeatureCollection | null>(null);
   const [riskGeoJson, setRiskGeoJson] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -56,7 +58,16 @@ export default function OnboardingSafetyScoreScreen() {
   const fadeIn = useRef(new Animated.Value(0)).current;
   const hasAnimated = useRef(false);
 
+  // Re-arm on focus: although forward nav uses `router.replace` (which pops
+  // safety-score off the stack), guard against any path that brings the user
+  // back onto a preserved instance — a stuck `hasNavigatedRef` would lock the
+  // card tap and present as a frozen screen.
   const hasNavigatedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      hasNavigatedRef.current = false;
+    }, []),
+  );
   const navigateNext = useCallback(() => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
@@ -164,6 +175,17 @@ export default function OnboardingSafetyScoreScreen() {
           </View>
         </View>
       )}
+
+      {/* Skip pill — exits onboarding entirely */}
+      <Pressable
+        style={[styles.skipPill, { top: insets.top + space[3] }]}
+        onPress={skipOnboarding}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Skip onboarding"
+      >
+        <Text style={styles.skipPillText}>Skip</Text>
+      </Pressable>
 
       {/* Loading indicator */}
       {isLoading ? (
@@ -336,5 +358,21 @@ const createThemedStyles = (colors: ThemeColors) =>
     fontFamily: fontFamily.body.semiBold,
     color: colors.accent,
     paddingTop: space[2],
+  },
+  skipPill: {
+    position: 'absolute',
+    right: space[4],
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
+    borderRadius: radii.full,
+    borderWidth: 1,
+    borderColor: colors.borderDefault,
+    backgroundColor: surfaceTints.glass,
+    zIndex: 20,
+  },
+  skipPillText: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+    color: colors.textPrimary,
   },
 });

@@ -23,6 +23,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useCurrentLocation } from '../../src/hooks/useCurrentLocation';
+import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 import { mobileApi } from '../../src/lib/api';
 import { mobileEnv } from '../../src/lib/env';
 import { useAppStore } from '../../src/store/appStore';
@@ -106,6 +107,7 @@ export default function OnboardingFirstRouteScreen() {
   const cyclingGoal = useAppStore((s) => s.cyclingGoal);
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
   const setRouteRequest = useAppStore((s) => s.setRouteRequest);
+  const skipOnboarding = useSkipOnboarding();
 
   const [routeResponse, setRouteResponse] = useState<RoutePreviewResponse | null>(null);
   const [destinationName, setDestinationName] = useState<string | null>(null);
@@ -224,9 +226,20 @@ export default function OnboardingFirstRouteScreen() {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
-      <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-        <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-      </Pressable>
+      <View style={styles.headerRow}>
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+        </Pressable>
+        <Pressable
+          style={styles.skipPill}
+          onPress={skipOnboarding}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Skip onboarding"
+        >
+          <Text style={styles.skipPillText}>Skip</Text>
+        </Pressable>
+      </View>
 
       <View style={styles.headerSection}>
         <Text style={styles.eyebrow}>Your first route</Text>
@@ -446,5 +459,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
       alignItems: 'center',
       paddingTop: space[3],
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    skipPill: {
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      borderRadius: radii.full,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      backgroundColor: colors.bgPrimary,
+    },
+    skipPillText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textSecondary,
     },
   });
