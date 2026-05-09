@@ -141,7 +141,9 @@ export default function OnboardingFirstRouteScreen() {
               destination: location,       // Return to start (circuit)
               waypoints: [dest.location],  // Stop at the destination along the way
               mode: 'safe',
-              avoidUnpaved: cyclingGoal === 'beginner',
+              // First-route demo always avoids unpaved — onboarding showcases
+              // the safest possible cycling experience regardless of goal.
+              avoidUnpaved: true,
               avoidHills: false,
               locale: 'en',
             });
@@ -190,7 +192,10 @@ export default function OnboardingFirstRouteScreen() {
         destination: location,         // Circuit: return to start
         waypoints: [destination],      // Stop at the POI
         mode: 'safe',
-        avoidUnpaved: cyclingGoal === 'beginner',
+        // Match the preview request above — the stored RouteRequest must
+        // mirror what was actually fetched, otherwise route-preview's reroute
+        // logic would refetch with different params and replace the route.
+        avoidUnpaved: true,
         avoidHills: false,
         locale: 'en',
       });

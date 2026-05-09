@@ -17,7 +17,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { mobileApi } from '../../src/lib/api';
-import { navigateAfterOnboardingSignup } from '../../src/lib/post-onboarding-nav';
+import { navigateAfterOnboarding } from '../../src/lib/post-onboarding-nav';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
@@ -46,7 +46,7 @@ export default function ChooseUsernameScreen() {
           // from /onboarding/first-route if it's still in store so they get
           // the same value moment as a fresh signup; otherwise fall through
           // to a clean planner.
-          navigateAfterOnboardingSignup();
+          navigateAfterOnboarding();
           return;
         }
       } catch {
@@ -88,7 +88,7 @@ export default function ChooseUsernameScreen() {
     // Preserve the demo circuit route from /onboarding/first-route if it's
     // still in store so the user lands on /route-preview with the safe route
     // they just saw being calculated — a concrete value moment.
-    navigateAfterOnboardingSignup();
+    navigateAfterOnboarding();
   };
 
   if (isCheckingExisting) {
