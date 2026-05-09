@@ -227,6 +227,49 @@ A "delete trip" handler that only touches `trip_tracks` removes the ride from Hi
 **Fix:** A user-driven trip deletion handler must scrub all three user-visible tables: `(a)` `DELETE FROM trip_tracks WHERE id = ? AND user_id = ?` with `.select('id, trip_id')` to atomically capture the parent `trip_id`, `(b)` `DELETE FROM trip_shares WHERE user_id = ? AND trip_id = parent_trip_id` (cascades `feed_likes` / `feed_comments` / `trip_loves` via existing FK rules), `(c)` `DELETE FROM activity_feed WHERE user_id = ? AND type = 'ride' AND payload->>tripId = parent_trip_id` (cascades `activity_reactions` / `activity_comments`). Short-circuit before `(b)` and `(c)` when `not_found` or when the deleted track had a `NULL` parent `trip_id` (legacy data). Do **not** unwind `profiles.total_*`, `ride_impacts`, `ride_microlives`, awarded badges, accumulated XP, or `leaderboard_snapshots` — those are immutable historical records and the confirm dialog is explicit that "past achievements and impact totals are kept". The same fan-out applies if anything else ever needs to "remove a ride" (privacy purge, retention policy, GDPR deletion subset). See `services/mobile-api/src/lib/submissions.ts:362` `deleteTripTrack`.
 **Occurrences:** Initial `DELETE /v1/trips/:id` (commit `8c224ce`, 2026-04-28) only deleted `trip_tracks`; deleted rides lingered on City Heartbeat aggregates, the Community Feed, the Neighborhood Leaderboard, and follower Activity Feeds. Caught by the `/review diagnose community-trip-count-divergence` audit and fixed in commit `a25eba4` same session.
 
+### 36. One-shot navigation locks (`hasNavigatedRef`) freeze a screen on re-focus
+**Pattern:** A screen uses `const hasNavigatedRef = useRef(false)` to prevent double-firing of navigation from a single tap (set to `true` before `router.push`/`router.replace`, gates every handler with `if (hasNavigatedRef.current) return`). Works fine going forward. But when forward nav uses `router.push` (not `replace`), the screen is preserved in the stack underneath the pushed screen — same component instance. When the user presses system back, the underlying instance re-focuses with `hasNavigatedRef.current` still `true`. Every tap handler short-circuits silently, no state change fires, no re-render — the screen looks identical but is completely unresponsive. Reads as a hard freeze.
+
+**Fix:** Reset the ref on every focus using `useFocusEffect` from `expo-router` (NOT `useEffect` — `useEffect` cleanup doesn't fire on push navigation since the screen stays mounted; only focus events do):
+```ts
+useFocusEffect(
+  useCallback(() => {
+    hasNavigatedRef.current = false;
+  }, []),
+);
+```
+
+Same diagnosis logic applies to ANY one-shot lock that should re-arm when the user re-enters a screen via stack pop. The Expo Router Stack does NOT unmount preserved screens, so any ref/state used as a "did this screen already do its thing" flag must explicitly reset on focus.
+**Occurrences:** `apps/mobile/app/onboarding/goal-selection.tsx` — Goal advanced to `/onboarding/first-route` via `router.push`, leaving Goal preserved underneath. Pressing system back from first-route returned to Goal with every goal card silently no-op-ing. Fixed in commit `a6aa8c7` (2026-05-08); same defensive reset added to `safety-score.tsx`.
+
+### 37. `adb reverse` can run at ~8 s per request even when raw USB transport is fast
+**Pattern:** Dev variant shows blank Splash forever; logcat ends at `BridgelessReact: ReactHost{0}.loadJSBundleFromMetro()` and goes silent. Probing with `adb shell "curl http://127.0.0.1:8081/status"` returns ~8 s latencies for a 23-byte response, or times out outright. Meanwhile `adb shell echo hello` runs in 78 ms and `adb shell "dd if=/dev/zero bs=1M count=4 | wc -c"` runs at ~34 MB/s — raw USB/adb transport is healthy. The slowness is specific to the reverse port-forwarding pipe.
+
+**Fix:** This is system-level interference, not project code. The 17 MB dev bundle simply cannot stream through an 8 s/request pipe. Things to try, in order:
+1. **Replace the USB cable** — even if `adb shell` is fast, low-quality cables can degrade the kernel-level adb-reverse handshake.
+2. **Check Windows Defender / corporate AV** — temporarily disable real-time protection and re-test. Some AV/firewall setups intercept the per-connection setup that `adb reverse` does.
+3. **Restart the phone** — clears the on-device adb daemon state.
+4. **Punt to preview build for testing.** `npm run build:preview` produces an embedded-bundle APK that doesn't need Metro at all. Push to Firebase App Distribution group `early-access-preview` and let testers install via the Firebase tester app.
+
+**Do NOT bother with `adb tcpip 5555` over WiFi** — empirically tested and timed out worse than the broken USB reverse. Metro is bound to `0.0.0.0:8081` but Windows Firewall blocks external interfaces by default, so even `192.168.x.x:8081` from the same PC times out without a manual firewall rule.
+**Occurrences:** 2026-05-08 dev-variant install round-trip stalled at `loadJSBundleFromMetro`; `adb shell` clean, reverse pipe degraded; preview build via Firebase used as the workaround.
+
+### 38. Multi-ABI native build OOMs on Windows with default JVM args
+**Pattern:** `./gradlew installDevelopmentDebug` (or any task that triggers `:app:configureCMake[*]` for all four `reactNativeArchitectures` — `armeabi-v7a,arm64-v8a,x86,x86_64`) crashes the Gradle daemon mid-build. Two flavors: (1) `# Native memory allocation (mmap) failed to map ... bytes ... 'The paging file is too small for this operation to complete' (DOS error/errno=1455)` — the 4 GB Gradle daemon plus a Kotlin daemon plus parallel CMake workers plus Metro plus IDEs/Chrome can exceed Windows's commit budget on a 16 GB / typical-pagefile machine. (2) Generic `Gradle build daemon disappeared unexpectedly` — `hs_err_pidNNNNN.log` next to the project's `android/` folder confirms the same OOM root cause.
+
+**Fix:** Build for only the device's ABI and serialize workers. Pre-check with `adb shell getprop ro.product.cpu.abi` (modern Samsung/Pixel devices return `arm64-v8a`). Then:
+```bash
+./gradlew --stop
+./gradlew installDevelopmentDebug \
+  -PreactNativeArchitectures=arm64-v8a \
+  --no-daemon --max-workers=1 \
+  -Dorg.gradle.jvmargs="-Xmx3072m -XX:MaxMetaspaceSize=768m"
+```
+Slower (~3 min instead of parallel) but fits within the system commit budget. **Do not lower `MaxMetaspaceSize` below 768m** — KSP processing of `expo-updates` / `expo-manifests` blew through 512m in session 36. **Do not skip `--no-daemon`** when memory is tight — daemons accumulate and amplify commit pressure across runs.
+
+If the OOM persists even with arm64-only + serial workers, the Windows pagefile is the bottleneck. System Properties → Advanced → Performance Settings → Advanced → Virtual memory → set to system-managed or 16+ GB.
+**Occurrences:** 2026-05-08 — first crash with `errno=1455` during `configureCMakeDebug[arm64-v8a]`; second crash with daemon-disappeared during `mergeExtDexDevelopmentDebug`. Third attempt with the flags above succeeded in under 4 min total.
+
 ### 30. TanStack Query keys and persisted Zustand state leak across account switches
 **Pattern:** Query keys in `useBadges`, `useTiers`, `useMiaJourney`, `useLeaderboard` etc. are not user-scoped (`['badges']` not `['badges', userId]`). When user A signs out and user B signs in, the cached responses remain under the shared key until each query happens to refetch. Simultaneously, the Zustand persist whitelist keeps user-scoped projections (`cachedImpact`, `cachedStreak`, `earnedMilestones`, `pendingBadgeUnlocks`, `pendingTierPromotion`, `persona`, `mia*`, `queuedMutations`, `tripServerIds`, `activeTripClientId`, `navigationSession`, `routeRequest`, `routePreview`, `pendingTelemetryEvents`, `homeLocation`, `recentDestinations`, `pendingShareClaim`, `onboardingCompleted`, `cyclingGoal`, `anonymousOpenCount`, `ratingSkipCount`) — so even after TanStack Query refetches, the persist layer re-hydrates A's values on app restart.
 **Fix:** Both layers must clear in lockstep on user-id change. `store.resetUserScopedState()` resets the persisted user-scoped fields while preserving true device preferences (theme, locale, voice, offline map packs, POI visibility, bike type, routing prefs, notify toggles). `UserCacheResetBridge` provider sits inside QueryClientProvider AND under AuthSessionProvider; tracks previous user id via `useRef` and fires `queryClient.clear()` + `resetUserScopedState()` on X→null (sign-out) and X→Y (account switch). Skips null→X (initial sign-in) and X→X (refresh-token rotation). When adding a new user-scoped query key or new persisted store field, update `resetUserScopedState()` to include it.
