@@ -47,21 +47,35 @@ export const UserCacheResetBridge = () => {
   const resetUserScopedState = useAppStore((s) => s.resetUserScopedState);
   const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
   const previousUserIdRef = useRef<string | null>(null);
+  const previousIsAnonymousRef = useRef<boolean>(true);
 
   useEffect(() => {
     if (isLoading) return;
 
     const previousUserId = previousUserIdRef.current;
+    const previousIsAnonymous = previousIsAnonymousRef.current;
     previousUserIdRef.current = userId;
+    previousIsAnonymousRef.current = isAnonymous;
 
     // Only act when a signed-in session transitions to a different session
     // (or to none at all). Initial null→X and steady-state X→X do nothing.
     if (!previousUserId) return;
     if (previousUserId === userId) return;
 
+    // Anonymous → real-account is the same conceptual user being upgraded
+    // (the canonical path: anonymous Supabase session generates a demo route
+    // in /onboarding/first-route, then user signs in with Google → Supabase
+    // mints a new userId for the real account). Treat it as continuity, not
+    // a switch — otherwise we wipe `routePreview` / `routeRequest` between
+    // signInWithGoogle() returning and the post-signup screen reading them,
+    // which strands the user on a blank planner instead of /route-preview.
+    // Anonymous accounts don't accumulate cross-user TanStack data either,
+    // so skipping the cache clear here is safe.
+    if (previousIsAnonymous && !isAnonymous) return;
+
     queryClient.clear();
     resetUserScopedState();
-  }, [userId, isLoading, queryClient, resetUserScopedState]);
+  }, [userId, isAnonymous, isLoading, queryClient, resetUserScopedState]);
 
   // Whenever the user holds a real (non-anonymous) account, mark onboarding
   // as completed. This covers every sign-in path — /auth (direct), the
