@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Inject Mapbox download token into gradle.properties so Gradle can
-# authenticate with Mapbox's Maven repository during the native build.
+# Inject Mapbox download token so the native build can authenticate with
+# Mapbox's package registry. Android reads it from gradle.properties, iOS
+# from ~/.netrc during the CocoaPods install.
 
-if [ -n "${RNMAPBOX_MAPS_DOWNLOAD_TOKEN:-}" ]; then
+if [ -z "${RNMAPBOX_MAPS_DOWNLOAD_TOKEN:-}" ]; then
+  echo "[eas-hook] WARNING: RNMAPBOX_MAPS_DOWNLOAD_TOKEN not set"
+  exit 0
+fi
+
+PLATFORM="${EAS_BUILD_PLATFORM:-}"
+
+if [ "$PLATFORM" = "android" ] || [ -z "$PLATFORM" ]; then
   GRADLE_PROPS="android/gradle.properties"
   if [ -f "$GRADLE_PROPS" ]; then
     echo "" >> "$GRADLE_PROPS"
@@ -13,6 +21,15 @@ if [ -n "${RNMAPBOX_MAPS_DOWNLOAD_TOKEN:-}" ]; then
   else
     echo "[eas-hook] WARNING: $GRADLE_PROPS not found"
   fi
-else
-  echo "[eas-hook] WARNING: RNMAPBOX_MAPS_DOWNLOAD_TOKEN not set"
+fi
+
+if [ "$PLATFORM" = "ios" ] || [ -z "$PLATFORM" ]; then
+  NETRC="$HOME/.netrc"
+  cat >> "$NETRC" <<EOF
+machine api.mapbox.com
+  login mapbox
+  password $RNMAPBOX_MAPS_DOWNLOAD_TOKEN
+EOF
+  chmod 0600 "$NETRC"
+  echo "[eas-hook] Wrote ~/.netrc for Mapbox CocoaPods download"
 fi
