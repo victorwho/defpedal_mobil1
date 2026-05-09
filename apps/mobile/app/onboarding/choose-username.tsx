@@ -17,7 +17,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { mobileApi } from '../../src/lib/api';
-import { useAppStore } from '../../src/store/appStore';
+import { navigateAfterOnboardingSignup } from '../../src/lib/post-onboarding-nav';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
@@ -25,7 +25,6 @@ export default function ChooseUsernameScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const resetFlow = useAppStore((s) => s.resetFlow);
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,10 +42,11 @@ export default function ChooseUsernameScreen() {
         const profile = await mobileApi.getProfile();
         if (cancelled) return;
         if (profile.username != null && profile.username.length > 0) {
-          // Drop the demo circuit route from /onboarding/first-route so the
-          // user lands on a fresh route-planning screen, not auto-routed.
-          resetFlow();
-          router.replace('/route-planning');
+          // Returning user landed here defensively. Preserve the demo route
+          // from /onboarding/first-route if it's still in store so they get
+          // the same value moment as a fresh signup; otherwise fall through
+          // to a clean planner.
+          navigateAfterOnboardingSignup();
           return;
         }
       } catch {
@@ -85,10 +85,10 @@ export default function ChooseUsernameScreen() {
   };
 
   const navigateToApp = () => {
-    // Drop the demo circuit route from /onboarding/first-route so the user
-    // lands on a fresh route-planning screen, not auto-routed.
-    resetFlow();
-    router.replace('/route-planning');
+    // Preserve the demo circuit route from /onboarding/first-route if it's
+    // still in store so the user lands on /route-preview with the safe route
+    // they just saw being calculated — a concrete value moment.
+    navigateAfterOnboardingSignup();
   };
 
   if (isCheckingExisting) {

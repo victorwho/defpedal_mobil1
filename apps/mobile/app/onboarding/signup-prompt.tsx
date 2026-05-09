@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -21,6 +21,7 @@ import {
 import { useT } from '../../src/hooks/useTranslation';
 import { mobileApi } from '../../src/lib/api';
 import { PRIVACY_URL, TERMS_URL } from '../../src/lib/legal-urls';
+import { navigateAfterOnboardingSignup } from '../../src/lib/post-onboarding-nav';
 import { useAuthSessionOptional } from '../../src/providers/AuthSessionProvider';
 import { useAppStore } from '../../src/store/appStore';
 
@@ -104,10 +105,10 @@ export default function OnboardingSignupPromptScreen() {
       }
 
       if (alreadyHasUsername) {
-        // Drop the demo circuit route from /onboarding/first-route so the user
-        // lands on a fresh route-planning screen instead of being auto-routed.
-        resetFlow();
-        router.replace('/route-planning');
+        // Preserve the demo circuit route from /onboarding/first-route so the
+        // user lands on /route-preview with the safe route they just saw being
+        // calculated — a concrete value moment, not an empty planner.
+        navigateAfterOnboardingSignup();
       } else {
         router.replace('/onboarding/choose-username');
       }
@@ -124,117 +125,128 @@ export default function OnboardingSignupPromptScreen() {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
+    <View style={[styles.root, { paddingTop: insets.top + space[4] }]}>
       <View style={styles.glowTop} />
 
-      {!isMandatory ? (
-        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </Pressable>
-      ) : <View style={styles.backButton} />}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {!isMandatory ? (
+          <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+        ) : <View style={styles.backButton} />}
 
-      <View style={styles.headerSection}>
-        <Text style={styles.eyebrow}>Almost there</Text>
-        <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>
-          {isMandatory
-            ? 'Create an account to continue using Defensive Pedal. Your data will be preserved.'
-            : 'Sync your rides, earn streaks, and join the community. You can always do this later.'}
-        </Text>
-      </View>
-
-      {/* Progress bar */}
-      <View style={styles.progressSection}>
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${PROGRESS_PERCENT}%` }]} />
+        <View style={styles.headerSection}>
+          <Text style={styles.eyebrow}>Almost there</Text>
+          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.subtitle}>
+            {isMandatory
+              ? 'Create an account to continue using Defensive Pedal. Your data will be preserved.'
+              : 'Sync your rides, earn streaks, and join the community. You can always do this later.'}
+          </Text>
         </View>
-        <Text style={styles.progressLabel}>{PROGRESS_PERCENT}% complete</Text>
 
-        <View style={styles.stepList}>
-          {PROGRESS_STEPS.map((step) => (
-            <View key={step.label} style={styles.stepRow}>
-              <Ionicons
-                name={step.completed ? 'checkmark-circle' : 'ellipse-outline'}
-                size={18}
-                color={step.completed ? colors.accent : colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.stepLabel,
-                  step.completed && styles.stepLabelCompleted,
-                ]}
-              >
-                {step.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Sign-up card */}
-      <View style={styles.card}>
-        {/* Google */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.googleButton,
-            pressed && { opacity: 0.8 },
-            isSubmitting && { opacity: 0.4 },
-          ]}
-          onPress={() => void handleGoogleSignIn()}
-          disabled={isSubmitting}
-          accessibilityRole="button"
-          accessibilityLabel="Sign in with Google"
-        >
-          <View style={styles.googleIconWrap}>
-            <Text style={styles.googleG}>G</Text>
+        {/* Progress bar */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${PROGRESS_PERCENT}%` }]} />
           </View>
-          <Text style={styles.googleLabel}>Continue with Google</Text>
-        </Pressable>
+          <Text style={styles.progressLabel}>{PROGRESS_PERCENT}% complete</Text>
 
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
+          <View style={styles.stepList}>
+            {PROGRESS_STEPS.map((step) => (
+              <View key={step.label} style={styles.stepRow}>
+                <Ionicons
+                  name={step.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={18}
+                  color={step.completed ? colors.accent : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.stepLabel,
+                    step.completed && styles.stepLabelCompleted,
+                  ]}
+                >
+                  {step.label}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Email */}
-        <Button variant="secondary" size="lg" fullWidth onPress={handleEmailSignUp}>
-          Sign up with email
-        </Button>
-
-        {errorMessage ? (
-          <Text style={styles.errorText}>{errorMessage}</Text>
-        ) : null}
-      </View>
-
-      {/* Legal footer — quietly discloses ToS + Privacy acceptance. */}
-      <View style={styles.legalFooter}>
-        <Text style={styles.legalText}>
-          {t('legal.signupAgreePrefix')}
-          <Text
-            style={styles.legalLink}
-            onPress={() => void Linking.openURL(TERMS_URL)}
-            accessibilityRole="link"
+        {/* Sign-up card */}
+        <View style={styles.card}>
+          {/* Google */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.googleButton,
+              pressed && { opacity: 0.8 },
+              isSubmitting && { opacity: 0.4 },
+            ]}
+            onPress={() => void handleGoogleSignIn()}
+            disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel="Sign in with Google"
           >
-            {t('legal.termsOfService')}
-          </Text>
-          {t('legal.signupAgreeAnd')}
-          <Text
-            style={styles.legalLink}
-            onPress={() => void Linking.openURL(PRIVACY_URL)}
-            accessibilityRole="link"
-          >
-            {t('legal.privacyPolicy')}
-          </Text>
-          {t('legal.signupAgreeSuffix')}
-        </Text>
-      </View>
+            <View style={styles.googleIconWrap}>
+              <Text style={styles.googleG}>G</Text>
+            </View>
+            <Text style={styles.googleLabel}>Continue with Google</Text>
+          </Pressable>
 
-      {/* Dismiss — hidden when mandatory */}
+          {/* Divider */}
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Email */}
+          <Button variant="secondary" size="lg" fullWidth onPress={handleEmailSignUp}>
+            Sign up with email
+          </Button>
+
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          ) : null}
+        </View>
+
+        {/* Legal footer — quietly discloses ToS + Privacy acceptance. */}
+        <View style={styles.legalFooter}>
+          <Text style={styles.legalText}>
+            {t('legal.signupAgreePrefix')}
+            <Text
+              style={styles.legalLink}
+              onPress={() => void Linking.openURL(TERMS_URL)}
+              accessibilityRole="link"
+            >
+              {t('legal.termsOfService')}
+            </Text>
+            {t('legal.signupAgreeAnd')}
+            <Text
+              style={styles.legalLink}
+              onPress={() => void Linking.openURL(PRIVACY_URL)}
+              accessibilityRole="link"
+            >
+              {t('legal.privacyPolicy')}
+            </Text>
+            {t('legal.signupAgreeSuffix')}
+          </Text>
+        </View>
+      </ScrollView>
+
+      {/* Dismiss — pinned outside the scroll so it stays clear of the system nav bar. */}
       {!isMandatory ? (
-        <View style={styles.footer}>
-          <Pressable onPress={finishOnboarding} hitSlop={12}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
+          <Pressable
+            onPress={finishOnboarding}
+            hitSlop={16}
+            accessibilityRole="button"
+            accessibilityLabel="Skip account creation for now"
+          >
             <Text style={styles.dismissText}>Maybe later</Text>
           </Pressable>
         </View>
@@ -248,7 +260,13 @@ const createThemedStyles = (colors: ThemeColors) =>
     root: {
       flex: 1,
       backgroundColor: colors.bgDeep,
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
       paddingHorizontal: space[5],
+      paddingBottom: space[4],
     },
     backButton: {
       width: 44,
@@ -389,6 +407,10 @@ const createThemedStyles = (colors: ThemeColors) =>
     footer: {
       alignItems: 'center',
       paddingTop: space[4],
+      paddingHorizontal: space[5],
+      backgroundColor: colors.bgDeep,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.borderDefault,
     },
     dismissText: {
       ...textSm,
