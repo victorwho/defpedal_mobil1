@@ -1,5 +1,5 @@
 import type { PropsWithChildren, ReactNode } from 'react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../design-system';
+import { useReducedMotion } from '../design-system/hooks/useReducedMotion';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
 import { surfaceTints } from '../design-system/tokens/tints';
@@ -58,6 +59,7 @@ const CollapsibleSheet = ({
   handleColor: string;
   borderColor: string;
 }) => {
+  const reducedMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(true);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
   // Use a ref so panResponder closures always read the current collapsed height,
@@ -66,6 +68,25 @@ const CollapsibleSheet = ({
   effectiveCollapsedRef.current = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
   const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
   const expandedRef = useRef(true);
+
+  // One-shot drag-handle teaching pulse on first idle. Suppressed by reduced
+  // motion. Doesn't replay on remount because handle visibility is the same
+  // gating signal each time.
+  const handleOpacity = useRef(new Animated.Value(1)).current;
+  const hasPulsedRef = useRef(false);
+  useEffect(() => {
+    if (reducedMotion || hasPulsedRef.current) return;
+    const start = setTimeout(() => {
+      hasPulsedRef.current = true;
+      Animated.sequence([
+        Animated.timing(handleOpacity, { toValue: 0.5, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 0.5, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]).start();
+    }, 800);
+    return () => clearTimeout(start);
+  }, [reducedMotion, handleOpacity]);
 
   const snapTo = (expand: boolean) => {
     expandedRef.current = expand;
@@ -112,7 +133,9 @@ const CollapsibleSheet = ({
       <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, backgroundColor: sheetBg, borderColor }]}>
         <View {...panResponder.panHandlers}>
           <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
-            <View style={[styles.handle, { backgroundColor: handleColor }]} />
+            <Animated.View
+              style={[styles.handle, { backgroundColor: handleColor, opacity: handleOpacity }]}
+            />
           </Pressable>
           {/* Peek row — only visible when collapsed. Lives inside the pan-responder
               wrapper so swipes from the visible summary strip drive the sheet, not

@@ -5,9 +5,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Screen } from '../src/components/Screen';
 import { useTheme, type ThemeColors } from '../src/design-system';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
+import { stagger } from '../src/design-system/tokens/motion';
 import { fontFamily, textBase, textSm } from '../src/design-system/tokens/typography';
 import { useBlockedUsersQuery, useUnblockUser, type BlockedUser } from '../src/hooks/useBlockUser';
 import { useT } from '../src/hooks/useTranslation';
@@ -53,8 +55,11 @@ export default function BlockedUsersScreen() {
   );
 
   const renderRow = useCallback(
-    ({ item }: { item: BlockedUser }) => (
-      <View style={styles.row}>
+    ({ item, index }: { item: BlockedUser; index: number }) => (
+      <FadeSlideIn
+        delay={Math.min(index, stagger.maxItems) * stagger.step}
+        style={styles.row}
+      >
         <View style={styles.avatar} importantForAccessibility="no" accessibilityElementsHidden>
           <Text style={styles.avatarText}>
             {item.displayName.slice(0, 2).toUpperCase()}
@@ -77,7 +82,7 @@ export default function BlockedUsersScreen() {
         >
           <Text style={styles.unblockButtonText}>{t('blockedUsers.unblock')}</Text>
         </Pressable>
-      </View>
+      </FadeSlideIn>
     ),
     [styles, t, handleUnblock],
   );

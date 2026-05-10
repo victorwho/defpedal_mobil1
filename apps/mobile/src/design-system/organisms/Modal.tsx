@@ -58,6 +58,10 @@ export const Modal: React.FC<ModalProps> = ({
   const haptics = useHaptics();
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  // Backdrop dim ramps in instead of snapping — gives the modal a sense of
+  // arriving rather than appearing. Uses bgColor interpolation (JS thread)
+  // because RN's nativeDriver can't animate background colors.
+  const backdropProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
@@ -68,11 +72,18 @@ export const Modal: React.FC<ModalProps> = ({
       else haptics.snap();
 
       if (reducedMotion) {
+        backdropProgress.setValue(1);
         scale.setValue(1);
         opacity.setValue(1);
         return;
       }
       Animated.parallel([
+        Animated.timing(backdropProgress, {
+          toValue: 1,
+          duration: duration.fast,
+          easing: easing.out,
+          useNativeDriver: false, // background color interpolation
+        }),
         Animated.timing(scale, {
           toValue: 1,
           duration: duration.normal,
@@ -86,10 +97,16 @@ export const Modal: React.FC<ModalProps> = ({
         }),
       ]).start();
     } else {
+      backdropProgress.setValue(0);
       scale.setValue(0.9);
       opacity.setValue(0);
     }
   }, [visible, reducedMotion]);
+
+  const backdropBg = backdropProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.6)'],
+  });
 
   const isCritical = variant === 'critical';
   const dismissable = !isCritical && !!onClose;
@@ -106,12 +123,15 @@ export const Modal: React.FC<ModalProps> = ({
       statusBarTranslucent
       onRequestClose={dismissable ? onClose : undefined}
     >
-      {/* Overlay */}
-      <Pressable
-        style={styles.overlay}
-        onPress={dismissable ? onClose : undefined}
-        disabled={!dismissable}
-      >
+      {/* Overlay — animated backdrop, with absolute-fill Pressable for tap-to-dismiss */}
+      <Animated.View style={[styles.overlay, { backgroundColor: backdropBg }]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={dismissable ? onClose : undefined}
+          disabled={!dismissable}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
         {/* Card — stop propagation */}
         <Animated.View
           accessibilityViewIsModal
@@ -154,7 +174,7 @@ export const Modal: React.FC<ModalProps> = ({
             {footer ? <View style={styles.footer}>{footer}</View> : null}
           </Pressable>
         </Animated.View>
-      </Pressable>
+      </Animated.View>
     </RNModal>
   );
 };
@@ -166,7 +186,7 @@ export const Modal: React.FC<ModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    // backgroundColor is animated by the component (rgba(0,0,0,0)→rgba(0,0,0,0.6))
     justifyContent: 'center',
     alignItems: 'center',
     padding: space[6],

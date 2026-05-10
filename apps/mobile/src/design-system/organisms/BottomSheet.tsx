@@ -155,6 +155,25 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     }
   }, [visible]);
 
+  // One-shot drag-handle pulse on first idle — teaches the gesture
+  // without being intrusive. Suppressed by reduced motion. Won't replay if
+  // the sheet is hidden then re-shown (hasPulsedRef gate).
+  const handleOpacity = useRef(new Animated.Value(1)).current;
+  const hasPulsedRef = useRef(false);
+  useEffect(() => {
+    if (!visible || reducedMotion || hasPulsedRef.current) return;
+    const start = setTimeout(() => {
+      hasPulsedRef.current = true;
+      Animated.sequence([
+        Animated.timing(handleOpacity, { toValue: 0.5, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 0.5, duration: 350, useNativeDriver: true }),
+        Animated.timing(handleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]).start();
+    }, 800);
+    return () => clearTimeout(start);
+  }, [visible, reducedMotion, handleOpacity]);
+
   if (!visible) return null;
 
   return (
@@ -177,7 +196,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         accessibilityLabel="Sheet drag handle"
         accessibilityHint="Drag up or down to resize"
       >
-        <View style={[styles.handle, { backgroundColor: gray[600] }]} />
+        <Animated.View
+          style={[styles.handle, { backgroundColor: gray[600], opacity: handleOpacity }]}
+        />
       </View>
 
       {/* Scrollable content */}

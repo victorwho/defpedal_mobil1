@@ -26,10 +26,12 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { AmbassadorImpactCard } from '../src/design-system/organisms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { space } from '../src/design-system/tokens/spacing';
+import { stagger } from '../src/design-system/tokens/motion';
 import {
   fontFamily,
   textSm,
@@ -138,7 +140,7 @@ export default function MySharesScreen() {
     );
   };
 
-  const renderRow = ({ item }: { item: MyShareRowClient }) => {
+  const renderRow = ({ item, index }: { item: MyShareRowClient; index: number }) => {
     const isRevoked = item.revokedAt !== null;
     const days = daysUntilExpiry(item.expiresAt);
     const expiryLine = isRevoked
@@ -152,7 +154,10 @@ export default function MySharesScreen() {
             : `Expires in ${days} days`;
 
     return (
-      <View style={[styles.row, isRevoked && styles.rowRevoked]}>
+      <FadeSlideIn
+        delay={Math.min(index, stagger.maxItems) * stagger.step}
+        style={[styles.row, isRevoked && styles.rowRevoked]}
+      >
         <View style={styles.rowHeader}>
           <Text style={styles.rowCode}>{item.shortCode}</Text>
           {isRevoked ? (
@@ -216,7 +221,7 @@ export default function MySharesScreen() {
             </Pressable>
           )}
         </View>
-      </View>
+      </FadeSlideIn>
     );
   };
 

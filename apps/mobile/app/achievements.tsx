@@ -31,6 +31,8 @@ import { TrophyCaseHeader } from '../src/design-system/organisms/TrophyCaseHeade
 import { CategoryTabBar } from '../src/design-system/organisms/CategoryTabBar';
 import { BadgeDetailModal } from '../src/design-system/organisms/BadgeDetailModal';
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { stagger } from '../src/design-system/tokens/motion';
 import { type BadgeTier, type BadgeCategory, badgeSpace } from '../src/design-system/tokens/badgeColors';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { space, layout } from '../src/design-system/tokens/spacing';
@@ -245,8 +247,11 @@ export default function AchievementsScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: SortedBadge }) => (
-      <View style={{ width: cellWidth }}>
+    ({ item, index }: { item: SortedBadge; index: number }) => (
+      <FadeSlideIn
+        delay={Math.min(index, stagger.maxItems) * stagger.step}
+        style={{ width: cellWidth }}
+      >
         <BadgeCard
           badge={item.badge}
           earned={item.earned}
@@ -256,7 +261,7 @@ export default function AchievementsScreen() {
           hasHigherTier={item.hasHigherTier}
           onPress={() => handleBadgePress(item)}
         />
-      </View>
+      </FadeSlideIn>
     ),
     [handleBadgePress, cellWidth],
   );

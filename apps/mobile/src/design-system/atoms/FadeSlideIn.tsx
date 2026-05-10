@@ -11,7 +11,7 @@
  *   </FadeSlideIn>
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, type ViewStyle } from 'react-native';
+import { Animated, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { duration as motionDuration, easing } from '../tokens/motion';
@@ -25,7 +25,7 @@ interface FadeSlideInProps {
   /** Initial vertical offset (px). Positive = starts below. Default: 10 */
   translateY?: number;
   /** Optional style applied to the wrapping Animated.View */
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function FadeSlideIn({

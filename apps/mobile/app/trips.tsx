@@ -13,7 +13,9 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Button } from '../src/design-system/atoms/Button';
+import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { Toast } from '../src/design-system/molecules/Toast';
+import { stagger } from '../src/design-system/tokens/motion';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -167,8 +169,8 @@ export default function TripsScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: TripHistoryItem }) => (
-      <View>
+    ({ item, index }: { item: TripHistoryItem; index: number }) => (
+      <FadeSlideIn delay={Math.min(index, stagger.maxItems) * stagger.step}>
         {compareMode ? (
           <Pressable
             onPress={() => handleToggle(item.id)}
@@ -214,7 +216,7 @@ export default function TripsScreen() {
             </Pressable>
           </View>
         )}
-      </View>
+      </FadeSlideIn>
     ),
     [expandedId, handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, handleDeleteTrip, deletingId, t],
   );
