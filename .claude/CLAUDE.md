@@ -346,6 +346,11 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 - POI colors: brand yellow `#D4A843` with white text labels
 - Parking: blue `#2196F3` with "P", Rental: dark green `#2E7D32` with "R"
 
+### Share text — always include the Play Store URL
+- Import `PLAY_STORE_URL` from `@defensivepedal/core` (defined in `packages/core/src/shareCaption.ts`). Don't hardcode the URL — `pcampaignid=web_share` is canonical for Google's Share install attribution.
+- All TEXT-based share invocations (`Share.share({ message })` from `react-native`) must include the URL so recipients without the app have a one-tap install path. Existing wired surfaces: profile "Help a friend" referral row, `useShareRoute` route share, `my-shares.tsx` re-share, `route-planning.tsx` hazard alert.
+- IMAGE-based shares routed through `lib/shareImage.ts` (`expo-sharing`'s `Sharing.shareAsync`) cannot carry body text — the API only takes `fileUri` + `dialogTitle`. The image itself carries the brand. Don't try to "fix" this by passing the URL in `dialogTitle` — that field is the share-sheet header visible only to the sharer, not the recipient. If the URL really matters on a particular image surface, burn it into the share-card render at capture time (small QR + footer text on the PNG itself).
+
 ## Gotchas & Pitfalls
 
 See `.claude/error-log.md` for the full list with details. Key ones:
