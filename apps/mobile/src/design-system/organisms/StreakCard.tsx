@@ -6,16 +6,57 @@
  */
 import type { StreakState } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, darkTheme, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
 import { fontFamily, textDataLg, textSm, textXs } from '../tokens/typography';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 import { StreakChain } from './StreakChain';
 import { useT } from '../../hooks/useTranslation';
+
+// ---------------------------------------------------------------------------
+// FlickerFlame — gentle looping opacity + scale on the flame icon when the
+// streak is "alive" (>=3 days). Suppressed under reduced motion.
+// ---------------------------------------------------------------------------
+
+const FlickerFlame = ({ active }: { active: boolean }) => {
+  const reduced = useReducedMotion();
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!active || reduced) {
+      opacity.setValue(1);
+      scale.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 0.85, duration: 800, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.96, duration: 800, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1.04, duration: 800, useNativeDriver: true }),
+        ]),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [active, reduced, opacity, scale]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ scale }] }}>
+      <Ionicons name="flame" size={24} color={brandColors.accent} />
+    </Animated.View>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -40,7 +81,7 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
       {/* Top row: flame + streak number + label */}
       <View style={styles.topRow}>
         <View style={styles.streakNumberSection}>
-          <Ionicons name="flame" size={24} color={brandColors.accent} />
+          <FlickerFlame active={streakState.currentStreak >= 3} />
           <Text style={styles.streakNumber}>{streakState.currentStreak}</Text>
           <Text style={styles.streakUnit}>{t('streak.dayStreak', { count: streakState.currentStreak })}</Text>
         </View>

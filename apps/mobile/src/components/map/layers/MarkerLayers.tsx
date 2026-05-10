@@ -1,10 +1,15 @@
 import Mapbox from '@rnmapbox/maps';
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+import { useReducedMotion } from '../../../design-system/hooks/useReducedMotion';
 import { brandColors, gray, safetyColors } from '../../../design-system/tokens/colors';
+import { useAppStore } from '../../../store/appStore';
 
 // ---------------------------------------------------------------------------
-// Hoisted styles for Mapbox layer performance (avoid recreation on every render)
+// Hoisted constants for non-animated layers
 // ---------------------------------------------------------------------------
+
+const RADIUS_TRANSITION = { duration: 200, delay: 0 };
 
 // Origin: small green dot — "you are here" (understated)
 const originMarkerStyle = {
@@ -12,22 +17,6 @@ const originMarkerStyle = {
   circleRadius: 6,
   circleStrokeColor: gray[50],
   circleStrokeWidth: 2,
-  circleEmissiveStrength: 1,
-};
-
-// Destination: larger red outer ring — "go here" (prominent, Google Maps convention)
-const destinationOuterStyle = {
-  circleColor: '#EF4444',
-  circleRadius: 11,
-  circleStrokeColor: gray[50],
-  circleStrokeWidth: 2,
-  circleEmissiveStrength: 1,
-};
-
-// Destination: white inner dot for target/bullseye effect
-const destinationInnerStyle = {
-  circleColor: '#FFFFFF',
-  circleRadius: 4,
   circleEmissiveStrength: 1,
 };
 
@@ -78,29 +67,103 @@ type MarkerLayersProps = {
 /**
  * Renders origin (green dot), destination (red bullseye), waypoints (yellow),
  * and user (blue with border) circle markers, plus the off-route dashed connector line.
+ *
+ * Motion: when a NEW destination appears (coordinate key changes), the
+ * destination bullseye scales from 0 → 1.25 → 1.0 via Mapbox native
+ * circleRadiusTransition (200ms each phase). Replays only on coordinate
+ * change. Suppressed during NAVIGATING and reduced motion.
  */
-export const MarkerLayers = React.memo(({
+const MarkerLayersInner = ({
   markerFeatureCollection,
   offRouteFeatureCollection,
-}: MarkerLayersProps) => (
-  <>
-    {markerFeatureCollection.features.length > 0 ? (
-      <Mapbox.ShapeSource id="route-markers" shape={markerFeatureCollection}>
-        <Mapbox.CircleLayer id="route-marker-origin" existing filter={originFilter} style={originMarkerStyle} />
-        {/* Destination: outer red ring + inner white dot = bullseye target */}
-        <Mapbox.CircleLayer id="route-marker-destination-outer" existing filter={destinationFilter} style={destinationOuterStyle} />
-        <Mapbox.CircleLayer id="route-marker-destination-inner" existing filter={destinationFilter} style={destinationInnerStyle} />
-        <Mapbox.CircleLayer id="route-marker-waypoint" existing filter={waypointFilter} style={waypointMarkerStyle} />
-        <Mapbox.CircleLayer id="route-marker-user" existing filter={userFilter} style={userMarkerStyle} />
-      </Mapbox.ShapeSource>
-    ) : null}
+}: MarkerLayersProps) => {
+  const reducedMotion = useReducedMotion();
+  const isNavigating = useAppStore((s) => s.appState === 'NAVIGATING');
+  const skipDrop = reducedMotion || isNavigating;
 
-    {offRouteFeatureCollection.features.length > 0 ? (
-      <Mapbox.ShapeSource id="off-route-connector" shape={offRouteFeatureCollection}>
-        <Mapbox.LineLayer id="off-route-connector-layer" existing style={offRouteConnectorStyle} />
-      </Mapbox.ShapeSource>
-    ) : null}
-  </>
-));
+  // Drop phase — drives the destination radius multiplier.
+  // 'pre' = 0× (invisible) | 'overshoot' = 1.25× | 'rest' = 1×
+  const [dropPhase, setDropPhase] = useState<'pre' | 'overshoot' | 'rest'>(
+    skipDrop ? 'rest' : 'rest',
+  );
+  const lastDestKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const destFeat: any = markerFeatureCollection.features.find(
+      (f: any) => f?.properties?.kind === 'destination',
+    );
+    if (!destFeat) {
+      lastDestKeyRef.current = null;
+      return;
+    }
+    const coords = destFeat.geometry?.coordinates;
+    const key = Array.isArray(coords) && coords.length >= 2
+      ? `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`
+      : null;
+    if (!key || key === lastDestKeyRef.current) return;
+    lastDestKeyRef.current = key;
+
+    if (skipDrop) {
+      setDropPhase('rest');
+      return;
+    }
+    setDropPhase('pre');
+    const t1 = setTimeout(() => setDropPhase('overshoot'), 16);
+    const t2 = setTimeout(() => setDropPhase('rest'), 16 + 200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [markerFeatureCollection, skipDrop]);
+
+  const dropMultiplier =
+    dropPhase === 'pre' ? 0 : dropPhase === 'overshoot' ? 1.25 : 1;
+
+  // Destination layers — radius animated via state * RADIUS_TRANSITION.
+  const destinationOuterStyle = useMemo(
+    () => ({
+      circleColor: '#EF4444',
+      circleRadius: 11 * dropMultiplier,
+      circleRadiusTransition: RADIUS_TRANSITION,
+      circleStrokeColor: gray[50],
+      circleStrokeWidth: 2,
+      circleEmissiveStrength: 1,
+    }),
+    [dropMultiplier],
+  );
+
+  const destinationInnerStyle = useMemo(
+    () => ({
+      circleColor: '#FFFFFF',
+      circleRadius: 4 * dropMultiplier,
+      circleRadiusTransition: RADIUS_TRANSITION,
+      circleEmissiveStrength: 1,
+    }),
+    [dropMultiplier],
+  );
+
+  return (
+    <>
+      {markerFeatureCollection.features.length > 0 ? (
+        <Mapbox.ShapeSource id="route-markers" shape={markerFeatureCollection}>
+          <Mapbox.CircleLayer id="route-marker-origin" existing filter={originFilter} style={originMarkerStyle} />
+          {/* Destination: outer red ring + inner white dot = bullseye target. Radius animates on drop. */}
+          <Mapbox.CircleLayer id="route-marker-destination-outer" existing filter={destinationFilter} style={destinationOuterStyle} />
+          <Mapbox.CircleLayer id="route-marker-destination-inner" existing filter={destinationFilter} style={destinationInnerStyle} />
+          <Mapbox.CircleLayer id="route-marker-waypoint" existing filter={waypointFilter} style={waypointMarkerStyle} />
+          <Mapbox.CircleLayer id="route-marker-user" existing filter={userFilter} style={userMarkerStyle} />
+        </Mapbox.ShapeSource>
+      ) : null}
+
+      {offRouteFeatureCollection.features.length > 0 ? (
+        <Mapbox.ShapeSource id="off-route-connector" shape={offRouteFeatureCollection}>
+          <Mapbox.LineLayer id="off-route-connector-layer" existing style={offRouteConnectorStyle} />
+        </Mapbox.ShapeSource>
+      ) : null}
+    </>
+  );
+};
+
+export const MarkerLayers = React.memo(MarkerLayersInner);
 
 MarkerLayers.displayName = 'MarkerLayers';

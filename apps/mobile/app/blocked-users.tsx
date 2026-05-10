@@ -6,6 +6,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Screen } from '../src/components/Screen';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { IdlePulse } from '../src/design-system/atoms/IdlePulse';
 import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -115,13 +116,15 @@ export default function BlockedUsersScreen() {
           </View>
         ) : !blocked || blocked.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Ionicons
-              name="happy-outline"
-              size={32}
-              color={colors.textSecondary}
-              importantForAccessibility="no"
-              accessibilityElementsHidden
-            />
+            <IdlePulse>
+              <Ionicons
+                name="happy-outline"
+                size={32}
+                color={colors.textSecondary}
+                importantForAccessibility="no"
+                accessibilityElementsHidden
+              />
+            </IdlePulse>
             <Text style={styles.emptyTitle} accessibilityRole="header">
               {t('blockedUsers.emptyTitle')}
             </Text>

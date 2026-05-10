@@ -17,6 +17,7 @@ import { BrandLogo } from '../src/components/BrandLogo';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Surface } from '../src/design-system/atoms/Card';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { IdlePulse } from '../src/design-system/atoms/IdlePulse';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -334,7 +335,9 @@ export default function HistoryScreen() {
     }
     return (
       <View style={styles.emptyCenter}>
-        <Ionicons name="bicycle-outline" size={40} color={colors.textMuted} />
+        <IdlePulse>
+          <Ionicons name="bicycle-outline" size={40} color={colors.textMuted} />
+        </IdlePulse>
         <Text style={styles.emptyTitle}>{t('history.noRidesYet')}</Text>
         <Text style={styles.emptyText}>{t('history.noRidesSub')}</Text>
       </View>

@@ -13,7 +13,7 @@ import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { fontFamily, textSm } from '../tokens/typography';
 import { darkTheme, safetyColors, gray } from '../tokens/colors';
-import { duration as dur, easing } from '../tokens/motion';
+import { duration as dur, easing, springs } from '../tokens/motion';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 // ---------------------------------------------------------------------------
@@ -80,16 +80,20 @@ export const Toast: React.FC<ToastProps> = ({
   const reducedMotion = useReducedMotion();
   const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  // Scale only blooms on `success` — other variants stay at 1 throughout so
+  // alerts (warning/error) feel firm rather than playful.
+  const scale = useRef(new Animated.Value(variant === 'success' ? 0.92 : 1)).current;
   const cfg = variantConfig[variant];
 
-  // Slide in
+  // Slide in (+ optional bloom for success)
   useEffect(() => {
     if (reducedMotion) {
       translateY.setValue(0);
       opacity.setValue(1);
+      scale.setValue(1);
       return;
     }
-    Animated.parallel([
+    const animations: Animated.CompositeAnimation[] = [
       Animated.timing(translateY, {
         toValue: 0,
         duration: dur.normal,
@@ -101,8 +105,25 @@ export const Toast: React.FC<ToastProps> = ({
         duration: dur.fast,
         useNativeDriver: true,
       }),
-    ]).start();
-  }, [reducedMotion]);
+    ];
+    if (variant === 'success') {
+      animations.push(
+        Animated.sequence([
+          Animated.spring(scale, {
+            toValue: 1.04,
+            ...springs.wobbly,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scale, {
+            toValue: 1,
+            ...springs.snappy,
+            useNativeDriver: true,
+          }),
+        ]),
+      );
+    }
+    Animated.parallel(animations).start();
+  }, [reducedMotion, variant]);
 
   // Auto-dismiss
   useEffect(() => {
@@ -135,7 +156,7 @@ export const Toast: React.FC<ToastProps> = ({
     <Animated.View
       style={[
         styles.container,
-        { backgroundColor: cfg.bg, transform: [{ translateY }], opacity },
+        { backgroundColor: cfg.bg, transform: [{ translateY }, { scale }], opacity },
         shadows.lg,
       ]}
       accessibilityRole="alert"

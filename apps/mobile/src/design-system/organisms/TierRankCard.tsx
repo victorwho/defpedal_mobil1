@@ -4,13 +4,21 @@
  * Main tier display card for Profile and Impact Dashboard.
  * Shows tier name, tagline, XP progress bar, and next tier info.
  */
-import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Image,
+  type LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { RiderTierName } from '@defensivepedal/core';
 
 import { useTheme, type ThemeColors } from '../ThemeContext';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { riderTiers, getNextTier, getTierProgress, getXpToNextTier, type RiderTierKey } from '../tokens/tierColors';
 import { hasTierImage, tierImages } from '../tokens/tierImages';
 import { radii } from '../tokens/radii';
@@ -31,10 +39,58 @@ export const TierRankCard = React.memo(function TierRankCard({
   showMascot = true,
 }: TierRankCardProps) {
   const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
   const s = createStyles(colors);
 
   const key = riderTier as RiderTierKey;
   const tierDef = riderTiers[key];
+
+  // Shine-sweep on XP increase. A bright vertical bar slides along the fill
+  // when totalXp grows, conveying "energy flowing into the bar". Cheap, runs
+  // on the native driver, hidden by the track's overflow: 'hidden'.
+  const [trackWidth, setTrackWidth] = useState(0);
+  const shineX = useRef(new Animated.Value(0)).current;
+  const shineOpacity = useRef(new Animated.Value(0)).current;
+  const prevXpRef = useRef(totalXp);
+  const SHINE_WIDTH = 24;
+
+  useEffect(() => {
+    if (reducedMotion) {
+      prevXpRef.current = totalXp;
+      return;
+    }
+    if (totalXp > prevXpRef.current && trackWidth > 0 && tierDef) {
+      const fillEnd = getTierProgress(totalXp, key) * trackWidth;
+      shineX.setValue(-SHINE_WIDTH);
+      shineOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(shineX, {
+          toValue: fillEnd,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(shineOpacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shineOpacity, {
+            toValue: 0,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+    prevXpRef.current = totalXp;
+  }, [totalXp, trackWidth, key, reducedMotion, tierDef, shineX, shineOpacity]);
+
+  const handleTrackLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    if (Math.abs(w - trackWidth) > 0.5) setTrackWidth(w);
+  };
+
   if (!tierDef) return null;
 
   const progress = getTierProgress(totalXp, key);
@@ -68,13 +124,25 @@ export const TierRankCard = React.memo(function TierRankCard({
 
           {!isLegend ? (
             <>
-              <View style={s.progressTrack}>
+              <View style={s.progressTrack} onLayout={handleTrackLayout}>
                 <View
                   style={[
                     s.progressFill,
                     {
                       width: `${Math.round(progress * 100)}%`,
                       backgroundColor: tierDef.color,
+                    },
+                  ]}
+                />
+                {/* Shine sweep — fires when totalXp grows, hidden by overflow */}
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    s.shine,
+                    {
+                      width: SHINE_WIDTH,
+                      opacity: shineOpacity,
+                      transform: [{ translateX: shineX }],
                     },
                   ]}
                 />
@@ -158,6 +226,12 @@ const createStyles = (colors: ThemeColors) =>
     progressFill: {
       height: '100%',
       borderRadius: radii.sm,
+    },
+    shine: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      backgroundColor: '#FFFFFF',
     },
     nextText: {
       fontSize: 11,

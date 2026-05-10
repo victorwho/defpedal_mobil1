@@ -31,6 +31,9 @@ export type { CardProps, CardVariant, CardElevation, CardRadius, SurfaceProps } 
 export { PressableScale } from './PressableScale';
 export type { PressableScaleProps } from './PressableScale';
 
+export { IdlePulse } from './IdlePulse';
+export type { IdlePulseProps } from './IdlePulse';
+
 export { SectionTitle } from './SectionTitle';
 export type { SectionTitleProps } from './SectionTitle';
 
