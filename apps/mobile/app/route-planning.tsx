@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
+import { ModeTogglePill } from '../src/components/ModeTogglePill';
 import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
@@ -1027,78 +1028,33 @@ export default function RoutePlanningScreen() {
           {hasValidDestination ? (
             <View>
               <View style={styles.modeToggleRow}>
-                <Pressable
-                  style={[
-                    styles.modeTogglePill,
-                    routeRequest.mode === 'safe' && !avoidHills && styles.modeTogglePillActive,
-                  ]}
+                <ModeTogglePill
+                  iconName="shield-checkmark-outline"
+                  label={t('planning.safe')}
+                  isActive={routeRequest.mode === 'safe' && !avoidHills}
+                  activeBgColor={safetyTints.infoLight}
+                  activeFgColor={colors.info}
                   onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
                   accessibilityLabel="Safe routing"
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: routeRequest.mode === 'safe' && !avoidHills }}
-                >
-                  <Ionicons
-                    name="shield-checkmark-outline"
-                    size={14}
-                    color={routeRequest.mode === 'safe' && !avoidHills ? colors.info : gray[400]}
-                  />
-                  <Text
-                    style={[
-                      styles.modeToggleLabel,
-                      routeRequest.mode === 'safe' && !avoidHills && styles.modeToggleLabelActive,
-                    ]}
-                  >
-                    {t('planning.safe')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.modeTogglePill,
-                    routeRequest.mode === 'fast' && styles.modeTogglePillActive,
-                  ]}
+                />
+                <ModeTogglePill
+                  iconName="flash-outline"
+                  label={t('planning.fast')}
+                  isActive={routeRequest.mode === 'fast'}
+                  activeBgColor={safetyTints.infoLight}
+                  activeFgColor={colors.info}
                   onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
                   accessibilityLabel="Fast routing"
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: routeRequest.mode === 'fast' }}
-                >
-                  <Ionicons
-                    name="flash-outline"
-                    size={14}
-                    color={routeRequest.mode === 'fast' ? colors.info : gray[400]}
-                  />
-                  <Text
-                    style={[
-                      styles.modeToggleLabel,
-                      routeRequest.mode === 'fast' && styles.modeToggleLabelActive,
-                    ]}
-                  >
-                    {t('planning.fast')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.modeTogglePill,
-                    avoidHills && routeRequest.mode === 'safe' && styles.modeTogglePillFlat,
-                  ]}
+                />
+                <ModeTogglePill
+                  iconName="trending-down-outline"
+                  label={t('planning.flat')}
+                  isActive={avoidHills && routeRequest.mode === 'safe'}
+                  activeBgColor={safetyTints.safeGreenLight}
+                  activeFgColor={colors.safe}
                   onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
                   accessibilityLabel="Flat routing — avoid hills"
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: avoidHills && routeRequest.mode === 'safe' }}
-                >
-                  <Ionicons
-                    name="trending-down-outline"
-                    size={14}
-                    color={avoidHills && routeRequest.mode === 'safe' ? colors.safe : gray[400]}
-                  />
-                  <Text
-                    style={[
-                      styles.modeToggleLabel,
-                      avoidHills && routeRequest.mode === 'safe' && styles.modeToggleLabelFlat,
-                    ]}
-                  >
-                    {t('planning.flat')}
-                  </Text>
-                </Pressable>
+                />
               </View>
             </View>
           ) : null}
@@ -1505,31 +1461,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.full,
       padding: 3,
       ...shadows.sm,
-    },
-    modeTogglePill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: space[3],
-      paddingVertical: 6,
-      borderRadius: radii.full,
-    },
-    modeTogglePillActive: {
-      backgroundColor: safetyTints.infoLight,
-    },
-    modeTogglePillFlat: {
-      backgroundColor: safetyTints.safeGreenLight,
-    },
-    modeToggleLabel: {
-      fontSize: 12,
-      fontFamily: fontFamily.body.bold,
-      color: gray[400],
-    },
-    modeToggleLabelActive: {
-      color: colors.info,
-    },
-    modeToggleLabelFlat: {
-      color: colors.safe,
     },
     searchOverlay: {
       backgroundColor: MAP_OVERLAY_BG,

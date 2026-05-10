@@ -16,6 +16,7 @@ import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 import { telemetry } from '../src/lib/telemetry';
 import { useTheme } from '../src/design-system';
+import { useReducedMotion } from '../src/design-system/hooks/useReducedMotion';
 import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
 import { tierColors } from '../src/design-system/tokens/badgeColors';
@@ -204,6 +205,7 @@ const RouteShareDeepLinkHandler = () => {
 
 const RootLayoutInner = () => {
   const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
 
   // Fire-and-forget offline pack cleanup on app launch
@@ -253,6 +255,11 @@ const RootLayoutInner = () => {
           contentStyle: {
             backgroundColor: colors.bgDeep,
           },
+          // Forward push slides right→left, back gesture/pop reverses it —
+          // matches iOS HIG and gives Android the same spatial mental model.
+          // Reduced motion falls back to fade.
+          animation: reducedMotion ? 'fade' : 'slide_from_right',
+          animationDuration: reducedMotion ? 150 : 280,
         }}
       />
       <BadgeUnlockOverlayManager />

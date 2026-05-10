@@ -26,7 +26,6 @@
  */
 import React from 'react';
 import {
-  Pressable,
   StyleSheet,
   View,
   type AccessibilityRole,
@@ -35,10 +34,12 @@ import {
 } from 'react-native';
 
 import { useTheme, type ThemeColors } from '../ThemeContext';
+import type { HapticToken } from '../tokens/haptics';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
 import { surfaceTints } from '../tokens/tints';
+import { PressableScale } from './PressableScale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,8 +84,17 @@ export interface CardProps {
    * only job is event propagation, not interaction.
    */
   accessible?: boolean;
-  /** Style applied while pressed. Default: `{ opacity: 0.85 }`. */
+  /**
+   * Static style merged into the press state (e.g. `borderColor` flip).
+   * The visual press feedback (scale + opacity) is provided by the
+   * underlying PressableScale and shouldn't be re-encoded here.
+   */
   pressedStyle?: ViewStyle;
+  /**
+   * Haptic intent fired on press in. Set `false` to suppress (e.g. for a
+   * passive informational card). Default `'confirm'`.
+   */
+  hapticOnPress?: HapticToken | false;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,8 +163,6 @@ const buildVariantStyle = (
   }
 };
 
-const DEFAULT_PRESSED_STYLE: ViewStyle = { opacity: 0.85 };
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -171,6 +179,7 @@ export const Card: React.FC<CardProps> = ({
   accessibilityHint,
   accessible,
   pressedStyle,
+  hapticOnPress = 'confirm',
   children,
   style,
 }) => {
@@ -181,9 +190,8 @@ export const Card: React.FC<CardProps> = ({
   const baseStyles = [styles.base, radiusStyle, variantStyle, elevationShadow[resolvedElevation]];
 
   if (onPress || onLongPress) {
-    const resolvedPressedStyle = pressedStyle ?? DEFAULT_PRESSED_STYLE;
     return (
-      <Pressable
+      <PressableScale
         onPress={onPress}
         onLongPress={onLongPress}
         disabled={disabled}
@@ -192,14 +200,12 @@ export const Card: React.FC<CardProps> = ({
         accessibilityLabel={accessibilityLabel}
         accessibilityHint={accessibilityHint}
         accessibilityState={disabled ? { disabled: true } : undefined}
-        style={({ pressed }) => [
-          ...baseStyles,
-          style,
-          pressed && resolvedPressedStyle,
-        ]}
+        hapticOnPress={hapticOnPress}
+        style={[...baseStyles, style]}
+        pressedStyle={pressedStyle}
       >
         {children}
-      </Pressable>
+      </PressableScale>
     );
   }
 

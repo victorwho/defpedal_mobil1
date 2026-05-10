@@ -28,6 +28,9 @@ export type { SkeletonProps } from './Skeleton';
 export { Card, Surface } from './Card';
 export type { CardProps, CardVariant, CardElevation, CardRadius, SurfaceProps } from './Card';
 
+export { PressableScale } from './PressableScale';
+export type { PressableScaleProps } from './PressableScale';
+
 export { SectionTitle } from './SectionTitle';
 export type { SectionTitleProps } from './SectionTitle';
 

@@ -3,9 +3,15 @@
  *
  * Height: 48px. Two variants: default (radius-md) | search (radius-full).
  * Accent focus border. Left/right icon slots.
+ *
+ * Motion: border color crossfades between resting and focus/error states
+ * (150ms ease-out). Border width snaps (1→2) — the color crossfade carries
+ * the visual transition; animating width would reflow layout on every frame.
+ * Reduced motion: snaps to final color immediately.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   StyleSheet,
   Text,
   TextInput as RNTextInput,
@@ -14,6 +20,8 @@ import {
 } from 'react-native';
 
 import { useTheme } from '../ThemeContext';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { duration as durations, easing as easings } from '../tokens/motion';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily } from '../tokens/typography';
@@ -46,15 +54,30 @@ export const TextInput: React.FC<TextInputProps> = ({
   ...inputProps
 }) => {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
   const [focused, setFocused] = useState(false);
 
-  const borderColor = error
-    ? colors.danger
-    : focused
-      ? colors.accent
-      : colors.borderDefault;
+  const isHighlighted = focused || Boolean(error);
+  const targetColor = error ? colors.danger : colors.accent;
 
-  const borderWidth = focused || error ? 2 : 1;
+  const focusProgress = useRef(new Animated.Value(isHighlighted ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusProgress, {
+      toValue: isHighlighted ? 1 : 0,
+      duration: reduced ? 0 : durations.fast,
+      easing: easings.default,
+      useNativeDriver: false, // animating borderColor
+    }).start();
+  }, [isHighlighted, reduced, focusProgress]);
+
+  const animatedBorderColor = focusProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.borderDefault, targetColor],
+  });
+
+  // Width snaps; color crossfades. The 1px shift is below visual threshold.
+  const borderWidth = isHighlighted ? 2 : 1;
 
   return (
     <View style={styles.wrapper}>
@@ -68,12 +91,12 @@ export const TextInput: React.FC<TextInputProps> = ({
           {label}
         </Text>
       ) : null}
-      <View
+      <Animated.View
         style={[
           styles.container,
           {
             backgroundColor: colors.bgSecondary,
-            borderColor,
+            borderColor: animatedBorderColor,
             borderWidth,
             borderRadius: variant === 'search' ? radii.full : radii.md,
             opacity: disabled ? 0.4 : 1,
@@ -104,7 +127,7 @@ export const TextInput: React.FC<TextInputProps> = ({
           ]}
         />
         {rightIcon ? <View style={styles.iconSlot}>{rightIcon}</View> : null}
-      </View>
+      </Animated.View>
       {error ? (
         <Text
           style={[

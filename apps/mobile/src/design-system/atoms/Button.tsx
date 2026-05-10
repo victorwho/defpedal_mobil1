@@ -8,19 +8,17 @@
 import React from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
 
-import { useTheme } from '../ThemeContext';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily } from '../tokens/typography';
 import { brandColors, darkTheme, safetyColors } from '../tokens/colors';
-import { useHaptics } from '../hooks/useHaptics';
+import { PressableScale } from './PressableScale';
 
 // Pressed-state variants (darker shades of safety colors, not in main token set)
 const DANGER_PRESSED = '#DC2626';
@@ -107,14 +105,8 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   accessibilityLabel,
 }) => {
-  const haptics = useHaptics();
   const s = sizeStyles[size];
   const v = variantStyles[variant];
-
-  const handlePress = () => {
-    haptics.confirm();
-    onPress?.();
-  };
 
   const containerStyle: ViewStyle = {
     height: s.height,
@@ -137,16 +129,14 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <Pressable
-      onPress={handlePress}
+    <PressableScale
+      onPress={onPress}
       disabled={disabled || loading}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, busy: loading }}
-      style={({ pressed }) => [
-        containerStyle,
-        pressed && { backgroundColor: v.pressedBg, transform: [{ scale: 0.97 }] },
-      ]}
+      style={containerStyle}
+      pressedStyle={{ backgroundColor: v.pressedBg }}
     >
       {loading ? (
         <ActivityIndicator
@@ -165,6 +155,6 @@ export const Button: React.FC<ButtonProps> = ({
           {rightIcon}
         </>
       )}
-    </Pressable>
+    </PressableScale>
   );
 };

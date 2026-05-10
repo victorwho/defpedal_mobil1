@@ -1,7 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useHaptics } from '../design-system/hooks/useHaptics';
+import { useReducedMotion } from '../design-system/hooks/useReducedMotion';
 import { brandColors, gray, safetyColors } from '../design-system/tokens/colors';
+import { springs } from '../design-system/tokens/motion';
 
 type ReactionButtonProps = {
   active: boolean;
@@ -12,20 +16,48 @@ type ReactionButtonProps = {
 };
 
 const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionButtonProps) => {
+  const reduced = useReducedMotion();
+  const haptics = useHaptics();
+  const scale = useRef(new Animated.Value(1)).current;
+
   const iconName = active
     ? (icon === 'thumbs-up' ? 'thumbs-up' : 'heart')
     : (icon === 'thumbs-up' ? 'thumbs-up-outline' : 'heart-outline');
 
   const label = icon === 'thumbs-up' ? 'Like' : 'Love';
+
+  const handlePress = () => {
+    haptics.confirm();
+    if (!reduced) {
+      // Bloom: quick overshoot then settle. Wobbly spring on the way up
+      // (overshoot 1.35), snappy back to rest.
+      Animated.sequence([
+        Animated.spring(scale, {
+          toValue: 1.35,
+          ...springs.wobbly,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          ...springs.snappy,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+    onPress();
+  };
+
   return (
     <Pressable
       style={[styles.button, active && styles.buttonActive]}
-      onPress={onPress}
+      onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${count}`}
       accessibilityState={{ selected: active }}
     >
-      <Ionicons name={iconName} size={20} color={active ? activeColor : gray[400]} />
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons name={iconName} size={20} color={active ? activeColor : gray[400]} />
+      </Animated.View>
       <Text style={[styles.count, active && { color: activeColor }]}>{count}</Text>
     </Pressable>
   );
