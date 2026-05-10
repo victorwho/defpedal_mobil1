@@ -147,7 +147,7 @@ C:\dev\defpedal/
 │   │   │   └── VoiceGuidanceButton.tsx
 │   │   ├── design-system/       # Branded design system (all 30 screens use useTheme())
 │   │   │   ├── tokens/          # colors, spacing, typography, radii, shadows, tints, iconSize, zIndex, badgeColors, badgeIcons, tierColors, tierImages
-│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, BadgeIcon, BadgeProgressBar, BadgeInlineChip, TierPill, XpGainToast
+│   │   │   ├── atoms/           # Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, BadgeIcon, BadgeProgressBar, BadgeInlineChip, TierPill, XpGainToast, PressableScale, IdlePulse, FadeSlideIn
 │   │   │   ├── molecules/       # SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget, BadgeCard
 │   │   │   └── organisms/       # NavigationHUD, BottomNav, RiskDistributionCard,
 │   │   │                        # ElevationChart, ElevationProgressCard, TripCard,
@@ -288,11 +288,15 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 - All 30 screens + key components (Screen, MapStageScreen, SettingRow, Toggle, TripCard, FeedCard, CommunityStatsCard, ElevationChart) use `createThemedStyles(colors)` factory pattern
 - Forces dark theme during NAVIGATING state (glare reduction, battery, safety contrast)
 - Tokens: `colors.ts`, `spacing.ts`, `typography.ts`, `radii.ts`, `shadows.ts`, `tints.ts` (opacity + rgba tints), `iconSize.ts` (xs-3xl), `zIndex.ts` (semantic layers), `motion.ts`
-- Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, FadeSlideIn) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
+- Components: atoms (Button, Badge, IconButton, Toggle, Card, SectionTitle, ScreenHeader, FadeSlideIn, PressableScale, IdlePulse) → molecules (SearchBar, SettingRow, Toast, HazardAlert, WeatherWidget) → organisms (NavigationHUD, BottomNav, RiskDistributionCard)
 - `ScreenHeader` atom: unified header with 4 variants (`back`, `close`, `brand-logo`, `title-only`). Screen wrapper accepts `headerVariant` prop. Map screens (route-planning, route-preview, navigation) excluded — use MapStageScreen. BackButton atom retained for floating map buttons only.
 - Map overlay cards (origin, destination, search, FABs) intentionally use `#FFFFFF` — they sit on the dark map regardless of theme
 - Legacy `mobileTheme` bridge deleted — all components use design system tokens directly
-- `FadeSlideIn` atom: entry animation (opacity + translateY, 200ms) with `useReducedMotion` support
+- `FadeSlideIn` atom: entry animation (opacity + translateY, 200ms) with `useReducedMotion` support. Pair with `Math.min(index, stagger.maxItems) * stagger.step` (from `motion.ts`) for list cascades.
+- `PressableScale` atom: canonical press primitive — spring scale + opacity + haptic-intent prop. Replaces ad-hoc `transform:[{scale:0.97}]` everywhere. Used by Button, Card, FABs in route-planning.
+- `IdlePulse` atom: looping opacity 1.0 ↔ 0.55 over ~1.1s phases. Reserved for empty-state illustrations and idle decorative elements; never wrap content the user must read or interact with.
+- `useStaggeredEntrance` hook: alternative to `FadeSlideIn` as a hook returning the animated style instead of a wrapper component. Same 40ms-step cascade semantics, mount-only, reduced-motion fallback.
+- `motion.ts` springs: `gentle` / `snappy` / `stiff` / `wobbly` presets are the project's tuning knob — adjust here when press feel is off, never inline `tension`/`friction` values in components.
 - `haptics.ts` utility: lazy NativeModules guard for expo-haptics (same pattern as push-notifications)
 - Analysis: `design-work/design-system-analysis.md` (SWOT, scores, component inventory, migration status)
 
@@ -396,9 +400,10 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-05-05)
+## Current State (as of 2026-05-10)
 
 ### Working Features
+- **Motion polish (v0.2.45 → v0.2.48, session 48):** four-phase initiative shipped to Firebase `early-access-preview`. P0 — everyday touchpoints (Button/Card spring press via new `PressableScale` atom, BottomNav sliding indicator + icon scale-pop, CategoryTabBar pill cross-fade, Safe/Fast/Flat `ModeTogglePill`, Like/Love bloom, animated TextInput focus border, directional Stack screen transitions). P1 — screen rhythm (list stagger via existing `FadeSlideIn` on trips/badges/shares/blocked-users, animated Modal backdrop ramp, BottomSheet drag-handle teaching pulse). P2 — map surface (route polyline + hazard layer fade-in via Mapbox native `*OpacityTransition`, NavigationHUD GPS-dot color crossfade, FAB spring press). P3 — celebration (Streak flame flicker, success Toast bloom, destination pin drop via `circleRadiusTransition`, empty-state `IdlePulse`, XP-bar shine sweep). All animations gated by `useReducedMotion`; safety-critical surfaces suppress motion when `appState === 'NAVIGATING'`. New shared primitives: `PressableScale`, `IdlePulse`, `useStaggeredEntrance`, extended `motion.ts` (springs.gentle/snappy/stiff/wobbly + EXIT_RATIO + stagger). Stayed on react-native built-in `Animated` API instead of Reanimated 4 because dev variant runs `newArchEnabled=false` (Windows Metro bridge constraint).
 - Route planning with destination autocomplete and recent destinations (Google Maps-style UX)
 - Safe routing (OSRM) and fast routing (Mapbox Directions)
 - Route preview with risk distribution card, elevation chart, weather warnings (progressive disclosure — details in expanded sheet)
