@@ -86,7 +86,7 @@ export const buildFirstRideNotificationRoutes = (
 
         const { data: profileRows, error: queryError } = await db
           .from('profiles')
-          .select('id, notify_mia, created_at, last_ride_at')
+          .select('id, notify_mia, created_at')
           .eq('notify_mia', true)
           .limit(1000);
 
@@ -106,7 +106,6 @@ export const buildFirstRideNotificationRoutes = (
           id: string;
           notify_mia: boolean;
           created_at: string;
-          last_ride_at: string | null;
         }>;
 
         let evaluated = 0;
@@ -122,12 +121,24 @@ export const buildFirstRideNotificationRoutes = (
               .select('id', { count: 'exact', head: true })
               .eq('user_id', row.id);
 
+            // Compute last_ride_at from trips (no profiles.last_ride_at column).
+            // post_first_ride and lapsed_reengagement gate on this; null is
+            // treated as "never rode" by the evaluator.
+            const { data: lastTrip } = await db
+              .from('trips')
+              .select('ended_at')
+              .eq('user_id', row.id)
+              .not('ended_at', 'is', null)
+              .order('ended_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
             const profile: FirstRideProfile = {
               id: row.id,
               total_rides: rideCount ?? 0,
               notify_mia: row.notify_mia,
               created_at: row.created_at,
-              last_ride_at: row.last_ride_at,
+              last_ride_at: (lastTrip?.ended_at as string | null | undefined) ?? null,
             };
 
             const results = await evaluateFirstRideNotifications(db, profile);
