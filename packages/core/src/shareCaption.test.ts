@@ -148,20 +148,6 @@ describe('buildShareCaption — badge', () => {
   });
 });
 
-describe('buildShareCaption — mia', () => {
-  it('renders level number and title with Mia hashtag', () => {
-    const caption = buildShareCaption({
-      type: 'mia',
-      level: 3,
-      levelTitle: 'Confident Rider',
-    });
-
-    expect(caption).toBe(
-      'Level 3: Confident Rider on Defensive Pedal. Riding safer every day. #DefensivePedal #MiaJourney',
-    );
-  });
-});
-
 describe('buildShareCaption — English-only', () => {
   it('always returns English even though the project supports i18n elsewhere', () => {
     // This is more of a spec guardrail — the function takes no locale input,
@@ -187,12 +173,5 @@ describe('buildShareCaption — English-only', () => {
       badgeName: 'x',
     });
     expect(badge).toMatch(/Just earned the/);
-
-    const mia = buildShareCaption({
-      type: 'mia',
-      level: 1,
-      levelTitle: 'x',
-    });
-    expect(mia).toMatch(/Riding safer every day/);
   });
 });

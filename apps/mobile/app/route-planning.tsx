@@ -47,11 +47,7 @@ import { duration, easing } from '../src/design-system/tokens/motion';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
-import { usePersonaT } from '../src/hooks/usePersonaT';
 import { useRecentRideDestinations } from '../src/hooks/useRecentRideDestinations';
-import { useMiaJourney } from '../src/hooks/useMiaJourney';
-import { MiaJourneyBar } from '../src/design-system/atoms/MiaJourneyBar';
-import { MiaEmptyState } from '../src/design-system/molecules/MiaEmptyState';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -126,58 +122,6 @@ export default function RoutePlanningScreen() {
       }
     })();
   }, [isOnline]);
-
-  // ── Mia Persona Journey ──
-  const persona = useAppStore((state) => state.persona);
-  const miaJourneyLevel = useAppStore((state) => state.miaJourneyLevel);
-  const miaJourneyStatus = useAppStore((state) => state.miaJourneyStatus);
-  const isMia = persona === 'mia' && miaJourneyStatus === 'active';
-  const { data: miaJourney } = useMiaJourney();
-  const pt = usePersonaT();
-
-  // Mia ride-count lookups: rides needed per level
-  const MIA_RIDES_NEEDED: Record<number, number> = { 1: 1, 2: 3, 3: 5, 4: 12 };
-  const miaRidesCompleted = miaJourney?.totalRides ?? 0;
-  const miaRidesNeeded = MIA_RIDES_NEEDED[miaJourneyLevel] ?? 12;
-
-  // ── map_browse_session telemetry ──
-  const browseStartRef = useRef<number>(Date.now());
-  const browseActionCountRef = useRef<number>(0);
-
-  // Emit map_browse_session event on unmount
-  useEffect(() => {
-    browseStartRef.current = Date.now();
-    browseActionCountRef.current = 0;
-    return () => {
-      const durationSeconds = Math.round((Date.now() - browseStartRef.current) / 1000);
-      const state = useAppStore.getState();
-      const home = state.homeLocation;
-      // Approximate max distance from home using the current map center or route destination
-      let maxDistFromHome = 0;
-      if (home) {
-        const dest = state.routeRequest.destination;
-        if (dest.lat !== 0 || dest.lon !== 0) {
-          // Haversine approximation (km)
-          const dLat = (dest.lat - home.lat) * Math.PI / 180;
-          const dLon = (dest.lon - home.lon) * Math.PI / 180;
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(home.lat * Math.PI / 180) * Math.cos(dest.lat * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          maxDistFromHome = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-      }
-      state.enqueueTelemetryEvent({
-        eventType: 'map_browse_session',
-        properties: {
-          duration_seconds: durationSeconds,
-          actions_taken: browseActionCountRef.current,
-          max_distance_from_home_km: Math.round(maxDistFromHome * 10) / 10,
-        },
-        timestamp: new Date().toISOString(),
-      });
-    };
-  }, []);
 
   const {
     location: currentLocation,
@@ -269,13 +213,6 @@ export default function RoutePlanningScreen() {
       }
     };
   }, []);
-
-  // Mia: force safe mode for levels 1-3
-  useEffect(() => {
-    if (isMia && miaJourneyLevel <= 3 && routeRequest.mode !== 'safe') {
-      setRoutingMode('safe');
-    }
-  }, [isMia, miaJourneyLevel, routeRequest.mode, setRoutingMode]);
 
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
@@ -377,8 +314,6 @@ export default function RoutePlanningScreen() {
   };
 
   const handleHazardTypeSelect = (hazardType: HazardType) => {
-    browseActionCountRef.current += 1;
-
     // "Other" routes through the describe stage for an optional free-text note.
     if (hazardType === 'other') {
       setHazardDescribeMode(true);
@@ -646,7 +581,6 @@ export default function RoutePlanningScreen() {
     setDestinationQuery(suggestion.label);
     setDestinationHydrated(true);
     setActiveField(null);
-    browseActionCountRef.current += 1;
     // Save to recent destinations
     addRecentDestination({
       ...suggestion,
@@ -837,28 +771,6 @@ export default function RoutePlanningScreen() {
                 <Ionicons name="chevron-forward" size={16} color={gray[400]} />
               </View>
             </Pressable>
-          ) : null}
-
-          {/* Mia Journey progress bar + skip ahead */}
-          {isMia ? (
-            <View style={styles.miaHeaderWrap}>
-              <MiaJourneyBar
-                level={miaJourneyLevel}
-                levelName={pt(`journey.levelNames.${miaJourneyLevel}`)}
-                ridesCompleted={miaRidesCompleted}
-                ridesNeeded={miaRidesNeeded}
-                onInfoPress={() => router.push('/achievements')}
-              />
-              <Pressable
-                onPress={() => {
-                  useAppStore.getState().optOutMia();
-                }}
-                accessibilityLabel={pt('journey.skipAhead')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.miaSkipAhead}>{pt('journey.skipAhead')}</Text>
-              </Pressable>
-            </View>
           ) : null}
 
           {/* Origin card — shown only after destination is set (progressive disclosure) */}
@@ -1111,12 +1023,9 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat routing toggle — hidden for Mia levels 1-3, shown with tooltip at 4+ */}
-          {hasValidDestination && !(isMia && miaJourneyLevel <= 3) ? (
+          {/* Safe / Fast / Flat routing toggle */}
+          {hasValidDestination ? (
             <View>
-              {isMia && miaJourneyLevel >= 4 ? (
-                <Text style={styles.miaToggleTooltip}>You've earned this control</Text>
-              ) : null}
               <View style={styles.modeToggleRow}>
                 <Pressable
                   style={[
@@ -1264,7 +1173,6 @@ export default function RoutePlanningScreen() {
               fullWidth
               disabled={!hasValidDestination}
               onPress={() => {
-                browseActionCountRef.current += 1;
                 setActiveField(null);
                 router.push('/route-preview');
               }}
@@ -1901,22 +1809,4 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.body.medium,
     },
 
-    // ── Mia persona styles ──
-    miaHeaderWrap: {
-      gap: space[1],
-    },
-    miaSkipAhead: {
-      ...textXs,
-      fontFamily: fontFamily.body.medium,
-      color: colors.textMuted,
-      textAlign: 'center',
-      textDecorationLine: 'underline',
-    },
-    miaToggleTooltip: {
-      ...textXs,
-      fontFamily: fontFamily.body.medium,
-      color: colors.safe,
-      textAlign: 'center',
-      marginBottom: space[1],
-    },
   });

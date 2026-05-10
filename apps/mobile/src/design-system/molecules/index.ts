@@ -19,18 +19,6 @@ export type { ToastProps } from './Toast';
 export { SettingRow } from './SettingRow';
 export type { SettingRowProps } from './SettingRow';
 
-export { MiaSegmentPreview } from './MiaSegmentPreview';
-export type { MiaSegmentPreviewProps, MiaSegmentInfo } from './MiaSegmentPreview';
-
-export { MiaSegmentBanner } from './MiaSegmentBanner';
-export type { MiaSegmentBannerProps } from './MiaSegmentBanner';
-
-export { MiaCourageSection } from './MiaCourageSection';
-export type { MiaCourageSectionProps } from './MiaCourageSection';
-
-export { MiaEmptyState } from './MiaEmptyState';
-export type { MiaEmptyStateProps } from './MiaEmptyState';
-
 export { OfflineBanner } from './OfflineBanner';
 export type { OfflineBannerProps } from './OfflineBanner';
 

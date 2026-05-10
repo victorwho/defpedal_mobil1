@@ -46,9 +46,6 @@ export type { XpGainToastProps } from './XpGainToast';
 export { LeaderboardRow } from './LeaderboardRow';
 export type { LeaderboardRowProps } from './LeaderboardRow';
 
-export { MiaJourneyBar } from './MiaJourneyBar';
-export type { MiaJourneyBarProps } from './MiaJourneyBar';
-
 export { FollowButton } from './FollowButton';
 export type { FollowButtonProps } from './FollowButton';
 

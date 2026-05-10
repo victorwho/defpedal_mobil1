@@ -21,8 +21,6 @@ import type {
   LeaderboardMetric,
   LeaderboardPeriod,
   LeaderboardResponse,
-  MiaDetectionSource,
-  MiaJourneyState,
   NavigationFeedbackRequest,
   NearbyHazard,
   NeighborhoodSafetyScore,
@@ -38,7 +36,6 @@ import type {
   SavedRouteCreateRequest,
   ShareTripRequest,
   SuggestedUser,
-  TelemetryEvent,
   UserPublicProfile,
   TiersResponse,
   RerouteRequest,
@@ -677,43 +674,6 @@ export const mobileApi = {
     });
     return requestJson<LeaderboardResponse>(`/v1/leaderboard?${params.toString()}`);
   },
-
-  // ── Mia Persona Journey ──
-
-  getMiaJourney: () =>
-    requestJson<MiaJourneyState>('/v1/mia/journey'),
-
-  activateMia: (source: MiaDetectionSource) =>
-    requestJson<{ activatedAt: string }>('/v1/mia/activate', {
-      method: 'POST',
-      body: JSON.stringify({ source }),
-    }).then(() => undefined),
-
-  optOutMia: () =>
-    requestJson<{ optedOutAt: string }>('/v1/mia/opt-out', {
-      method: 'POST',
-    }).then(() => undefined),
-
-  submitMiaTestimonial: (text: string) =>
-    requestJson<{ acceptedAt: string }>('/v1/mia/testimonial', {
-      method: 'POST',
-      body: JSON.stringify({ text }),
-    }).then(() => undefined),
-
-  // ── Telemetry Events ──
-
-  sendTelemetryEvents: (events: readonly TelemetryEvent[]) =>
-    requestJson<{ accepted: number }>('/v1/mia/telemetry/events', {
-      method: 'POST',
-      body: JSON.stringify({
-        events: events.map((e) => ({
-          event_type: e.eventType,
-          properties: e.properties,
-          session_id: e.sessionId,
-          timestamp: e.timestamp,
-        })),
-      }),
-    }).then(() => undefined),
 
   // ── Route Shares (slice 1) ──
 

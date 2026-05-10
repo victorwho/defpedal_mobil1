@@ -7,7 +7,6 @@ import {
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -39,8 +38,6 @@ import { riderTiers, getTierProgress, getNextTier, getXpToNextTier, type RiderTi
 import { mobileApi } from '../src/lib/api';
 import { brandTints } from '../src/design-system/tokens/tints';
 import { useAppStore } from '../src/store/appStore';
-import { MiaJourneyTracker } from '../src/design-system/organisms/MiaJourneyTracker';
-import { useMiaJourney } from '../src/hooks/useMiaJourney';
 
 // ---------------------------------------------------------------------------
 // Stat tile (reused pattern from CommunityStatsCard)
@@ -132,20 +129,6 @@ export default function ImpactDashboardScreen() {
 
   const treeEquivalent = data ? (data.totalCo2SavedKg / 21).toFixed(1) : '0';
 
-  // Mia journey state
-  const persona = useAppStore((s) => s.persona);
-  const miaJourneyStatus = useAppStore((s) => s.miaJourneyStatus);
-  const miaJourneyLevel = useAppStore((s) => s.miaJourneyLevel);
-  const { data: miaData } = useMiaJourney();
-  const showMiaTracker = persona === 'mia' && miaJourneyStatus === 'active';
-
-  const handleShareMiaProgress = () => {
-    const levelName = miaData?.level ?? miaJourneyLevel;
-    void Share.share({
-      message: `I'm on Level ${levelName} of my cycling journey with Defensive Pedal! #DefensivePedal #SaferCycling`,
-    });
-  };
-
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <ScreenHeader variant="back" title="Your Impact" />
@@ -175,15 +158,6 @@ export default function ImpactDashboardScreen() {
             />
           }
         >
-          {/* Mia Journey Tracker — shown at top for Mia persona */}
-          {showMiaTracker ? (
-            <MiaJourneyTracker
-              currentLevel={miaJourneyLevel}
-              totalRides={miaData?.totalRides ?? 0}
-              onShareProgress={handleShareMiaProgress}
-            />
-          ) : null}
-
           {/* 0. Time Bank — Microlives */}
           {data ? (
             <View style={styles.card}>

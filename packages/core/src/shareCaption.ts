@@ -17,16 +17,10 @@ export type ShareCaptionInput =
       badgeName: string;
       tier?: string;
       rarity?: string;
-    }
-  | {
-      type: 'mia';
-      level: number;
-      levelTitle: string;
     };
 
 const BASE_HASHTAGS = '#DefensivePedal';
 const RIDE_HASHTAGS = `${BASE_HASHTAGS} #SaferCycling`;
-const MIA_HASHTAGS = `${BASE_HASHTAGS} #MiaJourney`;
 
 /**
  * Rounds to 1 decimal place, returning a string without a trailing ".0"
@@ -44,8 +38,8 @@ const roundInt = (value: number): string => String(Math.round(value));
 
 /**
  * Builds a human-readable English caption for sharing a ride, milestone,
- * badge, or Mia journey level-up. Output is intentionally short so it fits
- * Instagram, Twitter, and WhatsApp status limits without truncation.
+ * or badge. Output is intentionally short so it fits Instagram, Twitter,
+ * and WhatsApp status limits without truncation.
  *
  * All output is English regardless of device or app locale — share images
  * are crossposted, and a mixed-language caption reads badly.
@@ -87,11 +81,6 @@ export function buildShareCaption(input: ShareCaptionInput): string {
       if (rarity) suffixParts.push(rarity);
       const suffix = suffixParts.length > 0 ? ` — ${suffixParts.join(' · ')}` : '';
       return `Just earned the ${badgeName} badge on Defensive Pedal${suffix}. ${BASE_HASHTAGS}`;
-    }
-
-    case 'mia': {
-      const { level, levelTitle } = input;
-      return `Level ${level}: ${levelTitle} on Defensive Pedal. Riding safer every day. ${MIA_HASHTAGS}`;
     }
   }
 }

@@ -12,15 +12,15 @@
  *
  *   • sign-out (userId X → null): clear caches so the auth/onboarding screens
  *     don't flash the previous account's data and so ShareClaimProcessor /
- *     MiaJourneyTracker / Trophy Case don't keep stale projections while the
- *     next sign-in resolves.
+ *     Trophy Case don't keep stale projections while the next sign-in
+ *     resolves.
  *
  *   • account switch (userId X → Y where X ≠ Y): the common case. TanStack
- *     Query keys like ['badges'], ['tiers'], ['mia-journey', persona] are not
- *     user-scoped and will serve user A's data to user B until each query
- *     happens to refetch. Zustand persist keeps cachedImpact / cachedStreak /
- *     earnedMilestones / pendingBadgeUnlocks / Mia journey state between
- *     sessions, which is correct for a single user but wrong across accounts.
+ *     Query keys like ['badges'], ['tiers'] are not user-scoped and will
+ *     serve user A's data to user B until each query happens to refetch.
+ *     Zustand persist keeps cachedImpact / cachedStreak / earnedMilestones /
+ *     pendingBadgeUnlocks between sessions, which is correct for a single
+ *     user but wrong across accounts.
  *
  * What it SKIPS (by design):
  *   • initial sign-in (null → X): nothing to clear — first auth resolution.

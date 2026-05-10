@@ -22,12 +22,9 @@ import { tierColors } from '../src/design-system/tokens/badgeColors';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
-import { MiaInvitationPrompt } from '../src/design-system/organisms/MiaInvitationPrompt';
-import { MiaLevelUpOverlay } from '../src/design-system/organisms/MiaLevelUpOverlay';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
-import { useMiaJourney } from '../src/hooks/useMiaJourney';
 import {
   computeOnboardingGateTarget,
   useOnboardingGate,
@@ -52,49 +49,6 @@ const RouteTelemetryObserver = () => {
       app_variant: mobileEnv.appVariant,
     });
   }, [pathname]);
-
-  return null;
-};
-
-/** Enqueues an `app_open` telemetry event on mount and when the app returns to foreground.
- *  Debounced: only fires if the last app_open was >60 seconds ago. */
-const AppOpenTelemetryObserver = () => {
-  const lastAppOpenRef = useRef<number>(0);
-  const enqueueTelemetryEvent = useAppStore((s) => s.enqueueTelemetryEvent);
-  const authCtx = useAuthSessionOptional();
-
-  const enqueueAppOpen = useCallback(() => {
-    const now = Date.now();
-    if (now - lastAppOpenRef.current < 60_000) return;
-    lastAppOpenRef.current = now;
-
-    const state = useAppStore.getState();
-    enqueueTelemetryEvent({
-      eventType: 'app_open',
-      properties: {
-        persona: state.persona,
-        mia_level: state.miaJourneyLevel,
-        locale: state.locale,
-        anonymous: authCtx?.isAnonymous ?? true,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  }, [enqueueTelemetryEvent, authCtx?.isAnonymous]);
-
-  // Fire on mount
-  useEffect(() => {
-    enqueueAppOpen();
-  }, [enqueueAppOpen]);
-
-  // Fire when app comes back to foreground
-  useEffect(() => {
-    const subscription = RNAppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
-        enqueueAppOpen();
-      }
-    });
-    return () => subscription.remove();
-  }, [enqueueAppOpen]);
 
   return null;
 };
@@ -201,133 +155,6 @@ const OnboardingGuard = () => {
 };
 
 /**
- * Shows the MiaInvitationPrompt when behavioral detection conditions are met:
- * - persona is still 'alex' (not yet in Mia journey)
- * - miaPromptShown is false (hasn't been dismissed before)
- * - onboarding is completed
- * - user has opened the app 3+ times without starting a ride
- * - NOT during NAVIGATING state
- */
-const MiaInvitationPromptManager = () => {
-  const persona = useAppStore((s) => s.persona);
-  const miaPromptShown = useAppStore((s) => s.miaPromptShown);
-  const appState = useAppStore((s) => s.appState);
-  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
-  const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
-  const activateMiaJourney = useAppStore((s) => s.activateMiaJourney);
-  const setMiaPromptShown = useAppStore((s) => s.setMiaPromptShown);
-
-  const [visible, setVisible] = useState(false);
-
-  // Behavioral detection: show prompt when conditions are met
-  const shouldShow =
-    persona === 'alex' &&
-    !miaPromptShown &&
-    onboardingCompleted &&
-    anonymousOpenCount >= 3 &&
-    appState !== 'NAVIGATING';
-
-  useEffect(() => {
-    if (shouldShow) {
-      // Small delay so the app settles before showing the prompt
-      const timer = setTimeout(() => setVisible(true), 1500);
-      return () => clearTimeout(timer);
-    }
-    setVisible(false);
-  }, [shouldShow]);
-
-  const handleAccept = useCallback(() => {
-    setVisible(false);
-    // Activate on server + update local store
-    mobileApi.activateMia('behavioral').catch(() => {
-      // Offline — the store update stands, will sync later
-    });
-    activateMiaJourney('behavioral');
-  }, [activateMiaJourney]);
-
-  const handleDecline = useCallback(() => {
-    setVisible(false);
-    // Mark prompt as shown in persisted Zustand store
-    setMiaPromptShown();
-  }, [setMiaPromptShown]);
-
-  if (!visible) return null;
-
-  return (
-    <MiaInvitationPrompt
-      onAccept={handleAccept}
-      onDecline={handleDecline}
-    />
-  );
-};
-
-/**
- * Handles deep links with ?persona=mia query parameter.
- *
- * When the app opens from a referral link containing persona=mia,
- * auto-activates the Mia journey with source='contextual',
- * skipping the onboarding self-selection step.
- *
- * Only activates if the user isn't already in a Mia journey.
- */
-const MiaDeepLinkHandler = () => {
-  const persona = useAppStore((s) => s.persona);
-  const miaJourneyStatus = useAppStore((s) => s.miaJourneyStatus);
-  const activateMiaJourney = useAppStore((s) => s.activateMiaJourney);
-  const hasHandledRef = useRef(false);
-
-  const handleUrl = useCallback(
-    (url: string) => {
-      if (hasHandledRef.current) return;
-
-      try {
-        const parsed = Linking.parse(url);
-        const personaParam =
-          parsed.queryParams?.persona ?? parsed.queryParams?.['persona'];
-
-        if (personaParam === 'mia') {
-          // Only activate if not already in a Mia journey
-          const currentPersona = useAppStore.getState().persona;
-          const currentStatus = useAppStore.getState().miaJourneyStatus;
-
-          if (currentPersona === 'alex' && currentStatus == null) {
-            hasHandledRef.current = true;
-            mobileApi.activateMia('contextual').catch(() => {
-              // Offline — store update stands
-            });
-            activateMiaJourney('contextual');
-          }
-        }
-      } catch {
-        // Invalid URL — ignore silently
-      }
-    },
-    [activateMiaJourney],
-  );
-
-  useEffect(() => {
-    // Already in Mia journey — skip
-    if (persona === 'mia' || miaJourneyStatus != null) return;
-
-    // Handle the URL that opened the app (cold start)
-    void Linking.getInitialURL().then((url) => {
-      if (url) handleUrl(url);
-    });
-
-    // Handle deep links while the app is running (warm start)
-    const subscription = Linking.addEventListener('url', (event) => {
-      handleUrl(event.url);
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [persona, miaJourneyStatus, handleUrl]);
-
-  return null;
-};
-
-/**
  * Route-share deep-link handler (slice 2 of route-share PRD).
  *
  * Captures `https://routes.defensivepedal.com/r/<code>` universal links
@@ -335,10 +162,6 @@ const MiaDeepLinkHandler = () => {
  * and queues the claim by writing the code into Zustand. The
  * `ShareClaimProcessor` provider in AppProviders watches that slot and
  * runs the claim pipeline once auth-session is ready.
- *
- * Runs as a sibling to MiaDeepLinkHandler — both subscribe to
- * Linking.addEventListener independently, so the two handlers compose
- * without interfering with each other.
  *
  * URL parsing lives in `src/lib/shareDeepLinkParser.ts` so it can be
  * unit-tested and reused by the install-referrer + clipboard fallbacks
@@ -379,52 +202,6 @@ const RouteShareDeepLinkHandler = () => {
   return null;
 };
 
-/** Shows the MiaLevelUpOverlay when a level-up is queued in appStore. */
-const MiaLevelUpOverlayManager = () => {
-  const appState = useAppStore((s) => s.appState);
-  const pendingMiaLevelUp = useAppStore((s) => s.pendingMiaLevelUp);
-  const shiftMiaLevelUp = useAppStore((s) => s.shiftMiaLevelUp);
-  const miaJourney = useMiaJourney();
-
-  // Suppress during navigation (same as badges and rank-up)
-  if (!pendingMiaLevelUp || appState === 'NAVIGATING') return null;
-
-  const handleTestimonialSubmit = (text: string) => {
-    mobileApi.submitMiaTestimonial(text).catch(() => {
-      // Offline — testimonial lost, acceptable
-    });
-  };
-
-  // Derive share-card stats from the journey query. Falls back to zeros until
-  // the query resolves — the overlay renders immediately on level-up and we
-  // don't want to block the celebration waiting for data.
-  const journeyStats = miaJourney.data
-    ? {
-        totalRides: miaJourney.data.totalRides,
-        totalKm: 0, // Not in MiaJourneyState — distance stats live in the impact dashboard.
-        daysSinceStart: miaJourney.data.startedAt
-          ? Math.max(
-              0,
-              Math.floor(
-                (Date.now() - new Date(miaJourney.data.startedAt).getTime()) /
-                  (1000 * 60 * 60 * 24),
-              ),
-            )
-          : 0,
-      }
-    : undefined;
-
-  return (
-    <MiaLevelUpOverlay
-      fromLevel={pendingMiaLevelUp.fromLevel}
-      toLevel={pendingMiaLevelUp.toLevel}
-      onDismiss={() => shiftMiaLevelUp()}
-      onTestimonialSubmit={handleTestimonialSubmit}
-      stats={journeyStats}
-    />
-  );
-};
-
 const RootLayoutInner = () => {
   const { colors } = useTheme();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
@@ -449,7 +226,6 @@ const RootLayoutInner = () => {
     <>
       <StatusBar style="auto" />
       <RouteTelemetryObserver />
-      <AppOpenTelemetryObserver />
       <OnboardingGuard />
       <NavigationResumeGuard />
       {showValidationOverlay ? (
@@ -481,9 +257,6 @@ const RootLayoutInner = () => {
       />
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
-      <MiaLevelUpOverlayManager />
-      <MiaInvitationPromptManager />
-      <MiaDeepLinkHandler />
       <RouteShareDeepLinkHandler />
     </>
   );

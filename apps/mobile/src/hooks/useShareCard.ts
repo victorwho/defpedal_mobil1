@@ -43,12 +43,6 @@ export type ShareCardInput =
       readonly tier?: string;
       readonly rarity?: string;
       readonly card: ReactElement;
-    }
-  | {
-      readonly type: 'mia';
-      readonly level: number;
-      readonly levelTitle: string;
-      readonly card: ReactElement;
     };
 
 export interface UseShareCardReturn {
@@ -84,12 +78,6 @@ function toCaptionInput(input: ShareCardInput): ShareCaptionInput {
         badgeName: input.badgeName,
         tier: input.tier,
         rarity: input.rarity,
-      };
-    case 'mia':
-      return {
-        type: 'mia',
-        level: input.level,
-        levelTitle: input.levelTitle,
       };
   }
 }

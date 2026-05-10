@@ -460,14 +460,6 @@ export default function FeedbackScreen() {
             if (result.tierPromotion?.promoted) {
               setTierPromotion(result.tierPromotion);
             }
-            // Handle Mia level-up
-            if (result.miaLevelUp) {
-              const toLevel = result.miaLevelUp.toLevel;
-              useAppStore.getState().levelUpMia(toLevel as import('@defensivepedal/core').MiaJourneyLevel);
-              if (toLevel === 5) {
-                useAppStore.getState().completeMiaJourney();
-              }
-            }
           }
         }
         // Fetch dashboard for milestone detection

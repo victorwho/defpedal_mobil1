@@ -9,7 +9,7 @@ import { buildActivityFeedRoutes } from './routes/activity-feed';
 import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
-import { buildMiaRoutes } from './routes/mia';
+import { buildFirstRideNotificationRoutes } from './routes/firstRideNotifications';
 import { buildModerationRoutes } from './routes/moderation';
 import { buildRetentionRoutes } from './routes/retention';
 import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
@@ -137,7 +137,7 @@ export const buildApp = (options: {
     prefix: '/v1',
   });
 
-  void app.register(buildMiaRoutes(dependencies), {
+  void app.register(buildFirstRideNotificationRoutes(dependencies), {
     prefix: '/v1',
   });
 
