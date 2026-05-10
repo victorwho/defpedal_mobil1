@@ -1,92 +1,20 @@
 import type { NearbyHazard } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useReducedMotion } from '../../../design-system/hooks/useReducedMotion';
 import { brandColors, safetyColors } from '../../../design-system/tokens/colors';
+import { useAppStore } from '../../../store/appStore';
 
 // ---------------------------------------------------------------------------
-// Hoisted styles for Mapbox layer performance (avoid recreation on every render)
+// Hoisted constants
 // ---------------------------------------------------------------------------
 
-const hazardZoneBaseStyle = {
-  lineColor: safetyColors.dangerText, // #991B1B
-  lineWidth: 7,
-  lineOpacity: 0.55,
-  lineCap: 'round' as const,
-  lineJoin: 'round' as const,
-  lineEmissiveStrength: 1,
-};
-
-const hazardZoneStripeStyle = {
-  lineColor: safetyColors.danger, // #EF4444
-  lineWidth: 5,
-  lineDasharray: [1, 2],
-  lineOpacity: 0.7,
-  lineCap: 'butt' as const,
-  lineJoin: 'round' as const,
-  lineEmissiveStrength: 1,
-};
-
-/**
- * Individual hazard marker circle — only renders for features without
- * `point_count` (i.e., unclustered points).
- */
-const hazardMarkerStyle = {
-  circleColor: safetyColors.caution,
-  circleRadius: 9,
-  circleStrokeColor: brandColors.textPrimary,
-  circleStrokeWidth: 2,
-  circleOpacity: 0.9,
-  circleEmissiveStrength: 1,
-};
-
-const hazardMarkerLabelStyle = {
-  textField: '!',
-  textSize: 13,
-  textColor: brandColors.textPrimary,
-  textAllowOverlap: true,
-  textIgnorePlacement: true,
-  textEmissiveStrength: 1,
-};
-
-/**
- * Cluster bubble — color by worst-case severity in the cluster
- * (`clusterProperties.max_severity`: 1 = low / 2 = medium / 3 = high),
- * size scales with `point_count`.
- */
-const hazardClusterBubbleStyle = {
-  circleRadius: ['step', ['get', 'point_count'], 16, 5, 22, 15, 28] as any,
-  circleColor: [
-    'step',
-    ['get', 'max_severity'],
-    safetyColors.caution, // 1 (default / low)
-    2,
-    '#F57C00', // 2 medium (amber-orange) — inline per team-lead decision
-    3,
-    safetyColors.danger, // 3 high
-  ] as any,
-  circleStrokeColor: brandColors.textPrimary,
-  circleStrokeWidth: 2,
-  circleOpacity: 0.95,
-  circleEmissiveStrength: 1,
-};
-
-const hazardClusterCountStyle = {
-  textField: ['get', 'point_count_abbreviated'] as any,
-  textSize: 13,
-  textColor: brandColors.textInverse,
-  textAllowOverlap: true,
-  textIgnorePlacement: true,
-  textEmissiveStrength: 1,
-};
-
+const TRANSITION = { duration: 500, delay: 0 };
 const hazardHitbox = { width: 44, height: 44 };
 
-// ---------------------------------------------------------------------------
 // Cluster expression — maps hazardType to a severity tier (1/2/3). Hoisted to
 // avoid re-parsing per render.
-// ---------------------------------------------------------------------------
-
 const clusterProperties = {
   max_severity: [
     'max',
@@ -156,6 +84,133 @@ export const HazardLayers = React.memo(
   }: HazardLayersProps) => {
     const clusterSourceRef = useRef<Mapbox.ShapeSource | null>(null);
 
+    // ---------------------------------------------------------------------
+    // First-paint fade-in (Mapbox native opacity transition).
+    // Skipped during NAVIGATING — riders need hazards visible instantly.
+    // Skipped on reduced motion.
+    // ---------------------------------------------------------------------
+    const reducedMotion = useReducedMotion();
+    const isNavigating = useAppStore((s) => s.appState === 'NAVIGATING');
+    const skipFade = reducedMotion || isNavigating;
+    const [ramp, setRamp] = useState(skipFade ? 1 : 0);
+    const hasAnimatedRef = useRef(false);
+
+    useEffect(() => {
+      if (skipFade) {
+        setRamp(1);
+        hasAnimatedRef.current = true;
+        return;
+      }
+      if (
+        (hazardFeatureCollection.features.length > 0 ||
+          hazardZoneFeatureCollection.features.length > 0) &&
+        !hasAnimatedRef.current
+      ) {
+        hasAnimatedRef.current = true;
+        requestAnimationFrame(() => setRamp(1));
+      }
+    }, [hazardFeatureCollection, hazardZoneFeatureCollection, skipFade]);
+
+    // ---------------------------------------------------------------------
+    // Layer styles — multiplied by `ramp` so they fade in on first paint.
+    // Mapbox `*OpacityTransition` props animate the change natively.
+    // ---------------------------------------------------------------------
+    const hazardZoneBaseStyle = useMemo(
+      () => ({
+        lineColor: safetyColors.dangerText, // #991B1B
+        lineWidth: 7,
+        lineOpacity: ramp * 0.55,
+        lineOpacityTransition: TRANSITION,
+        lineCap: 'round' as const,
+        lineJoin: 'round' as const,
+        lineEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    const hazardZoneStripeStyle = useMemo(
+      () => ({
+        lineColor: safetyColors.danger, // #EF4444
+        lineWidth: 5,
+        lineDasharray: [1, 2],
+        lineOpacity: ramp * 0.7,
+        lineOpacityTransition: TRANSITION,
+        lineCap: 'butt' as const,
+        lineJoin: 'round' as const,
+        lineEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    const hazardMarkerStyle = useMemo(
+      () => ({
+        circleColor: safetyColors.caution,
+        circleRadius: 9,
+        circleStrokeColor: brandColors.textPrimary,
+        circleStrokeWidth: 2,
+        circleOpacity: ramp * 0.9,
+        circleOpacityTransition: TRANSITION,
+        circleStrokeOpacity: ramp,
+        circleStrokeOpacityTransition: TRANSITION,
+        circleEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    const hazardMarkerLabelStyle = useMemo(
+      () => ({
+        textField: '!',
+        textSize: 13,
+        textColor: brandColors.textPrimary,
+        textOpacity: ramp,
+        textOpacityTransition: TRANSITION,
+        textAllowOverlap: true,
+        textIgnorePlacement: true,
+        textEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    const hazardClusterBubbleStyle = useMemo(
+      () => ({
+        circleRadius: ['step', ['get', 'point_count'], 16, 5, 22, 15, 28] as any,
+        circleColor: [
+          'step',
+          ['get', 'max_severity'],
+          safetyColors.caution, // 1 (default / low)
+          2,
+          '#F57C00', // 2 medium (amber-orange)
+          3,
+          safetyColors.danger, // 3 high
+        ] as any,
+        circleStrokeColor: brandColors.textPrimary,
+        circleStrokeWidth: 2,
+        circleOpacity: ramp * 0.95,
+        circleOpacityTransition: TRANSITION,
+        circleStrokeOpacity: ramp,
+        circleStrokeOpacityTransition: TRANSITION,
+        circleEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    const hazardClusterCountStyle = useMemo(
+      () => ({
+        textField: ['get', 'point_count_abbreviated'] as any,
+        textSize: 13,
+        textColor: brandColors.textInverse,
+        textOpacity: ramp,
+        textOpacityTransition: TRANSITION,
+        textAllowOverlap: true,
+        textIgnorePlacement: true,
+        textEmissiveStrength: 1,
+      }),
+      [ramp],
+    );
+
+    // ---------------------------------------------------------------------
+    // Press handler
+    // ---------------------------------------------------------------------
     const handlePress = useCallback(
       (event: any) => {
         const feature = event?.features?.[0];

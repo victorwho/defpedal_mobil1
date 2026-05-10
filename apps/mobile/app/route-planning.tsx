@@ -37,6 +37,7 @@ import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
 import { Button } from '../src/design-system/atoms/Button';
 import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
+import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -1062,15 +1063,15 @@ export default function RoutePlanningScreen() {
       }
       rightOverlay={
         <Animated.View style={[styles.fabColumn, { opacity: uiOpacity }]} pointerEvents={uiCollapsed ? 'none' : 'auto'}>
-          <Pressable
+          <PressableScale
             style={styles.fabButton}
             onPress={() => { void refreshLocation(); setRecenterKey((k) => k + 1); }}
             accessibilityLabel="Center on current location"
             accessibilityRole="button"
           >
             <Ionicons name="locate" size={22} color={gray[700]} />
-          </Pressable>
-          <Pressable
+          </PressableScale>
+          <PressableScale
             style={[styles.fabButton, hazardPlacementMode && { backgroundColor: colors.accent }]}
             onPress={toggleHazardMode}
             accessibilityLabel={hazardPlacementMode ? 'Cancel hazard report' : 'Report hazard'}
@@ -1081,24 +1082,24 @@ export default function RoutePlanningScreen() {
               size={22}
               color={hazardPlacementMode ? gray[900] : colors.accent}
             />
-          </Pressable>
-          <Pressable
+          </PressableScale>
+          <PressableScale
             style={styles.fabButton}
             onPress={() => setNearbySheetOpen(true)}
             accessibilityLabel="Show nearby places"
             accessibilityRole="button"
           >
             <Ionicons name="layers-outline" size={22} color={gray[700]} />
-          </Pressable>
+          </PressableScale>
           {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
-            <Pressable
+            <PressableScale
               style={styles.fabButton}
               onPress={() => setSavedRoutesOpen(true)}
               accessibilityLabel="Saved routes"
               accessibilityRole="button"
             >
               <Ionicons name="bookmark" size={22} color={colors.accent} />
-            </Pressable>
+            </PressableScale>
           ) : null}
         </Animated.View>
       }

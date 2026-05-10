@@ -23,6 +23,7 @@ import {
   textXs,
 } from '../tokens/typography';
 import { darkTheme, gray } from '../tokens/colors';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -106,15 +107,50 @@ const formatETA = (remainingSec: number): string => {
 const GPS_STRONG_THRESHOLD = 10;
 const GPS_FAIR_THRESHOLD = 25;
 
-const getGpsSignalColor = (accuracy: number | null | undefined): string => {
-  if (accuracy == null) return gray[500]; // no fix
-  if (accuracy <= GPS_STRONG_THRESHOLD) return '#4CAF50'; // green
-  if (accuracy <= GPS_FAIR_THRESHOLD) return '#FFC107'; // amber
-  return '#F44336'; // red — poor
+/** Color tier index used to drive the dot's animated color. */
+const GPS_COLOR_TIERS = [gray[500], '#F44336', '#FFC107', '#4CAF50'] as const;
+
+const getGpsTier = (accuracy: number | null | undefined): 0 | 1 | 2 | 3 => {
+  if (accuracy == null) return 0; // gray — no fix
+  if (accuracy <= GPS_STRONG_THRESHOLD) return 3; // green
+  if (accuracy <= GPS_FAIR_THRESHOLD) return 2; // amber
+  return 1; // red — poor
 };
+
+const getGpsSignalColor = (accuracy: number | null | undefined): string =>
+  GPS_COLOR_TIERS[getGpsTier(accuracy)];
 
 const isGpsPoor = (accuracy: number | null | undefined): boolean =>
   accuracy == null || accuracy > GPS_FAIR_THRESHOLD;
+
+/**
+ * Animated GPS quality dot. Crossfades backgroundColor between the 4 tiers
+ * (none → red → amber → green) over 200ms instead of snapping. Reduced
+ * motion: snaps as before.
+ */
+const GpsQualityDot: React.FC<{ accuracy: number | null | undefined }> = ({ accuracy }) => {
+  const reduced = useReducedMotion();
+  const tier = getGpsTier(accuracy);
+  const tierProgress = useRef(new Animated.Value(tier)).current;
+
+  useEffect(() => {
+    Animated.timing(tierProgress, {
+      toValue: tier,
+      duration: reduced ? 0 : 200,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: false, // backgroundColor interpolation
+    }).start();
+  }, [tier, reduced, tierProgress]);
+
+  const animatedBg = tierProgress.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: [GPS_COLOR_TIERS[0], GPS_COLOR_TIERS[1], GPS_COLOR_TIERS[2], GPS_COLOR_TIERS[3]],
+  });
+
+  return (
+    <Animated.View style={[styles.gpsDotInner, { backgroundColor: animatedBg }]} />
+  );
+};
 
 /** Pulsating GPS icon shown only when signal is poor/lost. */
 const PulsingGpsIcon: React.FC<{ color: string }> = ({ color }) => {
@@ -188,7 +224,7 @@ export const ManeuverCard: React.FC<{
         ) : (
           <>
             {poor ? <PulsingGpsIcon color={gpsColor} /> : null}
-            <View style={[styles.gpsDotInner, { backgroundColor: gpsColor }]} />
+            <GpsQualityDot accuracy={gpsAccuracyMeters} />
           </>
         )}
       </View>
