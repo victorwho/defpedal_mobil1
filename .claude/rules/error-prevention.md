@@ -19,6 +19,8 @@ Before making any code changes, consult `.claude/error-log.md` for known pitfall
 13. **Installing Expo native packages?** Must be in `apps/mobile/package.json`, not just root — autolinking only reads the workspace (Error #22)
 14. **Using community native modules (non-Expo)?** Check `NativeModules.<BridgeName>` BEFORE `require()` — the module's invariant throw can escape try/catch (Error #23)
 15. **Adding `// eslint-disable-next-line some-rule`?** Confirm the rule is actually registered first by running `npx eslint <the-file>`. This repo does NOT ship `eslint-plugin-react-hooks`, so disables for `react-hooks/exhaustive-deps` and `react-hooks/rules-of-hooks` will themselves error and fail CI's lint-ratchet (Error #35)
+16. **Adding a new Postgres SELECT?** Don't trust columns named in nearby/legacy code — verify they actually exist in the live schema with `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='X'` before depending on them. Especially "denormalized aggregate" columns on `profiles` (`total_rides`, `last_ride_at`, `streak_count`) — these are convenience fields maintained by triggers/cron and may have been removed without dropping the column, or planned but never added (Error #39)
+17. **Local CI parity?** Pre-push hook only runs typecheck + lint, NOT `npm audit`. CI's Security audit step will fail on every push if a new high-severity advisory lands. Run `npm audit --audit-level=high` locally before relying on CI to catch dep regressions, and fix with `npm audit fix` for non-breaking advisories
 
 ## After every code change
 
