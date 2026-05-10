@@ -15,6 +15,7 @@ import { useCallback, useState } from 'react';
 import { Share } from 'react-native';
 
 import type { RouteOption } from '@defensivepedal/core';
+import { PLAY_STORE_URL } from '@defensivepedal/core';
 
 import {
   mobileApi,
@@ -171,9 +172,12 @@ export function useShareRoute(): UseShareRouteReturn {
 
         // Native share sheet. iOS prefers `url`; Android concatenates the
         // message. Passing both fields gives us the best behavior on both.
+        // PLAY_STORE_URL appended so recipients without the app have a
+        // one-tap install path; the route share webUrl stays as the
+        // primary CTA for users who already have the app installed.
         const shareResult = await Share.share(
           {
-            message: `${caption}\n${created.webUrl}`,
+            message: `${caption}\n${created.webUrl}\nGet Defensive Pedal: ${PLAY_STORE_URL}`,
             url: created.webUrl,
             title: 'Share this route',
           },

@@ -8,7 +8,7 @@
  * Also the deep-link target for slice-8a first-view pushes
  * (`data.deepLink = '/my-shares'`).
  */
-import { buildShareDeepLinks } from '@defensivepedal/core';
+import { buildShareDeepLinks, PLAY_STORE_URL } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -93,7 +93,12 @@ export default function MySharesScreen() {
   const handleShare = async (row: MyShareRowClient) => {
     try {
       const { webUrl } = buildShareDeepLinks(row.shortCode);
-      await Share.share({ message: webUrl, url: webUrl });
+      // Append the Play Store install URL so recipients without the app have
+      // a one-tap install path. The route share webUrl is preserved as the
+      // primary CTA for users who already have the app — Android renders
+      // both URLs as tappable links in any sharing surface.
+      const message = `${webUrl}\nGet Defensive Pedal: ${PLAY_STORE_URL}`;
+      await Share.share({ message, url: webUrl });
     } catch {
       // user dismissed — swallow silently
     }

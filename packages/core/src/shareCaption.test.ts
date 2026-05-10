@@ -92,7 +92,7 @@ describe('buildShareCaption — milestone', () => {
     });
 
     expect(caption).toBe(
-      'Unlocked the First 100 km milestone on Defensive Pedal (100 km total). #DefensivePedal',
+      'Unlocked the First 100 km milestone on Defensive Pedal (100 km total). #DefensivePedal https://play.google.com/store/apps/details?id=com.defensivepedal.mobile&pcampaignid=web_share',
     );
   });
 });
@@ -105,7 +105,7 @@ describe('buildShareCaption — badge', () => {
     });
 
     expect(caption).toBe(
-      'Just earned the Commuter badge on Defensive Pedal. #DefensivePedal',
+      'Just earned the Commuter badge on Defensive Pedal. #DefensivePedal https://play.google.com/store/apps/details?id=com.defensivepedal.mobile&pcampaignid=web_share',
     );
   });
 
@@ -173,5 +173,31 @@ describe('buildShareCaption — English-only', () => {
       badgeName: 'x',
     });
     expect(badge).toMatch(/Just earned the/);
+  });
+
+  it('always appends the public Play Store install URL', () => {
+    const expectedUrl =
+      'https://play.google.com/store/apps/details?id=com.defensivepedal.mobile&pcampaignid=web_share';
+
+    const ride = buildShareCaption({
+      type: 'ride',
+      distanceKm: 1,
+      durationMinutes: 1,
+      co2SavedKg: 0.1,
+    });
+    expect(ride).toContain(expectedUrl);
+
+    const milestone = buildShareCaption({
+      type: 'milestone',
+      milestoneTitle: 'x',
+      milestoneValue: 'y',
+    });
+    expect(milestone).toContain(expectedUrl);
+
+    const badge = buildShareCaption({
+      type: 'badge',
+      badgeName: 'x',
+    });
+    expect(badge).toContain(expectedUrl);
   });
 });

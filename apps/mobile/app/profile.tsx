@@ -21,6 +21,7 @@ import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
+import { PLAY_STORE_URL } from '@defensivepedal/core';
 import { mobileApi } from '../src/lib/api';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
@@ -326,9 +327,8 @@ export default function ProfileScreen() {
         </View>
         <Pressable
           onPress={() => {
-            const referralUrl = Linking.createURL('/');
             void Share.share({
-              message: `Try Defensive Pedal — safer cycling routes for any city. ${referralUrl} #DefensivePedal`,
+              message: `Try Defensive Pedal — safer cycling routes for any city. ${PLAY_STORE_URL} #DefensivePedal`,
             });
           }}
           style={styles.helpFaqRow}

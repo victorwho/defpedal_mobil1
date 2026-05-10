@@ -23,6 +23,16 @@ const BASE_HASHTAGS = '#DefensivePedal';
 const RIDE_HASHTAGS = `${BASE_HASHTAGS} #SaferCycling`;
 
 /**
+ * Public Play Store install URL for the production app. Appended to every
+ * shareable caption so recipients without the app installed have a one-tap
+ * path to install it. The `pcampaignid=web_share` query param is Google's
+ * canonical attribution suffix for share-driven installs and lights up the
+ * "Share" install source in Play Console.
+ */
+export const PLAY_STORE_URL =
+  'https://play.google.com/store/apps/details?id=com.defensivepedal.mobile&pcampaignid=web_share';
+
+/**
  * Rounds to 1 decimal place, returning a string without a trailing ".0"
  * unless the input has a fractional part. Keeps output compact in captions.
  */
@@ -66,12 +76,12 @@ export function buildShareCaption(input: ShareCaptionInput): string {
         hashtags.push('#LifeEarned');
       }
 
-      return `${parts.join(' ')} ${hashtags.join(' ')}`;
+      return `${parts.join(' ')} ${hashtags.join(' ')} ${PLAY_STORE_URL}`;
     }
 
     case 'milestone': {
       const { milestoneTitle, milestoneValue } = input;
-      return `Unlocked the ${milestoneTitle} milestone on Defensive Pedal (${milestoneValue}). ${BASE_HASHTAGS}`;
+      return `Unlocked the ${milestoneTitle} milestone on Defensive Pedal (${milestoneValue}). ${BASE_HASHTAGS} ${PLAY_STORE_URL}`;
     }
 
     case 'badge': {
@@ -80,7 +90,7 @@ export function buildShareCaption(input: ShareCaptionInput): string {
       if (tier) suffixParts.push(tier);
       if (rarity) suffixParts.push(rarity);
       const suffix = suffixParts.length > 0 ? ` — ${suffixParts.join(' · ')}` : '';
-      return `Just earned the ${badgeName} badge on Defensive Pedal${suffix}. ${BASE_HASHTAGS}`;
+      return `Just earned the ${badgeName} badge on Defensive Pedal${suffix}. ${BASE_HASHTAGS} ${PLAY_STORE_URL}`;
     }
   }
 }

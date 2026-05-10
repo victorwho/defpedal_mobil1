@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride } from '@defensivepedal/core';
+import { hasStartOverride, PLAY_STORE_URL } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -1319,7 +1319,7 @@ export default function RoutePlanningScreen() {
               const label = hazardToast.hazardType ?? 'hazard';
               const loc = hazardToast.coordinate!;
               void Share.share({
-                message: `⚠️ Cycling hazard reported: ${label} near ${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}. Stay safe! — Defensive Pedal`,
+                message: `⚠️ Cycling hazard reported: ${label} near ${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}. Stay safe! — Defensive Pedal ${PLAY_STORE_URL}`,
               });
             }}
             accessible={true}

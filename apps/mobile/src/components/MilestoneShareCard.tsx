@@ -11,6 +11,7 @@
 import React, { forwardRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 
+import { PLAY_STORE_URL } from '@defensivepedal/core';
 import { BrandLogo } from './BrandLogo';
 import { brandColors, darkTheme } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
@@ -162,7 +163,7 @@ export const MilestoneShareCard = forwardRef<View, MilestoneShareCardProps>(
 
 export const getMilestoneShareText = (milestoneKey: MilestoneKey): string => {
   const config = MILESTONE_CONFIGS[milestoneKey];
-  return `I just earned the "${config.title}" milestone on Defensive Pedal! ${config.subtitle} #DefensivePedal #SaferCycling`;
+  return `I just earned the "${config.title}" milestone on Defensive Pedal! ${config.subtitle} #DefensivePedal #SaferCycling ${PLAY_STORE_URL}`;
 };
 
 // ---------------------------------------------------------------------------
