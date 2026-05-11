@@ -199,23 +199,6 @@ export default () => ({
       '@rnmapbox/maps',
       ...sentryPluginEntries,
       [
-        // Pedal riding the bike, centred on brand yellow. Dark variant keeps
-        // the same illustration on a near-black backdrop so the line-art
-        // contrast still reads. Splash is native — APK must be rebuilt
-        // (./gradlew installDevelopmentDebug) for changes to land.
-        'expo-splash-screen',
-        {
-          backgroundColor: '#F2C744',
-          image: './assets/mascot/pedal-red-bike.png',
-          imageWidth: 220,
-          resizeMode: 'contain',
-          dark: {
-            backgroundColor: '#0F0F0F',
-            image: './assets/mascot/pedal-red-bike.png',
-          },
-        },
-      ],
-      [
         'expo-notifications',
         {
           icon: './assets/notification-icon.png',
