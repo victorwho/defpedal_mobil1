@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Line, Text as SvgText } from 'react-native-svg';
 
 import { useTheme, type ThemeColors } from '..';
+import { Mascot } from '../atoms/Mascot';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
@@ -107,9 +108,16 @@ export const ElevationChart = ({
 
   if (!chartData) return null;
 
+  // Climb cue when the route has meaningful elevation range (~100m+ between
+  // the route's min and max points). Suppressed when user has Pedal hidden.
+  const isHilly = chartData.displayMax - chartData.displayMin >= 100;
+
   return (
     <View style={styles.card}>
-      <Text style={styles.header}>Elevation</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>Elevation</Text>
+        {isHilly ? <Mascot pose="climb" width={28} /> : null}
+      </View>
       <View style={styles.chartContainer}>
         <Svg width="100%" height={CHART_HEIGHT} viewBox={`0 0 360 ${CHART_HEIGHT}`}>
           <Defs>
@@ -222,6 +230,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 0.6,
       fontSize: 11,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
     chartContainer: {
       overflow: 'hidden',

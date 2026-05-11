@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { WeatherWarning } from '../../lib/weather';
+import { Mascot } from '../atoms/Mascot';
 import { brandColors, gray, safetyColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
@@ -30,7 +31,7 @@ export const WeatherWarningModal = ({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Ionicons name="warning" size={28} color={safetyColors.caution} />
+            <Mascot pose="rain" size="sm" />
             <Text style={styles.title}>Weather Warning</Text>
           </View>
 
