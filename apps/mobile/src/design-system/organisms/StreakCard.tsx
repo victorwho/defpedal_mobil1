@@ -17,6 +17,7 @@ import { fontFamily, textDataLg, textSm, textXs } from '../tokens/typography';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 import { StreakChain } from './StreakChain';
+import { Mascot } from '../atoms/Mascot';
 import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
@@ -95,7 +96,10 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
           scrollable={false}
         />
       ) : (
-        <Text style={styles.encouragement}>{t('streak.startChain')}</Text>
+        <View style={styles.sleepyState}>
+          <Mascot pose="sleep" size="sm" />
+          <Text style={styles.encouragement}>{t('streak.startChain')}</Text>
+        </View>
       )}
 
       {/* Bottom row: longest + freeze status */}
@@ -160,6 +164,11 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body.medium,
     color: darkTheme.textMuted,
     textAlign: 'center',
+    paddingVertical: space[2],
+  },
+  sleepyState: {
+    alignItems: 'center',
+    gap: space[2],
     paddingVertical: space[2],
   },
   bottomRow: {

@@ -17,6 +17,7 @@ import {
 import type { BadgeUnlockEvent } from '@defensivepedal/core';
 
 import { BadgeIcon } from '../atoms/BadgeIcon';
+import { Mascot } from '../atoms/Mascot';
 import {
   tierColors,
   badgeAnimations,
@@ -279,6 +280,14 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
         <Text style={styles.flavorText}>{badge.flavorText}</Text>
       </Animated.View>
 
+      {/* Pedal reaction — fades in with the dismiss hint */}
+      <Animated.View
+        style={[styles.pedalReaction, { opacity: dismissOpacity }]}
+        pointerEvents="none"
+      >
+        <Mascot pose="cheer" size="md" />
+      </Animated.View>
+
       {/* Dismiss hint */}
       <Animated.View style={[styles.dismissHint, { opacity: dismissOpacity }]}>
         <Text style={styles.dismissText}>Tap to dismiss</Text>
@@ -381,6 +390,11 @@ const styles = StyleSheet.create({
   dismissHint: {
     position: 'absolute',
     bottom: 60,
+  },
+  pedalReaction: {
+    position: 'absolute',
+    bottom: 100,
+    right: space[4],
   },
   dismissText: {
     ...textXs,

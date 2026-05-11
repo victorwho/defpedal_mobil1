@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { ActivityCommentSheet } from '../src/design-system/organisms/ActivityCommentSheet';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { ActivityFeedCard } from '../src/design-system/organisms/ActivityFeedCard';
@@ -287,6 +288,7 @@ export default function CommunityFeedScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
+              <Mascot pose="stand" size="lg" />
               <Text style={styles.emptyTitle}>{t('communityScreen.noRidesNearby')}</Text>
               <Text style={styles.emptySubtitle}>
                 {t('communityScreen.beFirst')}

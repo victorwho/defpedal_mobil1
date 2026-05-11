@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../src/components/BrandLogo';
-import { Button, Surface, TextInput, ScreenHeader } from '../src/design-system/atoms';
+import { Button, Mascot, Surface, TextInput, ScreenHeader } from '../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -157,6 +157,7 @@ export default function AuthScreen() {
       >
         {/* Avatar + branding */}
         <View style={styles.avatarSection}>
+          <Mascot pose="stand" size="md" />
           <View style={styles.avatarCircle}>
             <BrandLogo size={64} />
           </View>

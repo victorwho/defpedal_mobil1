@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Screen } from '../src/components/Screen';
 import { useTheme, type ThemeColors } from '../src/design-system';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -81,6 +82,9 @@ export default function DeleteAccountScreen() {
   return (
     <Screen title={t('deleteAccount.title')} headerVariant="back" onBack={handleCancel}>
       <View style={styles.body}>
+        <View style={styles.sadPedal}>
+          <Mascot pose="sad" size="md" />
+        </View>
         <View style={styles.warningCard}>
           <Ionicons
             name="warning-outline"
@@ -169,6 +173,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingHorizontal: space[5],
       paddingTop: space[5],
       paddingBottom: space[8],
+    },
+    sadPedal: {
+      alignItems: 'center',
+      paddingBottom: space[4],
     },
     warningCard: {
       flexDirection: 'row',

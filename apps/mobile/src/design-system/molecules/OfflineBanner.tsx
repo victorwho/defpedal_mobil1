@@ -9,8 +9,10 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { useAppStore } from '../../store/appStore';
 import { useTheme } from '../ThemeContext';
 import { FadeSlideIn } from '../atoms/FadeSlideIn';
+import { Mascot } from '../atoms/Mascot';
 import { space } from '../tokens/spacing';
 import { radii } from '../tokens/radii';
 import { fontFamily, textSm } from '../tokens/typography';
@@ -36,6 +38,7 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
   visible,
 }) => {
   const { colors } = useTheme();
+  const showMascot = useAppStore((s) => s.showMascot);
 
   if (!visible) return null;
 
@@ -46,7 +49,11 @@ export const OfflineBanner: React.FC<OfflineBannerProps> = ({
         accessibilityRole="alert"
         accessibilityLabel={message}
       >
-        <Ionicons name="cloud-offline-outline" size={16} color={colors.caution} />
+        {showMascot ? (
+          <Mascot pose="binoculars" size="xs" />
+        ) : (
+          <Ionicons name="cloud-offline-outline" size={16} color={colors.caution} />
+        )}
         <Text
           style={[styles.text, { color: colors.cautionText }]}
           numberOfLines={2}

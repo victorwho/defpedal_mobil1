@@ -103,6 +103,7 @@ type AppStore = QueueSlice & {
   } | null;
   locale: 'en' | 'ro';
   themePreference: 'system' | 'dark' | 'light';
+  showMascot: boolean;
   ratingSkipCount: number;
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
@@ -125,6 +126,7 @@ type AppStore = QueueSlice & {
   clearTierPromotion: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
+  setShowMascot: (show: boolean) => void;
   incrementRatingSkipCount: () => void;
   setShowHistoryOverlay: (show: boolean) => void;
   setOnboardingCompleted: (completed: boolean) => void;
@@ -254,6 +256,7 @@ export const useAppStore = create<AppStore>()(
       cachedImpact: null,
       locale: 'en',
       themePreference: 'dark',
+      showMascot: true,
       ratingSkipCount: 0,
       showHistoryOverlay: false,
       notificationPermissionAsked: false,
@@ -331,6 +334,7 @@ export const useAppStore = create<AppStore>()(
       clearTierPromotion: () => set(() => ({ pendingTierPromotion: null })),
       setLocale: (locale) => set(() => ({ locale })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
+      setShowMascot: (show) => set(() => ({ showMascot: show })),
       incrementRatingSkipCount: () =>
         set((state) => ({ ratingSkipCount: state.ratingSkipCount + 1 })),
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
@@ -763,6 +767,7 @@ export const useAppStore = create<AppStore>()(
         ratingSkipCount: state.ratingSkipCount,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
+        showMascot: state.showMascot,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,

@@ -14,6 +14,7 @@ import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { stagger } from '../src/design-system/tokens/motion';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -262,7 +263,8 @@ export default function TripsScreen() {
           </View>
         ) : !trips?.length ? (
           <View style={styles.center}>
-            <Text style={styles.emptyTitle}>{t('tripsScreen.noRides')}</Text>
+            <Mascot pose="ride-point" size="lg" />
+            <Text style={[styles.emptyTitle, styles.emptyTitleSpaced]}>{t('tripsScreen.noRides')}</Text>
             <Text style={styles.emptyText}>
               {t('tripsScreen.noRidesSub')}
             </Text>
@@ -373,6 +375,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.heading.bold,
       color: colors.textPrimary,
       fontSize: 18,
+    },
+    emptyTitleSpaced: {
+      marginTop: space[4],
     },
     emptyText: {
       ...textBase,

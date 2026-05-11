@@ -4,7 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { Button } from '../../src/design-system/atoms';
+import { Button, Mascot } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { gray } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
@@ -138,6 +138,9 @@ export default function OnboardingSignupPromptScreen() {
         ) : <View style={styles.backButton} />}
 
         <View style={styles.headerSection}>
+          <View style={styles.mascotRow}>
+            <Mascot pose="point" size="md" />
+          </View>
           <Text style={styles.eyebrow}>Almost there</Text>
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>
@@ -285,6 +288,10 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     headerSection: {
       gap: space[2],
+    },
+    mascotRow: {
+      alignItems: 'center',
+      paddingBottom: space[2],
     },
     eyebrow: {
       ...textXs,

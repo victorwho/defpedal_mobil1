@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Surface } from '../../src/design-system/atoms/Card';
+import { Mascot } from '../../src/design-system/atoms/Mascot';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
@@ -102,6 +103,9 @@ export default function OnboardingGoalSelectionScreen() {
       </View>
 
       <View style={styles.headerSection}>
+        <View style={styles.mascotRow}>
+          <Mascot pose="ride" size="md" />
+        </View>
         <Text style={styles.eyebrow}>Your cycling goal</Text>
         <Text style={styles.title}>What brings you here?</Text>
         <Text style={styles.subtitle}>
@@ -167,6 +171,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
       paddingTop: space[6],
       paddingBottom: space[4],
+    },
+    mascotRow: {
+      alignItems: 'center',
+      paddingBottom: space[2],
     },
     eyebrow: {
       ...textXs,

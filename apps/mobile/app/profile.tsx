@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '../src/components/Screen';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { SettingRow } from '../src/design-system/molecules/SettingRow';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -131,7 +132,7 @@ export default function ProfileScreen() {
   // State values - grouped by section with shallow comparison
   const {
     locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
-    shareTripsPublicly, themePreference, showBicycleLanes, poiVisibility,
+    shareTripsPublicly, themePreference, showMascot, showBicycleLanes, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin,
   } = useAppStore(useShallow((state) => ({
@@ -143,6 +144,7 @@ export default function ProfileScreen() {
     showRouteComparison: state.showRouteComparison,
     shareTripsPublicly: state.shareTripsPublicly,
     themePreference: state.themePreference,
+    showMascot: state.showMascot,
     showBicycleLanes: state.showBicycleLanes,
     poiVisibility: state.poiVisibility,
     notifyWeather: state.notifyWeather,
@@ -156,7 +158,7 @@ export default function ProfileScreen() {
   // Actions - stable references, single selector with shallow comparison
   const {
     setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
-    setShowRouteComparison, setShareTripsPublicly, setThemePreference,
+    setShowRouteComparison, setShareTripsPublicly, setThemePreference, setShowMascot,
     setShowBicycleLanes, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin,
@@ -169,6 +171,7 @@ export default function ProfileScreen() {
     setShowRouteComparison: state.setShowRouteComparison,
     setShareTripsPublicly: state.setShareTripsPublicly,
     setThemePreference: state.setThemePreference,
+    setShowMascot: state.setShowMascot,
     setShowBicycleLanes: state.setShowBicycleLanes,
     setPoiVisibility: state.setPoiVisibility,
     setNotifyWeather: state.setNotifyWeather,
@@ -408,7 +411,7 @@ export default function ProfileScreen() {
                   <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
                 ) : (
                   <View style={styles.avatarPlaceholder}>
-                    <Ionicons name="camera-outline" size={22} color={gray[400]} />
+                    <Mascot pose="stand" width={36} />
                   </View>
                 )}
               </Pressable>
@@ -586,6 +589,13 @@ export default function ProfileScreen() {
                 </Pressable>
               ))}
             </View>
+
+            <SettingRow
+              label={t('profile.showMascot')}
+              description={showMascot ? t('profile.showMascotOn') : t('profile.showMascotOff')}
+              checked={showMascot}
+              onChange={setShowMascot}
+            />
 
             <SettingRow
               label={t('profile.showBikeLanes')}
@@ -954,6 +964,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: surfaceTints.whiteSubtle,
+      overflow: 'hidden',
     },
     userInfo: { flex: 1, gap: space[1] },
     userName: {

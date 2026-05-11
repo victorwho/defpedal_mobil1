@@ -18,3 +18,5 @@ export { riderTiers, getNextTier, getTierProgress, getXpToNextTier } from './tie
 export type { RiderTierKey } from './tierColors';
 export { hasTierImage } from './tierImages';
 export { HAZARD_ICONS, getHazardIcon } from './hazardIcons';
+export { mascotPoses, mascotSizes } from './mascotPoses';
+export type { MascotPose, MascotSize, MascotPoseAsset } from './mascotPoses';

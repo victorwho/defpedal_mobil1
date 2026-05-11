@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
 import { useTheme, type ThemeColors } from '../../src/design-system';
+import { Mascot } from '../../src/design-system/atoms/Mascot';
 import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
@@ -190,6 +191,7 @@ export default function OnboardingSafetyScoreScreen() {
       {/* Loading indicator */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
+          <Mascot pose="map" size="md" />
           <ActivityIndicator color={colors.accent} size="large" />
           <Text style={styles.loadingText}>Analyzing your neighborhood...</Text>
         </View>

@@ -9,10 +9,30 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { telemetry } from '../../lib/telemetry';
+import { useAppStore } from '../../store/appStore';
+import { Mascot } from '../atoms/Mascot';
 import { darkTheme } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, text2xl, textBase, textSm } from '../tokens/typography';
+
+// Small functional sub-component so we can use hooks inside the class boundary.
+// Falls back to the warning icon when the mascot is suppressed (opt-out or
+// during navigation), so the screen never renders without a visual anchor.
+function CrashIllustration(): React.ReactElement {
+  const showMascot = useAppStore((s) => s.showMascot);
+  const appState = useAppStore((s) => s.appState);
+  const mascotSuppressed = !showMascot || appState === 'NAVIGATING';
+
+  if (mascotSuppressed) {
+    return (
+      <View style={styles.iconContainer}>
+        <Ionicons name="warning-outline" size={48} color={darkTheme.caution} />
+      </View>
+    );
+  }
+  return <Mascot pose="trapeze" size="lg" accessibilityLabel="Pedal hanging from a trapeze" />;
+}
 
 // Lazy-loaded so a missing expo-updates native module (e.g. local dev build
 // without the package linked) cannot crash the error UI itself. Mirrors the
@@ -91,17 +111,15 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <View style={styles.container}>
           <View style={styles.content}>
-            {/* Icon */}
-            <View style={styles.iconContainer}>
-              <Ionicons name="warning-outline" size={48} color={darkTheme.caution} />
-            </View>
+            {/* Illustration — mascot when available, warning icon otherwise */}
+            <CrashIllustration />
 
             {/* Title */}
-            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.title}>Hang in there</Text>
 
             {/* Description */}
             <Text style={styles.description}>
-              The app encountered an unexpected error. You can try again or restart the app.
+              Something tripped us up. You can try again or restart the app.
             </Text>
 
             {/* Error details (dev only) */}

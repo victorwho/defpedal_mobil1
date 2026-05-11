@@ -32,6 +32,7 @@ import { CategoryTabBar } from '../src/design-system/organisms/CategoryTabBar';
 import { BadgeDetailModal } from '../src/design-system/organisms/BadgeDetailModal';
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { stagger } from '../src/design-system/tokens/motion';
 import { type BadgeTier, type BadgeCategory, badgeSpace } from '../src/design-system/tokens/badgeColors';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -314,6 +315,14 @@ export default function AchievementsScreen() {
                 total={tabCounts.all.total}
                 recentBadge={recentBadge}
               />
+              {tabCounts.all.earned === 0 ? (
+                <View style={styles.pedalIntroContainer}>
+                  <Mascot pose="binoculars" size="lg" />
+                  <Text style={styles.pedalIntroText}>
+                    No badges yet — let&apos;s spot your first one.
+                  </Text>
+                </View>
+              ) : null}
               <CategoryTabBar
                 selected={selectedTab}
                 onSelect={(tab) => {
@@ -393,5 +402,17 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       color: colors.textMuted,
       textAlign: 'center',
+    },
+    pedalIntroContainer: {
+      alignItems: 'center',
+      paddingTop: space[6],
+      paddingBottom: space[2],
+      gap: space[2],
+    },
+    pedalIntroText: {
+      ...textSm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      paddingHorizontal: space[6],
     },
   });

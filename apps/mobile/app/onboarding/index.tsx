@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BrandLogo } from '../../src/components/BrandLogo';
-import { Button } from '../../src/design-system/atoms';
+import { Button, Mascot } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
@@ -93,6 +93,7 @@ export default function OnboardingPermissionScreen() {
         bounces={false}
       >
         <View style={styles.topSection}>
+          <Mascot pose="wave" size="lg" />
           <BrandLogo size={48} />
           <Text style={styles.eyebrow}>Defensive Pedal</Text>
           <Text style={styles.title}>See how safe your streets are</Text>

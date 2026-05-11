@@ -21,6 +21,7 @@ import type { LeaderboardMetric, LeaderboardPeriod } from '@defensivepedal/core'
 import { useTheme, type ThemeColors } from '../ThemeContext';
 import { FadeSlideIn } from '../atoms/FadeSlideIn';
 import { LeaderboardRow } from '../atoms/LeaderboardRow';
+import { Mascot } from '../atoms/Mascot';
 import { SectionTitle } from '../atoms/SectionTitle';
 import { Button } from '../atoms/Button';
 import { radii } from '../tokens/radii';
@@ -72,9 +73,23 @@ export function LeaderboardSection() {
     return data.entries.some((e) => e.userId === data.userRank!.userId);
   }, [data]);
 
+  // Trophy celebration when the requesting user is currently #1
+  const userIsChampion = useMemo(() => {
+    if (!data) return false;
+    if (data.userRank?.rank === 1) return true;
+    return data.entries[0]?.isRequestingUser ?? false;
+  }, [data]);
+
   return (
     <View style={styles.container}>
-      <SectionTitle variant="accent">Neighborhood Leaderboard</SectionTitle>
+      <View style={styles.titleRow}>
+        <SectionTitle variant="accent">Neighborhood Leaderboard</SectionTitle>
+        {userIsChampion ? (
+          <View style={styles.championStamp}>
+            <Mascot pose="trophy" size="sm" />
+          </View>
+        ) : null}
+      </View>
 
       {/* Metric tab bar */}
       <View style={styles.tabBar}>
@@ -195,6 +210,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       padding: space[4],
       gap: space[3],
       ...shadows.md,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: space[2],
+    },
+    championStamp: {
+      marginRight: -space[1],
     },
     tabBar: {
       flexDirection: 'row',

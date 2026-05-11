@@ -57,3 +57,6 @@ export type { FollowButtonProps } from './FollowButton';
 
 export { ShareRouteButton } from './ShareRouteButton';
 export type { ShareRouteButtonProps, ShareRouteButtonVariant } from './ShareRouteButton';
+
+export { Mascot } from './Mascot';
+export type { MascotProps } from './Mascot';

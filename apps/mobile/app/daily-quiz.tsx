@@ -14,6 +14,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Screen } from '../src/components/Screen';
 import { Button } from '../src/design-system/atoms/Button';
+import { Mascot } from '../src/design-system/atoms/Mascot';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -180,6 +181,13 @@ export default function DailyQuizScreen() {
             <Text style={styles.categoryText}>{question.category}</Text>
           </View>
 
+          {/* Pedal hero — study pose, only before answer */}
+          {!answer ? (
+            <View style={styles.quizMascot}>
+              <Mascot pose="study" size="md" />
+            </View>
+          ) : null}
+
           {/* Question */}
           <Text style={styles.questionText}>{question.questionText}</Text>
 
@@ -202,12 +210,8 @@ export default function DailyQuizScreen() {
           {/* Feedback */}
           {answer ? (
             <Animated.View style={[styles.feedbackCard, { opacity: feedbackOpacity }]}>
-              <View style={styles.feedbackHeader}>
-                <Ionicons
-                  name={answer.isCorrect ? 'checkmark-circle' : 'information-circle'}
-                  size={22}
-                  color={answer.isCorrect ? colors.safe : colors.caution}
-                />
+              <View style={styles.feedbackReactionRow}>
+                <Mascot pose={answer.isCorrect ? 'cheer' : 'sad'} size="sm" />
                 <Text
                   style={[
                     styles.feedbackTitle,
@@ -336,6 +340,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: space[2],
+    },
+    feedbackReactionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+    },
+    quizMascot: {
+      alignItems: 'center',
     },
     feedbackTitle: {
       ...textLg,

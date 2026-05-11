@@ -7,6 +7,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 
 import { AnimatedCounter } from '../design-system/atoms/AnimatedCounter';
 import { BadgeIcon } from '../design-system/atoms/BadgeIcon';
+import { Mascot } from '../design-system/atoms/Mascot';
 import { brandColors, darkTheme, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { shadows } from '../design-system/tokens/shadows';
@@ -150,6 +151,11 @@ export const ImpactSummaryCard = ({
 
   return (
     <View style={styles.card}>
+      {/* Holographic Pedal stamp — celebration cue for completed rides */}
+      <View style={styles.stickerStamp} pointerEvents="none">
+        <Mascot pose="sticker" size="sm" />
+      </View>
+
       {/* Badges earned this ride */}
       {newBadges && newBadges.length > 0 ? (
         <View style={styles.badgesSection}>
@@ -258,6 +264,13 @@ const styles = StyleSheet.create({
     padding: space[5],
     gap: space[5],
     ...shadows.lg,
+  },
+  stickerStamp: {
+    position: 'absolute',
+    top: -16,
+    right: -8,
+    transform: [{ rotate: '8deg' }],
+    zIndex: 2,
   },
   sectionTitle: {
     ...textSm,
