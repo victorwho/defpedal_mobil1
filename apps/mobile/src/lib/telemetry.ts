@@ -69,6 +69,37 @@ export const enableSentry = () => {
         app_variant: mobileEnv.appVariant,
       },
     },
+    beforeSend: (event) => {
+      // Inject app_variant onto every event, including AppExitInfo-captured
+      // ANRs from a prior process. initialScope tags only apply to events
+      // created after Sentry.init runs in the JS layer — but the native
+      // AnrIntegration v2 polls Android's ApplicationExitInfo on next launch
+      // and emits events that pre-date this init, so they miss initialScope.
+      // Mutating in beforeSend covers both code paths.
+      event.tags = {
+        ...event.tags,
+        app_env: mobileEnv.appEnv,
+        app_variant: mobileEnv.appVariant,
+      };
+
+      // Drop AppExitInfo-mechanism ANRs in development. They're post-mortem
+      // detections of background ANRs that Android attributed to our process
+      // on tester hardware; the stack trace points at stock Expo init code
+      // (MainApplication.onCreate → ApplicationLifecycleDispatcher), not at
+      // our code, and the events are dominated by low-end devices waking
+      // cold from BOOT_COMPLETED / FCM. Keeps the dev Sentry project signal
+      // useful. Preview and production still receive these events.
+      if (mobileEnv.sentryEnvironment === 'development') {
+        const hasAppExitInfoMechanism = event.exception?.values?.some(
+          (value) => value.mechanism?.type === 'AppExitInfo',
+        );
+        if (hasAppExitInfoMechanism) {
+          return null;
+        }
+      }
+
+      return event;
+    },
   });
   sentryEnabled = true;
 };
