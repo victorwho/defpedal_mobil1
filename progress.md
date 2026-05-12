@@ -974,3 +974,61 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - **Cumulative test impact**: +113 tests. Core 345 → 383. Mobile 612 → 649 passing (pre-existing 4 failures unchanged: ConnectivityMonitor x3, FeedCard.champion, LeaderboardSection).
 - Evidence: `npm run typecheck` passes (0 errors), `npm run check:bundle` HTTP 200.
 - **Dev APK rebuild required** to activate the 3 new native modules: `cd apps/mobile/android && ./gradlew installDevelopmentDebug`. Until then, `shareImage` fails soft with a guarded warning (Error #23 pattern, same as offline NetInfo).
+
+### Feat: Pedal Mascot System — Brand Personality Across Emotional Touchpoints (2026-05-11/12)
+
+- Status: Done. Commits `4a26e10` (Phase 1+2), `63f8ff1` (Phase 3), `77e7bb0` (splash revert). 20 in-app placements live on `origin/main`.
+- Goal: Give the app a friendlier, more alive feel by inserting a brand mascot ("Pedal" — friendly white poodle in yellow helmet/vest) at high-emotion moments while keeping safety-critical surfaces clean.
+
+- **Foundation** (one-time, unlocks every placement):
+  - `<Mascot pose size width accessibilityLabel />` atom — `src/design-system/atoms/Mascot.tsx`. Decorative-by-default for screen readers, explicit `width` override for fitting inside fixed containers, `resizeMode="contain"`, no layout shift.
+  - 19-pose typed token map — `src/design-system/tokens/mascotPoses.ts`. Single source of truth (filename + aspectRatio). All assets ship as RGBA PNG-24 at 1080×1350 portrait (trapeze is 536×466, sticker is 1080×1350).
+  - `showMascot: boolean` persisted Zustand preference (default `true`) + "Show Pedal the dog" toggle in Profile > Display. en + ro i18n.
+  - **Safety quarantine baked into the atom**: returns null when `appState === 'NAVIGATING'` OR `showMascot === false`. Pedal never appears over the nav HUD, hazard alerts, off-route banner, or low-GPS UI — same discipline that forces dark theme during nav.
+
+- **20 placements across 3 phases**:
+  - **Phase 1 — Emotional peaks (12 placements, commit `4a26e10`)**:
+    - `onboarding/index` welcome — wave pose
+    - `onboarding/safety-score` loading — map pose ("studying your area")
+    - `onboarding/goal-selection` — ride pose (aspirational hero)
+    - `onboarding/signup-prompt` — point pose (gentle CTA nudge)
+    - `auth.tsx` — stand pose (brand greeting)
+    - `ImpactSummaryCard` corner — holographic sticker stamp on every completed ride
+    - `achievements.tsx` (Trophy Case) — binoculars pose when `tabCounts.all.earned === 0` (sits in ListHeaderComponent, NOT ListEmptyComponent — that branch is unreachable because the badge grid is never empty)
+    - `BadgeUnlockOverlay` — cheer pose with confetti, bottom-right corner, fades in with dismiss hint
+    - `ErrorBoundary` — trapeze pose ("Hang in there — something tripped us up")
+    - `OfflineBanner` — binoculars pose (xs size, with Ionicon fallback when `showMascot=false`)
+    - `trips.tsx` empty state — ride-point pose
+    - `community-feed.tsx` empty state — stand pose
+  - **Phase 2 — Wishlist poses & accents (5 placements, same commit `4a26e10`)**:
+    - Profile avatar default — stand pose (36 px width override, inside the 52×52 dashed circle, `overflow: hidden` added)
+    - `daily-quiz.tsx` hero — study pose (pre-answer)
+    - `daily-quiz.tsx` feedback — cheer (correct) / sad (wrong)
+    - `delete-account.tsx` — sad pose above the warning card
+    - `StreakCard` — sleep pose when `currentStreak === 0`
+    - `LeaderboardSection` title row — trophy pose when user is rank #1
+  - **Phase 3 — Remaining wishlist (2 placements, commit `63f8ff1`)**:
+    - `WeatherWarningModal` header — rain pose (replaces warning icon)
+    - `ElevationChart` header — climb pose (28 px) when route's min→max elevation range ≥ 100 m
+
+- **Skipped placements** (no natural anchor):
+  - FAQ — no search field, no empty state
+  - Push notification permission rationale — app uses OS prompt directly, no in-app screen
+
+- **Unused poses still in token map** (waiting for natural anchors):
+  - `phone` — for future notification rationale screen
+  - `lock` — for bicycle-parking POI tooltip
+  - `excited` — earmarked for special-event app icon variant
+
+- **Splash screen — attempted and reverted (commit `77e7bb0`)**:
+  - Tried `expo-splash-screen` plugin in `app.config.ts` with Pedal riding-bike image + brand yellow background. Reverted because:
+    1. Android 12+ system splash enforces a circular icon mask (~108 dp). Pedal portrait gets cropped.
+    2. `app.config.ts` plugins only apply during `expo prebuild` — direct `./gradlew installDevelopmentDebug` skips them. Manual native edits to `colors.xml` + `drawable-*/splashscreen_logo.png` are required for "bare" Android setups.
+    3. User attempted a `expo-video` JS overlay splash with their own MP4 animation — didn't ship final UX preference.
+  - All native splash files restored to factory-like defaults: `splashscreen_background=#FFFFFF`, `values-night/colors.xml` empty, `splashscreen_logo.png` (×5 densities) → `assets/icon.png` (closest approximation since original Expo placeholder logos were overwritten and unrecoverable without `expo prebuild --clean`).
+  - User's `splash_video.mp4` preserved at `design-work/mascot/splash_video.mp4` for any future use.
+  - `expo-video` dependency uninstalled. `PedalSplashOverlay` component deleted.
+
+- **Assets**: 19 transparent RGBA PNGs in `apps/mobile/assets/mascot/` (~13 MB). `pedal-sticker.png` and `pedal-excited.png` still at 1755×2194 awaiting a tinypng pass — others already at 1080×1350.
+- **Wishlist prompts**: `design-work/mascot/wishlist-prompts.md` — 10 Gemini prompts for the wishlist poses (used 8 of 10 — phone, lock unused).
+- Evidence: `npm run typecheck` 0 errors at every commit, `npm run check:bundle` HTTP 200 at every commit, pre-push hook (typecheck + lint-ratchet) passed on every push.
