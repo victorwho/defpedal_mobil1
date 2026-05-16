@@ -29,7 +29,7 @@ import { ScreenHeader } from '../../src/design-system/atoms/ScreenHeader';
 import { Toast } from '../../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { ElevationChart } from '../../src/design-system/organisms/ElevationChart';
-import { gray, safetyColors } from '../../src/design-system/tokens/colors';
+import { brandColors, gray, safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
@@ -276,7 +276,7 @@ export default function TripDetailScreen() {
     );
   }
 
-  const plannedColor = trip.routingMode === 'safe' ? safetyColors.safe : '#EF4444';
+  const plannedColor = trip.routingMode === 'safe' ? safetyColors.safe : safetyColors.danger;
   const hasTrail = trailCoords.length >= 2;
   const hasMapData = hasTrail || (plannedCoords && plannedCoords.length >= 2);
 
@@ -345,7 +345,7 @@ export default function TripDetailScreen() {
           <View
             style={[
               styles.modeBadge,
-              { backgroundColor: trip.routingMode === 'safe' ? safetyColors.safe : '#EF4444' },
+              { backgroundColor: trip.routingMode === 'safe' ? safetyColors.safe : safetyColors.danger },
             ]}
           >
             <Text style={styles.modeBadgeText}>
@@ -401,7 +401,7 @@ export default function TripDetailScreen() {
             />
             <StatTile
               icon="heart-outline"
-              iconColor="#F2C30F"
+              iconColor={colors.accent}
               label="Life earned"
               value={microlives > 0 ? `+${formatMicrolivesAsTime(microlives)}` : '—'}
               hint={impactQuery.isLoading ? 'Loading…' : undefined}
@@ -409,7 +409,7 @@ export default function TripDetailScreen() {
             />
             <StatTile
               icon="people-outline"
-              iconColor="#F2C30F"
+              iconColor={colors.accent}
               label="Donated to city"
               value={communitySeconds > 0 ? formatCommunitySeconds(communitySeconds) : '—'}
               hint={impactQuery.isLoading ? 'Loading…' : undefined}
@@ -586,7 +586,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     modeBadgeText: {
       ...textXs,
-      color: '#FFFFFF',
+      color: brandColors.textPrimary,
       fontFamily: fontFamily.heading.bold,
       fontSize: 10,
       textTransform: 'uppercase',
