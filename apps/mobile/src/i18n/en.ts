@@ -365,6 +365,7 @@ export const en = {
     deleteCancel: 'Cancel',
     deleteConfirm: 'Delete',
     deleteFailed: 'Could not delete the trip. Please try again.',
+    noGpsTrail: 'No GPS trail recorded for this trip.',
   },
 
   // ── Community ──

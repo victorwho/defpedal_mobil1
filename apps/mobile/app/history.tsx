@@ -6,7 +6,7 @@ import {
   formatCo2Saved,
 } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -91,7 +91,6 @@ export default function HistoryScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['user-stats'],
@@ -114,8 +113,11 @@ export default function HistoryScreen() {
     staleTime: 60_000,
   });
 
-  const handleToggle = useCallback((tripId: string) => {
-    setExpandedId((prev) => (prev === tripId ? null : tripId));
+  const handleOpenTrip = useCallback((tripId: string) => {
+    // Push to the dedicated detail screen — matches the Trips tab behavior
+    // so users get the full interactive map, elevation chart, and stats
+    // regardless of which History surface they tap from.
+    router.push(`/trip/${tripId}` as any);
   }, []);
 
   const shareRide = useShareRide();
@@ -162,14 +164,14 @@ export default function HistoryScreen() {
       <FadeSlideIn delay={Math.min(index * 50, 300)}>
         <TripCard
           trip={item}
-          expanded={expandedId === item.id}
-          onToggle={() => handleToggle(item.id)}
+          expanded={false}
+          onToggle={() => handleOpenTrip(item.id)}
           onSharePress={handleShareTrip}
           sharePending={shareRide.isSharing}
         />
       </FadeSlideIn>
     ),
-    [expandedId, handleToggle, handleShareTrip, shareRide.isSharing],
+    [handleOpenTrip, handleShareTrip, shareRide.isSharing],
   );
 
   // ── Derived stat values ──

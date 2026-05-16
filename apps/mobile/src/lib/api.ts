@@ -559,6 +559,15 @@ export const mobileApi = {
   fetchRideImpact: (tripId: string) =>
     requestJson<RideImpact>(`/v1/rides/${tripId}/impact`),
 
+  fetchElevationProfile: (coordinates: ReadonlyArray<[number, number]>) =>
+    requestJson<{ elevationProfile: number[]; elevationGain: number; elevationLoss: number }>(
+      '/v1/elevation-profile',
+      {
+        method: 'POST',
+        body: JSON.stringify({ coordinates }),
+      },
+    ),
+
   fetchBadges: () =>
     requestJson<BadgeResponse>('/v1/badges'),
 

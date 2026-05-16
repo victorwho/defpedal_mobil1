@@ -1032,3 +1032,39 @@ For normal day-to-day feature work, we also recognize a softer milestone:
 - **Assets**: 19 transparent RGBA PNGs in `apps/mobile/assets/mascot/` (~13 MB). `pedal-sticker.png` and `pedal-excited.png` still at 1755×2194 awaiting a tinypng pass — others already at 1080×1350.
 - **Wishlist prompts**: `design-work/mascot/wishlist-prompts.md` — 10 Gemini prompts for the wishlist poses (used 8 of 10 — phone, lock unused).
 - Evidence: `npm run typecheck` 0 errors at every commit, `npm run check:bundle` HTTP 200 at every commit, pre-push hook (typecheck + lint-ratchet) passed on every push.
+
+### Feat: Dedicated trip detail screen (v0.2.50, 2026-05-16)
+
+- Status: Done. Shipped as preview v0.2.50 (versionCode 52) to Firebase `early-access-preview`.
+- Goal: Replace the cramped inline expand in the trips list with a Strava-style detail page that has a real interactive map, elevation profile, and a full stats grid.
+
+- **New screen** `apps/mobile/app/trip/[id].tsx` (Expo Router dynamic route):
+  - Map at fixed 300 px with native Mapbox gestures (pinch/pan/zoom/rotate). The wrapper View uses passive `onTouchStart`/`onTouchEnd`/`onTouchCancel` listeners that toggle a `mapInteracting` state; the parent ScrollView reads `scrollEnabled={!mapInteracting}` so it pauses pan while a finger is on the map. Passive `onTouch*` props don't claim the responder, so Mapbox keeps native gesture handling. **First attempt without this lock fought the ScrollView's pan recognizer — pinch/pan needed multiple tries and the page often scrolled instead.**
+  - `ElevationChart` underneath, fed by a new `mobileApi.fetchElevationProfile(coords)` wrapper around the existing `POST /v1/elevation-profile` endpoint. Lazy via TanStack Query, 24 h cache (elevation is static). Falls back to the planned polyline when no GPS trail exists; hides the section entirely when neither is available.
+  - 2-column stats grid: Distance · Avg speed · CO₂ saved · Money saved · Life earned · Donated to city · Total time. Distance/speed/CO₂ are client-derived from `TripHistoryItem`; money/microlives/communitySeconds come from `GET /v1/rides/:tripId/impact` (`fetchRideImpact`, lazy, no XP re-award per progress.md 2026-04-13 fix). "—" placeholders + "Loading…" hints during the impact query.
+  - Badges-earned row (horizontal scroll) reading `RideImpact.newBadges` — the badges unlocked specifically on that ride, same shape as the post-ride impact screen. Section hides when `newBadges.length === 0`.
+  - Share button in the `ScreenHeader` `rightAccessory` slot, wired to the shared `useShareRide` hook (1080×1080 `RideShareCard` + Mapbox Static + native share sheet). Same data extraction pattern as `trips.tsx` / `feedback.tsx`: GPS trail first, decoded planned polyline fallback. Failure toast routed through `shareRide.toastMessage`.
+  - Delete button moved from the inline TripCard expand into the detail screen. Confirmation Alert uses the existing `tripsScreen.delete*` i18n keys. On success: optimistic prune of the `trip-history` cache + invalidation of `stats-dashboard`, then `router.back()`.
+  - Loading guard: while `trips` query is hydrating, render header with placeholder title "Trip" and a centered ActivityIndicator instead of pushing through with an `undefined` trip.
+
+- **Navigation wiring**:
+  - `apps/mobile/app/trips.tsx`: tap on a non-compare-mode row now `router.push('/trip/${tripId}' as any)` instead of toggling inline expand. Dropped `expandedId` state, the `deleteTripMutation`, `handleDeleteTrip`, `deletingId` state, `deleteToast` state, `Alert` import, `useMutation` import, `useQueryClient` import — all unreachable after the migration.
+  - `apps/mobile/app/history.tsx` (History tab landing): same change — tap on a Trip card pushes to `/trip/[id]`. `handleToggle` → `handleOpenTrip`, `expandedId` state removed, `useState` import removed. **History card list now matches Trips list behavior — single canonical "view this ride" path.**
+
+- **API surface**:
+  - `apps/mobile/src/lib/api.ts`: added `fetchElevationProfile(coordinates: ReadonlyArray<[number, number]>)` wrapper that POSTs to `/v1/elevation-profile`. Server endpoint pre-existed; previously only invoked inline from `apps/mobile/src/lib/mapbox-routing.ts:256`. No server changes.
+
+- **i18n**:
+  - `apps/mobile/src/i18n/en.ts` + `ro.ts`: added `tripsScreen.noGpsTrail` for the map empty-state when neither GPS trail nor planned polyline is present (rare — only "stopped" trips with permission revoked mid-ride).
+
+- **Cap-style cert (caught by apksigner, not keytool)**: `keytool -printcert -jarfile` returned "Not a signed jar file" — modern APKs are signed with v2/v3/v4 only, not v1/JAR. The release workflow should use `apksigner verify --print-certs` instead. Path on this host: `C:\Users\Victor\AppData\Local\Android\Sdk\build-tools\36.0.0\apksigner.bat`. Cert verified: SHA-256 `82:7C:FD:44:D3:58:88:C5:7E:35:37:6D:17:70:81:CE:84:61:13:49:BD:06:80:E0:3D:9D:6E:D2:A9:6F:35:73` (upload keystore, owner CN=Victor Rotariu). **This is worth baking into `feedback_aab-build-caveat.md` — the memory says "verify cert owner after build" but doesn't specify the tool.**
+
+- **Releases on this branch**:
+  - v0.2.49 (vc 51) — initial detail-screen ship to Firebase. Tester report: map gestures wonky, often scrolls the page instead. → Diagnosed as ScrollView pan stealing.
+  - v0.2.50 (vc 52) — gesture fix + history-tab tap wiring + share button. Cert verified, audit passed, distributed. Tester release URL: `appdistribution.firebase.google.com/testerapps/.../releases/3bo51a4e75iig`.
+
+- **Untouched on purpose**:
+  - `TripCard` organism still has `onDeletePress`/`deletePending`/`deleteLabel` props and the `expanded && onDeletePress` branch — dead surface area, but removing it would create unnecessary churn. Leave for a future refactor pass.
+  - `apps/mobile/app/history.tsx`'s Trips card list is now navigate-on-tap, but the dashboard sections above it (Stats, streak, daily quiz) are unchanged. History remains the rich landing tab; `/trips` remains the flat list.
+
+- Evidence: `npm run typecheck` 0 errors (api + mobile + web). `npm run check:bundle` HTTP 200. Preview build clean in 1m 39s, audit passed, bundle 88s fresh, distributed to Firebase early-access-preview.

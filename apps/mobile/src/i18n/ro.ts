@@ -367,6 +367,7 @@ export const ro: TranslationKeys = {
     deleteCancel: 'Anulează',
     deleteConfirm: 'Șterge',
     deleteFailed: 'Cursa nu a putut fi ștearsă. Încearcă din nou.',
+    noGpsTrail: 'Nu există traseu GPS pentru această cursă.',
   },
 
   // ── Community ──

@@ -5,9 +5,9 @@ import {
   decodePolyline,
 } from '@defensivepedal/core';
 import { router, useFocusEffect } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
@@ -33,12 +33,8 @@ export default function TripsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
-  const queryClient = useQueryClient();
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteToast, setDeleteToast] = useState<string | null>(null);
   const shareRide = useShareRide();
 
   const handleShareTrip = useCallback((trip: TripHistoryItem) => {
@@ -103,48 +99,6 @@ export default function TripsScreen() {
     }, [refetch, user]),
   );
 
-  const deleteTripMutation = useMutation({
-    mutationFn: (tripId: string) => mobileApi.deleteTrip(tripId),
-    onMutate: (tripId) => {
-      setDeletingId(tripId);
-    },
-    onSuccess: async (_data, tripId) => {
-      // Optimistically prune from the cache so the row disappears immediately;
-      // then invalidate so any aggregate views refetch fresh.
-      queryClient.setQueryData<TripHistoryItem[] | undefined>(
-        ['trip-history'],
-        (prev) => prev?.filter((t) => t.id !== tripId),
-      );
-      if (expandedId === tripId) setExpandedId(null);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['trip-history'] }),
-        queryClient.invalidateQueries({ queryKey: ['stats-dashboard'] }),
-      ]);
-    },
-    onError: () => {
-      setDeleteToast(t('tripsScreen.deleteFailed'));
-    },
-    onSettled: () => {
-      setDeletingId(null);
-    },
-  });
-
-  const handleDeleteTrip = useCallback((trip: TripHistoryItem) => {
-    Alert.alert(
-      t('tripsScreen.deleteTitle'),
-      t('tripsScreen.deleteMessage'),
-      [
-        { text: t('tripsScreen.deleteCancel'), style: 'cancel' },
-        {
-          text: t('tripsScreen.deleteConfirm'),
-          style: 'destructive',
-          onPress: () => deleteTripMutation.mutate(trip.id),
-        },
-      ],
-      { cancelable: true },
-    );
-  }, [deleteTripMutation, t]);
-
   const handleToggle = useCallback((tripId: string) => {
     if (compareMode) {
       setSelectedIds((prev) => {
@@ -154,7 +108,10 @@ export default function TripsScreen() {
       });
       return;
     }
-    setExpandedId((prev) => (prev === tripId ? null : tripId));
+    // Push to the dedicated detail screen instead of expanding inline. The
+    // detail view has a full-height interactive map, elevation chart, and
+    // ride-impact stats that don't fit comfortably in the list row.
+    router.push(`/trip/${tripId}` as any);
   }, [compareMode]);
 
   const handleCompare = useCallback(() => {
@@ -195,11 +152,8 @@ export default function TripsScreen() {
           <View style={styles.tripCardWrapper}>
             <TripCard
               trip={item}
-              expanded={expandedId === item.id}
+              expanded={false}
               onToggle={() => handleToggle(item.id)}
-              onDeletePress={handleDeleteTrip}
-              deletePending={deletingId === item.id}
-              deleteLabel={t('tripsScreen.deleteAction')}
             />
             <Pressable
               style={styles.shareTripButton}
@@ -219,7 +173,7 @@ export default function TripsScreen() {
         )}
       </FadeSlideIn>
     ),
-    [expandedId, handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, handleDeleteTrip, deletingId, t],
+    [handleToggle, compareMode, selectedIds, styles, colors, shareRide.isSharing, handleShareTrip, t],
   );
 
   return (
@@ -276,7 +230,7 @@ export default function TripsScreen() {
             renderItem={renderItem}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
-            scrollEnabled={!compareMode || expandedId === null}
+            scrollEnabled={!compareMode}
           />
         )}
 
@@ -303,15 +257,6 @@ export default function TripsScreen() {
             message={shareRide.toastMessage}
             variant="warning"
             onDismiss={shareRide.consumeToast}
-          />
-        </View>
-      ) : null}
-      {deleteToast ? (
-        <View style={styles.shareToastContainer} pointerEvents="box-none">
-          <Toast
-            message={deleteToast}
-            variant="warning"
-            onDismiss={() => setDeleteToast(null)}
           />
         </View>
       ) : null}
