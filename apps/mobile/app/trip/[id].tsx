@@ -299,9 +299,9 @@ export default function TripDetailScreen() {
             ]}
           >
             <Ionicons
-              name="share-social-outline"
-              size={20}
-              color={shareRide.isSharing ? gray[500] : colors.accent}
+              name="share-social"
+              size={22}
+              color={shareRide.isSharing ? gray[500] : brandColors.textInverse}
             />
           </Pressable>
         }
@@ -754,17 +754,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       bottom: 80,
       alignItems: 'center',
     },
+    // Mirrors ScreenHeader.backButton — same 44px yellow accent circle so
+    // the share affordance is unmissable. A subtler styling round-tripped
+    // through v0.2.50 visibly enough that testers reported "no share
+    // button" — the contrast against bgDeep was too low.
     headerShareButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.bgPrimary,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
+      backgroundColor: brandColors.accent,
+      ...shadows.sm,
     },
     headerShareButtonPressed: {
-      opacity: 0.7,
+      opacity: 0.75,
     },
   });
