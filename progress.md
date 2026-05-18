@@ -1068,3 +1068,38 @@ For normal day-to-day feature work, we also recognize a softer milestone:
   - `apps/mobile/app/history.tsx`'s Trips card list is now navigate-on-tap, but the dashboard sections above it (Stats, streak, daily quiz) are unchanged. History remains the rich landing tab; `/trips` remains the flat list.
 
 - Evidence: `npm run typecheck` 0 errors (api + mobile + web). `npm run check:bundle` HTTP 200. Preview build clean in 1m 39s, audit passed, bundle 88s fresh, distributed to Firebase early-access-preview.
+
+### Session 50 — Trip detail polish + share-with-link + onboarding auto-save (2026-05-16 → 2026-05-18)
+
+Three preview drops to Firebase `early-access-preview` (v0.2.51 → .52 → uncommitted .53-eligible), 7 commits on `main`. Each preview was a tester-driven micro-iteration on the v0.2.50 trip detail screen.
+
+#### v0.2.51 (commits `e69211f` + `be39a15`) — share button visibility
+
+- Bug: share button shipped in v0.2.50 used `colors.bgPrimary` background — too low contrast against the surrounding `colors.bgDeep` header. Tester reported "no share button".
+- Fix: mirror the existing back button — 44×44 `brandColors.accent` circle with `brandColors.textInverse` icon and `shadows.sm`. Icon swapped to filled `share-social` @ 22 px to match the back-chevron weight. The `ScreenHeader.rightAccessory` slot is 44 px wide so the new button fills it cleanly.
+- **General lesson recorded:** copying patterns from a baselined file (TripCard) re-introduces the same lint violations in new files. Always run `npx eslint <new-file>` BEFORE pushing — the pre-push lint ratchet will block the push otherwise (5 hex-literal regressions caught on the first push of `app/trip/[id].tsx`).
+
+#### v0.2.52 (commits `20e0922` + `b7e860c`) — trip detail share now sends a tappable route link
+
+- Tester complaint: image-only share (via `useShareRide`) had no clickable URL. Recipients saw a 1080×1080 PNG, nothing to tap.
+- Constraint diagnosed (from CLAUDE.md): `expo-sharing.shareAsync` can ONLY carry `fileUri + dialogTitle` — `dialogTitle` is visible to the SHARER, not the recipient. RN's `Share.share({ message, url })` is the only native API that gives the recipient a tappable URL, but it can't attach a PNG. **The two paths don't mix.** Image vs link is a hard either/or in native share APIs.
+- Decision (with the user): drop the image, send caption + URL + Play Store link. Matches `useShareRoute` exactly. Recipient taps the URL to open the route on web or load it back into the app via universal link.
+- Implementation: trip-detail `handleShare` now decodes `trip.plannedRoutePolyline6` to derive `origin = coords[0]` and `destination = coords[coords.length - 1]`, POSTs to `/v1/route-shares` (`mobileApi.createRouteShare({ source: 'planned', route: {...} })`), then `Share.share({ message: `${caption}\n${webUrl}\nGet Defensive Pedal: ${PLAY_STORE_URL}`, url: webUrl })`. Offline-guarded, missing-polyline-guarded, decode-failure-guarded — all surface as a single `shareToast` state. Removed `useShareRide` import + state in favor of local `isSharing` + `shareToast` + `useConnectivity`.
+- **`useShareRoute` was NOT reused directly** — it's coupled to `useAppStore.lastLoadedSavedRouteId` for the "saved vs planned" caption branching, which is irrelevant for a completed trip. Inlined the call.
+- Tester false-alarm worth recording: tester first reported "link opens in browser fine, but app shows planning / blank after a brief loading flash". I started chasing the share-claim re-plan pipeline (`mapShareClaimToPreview` + `previewQuery` always-overwrite-on-mount) before the tester re-tested and confirmed it works. **The share-claim pipeline IS suspect for any in-app deep-link to a share, but no concrete bug confirmed yet.** Keep this in mind when the next tester report lands.
+
+#### Uncommitted-then-committed: onboarding first-route auto-save (commit `e7e738a`)
+
+- Request: "for the route created in onboarding flow, automatically save that route to user saved routes".
+- `apps/mobile/app/onboarding/first-route.tsx` `handleContinue` now fires `mobileApi.saveRoute({ name, origin, destination, waypoints, mode, avoidUnpaved, avoidHills })` with the same circuit-route shape that was just generated for the demo map. Name: `"<POI> — your first route"` when the destination POI name is known, falls back to `"Your first safe route"`. Fire-and-forget — failures (auth not ready, network) stay silent because a saved route is a nice-to-have, not a blocker for onboarding completion. On success, invalidates `['saved-routes']` so the new route shows up immediately in `/saved-routes` if the user navigates there. **Skip path unchanged** — only users who deliberately tap Continue get the demo route in their list.
+
+#### Preview ship cadence this session
+- v0.2.51 (vc 53) — release `5s8eorr8ngp88-style hex` (Firebase): share-button visibility fix. Built in 3m+. Cert verified via `apksigner` (keytool returns "Not a signed jar file" for v2/v3-only APKs — recorded in `feedback_aab-build-caveat.md` last session). Archived to `apkreleases/DefensivePedal-Preview-v0.2.51.apk`.
+- v0.2.52 (vc 54) — share-with-link. User explicitly asked to build BEFORE committing the fix this time so they could verify on phone first. Build + ship clean. Cert OK. User confirmed it works ("I was wrong, it works well") after initial false-alarm; commits landed afterwards. Tester release `3q3dp9rcn2938`.
+- Onboarding auto-save is committed but NOT shipped — held for batching.
+
+#### What's still NOT done
+- Push these 7 commits to `origin` (`c369141 fix(mobile): lint ratchet` → `e7e738a feat(mobile): onboarding auto-save`).
+- Decide whether the onboarding auto-save needs a v0.2.53 ship on its own or can ride along with the next batch.
+
+- Evidence: `npm run typecheck` 0 errors at every commit (api + mobile + web). `npm run check:bundle` HTTP 200 at every commit. `useShareRoute.test.ts` + `useShareRide.test.ts` both pass (the latter still imported by `trips.tsx`/`feedback.tsx` for the ride-card image share). Full mobile suite: 847 pass / 11 fail — same 11 as HEAD on every preview push (pre-existing failures: ConnectivityMonitor x4, FeedCard.champion, LeaderboardSection, HazardDetailSheet, ImpactSummaryCard x5, useShareCard mia, index routing). Pre-push hook (typecheck + lint-ratchet) passes on every push.
