@@ -76,6 +76,7 @@ const mockRouteOption = {
   totalClimbMeters: 30,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
 };
 

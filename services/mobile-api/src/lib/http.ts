@@ -204,6 +204,58 @@ const riskSegmentSchema = {
   },
 } as const;
 
+const routeFeatureSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'id',
+    'type',
+    'tier',
+    'lat',
+    'lon',
+    'distanceAlongRouteMeters',
+    'lengthMeters',
+  ],
+  properties: {
+    id: {
+      type: 'string',
+      minLength: 1,
+    },
+    type: {
+      type: 'string',
+      enum: [
+        'tunnel',
+        'bridge',
+        'semafor',
+        'left_turn_no_intersection',
+        'railway_crossing',
+      ],
+    },
+    tier: {
+      type: 'string',
+      enum: ['info', 'caution', 'warning'],
+    },
+    lat: {
+      type: 'number',
+      minimum: -90,
+      maximum: 90,
+    },
+    lon: {
+      type: 'number',
+      minimum: -180,
+      maximum: 180,
+    },
+    distanceAlongRouteMeters: {
+      type: 'number',
+      minimum: 0,
+    },
+    lengthMeters: {
+      type: ['number', 'null'],
+      minimum: 0,
+    },
+  },
+} as const;
+
 const navigationStepSchema = {
   type: 'object',
   additionalProperties: false,
@@ -262,6 +314,7 @@ const routeOptionSchema = {
     'totalClimbMeters',
     'steps',
     'riskSegments',
+    'routeFeatures',
     'warnings',
   ],
   properties: {
@@ -315,6 +368,10 @@ const routeOptionSchema = {
     riskSegments: {
       type: 'array',
       items: riskSegmentSchema,
+    },
+    routeFeatures: {
+      type: 'array',
+      items: routeFeatureSchema,
     },
     warnings: {
       type: 'array',

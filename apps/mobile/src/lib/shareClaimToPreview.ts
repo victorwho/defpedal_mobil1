@@ -93,6 +93,7 @@ export const mapShareClaimToPreview = (claim: ShareClaim): MappedShareClaim => {
     totalClimbMeters: null,
     steps: [],
     riskSegments: [],
+    routeFeatures: [],
     warnings: [],
   };
 

@@ -135,6 +135,7 @@ const buildSyntheticRoute = (item: RideActivity): RouteOption => ({
   totalClimbMeters: item.payload.elevationGainMeters,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
 });
 

@@ -38,6 +38,7 @@ const buildTestRoute = () => {
     adjustedDurationSeconds: 600,
     totalClimbMeters: 15,
     riskSegments: [],
+    routeFeatures: [],
     warnings: [],
     steps: [
       {

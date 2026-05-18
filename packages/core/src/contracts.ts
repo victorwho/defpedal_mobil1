@@ -38,6 +38,51 @@ export interface NavigationStep {
   mode: string;
 }
 
+/**
+ * Discrete on-route features that warrant rider awareness either as ambient
+ * map overlays (route preview + navigation) or as proximity alerts in the
+ * bottom-right alert stack during navigation. The set is intentionally
+ * narrow — riders see them on every ride, so each addition must justify
+ * the screen real estate.
+ *
+ * - `tunnel` / `bridge`: extracted from OSRM `annotation.classes` runs.
+ * - `semafor` / `railway_crossing`: require OSM node-tag data; currently
+ *   stub extractors that return empty until the data layer ships.
+ * - `left_turn_no_intersection`: detected from step maneuvers — left turns
+ *   at non-4-way junctions where the rider crosses opposing traffic.
+ */
+export type RouteFeatureType =
+  | 'tunnel'
+  | 'bridge'
+  | 'semafor'
+  | 'left_turn_no_intersection'
+  | 'railway_crossing';
+
+/**
+ * Visual + interaction tier. Drives icon color, haptic strength, and
+ * `accessibilityLiveRegion` politeness on the client. Owned server-side so
+ * tuning (e.g. upgrading long tunnels to caution) doesn't require an app
+ * release.
+ */
+export type RouteFeatureTier = 'info' | 'caution' | 'warning';
+
+export interface RouteFeature {
+  /** Stable within a route — `route-${routeIndex}-feature-${type}-${ordinal}`. */
+  readonly id: string;
+  readonly type: RouteFeatureType;
+  readonly tier: RouteFeatureTier;
+  readonly lat: number;
+  readonly lon: number;
+  /** Meters from the route start to where the feature begins. */
+  readonly distanceAlongRouteMeters: number;
+  /**
+   * Zone length in meters for `tunnel`/`bridge` runs. Point features
+   * (`semafor`, `railway_crossing`, `left_turn_no_intersection`) report
+   * `null`.
+   */
+  readonly lengthMeters: number | null;
+}
+
 export interface RouteOption {
   id: string;
   source: 'custom_osrm' | 'mapbox';
@@ -53,6 +98,7 @@ export interface RouteOption {
   elevationProfile?: number[];
   steps: NavigationStep[];
   riskSegments: RiskSegment[];
+  routeFeatures: RouteFeature[];
   warnings: string[];
 }
 

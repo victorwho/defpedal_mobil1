@@ -211,6 +211,7 @@ export default function CommunityTripScreen() {
       totalClimbMeters: item.elevationGainMeters,
       steps: [],
       riskSegments: [],
+      routeFeatures: [],
       warnings: [],
     };
   }, [item]);

@@ -58,6 +58,7 @@ const buildRoute = (opts: {
   totalClimbMeters: 0,
   elevationProfile: opts.elevationProfile,
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
   steps: opts.steps.map((s) => ({
     id: s.id,

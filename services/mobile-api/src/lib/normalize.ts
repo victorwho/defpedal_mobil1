@@ -14,6 +14,7 @@ import {
 } from '@defensivepedal/core';
 
 import { config } from '../config';
+import { extractRouteFeatures } from './routeFeatures';
 
 const toNavigationSteps = (routeResponse: RouteResponse, routeIndex: number): NavigationStep[] =>
   (routeResponse.routes[routeIndex]?.legs[0]?.steps ?? []).map((step, index) => ({
@@ -65,6 +66,7 @@ export const normalizeRoutePreviewResponse = (options: {
       elevationProfile: elevationProfile ?? undefined,
       steps: toNavigationSteps(options.routeResponse, index),
       riskSegments: options.riskByRoute[index] ?? [],
+      routeFeatures: extractRouteFeatures(route, index),
       warnings: options.warningsByRoute[index] ?? [],
     };
   });

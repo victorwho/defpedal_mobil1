@@ -7,6 +7,7 @@ export * from './formatters';
 export * from './mapboxStaticImageUrl';
 export * from './navigation';
 export * from './polyline';
+export * from './routeFeatures';
 export * from './routeRequest';
 export * from './routeAnalysis';
 export * from './riskDistribution';

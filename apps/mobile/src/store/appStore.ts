@@ -146,6 +146,8 @@ type AppStore = QueueSlice & {
   setNotifyCommunity: (enabled: boolean) => void;
   setQuietHours: (start: string, end: string) => void;
   setShowBicycleLanes: (enabled: boolean) => void;
+  showRouteFeatures: boolean;
+  setShowRouteFeatures: (enabled: boolean) => void;
   setPoiVisibility: (category: string, enabled: boolean) => void;
   showRouteComparison: boolean;
   setShowRouteComparison: (enabled: boolean) => void;
@@ -385,6 +387,9 @@ export const useAppStore = create<AppStore>()(
       },
       setShowBicycleLanes: (enabled) =>
         set(() => ({ showBicycleLanes: enabled })),
+      showRouteFeatures: true,
+      setShowRouteFeatures: (enabled) =>
+        set(() => ({ showRouteFeatures: enabled })),
       setPoiVisibility: (category, enabled) =>
         set((state) => ({
           poiVisibility: { ...state.poiVisibility, [category]: enabled },
@@ -748,6 +753,7 @@ export const useAppStore = create<AppStore>()(
         shareTripsPublicly: state.shareTripsPublicly,
         shareConversionFeedOptin: state.shareConversionFeedOptin,
         showBicycleLanes: state.showBicycleLanes,
+        showRouteFeatures: state.showRouteFeatures,
         poiVisibility: state.poiVisibility,
         notifyWeather: state.notifyWeather,
         notifyHazard: state.notifyHazard,

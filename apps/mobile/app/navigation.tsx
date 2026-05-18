@@ -51,6 +51,7 @@ import { ManeuverCard, FooterCard, SteepGradeIndicator } from '../src/design-sys
 
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
+import { RouteFeatureAlertStack } from '../src/design-system/organisms/RouteFeatureAlertStack';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { Button } from '../src/design-system/atoms/Button';
@@ -1143,6 +1144,9 @@ export default function NavigationScreen() {
           />
         </View>
       </View>
+
+      {/* Route-feature proximity alerts (bottom-right column) */}
+      <RouteFeatureAlertStack />
 
       {/* Waze-style hazard proximity alert */}
       {activeHazardAlert ? (

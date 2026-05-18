@@ -76,6 +76,7 @@ const baseRoute = {
   totalClimbMeters: null,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
 };
 

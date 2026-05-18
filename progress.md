@@ -1143,3 +1143,80 @@ Single preview drop to Firebase `early-access-preview` (v0.2.54, release `6ls375
 - The CI-vs-local-hook gap is already captured (error #39 + error-prevention.md item #17). Re-recording would be duplication.
 
 - Evidence: `npm run typecheck` 0 errors at every commit (api + mobile + web). `npm run check:bundle` HTTP 200. `mapbox-search.test.ts` 22/22 pass with new postcode-stripping logic. Pre-push hook (typecheck + lint-ratchet) green on every push. CI run `26033350913` fully green.
+
+### Session 52 — Route feature awareness layer (2026-05-18)
+
+Designed and implemented an end-to-end "elements on the map" surface: tunnels, bridges, traffic signals, unprotected left turns, and railway crossings now flow from the server through the map and into a bottom-right proximity alert stack during navigation. Single feature, shipped across 4 architecturally-sequenced steps in one push.
+
+#### Step 1 — Server-side extraction (`feat(api/core)`)
+
+- New types in `packages/core/src/contracts.ts`: `RouteFeatureType` (5-member union), `RouteFeatureTier` (`'info' | 'caution' | 'warning'`), `RouteFeature`. `RouteOption` gained a **required** `routeFeatures: RouteFeature[]` field — 14 fixture/literal sites across both workspaces backfilled with `routeFeatures: []` so the change is non-breaking.
+- New extractor `services/mobile-api/src/lib/routeFeatures.ts` with `extractRouteFeatures(route, routeIndex)`:
+  - **Tunnels / bridges**: walks each leg's `annotation.classes`, collapses contiguous `'tunnel'`/`'bridge'` runs into one feature with `lengthMeters` summed from per-edge `annotation.distance`. OSRM-only (Mapbox cycling profile doesn't ship `classes`).
+  - **Left-turn (no intersection)**: heuristic — any step maneuver where modifier ∈ {`left`, `sharp left`, `slight left`} AND the first intersection has `< 4` bearings (T-junction / side street / driveway, not a 4-way intersection more likely to be signalized). Works on both OSRM and Mapbox.
+  - **Semafor / railway crossing**: stub extractors that return `[]`. Wired as separate functions so the integration point is obvious when the OSM node-tag data layer ships (a future `osm_road_features(node_id, type, lat, lon)` Supabase table joined against `leg.annotation.nodes`).
+- Wired into `normalize.ts` per route option. Extended `routeOptionSchema` in `http.ts` with `routeFeatureSchema` so Fastify doesn't strip the new field on the way out (error #9).
+- 10 extractor tests cover: zone-run dedup, mixed-type sort, distance accumulation, the 4-way exclusion rule, sharp/slight-left modifiers, defensive empty-geometry path.
+
+#### Step 2 — Visual token contract (`feat(mobile)`)
+
+- New `apps/mobile/src/design-system/tokens/routeFeatureIcons.ts`:
+  - **Hybrid approach** (user picked over both "labels-only" and "blocking on SDF assets"): ships 2-letter ASCII labels today (`TN`/`BR`/`TL`/`LT`/`RR`) on tier-colored circles, with `iconImage: null` reserved on every entry for a future SDF sprite swap. Layers can branch on `iconImage` presence — no call-site changes needed when art lands.
+  - Tier colors intentionally diverge from `safetyColors`: `info` is slate `#475569` (not the bright blue `safetyColors.info`) because route features are environmental, not navigational hints. `caution` matches `safetyColors.caution` (`#F59E0B`). `warning` is red-600 (`#DC2626`) — one shade deeper than `safetyColors.danger` so route-feature warnings read as a distinct visual class from community-reported hazard markers.
+  - Pre-built Mapbox style expressions (`routeFeatureCircleColorExpression`, `routeFeatureLabelExpression`) so the map layer renders all 5 types from a single CircleLayer + SymbolLayer instead of 5 parallel layers.
+  - Marker geometry presets (`mapRadius` 14 / `mapRadiusCompact` 11, `alertTileSize` 40) co-located so the map layer (step 3) and proximity alert (step 4) stay visually consistent without drift.
+- 12 token tests guard: completeness per `RouteFeatureType`, ASCII discipline, label uniqueness, non-collision with existing single-letter POI labels (`P`/`R`/`B`), null `iconImage` invariant, accessibility labels populated, contrast brightness gate.
+
+#### Step 3 — Map layer + user toggle (`feat(mobile)`)
+
+- New helper `dedupeRouteFeaturesAgainstHazards(features, hazards, radiusMeters = 25)` in `packages/core/src/routeFeatures.ts`. Drops features within 25m of any reported hazard so a `dangerous_intersection` hazard hides the underlying `semafor` feature — incident signal wins over infrastructural fact.
+- New layer component `apps/mobile/src/components/map/layers/RouteFeatureLayer.tsx`:
+  - Single `ShapeSource` + one `CircleLayer` + one `SymbolLayer`. Colors / labels driven by Mapbox style expressions on the feature's `tier` / `type` properties.
+  - `step` expression on `circleRadius` — compact (11dp) at zoom 13–14, full (14dp) at zoom ≥15. Hidden below zoom 13.
+  - Empty FeatureCollection mounts unconditionally (error-log #12) so a future toggle-on doesn't surface stale cached symbols.
+  - Reads `showRouteFeatures` from Zustand directly — same pattern `HazardLayers` uses to read `appState`.
+- `useFeatureCollections.ts` extended with `routeFeatureMarkerCollection`: built from the **selected route only** (features on dropped alternatives would just be noise) with hazard dedup applied upstream so the layer never sees a feature it should hide.
+- `RouteMap.tsx` mounts the layer between `RouteLayers` and `OverpassPoiLayers` — above route + risk segments, below POI / hazard markers. Render-order docstring updated.
+- Zustand: new `showRouteFeatures: boolean` (default `true`) + `setShowRouteFeatures` action, persisted alongside `showBicycleLanes` (not cleared on sign-out — matches the existing display-preference semantics).
+- Profile > Display: new `SettingRow` "Show route features" with en + ro descriptions. Tied to the same toggle that controls map markers AND proximity alerts (single switch covers both layers per the design spec).
+- 8 dedup tests (empty inputs, exact overlap, radius boundary, custom radius, order preservation, default-constant invariant).
+
+#### Step 4 — Proximity alerts (`feat(mobile)`)
+
+- Core: `RouteFeatureAlertConfig` + `ROUTE_FEATURE_ALERT_CONFIG` per-type table, `MAX_VISIBLE_FEATURE_ALERTS = 2`, `ApproachingFeature`, pure `computeApproachingFeatures(features, riderDistanceAlongRouteMeters)`. Per-type windows: tunnel/left-turn 200m, bridge/railway 150m, semafor 100m. Dismiss buffer: 10m past. Warning-tier types (left-turn, railway) get `accessibilityLiveRegion="assertive"`; everything else is `polite`. Tunnel skips haptic; the other 4 fire `useHaptics().warning()` once on first appearance (the only token that fires during NAVIGATING).
+- Mobile hook `useApproachingRouteFeatures()`:
+  - Reads from Zustand: navigation session, route preview, selected route id, app state, `showRouteFeatures`.
+  - Suppression gates: not navigating, preference off, `offRouteSince` set, GPS accuracy > 25m (matches the existing ManeuverCard threshold) — returns the same `EMPTY` constant so memo identity holds.
+  - Computes `riderDistanceAlongRouteMeters = totalDistance - remainingDistance`, calls into the core function, caps at 2 visible + `hiddenCount`.
+- New organisms:
+  - `RouteFeatureAlert.tsx` — single card. Slide-in from right (32dp offset) + opacity ramp using `motion.duration.fast` (150ms) + `easing.out`. Mount-only animation — keyed by `feature.id` so a new feature gets a fresh entrance, and `metersAhead` ticking down between renders doesn't replay the animation. Reduced-motion → instant. Per-tier color circle + ASCII glyph + bold title + `tabular-nums` distance.
+  - `RouteFeatureAlertStack.tsx` — column container, absolute positioned bottom-right (right: 12dp, bottom: 180dp by default, `bottomOffset` prop to tune above tablet/landscape FooterCards). Fires `haptics.warning()` once per feature, tracked via `useRef<Set<string>>` so the haptic doesn't repeat on every GPS sample. Prunes ids no longer visible so a re-surfaced feature (e.g. after a reroute) re-fires once.
+- Wired into `navigation.tsx` at screen level — sits at `zIndex.sticky`, doesn't participate in `bottomCluster`'s flex layout, doesn't conflict with the recenter FAB or the existing `HazardAlert`.
+- 6 hook tests cover all suppression gates + the visibility cap. 12 core tests (in addition to step 1's) cover the config table + `computeApproachingFeatures` edge cases (past, far ahead, just inside window, dismiss buffer, sort order, per-type window independence).
+
+#### What ships, what's deferred
+
+- Live today: tunnels, bridges, unprotected left turns. Tunnel/bridge depend on OSRM emitting `annotation.classes` — confirmed via spec, will surface on safe + flat routes (the `osrm.defensivepedal.com` instances), zero on Mapbox-fast routes (acceptable: fast is a fallback surface, not where most riding happens).
+- Stubbed (returns `[]`): semafor, railway_crossing. The mobile layer + alert stack already handle these — they just need a server-side data source. Next step is to populate the planned `osm_road_features` Supabase table from an OSM extract and join it against `leg.annotation.nodes` in the extractor. No mobile-side changes required when that ships.
+
+#### Design decisions worth remembering
+
+- **Bridge upgraded from `info` to `caution` tier** mid-design after the user's call-out that Romanian winters mean bridges ice first. Bridge now matches semafor in visual weight — amber circle, haptic fires.
+- **Bottom-RIGHT not bottom-left** for the alert stack. Initial sketch put it on the left; user redirected because the recenter FAB sits on the right rail and the right side is otherwise empty during nav. Alerts now anchor to the same right rail as the FAB, with `bottomOffset` clearing the speed strip.
+- **Single Profile toggle** (not per-type) — covers both map markers AND proximity alerts. Simpler than mirroring the per-POI granularity pattern.
+- **Map overlay icons in BOTH preview AND navigation** — preview helps the rider mentally rehearse before starting; navigation surfaces the same data with the proximity alert as the active layer on top.
+- **Hazard dedup at 25m, hazard wins** — picked over the alternative of layering the marker on top of the hazard. Community-reported incident outranks an infrastructural fact at the same junction; otherwise a tagged `dangerous_intersection` would show twice.
+- **No SDF sprites this round.** Plain 2-letter ASCII labels render reliably on Android's Mapbox glyph PBFs (error #13 already documents the emoji constraint). Token file reserves an `iconImage` slot for the swap later; the layer code already branches via Mapbox expressions, so an SDF upgrade is a one-place change.
+
+#### Verification
+
+- `npm run typecheck` clean across api + mobile + web at every step.
+- `npm run lint:check` (mobile) clean — no new ratchet violations.
+- New tests: 10 (server extractor) + 12 (token contract) + 8 (dedup) + 12 (config + approach) + 6 (hook) = 48 new tests, all green. Existing 502 core + 455 mobile-api + 847 mobile tests unaffected (2 pre-existing `routes-feed` flakes on `main` unrelated to this change, confirmed by stash-and-replay).
+- `npm run check:bundle` NOT run — Metro wasn't started during the session. User to verify before phone testing per the project rule.
+
+#### Why no error-log entry
+- No new gotchas. The change leans on existing patterns (Zustand preference + persist, hoisted Mapbox styles, key-based remount for ShapeSource visibility, `useHaptics` semantic vocabulary). Mapbox style-expression typing as `unknown` matches the pattern already established in `HazardLayers.tsx`.
+
+#### Not yet shipped to phone / Firebase
+- Local commit only. No APK build, no Firebase distribution, no Play Store impact. User to drive the build + tester loop separately.

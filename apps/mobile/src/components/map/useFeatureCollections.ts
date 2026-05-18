@@ -1,5 +1,8 @@
 import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
-import { decodePolyline } from '@defensivepedal/core';
+import {
+  decodePolyline,
+  dedupeRouteFeaturesAgainstHazards,
+} from '@defensivepedal/core';
 import { useMemo } from 'react';
 import type { BicycleParkingLocation } from '../../lib/bicycle-parking';
 import type { BicycleRentalLocation } from '../../lib/bicycle-rental';
@@ -95,6 +98,37 @@ export const useFeatureCollections = ({
     }),
     [selectedRoute],
   );
+
+  // Route awareness markers (tunnel / bridge / semafor / left-turn / railway).
+  // Pulled from the SELECTED route only — features on dropped alternatives
+  // would just be visual noise that doesn't match what the rider is about to
+  // do. Server-emitted features are deduplicated against community-reported
+  // hazards within ~25m so a tagged `dangerous_intersection` doesn't show up
+  // twice (once as a semafor, once as a hazard).
+  const routeFeatureMarkerCollection = useMemo(() => {
+    const features = selectedRoute?.route.routeFeatures ?? [];
+    if (features.length === 0) {
+      return { type: 'FeatureCollection' as const, features: [] as any[] };
+    }
+    const survivors = dedupeRouteFeaturesAgainstHazards(features, nearbyHazards);
+    return {
+      type: 'FeatureCollection' as const,
+      features: survivors.map((f) => ({
+        type: 'Feature' as const,
+        properties: {
+          id: f.id,
+          type: f.type,
+          tier: f.tier,
+          lengthMeters: f.lengthMeters,
+          distanceAlongRouteMeters: f.distanceAlongRouteMeters,
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [f.lon, f.lat] as [number, number],
+        },
+      })),
+    };
+  }, [selectedRoute, nearbyHazards]);
 
   const bicycleParkingFeatureCollection = useMemo(
     () => ({
@@ -346,6 +380,7 @@ export const useFeatureCollections = ({
     selectedRoute,
     routeFeatureCollection,
     riskFeatureCollection,
+    routeFeatureMarkerCollection,
     bicycleParkingFeatureCollection,
     bicycleRentalFeatureCollection,
     bikeShopFeatureCollection,

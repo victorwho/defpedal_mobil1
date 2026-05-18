@@ -105,6 +105,7 @@ const mapRoute = (
     totalClimbMeters: null,
     steps: allSteps.map(mapStep),
     riskSegments: [],
+    routeFeatures: [],
     warnings: [],
   };
 };

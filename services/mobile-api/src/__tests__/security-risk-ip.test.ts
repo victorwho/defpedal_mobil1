@@ -59,6 +59,7 @@ const mockRouteOption = {
       geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] },
     },
   ],
+  routeFeatures: [],
   warnings: [],
 };
 

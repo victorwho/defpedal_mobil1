@@ -58,6 +58,7 @@ const buildSyntheticRoute = (item: FeedItem): RouteOption => ({
   totalClimbMeters: item.elevationGainMeters,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
 });
 

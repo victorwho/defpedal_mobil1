@@ -41,6 +41,7 @@ const makeRoute = (overrides: Partial<RouteOption> = {}): RouteOption => ({
   totalClimbMeters: 80,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
   ...overrides,
 });

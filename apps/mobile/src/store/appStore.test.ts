@@ -17,6 +17,7 @@ const createRoute = (id: string): RouteOption => ({
   totalClimbMeters: 24,
   steps: [],
   riskSegments: [],
+  routeFeatures: [],
   warnings: [],
 });
 

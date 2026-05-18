@@ -70,6 +70,7 @@ describe('navigation helpers', () => {
       adjustedDurationSeconds: 450,
       totalClimbMeters: 24,
       riskSegments: [],
+      routeFeatures: [],
       warnings: [],
       steps: [
         {
@@ -141,6 +142,7 @@ describe('navigation helpers', () => {
       adjustedDurationSeconds: 120,
       totalClimbMeters: 0,
       riskSegments: [],
+      routeFeatures: [],
       warnings: [],
       steps: [
         {
@@ -236,6 +238,7 @@ describe('navigation helpers', () => {
       adjustedDurationSeconds: 120,
       totalClimbMeters: 0,
       riskSegments: [],
+      routeFeatures: [],
       warnings: [],
       steps: [
         {
@@ -301,6 +304,7 @@ describe('navigation helpers', () => {
       adjustedDurationSeconds: 120,
       totalClimbMeters: 0,
       riskSegments: [],
+      routeFeatures: [],
       warnings: [],
       steps: [
         {

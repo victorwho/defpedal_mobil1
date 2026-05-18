@@ -20,3 +20,15 @@ export { hasTierImage } from './tierImages';
 export { HAZARD_ICONS, getHazardIcon } from './hazardIcons';
 export { mascotPoses, mascotSizes } from './mascotPoses';
 export type { MascotPose, MascotSize, MascotPoseAsset } from './mascotPoses';
+export {
+  routeFeatureTierColors,
+  routeFeatureLabelColor,
+  routeFeatureStrokeColor,
+  routeFeatureIcons,
+  routeFeatureCircleColorExpression,
+  routeFeatureLabelExpression,
+  routeFeatureMarker,
+  getRouteFeatureIcon,
+  getRouteFeatureTierColor,
+} from './routeFeatureIcons';
+export type { RouteFeatureIcon } from './routeFeatureIcons';

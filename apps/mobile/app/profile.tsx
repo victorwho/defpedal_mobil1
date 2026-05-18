@@ -132,7 +132,7 @@ export default function ProfileScreen() {
   // State values - grouped by section with shallow comparison
   const {
     locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
-    shareTripsPublicly, themePreference, showMascot, showBicycleLanes, poiVisibility,
+    shareTripsPublicly, themePreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin,
   } = useAppStore(useShallow((state) => ({
@@ -146,6 +146,7 @@ export default function ProfileScreen() {
     themePreference: state.themePreference,
     showMascot: state.showMascot,
     showBicycleLanes: state.showBicycleLanes,
+    showRouteFeatures: state.showRouteFeatures,
     poiVisibility: state.poiVisibility,
     notifyWeather: state.notifyWeather,
     notifyHazard: state.notifyHazard,
@@ -159,7 +160,7 @@ export default function ProfileScreen() {
   const {
     setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
     setShowRouteComparison, setShareTripsPublicly, setThemePreference, setShowMascot,
-    setShowBicycleLanes, setPoiVisibility, setNotifyWeather,
+    setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin,
   } = useAppStore(useShallow((state) => ({
@@ -173,6 +174,7 @@ export default function ProfileScreen() {
     setThemePreference: state.setThemePreference,
     setShowMascot: state.setShowMascot,
     setShowBicycleLanes: state.setShowBicycleLanes,
+    setShowRouteFeatures: state.setShowRouteFeatures,
     setPoiVisibility: state.setPoiVisibility,
     setNotifyWeather: state.setNotifyWeather,
     setNotifyHazard: state.setNotifyHazard,
@@ -602,6 +604,13 @@ export default function ProfileScreen() {
               description={showBicycleLanes ? t('profile.showBikeLanesOn') : t('profile.showBikeLanesOff')}
               checked={showBicycleLanes}
               onChange={setShowBicycleLanes}
+            />
+
+            <SettingRow
+              label={t('profile.showRouteFeatures')}
+              description={showRouteFeatures ? t('profile.showRouteFeaturesOn') : t('profile.showRouteFeaturesOff')}
+              checked={showRouteFeatures}
+              onChange={setShowRouteFeatures}
             />
 
             {poiCategories.map((cat) => (

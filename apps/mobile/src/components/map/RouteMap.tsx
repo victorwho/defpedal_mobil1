@@ -8,11 +8,12 @@
  * 4. HistoryLayers — planned route + GPS trail
  * 5. VectorTileLayers — bike lanes + 6 POI pairs from mapbox-streets-v8
  * 6. RouteLayers — route alternatives + risk segments
- * 7. OverpassPoiLayers — parking, rental, bike shops (Overpass API)
- * 8. SearchedPoiLayer — POIs from Mapbox Search Box API
- * 9. HazardLayers — hazard zones + hazard markers
- * 10. MarkerLayers — origin/dest/user markers + off-route connector
- * 11. Overlays — crosshair, POI card, route info
+ * 7. RouteFeatureLayer — awareness markers (tunnel/bridge/semafor/left-turn/railway)
+ * 8. OverpassPoiLayers — parking, rental, bike shops (Overpass API)
+ * 9. SearchedPoiLayer — POIs from Mapbox Search Box API
+ * 10. HazardLayers — hazard zones + hazard markers
+ * 11. MarkerLayers — origin/dest/user markers + off-route connector
+ * 12. Overlays — crosshair, POI card, route info
  */
 import type { NearbyHazard } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
@@ -31,6 +32,7 @@ import { HazardLayers } from './layers/HazardLayers';
 import { HistoryLayers } from './layers/HistoryLayers';
 import { MarkerLayers } from './layers/MarkerLayers';
 import { OverpassPoiLayers } from './layers/OverpassPoiLayers';
+import { RouteFeatureLayer } from './layers/RouteFeatureLayer';
 import { RouteLayers } from './layers/RouteLayers';
 import { SearchedPoiLayer } from './layers/SearchedPoiLayer';
 import { VectorTileLayers } from './layers/VectorTileLayers';
@@ -112,6 +114,7 @@ export const RouteMap = ({
     selectedRoute,
     routeFeatureCollection,
     riskFeatureCollection,
+    routeFeatureMarkerCollection,
     bicycleParkingFeatureCollection,
     bicycleRentalFeatureCollection,
     bikeShopFeatureCollection,
@@ -325,6 +328,8 @@ export const RouteMap = ({
           routeFeatureCollection={routeFeatureCollection}
           riskFeatureCollection={riskFeatureCollection}
         />
+
+        <RouteFeatureLayer featureCollection={routeFeatureMarkerCollection} />
 
         <OverpassPoiLayers
           parkingVisible={parkingVisible}
