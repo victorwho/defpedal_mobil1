@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-05-10 (session 48)
+Last updated: 2026-05-18 (session 51)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -1103,3 +1103,43 @@ Three preview drops to Firebase `early-access-preview` (v0.2.51 → .52 → unco
 - Decide whether the onboarding auto-save needs a v0.2.53 ship on its own or can ride along with the next batch.
 
 - Evidence: `npm run typecheck` 0 errors at every commit (api + mobile + web). `npm run check:bundle` HTTP 200 at every commit. `useShareRoute.test.ts` + `useShareRide.test.ts` both pass (the latter still imported by `trips.tsx`/`feedback.tsx` for the ride-card image share). Full mobile suite: 847 pass / 11 fail — same 11 as HEAD on every preview push (pre-existing failures: ConnectivityMonitor x4, FeedCard.champion, LeaderboardSection, HazardDetailSheet, ImpactSummaryCard x5, useShareCard mia, index routing). Pre-push hook (typecheck + lint-ratchet) passes on every push.
+
+### Session 51 — Two-line pill for selected origin/destination (2026-05-18)
+
+Single preview drop to Firebase `early-access-preview` (v0.2.54, release `6ls375acghejo`), 3 commits on `main`. Driven by user feedback that long addresses overflowed the destination search box during selection and after pick, and that postal codes were leaking into the visible label even though `stripAddressNoise` claimed to remove them.
+
+#### The fix — `SelectedLocationPill` molecule (commit `89d0c89`)
+
+- **Problem 1 (overflow):** Once a destination was selected, the entire cleaned `suggestion.label` got dumped into a single-line `<TextInput>`. On Romanian addresses like `"Strada Eroilor 42, Iosia, Oradea"` the trailing city scrolled off-screen with no visual hierarchy; the user couldn't tell at a glance whether they'd picked the right spot.
+- **Problem 2 (postcode leak):** `stripAddressNoise` worked when `context.postcode` was populated by Mapbox, but POI features sometimes omit it and Mapbox occasionally concatenates the postcode with the place name (`"410093 Oradea"` instead of as its own segment). The defensive path was missing. `buildSecondaryText` also fell back to `place_formatted`/`full_address` when context was thin, which re-introduced postcode + country into the muted secondary line.
+- **Design choice (from the user via AskUserQuestion):** picked "two-line pill" over "single-line chip + expand" or "keep TextInput + shorter label". Origin card adopts the same treatment for visual consistency.
+- **`apps/mobile/src/design-system/molecules/SelectedLocationPill.tsx`** (new, 198 LOC): tiny uppercase label slot, colored dot OR numbered badge, bold primary line, muted secondary line, optional pencil edit button, optional close button. Both content lines use `numberOfLines={1}` with ellipsis. Action column is absolutely positioned top-right with 56 px of reserved padding so primary/secondary text never collides with buttons. Surface intentionally `#FFFFFF` (matches existing `MAP_OVERLAY_BG`) — the pill lives on the dark Mapbox basemap regardless of theme.
+- **`apps/mobile/src/lib/mapbox-search.ts`** strengthened:
+  - `stripAddressNoise` now runs a `POSTCODE_REGEX = /(?:^|\s)\d{4,7}(?=\s|$)/g` sweep on every segment after the structured strip, then drops any segment that's a bare numeric string. Works even when `context.postcode` is null.
+  - `buildSecondaryText` no longer falls back to `placeFormatted` / `fullAddress` for known feature types — it returns either a structured context string (`streetFull, neighborhood` for POI; `neighborhood, place` for address/street; `region` for area features) or an empty string. The fallback for unknown feature types runs `placeFormatted` through `stripAddressNoise` first.
+  - `reverseGeocodeAddress` extended from `{ label, primaryText }` to `{ label, primaryText, secondaryText }` — the long-press destination handler benefits from structured display data without a second comma-split.
+- **`apps/mobile/app/route-planning.tsx`** rewired:
+  - Added `LocationDisplay = { primary, secondary }` shape and a `splitDisplayLabel(label)` helper that does first-comma split. Used as fallback when only a string label is available (server-routed reverse geocode returns `{ coordinate, label }` only — extending the server contract was out of scope for this UX fix).
+  - Added local state `destinationDisplay`, `startOverrideDisplay`, `waypointDisplays[]`. Populated from `suggestion.primaryText`/`secondaryText` on select, from structured `reverseGeocodeAddress` after long-press, from comma-split on server reverse-geocode hydration and saved-route load.
+  - Destination card: when `hasValidDestination && activeField !== 'destination'`, render `SelectedLocationPill`. Pencil → `setActiveField('destination')` swaps back to the `SearchBar`. Added a Cancel button inside the SearchBar block when a destination already exists, so the user can re-collapse without selecting.
+  - Origin card: replaced the hand-rolled two-line "From: Current Location" + subtitle layout with a single `SelectedLocationPill` call. The pill label reads `From · Current location` or `From · Custom start`; primary = resolved street/POI name (split from the reverse-geocode label); secondary = city/neighborhood. Falls through to `Waiting for GPS…` / `Resolving location…` / `Location permission denied` when no GPS fix yet. Deleted `originContent`/`originDot`/`originTextWrap`/`originTitle`/`originSubtitle`/`editButton`/`editButtonLabel` styles (kept `originCard` — still used to wrap the start-override SearchBar in edit mode).
+  - Waypoints kept the horizontal row layout (the reorder + remove buttons need to stay on the right) but the inline label slot now renders bold `waypointPrimary` + muted `waypointSecondary` instead of one truncated line. Tap-to-edit added on the label wrapper.
+  - `handleSwapWithDestination` swaps the structured display objects too, not just the labels.
+  - Saved-route loader sets `destinationDisplay = { primary: route.name, secondary: 'Saved route' }` so the pill reads cleanly even when there's no city context.
+
+#### CI failure → audit-fix follow-up (commit `8bf2772`)
+
+- Post-push, GitHub Actions failed on the Security audit step. Not caused by the UX commits — same failure had been recurring on every push since 2026-05-16 (the prior two CI runs also red). Cause: a new high-severity advisory in `protobufjs` (`GHSA-66ff-xgx4-vchm` + 6 related). CI runs `npm audit --audit-level=high`; pre-push hook runs typecheck + lint only, so high-severity dep regressions slip through locally.
+- Fix: `npm audit fix` (non-breaking, NOT `--force`). Lockfile-only change, +69/-70 lines. After fix: 0 high-severity, 9 moderate remaining (all in the vite/esbuild/postcss/expo/next chain, below CI threshold).
+- CI run `26033350913` green: Security audit + Lint ratchet + Contrast check + validation suite all pass in 1m 8s.
+- Same pattern as session 47's `325b571` (`fast-uri` advisory). The lesson — that local hooks don't run `npm audit` — is already captured in `.claude/error-log.md` Error #39 / the project's error-prevention checklist item #17. Not adding a new entry.
+- Annotation in the CI output: `actions/checkout@v4` and `actions/setup-node@v4` use Node.js 20, which GitHub deprecates in September 2026. Not blocking; bump whenever.
+
+#### Release ship cadence
+- v0.2.54 (versionCode 56, commits `89d0c89` + `415aa66`): two-line pill UX. Preview built in 4m 54s, audit passed, bundle 199s fresh. Cert verified via `apksigner` (`827cfd44…3573` — upload keystore, NOT debug). Archived to `apkreleases/DefensivePedal-Preview-v0.2.54.apk` (187 MB). Distributed to Firebase via app id `1:1070156882676:android:e8942c210dc337ebca34a1`, group `early-access-preview`. Tester link: `https://appdistribution.firebase.google.com/testerapps/1:1070156882676:android:e8942c210dc337ebca34a1/releases/6ls375acghejo`. Tester confirmed: "works well".
+
+#### Why no error-log entry
+- The postcode-leak root cause (`buildSecondaryText` fallback to `place_formatted`) was a latent design flaw in `mapbox-search.ts`, not a runtime gotcha. Documented inline in the code comments now; not a recurring-trap pattern.
+- The CI-vs-local-hook gap is already captured (error #39 + error-prevention.md item #17). Re-recording would be duplication.
+
+- Evidence: `npm run typecheck` 0 errors at every commit (api + mobile + web). `npm run check:bundle` HTTP 200. `mapbox-search.test.ts` 22/22 pass with new postcode-stripping logic. Pre-push hook (typecheck + lint-ratchet) green on every push. CI run `26033350913` fully green.
