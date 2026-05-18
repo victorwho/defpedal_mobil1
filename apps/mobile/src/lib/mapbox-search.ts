@@ -247,22 +247,26 @@ const getSessionToken = (): string => {
 // ---------------------------------------------------------------------------
 
 /**
+ * Matches standalone postal codes — 4-7 digit numbers that appear as a
+ * whole segment, as a leading token before a place name (e.g. "410093 Oradea"),
+ * or as a trailing token. Defensive fallback when context.postcode is missing.
+ */
+const POSTCODE_REGEX = /(?:^|\s)\d{4,7}(?=\s|$)/g;
+
+/**
  * Strip postal code, country, and region/county from a raw address string
  * using the structured Mapbox context to know exactly which substrings
- * to remove.  Falls back to the raw string if nothing can be stripped.
+ * to remove.  Falls back to a regex sweep when context fields are missing
+ * (Mapbox occasionally omits `postcode` for POIs).
  */
 const stripAddressNoise = (
   raw: string,
   context: SearchBoxSuggestion['context'] | undefined,
 ): string => {
-  if (!context) return raw;
-
   const stripTerms: string[] = [];
-  if (context.country?.name) stripTerms.push(context.country.name);
-  if (context.region?.name) stripTerms.push(context.region.name);
-  if (context.postcode?.name) stripTerms.push(context.postcode.name);
-
-  if (stripTerms.length === 0) return raw;
+  if (context?.country?.name) stripTerms.push(context.country.name);
+  if (context?.region?.name) stripTerms.push(context.region.name);
+  if (context?.postcode?.name) stripTerms.push(context.postcode.name);
 
   const cleaned = raw
     .split(', ')
@@ -271,6 +275,11 @@ const stripAddressNoise = (
       for (const term of stripTerms) {
         s = s.replace(term, '').trim();
       }
+      // Defensive sweep — strips inline 4-7 digit postcodes that survive when
+      // context.postcode is absent or formatted differently.
+      s = s.replace(POSTCODE_REGEX, '').replace(/\s{2,}/g, ' ').trim();
+      // A bare numeric segment is almost always a postcode — drop it whole.
+      if (/^\d{4,7}$/.test(s)) return '';
       return s;
     })
     .filter(segment => segment.length > 0)
@@ -281,8 +290,9 @@ const stripAddressNoise = (
 
 /**
  * Build a concise, human-readable secondary text from Mapbox context.
- * Aims for Google Maps/Waze style: "Street 45, Neighborhood" — not
- * the full country-level address.
+ * Aims for Google Maps/Waze style: "Neighborhood, City" — never falls
+ * back to the long country-level string, which would leak postcodes
+ * and country names into a single-line label.
  */
 const buildSecondaryText = (
   featureType: SuggestionFeatureType,
@@ -290,36 +300,45 @@ const buildSecondaryText = (
   fullAddress: string | undefined,
   placeFormatted: string | undefined,
 ): string => {
-  if (!context) return placeFormatted ?? fullAddress ?? '';
-
-  const street = context.address?.street_name;
-  const number = context.address?.address_number;
-  const neighborhood = context.neighborhood?.name ?? context.locality?.name;
-  const place = context.place?.name;
-  const region = context.region?.name;
+  const street = context?.address?.street_name;
+  const number = context?.address?.address_number;
+  const neighborhood = context?.neighborhood?.name ?? context?.locality?.name;
+  const place = context?.place?.name;
+  const region = context?.region?.name;
 
   const streetFull = street
     ? number ? `${street} ${number}` : street
     : undefined;
 
-  switch (featureType) {
-    case 'poi':
-      // POI: "Street 45, Neighborhood" or "Neighborhood, City"
-      return [streetFull, neighborhood ?? place].filter(Boolean).join(', ') || placeFormatted || '';
-    case 'address':
-      // Address: "Neighborhood, City"
-      return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
-    case 'street' as string:
-      // Street: "Neighborhood, City"
-      return [neighborhood, place].filter(Boolean).join(', ') || placeFormatted || '';
-    case 'place':
-    case 'locality':
-    case 'neighborhood':
-      // Area: just "Region" — country stripped
-      return region || placeFormatted || '';
-    default:
-      return placeFormatted ?? fullAddress ?? '';
-  }
+  // Prefer structured context fields. We deliberately do NOT fall back to
+  // place_formatted / full_address — those embed postcode + country and
+  // overflow the single-line label.
+  const fromContext = (() => {
+    switch (featureType) {
+      case 'poi':
+        // POI: "Street 45, Neighborhood" or "Neighborhood, City"
+        return [streetFull, neighborhood ?? place].filter(Boolean).join(', ');
+      case 'address':
+      case 'street' as string:
+        // Address / street: "Neighborhood, City"
+        return [neighborhood, place].filter(Boolean).join(', ');
+      case 'place':
+      case 'locality':
+      case 'neighborhood':
+        // Area: just "Region" — country stripped
+        return region ?? '';
+      default:
+        return '';
+    }
+  })();
+
+  if (fromContext) return fromContext;
+
+  // Last resort: try to derive something useful from place_formatted by
+  // re-using the noise stripper. This keeps single-line discipline even
+  // when context is missing.
+  const lastResort = placeFormatted ?? fullAddress ?? '';
+  return lastResort ? stripAddressNoise(lastResort, context) : '';
 };
 
 /**
@@ -585,7 +604,7 @@ export const reverseGeocodeLocality = async (
 export const reverseGeocodeAddress = async (
   lat: number,
   lon: number,
-): Promise<{ label: string; primaryText: string } | null> => {
+): Promise<{ label: string; primaryText: string; secondaryText: string } | null> => {
   const token = ensureMapboxToken();
   const params = new URLSearchParams({
     longitude: String(lon),
@@ -608,8 +627,17 @@ export const reverseGeocodeAddress = async (
     const name = feature.properties.name ?? `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     const fullAddress = feature.properties.full_address ?? feature.properties.place_formatted ?? name;
     const cleaned = stripAddressNoise(fullAddress, feature.properties.context);
+    // Reverse geocode features in the v6 Geocoding API expose feature_type as a
+    // string; map it to our local union for consistency with the Search Box flow.
+    const featureType = toFeatureType(feature.properties.feature_type);
+    const secondaryText = buildSecondaryText(
+      featureType,
+      feature.properties.context,
+      feature.properties.full_address,
+      feature.properties.place_formatted,
+    );
 
-    return { primaryText: name, label: cleaned };
+    return { primaryText: name, label: cleaned, secondaryText };
   } catch {
     return null;
   }

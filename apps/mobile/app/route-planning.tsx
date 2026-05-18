@@ -29,7 +29,7 @@ import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
-import { SearchBar } from '../src/design-system/molecules';
+import { SearchBar, SelectedLocationPill } from '../src/design-system/molecules';
 import { OfflineBanner } from '../src/design-system/molecules/OfflineBanner';
 import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
@@ -75,6 +75,28 @@ const formatCoordinateLabel = (coordinate: Coordinate) =>
 
 const coordinatesMatch = (left: Coordinate, right: Coordinate, precision = 0.000001) =>
   Math.abs(left.lat - right.lat) <= precision && Math.abs(left.lon - right.lon) <= precision;
+
+/**
+ * Two-line structured display derived from a single-line address label.
+ * Fallback for code paths where we only have a cleaned label string
+ * (e.g., server-routed reverse geocode) and need to populate the
+ * SelectedLocationPill's primary/secondary rows.
+ */
+interface LocationDisplay {
+  primary: string;
+  secondary: string;
+}
+
+/** Split a cleaned single-line label into "primary, secondary" on the first comma. */
+const splitDisplayLabel = (label: string): LocationDisplay => {
+  const trimmed = label.trim();
+  const firstComma = trimmed.indexOf(',');
+  if (firstComma === -1) return { primary: trimmed, secondary: '' };
+  return {
+    primary: trimmed.slice(0, firstComma).trim(),
+    secondary: trimmed.slice(firstComma + 1).trim(),
+  };
+};
 
 export default function RoutePlanningScreen() {
   const { colors } = useTheme();
@@ -178,6 +200,12 @@ export default function RoutePlanningScreen() {
   const [waypointQueries, setWaypointQueries] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [destinationHydrated, setDestinationHydrated] = useState(false);
+  // Structured two-line display state for the SelectedLocationPill. Sourced
+  // from suggestion.primaryText/secondaryText on select, or split from the
+  // cleaned label string when re-hydrated via reverse geocode.
+  const [destinationDisplay, setDestinationDisplay] = useState<LocationDisplay | null>(null);
+  const [startOverrideDisplay, setStartOverrideDisplay] = useState<LocationDisplay | null>(null);
+  const [waypointDisplays, setWaypointDisplays] = useState<(LocationDisplay | null)[]>([]);
   const syncedOriginKeyRef = useRef<string | null>(null);
   const hazardToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geocodeNonceRef = useRef(0);
@@ -250,8 +278,10 @@ export default function RoutePlanningScreen() {
         labels.push(formatCoordinateLabel(wp));
       }
       setWaypointQueries(labels);
+      setWaypointDisplays(labels.map((l) => splitDisplayLabel(l)));
     }
     setDestinationQuery(route.name);
+    setDestinationDisplay({ primary: route.name, secondary: 'Saved route' });
     setDestinationHydrated(true);
     // Touch last_used_at
     void mobileApi.useSavedRoute(route.id);
@@ -282,7 +312,9 @@ export default function RoutePlanningScreen() {
     // Otherwise, set as destination
     setShowLongPressHint(false);
     setRouteRequest({ destination: coordinate });
-    setDestinationQuery(`${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`);
+    const fallbackLabel = `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
+    setDestinationQuery(fallbackLabel);
+    setDestinationDisplay({ primary: 'Dropped pin', secondary: fallbackLabel });
     setDestinationHydrated(true);
     setActiveField(null);
 
@@ -295,6 +327,10 @@ export default function RoutePlanningScreen() {
       const result = await reverseGeocodeAddress(coordinate.lat, coordinate.lon);
       if (result && geocodeNonceRef.current === nonce) {
         setDestinationQuery(result.label);
+        setDestinationDisplay({
+          primary: result.primaryText,
+          secondary: result.secondaryText || splitDisplayLabel(result.label).secondary,
+        });
       }
     } catch {
       // Keep coordinate label as fallback
@@ -562,18 +598,30 @@ export default function RoutePlanningScreen() {
 
   useEffect(() => {
     if (!destinationHydrated && destinationLabelQuery.data) {
-      setDestinationQuery(
-        destinationLabelQuery.data.label ?? formatCoordinateLabel(routeRequest.destination),
-      );
+      const label =
+        destinationLabelQuery.data.label ?? formatCoordinateLabel(routeRequest.destination);
+      setDestinationQuery(label);
+      setDestinationDisplay(splitDisplayLabel(label));
       setDestinationHydrated(true);
     }
   }, [destinationHydrated, destinationLabelQuery.data, routeRequest.destination]);
+
+  // Hydrate startOverride display once its label query resolves.
+  useEffect(() => {
+    if (!routeRequest.startOverride || startOverrideDisplay) return;
+    const label = startOverrideLabelQuery.data?.label;
+    if (label) setStartOverrideDisplay(splitDisplayLabel(label));
+  }, [routeRequest.startOverride, startOverrideLabelQuery.data?.label, startOverrideDisplay]);
 
   // --- Handlers ---
 
   const handleStartOverrideSelect = (suggestion: AutocompleteSuggestion) => {
     setRouteRequest({ startOverride: suggestion.coordinates });
     setStartOverrideQuery(suggestion.label);
+    setStartOverrideDisplay({
+      primary: suggestion.primaryText,
+      secondary: suggestion.secondaryText ?? splitDisplayLabel(suggestion.label).secondary,
+    });
     setActiveField(null);
   };
 
@@ -581,6 +629,10 @@ export default function RoutePlanningScreen() {
     Keyboard.dismiss();
     setRouteRequest({ destination: suggestion.coordinates });
     setDestinationQuery(suggestion.label);
+    setDestinationDisplay({
+      primary: suggestion.primaryText,
+      secondary: suggestion.secondaryText ?? splitDisplayLabel(suggestion.label).secondary,
+    });
     setDestinationHydrated(true);
     setActiveField(null);
     // Save to recent destinations
@@ -593,6 +645,7 @@ export default function RoutePlanningScreen() {
   const clearStartOverride = () => {
     setRouteRequest({ startOverride: undefined });
     setStartOverrideQuery('');
+    setStartOverrideDisplay(null);
     setActiveField(null);
   };
 
@@ -617,12 +670,21 @@ export default function RoutePlanningScreen() {
       next[index] = suggestion.label;
       return next;
     });
+    setWaypointDisplays((prev) => {
+      const next = [...prev];
+      next[index] = {
+        primary: suggestion.primaryText,
+        secondary: suggestion.secondaryText ?? splitDisplayLabel(suggestion.label).secondary,
+      };
+      return next;
+    });
     setActiveField(null);
   };
 
   const handleRemoveWaypoint = (index: number) => {
     removeWaypoint(index);
     setWaypointQueries((prev) => prev.filter((_, i) => i !== index));
+    setWaypointDisplays((prev) => prev.filter((_, i) => i !== index));
     setActiveField(null);
   };
 
@@ -632,9 +694,12 @@ export default function RoutePlanningScreen() {
     if (!wp) return;
     const oldDest = routeRequest.destination;
     const oldDestLabel = destinationQuery;
+    const oldDestDisplay = destinationDisplay;
+    const oldWaypointDisplay = waypointDisplays[index] ?? null;
     // Set the waypoint as the new destination
     setRouteRequest({ destination: wp });
     setDestinationQuery(waypointQueries[index] || formatCoordinateLabel(wp));
+    setDestinationDisplay(oldWaypointDisplay);
     setDestinationHydrated(true);
     // Replace the waypoint with the old destination
     removeWaypoint(index);
@@ -646,6 +711,11 @@ export default function RoutePlanningScreen() {
     setWaypointQueries((prev) => {
       const next = [...prev];
       next[index] = oldDestLabel;
+      return next;
+    });
+    setWaypointDisplays((prev) => {
+      const next = [...prev];
+      next[index] = oldDestDisplay;
       return next;
     });
   };
@@ -668,15 +738,6 @@ export default function RoutePlanningScreen() {
     Boolean(mobileEnv.mobileApiUrl || mobileEnv.mapboxPublicToken) &&
     (Boolean(currentLocation) || customStartEnabled);
 
-  const currentLocationLabel = useMemo(() => {
-    if (!currentLocation) {
-      if (permissionStatus === 'denied') return 'Location permission denied';
-      if (isLocating) return 'Resolving location...';
-      return planningOrigin ? formatCoordinateLabel(planningOrigin) : 'Waiting for GPS...';
-    }
-    return currentLocationLabelQuery.data?.label ?? (planningOrigin ? formatCoordinateLabel(planningOrigin) : 'Waiting for GPS...');
-  }, [currentLocation, currentLocationLabelQuery.data?.label, isLocating, planningOrigin, permissionStatus]);
-
   const customStartLabel = useMemo(() => {
     if (!routeRequest.startOverride) return null;
     return (
@@ -684,6 +745,37 @@ export default function RoutePlanningScreen() {
       formatCoordinateLabel(routeRequest.startOverride)
     );
   }, [routeRequest.startOverride, startOverrideLabelQuery.data?.label]);
+
+  /**
+   * Structured two-line display for the origin pill. We always split the
+   * resolved label into "primary (street/POI), secondary (city)" so the user
+   * sees the same scannable hierarchy as the destination card.
+   */
+  const originDisplay = useMemo<LocationDisplay>(() => {
+    if (customStartEnabled) {
+      if (startOverrideDisplay) return startOverrideDisplay;
+      if (customStartLabel) return splitDisplayLabel(customStartLabel);
+      return { primary: 'Custom start', secondary: '' };
+    }
+    if (!currentLocation) {
+      if (permissionStatus === 'denied') {
+        return { primary: 'Location permission denied', secondary: 'Tap to enter a custom start' };
+      }
+      if (isLocating) return { primary: 'Resolving location…', secondary: '' };
+      return { primary: 'Waiting for GPS…', secondary: '' };
+    }
+    const resolved = currentLocationLabelQuery.data?.label;
+    if (resolved) return splitDisplayLabel(resolved);
+    return { primary: 'Current Location', secondary: formatCoordinateLabel(currentLocation) };
+  }, [
+    customStartEnabled,
+    customStartLabel,
+    startOverrideDisplay,
+    currentLocation,
+    currentLocationLabelQuery.data?.label,
+    isLocating,
+    permissionStatus,
+  ]);
 
   // Keep the edit-field query value in sync with the resolved custom start label
   // when the screen re-enters with an existing override (e.g. after returning
@@ -815,61 +907,70 @@ export default function RoutePlanningScreen() {
               </Pressable>
             </View>
           ) : (
-            /* Normal origin display */
-            <View style={styles.originCard}>
-              <View style={styles.originContent}>
-                <View style={styles.originDot} />
-                <View style={styles.originTextWrap}>
-                  <Text style={styles.originTitle} numberOfLines={1}>
-                    From: {customStartEnabled ? 'Custom Start' : 'Current Location'}
-                  </Text>
-                  <Text style={styles.originSubtitle} numberOfLines={1}>
-                    {customStartEnabled ? (customStartLabel ?? currentLocationLabel) : currentLocationLabel}
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                style={styles.editButton}
-                onPress={() => setActiveField('startOverride')}
-                accessibilityLabel="Edit start point"
-                accessibilityRole="button"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons name="pencil-outline" size={16} color={gray[500]} />
-              </Pressable>
-            </View>
+            /* Normal origin display — collapsed pill */
+            <SelectedLocationPill
+              label={`From · ${customStartEnabled ? 'Custom start' : 'Current location'}`}
+              primaryText={originDisplay.primary}
+              secondaryText={originDisplay.secondary}
+              dotColor={colors.info}
+              onEdit={() => setActiveField('startOverride')}
+            />
           ))}
 
-          {/* Destination search bar — always shown, even for Mia (users can always plan routes) */}
-          <View style={styles.destinationCard}>
-            <SearchBar
+          {/* Destination — pill (collapsed) when selected, SearchBar (expanded) when editing */}
+          {hasValidDestination && activeField !== 'destination' ? (
+            <SelectedLocationPill
               label="Destination"
-              value={isOnline ? destinationQuery : destinationQuery}
-              placeholder={isOnline ? 'Where to?' : 'Connect to internet to search'}
-              active={isOnline && activeField === 'destination'}
-              isLoading={destinationAutocompleteQuery.isPending}
-              errorMessage={
-                destinationAutocompleteQuery.isError
-                  ? destinationAutocompleteQuery.error.message
-                  : null
-              }
-              suggestions={mergedDestinationSuggestions}
-              recentDestinations={recentRideDestinations}
-              onFocus={() => { if (isOnline) setActiveField('destination'); }}
-              onChangeText={(value) => {
+              primaryText={destinationDisplay?.primary || destinationQuery || 'Destination'}
+              secondaryText={destinationDisplay?.secondary}
+              dotColor={colors.accent}
+              onEdit={() => {
                 if (!isOnline) return;
-                setDestinationQuery(value);
-                setDestinationHydrated(true);
                 setActiveField('destination');
               }}
-              onClear={() => {
-                setDestinationQuery('');
-                setDestinationHydrated(true);
-                setActiveField('destination');
-              }}
+            />
+          ) : (
+            <View style={styles.destinationCard}>
+              <SearchBar
+                label="Destination"
+                value={destinationQuery}
+                placeholder={isOnline ? 'Where to?' : 'Connect to internet to search'}
+                active={isOnline && activeField === 'destination'}
+                isLoading={destinationAutocompleteQuery.isPending}
+                errorMessage={
+                  destinationAutocompleteQuery.isError
+                    ? destinationAutocompleteQuery.error.message
+                    : null
+                }
+                suggestions={mergedDestinationSuggestions}
+                recentDestinations={recentRideDestinations}
+                onFocus={() => { if (isOnline) setActiveField('destination'); }}
+                onChangeText={(value) => {
+                  if (!isOnline) return;
+                  setDestinationQuery(value);
+                  setDestinationHydrated(true);
+                  setActiveField('destination');
+                }}
+                onClear={() => {
+                  setDestinationQuery('');
+                  setDestinationDisplay(null);
+                  setDestinationHydrated(true);
+                  setActiveField('destination');
+                }}
                 onSelectSuggestion={handleDestinationSelect}
               />
+              {hasValidDestination ? (
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={() => setActiveField(null)}
+                  accessibilityLabel="Cancel editing destination"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.cancelButtonLabel}>Cancel</Text>
+                </Pressable>
+              ) : null}
             </View>
+          )}
 
           {/* Waypoint stops — shown between destination and weather */}
           {waypoints.map((wp, index) => (
@@ -905,11 +1006,25 @@ export default function RoutePlanningScreen() {
                   />
                 </View>
               ) : (
-                <View style={styles.waypointLabel}>
-                  <Text style={styles.waypointLabelText} numberOfLines={1}>
-                    {waypointQueries[index] || formatCoordinateLabel(wp)}
+                <Pressable
+                  style={styles.waypointLabel}
+                  onPress={() => setActiveField(`waypoint-${index}` as ActiveField)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit stop ${index + 1}`}
+                >
+                  <Text style={styles.waypointPrimary} numberOfLines={1}>
+                    {waypointDisplays[index]?.primary
+                      || splitDisplayLabel(waypointQueries[index] || '').primary
+                      || formatCoordinateLabel(wp)}
                   </Text>
-                </View>
+                  {waypointDisplays[index]?.secondary
+                    || splitDisplayLabel(waypointQueries[index] || '').secondary ? (
+                    <Text style={styles.waypointSecondary} numberOfLines={1}>
+                      {waypointDisplays[index]?.secondary
+                        || splitDisplayLabel(waypointQueries[index] || '').secondary}
+                    </Text>
+                  ) : null}
+                </Pressable>
               )}
               {index > 0 ? (
                 <Pressable
@@ -1392,49 +1507,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingVertical: space[3],
       ...shadows.md,
     },
-    originContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: space[3],
-      minHeight: 48,
-      paddingRight: 44,
-    },
-    originTextWrap: {
-      flex: 1,
-      gap: 2,
-    },
-    originDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      backgroundColor: colors.info,
-    },
-    originTitle: {
-      color: gray[800],
-      fontFamily: fontFamily.body.bold,
-      fontSize: 15,
-    },
-    originSubtitle: {
-      color: gray[500],
-      fontSize: 13,
-    },
-    editButton: {
-      paddingHorizontal: space[2],
-      paddingVertical: space[1],
-      minWidth: 44,
-      minHeight: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'absolute',
-      top: space[1],
-      right: space[1],
-    },
-    editButtonLabel: {
-      color: gray[500],
-      fontFamily: fontFamily.body.bold,
-      fontSize: 13,
-      letterSpacing: 0.5,
-    },
     cancelButton: {
       alignSelf: 'flex-end',
       paddingHorizontal: space[3],
@@ -1640,12 +1712,22 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.lg,
       paddingHorizontal: space[3],
       paddingVertical: space[2],
+      gap: 2,
       ...shadows.sm,
     },
     waypointLabelText: {
       fontSize: 14,
       fontFamily: fontFamily.body.medium,
       color: gray[800],
+    },
+    waypointPrimary: {
+      fontSize: 14,
+      fontFamily: fontFamily.body.bold,
+      color: gray[800],
+    },
+    waypointSecondary: {
+      fontSize: 12,
+      color: gray[500],
     },
     waypointReorder: {
       padding: 2,

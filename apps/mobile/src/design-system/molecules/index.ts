@@ -4,6 +4,9 @@
 export { SearchBar } from './SearchBar';
 export type { SearchBarProps } from './SearchBar';
 
+export { SelectedLocationPill } from './SelectedLocationPill';
+export type { SelectedLocationPillProps } from './SelectedLocationPill';
+
 export { RouteCard } from './RouteCard';
 export type { RouteCardProps, RiskBarSegment } from './RouteCard';
 
