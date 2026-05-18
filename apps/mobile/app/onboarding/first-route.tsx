@@ -1,5 +1,6 @@
 import type { Coordinate, RoutePreviewResponse } from '@defensivepedal/core';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -108,6 +109,7 @@ export default function OnboardingFirstRouteScreen() {
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
   const setRouteRequest = useAppStore((s) => s.setRouteRequest);
   const skipOnboarding = useSkipOnboarding();
+  const queryClient = useQueryClient();
 
   const [routeResponse, setRouteResponse] = useState<RoutePreviewResponse | null>(null);
   const [destinationName, setDestinationName] = useState<string | null>(null);
@@ -201,6 +203,32 @@ export default function OnboardingFirstRouteScreen() {
       });
       // setRoutePreview automatically sets appState to ROUTE_PREVIEW when routes exist
       setRoutePreview(routeResponse);
+
+      // Auto-save this demo route so the user can re-ride it later from
+      // "Saved routes" — they completed onboarding deliberately and the
+      // safe-circuit route is a curated artefact worth keeping. Fire-and-
+      // forget: failure (auth not ready, network) shouldn't block the flow,
+      // a saved route is a nice-to-have.
+      const savedName = destinationName
+        ? `${destinationName} — your first route`
+        : 'Your first safe route';
+      void mobileApi
+        .saveRoute({
+          name: savedName,
+          origin: location,
+          destination: location,
+          waypoints: [destination],
+          mode: 'safe',
+          avoidUnpaved: true,
+          avoidHills: false,
+        })
+        .then(() => {
+          void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
+        })
+        .catch(() => {
+          // Silent — saved route is a nice-to-have. Don't surface a toast
+          // mid-onboarding for a feature the user hasn't asked for yet.
+        });
     }
     router.push('/onboarding/signup-prompt');
   };
