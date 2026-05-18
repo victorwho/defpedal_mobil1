@@ -1,5 +1,6 @@
 import type { BadgeUnlockEvent, RideImpact, TripHistoryItem } from '@defensivepedal/core';
 import {
+  PLAY_STORE_URL,
   calculateCo2SavedKg,
   calculateTrailDistanceMeters,
   decodePolyline,
@@ -16,6 +17,7 @@ import {
   Alert,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -41,7 +43,7 @@ import {
 } from '../../src/design-system/tokens/typography';
 import { mobileApi } from '../../src/lib/api';
 import { useAuthSession } from '../../src/providers/AuthSessionProvider';
-import { useShareRide } from '../../src/hooks/useShareRide';
+import { useConnectivity } from '../../src/providers/ConnectivityMonitor';
 import { useT } from '../../src/hooks/useTranslation';
 
 const MAP_HEIGHT = 300;
@@ -94,7 +96,9 @@ export default function TripDetailScreen() {
   const [mapInteracting, setMapInteracting] = useState(false);
   const handleMapTouchStart = useCallback(() => setMapInteracting(true), []);
   const handleMapTouchEnd = useCallback(() => setMapInteracting(false), []);
-  const shareRide = useShareRide();
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const { isOnline } = useConnectivity();
 
   // Trip comes from the cached history list — Trips screen has already
   // fetched it before push navigation lands here. We fall back to a network
@@ -228,42 +232,88 @@ export default function TripDetailScreen() {
     );
   }, [deleteMutation, t, trip]);
 
-  // Share — same payload shape as trips.tsx/feedback.tsx, fed to the shared
-  // useShareRide hook (RideShareCard + Mapbox Static + native share sheet).
-  const handleShare = useCallback(() => {
+  // Share — creates a route_share record from the trip's planned polyline,
+  // then opens the native text-share sheet with the caption + webUrl +
+  // Play Store install link. Same pattern as useShareRoute on the route
+  // planning screen: recipients tap the URL to open the route on web /
+  // load it in the app. Image share was dropped in v0.2.52 because
+  // expo-sharing can't include a tappable link alongside the PNG.
+  const handleShare = useCallback(async () => {
     if (!trip) return;
-    let coords: [number, number][] = trip.gpsBreadcrumbs.map((pt) => [pt.lon, pt.lat]);
-    if (coords.length < 2 && trip.plannedRoutePolyline6) {
-      try {
-        coords = decodePolyline(trip.plannedRoutePolyline6);
-      } catch {
-        coords = [];
-      }
+    if (!isOnline) {
+      setShareToast('You are offline. Try again when connected.');
+      return;
     }
 
+    // Need a planned polyline to share — that's what populates the public
+    // route viewer. Without it, the recipient has nothing to look at.
+    if (!trip.plannedRoutePolyline6) {
+      setShareToast('This ride has no planned route to share.');
+      return;
+    }
+
+    let coords: [number, number][];
+    try {
+      coords = decodePolyline(trip.plannedRoutePolyline6);
+    } catch {
+      setShareToast('Could not decode this ride’s route.');
+      return;
+    }
+    if (coords.length < 2) {
+      setShareToast('This ride has no planned route to share.');
+      return;
+    }
+
+    const first = coords[0]!;
+    const last = coords[coords.length - 1]!;
     const distanceMeters =
       trip.distanceMeters ??
+      trip.plannedRouteDistanceMeters ??
       (trip.gpsBreadcrumbs.length >= 2
         ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
-        : trip.plannedRouteDistanceMeters ?? 0);
-
-    const durationMinutes = trip.endedAt
-      ? Math.max(
-          1,
-          Math.round(
-            (new Date(trip.endedAt).getTime() - new Date(trip.startedAt).getTime()) / 60_000,
-          ),
-        )
+        : 0);
+    const durationSeconds = trip.endedAt
+      ? Math.max(1, Math.round(
+          (new Date(trip.endedAt).getTime() - new Date(trip.startedAt).getTime()) / 1000,
+        ))
       : 0;
 
-    void shareRide.share({
-      coords,
-      distanceKm: distanceMeters / 1000,
-      durationMinutes,
-      co2SavedKg: calculateCo2SavedKg(distanceMeters),
-      dateIso: trip.startedAt,
-    });
-  }, [shareRide, trip]);
+    setIsSharing(true);
+    try {
+      const created = await mobileApi.createRouteShare({
+        source: 'planned',
+        route: {
+          origin: { lat: first[1], lon: first[0] },
+          destination: { lat: last[1], lon: last[0] },
+          geometryPolyline6: trip.plannedRoutePolyline6,
+          distanceMeters,
+          durationSeconds,
+          routingMode: trip.routingMode,
+        },
+      });
+
+      const km = (distanceMeters / 1000).toFixed(1);
+      const caption = `I rode this ${km} km cycling route on Defensive Pedal — see the route.`;
+      // iOS prefers `url` for previews; Android concatenates message+url.
+      // Passing both gives the best behavior on both platforms.
+      await Share.share(
+        {
+          message: `${caption}\n${created.webUrl}\nGet Defensive Pedal: ${PLAY_STORE_URL}`,
+          url: created.webUrl,
+          title: 'Share this ride',
+        },
+        { dialogTitle: 'Share this ride' },
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Couldn’t share this ride. Try again.';
+      setShareToast(message);
+    } finally {
+      setIsSharing(false);
+    }
+  }, [isOnline, trip]);
 
   if (!trip) {
     return (
@@ -288,20 +338,20 @@ export default function TripDetailScreen() {
         rightAccessory={
           <Pressable
             onPress={handleShare}
-            disabled={shareRide.isSharing}
+            disabled={isSharing}
             accessibilityRole="button"
             accessibilityLabel={t('share.shareRide')}
-            accessibilityState={{ disabled: shareRide.isSharing }}
+            accessibilityState={{ disabled: isSharing }}
             hitSlop={10}
             style={({ pressed }) => [
               styles.headerShareButton,
-              pressed && !shareRide.isSharing && styles.headerShareButtonPressed,
+              pressed && !isSharing && styles.headerShareButtonPressed,
             ]}
           >
             <Ionicons
               name="share-social"
               size={22}
-              color={shareRide.isSharing ? gray[500] : brandColors.textInverse}
+              color={isSharing ? gray[500] : brandColors.textInverse}
             />
           </Pressable>
         }
@@ -494,12 +544,12 @@ export default function TripDetailScreen() {
           />
         </View>
       ) : null}
-      {shareRide.toastMessage ? (
+      {shareToast ? (
         <View style={styles.toastContainer} pointerEvents="box-none">
           <Toast
-            message={shareRide.toastMessage}
+            message={shareToast}
             variant="warning"
-            onDismiss={shareRide.consumeToast}
+            onDismiss={() => setShareToast(null)}
           />
         </View>
       ) : null}
