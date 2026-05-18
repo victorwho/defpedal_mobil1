@@ -16,7 +16,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { encodePolyline } from '@defensivepedal/core';
+import { encodePolyline, extractRouteFeatures } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -105,7 +105,13 @@ const mapRoute = (
     totalClimbMeters: null,
     steps: allSteps.map(mapStep),
     riskSegments: [],
-    routeFeatures: [],
+    // Route-feature awareness markers (tunnels, bridges, unprotected lefts).
+    // OSRM safe profile populates `annotation.classes` so tunnel/bridge runs
+    // surface; Mapbox cycling skips classes so fast routes only get left-turn
+    // detection from step maneuvers. Same extractor the server uses — kept
+    // in core so both paths produce identical features. See
+    // `packages/core/src/routeFeatures.ts`.
+    routeFeatures: extractRouteFeatures(route, index),
     warnings: [],
   };
 };
