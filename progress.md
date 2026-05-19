@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-05-18 (session 51)
+Last updated: 2026-05-19 (session 55)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -1308,3 +1308,46 @@ Single-commit UX fix prompted by the tester: the "Safe / Fast / Flat" badge on t
 
 #### Not shipped to Firebase
 - Dev variant only; no preview/production APK build. Will fold into the next versionCode bump alongside other queued changes.
+
+### Session 55 — Daily weather notification: 8:30 trigger + 40 witty variants + reliability fix (2026-05-19)
+
+User-requested rework of the morning cycling-weather notification: move from 9:00 to 8:30, add at least 30 friendly-but-slightly-sarcastic message variants picked at random per day, and keep the weather prediction in the body. Took the opportunity to refactor the SUT into testable shape and fix a reliability bug surfaced while writing tests.
+
+#### What shipped
+
+- **40 random title variants** in a new pure module `apps/mobile/src/lib/daily-weather-messages.ts`. Plain text only (no emoji — Android OEM skins mojibake some glyphs). Style: friendly, never preachy, never shaming the rider. Examples: *"Your bike misses you. Just saying."*, *"Weather rolled a natural 20. Roll with it."*, *"Forecast: suspiciously perfect. Cycle before it changes its mind."*, *"Today the wind agreed not to bully you."*
+- **8:30 AM trigger** (was 9:00). Both `daily-weather-notification.ts` schedule call and the today-vs-tomorrow forecast-row picker reanchored. The cutoff math uses hour + minute (not just hour) so an 08:15 app open still picks today's forecast row.
+- **Witty path only fires when the day is genuinely good for cycling.** Predicate `isGoodCyclingWeather`: temp 10–28°C, rain ≤30%, wind ≤25 km/h, no snow/storm codes. Otherwise the existing safety-warning branches still fire (storm / snow / extreme cold / strong wind / heavy rain / moderate rain / freezing / windy) — confirmed via AskUserQuestion before implementing.
+- **Reliability fix surfaced by the test review:** the SUT was calling `cancelScheduledNotificationAsync` BEFORE `fetchTomorrowForecast`. If Open-Meteo was down or rate-limited, the prior day's queued 08:30 notification got nuked with no replacement. Reordered so fetch runs first; the cancel + schedule pair only fires once we have a valid forecast in hand. Three-line reorder, no behaviour change in the happy path.
+
+#### Pure-helper refactor
+
+The original SUT mixed advice copy, trigger math, and forecast parsing with the imperative scheduling glue (`getNotifications`, `setNotificationChannelAsync`, `cancelScheduledNotificationAsync`, `scheduleNotificationAsync`). Testing the imperative side meant mocking `expo-notifications`, which transitively imports `react-native/index.js` — a file that contains Flow `import typeof` syntax Vite cannot parse. Tried four mocking strategies (vi.doMock with factory, vi.hoisted + require, dynamic import + mutate shim, alias to a stub file) before giving up on the integration angle.
+
+Extracted four pure helpers into `daily-weather-messages.ts`:
+- `buildCyclingAdvice(forecast, random?)` — single switch over forecast shape returning `{title, body}`. Accepts injectable RNG for deterministic tests.
+- `computeTriggerSeconds(now, hour?, minute?)` — pure trigger-time math with ≥60s floor.
+- `pickForecastIndex(now, hour?, minute?)` — picks today (0) or tomorrow (1) row based on the trigger cutoff.
+- `parseForecastResponse(data, idx)` — defensive Open-Meteo response parser, returns `null` for missing/malformed/partial payloads.
+
+SUT shrank from 223 to 99 lines and is now thin glue: native-module guard → permission check → fetch → channel setup → cancel → schedule. Every branch the scheduler executes is covered by direct pure-function unit tests.
+
+#### Tests
+
+`apps/mobile/src/lib/__tests__/daily-weather-messages.test.ts` (20 tests) and `apps/mobile/src/lib/__tests__/daily-weather-notification.test.ts` (40 tests) — 60 total, all pass. Five comprehensive risk axes:
+
+1. `computeTriggerSeconds` at 07:00 / 08:29 / 08:30 exact / 08:30:30 inside-minute / 23:00 / midnight — verifies the 8:30 anchor flips correctly and the ≥60s floor invariant holds.
+2. Good-weather day produces a witty title from the curated pool + factual body with temp range + condition + wind + rain %. Deterministic RNG injection verifies first/last bucket mapping.
+3. Table-driven over 8 bad-weather branches (storm, snow, extreme cold, very strong wind, heavy rain, moderate rain, freezing, windy) — each asserts title regex + body data point + `not.toContain(GOOD_WEATHER_TITLES)`.
+4. `pickForecastIndex` at 00:00 / 07:59 / 08:00 / 08:29 / 08:30 (cutoff itself flips) / 08:31 / 09:00 / 23:59 + custom hour/minute override.
+5. `parseForecastResponse` is resilient: happy path for idx 0/1 + 10 malformed-payload variants (null, undefined, scalar, empty object, missing daily, short time array, missing temp arrays, non-array weather_code, OOB idx, NaN slot) — all return `null`.
+
+#### Verification
+
+Typecheck clean across all 3 workspaces. Metro bundle returns HTTP 200. 60/60 tests pass. Not yet shipped to Firebase — will fold into the next versionCode bump alongside other queued changes.
+
+#### Lessons (not added to CLAUDE.md)
+
+- **When a test suite needs four different mocking approaches to instantiate the SUT, that's a design signal, not a tooling problem.** Extracting the pure helpers and testing them directly cost less time than the cumulative debugging of `vi.mock` / `vi.hoisted` / `vi.doMock` / resolve.alias attempts.
+- **"All tests pass" ≠ "no bugs found."** The cancel-before-fetch reordering was visible from code reading once Test 5 (silence-path) made me think about what happens when `parseForecastResponse` returns `null`. The test itself didn't fail; thinking through the test's implication did.
+- **Vitest `resolve.alias` only applies when vitest runs from the workspace where the config lives.** Running `npx vitest run apps/mobile/src/...` from the repo root skips `apps/mobile/vitest.config.ts` entirely and uses bare-Vite defaults — no aliases, real `react-native/index.js` gets parsed, Flow syntax explodes. Always `cd apps/mobile && npx vitest run src/...` for these tests.

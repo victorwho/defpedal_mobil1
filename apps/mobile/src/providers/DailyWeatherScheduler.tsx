@@ -15,7 +15,7 @@ const hasNotificationModule = () => {
 };
 
 /**
- * Schedules a daily 9am weather notification on every app open.
+ * Schedules a daily 8:30am weather notification on every app open.
  * Checks for native module availability before attempting anything.
  */
 export const DailyWeatherScheduler = () => {
