@@ -5,16 +5,26 @@
  * traffic signals, unprotected left turns, railway crossings). Backed by
  * server-emitted `RouteFeature[]` on every `RouteOption`.
  *
- * Today this is a label-based contract: a 2-letter ASCII glyph rendered as
- * a Mapbox SymbolLayer `textField` on top of a tier-colored circle. The
- * `iconImage` field is reserved for a future SDF sprite swap — layers
- * should branch on its presence so the upgrade is purely additive.
+ * Icons are SDF PNGs at `apps/mobile/assets/map-icons/` — black-on-alpha
+ * masters that Mapbox tints at render time via `iconColor`. The 2-letter
+ * `label` field is retained as a screen-reader fallback and a
+ * belt-and-suspenders glyph in case the sprite fails to load; both the
+ * map layer and alert card prefer the PNG when present.
  *
  * Tier semantics are owned server-side
- * (`services/mobile-api/src/lib/routeFeatures.ts`); keep this file in sync
- * if the TIER_BY_TYPE map there ever shifts.
+ * (`packages/core/src/routeFeatures.ts`); keep this file in sync if the
+ * TIER_BY_TYPE map there ever shifts.
  */
 import type { RouteFeatureTier, RouteFeatureType } from '@defensivepedal/core';
+
+// ES `import` syntax (rather than `require()`) so Vitest can resolve the
+// asset reference at bundle time without trying to parse the binary as JS.
+// Metro accepts both forms for static-asset references.
+import tunnelIcon from '../../../assets/map-icons/tunnel.png';
+import bridgeIcon from '../../../assets/map-icons/bridge.png';
+import semaforIcon from '../../../assets/map-icons/semafor.png';
+import leftTurnIcon from '../../../assets/map-icons/left_turn.png';
+import railwayIcon from '../../../assets/map-icons/railway_crossing.png';
 
 /**
  * Tier → marker background color.
@@ -32,25 +42,46 @@ export const routeFeatureTierColors: Record<RouteFeatureTier, string> = {
   warning: '#DC2626',
 } as const;
 
-/** Foreground color for the 2-letter label — white meets ≥4.5:1 on every tier. */
+/** Foreground tint for the SDF icon — white meets ≥4.5:1 on every tier. */
 export const routeFeatureLabelColor = '#FFFFFF';
 
 /** White stroke around the marker circle to preserve contrast on busy basemaps. */
 export const routeFeatureStrokeColor = '#FFFFFF';
 
+/**
+ * Mapbox sprite name registered with `<Mapbox.Images>` in
+ * `RouteFeatureLayer`. Kept in one place so the layer's `<Mapbox.Images>`
+ * declaration and the `iconImage` style expression read off the same keys.
+ */
+export const routeFeatureSpriteNames: Record<RouteFeatureType, string> = {
+  tunnel: 'route-feature-tunnel',
+  bridge: 'route-feature-bridge',
+  semafor: 'route-feature-semafor',
+  left_turn_no_intersection: 'route-feature-left-turn',
+  railway_crossing: 'route-feature-railway',
+} as const;
+
 export interface RouteFeatureIcon {
   /**
-   * Mapbox SymbolLayer `textField` glyph. ASCII only — Mapbox glyph PBFs
-   * for the Standard style do not ship reliable coverage of Unicode shape
-   * characters (↰, ≡) or any emoji on Android. See CLAUDE.md error #13.
+   * Short ASCII glyph used as a screen-reader-fallback render path if the
+   * SDF sprite fails to load. Map and alert surfaces prefer `iconImage`.
+   * Kept 2-character ASCII because Mapbox glyph PBFs for the Standard
+   * style don't ship reliable Unicode shape coverage on Android
+   * (CLAUDE.md error #13).
    */
   readonly label: string;
   /**
-   * Reserved for future SDF sprite swap. When non-null, layer code should
-   * prefer `iconImage` over `textField`. Until SDF assets land in
-   * `apps/mobile/assets/map-icons/`, this stays `null` everywhere.
+   * `require()`'d SDF PNG. Black-on-transparent at 96×96 master (+@2x +@3x),
+   * tinted via `iconColor` on the Mapbox SymbolLayer and via `tintColor`
+   * on the `Image` element in the alert card.
    */
-  readonly iconImage: string | null;
+  readonly iconImage: number;
+  /**
+   * Mapbox sprite key — the string passed to `<Mapbox.Images>` and matched
+   * against in `iconImage` style expressions. Mirrors
+   * `routeFeatureSpriteNames` so callers don't have to assemble the key.
+   */
+  readonly spriteName: string;
   /**
    * Long-form label for screen readers (`accessibilityLabel` on alert
    * cards, hazard sheet rows) and any non-map surface that needs to name
@@ -62,27 +93,32 @@ export interface RouteFeatureIcon {
 export const routeFeatureIcons: Record<RouteFeatureType, RouteFeatureIcon> = {
   tunnel: {
     label: 'TN',
-    iconImage: null,
+    iconImage: tunnelIcon,
+    spriteName: routeFeatureSpriteNames.tunnel,
     accessibilityLabel: 'Tunnel',
   },
   bridge: {
     label: 'BR',
-    iconImage: null,
+    iconImage: bridgeIcon,
+    spriteName: routeFeatureSpriteNames.bridge,
     accessibilityLabel: 'Bridge',
   },
   semafor: {
     label: 'TL',
-    iconImage: null,
+    iconImage: semaforIcon,
+    spriteName: routeFeatureSpriteNames.semafor,
     accessibilityLabel: 'Traffic signal',
   },
   left_turn_no_intersection: {
     label: 'LT',
-    iconImage: null,
+    iconImage: leftTurnIcon,
+    spriteName: routeFeatureSpriteNames.left_turn_no_intersection,
     accessibilityLabel: 'Left turn across traffic',
   },
   railway_crossing: {
     label: 'RR',
-    iconImage: null,
+    iconImage: railwayIcon,
+    spriteName: routeFeatureSpriteNames.railway_crossing,
     accessibilityLabel: 'Railway crossing',
   },
 } as const;
@@ -115,45 +151,51 @@ export const routeFeatureCircleColorExpression: unknown = [
 ];
 
 /**
- * Mapbox style expression — SymbolLayer `textField` keyed on the GeoJSON
- * feature's `type` property. One symbol layer handles every feature type.
+ * Mapbox style expression — SymbolLayer `iconImage` keyed on the GeoJSON
+ * feature's `type` property. The image keys must match the names passed
+ * to `<Mapbox.Images images={...} />` in `RouteFeatureLayer`.
  */
-export const routeFeatureLabelExpression: unknown = [
+export const routeFeatureIconImageExpression: unknown = [
   'match',
   ['get', 'type'],
   'tunnel',
-  routeFeatureIcons.tunnel.label,
+  routeFeatureSpriteNames.tunnel,
   'bridge',
-  routeFeatureIcons.bridge.label,
+  routeFeatureSpriteNames.bridge,
   'semafor',
-  routeFeatureIcons.semafor.label,
+  routeFeatureSpriteNames.semafor,
   'left_turn_no_intersection',
-  routeFeatureIcons.left_turn_no_intersection.label,
+  routeFeatureSpriteNames.left_turn_no_intersection,
   'railway_crossing',
-  routeFeatureIcons.railway_crossing.label,
+  routeFeatureSpriteNames.railway_crossing,
   '',
 ];
 
 /**
  * Marker geometry presets. Pulled into tokens so the proximity alert card
- * (step 4) can render the same circle+label combo at a smaller size on
- * the right-rail alert tile and stay visually consistent with the map.
+ * can render the same circle+icon combo at a smaller size on the
+ * bottom-right alert tile and stay visually consistent with the map.
  */
 export const routeFeatureMarker = {
   /** Map marker circle radius in points at base zoom (≥15). */
   mapRadius: 14,
   /** Map marker circle radius at intermediate zoom (13–14). */
   mapRadiusCompact: 11,
-  /** Map label text size in points. */
-  mapLabelSize: 11,
+  /**
+   * On-map icon scale factor against the 96-px SDF source. 0.18 renders
+   * the glyph at ~17 dp inside the 28-dp marker circle.
+   */
+  mapIconSize: 0.18,
+  /** Compact-zoom icon scale (smaller glyph for the smaller circle). */
+  mapIconSizeCompact: 0.14,
   /** Stroke width around the circle in points. */
   mapStrokeWidth: 1.5,
   /** Minimum zoom level at which markers render at all. */
   minZoom: 13,
   /** Zoom threshold below which the compact radius applies. */
   compactZoomThreshold: 15,
-  /** Alert tile (right-rail) icon tile size in points. */
+  /** Alert tile (bottom-right card) icon tile size in points. */
   alertTileSize: 40,
-  /** Alert tile label text size in points. */
-  alertTileLabelSize: 14,
+  /** Alert tile inner-icon size in points. */
+  alertTileIconSize: 22,
 } as const;

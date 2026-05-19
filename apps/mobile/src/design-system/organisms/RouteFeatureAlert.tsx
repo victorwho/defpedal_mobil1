@@ -8,7 +8,7 @@
  */
 import type { ApproachingFeature } from '@defensivepedal/core';
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { brandColors } from '../tokens/colors';
@@ -94,7 +94,12 @@ export const RouteFeatureAlert = React.memo(({ item }: RouteFeatureAlertProps) =
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
-        <Text style={styles.iconLabel}>{icon.label}</Text>
+        <Image
+          source={icon.iconImage}
+          style={styles.iconImage}
+          tintColor={routeFeatureLabelColor}
+          resizeMode="contain"
+        />
       </View>
       <View style={styles.textColumn}>
         <Text style={styles.title} numberOfLines={1}>
@@ -130,11 +135,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: routeFeatureStrokeColor,
   },
-  iconLabel: {
-    color: routeFeatureLabelColor,
-    fontFamily: fontFamily.heading.bold,
-    fontSize: routeFeatureMarker.alertTileLabelSize,
-    letterSpacing: 0.3,
+  iconImage: {
+    width: routeFeatureMarker.alertTileIconSize,
+    height: routeFeatureMarker.alertTileIconSize,
   },
   textColumn: {
     flex: 1,

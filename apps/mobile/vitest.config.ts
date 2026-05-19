@@ -1,10 +1,30 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, type Plugin } from 'vitest/config';
 import path from 'path';
 
 const mockRnPath = path.resolve(__dirname, 'vitest.mock-rn.ts');
 const mockAsyncStoragePath = path.resolve(__dirname, 'vitest.mock-async-storage.ts');
 
+/**
+ * Stub RN static-asset `require('./foo.png')` calls. The asset resolver
+ * returns an opaque numeric handle at runtime; vitest's bundler tries to
+ * parse the binary as JS and dies. A `resolve.alias` doesn't catch
+ * require() of relative PNG paths, so we plug in directly.
+ */
+const stubPngPlugin = (): Plugin => ({
+  name: 'stub-png',
+  enforce: 'pre',
+  resolveId(source) {
+    if (source.endsWith('.png')) return '\0stub-png';
+    return null;
+  },
+  load(id) {
+    if (id === '\0stub-png') return 'module.exports = 1;';
+    return null;
+  },
+});
+
 export default defineConfig({
+  plugins: [stubPngPlugin()],
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],

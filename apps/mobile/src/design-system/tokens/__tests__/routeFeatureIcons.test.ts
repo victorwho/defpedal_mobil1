@@ -55,10 +55,26 @@ describe('routeFeatureIcons', () => {
     }
   });
 
-  it('iconImage is null for every entry (SDF swap reserved)', () => {
+  it('iconImage resolves to a require()-returned asset id for every entry', () => {
     for (const type of ALL_FEATURE_TYPES) {
-      expect(routeFeatureIcons[type].iconImage).toBeNull();
+      // RN's `require()` of a static asset returns an opaque numeric handle
+      // (or, under happy-dom + vitest, the resolved relative path string).
+      // Either way: must be truthy and never null/undefined.
+      const { iconImage } = routeFeatureIcons[type];
+      expect(iconImage).toBeTruthy();
     }
+  });
+
+  it('spriteName is a stable kebab-case key for every entry', () => {
+    for (const type of ALL_FEATURE_TYPES) {
+      const { spriteName } = routeFeatureIcons[type];
+      expect(spriteName).toMatch(/^route-feature-[a-z-]+$/);
+    }
+  });
+
+  it('all spriteName values are unique', () => {
+    const names = ALL_FEATURE_TYPES.map((t) => routeFeatureIcons[t].spriteName);
+    expect(new Set(names).size).toBe(names.length);
   });
 
   it('every accessibilityLabel is a non-empty human-readable phrase', () => {
