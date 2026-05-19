@@ -316,3 +316,40 @@ Same lesson applies to any "denormalized aggregate" column you assume exists on 
 - For server-routed reverse geocode (`mobileApi.reverseGeocode` only returns `{ coordinate, label }`), use `splitDisplayLabel(label)` to split on the first comma: `primary = "Eroilor 42"`, `secondary = "Iosia, Oradea"`. Works because `stripAddressNoise` already produced a clean label.
 
 **Occurrences:** 2026-05-18 — session 51 two-line pill UX. Discovered when the destination card after selection showed `"Strada Eroilor 42, 410093 Oradea, Bihor"` overflowing the search box; tester couldn't confirm the picked spot. Romanian addresses surface both the prefix-concatenation shape AND the missing-`context.postcode` shape. Tested fixes against 22 unit tests in `mapbox-search.test.ts`.
+
+### 42. Vitest can't `require()` a static PNG — switch to ES `import` and declare the module type
+
+**Pattern:** RN's asset resolver returns an opaque numeric handle for `require('./icon.png')`, and the existing mascot-poses token file uses that form (`mascotPoses.ts`). The first test file that transitively loads a token that `require()`s a PNG will crash with `SyntaxError: Invalid or unexpected token` pointing at the .png line. Vitest's bundler parses source as ESM and lets Node evaluate `require()` at runtime against its own loader — which tries to parse the binary as JS and fails.
+
+`resolve.alias` (Vite's regex find-and-replace on import specifiers) doesn't help because it runs against ES `import` statements, not runtime `require()` calls. Writing a Vite plugin with `resolveId` + `load` hooks doesn't help either — Node's runtime require bypasses the bundler entirely.
+
+**Fix (the one that actually works):**
+1. **Switch the token file from `require()` to ES `import`** — e.g.
+   ```ts
+   import tunnelIcon from '../../../assets/map-icons/tunnel.png';
+   // …
+   export const icons = { tunnel: { iconImage: tunnelIcon, … } };
+   ```
+   Vite resolves ES imports at compile time via its own resolver, so the bundler can substitute the asset reference for a stub. Metro accepts both `import` and `require()` for static-asset references — the change is runtime-neutral on device.
+2. **Declare the module type** in a `.d.ts` at workspace root (e.g. `apps/mobile/assets.d.ts`):
+   ```ts
+   declare module '*.png' { const content: number; export default content; }
+   declare module '*.jpg' { const content: number; export default content; }
+   declare module '*.svg' { const content: number; export default content; }
+   ```
+   Add to `tsconfig.json` `include` so tsc picks it up. Without this, tsc rejects `import x from './x.png'` as a missing module.
+3. **(Optional, defense-in-depth)** Add a tiny `stubPngPlugin` to `vitest.config.ts` so any future `require()` of a PNG hits the bundler-side stub instead of Node's loader:
+   ```ts
+   const stubPngPlugin = (): Plugin => ({
+     name: 'stub-png', enforce: 'pre',
+     resolveId(source) { if (source.endsWith('.png')) return '\0stub-png'; return null; },
+     load(id) { if (id === '\0stub-png') return 'module.exports = 1;'; return null; },
+   });
+   ```
+   Harmless if nothing uses `require()` for PNGs; cushions the next addition.
+
+**Pre-change checklist:**
+- Adding a new image-bearing token? Use ES `import` for the asset, even if neighbouring files use `require()` — the ergonomic asymmetry is worth it for test-runnable tokens.
+- The mascot pose file (`mascotPoses.ts`) currently still uses `require()` because nothing tests it. If a test ever loads it, migrate it to ES `import` rather than fighting the bundler.
+
+**Occurrences:** 2026-05-19 — session 53 route-feature SDF icon swap. First token file with image assets that's also covered by a contract test. Cost ~25 minutes of dead-end attempts (alias regex, Vite plugin variants) before switching to ES `import` cleared everything in one move.

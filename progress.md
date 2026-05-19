@@ -1220,3 +1220,70 @@ Designed and implemented an end-to-end "elements on the map" surface: tunnels, b
 
 #### Not yet shipped to phone / Firebase
 - Local commit only. No APK build, no Firebase distribution, no Play Store impact. User to drive the build + tester loop separately.
+
+### Session 53 — Route feature awareness: ship, debug, iterate (2026-05-18 → 2026-05-19)
+
+Three preview builds in 24 hours: **v0.2.55** (initial feature ship, markers invisible due to extractor wiring bug), **v0.2.56** (client-side wiring fix, markers visible as 2-letter ASCII labels), **v0.2.57** (placeholder labels replaced with user-produced SDF PNG icons). Tester confirmed v0.2.57 reads well. Commits `7d22954` → `3f75b6c`.
+
+#### v0.2.55 → empty map → v0.2.56 root cause (commits `8adca60` `eeae285`)
+
+- Session 52 shipped the extractor at `services/mobile-api/src/lib/routeFeatures.ts` and wired it into `normalizeRoutePreviewResponse`. Local tests + cert verify + Firebase distribution all green; tester reported "I don't see the new items in either navigation or route preview" with the toggle confirmed on.
+- **The bug:** mobile fetches routes **client-side** via `apps/mobile/src/lib/mapbox-routing.ts`'s `directPreviewRoute` — it never calls the server's `/v1/routes/preview` endpoint where `normalizeRoutePreviewResponse` runs. So the server-side extractor existed but was never invoked on the rider's actual code path. `mapRoute()` hardcoded `routeFeatures: []`.
+- **The clue I missed during session 52 planning:** CLAUDE.md's tech-stack table explicitly says *"Both fetched client-side from the mobile app"* for safe + fast routing. Read it during the initial codebase walk; didn't connect it to the extractor's home until the tester signal.
+- **The fix:** moved `extractRouteFeatures` + its helpers (`buildCoordIndex`, `snapTargetToCumulative`, the four sub-extractors, `TIER_BY_TYPE`) from `services/mobile-api/src/lib/routeFeatures.ts` into `packages/core/src/routeFeatures.ts` alongside the dedup helper + alert-config that already lived there. Server's local file collapsed to a single re-export line — keeps `normalize.ts`'s import path stable. Client's `mapRoute()` now calls `extractRouteFeatures(route, index)` against the same OSRM `Route` it already had in scope.
+- **Defensive guard:** `extractLeftTurns` now bails when `maneuver.location` isn't a 2-element array. The mobile-side `mapbox-routing.test.ts` fixtures use minimal maneuvers without `location`, which crashed `const [lon, lat] = maneuver.location` during the first `npx vitest run`. Production OSRM always emits `location`, but a fixture-shape change shouldn't fault the production path.
+- Bumped to **0.2.56 (versionCode 58)**. Build 1m 29s warm-cache. Tester confirmed markers visible — but as the 2-letter ASCII placeholders (TN/BR/LT), which was the planned hybrid until art landed.
+
+#### v0.2.57 SDF icon swap (commit `8470032`)
+
+- Tester produced the 5 SDF PNGs (1×/@2x/@3x = 15 files total) to the spec from session 52 step 2: 96×96 master, black-on-alpha, 64×64 glyph box inside 16 px transparent padding, ≥6 px stroke weight. Files dropped at `apps/mobile/assets/map-icons/` named by type slug (`tunnel.png`, `bridge.png`, `semafor.png`, `left_turn.png`, `railway_crossing.png`).
+- Token file `routeFeatureIcons.ts` updates:
+  - `iconImage: null` slot populated with the imported asset id.
+  - New `spriteName: string` field per entry, sourced from a centralized `routeFeatureSpriteNames` map so `<Mapbox.Images>` keys and the `iconImage` style expression read from the same place.
+  - `routeFeatureLabelExpression` (text-based) replaced by `routeFeatureIconImageExpression`. The `label` field retained as a screen-reader / debug fallback — not rendered anywhere on-screen.
+  - Marker geometry: added `mapIconSize` 0.18 / `mapIconSizeCompact` 0.14 (zoom-stepped scale factor against the 96-px SDF master) and `alertTileIconSize` 22 for the alert-card inner glyph. Dropped the unused `alertTileLabelSize`.
+- `RouteFeatureLayer.tsx` rewrite:
+  - Hoisted `SDF_IMAGES` map keyed by `spriteName` with `{ image, sdf: true }` per entry. Mounted as `<Mapbox.Images images={SDF_IMAGES} />` alongside the existing ShapeSource. The `sdf: true` flag (confirmed in `node_modules/@rnmapbox/maps/lib/typescript/src/components/Images.d.ts:24`) tells the native side to treat the alpha channel as the SDF mask so `iconColor` tint paints over the existing tier-colored disc.
+  - SymbolLayer style swapped: `textField` / `textColor` / `textSize` → `iconImage` / `iconColor` / `iconSize`. `iconColor: routeFeatureLabelColor` ('#FFFFFF') paints every glyph white. `iconAllowOverlap: true` + `iconIgnorePlacement: true` matches the existing POI markers — features near each other don't drop out of view due to layout-collision avoidance.
+- `RouteFeatureAlert.tsx` follow-on: `<Text style={iconLabel}>{icon.label}</Text>` → `<Image source={icon.iconImage} tintColor={routeFeatureLabelColor} resizeMode="contain" />`. Keeps map markers and alert cards visually identical (same SDF glyph, same white tint, same circle background).
+
+#### Vitest interaction worth recording
+
+- The token file initially used `iconImage: require('../../../assets/map-icons/tunnel.png')` mirroring the mascot-pose pattern. `npx vitest run` failed with `SyntaxError: Invalid or unexpected token` parsing the .png file directly.
+- **First attempt** — added `resolve.alias` regex `/^.+\.png$/ → mockPngPath` plus a stub file. Didn't work: Vite's alias resolver runs against ES `import` specifiers but **not** against runtime `require()` calls (which Node resolves directly through its own loader, hitting the binary).
+- **Second attempt** — wrote a Vite plugin (`stubPngPlugin`) with `enforce: 'pre'`, `resolveId`, and `load` hooks returning `module.exports = 1`. Same result — Node's runtime require still bypassed it.
+- **What actually worked** — switched the token file from `require()` to ES `import logo from './path.png'`. Vite's bundler resolves ES imports at compile time, hits the plugin's `resolveId`, returns the stub. Metro accepts both `require()` and `import` for static-asset references, so the change is runtime-neutral. **Captured as error #42** in `.claude/error-log.md`.
+- **Side artefacts kept:** the `stubPngPlugin` stays in `vitest.config.ts` (harmless defense if any future code uses `require()` for a PNG and forgets the lesson); new `assets.d.ts` declares `*.png` / `*.jpg` / `*.svg` as numeric handles so tsc accepts the ES imports without per-file `// @ts-ignore`. Tracked via `tsconfig.json` `include` array.
+
+#### Verification across the three builds
+
+- Typecheck clean on every commit (api + mobile + web). Lint ratchet 0 regressions.
+- Token tests evolved 12 → 14 (added `spriteName` regex + uniqueness assertions; replaced `iconImage is null` with non-null + truthy check).
+- Cert verify on every APK: SHA-256 `827cfd44…3573` (upload keystore, not debug).
+- Build durations: v0.2.55 cold 5m 56s, v0.2.56 warm 1m 29s, v0.2.57 warm with 15 new PNGs ~2 min.
+- Tester verdict on v0.2.57: "it's good". Confirms icons read clearly at typical zoom, white-on-tier-color contrast works in both day and night map themes, alert card animation smooth.
+
+#### Commit list (session 52 → 53)
+
+```
+7d22954 feat(routes): route feature awareness — server extraction, map markers, proximity alerts
+c5b8646 chore(release): bump to 0.2.55 (versionCode 57)
+8adca60 fix(routes): extract features client-side too — routes are fetched on-device
+eeae285 chore(release): bump to 0.2.56 (versionCode 58)
+8470032 feat(routes): swap 2-letter labels for SDF icons on route-feature markers
+3f75b6c chore(release): bump to 0.2.57 (versionCode 59)
+```
+
+Three Firebase preview releases distributed to `early-access-preview`:
+- v0.2.55 — release `5ogss0khdcehg` (markers invisible)
+- v0.2.56 — release `1vq0i7pkjcc30` (markers visible as ASCII)
+- v0.2.57 — release `7j8d35u2bhl4g` (current — SDF icons)
+
+#### Lessons (not added to CLAUDE.md but worth surfacing here)
+
+- **Tester signal compounds quickly.** v0.2.55 surfaced the server-vs-client routing path bug within hours of distribution; without the tester loop I'd have shipped to production with an invisible feature. The 5-minute cost of each Firebase rebuild is dwarfed by the days a bad assumption can survive in main.
+- **Designs that "live in core" beat designs that "live in server-and-mobile-separately."** Step 1 originally put the extractor in `services/mobile-api/src/lib/`. Moving it to `packages/core/` cost ~10 minutes once the bug was diagnosed but eliminated a whole class of "server is right, client is stale" desync.
+- **`require()` of binary assets is fine until vitest runs.** Every existing PNG in the project uses `require()` because no test has ever transitively loaded one. The first test that touches a PNG-bearing token file pays the full discovery cost. Captured in error #42 so the next person doesn't.
+
+#### Not added to CLAUDE.md
+- The route feature awareness layer itself **is** worth a "Working Features" entry. Adding it in this same docs commit. Bumping "Current State (as of …)" date to 2026-05-19.

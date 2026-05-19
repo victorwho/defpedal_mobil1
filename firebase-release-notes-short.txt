@@ -1,0 +1,22 @@
+v0.2.57 — Route feature icons
+
+Replaces the 2-letter placeholder labels (TN, BR, LT etc.) with proper icons:
+
+- Tunnel = arch shape
+- Bridge = pillars + arch
+- Traffic light = vertical 3-dot housing (will activate once data ships)
+- Left turn = curved arrow
+- Railway = X crossbuck (will activate once data ships)
+
+Each icon is a single SDF master, recolored at render time to stay white against whatever tier color the marker uses (slate for tunnel, amber for bridge, red for unprotected left).
+
+Same alerts as before — bottom-right card slides in 200m / 150m / 100m before each feature. Profile > Display > "Show route features" still controls everything, on by default.
+
+Please confirm:
+- Icons read clearly at the map zoom you actually ride at
+- The white-on-tier-color contrast looks right in both day and night map themes
+- Nothing weird happens when the alert card icon resizes during the slide-in
+
+If any icon looks off, let me know which one and I'll iterate.
+
+Feedback to the early-access invitation email.
