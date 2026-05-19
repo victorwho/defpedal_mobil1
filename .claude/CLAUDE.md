@@ -411,6 +411,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Route preview with risk distribution card, elevation chart, weather warnings (progressive disclosure — details in expanded sheet)
 - Safe vs fast route comparison with "Switch to safe route" button (shows "Slightly safer" / "Similar safety" for small differences)
 - Flat routing (avoid hills) — 3-way toggle on route planning (Safe/Fast/Flat), uses separate OSRM instance with 7x uphill penalty
+- **Tap-to-cycle routing mode from preview (session 54):** the small Safe/Fast/Flat badge on `route-preview.tsx` (rendered in 3 places: top map overlay, collapsed peek strip, expanded summary strip) is a `PressableScale` that cycles Safe → Fast → Flat → Safe and triggers an automatic refetch (the previewQuery key includes `routeRequest.mode` + `avoidHills`). Distinct Badge variants per mode (Safe `risk-safe` green, Fast `info` blue, Flat `accent` yellow) make the current profile readable at a glance; a `swap-horizontal` icon advertises tappability and is swapped for a `Spinner` while `previewQuery.isFetching`. `hitSlop={8}` brings the ~28pt badge up to the 44pt touch-target minimum. Riders no longer need to pop back to route-planning to switch profiles. Single source of truth: `renderModeCyclePill(longLabel)` in `apps/mobile/app/route-preview.tsx`.
 - Turn-by-turn navigation with 3D follow camera
 - Remaining climb tracker (always shows ascent remaining, decreasing during navigation)
 - Elevation progress card (toggleable during navigation)

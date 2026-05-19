@@ -1287,3 +1287,24 @@ Three Firebase preview releases distributed to `early-access-preview`:
 
 #### Not added to CLAUDE.md
 - The route feature awareness layer itself **is** worth a "Working Features" entry. Adding it in this same docs commit. Bumping "Current State (as of …)" date to 2026-05-19.
+
+### Session 54 — Tap-to-cycle routing mode on preview screen (2026-05-19)
+
+Single-commit UX fix prompted by the tester: the "Safe / Fast / Flat" badge on the route-preview screen was static — to change profile you had to back out to route-planning, tap the toggle, and let the preview re-fetch. Now the badge itself is the toggle.
+
+#### The change
+
+- `apps/mobile/app/route-preview.tsx`: pulled `setRoutingMode` + `setAvoidHills` from the store, computed `currentDisplayMode` (`safe` / `fast` / `flat`) from `routeRequest.mode` + `avoidHills` (mirrors the planning-screen `ModeTogglePill` logic exactly so the two surfaces stay in sync), and added a `cycleRoutingMode` callback that advances Safe → Fast → Flat → Safe. The TanStack Query `previewQuery` key already includes `effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, showRouteComparison }`, so the refetch is automatic — no extra wiring.
+- Replaced three duplicate `<Badge>` usages (top overlay, collapsed `peekContent` strip, expanded `summaryStrip`) with a single `renderModeCyclePill(longLabel)` factory that wraps the Badge in `PressableScale`. `longLabel=true` for the top overlay ("Safe routing"), `false` elsewhere ("Safe"). Three distinct Badge variants (`risk-safe` / `info` / `accent`) give each mode a different color so the current state is recognizable without reading text.
+- Affordance: `swap-horizontal` Ionicon next to the label, swapped for a 16px `Spinner` while `previewQuery.isFetching`. `hapticOnPress="snap"` matches the planning toggle's feel; `hitSlop={8}` brings the ~28pt Badge up to the 44pt touch-target minimum; `disabled={isCyclingMode}` blocks double-taps; `accessibilityLabel` announces both current mode + next mode + the side effect.
+- `Speech.stop()` is called at the top of `cycleRoutingMode` so any leftover voice-guidance preview from a previous mode doesn't keep talking after the swap.
+- Left the existing `comparisonLabel` "Switch to safe route" button alone — it's a contextual nudge that only appears when the active route is measurably less safe, complementary to the always-visible cycle pill.
+
+#### Verification
+
+- Typecheck clean (api + mobile + web). Spinner only accepts 16 / 24 / 32 — initial draft used `size={12}`, fixed to `size={16}` after `tsc` flagged it.
+- Bundle check 200 OK.
+- Installed `app-development-debug.apk` to phone (Samsung SM-S918B / R5CX61E737J) via `./gradlew installDevelopmentDebug` — build successful in 9m 52s on a cold cache. After the install, `adb reverse` had to be re-applied (the install reset the daemon's reverse list) and Metro needed a Reload via the dev menu because the first dev-bundle fetch had timed out (60s+ build) before the splash gave up. Once reloaded the bundle came back in <3s and the tap-to-cycle worked on all three badge placements. Pattern worth remembering: **after `installDevelopmentDebug`, always re-run `adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080` and reload from the dev menu rather than relying on cold-start to recover.**
+
+#### Not shipped to Firebase
+- Dev variant only; no preview/production APK build. Will fold into the next versionCode bump alongside other queued changes.

@@ -39,6 +39,7 @@ import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
+import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -89,6 +90,8 @@ export default function RoutePreviewScreen() {
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
+  const setRoutingMode = useAppStore((state) => state.setRoutingMode);
+  const setAvoidHills = useAppStore((state) => state.setAvoidHills);
 
   const { isOnline } = useConnectivity();
 
@@ -396,16 +399,81 @@ export default function RoutePreviewScreen() {
     }
   }, [saveRouteName, routeRequest, queryClient]);
 
-  const topOverlay = (
-    <View style={styles.metaRow}>
+  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Safe) ──
+  // Mirrors the 3-way ModeTogglePill row on route-planning so the user can
+  // switch profiles directly from the preview without going back. Changing
+  // `routeRequest.mode` and/or `avoidHills` invalidates the previewQuery key
+  // (`effectiveRequest`), which triggers an automatic refetch.
+  type RoutingDisplay = 'safe' | 'fast' | 'flat';
+  const currentDisplayMode: RoutingDisplay =
+    routeRequest.mode === 'fast' ? 'fast' : avoidHills ? 'flat' : 'safe';
+
+  const modeDisplay: Record<
+    RoutingDisplay,
+    {
+      label: string;
+      variant: 'risk-safe' | 'info' | 'accent';
+      next: RoutingDisplay;
+    }
+  > = {
+    safe: { label: 'Safe', variant: 'risk-safe', next: 'fast' },
+    fast: { label: 'Fast', variant: 'info', next: 'flat' },
+    flat: { label: 'Flat', variant: 'accent', next: 'safe' },
+  };
+
+  const cycleRoutingMode = useCallback(() => {
+    // Cancel any speech triggered by an earlier mode preview before switching.
+    void Speech.stop();
+    if (currentDisplayMode === 'safe') {
+      setAvoidHills(false);
+      setRoutingMode('fast');
+    } else if (currentDisplayMode === 'fast') {
+      setAvoidHills(true);
+      setRoutingMode('safe');
+    } else {
+      setAvoidHills(false);
+      setRoutingMode('safe');
+    }
+  }, [currentDisplayMode, setAvoidHills, setRoutingMode]);
+
+  const isCyclingMode = previewQuery.isFetching;
+  const currentMode = modeDisplay[currentDisplayMode];
+  const nextMode = modeDisplay[currentMode.next];
+
+  // Single source of truth for the tappable badge — reused in 3 placements
+  // (top overlay, collapsed peek strip, expanded summary strip). hitSlop
+  // brings the ~28pt Badge surface up to the 44pt minimum touch target.
+  const renderModeCyclePill = (longLabel: boolean) => (
+    <PressableScale
+      onPress={cycleRoutingMode}
+      accessibilityRole="button"
+      accessibilityLabel={`Routing: ${currentMode.label}. Tap to switch to ${nextMode.label}.`}
+      accessibilityHint="Recomputes the route with the new profile"
+      hapticOnPress="snap"
+      hitSlop={8}
+      disabled={isCyclingMode}
+    >
       <Badge
-        variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
+        variant={currentMode.variant}
         size="md"
+        icon={
+          isCyclingMode ? (
+            <Spinner size={16} accessibilityLabel="Recomputing route" />
+          ) : (
+            <Ionicons
+              name="swap-horizontal"
+              size={12}
+              color={colors.textPrimary}
+            />
+          )
+        }
       >
-        {routePreview?.selectedMode === 'safe' ? 'Safe routing' : 'Fast routing'}
+        {longLabel ? `${currentMode.label} routing` : currentMode.label}
       </Badge>
-    </View>
+    </PressableScale>
   );
+
+  const topOverlay = <View style={styles.metaRow}>{renderModeCyclePill(true)}</View>;
 
   if (!guardPassed) return null;
 
@@ -429,12 +497,7 @@ export default function RoutePreviewScreen() {
       useBottomSheet
       peekContent={selectedRoute ? (
         <View style={styles.peekStrip}>
-          <Badge
-            variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
-            size="md"
-          >
-            {routePreview?.selectedMode === 'safe' ? 'Safe' : 'Fast'}
-          </Badge>
+          {renderModeCyclePill(false)}
           <Text style={styles.peekStat}>
             {(selectedRoute.distanceMeters / 1000).toFixed(1)} km
           </Text>
@@ -530,12 +593,7 @@ export default function RoutePreviewScreen() {
       {selectedRoute ? (
         <FadeSlideIn>
         <View style={styles.summaryStrip}>
-          <Badge
-            variant={routePreview?.selectedMode === 'safe' ? 'risk-safe' : 'info'}
-            size="md"
-          >
-            {routePreview?.selectedMode === 'safe' ? 'Safe' : 'Fast'}
-          </Badge>
+          {renderModeCyclePill(false)}
 
           <View style={styles.statGroup}>
             <View style={styles.stat}>
