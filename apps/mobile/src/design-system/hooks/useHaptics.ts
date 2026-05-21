@@ -21,10 +21,10 @@
  * should use semantic tokens; existing call sites are migrated phase-by-phase.
  */
 import { useCallback, useMemo } from 'react';
-import { NativeModules } from 'react-native';
 
 import { useAppStore } from '../../store/appStore';
 
+import { hasExpoNativeModule } from '../../lib/expoNativeModule';
 import { HAPTIC_TOKENS, type HapticToken } from '../tokens/haptics';
 import { useReducedMotion } from './useReducedMotion';
 
@@ -33,12 +33,16 @@ import { useReducedMotion } from './useReducedMotion';
 // (defends against builds where the native binary is missing — CLAUDE.md #8)
 // ---------------------------------------------------------------------------
 
-const hasHapticsNative = Boolean(NativeModules.ExpoHaptics);
 let _haptics: typeof import('expo-haptics') | null | undefined;
 
 function getHaptics(): typeof import('expo-haptics') | null {
-  if (!hasHapticsNative) return null;
   if (_haptics !== undefined) return _haptics;
+  // Detect via the Expo Modules API, not NativeModules.ExpoHaptics — the
+  // latter is undefined on bridgeless release builds (error-log #21).
+  if (!hasExpoNativeModule('ExpoHaptics')) {
+    _haptics = null;
+    return _haptics;
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     _haptics = require('expo-haptics') as typeof import('expo-haptics');

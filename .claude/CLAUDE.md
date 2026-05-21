@@ -298,7 +298,7 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 - `IdlePulse` atom: looping opacity 1.0 ↔ 0.55 over ~1.1s phases. Reserved for empty-state illustrations and idle decorative elements; never wrap content the user must read or interact with.
 - `useStaggeredEntrance` hook: alternative to `FadeSlideIn` as a hook returning the animated style instead of a wrapper component. Same 40ms-step cascade semantics, mount-only, reduced-motion fallback.
 - `motion.ts` springs: `gentle` / `snappy` / `stiff` / `wobbly` presets are the project's tuning knob — adjust here when press feel is off, never inline `tension`/`friction` values in components.
-- `haptics.ts` utility: native-module guard for expo-haptics. ⚠️ Still uses `Boolean(NativeModules.ExpoHaptics)`, which is the same bug as error-log #21/#2b — `undefined` on bridgeless preview/production, so haptics are silently disabled on release builds. Should migrate to a `requireOptionalNativeModule('ExpoHaptics')` probe like `notificationNativeModule.ts`.
+- `haptics.ts` utility + `useHaptics` hook: native-module guard for expo-haptics via `hasExpoNativeModule('ExpoHaptics')` (the generic arch-independent probe in `src/lib/expoNativeModule.ts`). Do NOT use `Boolean(NativeModules.ExpoHaptics)` — it's `undefined` on bridgeless release builds and silently disables haptics (error-log #21). Use `hasExpoNativeModule(name)` for ANY new Expo native-module presence check.
 - Analysis: `design-work/design-system-analysis.md` (SWOT, scores, component inventory, migration status)
 
 ### 3D Navigation Camera
