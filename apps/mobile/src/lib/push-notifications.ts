@@ -45,6 +45,26 @@ export const configureNotificationHandler = () => {
 };
 
 /**
+ * Ensure the OS notification permission is granted, prompting the user once
+ * if it hasn't been decided yet. Safe to call on every app open — it never
+ * re-prompts after the user has permanently denied (canAskAgain === false),
+ * so it won't spam the system dialog.
+ *
+ * Returns true only when permission is currently granted.
+ */
+export const ensureNotificationPermissionAsync = async (): Promise<boolean> => {
+  const N = getNotifications();
+  if (!N) return false;
+
+  const { status: existingStatus, canAskAgain } = await N.getPermissionsAsync();
+  if (existingStatus === 'granted') return true;
+  if (!canAskAgain) return false;
+
+  const { status } = await N.requestPermissionsAsync();
+  return status === 'granted';
+};
+
+/**
  * Register for push notifications, request permission, get Expo push token,
  * and send it to the server.
  */
@@ -52,16 +72,9 @@ export const registerForPushNotifications = async (): Promise<string | null> => 
   const N = getNotifications();
   if (!N) return null;
 
-  // Check/request permission
-  const { status: existingStatus } = await N.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await N.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
+  // Check/request permission (prompts once if undecided)
+  const granted = await ensureNotificationPermissionAsync();
+  if (!granted) {
     return null;
   }
 

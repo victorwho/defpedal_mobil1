@@ -38,6 +38,7 @@ import {
   unregisterPushToken,
   configureNotificationHandler,
   registerForPushNotifications,
+  ensureNotificationPermissionAsync,
 } from './push-notifications';
 import { router } from 'expo-router';
 import { mobileApi } from './api';
@@ -56,6 +57,11 @@ describe('push-notifications', () => {
     it('registerForPushNotifications returns null when native module is absent', async () => {
       const result = await registerForPushNotifications();
       expect(result).toBeNull();
+    });
+
+    it('ensureNotificationPermissionAsync returns false when native module is absent', async () => {
+      const granted = await ensureNotificationPermissionAsync();
+      expect(granted).toBe(false);
     });
   });
 

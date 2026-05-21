@@ -31,6 +31,15 @@ export const DailyWeatherScheduler = () => {
         const { scheduleDailyWeatherNotification } = require('../lib/daily-weather-notification') as {
           scheduleDailyWeatherNotification: (lat: number, lon: number) => Promise<void>;
         };
+        const { ensureNotificationPermissionAsync } = require('../lib/push-notifications') as {
+          ensureNotificationPermissionAsync: () => Promise<boolean>;
+        };
+
+        // Prompt for notification permission first (decoupled from location).
+        // The weather ping is on by default, so this is the entry point that
+        // actually surfaces the OS permission dialog for users who never sign in.
+        const notificationsGranted = await ensureNotificationPermissionAsync();
+        if (!notificationsGranted) return;
 
         const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== 'granted') return;
