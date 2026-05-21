@@ -298,7 +298,7 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 - `IdlePulse` atom: looping opacity 1.0 ↔ 0.55 over ~1.1s phases. Reserved for empty-state illustrations and idle decorative elements; never wrap content the user must read or interact with.
 - `useStaggeredEntrance` hook: alternative to `FadeSlideIn` as a hook returning the animated style instead of a wrapper component. Same 40ms-step cascade semantics, mount-only, reduced-motion fallback.
 - `motion.ts` springs: `gentle` / `snappy` / `stiff` / `wobbly` presets are the project's tuning knob — adjust here when press feel is off, never inline `tension`/`friction` values in components.
-- `haptics.ts` utility: lazy NativeModules guard for expo-haptics (same pattern as push-notifications)
+- `haptics.ts` utility: native-module guard for expo-haptics. ⚠️ Still uses `Boolean(NativeModules.ExpoHaptics)`, which is the same bug as error-log #21/#2b — `undefined` on bridgeless preview/production, so haptics are silently disabled on release builds. Should migrate to a `requireOptionalNativeModule('ExpoHaptics')` probe like `notificationNativeModule.ts`.
 - Analysis: `design-work/design-system-analysis.md` (SWOT, scores, component inventory, migration status)
 
 ### 3D Navigation Camera
@@ -316,7 +316,7 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 | **Filter-based layer hiding** (not conditional mount/unmount) | Mapbox RN caches rendered features. Unmounting a ShapeSource doesn't clear markers. Use `key={vis ? 'on' : 'off'}` or impossible filter to force remount |
 | **`newArchEnabled` per variant** | Development: off (bridge mode) so Metro bundle loads over USB. Preview/production: on (bridgeless). Controlled in `app.config.ts` + `gradle.properties` |
 | **Expo Push + local notifications** | Server-side pushes go through Expo Push API (`services/mobile-api/src/lib/push.ts` → `https://exp.host/--/api/v2/push/send`) with per-user prefs, quiet hours, and daily budget. Local scheduling (`expo-notifications`) handles the daily 8:30am weather ping. EAS project ID `f8bcd740-...` wired in `app.config.ts:223` |
-| **`NativeModules` guard before `require('expo-notifications')`** | `require()` of a missing native module causes uncatchable fatal crash on Android. Checking `NativeModules.ExpoPushTokenManager` first prevents this |
+| **Expo Modules API guard before `require('expo-notifications')`** | `require()` of a missing native module causes uncatchable fatal crash on Android. Detect presence first via `hasNotificationsNativeModule()` (`apps/mobile/src/lib/notificationNativeModule.ts`), which probes `requireOptionalNativeModule('ExpoPushTokenManager')` from `expo-modules-core`. **Do NOT check `NativeModules.ExpoPushTokenManager`** — it's `undefined` on the New Architecture (bridgeless) preview/production builds even when the module is present, silently killing all notifications. See error-log #21 + #2b |
 | **Short path `C:\dev\defpedal`** | Original path `C:\Users\Victor\Documents\1. Projects\...` exceeds Windows 260-char limit for CMake. Junction from old path preserved for file explorer |
 | **`C:\dpb` for release builds** | Even `C:\dev\defpedal` can fail for release builds (node_modules resolves to long paths). Full copy to `C:\dpb` with fresh `npm install` is the reliable path |
 | **Off-route threshold 50m + segment-aware snap** | `closestPointOnPolyline` projects GPS onto nearest line segment (perpendicular distance), not just nearest vertex. 50m base + up to 50m GPS accuracy buffer = effective 50-100m. Old vertex-only approach needed 100m because midpoint of straight segments inflated distance |
@@ -367,7 +367,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 5. **Conditional ShapeSource mount/unmount leaves ghost markers** — use `key` prop to force remount instead
 6. **`DEFAULT_ROUTE_REQUEST` must have `0,0` coords** — non-zero default causes camera to center on wrong location
 7. **Windows 260-char CMake path limit** — build from `C:\dpb` (full copy) for release APKs
-8. **`expo-notifications` native module crash** — guard with `NativeModules.ExpoPushTokenManager` check before `require()`
+8. **`expo-notifications` native module crash** — guard with `hasNotificationsNativeModule()` (Expo Modules API probe) before `require()`. NEVER use `NativeModules.ExpoPushTokenManager` — it's `undefined` on bridgeless preview/production builds and silently disables all notifications (error-log #21 + #2b)
 9. **Fastify strips unknown response fields** — add new fields to JSON Schema in `feedSchemas.ts` or they'll be silently dropped
 
 ## Rules
