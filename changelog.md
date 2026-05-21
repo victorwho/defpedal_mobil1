@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-05-21 — Native Google Sign-In (replaces browser/PKCE OAuth flow) — v0.2.62 (build 64)
+
+### Behavior
+- "Continue with Google" now uses the **native Android account picker** (`@react-native-google-signin/google-signin`) instead of opening a browser. The Google ID token is exchanged for a Supabase session via `supabase.auth.signInWithIdToken`.
+- Fixes the reported issue where Google's account screen showed the raw Supabase project domain (`uobubaulcdcuggnetzei.supabase.co`) — the old `signInWithOAuth` flow brokered through the Supabase callback URL, which is the host Google displays. The native flow has no such redirect, so the user no longer sees a database URL.
+- Email/password sign-in and anonymous ("continue without an account") are unchanged.
+
+### Trust model & setup
+- `webClientId` (`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`) is the SAME web client already configured in the Supabase Google provider, so `signInWithIdToken` validates the token audience server-side — no Supabase config change.
+- Android OAuth clients (package + signing SHA-1) registered in the web client's GCP project `gen-lang-client-0895796477` (NOT the Firebase `defensive-pedal` project) for all four identities: dev (debug keystore), preview + production-sideload (upload keystore), and production-via-Play (Play App Signing key). Wrong project / wrong SHA-1 → `DEVELOPER_ERROR` code 10. See `.claude/error-log.md` #44.
+
+### Files
+- `apps/mobile/src/lib/supabase.ts` — `signInWithGoogle` rewritten (native picker + `signInWithIdToken`); removed the browser-flow machinery (`signInWithOAuth`, `oauth-redirect` intermediary, `oauthCallbackResolver`/`resolveOAuthCallback`/`isOAuthInProgress`/`extractCodeFromUrl`, `expo-web-browser` import). New return contract `{ error, cancelled? }`.
+- `apps/mobile/src/providers/AuthSessionProvider.tsx` — dropped the dead OAuth-callback branch (deep-link handler is now email-confirmation-only); added an allowed-set `is`-guard for the `verifyOtp` `type` (security hardening).
+- `apps/mobile/app/auth.tsx`, `apps/mobile/app/onboarding/signup-prompt.tsx` — handle `cancelled` (no false success / no onboarding advance on picker dismiss).
+- `apps/mobile/app.config.ts`, `apps/mobile/src/lib/env.ts` — `googleWebClientId` plumbing. `apps/mobile/package.json` — added `@react-native-google-signin/google-signin@^16.1.2`.
+
+### Tests
+- `npm run typecheck` clean (3 workspaces); lint ratchet 0 regressions; `npm run check:bundle` HTTP 200.
+- Security review (security-reviewer agent): no CRITICAL/HIGH; two LOW hardening tweaks applied.
+
+### Release
+- **Preview**: v0.2.62 / build 64 built from `C:\dpb` (dev-leak audit passed; APK signer verified = upload keystore SHA-1 `0B:C4…FD:E0`). Distributed via Firebase App Distribution to `early-access-preview`.
+- **Native module** → requires a native rebuild (no OTA). Dev: `./gradlew installDevelopmentDebug`.
+
 ## 2026-04-28 — OSRM HTTPS Migration (Caddy + Let's Encrypt, Cleartext Exceptions Removed)
 
 ### Behavior

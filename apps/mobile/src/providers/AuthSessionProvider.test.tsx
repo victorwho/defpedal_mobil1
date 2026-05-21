@@ -29,8 +29,6 @@ vi.mock('../lib/supabase', () => ({
   getCurrentSession: vi.fn().mockResolvedValue(null),
   subscribeToAuthSessionChanges: vi.fn(() => vi.fn()),
   supabaseClient: null,
-  isOAuthInProgress: vi.fn(() => false),
-  resolveOAuthCallback: vi.fn(),
   signInWithEmail: vi.fn(),
   signUpWithEmail: vi.fn(),
   signInWithGoogle: vi.fn(),

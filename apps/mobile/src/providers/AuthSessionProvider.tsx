@@ -10,9 +10,7 @@ import {
   getCurrentSession,
   getLastAnonSignInError,
   isDeveloperAuthBypassAvailable,
-  isOAuthInProgress,
   isSupabaseConfigured,
-  resolveOAuthCallback,
   signInAnonymously,
   signInWithEmail,
   signInWithGoogle,
@@ -41,6 +39,21 @@ type AuthSessionContextValue = {
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
+
+// Email-confirmation deep links carry a `type` query param that we hand to
+// verifyOtp. It's attacker-influenceable (anyone can craft a custom-scheme
+// link), so narrow it against the allowed set rather than blindly casting.
+const ALLOWED_OTP_TYPES = [
+  'signup',
+  'magiclink',
+  'recovery',
+  'invite',
+  'email_change',
+  'email',
+] as const;
+type AllowedOtpType = (typeof ALLOWED_OTP_TYPES)[number];
+const isAllowedOtpType = (value: string): value is AllowedOtpType =>
+  (ALLOWED_OTP_TYPES as readonly string[]).includes(value);
 
 export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<MobileAuthSession | null>(null);
@@ -115,24 +128,16 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     };
   }, []);
 
-  // ── Handle OAuth deep link callback ──
-  // When the browser redirects back to the app via the custom scheme,
-  // forward the URL to signInWithGoogle() if it is actively waiting.
-  // On cold start (app was killed), handle the code exchange directly.
+  // ── Handle email-confirmation deep link callback ──
+  // Email confirmation / magic links redirect back to the app via the custom
+  // scheme (through the email-confirm edge function). Google sign-in no longer
+  // uses this path — it's native now (signInWithIdToken), with no browser
+  // redirect. This handler exchanges the PKCE code (or verifies the OTP token)
+  // that the email link carries.
   useEffect(() => {
     const handleOAuthDeepLink = async (url: string) => {
       if (!url.includes('auth/callback')) return;
 
-      // Preferred path: signInWithGoogle() is awaiting this callback.
-      // Forward the URL so it handles the PKCE exchange in one place.
-      if (isOAuthInProgress()) {
-        resolveOAuthCallback(url);
-        return;
-      }
-
-      // Cold-start fallback: the app was killed or the activity restarted
-      // after opening the browser. The PKCE verifier may be lost, but
-      // attempt the exchange anyway — Supabase persists it in secure storage.
       if (!supabaseClient) return;
 
       // Close the Chrome Custom Tab that's showing a blank page
@@ -166,9 +171,13 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
         } else if (tokenHash && type) {
           // Non-PKCE email confirmation (e.g. link opened on a different
           // device where the PKCE verifier is not in SecureStore).
+          if (!isAllowedOtpType(type)) {
+            setAuthError('Sign-in failed: unrecognized link type.');
+            return;
+          }
           const { error } = await supabaseClient.auth.verifyOtp({
             token_hash: tokenHash,
-            type: type as 'signup' | 'magiclink' | 'recovery' | 'invite' | 'email_change' | 'email',
+            type,
           });
           if (error) {
             setAuthError(`Sign-in failed: ${error.message}`);

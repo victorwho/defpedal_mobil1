@@ -81,7 +81,11 @@ export default function OnboardingSignupPromptScreen() {
     setErrorMessage(null);
 
     try {
-      const { error } = await authCtx.signInWithGoogle();
+      const { error, cancelled } = await authCtx.signInWithGoogle();
+
+      if (cancelled) {
+        return;
+      }
 
       if (error) {
         setErrorMessage(error.message);

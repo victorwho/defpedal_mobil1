@@ -50,7 +50,7 @@ Defensive Pedal is a **mobile-only** cycling safety app. The legacy React/Vite w
 | Community Feed | `app/community-feed.tsx` | Location-based shared trips |
 | Community Trip | `app/community-trip.tsx` | Individual shared trip detail |
 | Profile | `app/profile.tsx` | Bike type, cycling frequency, routing prefs, privacy |
-| Auth | `app/auth.tsx` | Email/password + Google OAuth sign-in |
+| Auth | `app/auth.tsx` | Email/password + native Google sign-in (`signInWithIdToken`) |
 | Settings | `app/settings.tsx` | App settings |
 | Offline Maps | `app/offline-maps.tsx` | Download map packs |
 | Diagnostics | `app/diagnostics.tsx` | Debug info, queue state, API health |

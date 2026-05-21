@@ -1353,3 +1353,36 @@ Typecheck clean across all 3 workspaces. Metro bundle returns HTTP 200. 60/60 te
 - **When a test suite needs four different mocking approaches to instantiate the SUT, that's a design signal, not a tooling problem.** Extracting the pure helpers and testing them directly cost less time than the cumulative debugging of `vi.mock` / `vi.hoisted` / `vi.doMock` / resolve.alias attempts.
 - **"All tests pass" ≠ "no bugs found."** The cancel-before-fetch reordering was visible from code reading once Test 5 (silence-path) made me think about what happens when `parseForecastResponse` returns `null`. The test itself didn't fail; thinking through the test's implication did.
 - **Vitest `resolve.alias` only applies when vitest runs from the workspace where the config lives.** Running `npx vitest run apps/mobile/src/...` from the repo root skips `apps/mobile/vitest.config.ts` entirely and uses bare-Vite defaults — no aliases, real `react-native/index.js` gets parsed, Flow syntax explodes. Always `cd apps/mobile && npx vitest run src/...` for these tests.
+
+### Session 56 — Native Google Sign-In (kill the `…supabase.co` branding on the Google account picker) (2026-05-21)
+
+User report: tapping "Continue with Google" opened a browser to *"Choose an account to continue to **uobubaulcdcuggnetzei.supabase.co**"* — no app name. Root cause: the previous flow used Supabase's browser/PKCE `signInWithOAuth`, so Google's `redirect_uri` was the Supabase callback (`…supabase.co/auth/v1/callback`) and Google displays that host. App name + authorized domains in the consent screen can't change the account-picker host — it's bound to the redirect URI.
+
+#### What shipped
+
+- **Native Google Sign-In** via `@react-native-google-signin/google-signin@^16.1.2` (added to `apps/mobile/package.json` — error #22). `signInWithGoogle` in `apps/mobile/src/lib/supabase.ts` rewritten: native OS account picker → Google ID token → `supabase.auth.signInWithIdToken({ provider: 'google', token })`. No browser, no `…supabase.co` shown to the user.
+- **Removed the browser-flow machinery**: `signInWithOAuth` + the `oauth-redirect` edge-function intermediary dance, `oauthCallbackResolver` / `resolveOAuthCallback` / `isOAuthInProgress` / `extractCodeFromUrl` / `OAUTH_TIMEOUT_MS`, and the `expo-web-browser` import in `supabase.ts`. The `AuthSessionProvider` deep-link handler is now email-confirmation-only (its PKCE-exchange + OTP-verify branches stay — email links still need them).
+- **Env plumbing**: `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` → `app.config.ts` extra (`googleWebClientId`) → `mobileEnv.googleWebClientId`. Value is the SAME web client already configured in the Supabase Google provider (`1081412761678-…`), so its audience is already trusted by `signInWithIdToken` — no Supabase config change.
+- **Return contract** changed to `{ error: Error | null; cancelled?: boolean }` so a deliberate picker-dismiss is distinct from a failure. Updated `auth.tsx` (skip success toast on cancel) and `signup-prompt.tsx` (don't complete onboarding on cancel); `feedback.tsx` ignores the result so unchanged. Native module is lazy-`require()`d per project convention; returns a friendly error if absent.
+
+#### Project-topology gotcha (see error-log #44)
+
+The web client lives in GCP project `gen-lang-client-0895796477` (project# `1081412761678`, same as Cloud Run). The Firebase project `defensive-pedal` (project# `1070156882676`, from `google-services.json`) is DIFFERENT. **Android OAuth clients (package + signing SHA-1) must be created in the web client's project, not Firebase**, or sign-in fails with `DEVELOPER_ERROR` (code 10). `google-services.json` is irrelevant to google-signin (FCM only); its empty `oauth_client: []` arrays are a red herring.
+
+Fingerprints captured for the user to register Android OAuth clients:
+- dev (`com.defensivepedal.mobile.dev`, debug.keystore): `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25`
+- preview (`com.defensivepedal.mobile.preview`, upload keystore): `0B:C4:30:C2:0C:FF:67:1E:FC:4D:7B:39:7F:EB:EC:52:BA:EE:FD:E0`
+- production sideload (`com.defensivepedal.mobile`, upload keystore): same as preview
+- production via Play (`com.defensivepedal.mobile`, **Play App Signing** key from Play Console → Setup → App signing): registered 2026-05-21
+
+#### Verification
+
+Typecheck clean (3 workspaces). Lint ratchet 0 regressions. Bundle HTTP 200. Native module added → dev APK must be rebuilt (`./gradlew installDevelopmentDebug`) before testing; the JS bundle resolves but the native lib isn't in the previously-installed APK. Sign-in won't actually succeed until the Android OAuth clients above are created in `gen-lang-client-0895796477`.
+
+#### Security review + hardening
+
+Ran the security-reviewer agent over `signInWithGoogle` + the deep-link handler. Verdict: clean, no CRITICAL/HIGH. Trust model sound (web client ID is the correct `signInWithIdToken` audience, validated server-side; not a secret; ID token never logged/stored), and removing the OAuth deep-link branch opened no hole (an `auth/callback` link still needs the on-device PKCE verifier or a real Supabase-signed OTP). Applied the two LOW hardening tweaks: (1) documented that `googleSigninConfigured` intentionally never resets (one webClientId per process); (2) `AuthSessionProvider` now narrows the URL-supplied `verifyOtp` `type` against an allowed-set `is`-guard instead of a blind `as` cast. Left the pre-existing `console.error` noise filter as-is (reviewer confirmed not a vulnerability).
+
+#### Shipped to preview
+
+User confirmed the Android OAuth clients were created. Bumped to **v0.2.62 / build 64** (v0.2.61/63 was the haptics fix, already shipped). Built the preview APK from `C:\dpb` — dev-leak audit passed, and APK signer verified as the upload keystore (SHA-1 `0B:C4:…:FD:E0`, the cert registered as the preview Android OAuth client, so native sign-in resolves on this build). Distributed via Firebase App Distribution to the `early-access-preview` group (app `1:1070156882676:android:e8942c210dc337ebca34a1`, release notes `apkreleases/release-notes-v0.2.62.txt`). Not yet committed to git — local changes awaiting review.

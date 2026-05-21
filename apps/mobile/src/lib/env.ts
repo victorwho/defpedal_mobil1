@@ -10,6 +10,7 @@ const extra =
     mapboxPublicToken?: string;
     supabaseUrl?: string;
     supabaseAnonKey?: string;
+    googleWebClientId?: string;
     sentryDsn?: string;
     sentryEnvironment?: string;
     sentryTracesSampleRate?: string;
@@ -59,6 +60,8 @@ export const mobileEnv = {
   supabaseUrl: publicEnv.EXPO_PUBLIC_SUPABASE_URL ?? extra.supabaseUrl ?? '',
   supabaseAnonKey:
     publicEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? extra.supabaseAnonKey ?? '',
+  googleWebClientId:
+    publicEnv.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? extra.googleWebClientId ?? '',
   sentryDsn: publicEnv.EXPO_PUBLIC_SENTRY_DSN ?? extra.sentryDsn ?? '',
   sentryEnvironment:
     publicEnv.EXPO_PUBLIC_SENTRY_ENVIRONMENT ??

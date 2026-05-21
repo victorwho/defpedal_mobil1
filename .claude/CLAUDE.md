@@ -98,7 +98,7 @@ All three variants are defined as Gradle product flavors in `build.gradle`:
 | **Data fetching** | TanStack Query (React Query) | Server state, caching, optimistic updates |
 | **Maps** | @rnmapbox/maps + Mapbox Standard style | Map rendering, routing visualization |
 | **Charts** | react-native-svg | Elevation chart, risk distribution bar |
-| **Auth** | Supabase Auth (Google OAuth) | User authentication |
+| **Auth** | Supabase Auth (native Google Sign-In via `signInWithIdToken`; email/password; anonymous) | User authentication |
 | **Database** | Supabase (PostgreSQL + PostGIS) | Trips, hazards, feedback, community feed, road risk data |
 | **API server** | Fastify (Node.js) | Mobile API (services/mobile-api) |
 | **Safe routing** | Custom OSRM server (`osrm.defensivepedal.com`) | Safety-optimized cycling routes |
@@ -334,6 +334,7 @@ expo-notifications registers through the Expo Modules API (`globalThis.expo.modu
 | **Overpass only for parking/rental/shops** | These specific OSM tags aren't in Mapbox's POI layer. Rate limit risk accepted (cached 5-10 min via TanStack Query) |
 | **Filter-based layer hiding** (not conditional mount/unmount) | Mapbox RN caches rendered features. Unmounting a ShapeSource doesn't clear markers. Use `key={vis ? 'on' : 'off'}` or impossible filter to force remount |
 | **`newArchEnabled` per variant** | Development: off (bridge mode) so Metro bundle loads over USB. Preview/production: on (bridgeless). Controlled in `app.config.ts` + `gradle.properties` |
+| **Native Google Sign-In (not browser OAuth)** | `@react-native-google-signin/google-signin` + `supabase.auth.signInWithIdToken` shows the OS account picker — no Chrome Custom Tab, and the user never sees `…supabase.co` (Google is no longer brokered through the Supabase callback). Requires `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (the SAME web client as the Supabase Google provider, so its audience is pre-trusted) + Android OAuth clients (package + signing SHA-1) in the web client's GCP project `gen-lang-client-0895796477` — NOT the Firebase project. `google-services.json` is unused by sign-in. Lazy-required native module (no `expo prebuild`; autolinking handles it). See error-log #44 |
 | **Expo Push + local notifications** | Server-side pushes go through Expo Push API (`services/mobile-api/src/lib/push.ts` → `https://exp.host/--/api/v2/push/send`) with per-user prefs, quiet hours, and daily budget. Local scheduling (`expo-notifications`) handles the daily 8:30am weather ping. EAS project ID `f8bcd740-...` wired in `app.config.ts:223` |
 | **Expo Modules API guard before `require('expo-notifications')`** | `require()` of a missing native module causes uncatchable fatal crash on Android. Detect presence first via `hasNotificationsNativeModule()` (`apps/mobile/src/lib/notificationNativeModule.ts`), which probes `requireOptionalNativeModule('ExpoPushTokenManager')` from `expo-modules-core`. **Do NOT check `NativeModules.ExpoPushTokenManager`** — it's `undefined` on the New Architecture (bridgeless) preview/production builds even when the module is present, silently killing all notifications. See error-log #21 + #2b |
 | **Short path `C:\dev\defpedal`** | Original path `C:\Users\Victor\Documents\1. Projects\...` exceeds Windows 260-char limit for CMake. Junction from old path preserved for file explorer |

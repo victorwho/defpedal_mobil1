@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
-import * as WebBrowser from 'expo-web-browser';
 
 import {
   buildDeveloperBypassSession,
@@ -194,134 +193,93 @@ export const signUpWithEmail = async (email: string, password: string) => {
   });
 };
 
-// ── OAuth callback coordination ──
-// signInWithGoogle() opens the browser and waits for the deep link handler
-// (in AuthSessionProvider) to resolve the PKCE code exchange. This eliminates
-// the previous race condition where three code paths could set the session.
-const OAUTH_TIMEOUT_MS = 20_000;
-
-let oauthCallbackResolver: ((url: string) => void) | null = null;
-
-/**
- * Called by AuthSessionProvider's deep link handler when an OAuth callback
- * URL arrives. Resolves the Promise that signInWithGoogle() is awaiting,
- * then dismisses the browser so openAuthSessionAsync unblocks.
- */
-export const resolveOAuthCallback = (url: string) => {
-  if (oauthCallbackResolver) {
-    oauthCallbackResolver(url);
-    oauthCallbackResolver = null;
-    // Close the Chrome Custom Tab so openAuthSessionAsync resolves.
-    // Without this, the tab stays open showing a blank page after the
-    // intent-URI redirect and the user sees a "stuck" blank screen.
-    void WebBrowser.dismissBrowser();
-  }
-};
+// GoogleSignin.configure() only needs to run once per process; guard so we
+// don't reconfigure on every sign-in attempt. This intentionally never resets:
+// there is exactly one webClientId per process lifetime, so don't try to swap
+// the webClientId at runtime — this flag would make the second configure() a
+// no-op.
+let googleSigninConfigured = false;
 
 /**
- * Returns true when signInWithGoogle() is actively waiting for a callback.
- * The deep link handler in AuthSessionProvider uses this to decide whether
- * to forward the URL via resolveOAuthCallback (preferred) or handle it
- * independently (cold-start fallback).
- */
-export const isOAuthInProgress = () => oauthCallbackResolver !== null;
-
-/**
- * Extract a PKCE authorization code from an OAuth callback URL.
- */
-const extractCodeFromUrl = (url: string): string | null => {
-  const queryString = url.includes('?') ? url.split('?')[1]?.split('#')[0] : '';
-  const params = new URLSearchParams(queryString ?? '');
-  return params.get('code');
-};
-
-/**
- * Sign in with Google via Supabase OAuth (PKCE flow).
+ * Sign in with Google using the native account picker, then exchange the
+ * Google ID token for a Supabase session via signInWithIdToken.
  *
- * 1. Gets an OAuth URL from Supabase.
- * 2. Opens a browser that redirects through a web intermediary (edge function)
- *    which performs a JS redirect to the app's custom scheme — avoiding the
- *    Android Chrome Custom Tab 302-to-custom-scheme failure.
- * 3. Waits for AuthSessionProvider's deep link handler to forward the callback
- *    URL, then exchanges the PKCE code for a session.
+ * This replaces the previous browser/PKCE flow (signInWithOAuth + an HTTPS
+ * edge-function intermediary). The native picker shows the OS account sheet —
+ * no Chrome Custom Tab, and crucially the user never sees "…supabase.co",
+ * because Google is no longer brokered through the Supabase callback URL.
+ *
+ * Requires EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID — the SAME web client configured in
+ * the Supabase Google provider, so the ID token's audience is already trusted —
+ * plus an Android OAuth client in the same GCP project keyed by package name +
+ * signing SHA-1. The native module is lazy-required (project convention: never
+ * top-level import native modules; keeps Vitest/happy-dom and any non-GMS
+ * device safe).
+ *
+ * Returns `cancelled: true` (with no error) when the user dismisses the picker,
+ * so callers can distinguish a deliberate cancel from a real failure.
  */
 export const signInWithGoogle = async (): Promise<{
   error: Error | null;
+  cancelled?: boolean;
 }> => {
   const client = requireSupabaseClient();
   await clearDeveloperBypassSession();
 
-  // The deep link URL the app will ultimately receive
-  const appCallbackUrl = `${appScheme}://auth/callback`;
-
-  // The HTTPS intermediary that Supabase will 302 to. It serves a tiny HTML
-  // page whose JS redirects to the custom scheme (works on Android).
-  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
-  const intermediaryUrl = `${supabaseUrl}/functions/v1/oauth-redirect?scheme=${encodeURIComponent(appScheme)}`;
-
-  // 1. Get the OAuth URL from Supabase, redirecting to the intermediary
-  const { data, error } = await client.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: intermediaryUrl,
-      skipBrowserRedirect: true,
-      queryParams: {
-        prompt: 'select_account',
-      },
-    },
-  });
-
-  if (error || !data.url) {
-    return { error: error ?? new Error('Failed to get OAuth URL from Supabase.') };
+  const webClientId = mobileEnv.googleWebClientId;
+  if (!webClientId) {
+    return {
+      error: new Error(
+        'Google sign-in is not configured (missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID).',
+      ),
+    };
   }
 
-  // 2. Set up a Promise that resolves when the deep link handler forwards
-  //    the OAuth callback URL to us (or rejects on timeout).
-  const callbackUrlPromise = new Promise<string>((resolve, reject) => {
-    oauthCallbackResolver = resolve;
+  let mod: typeof import('@react-native-google-signin/google-signin');
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    mod = require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
+  } catch {
+    return { error: new Error('Google sign-in is unavailable in this build.') };
+  }
+  const { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } = mod;
 
-    setTimeout(() => {
-      if (oauthCallbackResolver === resolve) {
-        oauthCallbackResolver = null;
-        reject(new Error('Google sign-in timed out. Please try again.'));
-      }
-    }, OAUTH_TIMEOUT_MS);
-  });
-
-  // 3. Open the browser. On iOS, WebBrowser may intercept the redirect and
-  //    return the URL directly. On Android, the deep link handler catches it.
-  const result = await WebBrowser.openAuthSessionAsync(
-    data.url,
-    appCallbackUrl,
-  );
-
-  // 4. Determine the callback URL from whichever path delivered it
-  let callbackUrl: string | null = null;
-
-  if (result.type === 'success' && result.url) {
-    // iOS path: WebBrowser intercepted the redirect
-    callbackUrl = result.url;
-    oauthCallbackResolver = null; // No longer needed
-  } else {
-    // Android path (or iOS fallback): wait for the deep link handler
-    try {
-      callbackUrl = await callbackUrlPromise;
-    } catch (err) {
-      return { error: err instanceof Error ? err : new Error('Google sign-in failed.') };
+  try {
+    if (!googleSigninConfigured) {
+      GoogleSignin.configure({ webClientId });
+      googleSigninConfigured = true;
     }
+
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const response = await GoogleSignin.signIn();
+
+    // User dismissed the picker — a deliberate cancel, not an error.
+    if (!isSuccessResponse(response)) {
+      return { error: null, cancelled: true };
+    }
+
+    const idToken = response.data.idToken;
+    if (!idToken) {
+      return { error: new Error('Google sign-in did not return an ID token.') };
+    }
+
+    const { error } = await client.auth.signInWithIdToken({
+      provider: 'google',
+      token: idToken,
+    });
+    if (error) return { error };
+
+    emitAuthSessionChange();
+    return { error: null };
+  } catch (err) {
+    // Older devices / One Tap surface a cancel as a thrown status code.
+    if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
+      return { error: null, cancelled: true };
+    }
+    return {
+      error: err instanceof Error ? err : new Error('Google sign-in failed.'),
+    };
   }
-
-  // 5. Exchange the PKCE code for a session
-  const code = extractCodeFromUrl(callbackUrl);
-  if (!code) {
-    return { error: new Error('Missing authorization code in OAuth callback.') };
-  }
-
-  const { error: codeError } = await client.auth.exchangeCodeForSession(code);
-  if (codeError) return { error: codeError };
-
-  emitAuthSessionChange();
-  return { error: null };
 };
 
 export const signOut = async () => {

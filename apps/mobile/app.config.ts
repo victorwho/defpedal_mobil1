@@ -171,7 +171,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.61',
+    version: '0.2.62',
     icon: './assets/icon.png',
     // Global default is unlocked so non-map screens (history, community,
     // profile, settings, trophy case, onboarding) follow the OS auto-rotate
@@ -314,6 +314,13 @@ export default () => ({
         'EXPO_PUBLIC_SUPABASE_ANON_KEY',
         'SUPABASE_ANON_KEY',
         'VITE_SUPABASE_ANON_KEY',
+      ]),
+      // Web OAuth client ID used by native Google Sign-In. The ID token's
+      // audience is this client, which Supabase's signInWithIdToken validates.
+      // Reuses the same web client configured in the Supabase Google provider.
+      googleWebClientId: resolveExpoExtraValue([
+        'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
+        'GOOGLE_WEB_CLIENT_ID',
       ]),
       sentryDsn: resolveExpoExtraValue(['EXPO_PUBLIC_SENTRY_DSN']),
       sentryEnvironment: resolveExpoExtraValue(
