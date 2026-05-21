@@ -1,4 +1,4 @@
-import { NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import {
   TRIGGER_HOUR,
@@ -9,15 +9,12 @@ import {
   pickForecastIndex,
   type GoodWeatherForecast,
 } from './daily-weather-messages';
+import { hasNotificationsNativeModule } from './notificationNativeModule';
 
 const NOTIFICATION_ID = 'daily-weather-cycling';
 
-const hasNativeModule = Boolean(
-  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotificationPresenter,
-);
-
 const getNotifications = () => {
-  if (!hasNativeModule) return null;
+  if (!hasNotificationsNativeModule()) return null;
   try {
     return require('expo-notifications') as typeof import('expo-notifications');
   } catch {

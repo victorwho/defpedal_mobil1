@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock expo-modules-core so the native-module probe deterministically reports
+// "absent" under node (an unmocked import throws a __DEV__ reference error).
+vi.mock('expo-modules-core', () => ({
+  requireOptionalNativeModule: () => null,
+}));
+
 import {
   scheduleDailyWeatherNotification,
   cancelDailyWeatherNotification,

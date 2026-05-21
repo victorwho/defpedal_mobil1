@@ -1,18 +1,7 @@
 import { useEffect } from 'react';
-import { NativeModules } from 'react-native';
 
 import { useAppStore } from '../store/appStore';
-
-const hasNotificationModule = () => {
-  try {
-    return Boolean(
-      NativeModules.ExpoPushTokenManager ||
-      NativeModules.ExpoNotificationPresenter,
-    );
-  } catch {
-    return false;
-  }
-};
+import { hasNotificationsNativeModule } from '../lib/notificationNativeModule';
 
 /**
  * Schedules a daily 8:30am weather notification on every app open.
@@ -23,7 +12,7 @@ export const DailyWeatherScheduler = () => {
 
   useEffect(() => {
     if (!notifyWeather) return;
-    if (!hasNotificationModule()) return;
+    if (!hasNotificationsNativeModule()) return;
 
     const timer = setTimeout(async () => {
       try {

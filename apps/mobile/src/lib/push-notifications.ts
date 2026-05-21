@@ -1,21 +1,14 @@
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { router } from 'expo-router';
 
 import { mobileApi } from './api';
-
-// Guard: expo-notifications requires ExpoPushTokenManager native module.
-// In dev builds without a native rebuild the JS module loads fine but any
-// call throws "Cannot find native module 'ExpoPushTokenManager'". Check the
-// native module presence first, before requiring the JS module at all.
-const hasNotificationsNative = Boolean(
-  NativeModules.ExpoPushTokenManager || NativeModules.ExpoNotifications,
-);
+import { hasNotificationsNativeModule } from './notificationNativeModule';
 
 let _notifications: typeof import('expo-notifications') | null | undefined;
 const getNotifications = () => {
-  if (!hasNotificationsNative) return null;
+  if (!hasNotificationsNativeModule()) return null;
   if (_notifications !== undefined) return _notifications;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

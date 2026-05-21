@@ -25,6 +25,12 @@ vi.mock('expo-router', () => ({
   },
 }));
 
+// Mock expo-modules-core so the native-module probe deterministically reports
+// "absent" under node (an unmocked import throws a __DEV__ reference error).
+vi.mock('expo-modules-core', () => ({
+  requireOptionalNativeModule: () => null,
+}));
+
 // Mock the api module
 vi.mock('./api', () => ({
   mobileApi: {
