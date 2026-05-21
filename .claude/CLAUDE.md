@@ -307,6 +307,25 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 - Tap map → breaks follow (flat overview). Recenter button → resumes 3D follow.
 - Native `LocationPuck` with `puckBearing="course"` replaces manual circle marker
 
+### Notifications (read before adding any notification)
+The notification stack has several non-obvious invariants that have each caused silent, hard-to-debug failures. Follow this section exactly when adding a new notification.
+
+**1. Native-module detection — NEVER use `NativeModules.Expo*`.**
+expo-notifications registers through the Expo Modules API (`globalThis.expo.modules`), NOT the legacy React Native bridge. `NativeModules.ExpoPushTokenManager` is `undefined` on the **New Architecture (bridgeless)**, which the preview/production variants run — so a `NativeModules`-based guard passes on the dev variant (old-arch bridge) and silently disables ALL notifications on every release build. Always gate on `hasNotificationsNativeModule()` from `apps/mobile/src/lib/notificationNativeModule.ts`, which probes via `requireOptionalNativeModule('ExpoPushTokenManager')`. See error-log #21 + #2b.
+
+**2. Permission must be REQUESTED, not just checked.**
+`Notifications.getPermissionsAsync()` only reads current status. To surface the OS dialog, call `ensureNotificationPermissionAsync()` (`push-notifications.ts`) — it prompts once and respects `canAskAgain` so it never spams after a permanent denial. The entry point that actually triggers the prompt for anonymous/first-run users is `DailyWeatherScheduler` (weather ping is on by default), since push-token registration is gated behind a logged-in session. `POST_NOTIFICATIONS` must stay declared in `AndroidManifest.xml` (required for the Android 13+ dialog) — note the manifest is hand-managed because this project never runs `expo prebuild` (error-log #27).
+
+**3. Lazy `require()` after the guard.** Never top-level `import * as Notifications`. Use `hasNotificationsNativeModule()` → then `require('expo-notifications')` inside try/catch (error #2/#2b).
+
+**4. Two delivery paths.** Server-side pushes go through the Expo Push API (`services/mobile-api/src/lib/push.ts`) with per-user prefs/quiet-hours/budget. Local scheduling (`expo-notifications`) handles the daily 8:30am weather ping (`daily-weather-notification.ts` + `daily-weather-messages.ts`, scheduled by `DailyWeatherScheduler`).
+
+**5. Daily weather ping specifics.** Scheduled on every app open: fetch fresh forecast FIRST, then cancel + reschedule a one-shot `timeInterval` trigger (so a fetch failure leaves yesterday's queued notification intact). **Timing is intentionally inexact** — Android batches `timeInterval` triggers under Doze, so delivery can drift 5–15 min past 8:30. This is accepted, NOT a bug; do not "fix" it with `SCHEDULE_EXACT_ALARM` (Play Store restricts that permission to alarm/calendar apps). A `DAILY` trigger would fire closer + repeat without reopening, but freezes the content between app opens — rejected to keep the forecast fresh.
+
+**6. Tap handling → in-app.** Every notification's `content.data` must carry a `type` discriminator (and any payload the tap needs). `handleNotificationResponse` (`push-notifications.ts`) switches on `data.type`; `NotificationProvider` wires both the warm-start listener and the cold-start `getLastNotificationResponseAsync()` path. To show content in-app on tap (rather than just navigate), stash it in a **transient, non-persisted** store field and render an overlay manager in `app/_layout.tsx` (suppressed during `NAVIGATING`). Canonical example: the daily-weather tap sets `weatherNotice` → `WeatherNoticeManager` renders `WeatherNoticeModal`. Non-persisted is deliberate so persist-hydration on cold start doesn't wipe a tap that just fired.
+
+**New-notification checklist:** (a) guard with `hasNotificationsNativeModule()`; (b) request permission via `ensureNotificationPermissionAsync()` somewhere reachable; (c) set `content.data.type`; (d) add a `handleNotificationResponse` case; (e) if showing in-app, add a transient store field + overlay manager; (f) add the channel on Android; (g) bundle check + test on a **preview** build (dev's old-arch bridge hides the bridgeless-only failures).
+
 ## Key Decisions & Rationale
 
 | Decision | Why |

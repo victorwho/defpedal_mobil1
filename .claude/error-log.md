@@ -354,3 +354,8 @@ Same lesson applies to any "denormalized aggregate" column you assume exists on 
 - The mascot pose file (`mascotPoses.ts`) currently still uses `require()` because nothing tests it. If a test ever loads it, migrate it to ES `import` rather than fighting the bundler.
 
 **Occurrences:** 2026-05-19 — session 53 route-feature SDF icon swap. First token file with image assets that's also covered by a contract test. Cost ~25 minutes of dead-end attempts (alias regex, Vite plugin variants) before switching to ES `import` cleared everything in one move.
+
+### 43. Scheduled local notifications drift past their target time on Android — this is expected, not a bug
+**Pattern:** The daily 8:30am weather ping arrived at 8:44. `computeTriggerSeconds` targets 08:30:00 exactly, so the scheduling math is correct. The drift comes from the trigger TYPE: `expo-notifications` `timeInterval` triggers are delivered via Android **inexact alarms**, which the OS batches under Doze to save battery. 5–15 min of drift is normal for any scheduled local notification on Android.
+**Fix:** None — accept the drift for non-time-critical pings. Do NOT reach for `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM`: Play Store restricts those permissions to alarm-clock/calendar app categories, so a cycling app risks policy rejection. A `DAILY` trigger (`{ type: 'daily', hour, minute }`) fires closer to target and repeats without reopening the app, but it freezes the notification content between app opens — we deliberately keep the one-shot `timeInterval` + reschedule-on-open so each morning's forecast is fresh. See the "Notifications" section in CLAUDE.md.
+**Occurrences:** 2026-05-21 — daily weather ping delivered ~14 min late; confirmed expected Android behavior, left as-is by decision.
