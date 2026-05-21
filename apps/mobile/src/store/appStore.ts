@@ -51,6 +51,12 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   countryHint: 'RO',
 };
 
+export type WeatherNotice = {
+  title: string;
+  body: string;
+  tone: 'good' | 'caution';
+};
+
 type AppStore = QueueSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
@@ -124,6 +130,12 @@ type AppStore = QueueSlice & {
   pendingTierPromotion: import('@defensivepedal/core').XpAwardResult | null;
   setTierPromotion: (promotion: import('@defensivepedal/core').XpAwardResult | null) => void;
   clearTierPromotion: () => void;
+  // Transient: set when the user taps the daily weather notification, so the
+  // app can re-show the same content in-app. Not persisted — derived from the
+  // live tap (NotificationProvider re-reads the tap on cold start anyway).
+  weatherNotice: WeatherNotice | null;
+  setWeatherNotice: (notice: WeatherNotice | null) => void;
+  clearWeatherNotice: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
   setShowMascot: (show: boolean) => void;
@@ -334,6 +346,9 @@ export const useAppStore = create<AppStore>()(
       pendingTierPromotion: null,
       setTierPromotion: (promotion) => set(() => ({ pendingTierPromotion: promotion })),
       clearTierPromotion: () => set(() => ({ pendingTierPromotion: null })),
+      weatherNotice: null,
+      setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
+      clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
       setLocale: (locale) => set(() => ({ locale })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
       setShowMascot: (show) => set(() => ({ showMascot: show })),
@@ -730,6 +745,7 @@ export const useAppStore = create<AppStore>()(
           userHazardVotes: {},
           pendingBadgeUnlocks: [],
           pendingTierPromotion: null,
+          weatherNotice: null,
           homeLocation: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,

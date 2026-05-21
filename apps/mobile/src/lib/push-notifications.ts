@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 
 import { mobileApi } from './api';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
+import { useAppStore } from '../store/appStore';
 
 let _notifications: typeof import('expo-notifications') | null | undefined;
 const getNotifications = () => {
@@ -142,6 +143,16 @@ export const handleNotificationResponse = (
     case 'weather':
       router.push('/route-planning');
       break;
+    case 'daily-weather': {
+      // Re-show the same notification content in-app via a modal overlay.
+      const title = typeof data.title === 'string' ? data.title : null;
+      const body = typeof data.body === 'string' ? data.body : null;
+      if (title && body) {
+        const tone = data.tone === 'caution' ? 'caution' : 'good';
+        useAppStore.getState().setWeatherNotice({ title, body, tone });
+      }
+      break;
+    }
     default:
       break;
   }

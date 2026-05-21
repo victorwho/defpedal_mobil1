@@ -5,6 +5,7 @@ import {
   TRIGGER_MINUTE,
   buildCyclingAdvice,
   computeTriggerSeconds,
+  isGoodCyclingWeather,
   parseForecastResponse,
   pickForecastIndex,
   type GoodWeatherForecast,
@@ -70,6 +71,7 @@ export const scheduleDailyWeatherNotification = async (
   await N.cancelScheduledNotificationAsync(NOTIFICATION_ID).catch(() => {});
 
   const { title, body } = buildCyclingAdvice(forecast);
+  const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
   const secondsUntilTrigger = computeTriggerSeconds(new Date(), TRIGGER_HOUR, TRIGGER_MINUTE);
 
   await N.scheduleNotificationAsync({
@@ -78,6 +80,8 @@ export const scheduleDailyWeatherNotification = async (
       title,
       body,
       sound: 'default',
+      // Carry the content in the payload so a tap can re-show it in-app.
+      data: { type: 'daily-weather', title, body, tone },
       ...(Platform.OS === 'android' ? { channelId: 'daily-weather' } : {}),
     },
     trigger: {

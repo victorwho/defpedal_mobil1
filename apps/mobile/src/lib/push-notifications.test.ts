@@ -48,6 +48,7 @@ import {
 } from './push-notifications';
 import { router } from 'expo-router';
 import { mobileApi } from './api';
+import { useAppStore } from '../store/appStore';
 
 describe('push-notifications', () => {
   beforeEach(() => {
@@ -153,6 +154,32 @@ describe('push-notifications', () => {
         },
       });
 
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it('sets weatherNotice in the store for a daily-weather tap', () => {
+      useAppStore.getState().clearWeatherNotice();
+
+      handleNotificationResponse({
+        notification: {
+          request: {
+            content: {
+              data: {
+                type: 'daily-weather',
+                title: 'Perfect day to ride',
+                body: '18-24°C, clear skies.',
+                tone: 'good',
+              },
+            },
+          },
+        },
+      });
+
+      expect(useAppStore.getState().weatherNotice).toEqual({
+        title: 'Perfect day to ride',
+        body: '18-24°C, clear skies.',
+        tone: 'good',
+      });
       expect(router.push).not.toHaveBeenCalled();
     });
 

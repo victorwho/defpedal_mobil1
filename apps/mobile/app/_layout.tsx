@@ -24,6 +24,7 @@ import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
+import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import {
@@ -264,6 +265,7 @@ const RootLayoutInner = () => {
       />
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
+      <WeatherNoticeManager />
       <RouteShareDeepLinkHandler />
     </>
   );
@@ -289,6 +291,19 @@ const RankUpOverlayManager = () => {
       onDismiss={clearPromotion}
     />
   );
+};
+
+/** Re-shows the daily weather notification content after the user taps it. */
+const WeatherNoticeManager = () => {
+  const notice = useAppStore((s) => s.weatherNotice);
+  const clearNotice = useAppStore((s) => s.clearWeatherNotice);
+  const appState = useAppStore((s) => s.appState);
+
+  // Suppress over the live nav HUD (same safety rule as other overlays); the
+  // notice stays queued and shows once the user leaves NAVIGATING.
+  if (!notice || appState === 'NAVIGATING') return null;
+
+  return <WeatherNoticeModal notice={notice} visible onDismiss={clearNotice} />;
 };
 
 function RootLayout() {
