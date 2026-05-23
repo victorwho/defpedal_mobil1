@@ -34,6 +34,7 @@ import { zustandStorage } from '../lib/storage';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
 
 const MAX_RECENT_DESTINATIONS = 3;
+const MAX_RECENT_CITY_SUGGESTIONS = 5;
 
 const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   origin: {
@@ -117,6 +118,16 @@ type AppStore = QueueSlice & {
   earnedMilestones: readonly string[];
   recentDestinations: readonly RecentDestination[];
   addRecentDestination: (destination: RecentDestination) => void;
+  recentCitySuggestions: readonly {
+    coordinate: Coordinate;
+    submittedAt: string;
+    suggestionPreview: string;
+  }[];
+  addRecentCitySuggestion: (entry: {
+    coordinate: Coordinate;
+    submittedAt: string;
+    suggestionPreview: string;
+  }) => void;
   userHazardVotes: Record<string, HazardVoteDirection>;
   setUserHazardVote: (hazardId: string, direction: HazardVoteDirection) => void;
   clearUserHazardVote: (hazardId: string) => void;
@@ -277,6 +288,18 @@ export const useAppStore = create<AppStore>()(
       anonymousOpenCount: 0,
       earnedMilestones: [],
       recentDestinations: [],
+      recentCitySuggestions: [],
+      addRecentCitySuggestion: (entry) =>
+        set((state) => {
+          const filtered = (state.recentCitySuggestions ?? []).filter(
+            (e) =>
+              e.coordinate.lat !== entry.coordinate.lat ||
+              e.coordinate.lon !== entry.coordinate.lon,
+          );
+          return {
+            recentCitySuggestions: [entry, ...filtered].slice(0, MAX_RECENT_CITY_SUGGESTIONS),
+          };
+        }),
       userHazardVotes: {},
       setUserHazardVote: (hazardId, direction) =>
         set((state) => ({
@@ -742,6 +765,7 @@ export const useAppStore = create<AppStore>()(
           anonymousOpenCount: 0,
           earnedMilestones: [],
           recentDestinations: [],
+          recentCitySuggestions: [],
           userHazardVotes: {},
           pendingBadgeUnlocks: [],
           pendingTierPromotion: null,
@@ -793,6 +817,7 @@ export const useAppStore = create<AppStore>()(
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
+        recentCitySuggestions: state.recentCitySuggestions,
         userHazardVotes: state.userHazardVotes,
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
         pendingTierPromotion: state.pendingTierPromotion,

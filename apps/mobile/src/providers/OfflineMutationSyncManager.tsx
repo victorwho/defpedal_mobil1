@@ -147,6 +147,10 @@ const submitQueuedMutation = async (
         payload.clientSubmittedAt,
       );
     }
+    case 'city_suggestion': {
+      const payload = mutation.payload as QueuedMutationPayloadByType['city_suggestion'];
+      return mobileApi.submitCitySuggestion(payload);
+    }
     default:
       return null;
   }

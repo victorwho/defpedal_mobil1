@@ -474,7 +474,7 @@ export interface OfflineRegion {
   error?: string | null;
 }
 
-export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote';
+export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote' | 'city_suggestion';
 export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed' | 'dead';
 
 export interface QueuedMutation {
@@ -486,6 +486,34 @@ export interface QueuedMutation {
   status?: QueuedMutationStatus;
   lastAttemptAt?: string;
   lastError?: string | null;
+}
+
+// ── City Suggestions ──
+
+export interface CitySuggestionRequest {
+  coordinate: Coordinate;
+  body: string;
+  submittedAt: string;
+  source: 'route_preview';
+  locality?: string | null;
+  routeContext?: {
+    mode: 'safe' | 'fast' | 'flat';
+    distanceMeters: number;
+    routeId?: string;
+  } | null;
+}
+
+export interface CitySuggestionResponse {
+  id: string;
+  createdAt: string;
+  status: 'open';
+}
+
+export interface NearbyCitySuggestion {
+  id: string;
+  coordinate: Coordinate;
+  suggestionPreview: string;
+  submittedAt: string;
 }
 
 // ── Community Feed ──

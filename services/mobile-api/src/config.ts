@@ -156,6 +156,16 @@ export const config = {
         900000,
       ),
     },
+    citySuggestion: {
+      limit: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_CITY_SUGGESTION_MAX'], '5'),
+        5,
+      ),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_CITY_SUGGESTION_WINDOW_MS'], '3600000'),
+        3600000,
+      ),
+    },
   },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),

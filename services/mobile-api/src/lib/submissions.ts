@@ -1,4 +1,6 @@
 import type {
+  CitySuggestionRequest,
+  CitySuggestionResponse,
   HazardReportRequest,
   HazardReportResponse,
   NavigationFeedbackRequest,
@@ -518,5 +520,60 @@ export const getTripStatsDashboard = async (
     modeSplit: mapModeSplit(raw.modeSplit),
     weeklyModeSplit: mapModeSplit(raw.weeklyModeSplit),
     monthlyModeSplit: mapModeSplit(raw.monthlyModeSplit),
+  };
+};
+
+// ── City suggestions ──
+
+const memoryCitySuggestions = new Map<
+  string,
+  { request: CitySuggestionRequest; userId: string }
+>();
+
+export const submitCitySuggestion = async (
+  request: CitySuggestionRequest,
+  userId: string,
+): Promise<CitySuggestionResponse> => {
+  // Server-side trim + length guard. DB has CHECK (1..500) but a clean trim
+  // here keeps a misbehaving client from tripping the 502 UPSTREAM_ERROR path.
+  const trimmedBody = request.body.trim();
+  if (trimmedBody.length === 0 || trimmedBody.length > 500) {
+    throw new Error('Suggestion body must be 1-500 characters after trimming.');
+  }
+
+  if (supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('city_suggestions')
+      .insert({
+        user_id: userId,
+        lat: request.coordinate.lat,
+        lon: request.coordinate.lon,
+        location: `SRID=4326;${toPointWkt(request.coordinate.lat, request.coordinate.lon)}`,
+        body: trimmedBody,
+        source: request.source,
+        client_submitted_at: request.submittedAt,
+        locality: request.locality ?? null,
+        route_context: request.routeContext ?? null,
+      })
+      .select('id, created_at, status')
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message ?? 'Insert failed');
+    }
+
+    return {
+      id: data.id as string,
+      createdAt: data.created_at as string,
+      status: 'open',
+    };
+  }
+
+  const id = createId('city-suggestion');
+  memoryCitySuggestions.set(id, { request: { ...request, body: trimmedBody }, userId });
+  return {
+    id,
+    createdAt: new Date().toISOString(),
+    status: 'open',
   };
 };

@@ -1,4 +1,5 @@
 import type {
+  CitySuggestionRequest,
   HazardReportRequest,
   HazardVoteDirection,
   HazardVoteQueuePayload,
@@ -27,6 +28,7 @@ export type QueuedMutationPayloadByType = {
   trip_track: QueuedTripTrackPayload;
   trip_share: ShareTripRequest;
   feedback: NavigationFeedbackRequest;
+  city_suggestion: CitySuggestionRequest;
 };
 
 const createId = (prefix: string) => {

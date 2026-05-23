@@ -38,3 +38,6 @@ export type { AmbassadorImpactCardProps } from './AmbassadorImpactCard';
 
 export { HazardDetailSheet } from './HazardDetailSheet';
 export type { HazardDetailSheetProps } from './HazardDetailSheet';
+
+export { CitySuggestionSheet } from './CitySuggestionSheet';
+export type { CitySuggestionSheetProps } from './CitySuggestionSheet';

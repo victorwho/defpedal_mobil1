@@ -16,6 +16,9 @@ export type RateLimitPolicies = {
   report: RateLimitPolicy;
   block: RateLimitPolicy;
   comment: RateLimitPolicy;
+  // Free-text suggestion submissions — tight bucket because each row is a
+  // human-review cost and the surface is abuse-prone.
+  citySuggestion: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {

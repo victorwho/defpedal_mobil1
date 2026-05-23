@@ -1,11 +1,14 @@
 import type {
   AutocompleteResponse,
   BadgeResponse,
+  CitySuggestionRequest,
+  CitySuggestionResponse,
   CoverageResponse,
   EarlyEndReason,
   ErrorResponse,
   GeoJsonLineString,
   HazardReportResponse,
+  NearbyCitySuggestion,
   RerouteRequest,
   RiskSegment,
   RoutePreviewRequest,
@@ -92,6 +95,12 @@ import {
   nearbyHazardsResponseSchema,
   type HazardVoteBody,
 } from '../lib/hazardSchemas';
+import {
+  citySuggestionRequestSchema,
+  citySuggestionResponseSchema,
+  nearbyCitySuggestionsQuerySchema,
+  nearbyCitySuggestionsResponseSchema,
+} from '../lib/citySuggestionSchemas';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
@@ -1078,6 +1087,93 @@ export const buildV1Routes = (
           details: [error instanceof Error ? error.message : 'Unknown error.'],
         });
       }
+    });
+
+    // ── City suggestions ──
+    // Free-text, location-tagged feedback from riders to the dev team. Stored
+    // independently from hazards (no TTL, no community vote, no display layer
+    // in v1). Anonymous Supabase sessions are rejected so we have a verified
+    // identity behind every submission for moderation/abuse response.
+    //
+    // Dedicated `citySuggestion` rate-limit bucket (5/hour) — tight because
+    // each row is a human-review cost and free-text surfaces are abuse-prone.
+
+    app.post<{ Body: CitySuggestionRequest }>('/city-suggestions', {
+      schema: {
+        body: citySuggestionRequestSchema,
+        response: {
+          200: citySuggestionResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          403: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
+      const user = await requireFullUser(request, dependencies.authenticateUser);
+      await applyRateLimit(request, reply, dependencies, 'citySuggestion', {
+        userId: user.id,
+      });
+
+      const trimmedBody = request.body.body.trim();
+      if (trimmedBody.length === 0) {
+        throw new HttpError('Suggestion body cannot be empty.', {
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          details: ['Whitespace-only suggestions are rejected.'],
+        });
+      }
+
+      try {
+        const result = await dependencies.submitCitySuggestion(
+          {
+            coordinate: request.body.coordinate,
+            body: trimmedBody,
+            submittedAt: request.body.submittedAt,
+            source: request.body.source,
+            locality: request.body.locality ?? null,
+            routeContext: request.body.routeContext ?? null,
+          },
+          user.id,
+        );
+
+        const response: CitySuggestionResponse = {
+          id: result.id,
+          createdAt: result.createdAt,
+          status: 'open',
+        };
+        return response;
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError('City suggestion submission failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+        });
+      }
+    });
+
+    // Stub list endpoint — v1 always returns []. Wired so the mobile hook has
+    // a stable URL for when a display surface ships later. Allows anonymous
+    // reads (no auth) because in v2 we may show public/aggregated previews.
+    app.get<{
+      Querystring: { lat: number; lon: number; radius?: number };
+    }>('/city-suggestions/nearby', {
+      schema: {
+        querystring: nearbyCitySuggestionsQuerySchema,
+        response: {
+          200: nearbyCitySuggestionsResponseSchema,
+          400: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
+      await applyRateLimit(request, reply, dependencies, 'routePreview');
+      const stub: NearbyCitySuggestion[] = [];
+      return stub;
     });
 
     // ── Hazard expiry cron ──

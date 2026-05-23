@@ -40,7 +40,7 @@ import { CrosshairOverlay } from './overlays/CrosshairOverlay';
 import { PoiCard, usePoiCardHandler } from './overlays/PoiCard';
 import { RouteInfoOverlay } from './overlays/RouteInfoOverlay';
 import { ScreenReaderMapSummary } from './ScreenReaderMapSummary';
-import type { RouteMapProps, SelectedPoiState } from './types';
+import type { CrosshairMode, RouteMapProps, SelectedPoiState } from './types';
 import { useCameraConfig } from './useCameraConfig';
 import { useFeatureCollections } from './useFeatureCollections';
 import { useMapA11ySummary } from './useMapA11ySummary';
@@ -94,6 +94,7 @@ export const RouteMap = ({
   plannedRouteColor = safetyColors.safe,
   onMapTap,
   onMapLongPress,
+  crosshairMode = null,
   hazardPlacementMode = false,
   onCenterChange,
   historyTrails,
@@ -102,6 +103,11 @@ export const RouteMap = ({
   a11yContext,
 }: RouteMapProps) => {
   const t = useT();
+  // Derive a single resolved mode so callers can drive the crosshair via the
+  // new `crosshairMode` union OR the legacy `hazardPlacementMode` boolean.
+  // Follow-up PR migrates route-planning.tsx and we drop the fallback.
+  const resolvedCrosshairMode: CrosshairMode =
+    crosshairMode ?? (hazardPlacementMode ? 'hazard' : null);
   const mapViewRef = useRef<Mapbox.MapView | null>(null);
   const cameraRef = useRef<Mapbox.Camera | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<SelectedPoiState>(null);
@@ -262,7 +268,9 @@ export const RouteMap = ({
         ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
         styleURL={STANDARD_STYLE_URL}
-        onCameraChanged={onCenterChange ? handleCameraChanged : undefined}
+        onCameraChanged={
+          onCenterChange && resolvedCrosshairMode !== null ? handleCameraChanged : undefined
+        }
         onPress={onMapTap ? handleMapTap : undefined}
         onLongPress={onMapLongPress ? handleMapLongPress : undefined}
         accessibilityLabel={a11ySummary.label}
@@ -359,7 +367,7 @@ export const RouteMap = ({
         />
       </Mapbox.MapView>
 
-      {hazardPlacementMode ? <CrosshairOverlay /> : null}
+      {resolvedCrosshairMode !== null ? <CrosshairOverlay /> : null}
 
       {selectedPoi ? (
         <PoiCard selectedPoi={selectedPoi} onDismiss={dismissPoi} />

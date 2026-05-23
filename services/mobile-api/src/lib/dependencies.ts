@@ -21,6 +21,7 @@ import {
   getUserStats,
   saveTripTrack,
   startTripRecord,
+  submitCitySuggestion,
   submitHazardReport,
   submitNavigationFeedback,
 } from './submissions';
@@ -47,6 +48,7 @@ export type MobileApiDependencies = {
   getUserStats: typeof getUserStats;
   getTripStatsDashboard: typeof getTripStatsDashboard;
   submitNavigationFeedback: typeof submitNavigationFeedback;
+  submitCitySuggestion: typeof submitCitySuggestion;
   routeResponseCache: RouteResponseCache;
   rateLimiter: RateLimiter;
   rateLimitPolicies: RateLimitPolicies;
@@ -96,6 +98,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     getUserStats,
     getTripStatsDashboard,
     submitNavigationFeedback,
+    submitCitySuggestion,
     routeResponseCache: sharedStore.routeResponseCache,
     rateLimiter: sharedStore.rateLimiter,
     rateLimitPolicies: config.rateLimits,

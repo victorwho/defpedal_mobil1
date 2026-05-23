@@ -858,6 +858,26 @@ export const en = {
     shareLevelUp: 'Share',
   },
 
+  // ── City Suggestions ──
+  citySuggestion: {
+    fabLabel: 'Suggest improvement',
+    fabLabelActive: 'Cancel suggestion',
+    fabHint: 'Drop a pin on the map and tell us what would make this spot better',
+    crosshairHelper: 'Move map to the spot you want to flag',
+    footerConfirm: 'Add suggestion here',
+    footerCancel: 'Cancel',
+    modalTitle: 'Suggest an improvement',
+    modalSubtitle: "Tell us what's wrong here, or what would make this safer or better.",
+    modalPlaceholder: 'e.g. Needs a protected bike lane — buses pass too close at rush hour',
+    modalSubmit: 'Send',
+    modalSubmitting: 'Sending…',
+    modalCancel: 'Cancel',
+    minLengthHint: 'Add a bit more detail',
+    toastSuccess: 'Suggestion sent — thanks!',
+    toastOffline: "Saved — we'll send it when you're back online",
+    toastError: "Couldn't send — please try again",
+  },
+
   // ── Map accessibility summary (screen readers) ──
   mapA11y: {
     hint: 'Map shows route, hazards, and points of interest. Use overlay controls above and below.',

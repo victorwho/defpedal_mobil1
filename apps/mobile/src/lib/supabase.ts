@@ -235,14 +235,26 @@ export const signInWithGoogle = async (): Promise<{
     };
   }
 
-  let mod: typeof import('@react-native-google-signin/google-signin');
+  // Error-log #23: pull the destructure INSIDE the try. Accessing
+  // `mod.GoogleSignin` triggers `TurboModuleRegistry.getEnforcing('RNGoogleSignin')`,
+  // which throws an invariant violation when the native module isn't linked
+  // (e.g. fresh dev APK without `./gradlew installDevelopmentDebug` after the
+  // dependency was added). That throw escapes a try/catch wrapped only around
+  // `require()` and surfaces as a LogBox warning on the dev variant.
+  let GoogleSignin: typeof import('@react-native-google-signin/google-signin').GoogleSignin;
+  let isSuccessResponse: typeof import('@react-native-google-signin/google-signin').isSuccessResponse;
+  let isErrorWithCode: typeof import('@react-native-google-signin/google-signin').isErrorWithCode;
+  let statusCodes: typeof import('@react-native-google-signin/google-signin').statusCodes;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    mod = require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
+    const mod = require('@react-native-google-signin/google-signin') as typeof import('@react-native-google-signin/google-signin');
+    GoogleSignin = mod.GoogleSignin;
+    isSuccessResponse = mod.isSuccessResponse;
+    isErrorWithCode = mod.isErrorWithCode;
+    statusCodes = mod.statusCodes;
   } catch {
     return { error: new Error('Google sign-in is unavailable in this build.') };
   }
-  const { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } = mod;
 
   try {
     if (!googleSigninConfigured) {

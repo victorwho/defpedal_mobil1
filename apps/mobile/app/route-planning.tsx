@@ -33,6 +33,7 @@ import { SearchBar, SelectedLocationPill } from '../src/design-system/molecules'
 import { OfflineBanner } from '../src/design-system/molecules/OfflineBanner';
 import { WeatherWidget } from '../src/design-system/molecules/WeatherWidget';
 import { BottomNav, type TabKey } from '../src/design-system/organisms/BottomNav';
+import { CitySuggestionSheet } from '../src/design-system/organisms/CitySuggestionSheet';
 import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
 import { Button } from '../src/design-system/atoms/Button';
 import { Surface } from '../src/design-system/atoms/Card';
@@ -50,6 +51,7 @@ import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
 import { useRecentRideDestinations } from '../src/hooks/useRecentRideDestinations';
+import { useSubmitCitySuggestion } from '../src/hooks/useCitySuggestions';
 
 type ActiveField = 'startOverride' | 'destination' | `waypoint-${number}` | null;
 
@@ -224,6 +226,20 @@ export default function RoutePlanningScreen() {
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
   const [nearbySheetOpen, setNearbySheetOpen] = useState(false);
 
+  // City suggestion state. Mutually exclusive with hazardPlacementMode (the
+  // toggle handlers below force-off the other mode). Shares mapCenterCoordinate
+  // since both crosshair modes track the same camera center.
+  const [suggestionPlacementMode, setSuggestionPlacementMode] = useState(false);
+  const [suggestionDialogVisible, setSuggestionDialogVisible] = useState(false);
+  const [pendingSuggestionCoordinate, setPendingSuggestionCoordinate] =
+    useState<Coordinate | null>(null);
+  const [suggestionToast, setSuggestionToast] = useState<string | null>(null);
+  const suggestionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    submit: submitCitySuggestion,
+    isSubmitting: isSubmittingCitySuggestion,
+  } = useSubmitCitySuggestion();
+
   // Collapsible UI — tap map to toggle FABs, weather, bottom nav
   const [uiCollapsed, setUiCollapsed] = useState(false);
   const uiOpacity = useRef(new Animated.Value(1)).current;
@@ -240,6 +256,15 @@ export default function RoutePlanningScreen() {
     return () => {
       if (hazardToastTimerRef.current) {
         clearTimeout(hazardToastTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Cleanup suggestion toast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (suggestionToastTimerRef.current) {
+        clearTimeout(suggestionToastTimerRef.current);
       }
     };
   }, []);
@@ -289,8 +314,8 @@ export default function RoutePlanningScreen() {
   }, [setRouteRequest, setDestinationQuery, setDestinationHydrated, setWaypointQueries]);
 
   const handleMapTap = useCallback(() => {
-    // Don't toggle while in hazard placement mode
-    if (hazardPlacementMode) return;
+    // Don't toggle UI while in any crosshair placement mode
+    if (hazardPlacementMode || suggestionPlacementMode) return;
     const next = !uiCollapsed;
     setUiCollapsed(next);
     Animated.timing(uiOpacity, {
@@ -299,9 +324,11 @@ export default function RoutePlanningScreen() {
       easing: easing.default,
       useNativeDriver: true,
     }).start();
-  }, [hazardPlacementMode, uiCollapsed, uiOpacity]);
+  }, [hazardPlacementMode, suggestionPlacementMode, uiCollapsed, uiOpacity]);
 
   const handleMapLongPress = async (coordinate: Coordinate) => {
+    // Suppress long-press shortcuts during suggestion placement
+    if (suggestionPlacementMode) return;
     // If hazard placement FAB is active, open hazard picker
     if (hazardPlacementMode) {
       setPendingHazardCoordinate(coordinate);
@@ -427,9 +454,77 @@ export default function RoutePlanningScreen() {
       setHazardPlacementMode(false);
       setSelectedHazardType(null);
     } else {
+      // Mutex: opening hazard mode cancels any active suggestion placement.
+      if (suggestionPlacementMode) {
+        setSuggestionPlacementMode(false);
+        setSuggestionDialogVisible(false);
+        setPendingSuggestionCoordinate(null);
+      }
       setHazardPickerOpen(true);
     }
   };
+
+  const showSuggestionToast = useCallback((message: string) => {
+    setSuggestionToast(message);
+    if (suggestionToastTimerRef.current) clearTimeout(suggestionToastTimerRef.current);
+    suggestionToastTimerRef.current = setTimeout(() => setSuggestionToast(null), 4000);
+  }, []);
+
+  const toggleSuggestionMode = useCallback(() => {
+    setSuggestionPlacementMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setSuggestionDialogVisible(false);
+        setPendingSuggestionCoordinate(null);
+      } else {
+        // Mutex: opening suggestion mode cancels any active hazard placement.
+        if (hazardPlacementMode) {
+          setHazardPlacementMode(false);
+          setSelectedHazardType(null);
+        }
+        if (hazardPickerOpen) {
+          setHazardPickerOpen(false);
+        }
+      }
+      return next;
+    });
+  }, [hazardPlacementMode, hazardPickerOpen]);
+
+  const handleSuggestionPlacementConfirm = useCallback(() => {
+    if (!mapCenterCoordinate) return;
+    setPendingSuggestionCoordinate(mapCenterCoordinate);
+    setSuggestionDialogVisible(true);
+  }, [mapCenterCoordinate]);
+
+  const cancelSuggestionDialog = useCallback(() => {
+    setSuggestionDialogVisible(false);
+  }, []);
+
+  const handleSuggestionSubmit = useCallback(
+    (body: string) => {
+      if (!pendingSuggestionCoordinate) return;
+      const coordinate = pendingSuggestionCoordinate;
+      void submitCitySuggestion({ coordinate, body })
+        .then(() => {
+          setSuggestionDialogVisible(false);
+          setSuggestionPlacementMode(false);
+          setPendingSuggestionCoordinate(null);
+          showSuggestionToast(
+            t(isOnline ? 'citySuggestion.toastSuccess' : 'citySuggestion.toastOffline'),
+          );
+        })
+        .catch(() => {
+          showSuggestionToast(t('citySuggestion.toastError'));
+        });
+    },
+    [
+      pendingSuggestionCoordinate,
+      submitCitySuggestion,
+      isOnline,
+      showSuggestionToast,
+      t,
+    ],
+  );
 
   const deferredStartOverrideQuery = useDeferredValue(startOverrideQuery.trim());
   const deferredDestinationQuery = useDeferredValue(destinationQuery.trim());
@@ -818,8 +913,18 @@ export default function RoutePlanningScreen() {
             recenterKey={recenterKey}
             onMapTap={handleMapTap}
             onMapLongPress={handleMapLongPress}
-            hazardPlacementMode={hazardPlacementMode}
-            onCenterChange={hazardPlacementMode ? setMapCenterCoordinate : undefined}
+            crosshairMode={
+              suggestionPlacementMode
+                ? 'suggestion'
+                : hazardPlacementMode
+                  ? 'hazard'
+                  : null
+            }
+            onCenterChange={
+              hazardPlacementMode || suggestionPlacementMode
+                ? setMapCenterCoordinate
+                : undefined
+            }
             a11yContext={{ mode: 'planning' }}
           />
           {showLongPressHint ? (
@@ -1199,6 +1304,26 @@ export default function RoutePlanningScreen() {
             />
           </PressableScale>
           <PressableScale
+            style={[styles.fabButton, suggestionPlacementMode && { backgroundColor: colors.accent }]}
+            onPress={toggleSuggestionMode}
+            accessibilityLabel={t(
+              suggestionPlacementMode
+                ? 'citySuggestion.fabLabelActive'
+                : 'citySuggestion.fabLabel',
+            )}
+            accessibilityHint={
+              suggestionPlacementMode ? undefined : t('citySuggestion.fabHint')
+            }
+            accessibilityRole="button"
+            accessibilityState={{ selected: suggestionPlacementMode }}
+          >
+            <Ionicons
+              name={suggestionPlacementMode ? 'close' : 'bulb-outline'}
+              size={22}
+              color={suggestionPlacementMode ? gray[900] : colors.accent}
+            />
+          </PressableScale>
+          <PressableScale
             style={styles.fabButton}
             onPress={() => setNearbySheetOpen(true)}
             accessibilityLabel="Show nearby places"
@@ -1219,7 +1344,26 @@ export default function RoutePlanningScreen() {
         </Animated.View>
       }
       footer={
-        hazardPlacementMode ? (
+        suggestionPlacementMode ? (
+          <View style={styles.hazardPlacementFooter}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!mapCenterCoordinate}
+              onPress={handleSuggestionPlacementConfirm}
+            >
+              {t('citySuggestion.footerConfirm')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="md"
+              onPress={toggleSuggestionMode}
+            >
+              {t('citySuggestion.footerCancel')}
+            </Button>
+          </View>
+        ) : hazardPlacementMode ? (
           <View style={styles.hazardPlacementFooter}>
             <Button
               variant="primary"
@@ -1374,6 +1518,32 @@ export default function RoutePlanningScreen() {
           )}
         </Surface>
       </Pressable>
+    ) : null}
+
+    {/* City suggestion dialog */}
+    <CitySuggestionSheet
+      visible={suggestionDialogVisible}
+      title={t('citySuggestion.modalTitle')}
+      subtitle={t('citySuggestion.modalSubtitle')}
+      placeholder={t('citySuggestion.modalPlaceholder')}
+      submitLabel={t('citySuggestion.modalSubmit')}
+      submittingLabel={t('citySuggestion.modalSubmitting')}
+      cancelLabel={t('citySuggestion.modalCancel')}
+      minLengthHint={t('citySuggestion.minLengthHint')}
+      submitting={isSubmittingCitySuggestion}
+      onSubmit={handleSuggestionSubmit}
+      onCancel={cancelSuggestionDialog}
+    />
+
+    {/* City suggestion toast */}
+    {suggestionToast ? (
+      <View style={styles.hazardToastContainer}>
+        <Toast
+          message={suggestionToast}
+          variant="info"
+          onDismiss={() => setSuggestionToast(null)}
+        />
+      </View>
     ) : null}
 
     {/* Hazard toast */}

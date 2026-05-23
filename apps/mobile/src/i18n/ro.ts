@@ -860,6 +860,26 @@ export const ro: TranslationKeys = {
     shareLevelUp: 'Distribuie',
   },
 
+  // ── City Suggestions ──
+  citySuggestion: {
+    fabLabel: 'Sugerează o îmbunătățire',
+    fabLabelActive: 'Anulează sugestia',
+    fabHint: 'Plasează un pin pe hartă și spune-ne ce ar îmbunătăți acest loc',
+    crosshairHelper: 'Mută harta către locul pe care vrei să-l semnalezi',
+    footerConfirm: 'Adaugă sugestia aici',
+    footerCancel: 'Anulează',
+    modalTitle: 'Sugerează o îmbunătățire',
+    modalSubtitle: 'Spune-ne ce e în neregulă aici sau cum ar fi mai bine ori mai sigur.',
+    modalPlaceholder: 'ex. Este nevoie de pistă protejată — autobuzele trec prea aproape la orele de vârf',
+    modalSubmit: 'Trimite',
+    modalSubmitting: 'Se trimite…',
+    modalCancel: 'Anulează',
+    minLengthHint: 'Adaugă puțin mai multe detalii',
+    toastSuccess: 'Sugestie trimisă — mulțumim!',
+    toastOffline: 'Salvată — o trimitem când ești din nou online',
+    toastError: 'Nu am putut trimite — te rugăm să încerci din nou',
+  },
+
   // ── Map accessibility summary (screen readers) ──
   mapA11y: {
     hint: 'Harta afișează traseul, pericolele și punctele de interes. Folosește butoanele de deasupra și dedesubt.',

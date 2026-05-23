@@ -4,6 +4,8 @@ import type {
   AutocompleteResponse,
   BadgeResponse,
   CityHeartbeat,
+  CitySuggestionRequest,
+  CitySuggestionResponse,
   CommunityStats,
   Coordinate,
   CoverageResponse,
@@ -22,6 +24,7 @@ import type {
   LeaderboardPeriod,
   LeaderboardResponse,
   NavigationFeedbackRequest,
+  NearbyCitySuggestion,
   NearbyHazard,
   NeighborhoodSafetyScore,
   ProfileResponse,
@@ -384,6 +387,18 @@ export const mobileApi = {
         ...(clientSubmittedAt ? { clientSubmittedAt } : {}),
       }),
     }),
+
+  // ── City Suggestions ──
+
+  submitCitySuggestion: (payload: CitySuggestionRequest) =>
+    requestJson<CitySuggestionResponse>('/v1/city-suggestions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getNearbyCitySuggestions: (lat: number, lon: number, radiusMeters = 1000) =>
+    requestJson<NearbyCitySuggestion[]>(
+      `/v1/city-suggestions/nearby?lat=${lat}&lon=${lon}&radius=${radiusMeters}`,
+    ),
 
   // ── Community Feed ──
 

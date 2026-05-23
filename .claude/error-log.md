@@ -368,3 +368,26 @@ Same lesson applies to any "denormalized aggregate" column you assume exists on 
 2. **Wrong/missing SHA-1.** An Android OAuth client is keyed by (package name, signing-cert SHA-1). This app has 3 packages and 3 signing identities: dev (`com.defensivepedal.mobile.dev`, debug.keystore SHA-1 `5E:8F:16:…:F6:25`), preview (`com.defensivepedal.mobile.preview`, upload keystore `0B:C4:30:…:FD:E0`), production sideload (`com.defensivepedal.mobile`, upload keystore), and **Play-distributed production** (`com.defensivepedal.mobile`, **Play App Signing** SHA-1 from Play Console → Setup → App signing — NOT the upload key). Each combo needs its own Android OAuth client or sign-in throws code 10 on that build.
 **Fix:** `webClientId` = the existing Supabase web client (so its audience is already trusted by `signInWithIdToken` — no Supabase "Authorized Client IDs" change needed). Wired via `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` → `app.config.ts` extra → `mobileEnv.googleWebClientId`. `google-services.json` is irrelevant to google-signin (it's only for FCM/push) — the empty `oauth_client: []` arrays there are a red herring. No `expo prebuild` / config plugin needed for Android; RN autolinking links the native module. Implementation in `apps/mobile/src/lib/supabase.ts` `signInWithGoogle` (lazy `require()` per native-module convention; returns `{ error, cancelled? }`). A native-module addition requires an APK rebuild (`./gradlew installDevelopmentDebug`) — the JS bundle resolves fine but the native lib isn't in the previously-installed APK.
 **Occurrences:** 2026-05-21 — migrated to native sign-in to remove the `uobubaulcdcuggnetzei.supabase.co` branding from the Google account picker.
+
+### 45. TurboModule `getEnforcing` escapes a try/catch that wraps only `require()`
+**Pattern:** A community native module that registers via the New Architecture (e.g. `@react-native-google-signin/google-signin` → `RNGoogleSignin`) is accessed through a TurboModule proxy. The proxy lazily calls `TurboModuleRegistry.getEnforcing('<BridgeName>')` the first time you READ a property on it — NOT when `require()` returns. If the native lib isn't linked (typical after adding a new dependency without rebuilding the APK), that read throws `Invariant Violation: TurboModuleRegistry.getEnforcing(...): 'X' could not be found`. A `try { require(...) } catch {}` wrapped only around the import line does NOT catch this — `require` returns the module object cleanly; the throw fires later, on the destructure / property access that comes after.
+**Symptom (the misleading one):** the throw surfaces as a yellow LogBox warning toast at the bottom of an otherwise-rendering screen, which can read as "the app is stuck at a loading screen" because the toast covers the screen's primary CTA. The screen actually rendered fine.
+**Fix:** Pull the destructure / property access INSIDE the same try/catch as the `require`, so any TurboModule wakeup during access is caught and you can return a clean "unavailable in this build" error. Concretely (see `apps/mobile/src/lib/supabase.ts` `signInWithGoogle`):
+```ts
+// WRONG — destructure outside the guard; getEnforcing escapes
+try { mod = require('@react-native-google-signin/google-signin'); } catch { /*…*/ }
+const { GoogleSignin } = mod;  // ← throws here when native lib missing
+
+// RIGHT — destructure inside the guard
+let GoogleSignin; let isSuccessResponse; /* … */
+try {
+  const mod = require('@react-native-google-signin/google-signin');
+  GoogleSignin = mod.GoogleSignin;          // accesses TurboModule proxy here, still inside try
+  isSuccessResponse = mod.isSuccessResponse;
+  /* … */
+} catch { return { error: new Error('Sign-in unavailable in this build.') }; }
+```
+**The other fix (root cause):** after adding any new community native module to `package.json`, rebuild the APK — `cd apps/mobile/android && ./gradlew installDevelopmentDebug` for the dev variant. Metro/JS hot-reload picks up the JS-side change but the native lib isn't in the previously-installed APK. The defensive try/catch above doesn't substitute for the rebuild; it just prevents the missing module from blowing up unrelated UI flows.
+**Note vs Expo modules (error #21):** Expo native modules register through `globalThis.expo.modules` and never appear in `NativeModules` — for those, gate on `hasExpoNativeModule(name)` from `apps/mobile/src/lib/expoNativeModule.ts`. Community TurboModules like `RNGoogleSignin` and `RNCNetInfo` ARE exposed via `NativeModules.<BridgeName>` (the bridgeless interop proxy), so a `NativeModules.RNGoogleSignin` boolean check before `require()` is also valid. Either-or: destructure-inside-try OR check `NativeModules.<BridgeName>` first.
+**Occurrences:** 2026-05-23 — dev APK from before the May-21 Google-Sign-In commit (`1a34b2e`) lacked the autolinked `RNGoogleSignin`. The destructure on line 245 of `apps/mobile/src/lib/supabase.ts` was outside the try/catch wrapped only around the require call (line 239-244), so the invariant violation surfaced as a LogBox warning that read as "stuck loading screen". Rebuilt APK via `./gradlew installDevelopmentDebug` AND patched the destructure into the guard for any future re-occurrence.
+

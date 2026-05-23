@@ -35,6 +35,8 @@ export type RouteMapA11yContext =
       suppressHazardLive?: boolean;
     };
 
+export type CrosshairMode = 'hazard' | 'suggestion' | null;
+
 export type PoiVisibility = {
   hydration: boolean;
   repair: boolean;
@@ -77,9 +79,17 @@ export type RouteMapProps = {
   onMapTap?: (coordinate: Coordinate) => void;
   /** Called when user long-presses the map (used for armchair hazard reporting) */
   onMapLongPress?: (coordinate: Coordinate) => void;
-  /** When true, shows a crosshair overlay for hazard placement */
+  /**
+   * Drives the crosshair overlay. `'hazard'` and `'suggestion'` both render
+   * the same atom in v1; a future iteration may diverge colour/copy per mode.
+   */
+  crosshairMode?: CrosshairMode;
+  /**
+   * @deprecated Use `crosshairMode='hazard'` instead. Retained one release so
+   * the route-planning hazard flow does not have to migrate in the same PR.
+   */
   hazardPlacementMode?: boolean;
-  /** Called when map center changes (used for crosshair-based hazard placement) */
+  /** Called when map center changes (used for crosshair-based placement) */
   onCenterChange?: (coordinate: Coordinate) => void;
   /** Array of past ride GPS trails for personal safety overlay */
   historyTrails?: readonly { coordinates: readonly [number, number][]; mode: 'safe' | 'fast' | 'flat' }[];
