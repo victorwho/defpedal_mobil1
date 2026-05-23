@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-05-21 (session 56)
+Last updated: 2026-05-23 (session 57)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -1386,3 +1386,28 @@ Ran the security-reviewer agent over `signInWithGoogle` + the deep-link handler.
 #### Shipped to preview
 
 User confirmed the Android OAuth clients were created. Bumped to **v0.2.62 / build 64** (v0.2.61/63 was the haptics fix, already shipped). Built the preview APK from `C:\dpb` — dev-leak audit passed, and APK signer verified as the upload keystore (SHA-1 `0B:C4:…:FD:E0`, the cert registered as the preview Android OAuth client, so native sign-in resolves on this build). Distributed via Firebase App Distribution to the `early-access-preview` group (app `1:1070156882676:android:e8942c210dc337ebca34a1`, release notes `apkreleases/release-notes-v0.2.62.txt`). Not yet committed to git — local changes awaiting review.
+
+### Session 57 — Early end-of-ride reason capture (2026-05-21 → 2026-05-23)
+
+Product ask: when a rider ends a route before reaching the destination, ask **"Why did you end your route early?"** with single-choice options, plus a free-text **Other**. Recorded against the trip in the database so we can analyse why riders bail. After shipping the Save path, the user asked for the same question on Discard too — added in the same session.
+
+#### What shipped
+
+- **Core type** (`packages/core/src/contracts.ts`): new `EarlyEndReason` union — `'reached_destination' | 'found_better_route' | 'felt_unsafe' | 'no_longer_needed' | 'other'`. `TripTrackRequest` and `TripEndRequest` both gained optional `earlyEndReason` + `earlyEndReasonNote` (max 280 chars; only meaningful when reason is `'other'`).
+- **DB columns on both `trip_tracks` AND `trips`**, with a CHECK constraint pinning the enum. The duplication is intentional: `trip_tracks` only gets written on the Save path (no row at all on Discard), but `trips` is written by every `trip_end` regardless of outcome. **`trips.early_end_reason` is the authoritative source for analytics covering both Save and Discard**; the `trip_tracks` copy is a convenience for History-joined queries. Three migrations: `202605210001_trip_track_early_end_reason.sql`, `202605220001_trip_track_early_end_reason_other.sql` (added `'other'` + the note column), `202605230001_trips_early_end_reason.sql` (parent row).
+- **API** (`services/mobile-api`): `/v1/trips/track` and `/v1/trips/end` JSON Schemas updated (`additionalProperties: false` forces explicit allowlisting); `saveTripTrack` and `finishTripRecord` write the columns. `normalizeTripEndRequest` propagates the fields. Shipped as Cloud Run revision `defpedal-api-00080-f59`.
+- **`EarlyEndReasonModal`** (`apps/mobile/src/design-system/organisms/EarlyEndReasonModal.tsx`): i18n-agnostic radio list built on the existing `Modal` organism. Tapping **Other** reveals an autofocused 280-char `TextInput` with counter. Skippable — Save submits the current selection (null if none), Skip submits null. **Intentionally no `onClose` is passed to the underlying Modal** — see the Alert→Modal touch-race investigation below; the Skip button is the documented out, and removing backdrop dismiss also prevents accidental loss of the reason on a stray tap.
+- **Navigation flow rework** (`apps/mobile/app/navigation.tsx`): the End Ride alert kept its two buttons, but both now route through the reason modal via a new `endActionPending: 'save' | 'discard' | null` state. `finalizeEarlyEnd` branches on the action — save still goes to `/feedback` (XP, badges, microlives); discard routes to `/route-planning`, skips `/feedback`, and `queueTripEnd('stopped', { discard: true })` skips the `trip_track` write as before. The reason rides along on the `trip_end` mutation either way, so even discarded rides record it on `trips`. The modal's primary-button label flips between "Save ride" / "Discard ride" via `endActionPending`. i18n keys (`earlyEndTitle`, four reason labels, `earlyEndOther`, `earlyEndOtherPlaceholder`, `earlyEndSave`, `earlyEndDiscard`, `earlyEndSkip`) added in en + ro.
+
+#### The wild-goose chase that turned out to be a wrong app variant
+
+Most of the session was a long debug of "the modal doesn't appear when ending early without moving" — the reason picker was bypassed and the user landed straight on `/feedback`. Two failed theories spent real time:
+
+1. **Touch propagation from `Alert.alert` → `Modal` backdrop** — I removed `onClose` from the modal (kills the backdrop's `Pressable.onPress`) and added a 300 ms `setTimeout` before opening the modal so any propagated touch could drain. Bundle was verified fresh by grepping the served `index.bundle` for diagnostic strings — they were present, so the device WAS running the new code. But the symptom remained.
+2. **A second `/feedback` path firing** — instrumented `saveAndEnd`, `finalizeEarlyEnd`, and the `shouldCompleteNavigation` block with `[EE-DBG]` console.logs, watched `adb logcat -s ReactNativeJS:*`. **Zero output** between app launch and the next launch despite the user reporting a full flow.
+
+Root cause discovered via `adb shell dumpsys activity recents`: **three Defensive Pedal packages are installed on the device — `com.defensivepedal.mobile`, `…mobile.dev`, `…mobile.preview` — and the user was tapping the production icon ("Defensive Pedal", no suffix), not the dev one ("Defensive Pedal Dev")**. Production runs an embedded bundle that of course doesn't contain any of my Metro-fed changes. The original 4-option flow "worked" only because the user had been on the dev app at that point. After a force-stop and a confused icon tap on the home screen, the test ran on a completely different APK. As soon as we explicitly relaunched `com.defensivepedal.mobile.dev` and the user retested, the modal worked perfectly. Lesson logged: when JS console output is silent despite the user confirming UI activity, dumpsys the recent-tasks list before adding more diagnostics. Both the `onClose` removal and the cleaner `endActionPending` state structure were kept; the 300 ms `setTimeout` and console.logs were removed.
+
+#### Verification + deploy
+
+Typecheck clean across all three packages, lint ratchet zero regressions, Metro bundle HTTP 200 (~18 MB). All three migrations applied to prod Supabase via the MCP and verified by re-querying `information_schema.columns` and `pg_constraint`. Cloud Build SUCCESS, Cloud Run revision `defpedal-api-00080-f59` deployed, `/health` 200. Tester confirmed both Save and Discard paths show the picker and the answer lands in the DB (`trips.early_end_reason` + the `trip_tracks` copy on Save).

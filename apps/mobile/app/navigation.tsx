@@ -1,4 +1,4 @@
-import type { Coordinate, HazardType } from '@defensivepedal/core';
+import type { Coordinate, EarlyEndReason, HazardType } from '@defensivepedal/core';
 import {
   AUTO_REROUTE_DELAY_MS,
   HAZARD_TYPE_OPTIONS,
@@ -54,6 +54,10 @@ import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
 import { RouteFeatureAlertStack } from '../src/design-system/organisms/RouteFeatureAlertStack';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
+import {
+  EarlyEndReasonModal,
+  type EarlyEndReasonOption,
+} from '../src/design-system/organisms/EarlyEndReasonModal';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Surface } from '../src/design-system/atoms/Card';
@@ -316,6 +320,13 @@ export default function NavigationScreen() {
   const [showMenu, setShowMenu] = useState(false);
   const [showElevationProgress, setShowElevationProgress] = useState(false);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
+  // Open when the rider chose "Save" from the End Ride dialog while ending the
+  // route early — collects an optional early-end reason before finishing.
+  const [earlyEndPromptOpen, setEarlyEndPromptOpen] = useState(false);
+  // Tracks which End Ride action the rider chose before the reason modal —
+  // saved rides go to /feedback (XP/badges), discarded rides skip feedback
+  // and trip_track but still record the reason on the trip itself.
+  const [endActionPending, setEndActionPending] = useState<'save' | 'discard' | null>(null);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hazardTypeLabels = HAZARD_TYPE_OPTIONS.reduce<Record<HazardType, string>>(
@@ -347,9 +358,15 @@ export default function NavigationScreen() {
 
   const queueTripEnd = useCallback((
     reason: 'completed' | 'stopped',
-    options?: { readonly discard?: boolean },
+    options?: {
+      readonly discard?: boolean;
+      readonly earlyEndReason?: EarlyEndReason | null;
+      readonly earlyEndReasonNote?: string | null;
+    },
   ) => {
     const discard = options?.discard === true;
+    const earlyEndReason = options?.earlyEndReason ?? null;
+    const earlyEndReasonNote = options?.earlyEndReasonNote ?? null;
     const store = useAppStore.getState();
     const currentActiveTripClientId = store.activeTripClientId;
     const currentSession = store.navigationSession;
@@ -380,6 +397,8 @@ export default function NavigationScreen() {
       clientTripId: currentActiveTripClientId,
       endedAt,
       reason,
+      earlyEndReason,
+      earlyEndReasonNote,
     });
 
     // Discarded rides skip the trip_track + trip_share writes. The trip lifecycle
@@ -410,6 +429,8 @@ export default function NavigationScreen() {
         endedAt,
         bikeType: store.bikeType ?? undefined,
         aqiAtStart: null, // TODO: capture AQI at navigation start
+        earlyEndReason,
+        earlyEndReasonNote,
       });
     }
 
@@ -439,6 +460,40 @@ export default function NavigationScreen() {
       breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
     });
   }, [enqueueMutation, selectedRoute, user]);
+
+  // Completes the End Ride flow after the rider answered (or skipped) the
+  // reason question. Branches on endActionPending: 'save' goes to /feedback
+  // (XP/badges/trip_track written); 'discard' routes back to /route-planning
+  // and skips trip_track + feedback. In both cases the reason is recorded on
+  // the trip via the trip_end payload so analytics covers both outcomes.
+  const finalizeEarlyEnd = useCallback((
+    earlyEndReason: EarlyEndReason | null,
+    earlyEndReasonNote: string | null,
+  ) => {
+    setEarlyEndPromptOpen(false);
+    const action = endActionPending;
+    setEndActionPending(null);
+
+    const isDiscard = action === 'discard';
+    queueTripEnd('stopped', { discard: isDiscard, earlyEndReason, earlyEndReasonNote });
+    telemetry.capture('navigation_stopped', {
+      route_id: selectedRoute?.id ?? 'unknown',
+      session_id: navigationSession?.sessionId ?? 'unknown',
+      outcome: isDiscard ? 'discarded' : 'saved',
+      early_end_reason: earlyEndReason ?? 'skipped',
+    });
+    void clearCachedRoute();
+    finishNavigation();
+    router.replace(isDiscard ? '/route-planning' : '/feedback');
+  }, [endActionPending, queueTripEnd, selectedRoute, navigationSession, finishNavigation]);
+
+  const earlyEndReasonOptions: ReadonlyArray<EarlyEndReasonOption> = [
+    { value: 'reached_destination', label: t('nav.earlyEndReachedDestination') },
+    { value: 'found_better_route', label: t('nav.earlyEndFoundBetterRoute') },
+    { value: 'felt_unsafe', label: t('nav.earlyEndFeltUnsafe') },
+    { value: 'no_longer_needed', label: t('nav.earlyEndNoLongerNeeded') },
+    { value: 'other', label: t('nav.earlyEndOther') },
+  ];
 
   const queueHazardReport = (hazardType: HazardType, description?: string) => {
     if (!mapUserCoordinate) {
@@ -1062,28 +1117,18 @@ export default function NavigationScreen() {
             <IconButton
               icon={<Ionicons name="stop-circle" size={24} color={gray[50]} />}
               onPress={() => {
+                // Both Save and Discard route through finalizeEarlyEnd via
+                // the reason modal; endActionPending tells finalize which
+                // outcome to apply. This lets us capture the reason even
+                // when the rider discards (the trip_track is skipped but
+                // trip_end still writes the reason onto the trips row).
                 const saveAndEnd = () => {
-                  queueTripEnd('stopped');
-                  telemetry.capture('navigation_stopped', {
-                    route_id: selectedRoute.id,
-                    session_id: navigationSession.sessionId,
-                    outcome: 'saved',
-                  });
-                  void clearCachedRoute();
-                  finishNavigation();
-                  router.push('/feedback');
+                  setEndActionPending('save');
+                  setEarlyEndPromptOpen(true);
                 };
                 const discardAndEnd = () => {
-                  queueTripEnd('stopped', { discard: true });
-                  telemetry.capture('navigation_stopped', {
-                    route_id: selectedRoute.id,
-                    session_id: navigationSession.sessionId,
-                    outcome: 'discarded',
-                  });
-                  void clearCachedRoute();
-                  finishNavigation();
-                  // Skip /feedback so no XP/badges/microlives are awarded.
-                  router.replace('/route-planning');
+                  setEndActionPending('discard');
+                  setEarlyEndPromptOpen(true);
                 };
                 Alert.alert(
                   t('nav.endRideSaveTitle'),
@@ -1289,6 +1334,17 @@ export default function NavigationScreen() {
           </Surface>
         </Pressable>
       ) : null}
+
+      {/* Early-end reason — shown after the rider chose Save or Discard */}
+      <EarlyEndReasonModal
+        visible={earlyEndPromptOpen}
+        title={t('nav.earlyEndTitle')}
+        options={earlyEndReasonOptions}
+        saveLabel={t(endActionPending === 'discard' ? 'nav.earlyEndDiscard' : 'nav.earlyEndSave')}
+        skipLabel={t('nav.earlyEndSkip')}
+        otherPlaceholder={t('nav.earlyEndOtherPlaceholder')}
+        onSubmit={finalizeEarlyEnd}
+      />
 
     </View>
   );

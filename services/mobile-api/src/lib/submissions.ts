@@ -178,6 +178,8 @@ export const finishTripRecord = async (
       .update({
         end_reason: request.reason,
         ended_at: request.endedAt,
+        early_end_reason: request.earlyEndReason ?? null,
+        early_end_reason_note: request.earlyEndReasonNote ?? null,
       })
       .eq('id', request.tripId)
       .eq('user_id', userId);
@@ -265,6 +267,8 @@ export const saveTripTrack = async (
           ended_at: request.endedAt,
           bike_type: request.bikeType ?? null,
           aqi_at_start: request.aqiAtStart ?? null,
+          early_end_reason: request.earlyEndReason ?? null,
+          early_end_reason_note: request.earlyEndReasonNote ?? null,
         },
       ],
       { onConflict: 'trip_id' },

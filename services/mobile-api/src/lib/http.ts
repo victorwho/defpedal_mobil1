@@ -680,6 +680,18 @@ export const tripEndRequestSchema = {
       type: 'string',
       enum: ['completed', 'stopped'],
     },
+    earlyEndReason: {
+      type: ['string', 'null'],
+      enum: [
+        'reached_destination',
+        'found_better_route',
+        'felt_unsafe',
+        'no_longer_needed',
+        'other',
+        null,
+      ],
+    },
+    earlyEndReasonNote: { type: ['string', 'null'], maxLength: 280 },
   },
 } as const;
 
@@ -971,6 +983,8 @@ export const normalizeTripEndRequest = (body: TripEndBody): TripEndRequest => ({
   tripId: body.tripId,
   endedAt: body.endedAt,
   reason: body.reason,
+  earlyEndReason: body.earlyEndReason ?? null,
+  earlyEndReasonNote: body.earlyEndReasonNote ?? null,
 });
 
 export const normalizeNavigationFeedbackRequest = (

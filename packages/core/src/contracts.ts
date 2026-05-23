@@ -345,7 +345,23 @@ export interface TripEndRequest {
   tripId: string;
   endedAt: string;
   reason: 'completed' | 'stopped';
+  /** Rider's reason for ending early; null when skipped or naturally completed. */
+  earlyEndReason?: EarlyEndReason | null;
+  /** Free-text note when earlyEndReason === 'other'. */
+  earlyEndReasonNote?: string | null;
 }
+
+/**
+ * Why a rider ended turn-by-turn guidance before reaching the destination.
+ * Captured (optionally) when the rider saves an early-ended ride; null when
+ * the rider skipped the question or the ride completed naturally.
+ */
+export type EarlyEndReason =
+  | 'reached_destination'
+  | 'found_better_route'
+  | 'felt_unsafe'
+  | 'no_longer_needed'
+  | 'other';
 
 export interface TripTrackRequest {
   tripId: string;
@@ -359,6 +375,9 @@ export interface TripTrackRequest {
   endedAt: string;
   bikeType?: string;
   aqiAtStart?: number | null;
+  earlyEndReason?: EarlyEndReason | null;
+  /** Free-text reason the rider typed when earlyEndReason is 'other'. */
+  earlyEndReasonNote?: string | null;
 }
 
 export interface TripHistoryItem {

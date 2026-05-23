@@ -2,6 +2,7 @@ import type {
   AutocompleteResponse,
   BadgeResponse,
   CoverageResponse,
+  EarlyEndReason,
   ErrorResponse,
   GeoJsonLineString,
   HazardReportResponse,
@@ -539,6 +540,18 @@ export const buildV1Routes = (
               endedAt: { type: 'string', format: 'date-time' },
               bikeType: { type: 'string', maxLength: 50 },
               aqiAtStart: { type: ['integer', 'null'], minimum: 0, maximum: 500 },
+              earlyEndReason: {
+                type: ['string', 'null'],
+                enum: [
+                  'reached_destination',
+                  'found_better_route',
+                  'felt_unsafe',
+                  'no_longer_needed',
+                  'other',
+                  null,
+                ],
+              },
+              earlyEndReasonNote: { type: ['string', 'null'], maxLength: 280 },
             },
           },
         },
@@ -560,6 +573,8 @@ export const buildV1Routes = (
             endReason: 'completed' | 'stopped' | 'app_killed';
             startedAt: string;
             endedAt: string;
+            earlyEndReason?: EarlyEndReason | null;
+            earlyEndReasonNote?: string | null;
           };
 
           return await dependencies.saveTripTrack(
@@ -573,6 +588,8 @@ export const buildV1Routes = (
               endReason: body.endReason,
               startedAt: body.startedAt,
               endedAt: body.endedAt,
+              earlyEndReason: body.earlyEndReason ?? null,
+              earlyEndReasonNote: body.earlyEndReasonNote ?? null,
             },
             user.id,
           );
