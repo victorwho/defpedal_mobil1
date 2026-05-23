@@ -134,7 +134,7 @@ export default function ProfileScreen() {
     locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
     shareTripsPublicly, themePreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
-    shareConversionFeedOptin,
+    shareConversionFeedOptin, reviewPromptOptedOut,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -154,6 +154,7 @@ export default function ProfileScreen() {
     quietHoursStart: state.quietHoursStart,
     quietHoursEnd: state.quietHoursEnd,
     shareConversionFeedOptin: state.shareConversionFeedOptin,
+    reviewPromptOptedOut: state.reviewPromptState.optedOut,
   })));
 
   // Actions - stable references, single selector with shallow comparison
@@ -162,7 +163,7 @@ export default function ProfileScreen() {
     setShowRouteComparison, setShareTripsPublicly, setThemePreference, setShowMascot,
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
-    setShareConversionFeedOptin,
+    setShareConversionFeedOptin, setReviewOptOut,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -181,6 +182,7 @@ export default function ProfileScreen() {
     setNotifyCommunity: state.setNotifyCommunity,
     setQuietHours: state.setQuietHours,
     setShareConversionFeedOptin: state.setShareConversionFeedOptin,
+    setReviewOptOut: state.setReviewOptOut,
   })));
 
   // Sync a single notification preference to the backend (fire-and-forget).
@@ -597,6 +599,13 @@ export default function ProfileScreen() {
               description={showMascot ? t('profile.showMascotOn') : t('profile.showMascotOff')}
               checked={showMascot}
               onChange={setShowMascot}
+            />
+
+            <SettingRow
+              label={t('profile.reviewPrompts')}
+              description={reviewPromptOptedOut ? t('profile.reviewPromptsOff') : t('profile.reviewPromptsOn')}
+              checked={!reviewPromptOptedOut}
+              onChange={(enabled) => setReviewOptOut(!enabled)}
             />
 
             <SettingRow

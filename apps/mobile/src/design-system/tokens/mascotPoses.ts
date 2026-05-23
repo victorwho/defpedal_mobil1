@@ -32,7 +32,8 @@ export type MascotPose =
   | 'phone'
   | 'study'
   | 'cheer'
-  | 'excited';
+  | 'excited'
+  | 'high-five';
 
 export interface MascotPoseAsset {
   /** require()'d PNG */
@@ -66,6 +67,7 @@ export const mascotPoses: Record<MascotPose, MascotPoseAsset> = {
   study:        { source: require('../../../assets/mascot/pedal-study.png'),       aspectRatio: PORTRAIT },
   cheer:        { source: require('../../../assets/mascot/pedal-cheer.png'),       aspectRatio: PORTRAIT },
   excited:      { source: require('../../../assets/mascot/pedal-excited.png'),     aspectRatio: PORTRAIT },
+  'high-five':  { source: require('../../../assets/mascot/pedal-high-five.png'),   aspectRatio: PORTRAIT },
 };
 
 /** Standard render sizes (logical px / dp). Width-driven; height derived from aspectRatio. */

@@ -41,3 +41,6 @@ export type { HazardDetailSheetProps } from './HazardDetailSheet';
 
 export { CitySuggestionSheet } from './CitySuggestionSheet';
 export type { CitySuggestionSheetProps } from './CitySuggestionSheet';
+
+export { ReviewPromptCard } from './ReviewPromptCard';
+export type { ReviewPromptCardProps } from './ReviewPromptCard';

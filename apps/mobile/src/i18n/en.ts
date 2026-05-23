@@ -134,6 +134,26 @@ export const en = {
     skipConfirmButton: 'Skip',
   },
 
+  // ── Review Prompt (Play Store sentiment funnel) ──
+  reviewPrompt: {
+    sentimentTitle: 'Enjoying Defensive Pedal?',
+    sentimentBody: 'Your honest answer shapes what we build next.',
+    sentimentPositive: 'Loving it',
+    sentimentNegative: 'Could be better',
+    sentimentLater: 'Later',
+    positiveTitle: 'Mind sharing on the Play Store?',
+    positiveBody: '30 seconds. It helps other cyclists find the app.',
+    positiveCta: 'Sure, rate',
+    positiveDismiss: 'Maybe later',
+    negativeTitle: 'Sorry to hear that — what is missing?',
+    negativeBody: 'Tell us directly. We read every reply.',
+    negativeCta: 'Send feedback',
+    negativeDismiss: 'Skip',
+    thanksTitle: 'Thanks for the feedback!',
+    thanksBody: 'It means a lot.',
+    dismissA11y: 'Dismiss review prompt',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profile',
@@ -212,6 +232,9 @@ export const en = {
     showRouteFeaturesOff: 'Route feature markers are hidden',
     showMascotOn: 'Pedal appears in friendly moments',
     showMascotOff: 'Pedal is hidden across the app',
+    reviewPrompts: 'Play Store review prompts',
+    reviewPromptsOn: 'Occasionally invite you to rate the app after great rides',
+    reviewPromptsOff: 'You will not be asked to rate the app',
     dailyWeatherOn: 'Daily 9am cycling weather forecast & advice',
     dailyWeatherOff: 'Daily weather notification is off',
     hazardAlertsOn: 'Get notified about hazards near your routes',

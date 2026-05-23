@@ -1,6 +1,7 @@
-import type { ImpactDashboard, RideImpact } from '@defensivepedal/core';
+import type { ImpactDashboard, ReviewTrigger, RideImpact } from '@defensivepedal/core';
 import {
   calculateTrailDistanceMeters,
+  evaluateReviewEligibility,
   getPreviewOrigin,
   calculatePersonalMicrolives,
   calculateCommunitySeconds,
@@ -10,6 +11,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -31,6 +33,9 @@ import {
 import { Button, Surface } from '../src/design-system/atoms';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
+import { ReviewPromptCard } from '../src/design-system/organisms/ReviewPromptCard';
+import { mascotPoses } from '../src/design-system/tokens/mascotPoses';
+import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { space } from '../src/design-system/tokens/spacing';
@@ -155,9 +160,15 @@ type RatingStepProps = {
   readonly onCancel: () => void;
   readonly styles: ThemedStyles;
   readonly colors: ThemeColors;
+  /**
+   * Inferred review-prompt trigger label, derived in the parent from this
+   * ride's signal (tier promotion > badge unlock > milestone > positive
+   * feedback). Forwarded straight to the eligibility helper for telemetry.
+   */
+  readonly reviewTrigger: ReviewTrigger;
 };
 
-const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
+const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingStepProps) => {
   const t = useT();
   const { user } = useAuthSession();
   const [rating, setRating] = useState(0);
@@ -172,6 +183,12 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
   const tripServerIds = useAppStore((s) => s.tripServerIds);
   const queuedMutations = useAppStore((s) => s.queuedMutations);
   const enqueueMutation = useAppStore((s) => s.enqueueMutation);
+
+  // ── Play Store review prompt (Stage 1 eligibility) ─────────────────────
+  const reviewPromptState = useAppStore((s) => s.reviewPromptState);
+  const completedRideCount = useAppStore((s) => s.completedRideCount);
+  const { isOnline } = useConnectivity();
+  const [showReviewCard, setShowReviewCard] = useState(false);
 
   const selectedRoute =
     routePreview?.routes.find((r) => r.id === selectedRouteId) ??
@@ -211,6 +228,32 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
     }
 
     setSubmitted(true);
+
+    // Stage 1 eligibility for the Play Store review prompt. Only consider
+    // showing the card when the user just gave a positive rating (4-5 stars)
+    // — we never want to ask after a meh ride. The card itself handles the
+    // second-stage sentiment funnel; this check is just the gate.
+    const sessionHadReroute = navigationSession?.lastRerouteAt != null;
+    const decision = evaluateReviewEligibility(reviewPromptState, {
+      nowIso: new Date().toISOString(),
+      completedRideCount,
+      trigger: reviewTrigger,
+      suppress: {
+        // `lastErrorAt` is stamped by ErrorBoundary.componentDidCatch; the
+        // helper cross-checks that timestamp against its 24h window, so we
+        // don't need a separate live error flag here.
+        hasRecentError: false,
+        isOffline: !isOnline,
+        // We're on AWAITING_FEEDBACK by route guard, never NAVIGATING.
+        isNavigating: false,
+        hadRerouteOnLastRide: sessionHadReroute,
+        lastRideDiscarded: false,
+        lastFeedbackNegative: rating < 4,
+      },
+    });
+    if (decision !== null) {
+      setShowReviewCard(true);
+    }
   };
 
   if (submitted) {
@@ -221,6 +264,18 @@ const RatingStep = ({ onDone, onCancel, styles, colors }: RatingStepProps) => {
           <Text style={styles.subtitle}>
             {t('feedback.thankYouSub')}
           </Text>
+          {showReviewCard ? (
+            <View style={styles.reviewPromptSlot}>
+              <ReviewPromptCard
+                onNegativeFeedback={() => {
+                  // Negative path: user already opened the in-app feedback
+                  // (us). Just hide the card and let them tap Done.
+                  setShowReviewCard(false);
+                }}
+                onDismiss={() => setShowReviewCard(false)}
+              />
+            </View>
+          ) : null}
           <Pressable
             style={[styles.button, styles.doneButton]}
             onPress={onDone}
@@ -355,6 +410,16 @@ export default function FeedbackScreen() {
   }, []);
 
   const incrementRatingSkipCount = useAppStore((s) => s.incrementRatingSkipCount);
+  const seedReviewInstallAtIfMissing = useAppStore((s) => s.seedReviewInstallAtIfMissing);
+
+  // Seed the review-prompt install timestamp on the first AWAITING_FEEDBACK
+  // entry. Idempotent — subsequent calls are no-ops. Reaching the feedback
+  // screen is a stronger "user is engaged" signal than first app open, so we
+  // start the 7-day install gate from here.
+  useEffect(() => {
+    seedReviewInstallAtIfMissing();
+  }, [seedReviewInstallAtIfMissing]);
+
   const [step, setStep] = useState<FeedbackStep>('impact');
   const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
@@ -568,10 +633,36 @@ export default function FeedbackScreen() {
     navigateAway();
   };
 
+  // Derive the review-prompt trigger label from the strongest signal this
+  // ride produced. Telemetry-only — does not change which card surfaces.
+  // Ladder (highest → lowest signal):
+  //   tier_promotion → badge_unlocked → co2_milestone → positive_feedback
+  // Recomputed on every render; cheap (handful of boolean checks).
+  const inferredReviewTrigger: ReviewTrigger =
+    rideImpact.tierPromotion?.promoted
+      ? 'tier_promotion'
+      : rideImpact.newBadges.length > 0
+        ? 'badge_unlocked'
+        : pendingMilestone != null
+          ? 'co2_milestone'
+          : 'positive_feedback';
+
   if (!guardPassed) return null;
 
   return (
     <View style={styles.root}>
+      {/*
+        Warm the mascot bitmap cache during the impact step so the
+        ReviewPromptCard's <Image> has zero decode latency when it mounts
+        post-submit. Rendered off-screen (1×1, opacity 0) — RN's Image
+        component still decodes and caches it.
+      */}
+      <Image
+        source={mascotPoses['high-five'].source}
+        style={styles.mascotPreload}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
       <SafeAreaView style={styles.safeArea}>
         {step === 'impact' ? (
           <ImpactStep
@@ -598,6 +689,7 @@ export default function FeedbackScreen() {
             }}
             styles={styles}
             colors={colors}
+            reviewTrigger={inferredReviewTrigger}
           />
         )}
       </SafeAreaView>
@@ -809,6 +901,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       marginTop: space[2],
       paddingVertical: space[4],
       minHeight: 52,
+    },
+    reviewPromptSlot: {
+      marginTop: space[3],
+    },
+    mascotPreload: {
+      position: 'absolute',
+      width: 1,
+      height: 1,
+      opacity: 0,
     },
     doneButtonText: {
       fontSize: 16,

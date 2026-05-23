@@ -82,6 +82,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       component_stack: errorInfo.componentStack ?? null,
       source: 'ErrorBoundary',
     });
+    // Stamp the review-prompt error window so we don't ask the user to rate
+    // the app within 24h of a crash. The eligibility helper cross-checks
+    // `lastErrorAt` in addition to the live `hasRecentError` flag.
+    try {
+      useAppStore.getState().markReviewError();
+    } catch {
+      // Never let a Zustand error break the error boundary itself.
+    }
   }
 
   handleRetry = (): void => {

@@ -67,6 +67,7 @@ afterEach(() => {
     locale: 'en',
     onboardingCompleted: false,
     ratingSkipCount: 0,
+    completedRideCount: 0,
     anonymousOpenCount: 0,
     showRouteComparison: true,
     shareTripsPublicly: true,

@@ -281,6 +281,8 @@ function DiagnosticsContent() {
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
   const anonymousOpenCount = useAppStore((state) => state.anonymousOpenCount);
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
+  const reviewPromptState = useAppStore((state) => state.reviewPromptState);
+  const completedRideCount = useAppStore((state) => state.completedRideCount);
   const queueDeveloperValidationWrites = useAppStore(
     (state) => state.queueDeveloperValidationWrites,
   );
@@ -701,6 +703,52 @@ function DiagnosticsContent() {
             </Button>
           </View>
         </DiagnosticCard>
+      ) : null}
+
+      {mobileEnv.appEnv !== 'production' ? (
+      <DiagnosticCard title="Review prompt (dev)">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          installedAt:{' '}
+          <Text style={styles.monoValue}>{reviewPromptState.installedAt ?? 'null'}</Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          State:{' '}
+          <Text style={styles.monoValue}>
+            shown={reviewPromptState.promptCount} · rides={completedRideCount} · sentiment={String(reviewPromptState.lastSentiment)} · rated={String(reviewPromptState.rated)} · optedOut={String(reviewPromptState.optedOut)}
+          </Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 8 }]}>
+          Pre-seeds install age (-8d) + ride count to bypass the install / ride
+          gates. Finish a ride and rate 4-5 stars to see the card.
+        </Text>
+        <View style={styles.buttonRow}>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              const eightDaysAgo = new Date(
+                Date.now() - 8 * 24 * 60 * 60 * 1000,
+              ).toISOString();
+              useAppStore.setState(() => ({
+                reviewPromptState: {
+                  installedAt: eightDaysAgo,
+                  lastShownAt: null,
+                  lastErrorAt: null,
+                  promptCount: 0,
+                  softDismissCount: 0,
+                  lastSentiment: null,
+                  rated: false,
+                  optedOut: false,
+                },
+                completedRideCount: 3,
+              }));
+            }}
+          >
+            Seed eligibility
+          </Button>
+        </View>
+      </DiagnosticCard>
       ) : null}
 
       <View style={styles.buttonRow}>

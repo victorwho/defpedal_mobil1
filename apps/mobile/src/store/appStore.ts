@@ -5,6 +5,8 @@ import type {
   OfflineRegion,
   NavigationLocationSample,
   RecentDestination,
+  ReviewPromptState,
+  ReviewSentiment,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
@@ -15,8 +17,16 @@ import {
   advanceNavigationStep,
   completeNavigationSession,
   createNavigationSession,
+  DEFAULT_REVIEW_PROMPT_STATE,
+  ensureInstalledAt,
   resetNavigationSession,
+  recordError as reviewRecordError,
+  recordPromptShown as reviewRecordPromptShown,
+  recordRated as reviewRecordRated,
   recordRerouteAttempt,
+  recordSentiment as reviewRecordSentiment,
+  recordSoftDismiss as reviewRecordSoftDismiss,
+  setOptedOut as reviewSetOptedOut,
   setSessionPreAnnouncement,
   setSessionApproachAnnouncement,
   setSessionFollowMode,
@@ -112,6 +122,18 @@ type AppStore = QueueSlice & {
   themePreference: 'system' | 'dark' | 'light';
   showMascot: boolean;
   ratingSkipCount: number;
+  // ── Play Store review prompt (device-scoped) ──
+  //
+  // The Stage 1 sentiment card we render before triggering the native
+  // Play Store ReviewManager. Eligibility rules live in `@defensivepedal/core`'s
+  // `reviewEligibility.ts`; this slice only mirrors the persisted state and
+  // the lifetime completed-ride counter used as one of the gates.
+  //
+  // Intentionally NOT reset by `resetUserScopedState`: Google's review quota
+  // is per-Play-account on the device, not per-app-account, so a user signing
+  // out and back in on the same handset should not reopen the prompt window.
+  reviewPromptState: ReviewPromptState;
+  completedRideCount: number;
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
@@ -151,6 +173,14 @@ type AppStore = QueueSlice & {
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
   setShowMascot: (show: boolean) => void;
   incrementRatingSkipCount: () => void;
+  // ── Review prompt actions ──
+  seedReviewInstallAtIfMissing: () => void;
+  markReviewPromptShown: () => void;
+  setReviewSentiment: (sentiment: ReviewSentiment) => void;
+  markReviewSoftDismiss: () => void;
+  markReviewRated: () => void;
+  markReviewError: () => void;
+  setReviewOptOut: (optedOut: boolean) => void;
   setShowHistoryOverlay: (show: boolean) => void;
   setOnboardingCompleted: (completed: boolean) => void;
   incrementAnonymousOpenCount: () => void;
@@ -283,6 +313,8 @@ export const useAppStore = create<AppStore>()(
       themePreference: 'dark',
       showMascot: true,
       ratingSkipCount: 0,
+      reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
+      completedRideCount: 0,
       showHistoryOverlay: false,
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
@@ -377,6 +409,44 @@ export const useAppStore = create<AppStore>()(
       setShowMascot: (show) => set(() => ({ showMascot: show })),
       incrementRatingSkipCount: () =>
         set((state) => ({ ratingSkipCount: state.ratingSkipCount + 1 })),
+      // ── Review prompt actions ──
+      seedReviewInstallAtIfMissing: () =>
+        set((state) => ({
+          reviewPromptState: ensureInstalledAt(
+            state.reviewPromptState,
+            new Date().toISOString(),
+          ),
+        })),
+      markReviewPromptShown: () =>
+        set((state) => ({
+          reviewPromptState: reviewRecordPromptShown(
+            state.reviewPromptState,
+            new Date().toISOString(),
+          ),
+        })),
+      setReviewSentiment: (sentiment) =>
+        set((state) => ({
+          reviewPromptState: reviewRecordSentiment(state.reviewPromptState, sentiment),
+        })),
+      markReviewSoftDismiss: () =>
+        set((state) => ({
+          reviewPromptState: reviewRecordSoftDismiss(state.reviewPromptState),
+        })),
+      markReviewRated: () =>
+        set((state) => ({
+          reviewPromptState: reviewRecordRated(state.reviewPromptState),
+        })),
+      markReviewError: () =>
+        set((state) => ({
+          reviewPromptState: reviewRecordError(
+            state.reviewPromptState,
+            new Date().toISOString(),
+          ),
+        })),
+      setReviewOptOut: (optedOut) =>
+        set((state) => ({
+          reviewPromptState: reviewSetOptedOut(state.reviewPromptState, optedOut),
+        })),
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
@@ -659,6 +729,10 @@ export const useAppStore = create<AppStore>()(
             return {
               navigationSession: completeNavigationSession(session),
               appState: 'AWAITING_FEEDBACK',
+              // Bump the device-level completed-ride counter exactly on the
+              // real transition (not on the idempotent reconciliation branch
+              // below). Read by the review-prompt eligibility gate.
+              completedRideCount: state.completedRideCount + 1,
             };
           }
           // Idempotent reconciliation: if the session is already terminal but
@@ -811,6 +885,8 @@ export const useAppStore = create<AppStore>()(
         cachedImpact: state.cachedImpact,
         notificationPermissionAsked: state.notificationPermissionAsked,
         ratingSkipCount: state.ratingSkipCount,
+        reviewPromptState: state.reviewPromptState,
+        completedRideCount: state.completedRideCount,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
         showMascot: state.showMascot,

@@ -136,6 +136,26 @@ export const ro: TranslationKeys = {
     skipConfirmButton: 'Sari peste',
   },
 
+  // ── Review Prompt ──
+  reviewPrompt: {
+    sentimentTitle: 'Îți place Defensive Pedal?',
+    sentimentBody: 'Răspunsul tău sincer ne ajută să decidem ce construim mai departe.',
+    sentimentPositive: 'Îmi place',
+    sentimentNegative: 'Poate fi mai bine',
+    sentimentLater: 'Mai târziu',
+    positiveTitle: 'Lași o recenzie în Play Store?',
+    positiveBody: '30 de secunde. Ajută alți cicliști să descopere aplicația.',
+    positiveCta: 'Sigur, lasă o recenzie',
+    positiveDismiss: 'Poate mai târziu',
+    negativeTitle: 'Ne pare rău — ce lipsește?',
+    negativeBody: 'Spune-ne direct. Citim fiecare răspuns.',
+    negativeCta: 'Trimite feedback',
+    negativeDismiss: 'Sari peste',
+    thanksTitle: 'Mulțumim pentru feedback!',
+    thanksBody: 'Înseamnă mult.',
+    dismissA11y: 'Închide solicitarea de recenzie',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profil',
@@ -188,6 +208,9 @@ export const ro: TranslationKeys = {
     showRouteFeaturesOff: 'Marcajele cu elemente ale traseului sunt ascunse',
     showMascotOn: 'Pedal apare în momente prietenoase',
     showMascotOff: 'Pedal este ascuns în toată aplicația',
+    reviewPrompts: 'Solicitări de recenzie în Play Store',
+    reviewPromptsOn: 'Te vom întreba ocazional dacă vrei să lași o recenzie după curse reușite',
+    reviewPromptsOff: 'Nu vei fi întrebat să lași recenzie',
     dailyWeatherOn: 'Prognoza meteo zilnică la 9 dimineața și sfaturi',
     dailyWeatherOff: 'Notificarea meteo zilnică este dezactivată',
     hazardAlertsOn: 'Primește notificări despre pericolele de pe traseele tale',
