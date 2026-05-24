@@ -42,7 +42,7 @@ import {
   type PanResponderGestureState,
   type ViewStyle,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAppStore } from '../../store/appStore';
 import { tierColors, type BadgeTier } from '../tokens/badgeColors';
@@ -211,25 +211,19 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
 
   const halo = tierColors[tier];
 
-  // Cast shadow — dark ellipse below the sticker, blurred via shadow on iOS.
-  const shadowSize = size * 0.9;
+  // Cast shadow — true ellipse via SVG (RN's borderRadius is clamped to half
+  // the smallest dimension, so a wide rect with borderRadius: width renders as
+  // a rounded rectangle, not an ellipse — that surfaced as a "dark square"
+  // behind the sticker on Android in v0.2.63 / v0.2.64). The ellipse here
+  // softens at the rim via a radial-ish gradient simulated with three stops.
+  const shadowWidth = size * 0.85;
+  const shadowHeight = size * 0.22;
   const shadowStyle: ViewStyle = {
     position: 'absolute',
-    width: shadowSize,
-    height: shadowSize * 0.4,
-    top: size * 0.7,
-    left: (size - shadowSize) / 2,
-    borderRadius: shadowSize,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 16,
-      },
-      default: {},
-    }),
+    width: shadowWidth,
+    height: shadowHeight,
+    top: size * 0.82,
+    left: (size - shadowWidth) / 2,
   };
 
   // Halo glow — extends past the sticker silhouette.
@@ -291,7 +285,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
       style={containerStyle}
       {...panResponder.panHandlers}
     >
-      {/* Layer 1: Cast shadow — sits OUTSIDE the 3D layer so it's not painted over */}
+      {/* Layer 1: Cast shadow — SVG ellipse (true round shape, no clamping) */}
       <Animated.View
         pointerEvents="none"
         style={[
@@ -303,14 +297,31 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
             ],
           },
         ]}
-      />
+      >
+        <Svg width={shadowWidth} height={shadowHeight}>
+          <Defs>
+            <LinearGradient id="holoShadow" x1="50%" y1="0%" x2="50%" y2="100%">
+              <Stop offset="0%" stopColor="#000" stopOpacity="0.45" />
+              <Stop offset="100%" stopColor="#000" stopOpacity="0.15" />
+            </LinearGradient>
+          </Defs>
+          <Ellipse
+            cx={shadowWidth / 2}
+            cy={shadowHeight / 2}
+            rx={shadowWidth / 2}
+            ry={shadowHeight / 2}
+            fill="url(#holoShadow)"
+          />
+        </Svg>
+      </Animated.View>
 
       {/* Layer 2: Halo glow — sibling to the 3D layer */}
       <View style={haloStyle} pointerEvents="none" />
 
-      {/* Layer 3: Card face — 3D rotated group */}
+      {/* Layer 3: Card face — 3D rotated group (no needsOffscreenAlphaCompositing —
+          on some Android devices it allocates an offscreen buffer with a black
+          default backing that shows through any transparent child areas) */}
       <Animated.View
-        needsOffscreenAlphaCompositing
         style={[
           cardFaceStyle,
           {
