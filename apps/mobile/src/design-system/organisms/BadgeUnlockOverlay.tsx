@@ -16,7 +16,7 @@ import {
 
 import type { BadgeUnlockEvent } from '@defensivepedal/core';
 
-import { BadgeIcon } from '../atoms/BadgeIcon';
+import { BadgeVisual } from '../atoms/BadgeVisual';
 import { Mascot } from '../atoms/Mascot';
 import {
   tierColors,
@@ -249,7 +249,7 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
         ]}
       >
         <Animated.View style={{ opacity: iconOpacity }}>
-          <BadgeIcon
+          <BadgeVisual
             badgeKey={badge.badgeKey}
             tier={tier}
             size="lg"

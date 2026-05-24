@@ -12,7 +12,7 @@ import { brandColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textXs } from '../tokens/typography';
-import { BadgeIcon } from './BadgeIcon';
+import { BadgeVisual } from './BadgeVisual';
 
 export interface BadgeInlineChipProps {
   badgeKey: string;
@@ -48,7 +48,7 @@ export const BadgeInlineChip: React.FC<BadgeInlineChipProps> = ({
   const content = (
     <View style={containerStyle}>
       <View style={{ transform: [{ scale: 24 / 40 }], width: 24, height: 28 }}>
-        <BadgeIcon badgeKey={badgeKey} tier={tier} size="sm" />
+        <BadgeVisual badgeKey={badgeKey} tier={tier} size="sm" />
       </View>
       <Text style={nameStyle} numberOfLines={1}>
         {name}

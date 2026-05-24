@@ -63,3 +63,6 @@ export type { MascotProps } from './Mascot';
 
 export { HoloSticker } from './HoloSticker';
 export type { HoloStickerProps } from './HoloSticker';
+
+export { BadgeVisual } from './BadgeVisual';
+export type { BadgeVisualProps } from './BadgeVisual';

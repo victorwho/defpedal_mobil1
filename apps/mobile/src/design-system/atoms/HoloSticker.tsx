@@ -46,17 +46,28 @@ import Svg, { Defs, Ellipse, LinearGradient, Rect, Stop } from 'react-native-svg
 
 import { useAppStore } from '../../store/appStore';
 import { tierColors, type BadgeTier } from '../tokens/badgeColors';
+import { getHoloBadgeAsset } from '../tokens/holoBadges';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface HoloStickerProps {
-  source: ImageSourcePropType;
+  /** Direct image source. Mutually exclusive with `badgeKey`. */
+  source?: ImageSourcePropType;
+  /** Badge key — resolved via holoBadges manifest. Mutually exclusive with `source`. */
+  badgeKey?: string;
+  /** Fallback key (tier family) used when `badgeKey` isn't in the manifest. */
+  tierFamily?: string | null;
+  /** Render size (square) in points. */
   size: number;
+  /** Tier — drives halo and rim color. */
   tier?: BadgeTier;
+  /** Disable tilt + glare interactions. */
   interactive?: boolean;
+  /** Override the NAVIGATING suppression (testing only). */
   forceMotion?: boolean;
+  /** Accessibility label — defaults to "Holographic badge". */
   accessibilityLabel?: string;
 }
 
@@ -69,12 +80,20 @@ const TAP_MAX_DURATION_MS = 300;
 
 export const HoloSticker: React.FC<HoloStickerProps> = ({
   source,
+  badgeKey,
+  tierFamily,
   size,
   tier = 'gold',
   interactive = true,
   forceMotion = false,
   accessibilityLabel = 'Holographic badge',
 }) => {
+  // Resolve the PNG source: explicit `source` wins; otherwise look up by key.
+  const resolvedSource = useMemo(
+    () => source ?? (badgeKey ? getHoloBadgeAsset(badgeKey, tierFamily) : undefined),
+    [source, badgeKey, tierFamily],
+  );
+
   const appState = useAppStore((s) => s.appState);
   const motionAllowed = forceMotion || appState !== 'NAVIGATING';
 
@@ -278,6 +297,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
     backgroundColor: 'transparent',
   };
 
+  // No holo art available — caller is expected to fall back to BadgeIcon.
+  if (!resolvedSource) {
+    return null;
+  }
+
   return (
     <View
       accessibilityRole="image"
@@ -340,7 +364,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
             instead of filling the bounding rect). Offsets stagger so the
             accumulated darkening reads as visible thickness, not a halo. */}
         <Image
-          source={source}
+          source={resolvedSource}
           style={{
             position: 'absolute',
             width: size,
@@ -353,7 +377,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
           accessibilityIgnoresInvertColors
         />
         <Image
-          source={source}
+          source={resolvedSource}
           style={{
             position: 'absolute',
             width: size,
@@ -368,7 +392,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
 
         {/* 3b. Base PNG */}
         <Image
-          source={source}
+          source={resolvedSource}
           style={{ width: size, height: size }}
           resizeMode="contain"
           accessibilityIgnoresInvertColors

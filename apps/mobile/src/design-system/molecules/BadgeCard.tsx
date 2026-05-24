@@ -9,7 +9,7 @@ import { Pressable, Text, View, type TextStyle, type ViewStyle } from 'react-nat
 
 import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
 
-import { BadgeIcon } from '../atoms/BadgeIcon';
+import { BadgeVisual } from '../atoms/BadgeVisual';
 import { tierColors, type BadgeTier } from '../tokens/badgeColors';
 import { brandColors, safetyColors } from '../tokens/colors';
 import { space } from '../tokens/spacing';
@@ -98,7 +98,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
           : `${badge.name}, ${earned ? `${tier} tier, earned` : 'locked'}${isInProgress ? `, ${Math.round((progress?.progress ?? 0) * 100)}% complete` : ''}`
       }
     >
-      <BadgeIcon
+      <BadgeVisual
         badgeKey={badge.badgeKey}
         tierFamily={badge.tierFamily}
         tier={tier}

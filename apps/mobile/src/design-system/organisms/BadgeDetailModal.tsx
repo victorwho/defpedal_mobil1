@@ -11,7 +11,7 @@ import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
 
 import { BadgeShareCard } from '../../components/BadgeShareCard';
 import { useShareCard } from '../../hooks/useShareCard';
-import { BadgeIcon } from '../atoms/BadgeIcon';
+import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import {
   tierColors,
@@ -148,7 +148,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
           >
             {/* Hero badge icon */}
             <View style={styles.heroRow}>
-              <BadgeIcon
+              <BadgeVisual
                 badgeKey={badge.badgeKey}
                 tierFamily={badge.tierFamily}
                 tier={tier}
