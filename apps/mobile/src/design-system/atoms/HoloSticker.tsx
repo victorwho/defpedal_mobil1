@@ -333,11 +333,38 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
           },
         ]}
       >
-        {/* 3a. Edge thickness REMOVED — Android's tintColor on PNG ignores
-            the die-cut alpha channel and fills the full bounding rect with
-            the tint color, which surfaced as a dark square behind the
-            sticker. Depth now comes from cast shadow + 3D tilt + halo.
-            Proper thickness will be revisited with a Skia approach. */}
+        {/* 3a. Edge thickness — two dark, alpha-respecting copies of the PNG
+            offset down-right to fake the sticker's side profile. Each copy is
+            shaped by the source PNG's alpha (we background-removed the source
+            in v0.2.66, so tintColor now respects the die-cut silhouette
+            instead of filling the bounding rect). Offsets stagger so the
+            accumulated darkening reads as visible thickness, not a halo. */}
+        <Image
+          source={source}
+          style={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            transform: [{ translateX: 8 }, { translateY: 12 }],
+            tintColor: '#000',
+            opacity: 0.22,
+          }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+        <Image
+          source={source}
+          style={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            transform: [{ translateX: 4 }, { translateY: 6 }],
+            tintColor: '#000',
+            opacity: 0.4,
+          }}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
 
         {/* 3b. Base PNG */}
         <Image
