@@ -29,7 +29,7 @@
  *
  * Suppressed during NAVIGATING (the static PNG + halo + rim still render).
  */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Image,
@@ -45,6 +45,7 @@ import {
 import Svg, { Defs, Ellipse, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAppStore } from '../../store/appStore';
+import { useHoloTilt } from '../hooks/useHoloTilt';
 import { tierColors, type BadgeTier } from '../tokens/badgeColors';
 import { getHoloBadgeAsset } from '../tokens/holoBadges';
 
@@ -101,6 +102,17 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   const tiltY = useRef(new Animated.Value(0)).current;
   const glareProgress = useRef(new Animated.Value(0)).current;
 
+  // Drag suspends gyro so a finger touch always wins over the sensor stream.
+  // While `isDragging` is true, useHoloTilt detaches its listener (this is
+  // refcounted globally — the sensor is fully off when no consumer wants it).
+  const [isDragging, setIsDragging] = useState(false);
+
+  useHoloTilt({
+    tiltX,
+    tiltY,
+    enabled: interactive && motionAllowed && !isDragging,
+  });
+
   const pressStartRef = useRef<{ t: number; movedFar: boolean }>({
     t: 0,
     movedFar: false,
@@ -130,7 +142,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
         stiffness: 90,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start(({ finished }) => {
+      // Hand control back to gyro only after the spring settles; otherwise
+      // the sensor's next sample would jump-cut over the in-flight animation.
+      if (finished) setIsDragging(false);
+    });
   };
 
   const panResponder = useMemo(
@@ -143,6 +159,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
           pressStartRef.current = { t: Date.now(), movedFar: false };
+          setIsDragging(true);
         },
         onPanResponderMove: (
           _e: GestureResponderEvent,
