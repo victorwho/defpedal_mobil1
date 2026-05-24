@@ -23,6 +23,12 @@ import { mobileEnv } from '../src/lib/env';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
 import { storageEngineKind } from '../src/lib/storage';
 import {
+  isSentryEnabled,
+  sendSentrySmokeEvent,
+  sentryConfigured,
+  type SentrySmokeResult,
+} from '../src/lib/telemetry';
+import {
   summarizeBackgroundMovement,
   summarizeSelectedRouteOfflineReadiness,
 } from '../src/lib/validationSummary';
@@ -294,6 +300,8 @@ function DiagnosticsContent() {
   const [backgroundPermission, setBackgroundPermission] = useState<string>('unknown');
   const [apiHealth, setApiHealth] = useState<ApiHealthResponse | null>(null);
   const [nativeOfflinePackCount, setNativeOfflinePackCount] = useState<number | null>(null);
+  const [smokeResult, setSmokeResult] = useState<SentrySmokeResult | null>(null);
+  const [smokeFiredAt, setSmokeFiredAt] = useState<string | null>(null);
   const [queueActionSnapshot, setQueueActionSnapshot] = useState<QueueActionSnapshot>({
     pressInCount: 0,
     lastPressInAt: null,
@@ -700,6 +708,73 @@ function DiagnosticsContent() {
               }}
             >
               Queue sample writes
+            </Button>
+          </View>
+        </DiagnosticCard>
+      ) : null}
+
+      {mobileEnv.appVariant !== 'production' ? (
+        <DiagnosticCard title="Sentry smoke test">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+            Fires a recognizable `release-smoke` event so you can verify in the Sentry
+            UI that release, environment, and source-maps are wired end-to-end on this
+            APK. Source-maps only ship on EAS preview/production builds — a smoke
+            event on a debug build will show minified Hermes frames.
+          </Text>
+          <View style={styles.badgeRow}>
+            <StatusBadge label={`DSN: ${sentryConfigured ? 'Configured' : 'Missing'}`} ok={sentryConfigured} />
+            <StatusBadge label={`Consent: ${isSentryEnabled() ? 'Granted' : 'Not granted'}`} ok={isSentryEnabled()} />
+          </View>
+          <View style={styles.metricGrid}>
+            <MetricBlock label="Environment" value={mobileEnv.sentryEnvironment} />
+            <MetricBlock label="App variant" value={mobileEnv.appVariant} />
+            <MetricBlock
+              label="Last result"
+              value={smokeResult?.status ?? 'never'}
+              emphasis={smokeResult?.status === 'ok'}
+            />
+            <MetricBlock label="Last fired" value={smokeFiredAt ?? 'Never'} />
+          </View>
+          {smokeResult?.status === 'ok' ? (
+            <>
+              <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+                Release: <Text style={styles.monoValue}>{smokeResult.release}</Text>
+              </Text>
+              <Text style={[styles.dataText, { color: colors.textSecondary }]}>
+                Event ID:{' '}
+                <Text style={styles.monoValue}>{smokeResult.eventId ?? 'pending'}</Text>
+              </Text>
+            </>
+          ) : null}
+          {smokeResult?.status === 'no-config' ? (
+            <Text style={[styles.helperText, { color: colors.textMuted }]}>
+              EXPO_PUBLIC_SENTRY_DSN is not set in this build. Check `.env` /
+              `app.config.ts` and rebuild.
+            </Text>
+          ) : null}
+          {smokeResult?.status === 'no-consent' ? (
+            <Text style={[styles.helperText, { color: colors.textMuted }]}>
+              Sentry is consent-gated. Grant analytics consent in Profile →
+              Privacy & analytics (or during onboarding) and try again.
+            </Text>
+          ) : null}
+          {smokeResult?.status === 'error' ? (
+            <Text style={[styles.helperText, { color: colors.danger }]}>
+              {smokeResult.message}
+            </Text>
+          ) : null}
+          <View style={styles.buttonRow}>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              accessibilityLabel="Send Sentry smoke event"
+              onPress={() => {
+                setSmokeResult(sendSentrySmokeEvent());
+                setSmokeFiredAt(new Date().toLocaleTimeString());
+              }}
+            >
+              Send smoke event
             </Button>
           </View>
         </DiagnosticCard>

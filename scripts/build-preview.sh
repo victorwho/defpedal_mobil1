@@ -85,6 +85,10 @@ for f in app.config.ts metro.config.js tsconfig.json package.json .env; do
 done
 cp -f "$SRC/package.json" "$DST/package.json" 2>/dev/null || true
 cp -pf "$SRC/package-lock.json" "$DST/package-lock.json" 2>/dev/null || true
+# .npmrc carries `legacy-peer-deps=true` — without it, npm install on DST fails
+# with ERESOLVE on @types/react vs @radix-ui/react-* peer ranges. Sync it so the
+# install step inherits the same resolver behavior as SRC.
+cp -f "$SRC/.npmrc" "$DST/.npmrc" 2>/dev/null || true
 
 # Sync workspace package.json files (in case new deps were added)
 cp -f "$SRC/apps/mobile/package.json" "$DST/apps/mobile/package.json" 2>/dev/null || true
@@ -135,15 +139,26 @@ done
 # withAndroidCleartextTraffic.js) gets pruned from DST.
 robocopy "$SRC/apps/mobile/plugins" "$DST/apps/mobile/plugins" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
 
-echo "── Step 1b: Set APP_VARIANT in .env ──"
+echo "── Step 1b: Set APP_VARIANT and EXPO_PUBLIC_APP_ENV in .env ──"
 # The JS bundle reads APP_VARIANT to determine the scheme, package name,
 # and API URLs. Must match the Gradle flavor being built.
+#
+# EXPO_PUBLIC_APP_ENV must ALSO flip — it feeds mobileEnv.appEnv and cascades
+# into Sentry's `environment` tag. Without this, preview/production APKs run
+# with appEnv=development (the default in SRC's .env) and every Sentry event
+# is tagged environment=development, hiding real preview/prod telemetry.
 if grep -q '^APP_VARIANT=' "$DST/apps/mobile/.env" 2>/dev/null; then
   sed -i "s/^APP_VARIANT=.*/APP_VARIANT=$FLAVOR/" "$DST/apps/mobile/.env"
 else
   echo "APP_VARIANT=$FLAVOR" >> "$DST/apps/mobile/.env"
 fi
+if grep -q '^EXPO_PUBLIC_APP_ENV=' "$DST/apps/mobile/.env" 2>/dev/null; then
+  sed -i "s/^EXPO_PUBLIC_APP_ENV=.*/EXPO_PUBLIC_APP_ENV=$FLAVOR/" "$DST/apps/mobile/.env"
+else
+  echo "EXPO_PUBLIC_APP_ENV=$FLAVOR" >> "$DST/apps/mobile/.env"
+fi
 echo "  APP_VARIANT=$FLAVOR"
+echo "  EXPO_PUBLIC_APP_ENV=$FLAVOR"
 
 echo "── Step 1c: Ensure deep link scheme in AndroidManifest ──"
 # Each flavor needs its scheme in the manifest for OAuth deep links.

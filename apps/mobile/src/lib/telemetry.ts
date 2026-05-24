@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as Sentry from '@sentry/react-native';
 import PostHog from 'posthog-react-native';
 
@@ -138,6 +139,64 @@ export const disablePostHog = () => {
 
 export const isSentryEnabled = () => sentryEnabled;
 export const isPostHogEnabled = () => posthogClient !== null;
+
+export type SentrySmokeResult =
+  | { status: 'ok'; eventId: string | undefined; release: string; environment: string }
+  | { status: 'no-config' }
+  | { status: 'no-consent' }
+  | { status: 'error'; message: string };
+
+// Fires a recognizable Sentry event from a non-production build so the operator
+// can verify in the Sentry UI that release/environment/source-maps are wired
+// end-to-end on the running APK. Surfaced via the Diagnostics screen — never
+// invoked automatically.
+export const sendSentrySmokeEvent = (): SentrySmokeResult => {
+  if (!sentryConfigured) {
+    return { status: 'no-config' };
+  }
+
+  if (!sentryEnabled) {
+    return { status: 'no-consent' };
+  }
+
+  try {
+    const version =
+      typeof Constants.expoConfig?.version === 'string'
+        ? Constants.expoConfig.version
+        : 'unknown';
+    const versionCode =
+      typeof Constants.expoConfig?.android?.versionCode === 'number'
+        ? String(Constants.expoConfig.android.versionCode)
+        : 'unknown';
+
+    const eventId = Sentry.captureMessage('release-smoke', {
+      level: 'info',
+      tags: {
+        smoke: 'release',
+        app_env: mobileEnv.appEnv,
+        app_variant: mobileEnv.appVariant,
+      },
+      extra: {
+        version,
+        versionCode,
+        sentryEnvironment: mobileEnv.sentryEnvironment,
+        firedAt: new Date().toISOString(),
+      },
+    });
+
+    return {
+      status: 'ok',
+      eventId,
+      release: `${version}+${versionCode}`,
+      environment: mobileEnv.sentryEnvironment,
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown smoke-test error',
+    };
+  }
+};
 
 export const telemetry = {
   identify: (
