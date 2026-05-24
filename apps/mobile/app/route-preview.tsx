@@ -39,6 +39,7 @@ import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
+import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
 import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
@@ -73,7 +74,7 @@ const formatDuration = (seconds: number): string => {
 };
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
-export default function RoutePreviewScreen() {
+function RoutePreviewScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { user } = useAuthSession();
@@ -1199,3 +1200,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.accent,
     },
   });
+
+export default withErrorBoundary('route-preview', RoutePreviewScreen);

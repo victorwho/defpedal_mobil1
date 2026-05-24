@@ -4,7 +4,7 @@
  * Global error boundary that catches JavaScript runtime errors
  * and provides users with a recovery option instead of a blank screen.
  */
-import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import React, { Component, type ComponentType, type ErrorInfo, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -56,6 +56,12 @@ const loadExpoUpdates = async (): Promise<ExpoUpdatesModule | null> => {
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  /**
+   * Optional label that identifies WHICH boundary caught the error. Passed as
+   * a Sentry tag so per-screen failures can be filtered (e.g. `boundary:navigation`
+   * vs `boundary:community-feed`). Omit for the global app-root boundary.
+   */
+  boundary?: string;
 }
 
 interface ErrorBoundaryState {
@@ -81,6 +87,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     telemetry.captureError(error, {
       component_stack: errorInfo.componentStack ?? null,
       source: 'ErrorBoundary',
+      // `boundary` lets Sentry split per-route crashes from the global root
+      // boundary. Falls back to 'global' so events from the app-root wrapper
+      // (no prop set) are still bucketable in the dashboard.
+      boundary: this.props.boundary ?? 'global',
     });
     // Stamp the review-prompt error window so we don't ask the user to rate
     // the app within 24h of a crash. The eligibility helper cross-checks
@@ -259,3 +269,34 @@ const styles = StyleSheet.create({
     color: darkTheme.textSecondary,
   },
 });
+
+// ---------------------------------------------------------------------------
+// withErrorBoundary HOC
+// ---------------------------------------------------------------------------
+
+/**
+ * Wraps a screen-level component in an `ErrorBoundary` tagged with the given
+ * `boundary` label so per-route failures are bucketable in Sentry. Designed for
+ * Expo Router default exports — call it inline on the export line.
+ *
+ * Sits below the global app-root boundary in `_layout.tsx`: a crash in the
+ * wrapped screen is caught here first, the user sees the recovery UI inside
+ * that route, the rest of the app keeps running.
+ *
+ * @example
+ *   function NavigationScreen() { ... }
+ *   export default withErrorBoundary('navigation', NavigationScreen);
+ */
+export function withErrorBoundary<P extends object>(
+  boundary: string,
+  WrappedComponent: ComponentType<P>,
+): ComponentType<P> {
+  const displayName = WrappedComponent.displayName ?? WrappedComponent.name ?? 'Anonymous';
+  const Wrapped = (props: P) => (
+    <ErrorBoundary boundary={boundary}>
+      <WrappedComponent {...props} />
+    </ErrorBoundary>
+  );
+  Wrapped.displayName = `withErrorBoundary(${boundary})(${displayName})`;
+  return Wrapped;
+}

@@ -19,6 +19,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { ActivityCommentSheet } from '../src/design-system/organisms/ActivityCommentSheet';
+import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { ActivityFeedCard } from '../src/design-system/organisms/ActivityFeedCard';
 import { SuggestedUsersRow } from '../src/design-system/organisms/SuggestedUsersRow';
@@ -40,7 +41,7 @@ type MergedItem =
   | { kind: 'activity'; data: ActivityFeedItem }
   | { kind: 'suggested'; key: string };
 
-export default function CommunityFeedScreen() {
+function CommunityFeedScreen() {
   const t = useT();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -403,3 +404,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       bottom: 80,
     },
   });
+
+export default withErrorBoundary('community-feed', CommunityFeedScreen);

@@ -11,6 +11,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
+import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { TripCard } from '../src/design-system/organisms/TripCard';
 import { Button } from '../src/design-system/atoms/Button';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
@@ -28,7 +29,7 @@ import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
 
-export default function TripsScreen() {
+function TripsScreen() {
   const { user } = useAuthSession();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -403,3 +404,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       alignItems: 'center',
     },
   });
+
+export default withErrorBoundary('trips', TripsScreen);
