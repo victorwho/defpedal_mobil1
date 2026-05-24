@@ -8,6 +8,7 @@ import { fontFamily } from '../../../design-system/tokens/typography';
 import { zIndex } from '../../../design-system/tokens/zIndex';
 import type { SelectedPoiState } from '../types';
 import { MAKI_TO_TYPE } from '../constants';
+import { extractPointCoordinate } from '../extractPointCoordinate';
 
 type PoiCardProps = {
   selectedPoi: NonNullable<SelectedPoiState>;
@@ -78,8 +79,15 @@ export const usePoiCardHandler = (
       const feature = event?.features?.[0];
       if (!feature) return;
       const props = feature.properties ?? {};
-      const coords = feature.geometry?.coordinates;
-      if (!Array.isArray(coords) || coords.length < 2) return;
+
+      // Vector tile source layers mix Point/LineString/Polygon features.
+      // `getPointInView` (called below) goes across the RN bridge into a
+      // native Kotlin function that strict-casts each element to Double, so
+      // a nested coordinate array (LineString = `[[lng,lat], …]`) used to
+      // crash the app fatally — Sentry MOBILE-9. The helper enforces Point
+      // shape AND validates finite numbers; everything else returns null.
+      const coord = extractPointCoordinate(feature.geometry);
+      if (!coord) return;
 
       const name = props.name ?? 'Unknown';
 
@@ -93,7 +101,9 @@ export const usePoiCardHandler = (
       try {
         const mapRef = mapViewRef.current;
         if (mapRef) {
-          const point = await (mapRef as any).getPointInView([coords[0], coords[1]]);
+          // `coord` is a readonly tuple; spread into a fresh mutable array
+          // because rnmapbox's getPointInView types want `number[]`.
+          const point = await (mapRef as any).getPointInView([coord[0], coord[1]]);
           if (Array.isArray(point) && point.length >= 2) {
             screenX = point[0];
             screenY = point[1];

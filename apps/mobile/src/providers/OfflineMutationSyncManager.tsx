@@ -4,85 +4,19 @@ import { useEffect, useRef } from 'react';
 import type { QueuedMutationPayloadByType, QueuedTripEndPayload, QueuedTripTrackPayload } from '../lib/offlineQueue';
 import { mobileApi } from '../lib/api';
 import { mobileEnv } from '../lib/env';
+import {
+  getBackoffDelay,
+  getMutationTimeoutMs,
+  getResolvedTripId,
+  isPermanentError,
+  MAX_RETRY_COUNT,
+  shouldSkipMutation,
+  SYNC_INTERVAL_MS,
+  TRIP_DEPENDENT_TYPES,
+} from '../lib/offlineSyncHelpers';
 import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
 import { useConnectivity } from './ConnectivityMonitor';
-
-const SYNC_INTERVAL_MS = 15000;
-const MUTATION_SYNC_TIMEOUT_MS = 10000;
-const MAX_RETRY_COUNT = 5;
-const BACKOFF_BASE_MS = 1000;
-
-/** Returns the backoff delay in ms for a given retry count (exponential: 1s, 2s, 4s, 8s, 16s). */
-const getBackoffDelay = (retryCount: number): number =>
-  BACKOFF_BASE_MS * Math.pow(2, Math.min(retryCount, MAX_RETRY_COUNT));
-
-/** Returns true if enough time has passed since the last attempt for this mutation's retry count. */
-const isBackoffElapsed = (mutation: QueuedMutation): boolean => {
-  if (!mutation.lastAttemptAt || mutation.retryCount === 0) {
-    return true;
-  }
-
-  const elapsed = Date.now() - new Date(mutation.lastAttemptAt).getTime();
-  return elapsed >= getBackoffDelay(mutation.retryCount - 1);
-};
-
-const getResolvedTripId = (
-  payload: { clientTripId?: string; tripId?: string },
-  tripServerIds: Record<string, string>,
-): string | null => {
-  if (payload.tripId) {
-    return payload.tripId;
-  }
-
-  if (payload.clientTripId) {
-    return tripServerIds[payload.clientTripId] ?? null;
-  }
-
-  return null;
-};
-
-const isMutationReady = (
-  mutation: QueuedMutation,
-  tripServerIds: Record<string, string>,
-): boolean => {
-  if (mutation.type === 'trip_end' || mutation.type === 'trip_track') {
-    return (
-      getResolvedTripId(
-        mutation.payload as QueuedTripEndPayload,
-        tripServerIds,
-      ) !== null
-    );
-  }
-
-  return true;
-};
-
-/** Trip-related types that must be ordered (trip_start before trip_end/trip_track). */
-const TRIP_DEPENDENT_TYPES = new Set(['trip_end', 'trip_track']);
-
-/**
- * Returns true if this mutation should be skipped (not blocked) in the current flush cycle.
- * Reasons to skip: backoff not elapsed, dependency not ready, already dead.
- */
-const shouldSkipMutation = (
-  mutation: QueuedMutation,
-  tripServerIds: Record<string, string>,
-): boolean => {
-  if (mutation.status === 'dead' || mutation.status === 'syncing') {
-    return true;
-  }
-
-  if (!isBackoffElapsed(mutation)) {
-    return true;
-  }
-
-  if (!isMutationReady(mutation, tripServerIds)) {
-    return true;
-  }
-
-  return false;
-};
 
 const submitQueuedMutation = async (
   mutation: QueuedMutation,
@@ -159,17 +93,16 @@ const submitQueuedMutation = async (
 const withMutationTimeout = async <TResponse,>(
   promise: Promise<TResponse>,
   mutationType: QueuedMutation['type'],
-) =>
-  new Promise<TResponse>((resolve, reject) => {
+) => {
+  const timeoutMs = getMutationTimeoutMs(mutationType);
+  return new Promise<TResponse>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(
         new Error(
-          `Offline sync for ${mutationType} timed out after ${
-            MUTATION_SYNC_TIMEOUT_MS / 1000
-          } seconds.`,
+          `Offline sync for ${mutationType} timed out after ${timeoutMs / 1000} seconds.`,
         ),
       );
-    }, MUTATION_SYNC_TIMEOUT_MS);
+    }, timeoutMs);
 
     promise
       .then((result) => {
@@ -181,6 +114,7 @@ const withMutationTimeout = async <TResponse,>(
         reject(error);
       });
   });
+};
 
 export const OfflineMutationSyncManager = () => {
   const { isOnline } = useConnectivity();
@@ -278,8 +212,12 @@ export const OfflineMutationSyncManager = () => {
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Offline sync failed.';
             const nextRetryCount = mutation.retryCount + 1;
+            // 4xx (except 408/429) → no point retrying. Skip the backoff loop
+            // entirely and treat as if max retries were exhausted, so cascade-
+            // kill of dependent trip_end/trip_track still runs below.
+            const permanentFailure = isPermanentError(error);
 
-            if (nextRetryCount >= MAX_RETRY_COUNT) {
+            if (permanentFailure || nextRetryCount >= MAX_RETRY_COUNT) {
               // Mutation has exceeded max retries — mark as dead.
               state.killMutation(mutation.id, errorMessage);
 
@@ -313,6 +251,9 @@ export const OfflineMutationSyncManager = () => {
                 mutation_id: mutation.id,
                 retry_count: nextRetryCount,
                 error: errorMessage,
+                // Lets us tell apart "killed by 4xx on first try" from "killed
+                // after 5 transient retries" in Sentry/PostHog dashboards.
+                reason: permanentFailure ? 'permanent_4xx' : 'retries_exhausted',
               });
             } else {
               state.failMutation(mutation.id, errorMessage);

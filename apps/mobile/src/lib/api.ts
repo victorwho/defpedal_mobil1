@@ -57,6 +57,14 @@ import type {
 } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
+import { HttpError } from './httpError';
+import {
+  ActivityFeedResponseSchema,
+  FeedResponseSchema,
+  LeaderboardResponseSchema,
+  TiersResponseSchema,
+} from './schemas/apiResponses';
+import { validateResponse } from './schemas/responseValidation';
 import { getAccessToken, refreshAccessToken } from './supabase';
 import {
   mapboxAutocomplete,
@@ -87,6 +95,11 @@ const ensureBaseUrl = (): string => {
 
   return mobileEnv.mobileApiUrl.replace(/\/$/, '');
 };
+
+// Re-exported so existing callers can keep importing HttpError from `./api`.
+// The class itself lives in ./httpError.ts so pure-logic modules can use it
+// without dragging expo-constants into their test environment.
+export { HttpError };
 
 const formatErrorMessage = (status: number, parsedError: ErrorResponse | null, rawError: string) => {
   const fallbackMessage = rawError || `Request failed with ${status}`;
@@ -301,7 +314,7 @@ const requestJson = async <TResponse>(
     }
 
     const errorMessage = formatErrorMessage(response.status, parsedError, rawError);
-    throw new Error(errorMessage);
+    throw new HttpError(errorMessage, response.status);
   }
 
   try {
@@ -406,7 +419,9 @@ export const mobileApi = {
     const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
     if (cursor) params.set('cursor', cursor);
     if (limit) params.set('limit', String(limit));
-    return requestJson<FeedResponse>(`/v1/feed?${params.toString()}`);
+    return requestJson<FeedResponse>(`/v1/feed?${params.toString()}`).then((data) =>
+      validateResponse<FeedResponse>(FeedResponseSchema, data, '/v1/feed'),
+    );
   },
   shareTripToFeed: (payload: ShareTripRequest) =>
     requestJson<{ id: string; sharedAt: string }>('/v1/feed/share', {
@@ -587,7 +602,9 @@ export const mobileApi = {
     requestJson<BadgeResponse>('/v1/badges'),
 
   fetchTiers: () =>
-    requestJson<TiersResponse>('/v1/tiers'),
+    requestJson<TiersResponse>('/v1/tiers').then((data) =>
+      validateResponse<TiersResponse>(TiersResponseSchema, data, '/v1/tiers'),
+    ),
 
   fetchImpactDashboard: (timeZone?: string) => {
     const params = timeZone ? `?tz=${encodeURIComponent(timeZone)}` : '';
@@ -636,7 +653,14 @@ export const mobileApi = {
     if (cursorScore != null) params.set('cursorScore', String(cursorScore));
     if (cursorId) params.set('cursorId', cursorId);
     if (limit) params.set('limit', String(limit));
-    return requestJson<ActivityFeedResponse>(`/v1/v2/feed?${params.toString()}`);
+    return requestJson<ActivityFeedResponse>(`/v1/v2/feed?${params.toString()}`).then(
+      (data) =>
+        validateResponse<ActivityFeedResponse>(
+          ActivityFeedResponseSchema,
+          data,
+          '/v1/v2/feed',
+        ),
+    );
   },
 
   reactToActivity: (activityId: string, type: 'like' | 'love') =>
@@ -696,7 +720,14 @@ export const mobileApi = {
       period,
       radiusKm: String(radiusKm),
     });
-    return requestJson<LeaderboardResponse>(`/v1/leaderboard?${params.toString()}`);
+    return requestJson<LeaderboardResponse>(`/v1/leaderboard?${params.toString()}`).then(
+      (data) =>
+        validateResponse<LeaderboardResponse>(
+          LeaderboardResponseSchema,
+          data,
+          '/v1/leaderboard',
+        ),
+    );
   },
 
   // ── Route Shares (slice 1) ──

@@ -50,6 +50,7 @@ import { useShallow } from 'zustand/shallow';
 import { ManeuverCard, FooterCard, SteepGradeIndicator } from '../src/design-system/organisms/NavigationHUD';
 
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
+import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
 import { RouteFeatureAlertStack } from '../src/design-system/organisms/RouteFeatureAlertStack';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -76,7 +77,7 @@ import { useTheme, type ThemeColors } from '../src/design-system';
 // can't drift across renders or accidentally collide with anyone else's lock.
 const KEEP_AWAKE_TAG = 'defensivepedal-navigation';
 
-export default function NavigationScreen() {
+function NavigationScreen() {
   // Keep the screen on during the entire ride. Replaces the previous
   // useKeepAwake() hook with an explicit activate/deactivate pair so the
   // activation is observably tied to NavigationScreen mount and any native
@@ -1514,3 +1515,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
   });
+
+export default withErrorBoundary('navigation', NavigationScreen);

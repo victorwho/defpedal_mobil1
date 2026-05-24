@@ -94,8 +94,13 @@ const resolveMapboxDownloadToken = () => {
   return '';
 };
 
-const appEnv =
-  resolveExpoExtraValue(['EXPO_PUBLIC_APP_ENV'], appVariant === 'preview' ? 'staging' : appVariant);
+// Default appEnv to match the build variant. Previously preview defaulted to
+// 'staging' for historical reasons, but every other surface (Gradle flavor,
+// Android package, Firebase app, tester group) uses 'preview' — the mismatch
+// just made Sentry filtering confusing. The build script now writes
+// EXPO_PUBLIC_APP_ENV explicitly per flavor (step 1b), so this fallback only
+// fires for local dev / Metro starts where it's harmless.
+const appEnv = resolveExpoExtraValue(['EXPO_PUBLIC_APP_ENV'], appVariant);
 const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
 
 // Sentry config plugin slugs. Read from env so we never commit org/project
