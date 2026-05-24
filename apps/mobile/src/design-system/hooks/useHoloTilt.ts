@@ -15,22 +15,28 @@
  *   N times. We register exactly ONE listener at module scope and broadcast
  *   its filtered output to every consumer.
  *
+ * Focus mode (claimHoloFocus / focused prop):
+ *   The detail modal calls claimHoloFocus() on mount and releases on unmount.
+ *   While ANY claim is active, every useHoloTilt consumer whose `focused`
+ *   prop is false suspends — so the modal's hero sticker gets exclusive tilt
+ *   and the grid stickers behind it stop animating. Tap-anywhere-to-close
+ *   the modal releases the claim and the grid resumes.
+ *
  * Bridgeless guard:
  *   expo-sensors is gated behind hasExpoNativeModule('ExponentDeviceMotion').
  *   On dev (old-arch bridge) and preview/production (bridgeless) the helper
  *   probes via requireOptionalNativeModule under the hood — see error-log
  *   #21 and src/lib/expoNativeModule.ts. If the sensor is absent (sim/web/
  *   unsupported device) the hook returns `gyroAvailable=false` and never
- *   touches the Animated.Values — the caller's drag handler remains the
- *   sole driver.
+ *   touches the Animated.Values.
  *
  * Suppression:
  *   - When `appState === 'NAVIGATING'` (no shimmer-during-ride distraction).
  *   - When `useReducedMotion()` returns true (accessibility).
- *   The hook detaches the sensor entirely in either case to spare battery,
- *   not just zero out the values.
+ *   The hook detaches the sensor entirely in either case, not just zeroes
+ *   out the values.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated } from 'react-native';
 
 import { useAppStore } from '../../store/appStore';
@@ -59,6 +65,35 @@ const listeners = new Set<Listener>();
 let activeSubscription: Subscription | null = null;
 let lastFilteredX = 0;
 let lastFilteredY = 0;
+
+// Refcounted focus claim — used by the detail modal to suspend grid stickers
+// while the hero sticker has exclusive tilt.
+let focusClaims = 0;
+const focusListeners = new Set<() => void>();
+
+/**
+ * Claim exclusive holo tilt for the calling component. Returns a release
+ * function that MUST be called when the component unmounts (typically from
+ * a useEffect cleanup). Refcounted — multiple simultaneous claims are fine.
+ */
+export function claimHoloFocus(): () => void {
+  focusClaims++;
+  if (focusClaims === 1) focusListeners.forEach((l) => l());
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    focusClaims--;
+    if (focusClaims === 0) focusListeners.forEach((l) => l());
+  };
+}
+
+function subscribeToFocus(cb: () => void): () => void {
+  focusListeners.add(cb);
+  return () => focusListeners.delete(cb);
+}
+
+// ---- Sensor module + subscription -------------------------------------------
 
 const moduleCache: { mod?: DeviceMotionModule | null } = {};
 
@@ -114,24 +149,36 @@ export interface UseHoloTiltOptions {
   tiltY: Animated.Value;
   /** Caller can pause gyro (e.g. during drag) without unmounting the consumer. */
   enabled?: boolean;
+  /**
+   * Set true when THIS instance is the focused one (modal hero). While ANY
+   * claimHoloFocus() refcount is active, only consumers with focused=true
+   * receive gyro updates.
+   */
+  focused?: boolean;
 }
 
 export interface UseHoloTiltResult {
-  /** True iff the sensor module is present and not suppressed. */
+  /** True iff the sensor is currently driving the passed Animated.Values. */
   gyroAvailable: boolean;
 }
 
 export function useHoloTilt(options: UseHoloTiltOptions): UseHoloTiltResult {
-  const { tiltX, tiltY, enabled = true } = options;
+  const { tiltX, tiltY, enabled = true, focused = false } = options;
   const appState = useAppStore((s) => s.appState);
   const reducedMotion = useReducedMotion();
+
+  // Track focus mode reactively so non-focused consumers update when the
+  // modal mounts/unmounts.
+  const [focusModeOn, setFocusModeOn] = useState(focusClaims > 0);
+  useEffect(() => subscribeToFocus(() => setFocusModeOn(focusClaims > 0)), []);
 
   const moduleAvailable = useMemo(() => loadDeviceMotion() != null, []);
   const gyroAvailable =
     enabled &&
     moduleAvailable &&
     appState !== 'NAVIGATING' &&
-    !reducedMotion;
+    !reducedMotion &&
+    (!focusModeOn || focused);
 
   useEffect(() => {
     if (!gyroAvailable) return;

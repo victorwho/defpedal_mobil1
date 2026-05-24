@@ -30,7 +30,11 @@ import { HoloSticker } from './HoloSticker';
 import { hasHoloBadgeAsset } from '../tokens/holoBadges';
 import type { BadgeSize, BadgeTier } from '../tokens/badgeColors';
 
-export type BadgeVisualProps = BadgeIconProps;
+/**
+ * `focused` is the only extension over BadgeIconProps — see HoloSticker for
+ * the meaning. Passes through unchanged to the holo path; ignored by SVG.
+ */
+export type BadgeVisualProps = BadgeIconProps & { focused?: boolean };
 
 const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
   sm: 40,
@@ -39,7 +43,7 @@ const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
 };
 
 export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
-  const { badgeKey, tierFamily, tier, size, progress, isNew, hasHigherTier } = props;
+  const { badgeKey, tierFamily, tier, size, progress, isNew, hasHigherTier, focused } = props;
 
   // Holo treatment only for EARNED, non-progress, non-secret, non-locked states.
   const isEarned =
@@ -58,6 +62,7 @@ export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
         size={HOLO_SIZE_BY_BADGE_SIZE[size]}
         // sm is a static thumbnail — tilt/glare would be twitchy at 40px.
         interactive={size !== 'sm'}
+        focused={focused}
         accessibilityLabel={`${badgeKey} badge`}
       />
     );

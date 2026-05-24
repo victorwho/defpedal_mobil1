@@ -68,6 +68,12 @@ export interface HoloStickerProps {
   interactive?: boolean;
   /** Override the NAVIGATING suppression (testing only). */
   forceMotion?: boolean;
+  /**
+   * Set true when this sticker is the focused one (e.g. detail-modal hero).
+   * While any consumer has claimed focus, only stickers with focused=true
+   * receive gyro updates — grid stickers behind a modal stop tilting.
+   */
+  focused?: boolean;
   /** Accessibility label — defaults to "Holographic badge". */
   accessibilityLabel?: string;
 }
@@ -87,6 +93,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   tier = 'gold',
   interactive = true,
   forceMotion = false,
+  focused = false,
   accessibilityLabel = 'Holographic badge',
 }) => {
   // Resolve the PNG source: explicit `source` wins; otherwise look up by key.
@@ -111,6 +118,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
     tiltX,
     tiltY,
     enabled: interactive && motionAllowed && !isDragging,
+    focused,
   });
 
   const pressStartRef = useRef<{ t: number; movedFar: boolean }>({

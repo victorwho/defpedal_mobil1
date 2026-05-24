@@ -4,7 +4,7 @@
  * Bottom sheet modal showing full badge information:
  * hero icon (lg), name, tier, flavor text, criteria, progress bar, rarity, share.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
 
 import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
@@ -13,6 +13,7 @@ import { BadgeShareCard } from '../../components/BadgeShareCard';
 import { useShareCard } from '../../hooks/useShareCard';
 import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
+import { claimHoloFocus } from '../hooks/useHoloTilt';
 import {
   tierColors,
   badgeSpace,
@@ -78,6 +79,14 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
   onClose,
 }) => {
   const { share: shareCard, isSharing } = useShareCard();
+
+  // Claim exclusive holo tilt while the modal is up — grid stickers behind
+  // the backdrop suspend their gyro so only the hero responds to the phone's
+  // motion. Release is refcounted; safe across overlapping open/close.
+  useEffect(() => {
+    if (!badge) return;
+    return claimHoloFocus();
+  }, [badge]);
 
   const handleShare = useCallback(async () => {
     if (!badge) return;
@@ -154,6 +163,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
                 tier={tier}
                 size="lg"
                 progress={progressFraction}
+                focused
               />
             </View>
 
