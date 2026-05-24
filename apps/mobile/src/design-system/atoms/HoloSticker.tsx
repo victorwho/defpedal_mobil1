@@ -310,6 +310,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
 
       {/* Layer 3: Card face — 3D rotated group */}
       <Animated.View
+        needsOffscreenAlphaCompositing
         style={[
           cardFaceStyle,
           {
@@ -321,20 +322,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
           },
         ]}
       >
-        {/* 3a. Edge thickness — dark tinted copy of the PNG, offset to fake depth */}
-        <Image
-          source={source}
-          style={{
-            position: 'absolute',
-            width: size,
-            height: size,
-            transform: [{ translateX: 4 }, { translateY: 6 }],
-            tintColor: 'rgba(0,0,0,1)',
-            opacity: 0.35,
-          }}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        {/* 3a. Edge thickness REMOVED — Android's tintColor on PNG ignores
+            the die-cut alpha channel and fills the full bounding rect with
+            the tint color, which surfaced as a dark square behind the
+            sticker. Depth now comes from cast shadow + 3D tilt + halo.
+            Proper thickness will be revisited with a Skia approach. */}
 
         {/* 3b. Base PNG */}
         <Image
