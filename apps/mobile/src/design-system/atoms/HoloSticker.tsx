@@ -350,40 +350,13 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
         {/* 3c. Tier rim ring */}
         <View style={rimStyle} pointerEvents="none" />
 
-        {/* 3d. Holo sheen — static gradient, animated transform */}
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: -sheenInset,
-            left: -sheenInset,
-            width: sheenSize,
-            height: sheenSize,
-            opacity: 0.45,
-            transform: [
-              { translateX: sheenTranslateX },
-              { translateY: sheenTranslateY },
-              { rotate: sheenRotate },
-            ],
-          }}
-        >
-          <Svg width={sheenSize} height={sheenSize} viewBox={`0 0 ${sheenSize} ${sheenSize}`}>
-            <Defs>
-              <LinearGradient id="holoSheen" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor="#7DFCFC" stopOpacity="0" />
-                <Stop offset="20%" stopColor="#7DFCFC" stopOpacity="0.9" />
-                <Stop offset="40%" stopColor="#FF7BD9" stopOpacity="0.9" />
-                <Stop offset="60%" stopColor="#FFE066" stopOpacity="0.9" />
-                <Stop offset="80%" stopColor="#9DFCFC" stopOpacity="0.9" />
-                <Stop offset="100%" stopColor="#7DFCFC" stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-            <Rect x={0} y={0} width={sheenSize} height={sheenSize} fill="url(#holoSheen)" />
-          </Svg>
-        </Animated.View>
-
-        {/* 3e. Glare sweep */}
-        <Animated.View
+        {/* 3d-e. Sheen + glare wrapped in a circular clip inscribed in the
+            sticker bounds. Without this clip the sheen Animated.View (sized
+            at 1.8× to allow translation) bleeds the rainbow gradient onto
+            the surrounding card area and over the title text above. The
+            die-cut sticker silhouette fits within an inscribed circle, so
+            this clip removes the spillage without cropping the artwork. */}
+        <View
           pointerEvents="none"
           style={{
             position: 'absolute',
@@ -391,10 +364,55 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
             left: 0,
             width: size,
             height: size,
-            opacity: glareOpacity,
-            transform: [{ translateX: glareTranslateX }, { rotate: '20deg' }],
+            borderRadius: size / 2,
+            overflow: 'hidden',
           }}
         >
+          {/* 3d. Holo sheen — static gradient, animated transform */}
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -sheenInset,
+              left: -sheenInset,
+              width: sheenSize,
+              height: sheenSize,
+              opacity: 0.45,
+              transform: [
+                { translateX: sheenTranslateX },
+                { translateY: sheenTranslateY },
+                { rotate: sheenRotate },
+              ],
+            }}
+          >
+            <Svg width={sheenSize} height={sheenSize} viewBox={`0 0 ${sheenSize} ${sheenSize}`}>
+              <Defs>
+                <LinearGradient id="holoSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <Stop offset="0%" stopColor="#7DFCFC" stopOpacity="0" />
+                  <Stop offset="20%" stopColor="#7DFCFC" stopOpacity="0.9" />
+                  <Stop offset="40%" stopColor="#FF7BD9" stopOpacity="0.9" />
+                  <Stop offset="60%" stopColor="#FFE066" stopOpacity="0.9" />
+                  <Stop offset="80%" stopColor="#9DFCFC" stopOpacity="0.9" />
+                  <Stop offset="100%" stopColor="#7DFCFC" stopOpacity="0" />
+                </LinearGradient>
+              </Defs>
+              <Rect x={0} y={0} width={sheenSize} height={sheenSize} fill="url(#holoSheen)" />
+            </Svg>
+          </Animated.View>
+
+          {/* 3e. Glare sweep */}
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: size,
+              height: size,
+              opacity: glareOpacity,
+              transform: [{ translateX: glareTranslateX }, { rotate: '20deg' }],
+            }}
+          >
           <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
             <Defs>
               <LinearGradient id="holoGlare" x1="0%" y1="50%" x2="100%" y2="50%">
@@ -408,6 +426,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
             <Rect x={0} y={0} width={size} height={size} fill="url(#holoGlare)" />
           </Svg>
         </Animated.View>
+        </View>
       </Animated.View>
     </View>
   );
