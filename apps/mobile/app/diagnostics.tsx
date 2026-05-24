@@ -1,11 +1,13 @@
 import * as Location from 'expo-location';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../src/components/Screen';
 import { Badge } from '../src/design-system/atoms';
 import { Button } from '../src/design-system/atoms';
+import { HoloSticker } from '../src/design-system/atoms';
+import type { BadgeTier } from '../src/design-system/tokens/badgeColors';
 import { useTheme } from '../src/design-system/ThemeContext';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -290,6 +292,7 @@ function DiagnosticsContent() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [screenError, setScreenError] = useState<string | null>(null);
   const [devStatusMessage, setDevStatusMessage] = useState<string | null>(null);
+  const [holoTier, setHoloTier] = useState<BadgeTier>('gold');
   const [foregroundPermission, setForegroundPermission] = useState<string>('unknown');
   const [backgroundPermission, setBackgroundPermission] = useState<string>('unknown');
   const [apiHealth, setApiHealth] = useState<ApiHealthResponse | null>(null);
@@ -450,6 +453,42 @@ function DiagnosticsContent() {
           Generated:{' '}
           {apiHealth?.generatedAt ? new Date(apiHealth.generatedAt).toLocaleTimeString() : 'Not available'}
         </Text>
+      </DiagnosticCard>
+
+      <DiagnosticCard title="Holo sticker (dev preview)" tone="accent">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Drag to tilt the sheen. Tap to fire a glare sweep. Tier changes the
+          halo glow only.
+        </Text>
+        <View
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: space[6],
+          }}
+        >
+          <HoloSticker
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            source={require('../assets/holo_badges/first_ride.png')}
+            size={220}
+            tier={holoTier}
+            accessibilityLabel="First Pedal holographic badge preview"
+          />
+        </View>
+        <View style={styles.badgeRow}>
+          {(['bronze', 'silver', 'gold', 'platinum', 'diamond'] as const).map(
+            (t) => (
+              <Pressable key={t} onPress={() => setHoloTier(t)}>
+                <Badge
+                  variant={holoTier === t ? 'info' : 'neutral'}
+                  size="sm"
+                >
+                  {t}
+                </Badge>
+              </Pressable>
+            ),
+          )}
+        </View>
       </DiagnosticCard>
 
       <DiagnosticCard title="Environment">

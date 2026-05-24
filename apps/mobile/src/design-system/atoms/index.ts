@@ -60,3 +60,6 @@ export type { ShareRouteButtonProps, ShareRouteButtonVariant } from './ShareRout
 
 export { Mascot } from './Mascot';
 export type { MascotProps } from './Mascot';
+
+export { HoloSticker } from './HoloSticker';
+export type { HoloStickerProps } from './HoloSticker';
