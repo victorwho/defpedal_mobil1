@@ -476,7 +476,6 @@ function DiagnosticsContent() {
           }}
         >
           <HoloSticker
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
             source={require('../assets/holo_badges/first_ride.png')}
             size={220}
             tier={holoTier}
