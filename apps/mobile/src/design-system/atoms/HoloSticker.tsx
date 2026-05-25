@@ -74,6 +74,13 @@ export interface HoloStickerProps {
    * receive gyro updates — grid stickers behind a modal stop tilting.
    */
   focused?: boolean;
+  /**
+   * Tap callback — fires on a quick press with no drag movement. Pair with
+   * the glare sweep that already runs on tap. Required for cases where the
+   * sticker sits inside a parent Pressable (the PanResponder claims the
+   * gesture and would otherwise swallow the parent's onPress).
+   */
+  onTap?: () => void;
   /** Accessibility label — defaults to "Holographic badge". */
   accessibilityLabel?: string;
 }
@@ -94,6 +101,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   interactive = true,
   forceMotion = false,
   focused = false,
+  onTap,
   accessibilityLabel = 'Holographic badge',
 }) => {
   // Resolve the PNG source: explicit `source` wins; otherwise look up by key.
@@ -125,6 +133,12 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
     t: 0,
     movedFar: false,
   });
+
+  // Keep onTap fresh inside the (memoized) PanResponder closure without
+  // having to rebuild it every render. Parents typically pass a new
+  // arrow each render — adding `onTap` to the useMemo deps would thrash.
+  const onTapRef = useRef(onTap);
+  onTapRef.current = onTap;
 
   const fireGlare = () => {
     if (!motionAllowed) return;
@@ -188,6 +202,10 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
           const elapsed = Date.now() - t;
           if (!movedFar && elapsed < TAP_MAX_DURATION_MS) {
             fireGlare();
+            // The PanResponder swallowed the gesture from any parent Pressable,
+            // so we forward the tap explicitly. Caller wires this to whatever
+            // onPress would have done (e.g. open the detail modal).
+            onTapRef.current?.();
           }
           releaseTilt();
         },

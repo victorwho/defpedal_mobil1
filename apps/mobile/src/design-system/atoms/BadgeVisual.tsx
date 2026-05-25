@@ -31,10 +31,18 @@ import { hasHoloBadgeAsset } from '../tokens/holoBadges';
 import type { BadgeSize, BadgeTier } from '../tokens/badgeColors';
 
 /**
- * `focused` is the only extension over BadgeIconProps — see HoloSticker for
- * the meaning. Passes through unchanged to the holo path; ignored by SVG.
+ * Extensions over BadgeIconProps:
+ *   - `focused`: forwarded to HoloSticker so the modal hero can claim
+ *     exclusive tilt while the grid behind freezes.
+ *   - `onTap`: forwarded to HoloSticker so a tap inside the sticker
+ *     reaches the caller even though HoloSticker's PanResponder claims
+ *     the gesture from any parent Pressable.
+ * Both are ignored on the SVG fallback path.
  */
-export type BadgeVisualProps = BadgeIconProps & { focused?: boolean };
+export type BadgeVisualProps = BadgeIconProps & {
+  focused?: boolean;
+  onTap?: () => void;
+};
 
 const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
   sm: 40,
@@ -43,7 +51,7 @@ const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
 };
 
 export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
-  const { badgeKey, tierFamily, tier, size, progress, isNew, hasHigherTier, focused } = props;
+  const { badgeKey, tierFamily, tier, size, progress, isNew, hasHigherTier, focused, onTap } = props;
 
   // Holo treatment only for EARNED, non-progress, non-secret, non-locked states.
   const isEarned =
@@ -63,6 +71,7 @@ export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
         // sm is a static thumbnail — tilt/glare would be twitchy at 40px.
         interactive={size !== 'sm'}
         focused={focused}
+        onTap={onTap}
         accessibilityLabel={`${badgeKey} badge`}
       />
     );

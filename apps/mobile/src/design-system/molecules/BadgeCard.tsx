@@ -106,6 +106,10 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
         progress={progressFraction}
         isNew={isNew}
         hasHigherTier={hasHigherTier}
+        // HoloSticker's PanResponder swallows the gesture from the parent
+        // Pressable, so we forward the tap explicitly. SVG fallback path
+        // ignores onTap and uses the Pressable's onPress normally.
+        onTap={onPress}
       />
       <Text style={nameStyle} numberOfLines={2}>
         {isSecret ? '???' : badge.name}
