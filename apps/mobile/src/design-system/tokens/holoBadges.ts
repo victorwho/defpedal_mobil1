@@ -21,7 +21,10 @@ export const holoBadgeAssets: Record<string, ImageSourcePropType> = {
   aqi_aware: require('../../../assets/holo_badges/aqi_aware.png'),
   autumn_leaf: require('../../../assets/holo_badges/autumn_leaf.png'),
   bike_day: require('../../../assets/holo_badges/bike_day.png'),
-  c02_champion: require('../../../assets/holo_badges/c02_champion.png'),
+  co2_champion: require('../../../assets/holo_badges/co2_champion.png'),
+  co2_weekly_champion: require('../../../assets/holo_badges/co2_champion.png'),
+  co2_monthly_champion: require('../../../assets/holo_badges/co2_champion.png'),
+  co2_champion_repeat: require('../../../assets/holo_badges/co2_champion.png'),
   cheerleader: require('../../../assets/holo_badges/cheerleader.png'),
   christmas: require('../../../assets/holo_badges/christmas.png'),
   commentator: require('../../../assets/holo_badges/commentator.png'),
@@ -67,7 +70,7 @@ export const holoBadgeAssets: Record<string, ImageSourcePropType> = {
   mirror_distance: require('../../../assets/holo_badges/mirror_distance.png'),
   monthly_regular: require('../../../assets/holo_badges/monthly_regular.png'),
   mountain_goat: require('../../../assets/holo_badges/mountain_goat.png'),
-  multi_3stop: require('../../../assets/holo_badges/multi_3stop.png'),
+  multi_3stops: require('../../../assets/holo_badges/multi_3stops.png'),
   new_year: require('../../../assets/holo_badges/new_year.png'),
   night_owl: require('../../../assets/holo_badges/night_owl.png'),
   pedal_counter: require('../../../assets/holo_badges/pedal_counter.png'),
@@ -95,6 +98,31 @@ export const holoBadgeAssets: Record<string, ImageSourcePropType> = {
   winter_solstice: require('../../../assets/holo_badges/winter_solstice.png'),
   winter_steel: require('../../../assets/holo_badges/winter_steel.png'),
   zero_risk: require('../../../assets/holo_badges/zero_risk.png'),
+
+  // ---------------------------------------------------------------------------
+  // Aliases — badges whose badge_key differs from the PNG stem but whose
+  // icon_key (or fuzzy filename match) points at an existing asset. Listed
+  // by `scripts/list-missing-holo-badges.py`. Keep alphabetised within group.
+  // ---------------------------------------------------------------------------
+
+  // quiz_perfect family — one PNG covers all three quiz-perfect badges
+  quiz_perfect_1: require('../../../assets/holo_badges/quiz_perfect.png'),
+  quiz_perfect_5: require('../../../assets/holo_badges/quiz_perfect.png'),
+  quiz_perfect_streak_3: require('../../../assets/holo_badges/quiz_perfect.png'),
+
+  // endurance family — both endurance badges share the icon
+  endurance_2h: require('../../../assets/holo_badges/endurance.png'),
+  endurance_4h: require('../../../assets/holo_badges/endurance.png'),
+
+  // weather + AQI — badge_key references the condition; icon_key matches the
+  // mascot illustration name. Map each badge to its existing PNG.
+  rain_ride: require('../../../assets/holo_badges/drizzle_drifter.png'),
+  rain_ride_10: require('../../../assets/holo_badges/storm_chaser.png'),
+  wind_ride: require('../../../assets/holo_badges/headwind_hero.png'),
+  cold_ride: require('../../../assets/holo_badges/frost_rider.png'),
+  hot_ride: require('../../../assets/holo_badges/heatwave_hauler.png'),
+  good_air_20: require('../../../assets/holo_badges/good_air.png'),
+  aqi_aware_5: require('../../../assets/holo_badges/aqi_aware.png'),
 };
 
 /**
