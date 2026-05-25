@@ -1462,3 +1462,57 @@ After the user submitted a suggestion through the live app, they couldn't see th
 Typecheck clean across all three workspaces (`npm run typecheck`); `npm run check:bundle` returns HTTP 200 after every change; one end-to-end submission landed in `public.city_suggestions` with the correct body, coordinate, source, and `client_submitted_at`. Plan doc + project docs updated.
 
 **Cloud Run revision:** `defpedal-api-00081-69b`. **Commits:** TBD this session.
+
+### Session 60 — Holographic badge stickers, end-to-end (2026-05-24 → 2026-05-25)
+
+Replaced the SVG shield + duotone icon visuals across the entire badge surface with die-cut holographic Pedal-mascot stickers. Drag + gyro tilt, chromatic sheen, glare sweep, tier-colored halo + rim, edge thickness, share card with Google Play CTA + clipboard link. Shipped via 14 preview releases (v0.2.62 → v0.2.76) to Firebase App Distribution, each iteration responding to one piece of tester feedback. Branch `worktree-holo-badges`, 17 commits, pushed to `origin/main` at `64f0b52`.
+
+#### Scope shipped
+
+- **Atom stack**: `HoloSticker` (pure visual — PNG + halo + rim + sheen + glare + 3D rotation + edge thickness + cast shadow) and `BadgeVisual` (drop-in `BadgeIcon` replacement that picks holo vs SVG by earned-state + manifest presence). Props mirror `BadgeIconProps` so call sites change one import.
+- **Manifest** at `apps/mobile/src/design-system/tokens/holoBadges.ts` — static `require()` map keyed by `badge_key`. `getHoloBadgeAsset` falls back to `tier_family` when an individual tiered badge isn't a top-level entry (one PNG covers all five tiers of a family). `hasHoloBadgeAsset` is the gate `BadgeVisual` uses to decide between holo and SVG.
+- **Asset pipeline** `scripts/process-holo-badges.py` — corner flood-fill (tolerance 40) on each PNG to mark background pixels, 1 px Gaussian blur on the alpha edge, threshold re-tighten for clean interiors. Idempotent (skips PNGs already RGBA with transparent corners). All 79 PNGs resized 1254 × 1254 → 480 × 480 inline. Bundle weight 115 MB → 15 MB.
+- **Gyro** via `expo-sensors` `DeviceMotion` (new dep, autolinked). Shared, refcounted listener in `useHoloTilt` hook with exponential low-pass filter — many stickers on one screen share a single sensor subscription. Bridgeless-safe guard via `hasExpoNativeModule('ExponentDeviceMotion')` (error-log #21). Falls back to drag-only when sensor absent (sim/web/older Androids). Suppressed during `NAVIGATING` and under reduced-motion.
+- **Focused tilt**: `claimHoloFocus()` is a refcounted module-level claim that flips `useHoloTilt` consumers without `focused` into a paused state. `BadgeDetailModal` claims on mount, grid stickers behind it freeze, only the hero responds to tilt, claim releases on dismiss.
+- **Tap forwarding**: `HoloSticker`'s PanResponder claims gestures from any parent `Pressable` (error-log #51) — needed to beat the parent ScrollView arbitration but that also kills the parent's `onPress`. Fixed by exposing an `onTap` callback fired alongside the glare on tap-shaped releases (no drag movement, short duration); callback in a `useRef` so the memoized PanResponder closure stays stable while parent re-renders pass new arrow functions.
+- **Surfaces wired** (14): `BadgeCard` (md grid), `BadgeDetailModal` (lg hero), `BadgeUnlockOverlay` (lg + particle burst), `BadgeInlineChip` (sm static), `BadgeShareCard` (lg static, both capture + preview variants), `ImpactSummaryCard`, `ActivityFeedCard`, `impact-dashboard.tsx`, `app/trip/[id].tsx`, `TrophyCaseHeader`, plus the diagnostics dev preview.
+- **Share card**: capture variant has a prominent "GET IT ON / Google Play" CTA badge (multicolor Play triangle rendered inline as four SVG Paths with Google brand colors + bold typography) and the full play.google.com URL beneath in monospace. After a successful share, `useShareCard` copies `PLAY_STORE_URL` (canonical URL with `pcampaignid=web_share`) to the clipboard via `expo-clipboard` and shows a native Alert "Play Store link copied — paste it after sending". `BadgeVisual` gained a `static` prop that disables tilt/glare/gyro so view-shot captures an idle frame.
+- **Audit tool** `scripts/list-missing-holo-badges.py` — parses all Supabase migrations, builds the current `badge_definitions` set, diffs against the holo manifest, and categorizes each badge as wired / manifest-alias-needed / filename-typo / truly-missing-art. Generates `docs/badges-missing-holo-art.md`. Surfaced 16 originally-missing badges, all resolvable by metadata fixes (no new illustrations needed): renamed `c02_champion.png` → `co2_champion.png` and `multi_3stop.png` → `multi_3stops.png`, added 15 manifest aliases. Current state: 147/147 wired.
+- **Bundle cleanup**: `apps/mobile/src/design-system/tokens/badgeIcons.ts` shrunk 662 → 41 lines. The duotone SVG path data for every badge is unreachable now that every badge resolves to a holo PNG. Map kept empty for graceful future-proofing if a new badge ships to the DB without art.
+
+#### Iteration log (each shipped via Firebase to victorrotariu@gmail.com)
+
+| Build | What it fixed |
+|---|---|
+| 0.2.63 | First scaffold + 6 QA commits from main merged in + 79 PNGs added |
+| 0.2.64 | Drop the broken `tintColor` edge-thickness layer (error-log #48 — RGB PNG fills the bounding rect) |
+| 0.2.65 | Cast shadow = SVG `<Ellipse>` not `borderRadius:width` (error-log #49) + drop `needsOffscreenAlphaCompositing` (error-log #50) |
+| 0.2.66 | Background-remove all 78 RGB PNGs — root cause of the dark square that survived 0.2.65 |
+| 0.2.67 | Circular clip on sheen + glare to stop the rainbow gradient bleeding onto the title text |
+| 0.2.68 | Re-add edge thickness now that PNGs have alpha — two dark offset copies for tactile depth |
+| 0.2.69 | Roll out to BadgeCard / BadgeDetailModal / BadgeUnlockOverlay / BadgeInlineChip |
+| 0.2.70 | Gyro via expo-sensors — shared listener, low-pass filter, native-module guard |
+| 0.2.71 | Focused-tilt — grid stickers freeze under detail modal |
+| 0.2.72 | `onTap` callback in HoloSticker — fixes "tap badge but modal doesn't open" (error-log #51) |
+| 0.2.73 | Share card uses BadgeVisual + 104 px QR + first version of clipboard fallback (kept briefly) |
+| 0.2.74 | Drop QR (tester said scanning on the same phone is awkward), upsize to Google Play CTA + clipboard + native Alert |
+| 0.2.75 | Close 16 manifest gaps (12 aliases + 4 PNG renames) — 147/147 wired |
+| 0.2.76 | ImpactSummaryCard / ActivityFeedCard / impact-dashboard / trip-detail / TrophyCaseHeader swaps + 621-line cleanup of badgeIcons.ts |
+
+#### Gotchas captured in `.claude/error-log.md`
+
+Each cost a round-trip with the tester:
+
+- **#48** — Android `<Image tintColor>` fills the bounding rect when the PNG has no alpha channel. The "dark square behind the badge" we chased for three builds was the image itself.
+- **#49** — RN clamps `borderRadius` to half the **shortest** dimension. A wide rect with `borderRadius:width` is a rounded rectangle, not an ellipse. Use SVG `<Ellipse>`.
+- **#50** — `needsOffscreenAlphaCompositing: true` on a 3D-transformed Animated.View paints a black backing on some Android GPU drivers. Don't reach for it unless you can name the artifact it's solving.
+- **#51** — PanResponder's `onStartShouldSetPanResponderCapture: true` swallows tap from any parent Pressable. Components that capture gestures MUST expose an `onTap` callback (ref-stored so the memoized closure stays stable).
+- **#52** — `react-native-svg` `<Stop>` cannot be animated via `Animated.createAnimatedComponent`. The first sheen animation rendered as opaque black covering the badge. Keep stops static, animate the wrapping View's transform instead.
+
+#### Verification
+
+`npm run check:bundle` returned HTTP 200 between every code change. Pre-push hook ran `npm run typecheck` (all workspaces clean) + `npm run lint:mobile:check` (0 violations after dropping a stale `eslint-disable` for an unregistered rule, error-log #35). All 14 preview APKs passed `scripts/audit-release-artifacts.sh` (no dev-only artefacts leaked).
+
+**Worktree workflow:** all 17 commits authored on a `.claude/worktrees/holo-badges/` git worktree (branch `worktree-holo-badges`) so the QA session working on `main` was undisturbed. Merged main into worktree once mid-session to pull in 6 QA commits (`b187c6e` ErrorBoundary, `4f63752` Mapbox crash fix, `0b47608` offline-sync hardening, `9ffc77e` Sentry env-tag fix, `7c079e8`/`975f8f9` docs). Pushed via `git push origin worktree-holo-badges:main` — straight fast-forward, no force push.
+
+**Memory** snapshot at `~/.claude/projects/C--dev-defpedal/memory/project_holo-badges-todo.md` captures the full final state (file map, design decisions, deferred items) for future maintainers.
