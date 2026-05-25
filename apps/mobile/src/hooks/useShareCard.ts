@@ -17,8 +17,11 @@
  * button-disable + loading-indicator states.
  */
 import { useCallback, useState, type ReactElement } from 'react';
+import { Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 import {
+  PLAY_STORE_URL,
   buildShareCaption,
   type ShareCaptionInput,
 } from '@defensivepedal/core';
@@ -104,6 +107,27 @@ export function useShareCard(): UseShareCardReturn {
         const caption = buildShareCaption(toCaptionInput(input));
 
         const result = await shareImage(fileUri, caption);
+
+        // Image-based shares through expo-sharing cannot carry body text to
+        // the recipient — only the captured image reaches them. Copy the
+        // Play Store URL to the clipboard so the sender can paste it as a
+        // tappable link in the same chat. Alert is fire-and-forget so it
+        // doesn't block the return.
+        if (result.shared) {
+          try {
+            await Clipboard.setStringAsync(PLAY_STORE_URL);
+            Alert.alert(
+              'Play Store link copied',
+              'Paste it after sending — image shares can\'t carry a tappable link.',
+              [{ text: 'Got it' }],
+              { cancelable: true },
+            );
+          } catch {
+            // Clipboard write failure is silent — the burned-in URL on the
+            // share image still gives the recipient a path.
+          }
+        }
+
         return result;
       } catch {
         return { shared: false, savedToLibrary: false };

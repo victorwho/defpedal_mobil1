@@ -9,13 +9,7 @@
  */
 import React, { forwardRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const QRCode = require('react-native-qrcode-svg').default as React.ComponentType<{
-  value: string;
-  size: number;
-  color?: string;
-  backgroundColor?: string;
-}>;
+import Svg, { Path } from 'react-native-svg';
 
 import { PLAY_STORE_URL, type BadgeDefinition } from '@defensivepedal/core';
 
@@ -98,24 +92,16 @@ export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
             ) : null}
           </View>
 
-          {/* Footer — QR to the Play Store + install prompt. Image-based shares
-              through expo-sharing can't carry body text to the recipient, so
-              the install path has to be burned into the captured PNG itself. */}
+          {/* Footer — prominent Google Play install CTA + visible URL.
+              Image-based shares through expo-sharing can't carry body text
+              to the recipient, so the install path lives in the PNG itself.
+              The share flow also copies PLAY_STORE_URL to the clipboard so
+              the sender can paste a tappable link alongside the image. */}
           <View style={captureStyles.footer}>
-            <View style={captureStyles.qrFrame}>
-              <QRCode
-                value={PLAY_STORE_URL}
-                size={104}
-                color={darkTheme.bgDeep}
-                backgroundColor={brandColors.accent}
-              />
-            </View>
-            <View style={captureStyles.footerCopy}>
-              <Text style={captureStyles.footerHeadline}>Scan to install</Text>
-              <Text style={captureStyles.footerSubline}>
-                Defensive Pedal on Google Play
-              </Text>
-            </View>
+            <GooglePlayBadge />
+            <Text style={captureStyles.footerUrl}>
+              play.google.com/store/apps/details?id=com.defensivepedal.mobile
+            </Text>
           </View>
         </View>
       );
@@ -166,6 +152,68 @@ export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
     );
   },
 );
+
+// ---------------------------------------------------------------------------
+// GooglePlayBadge — official-style "GET IT ON / Google Play" CTA.
+//
+// Mirrors the proportions of Google's distributed badge asset so it reads as
+// authentic at a glance, but rendered inline (View + Text + SVG triangle)
+// so there's no asset bundle to manage and the colors stay theme-compatible
+// at capture time. The triangle uses the four Google brand colors layered
+// to approximate the multi-color "Play" mark.
+// ---------------------------------------------------------------------------
+
+const GOOGLE_PLAY_BLUE = '#4285F4';
+const GOOGLE_PLAY_GREEN = '#34A853';
+const GOOGLE_PLAY_YELLOW = '#FBBC05';
+const GOOGLE_PLAY_RED = '#EA4335';
+
+const GooglePlayBadge: React.FC = () => (
+  <View style={gpBadge.outer}>
+    <Svg width={88} height={88} viewBox="0 0 100 100">
+      {/* Approximation of the multi-color Play triangle —
+          four overlapping quads forming the iconic shape. */}
+      <Path d="M15 12 L15 88 L55 50 Z" fill={GOOGLE_PLAY_BLUE} />
+      <Path d="M15 12 L55 50 L80 35 Z" fill={GOOGLE_PLAY_GREEN} />
+      <Path d="M15 88 L55 50 L80 65 Z" fill={GOOGLE_PLAY_RED} />
+      <Path d="M55 50 L80 35 L80 65 Z" fill={GOOGLE_PLAY_YELLOW} />
+    </Svg>
+    <View style={gpBadge.textStack}>
+      <Text style={gpBadge.eyebrow}>GET IT ON</Text>
+      <Text style={gpBadge.brand}>Google Play</Text>
+    </View>
+  </View>
+);
+
+const gpBadge = StyleSheet.create({
+  outer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    paddingHorizontal: 28,
+    paddingVertical: 18,
+    gap: 16,
+    alignSelf: 'center',
+  },
+  textStack: {
+    gap: 2,
+  },
+  eyebrow: {
+    fontFamily: fontFamily.body.medium,
+    color: '#FFFFFF',
+    fontSize: 18,
+    letterSpacing: 1.5,
+  },
+  brand: {
+    fontFamily: fontFamily.heading.extraBold,
+    color: '#FFFFFF',
+    fontSize: 40,
+    lineHeight: 44,
+  },
+});
 
 export const getBadgeShareText = (badge: BadgeDefinition, tier: BadgeTier): string => {
   const tierLabel = TIER_LABELS[tier];
@@ -244,7 +292,7 @@ const previewStyles = StyleSheet.create({
 
 const CAPTURE_SIZE = 1080;
 const CAPTURE_HEADER_H = 96;
-const CAPTURE_FOOTER_H = 168; // taller — QR + install prompt
+const CAPTURE_FOOTER_H = 220; // taller — big Google Play CTA + visible URL
 const ACCENT = brandColors.accent;
 const HEADER_BG = '#1A1A1A';
 
@@ -274,8 +322,8 @@ const captureStyles = StyleSheet.create({
     letterSpacing: 2,
   },
   hero: {
-    // 96 (header) + 540 (hero) + flex text + 168 (footer) = 1080.
-    height: 540,
+    // 96 (header) + 520 (hero) + flex text + 220 (footer) = 1080.
+    height: 520,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space[6],
@@ -318,30 +366,16 @@ const captureStyles = StyleSheet.create({
   footer: {
     height: CAPTURE_FOOTER_H,
     backgroundColor: HEADER_BG,
-    paddingHorizontal: space[8],
-    flexDirection: 'row',
+    paddingHorizontal: space[6],
+    paddingVertical: space[4],
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: space[6],
+    justifyContent: 'center',
+    gap: space[3],
   },
-  qrFrame: {
-    padding: space[2],
-    backgroundColor: ACCENT,
-    borderRadius: radii.md,
-  },
-  footerCopy: {
-    flex: 1,
-    gap: space[1],
-  },
-  footerHeadline: {
-    fontFamily: fontFamily.heading.extraBold,
-    color: ACCENT,
-    fontSize: 32,
-    letterSpacing: 1,
-  },
-  footerSubline: {
-    fontFamily: fontFamily.body.medium,
-    color: darkTheme.textSecondary,
-    fontSize: 22,
+  footerUrl: {
+    fontFamily: fontFamily.mono.medium,
+    color: darkTheme.textMuted,
+    fontSize: 18,
+    textAlign: 'center',
   },
 });
