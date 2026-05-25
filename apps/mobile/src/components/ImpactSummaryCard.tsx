@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedCounter } from '../design-system/atoms/AnimatedCounter';
-import { BadgeIcon } from '../design-system/atoms/BadgeIcon';
+import { BadgeVisual } from '../design-system/atoms/BadgeVisual';
 import { Mascot } from '../design-system/atoms/Mascot';
 import { brandColors, darkTheme, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
@@ -130,7 +130,7 @@ const StaggeredBadge = ({
         { opacity, transform: [{ translateY }] },
       ]}
     >
-      <BadgeIcon badgeKey={badge.badgeKey} tier={tier} size="md" />
+      <BadgeVisual badgeKey={badge.badgeKey} tier={tier} size="md" />
       <Text style={styles.badgeName} numberOfLines={2}>
         {badge.name}
       </Text>

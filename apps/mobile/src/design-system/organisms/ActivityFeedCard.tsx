@@ -32,7 +32,7 @@ import { formatDistance, formatDuration, formatCo2Saved, HAZARD_TYPE_OPTIONS } f
 
 import { useTheme, type ThemeColors } from '../ThemeContext';
 import { TierPill } from '../atoms/TierPill';
-import { BadgeIcon } from '../atoms/BadgeIcon';
+import { BadgeVisual } from '../atoms/BadgeVisual';
 import { ReactionBar } from '../../components/LikeButton';
 import { RouteMap } from '../../components/map';
 import { useActivityComments } from '../../hooks/useActivityFeed';
@@ -645,7 +645,7 @@ const BadgeUnlockContent = React.memo(function BadgeUnlockContent({
 
   return (
     <View style={styles.badgeContainer}>
-      <BadgeIcon
+      <BadgeVisual
         badgeKey={payload.badgeKey}
         tier={badgeTier}
         size="md"

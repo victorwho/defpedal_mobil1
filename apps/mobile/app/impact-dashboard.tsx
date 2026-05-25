@@ -16,7 +16,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery } from '@tanstack/react-query';
 
 import { AnimatedCounter } from '../src/design-system/atoms/AnimatedCounter';
-import { BadgeIcon } from '../src/design-system/atoms/BadgeIcon';
+import { BadgeVisual } from '../src/design-system/atoms/BadgeVisual';
 import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { Button } from '../src/design-system/atoms/Button';
 import { Surface } from '../src/design-system/atoms/Card';
@@ -100,7 +100,7 @@ const RecentBadgesSection = ({ styles }: { readonly styles: ReturnType<typeof cr
           const tier = TIER_FROM_LEVEL[def.tier] ?? 'bronze';
           return (
             <View key={ub.badgeKey} style={styles.recentBadgeItem}>
-              <BadgeIcon badgeKey={def.badgeKey} tierFamily={def.tierFamily} tier={tier} size="md" />
+              <BadgeVisual badgeKey={def.badgeKey} tierFamily={def.tierFamily} tier={tier} size="md" />
               <Text style={styles.recentBadgeName} numberOfLines={2}>{def.name}</Text>
             </View>
           );

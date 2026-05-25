@@ -26,7 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
-import { BadgeIcon } from '../../src/design-system/atoms/BadgeIcon';
+import { BadgeVisual } from '../../src/design-system/atoms/BadgeVisual';
 import { ScreenHeader } from '../../src/design-system/atoms/ScreenHeader';
 import { Toast } from '../../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../../src/design-system';
@@ -490,7 +490,7 @@ export default function TripDetailScreen() {
             >
               {newBadges.map((badge: BadgeUnlockEvent) => (
                 <View key={badge.badgeKey} style={styles.badgeItem}>
-                  <BadgeIcon
+                  <BadgeVisual
                     badgeKey={badge.badgeKey}
                     tier={badge.tier ?? 'bronze'}
                     size="md"

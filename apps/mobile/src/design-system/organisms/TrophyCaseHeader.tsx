@@ -8,7 +8,7 @@ import { Text, View, StyleSheet } from 'react-native';
 
 import type { BadgeDefinition } from '@defensivepedal/core';
 
-import { BadgeIcon } from '../atoms/BadgeIcon';
+import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import { type BadgeTier } from '../tokens/badgeColors';
 import { brandColors } from '../tokens/colors';
@@ -68,7 +68,7 @@ export const TrophyCaseHeader: React.FC<TrophyCaseHeaderProps> = ({
 
     {recentBadge ? (
       <View style={styles.recentCard}>
-        <BadgeIcon
+        <BadgeVisual
           badgeKey={recentBadge.badge.badgeKey}
           tierFamily={recentBadge.badge.tierFamily}
           tier={recentBadge.tier ?? TIER_FROM_LEVEL[recentBadge.badge.tier] ?? 'bronze'}
