@@ -37,11 +37,16 @@ import type { BadgeSize, BadgeTier } from '../tokens/badgeColors';
  *   - `onTap`: forwarded to HoloSticker so a tap inside the sticker
  *     reaches the caller even though HoloSticker's PanResponder claims
  *     the gesture from any parent Pressable.
- * Both are ignored on the SVG fallback path.
+ *   - `static`: disables all interactivity (no tilt, no glare, no gyro)
+ *     for share-card captures and other off-screen rendering. Required
+ *     for `react-native-view-shot` — the capture host needs an idle
+ *     frame, not an animated one.
+ * All are ignored on the SVG fallback path.
  */
 export type BadgeVisualProps = BadgeIconProps & {
   focused?: boolean;
   onTap?: () => void;
+  static?: boolean;
 };
 
 const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
@@ -52,6 +57,7 @@ const HOLO_SIZE_BY_BADGE_SIZE: Record<BadgeSize, number> = {
 
 export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
   const { badgeKey, tierFamily, tier, size, progress, isNew, hasHigherTier, focused, onTap } = props;
+  const isStatic = props.static === true;
 
   // Holo treatment only for EARNED, non-progress, non-secret, non-locked states.
   const isEarned =
@@ -69,7 +75,8 @@ export const BadgeVisual: React.FC<BadgeVisualProps> = (props) => {
         tier={tier as BadgeTier}
         size={HOLO_SIZE_BY_BADGE_SIZE[size]}
         // sm is a static thumbnail — tilt/glare would be twitchy at 40px.
-        interactive={size !== 'sm'}
+        // `static` always wins (share-card capture path).
+        interactive={!isStatic && size !== 'sm'}
         focused={focused}
         onTap={onTap}
         accessibilityLabel={`${badgeKey} badge`}

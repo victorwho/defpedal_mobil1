@@ -9,11 +9,18 @@
  */
 import React, { forwardRef } from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const QRCode = require('react-native-qrcode-svg').default as React.ComponentType<{
+  value: string;
+  size: number;
+  color?: string;
+  backgroundColor?: string;
+}>;
 
-import type { BadgeDefinition } from '@defensivepedal/core';
+import { PLAY_STORE_URL, type BadgeDefinition } from '@defensivepedal/core';
 
 import { BrandLogo } from './BrandLogo';
-import { BadgeIcon } from '../design-system/atoms/BadgeIcon';
+import { BadgeVisual } from '../design-system/atoms/BadgeVisual';
 import { tierColors, getRarity, type BadgeTier } from '../design-system/tokens/badgeColors';
 import { brandColors, darkTheme } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
@@ -60,14 +67,15 @@ export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
             </View>
           </View>
 
-          {/* Hero: large scaled-up badge shield */}
+          {/* Hero: large scaled-up holo sticker (or SVG shield fallback) */}
           <View style={captureStyles.hero}>
             <View style={captureStyles.badgeScaleWrap}>
-              <BadgeIcon
+              <BadgeVisual
                 badgeKey={badge.badgeKey}
                 tierFamily={badge.tierFamily}
                 tier={tier}
                 size="lg"
+                static
               />
             </View>
           </View>
@@ -90,10 +98,24 @@ export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
             ) : null}
           </View>
 
-          {/* Footer */}
+          {/* Footer — QR to the Play Store + install prompt. Image-based shares
+              through expo-sharing can't carry body text to the recipient, so
+              the install path has to be burned into the captured PNG itself. */}
           <View style={captureStyles.footer}>
-            <BrandLogo size={44} />
-            <Text style={captureStyles.footerUrl}>defensivepedal.com</Text>
+            <View style={captureStyles.qrFrame}>
+              <QRCode
+                value={PLAY_STORE_URL}
+                size={104}
+                color={darkTheme.bgDeep}
+                backgroundColor={brandColors.accent}
+              />
+            </View>
+            <View style={captureStyles.footerCopy}>
+              <Text style={captureStyles.footerHeadline}>Scan to install</Text>
+              <Text style={captureStyles.footerSubline}>
+                Defensive Pedal on Google Play
+              </Text>
+            </View>
           </View>
         </View>
       );
@@ -109,11 +131,12 @@ export const BadgeShareCard = forwardRef<View, BadgeShareCardProps>(
 
         {/* Badge hero */}
         <View style={previewStyles.centerSection}>
-          <BadgeIcon
+          <BadgeVisual
             badgeKey={badge.badgeKey}
             tierFamily={badge.tierFamily}
             tier={tier}
             size="lg"
+            static
           />
         </View>
 
@@ -221,11 +244,11 @@ const previewStyles = StyleSheet.create({
 
 const CAPTURE_SIZE = 1080;
 const CAPTURE_HEADER_H = 96;
-const CAPTURE_FOOTER_H = 80;
+const CAPTURE_FOOTER_H = 168; // taller — QR + install prompt
 const ACCENT = brandColors.accent;
 const HEADER_BG = '#1A1A1A';
 
-// BadgeIcon lg is 120x139; scale ~4x to fit the hero area.
+// BadgeVisual lg is 120x120; scale ~4x to fit the hero area.
 const BADGE_SCALE = 4;
 
 const captureStyles = StyleSheet.create({
@@ -251,7 +274,8 @@ const captureStyles = StyleSheet.create({
     letterSpacing: 2,
   },
   hero: {
-    height: 560,
+    // 96 (header) + 540 (hero) + flex text + 168 (footer) = 1080.
+    height: 540,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space[6],
@@ -294,16 +318,30 @@ const captureStyles = StyleSheet.create({
   footer: {
     height: CAPTURE_FOOTER_H,
     backgroundColor: HEADER_BG,
-    paddingHorizontal: space[6],
+    paddingHorizontal: space[8],
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[3],
+    justifyContent: 'flex-start',
+    gap: space[6],
   },
-  footerUrl: {
-    fontFamily: fontFamily.body.semiBold,
+  qrFrame: {
+    padding: space[2],
+    backgroundColor: ACCENT,
+    borderRadius: radii.md,
+  },
+  footerCopy: {
+    flex: 1,
+    gap: space[1],
+  },
+  footerHeadline: {
+    fontFamily: fontFamily.heading.extraBold,
     color: ACCENT,
-    fontSize: 20,
+    fontSize: 32,
     letterSpacing: 1,
+  },
+  footerSubline: {
+    fontFamily: fontFamily.body.medium,
+    color: darkTheme.textSecondary,
+    fontSize: 22,
   },
 });
