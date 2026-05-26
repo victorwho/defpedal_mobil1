@@ -128,16 +128,36 @@ packagingOptions {
             dimension "variant"
             applicationId 'com.defensivepedal.mobile.dev'
             resValue "string", "app_name", "Defensive Pedal Dev"
+            // P3f (sentryfix.md, 2026-05-25): native-side Sentry tag injection
+            // for pre-JS fatal events. Read in AndroidManifest.xml via the
+            // `${SENTRY_APP_VARIANT}` / `${SENTRY_APP_ENV}` placeholders. The
+            // values mirror what `mobileEnv.appVariant` / `mobileEnv.appEnv`
+            // resolve to in JS, so events tagged natively and events tagged
+            // via the JS `beforeSend` hook in `lib/telemetry.ts` use the
+            // same vocabulary. Keep these in sync if the JS resolution
+            // ever changes (or, better: extract a shared constant).
+            manifestPlaceholders = [
+                SENTRY_APP_VARIANT: 'development',
+                SENTRY_APP_ENV: 'development',
+            ]
         }
         preview {
             dimension "variant"
             applicationId 'com.defensivepedal.mobile.preview'
             resValue "string", "app_name", "Defensive Pedal Preview"
+            manifestPlaceholders = [
+                SENTRY_APP_VARIANT: 'preview',
+                SENTRY_APP_ENV: 'preview',
+            ]
         }
         production {
             dimension "variant"
             applicationId 'com.defensivepedal.mobile'
             resValue "string", "app_name", "Defensive Pedal"
+            manifestPlaceholders = [
+                SENTRY_APP_VARIANT: 'production',
+                SENTRY_APP_ENV: 'production',
+            ]
         }
     }
     buildTypes {
