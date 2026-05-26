@@ -24,6 +24,42 @@ vi.mock('./mapbox-routing', () => ({
   directReroute: vi.fn().mockResolvedValue({ routes: [], selectedMode: 'safe', generatedAt: new Date().toISOString() }),
 }));
 
+// mobileApiFetch (added P3b Day 2) is the auth-aware wrapper that every
+// `requestJson` call now flows through. Stub it directly so the test
+// doesn't pull expo-constants → react-native through its `./env` +
+// `./supabase` imports. The tests below assert on `fetch` arguments, so
+// the wrapper just needs to issue a single real fetch and return its body.
+vi.mock('./mobileApiFetch', () => ({
+  mobileApiFetch: async <T>(path: string, init?: RequestInit & Record<string, unknown>): Promise<T> => {
+    const url = `https://test-api.example.com${path}`;
+    const response = await fetch(url, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer test-access-token',
+        ...(init?.headers as Record<string, string> | undefined),
+      },
+    } as RequestInit);
+    if (!response.ok) {
+      const body = await response.text();
+      const error = new Error(`HTTP ${response.status}`) as Error & { status: number; body: string };
+      error.status = response.status;
+      error.body = body;
+      throw error;
+    }
+    return (await response.json()) as T;
+  },
+}));
+
+// `responseValidation` transitively imports `./telemetry` which pulls
+// `@sentry/react-native` + `posthog-react-native` + `expo-constants`, all
+// of which fail to load in vitest's node environment. The validation
+// behaviour is covered separately by `schemas/responseValidation.test.ts`,
+// so the mock here is a pass-through that returns the response unchanged.
+vi.mock('./schemas/responseValidation', () => ({
+  validateResponse: <T>(_schema: unknown, data: T): T => data,
+}));
+
 import { mobileApi } from './api';
 
 // ---------------------------------------------------------------------------
@@ -435,23 +471,46 @@ describe('mobileApi', () => {
   });
 
   describe('error handling', () => {
-    it('throws on non-OK response', async () => {
+    // P3b Day 3 (2026-05-25) replaced the legacy `requestJson` error path —
+    // which concatenated `error + detail` into a single message string and
+    // threw `HttpError(message, status)` — with `ApiClientError({ kind: 'http',
+    // status, body })`. The raw response body is preserved (truncated to 500
+    // chars) on the error rather than reformatted into the message. These
+    // tests now assert on `error.status` + `error.body` instead of message
+    // shape. See apiFetch.test.ts for the full envelope contract.
+    //
+    // The mobileApiFetch mock at the top of this file mirrors that contract:
+    // it throws `Error & { status, body }` on non-2xx and exposes the raw
+    // body. assertion below uses that shape.
+    type ApiLikeError = Error & { status?: number; body?: string };
+
+    it('throws ApiClientError-like envelope on non-OK response', async () => {
       mockFetchResponse({ error: 'Not found', details: [] }, false, 404);
 
-      await expect(mobileApi.getTripHistory()).rejects.toThrow('Not found');
+      await expect(mobileApi.getTripHistory()).rejects.toMatchObject({ status: 404 });
     });
 
-    it('throws with detail when available', async () => {
+    it('preserves the raw response body on the error envelope', async () => {
       mockFetchResponse(
         { error: 'Validation failed', details: ['Field required'] },
         false,
         400,
       );
 
-      await expect(mobileApi.submitFeedback({} as any)).rejects.toThrow('Validation failed Field required');
+      try {
+        await mobileApi.submitFeedback({} as Parameters<typeof mobileApi.submitFeedback>[0]);
+        throw new Error('expected throw');
+      } catch (err) {
+        const apiErr = err as ApiLikeError;
+        expect(apiErr.status).toBe(400);
+        // Body is the raw JSON the server emitted; we preserve it verbatim
+        // so callers can JSON.parse and pull `error` / `details` themselves.
+        expect(apiErr.body).toContain('Validation failed');
+        expect(apiErr.body).toContain('Field required');
+      }
     });
 
-    it('throws fallback message for non-JSON error', async () => {
+    it('throws on non-JSON 5xx error and surfaces the raw text body', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: false,
         status: 500,
@@ -459,7 +518,14 @@ describe('mobileApi', () => {
         text: async () => 'Internal Server Error',
       } as Response);
 
-      await expect(mobileApi.getTripHistory()).rejects.toThrow('Internal Server Error');
+      try {
+        await mobileApi.getTripHistory();
+        throw new Error('expected throw');
+      } catch (err) {
+        const apiErr = err as ApiLikeError;
+        expect(apiErr.status).toBe(500);
+        expect(apiErr.body).toBe('Internal Server Error');
+      }
     });
   });
 

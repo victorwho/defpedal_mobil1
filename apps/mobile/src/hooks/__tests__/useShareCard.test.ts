@@ -146,27 +146,10 @@ describe('useShareCard', () => {
     });
   });
 
-  describe('mia variant', () => {
-    it('forwards level + levelTitle to the caption builder', async () => {
-      const { result } = renderHook(() => useShareCard());
-
-      await act(async () => {
-        await result.current.share({
-          type: 'mia',
-          level: 3,
-          levelTitle: 'Cafe Rider',
-          card: dummyCardElement,
-        });
-      });
-
-      expect(captionSpy).toHaveBeenCalledWith({
-        type: 'mia',
-        level: 3,
-        levelTitle: 'Cafe Rider',
-      });
-      expect(shareImageSpy).toHaveBeenCalledWith(FILE_URI, CAPTION);
-    });
-  });
+  // The 'mia' variant of useShareCard was removed when Mia Persona Journey
+  // was retired in v0.2.43 (2026-05-10, per CLAUDE.md). The hook now only
+  // accepts type: 'badge'. The corresponding describe block was deleted
+  // 2026-05-25 — leaving this note in case someone hunts git blame.
 
   describe('isSharing state', () => {
     it('is true during the in-flight capture and false after', async () => {

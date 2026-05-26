@@ -26,13 +26,18 @@ import {
 } from '../../src/lib/telemetry';
 
 /**
- * Item 8 of the compliance plan: pre-collection consent screen. Shown during
- * onboarding before any analytics events fire. Both toggles default ON for
- * first-time users (counsel-flagged for ANSPDCP review — see in-line comment
- * on the useState initializers below for the legal-basis breakdown).
+ * Item 8 of the compliance plan + P0.1 (2026-05-25): split consent.
+ *
+ * Pre-collection consent screen shown during onboarding before any analytics
+ * events fire. **Crash reports** default ON (legitimate-interest basis under
+ * GDPR Art 6(1)(f) — service-stability diagnostics; the toggle is kept so the
+ * user can object per Art 21). **Product analytics** defaults OFF (opt-in
+ * consent under ePrivacy / Law 506/2004).
  *
  * The decision is persisted device-scoped (not user-scoped) — see appStore
  * resetUserScopedState comment block for the rationale.
+ *
+ * Legal record: docs/legal/consent-split-2026-05-25.md
  */
 export default function OnboardingConsentScreen() {
   const insets = useSafeAreaInsets();
@@ -46,20 +51,19 @@ export default function OnboardingConsentScreen() {
   const persistedPosthog = useAppStore((s) => s.analyticsConsent.posthog);
   const persistedCapturedAt = useAppStore((s) => s.analyticsConsent.capturedAt);
 
-  // First-time defaults vs returning visitor:
-  // - Both crash reports (Sentry) and product analytics (PostHog) default OFF
-  //   for first-time onboarding (capturedAt is null). User opts in from the
-  //   same screen or anytime later in Profile → Privacy & analytics.
-  // - Defense: ANSPDCP / Law 506/2004 (Romania transposition of ePrivacy)
-  //   treats both crash diagnostics and product analytics as requiring
-  //   informed opt-in. Defaulting OFF is the safe posture for a Romanian-
-  //   resident controller; it also matches the Play Console Data Safety
-  //   posture once the form is reconciled with shipped sub-processors.
+  // First-time defaults vs returning visitor (P0.1, 2026-05-25):
+  // - Crash reports (Sentry) default ON. Legitimate-interest basis under
+  //   GDPR Art 6(1)(f) — bug telemetry is part of operating the service
+  //   safely. The toggle stays visible (Art 21 objection right). Counsel
+  //   sign-off note recorded in docs/legal/consent-split-2026-05-25.md.
+  // - Product analytics (PostHog) default OFF. Consent basis under
+  //   ePrivacy / ANSPDCP Law 506/2004 — non-essential, requires informed
+  //   opt-in.
   // - Returning users always see their previously-saved choice; we never
   //   silently flip a setting they already opted in or out of.
   const isFirstTimeConsent = persistedCapturedAt === null;
   const [crashReports, setCrashReports] = useState(
-    isFirstTimeConsent ? false : persistedSentry,
+    isFirstTimeConsent ? true : persistedSentry,
   );
   const [productAnalytics, setProductAnalytics] = useState(
     isFirstTimeConsent ? false : persistedPosthog,

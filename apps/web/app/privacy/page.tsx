@@ -136,8 +136,15 @@ export default function PrivacyPage() {
             comments, reactions, and votes.
           </li>
           <li>
-            Device and crash data (only if you opt in): app version, device
-            model, OS version, anonymised stack traces.
+            Crash diagnostics (on by default; legitimate-interest basis under
+            GDPR Art 6(1)(f) for service-stability — opt out anytime in
+            Profile → Privacy & analytics): app version, device model, OS
+            version, anonymised stack traces. No location, no personal data.
+          </li>
+          <li>
+            Product analytics (opt-in only, off by default): anonymous usage
+            events when you explicitly enable it in Profile → Privacy &
+            analytics. Helps us prioritise the roadmap. No GPS tracking.
           </li>
         </ul>
 
@@ -238,11 +245,15 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Sentry</strong> — anonymised crash reports, EU region.
-            Only if you opt in (off by default).
+            <strong> On by default</strong> under a legitimate-interest legal
+            basis (GDPR Art 6(1)(f)) since crash diagnostics are essential
+            to keep the routing service safe and stable. You can object and
+            disable it anytime in Profile → Privacy & analytics.
           </li>
           <li>
             <strong>PostHog</strong> — anonymised product analytics, EU host
-            (eu.i.posthog.com). Only if you opt in (off by default).
+            (eu.i.posthog.com). <strong>Off by default</strong>; transmitted
+            only when you explicitly opt in.
           </li>
           <li>
             <strong>Firebase App Distribution</strong> — used for tester

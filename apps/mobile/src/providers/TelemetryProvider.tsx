@@ -10,11 +10,16 @@ import { useAuthSession } from './AuthSessionProvider';
  * appStore. Init / teardown both clients whenever the flags flip. Identifies
  * the active user (id-only for anonymous sessions) once consent is granted.
  *
- * Item 8 of the compliance plan: no telemetry events fire before the user
- * has explicitly consented in onboarding (or post-onboarding via Profile →
- * Privacy & Analytics). The store default is { sentry: false, posthog: false,
- * capturedAt: null } so a fresh install never sends anything until the
- * consent screen captures a decision.
+ * Compliance plan item 8, updated for P0.1 split (2026-05-25): the two
+ * channels have asymmetric legal bases.
+ *   - Sentry crash reports default ON under legitimate interest (GDPR Art
+ *     6(1)(f)). User can object via Profile → Privacy & Analytics.
+ *   - PostHog product analytics default OFF; requires affirmative opt-in
+ *     under ePrivacy / ANSPDCP Law 506/2004.
+ * The store default is { sentry: true, posthog: false, capturedAt: null }
+ * — so a fresh install starts emitting crash diagnostics immediately while
+ * holding analytics events until the user opts in via the consent screen.
+ * See docs/legal/consent-split-2026-05-25.md for the decision record.
  */
 export const TelemetryProvider = ({ children }: PropsWithChildren) => {
   const { user } = useAuthSession();

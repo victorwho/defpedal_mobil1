@@ -180,7 +180,10 @@ describe('push-notifications', () => {
         body: '18-24°C, clear skies.',
         tone: 'good',
       });
-      expect(router.push).not.toHaveBeenCalled();
+      // Must also navigate to a real screen — the modal would otherwise mount
+      // over a still-loading app/index.tsx on cold start and the user gets
+      // stuck at the loading screen (see push-notifications.ts comment).
+      expect(router.push).toHaveBeenCalledWith('/route-planning');
     });
 
     it('does not navigate for community type without tripShareId', () => {

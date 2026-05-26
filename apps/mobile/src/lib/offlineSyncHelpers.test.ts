@@ -14,7 +14,10 @@
 import type { QueuedMutation, QueuedMutationType } from '@defensivepedal/core';
 import { describe, expect, it } from 'vitest';
 
-import { HttpError } from './httpError';
+import { ApiClientError } from './apiFetch';
+
+const httpError = (status: number): ApiClientError =>
+  new ApiClientError({ kind: 'http', message: `HTTP ${status}`, status });
 import {
   BACKOFF_BASE_MS,
   BACKOFF_JITTER_RATIO,
@@ -228,14 +231,14 @@ describe('isPermanentError', () => {
     [422, true],
     [499, true],
   ])('marks status %d as permanent', (status, expected) => {
-    expect(isPermanentError(new HttpError('test', status))).toBe(expected);
+    expect(isPermanentError(httpError(status))).toBe(expected);
   });
 
   it.each<[number, boolean]>([
     [408, false],
     [429, false],
   ])('treats status %d as transient (retryable)', (status, expected) => {
-    expect(isPermanentError(new HttpError('test', status))).toBe(expected);
+    expect(isPermanentError(httpError(status))).toBe(expected);
   });
 
   it.each<[number, boolean]>([
@@ -244,7 +247,7 @@ describe('isPermanentError', () => {
     [503, false],
     [504, false],
   ])('treats 5xx %d as transient', (status, expected) => {
-    expect(isPermanentError(new HttpError('test', status))).toBe(expected);
+    expect(isPermanentError(httpError(status))).toBe(expected);
   });
 
   it('does NOT mark plain Errors as permanent (timeout / network / runtime)', () => {
@@ -252,6 +255,15 @@ describe('isPermanentError', () => {
       false,
     );
     expect(isPermanentError(new Error('Network request failed'))).toBe(false);
+  });
+
+  it('does NOT mark ApiClientError(kind=network|timeout) as permanent', () => {
+    expect(
+      isPermanentError(new ApiClientError({ kind: 'network', message: 'fetch rejected' })),
+    ).toBe(false);
+    expect(
+      isPermanentError(new ApiClientError({ kind: 'timeout', message: 'timed out' })),
+    ).toBe(false);
   });
 
   it('handles non-Error throw values defensively', () => {
