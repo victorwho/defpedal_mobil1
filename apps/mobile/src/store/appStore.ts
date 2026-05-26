@@ -305,7 +305,19 @@ export const useAppStore = create<AppStore>()(
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
       onboardingCompleted: false,
-      analyticsConsent: { sentry: false, posthog: false, capturedAt: null },
+      // P0.1 (2026-05-25) split crash reporting from product analytics.
+      // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
+      //   Art 6(1)(f) / ANSPDCP Law 506/2004 equivalent for service-stability
+      //   diagnostics). User can object via Profile > Privacy & Analytics —
+      //   the toggle still exists, just defaults on.
+      // - posthog: defaults FALSE. Legal basis = consent (Art 6(1)(a)) since
+      //   product analytics is non-essential under ePrivacy. Requires affirmative
+      //   opt-in.
+      // - capturedAt: null until the user is shown the consent screen. Existing
+      //   persisted users with capturedAt !== null keep their saved choice (no
+      //   silent flip — Zustand persist merges the previous state on hydration).
+      // Decision recorded: docs/legal/consent-split-2026-05-25.md
+      analyticsConsent: { sentry: true, posthog: false, capturedAt: null },
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
@@ -852,6 +864,37 @@ export const useAppStore = create<AppStore>()(
     {
       name: 'defensivepedal-app-store',
       storage: createJSONStorage(() => zustandStorage),
+      // P0.1 consent split migration (2026-05-25). Bumps the persisted state
+      // version from undefined (effectively v0) to 1 and:
+      //   - For users who never made a consent choice (`capturedAt === null`
+      //     AND `sentry === false`), flip `sentry` to `true` so the new
+      //     legitimate-interest default applies. They never opted out of
+      //     anything — the old `false` value was a bundled default they
+      //     never saw.
+      //   - For users who explicitly chose (`capturedAt !== null`), respect
+      //     their saved choice. We never silently flip an explicit decision.
+      // Decision recorded: docs/legal/consent-split-2026-05-25.md
+      version: 1,
+      migrate: (persistedState, version) => {
+        if (version >= 1) return persistedState;
+        // Narrow the persisted blob just enough to inspect the consent slot
+        // without dragging the full store type into scope.
+        const state = persistedState as
+          | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
+          | undefined;
+        const consent = state?.analyticsConsent;
+        if (
+          consent &&
+          (consent.capturedAt ?? null) === null &&
+          consent.sentry === false
+        ) {
+          return {
+            ...(state as object),
+            analyticsConsent: { ...consent, sentry: true },
+          };
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         appState: state.appState,
         voiceGuidanceEnabled: state.voiceGuidanceEnabled,
