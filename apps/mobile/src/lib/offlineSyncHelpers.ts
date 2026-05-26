@@ -1,6 +1,6 @@
 import type { QueuedMutation } from '@defensivepedal/core';
 
-import { HttpError } from './httpError';
+import { ApiClientError } from './apiFetch';
 import type { QueuedTripEndPayload } from './offlineQueue';
 
 /**
@@ -148,15 +148,23 @@ export const shouldSkipMutation = (
  * EXCEPT 408 Request Timeout and 429 Too Many Requests — both signal the
  * server temporarily can't handle the request, so retry is legitimate.
  *
- * Non-HttpError errors (timeout, network, runtime) are NOT permanent — they
- * fall through to the existing retry-with-backoff path.
+ * Network/timeout errors (`kind: 'network' | 'timeout'`) are NOT permanent —
+ * they fall through to the existing retry-with-backoff path.
  *
  * Pre-2026-05-24, every error type went through the same 5-retry loop;
  * a 422 (e.g. trip_end with a stale tripId) burned 5 attempts over ~31s
  * of backoff before being killed. Now it's dropped on the first failure.
+ *
+ * Day-3 of P3b retired `HttpError` in favour of `ApiClientError` (a single
+ * envelope for http / network / timeout). The HTTP-status logic below is
+ * identical to the prior implementation.
  */
 export const isPermanentError = (error: unknown): boolean => {
-  if (!(error instanceof HttpError)) {
+  if (!(error instanceof ApiClientError)) {
+    return false;
+  }
+
+  if (error.kind !== 'http' || error.status == null) {
     return false;
   }
 
