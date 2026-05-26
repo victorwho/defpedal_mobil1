@@ -1,9 +1,8 @@
-# sentryfix — remaining work from the error-reduction plan
+# sentryfix — error-reduction plan punch list
 
-Status snapshot as of 2026-05-24, after the 5-commit shipped in v0.2.62 / build 64.
-Full plan lives at [`docs/plans/error-reduction.md`](docs/plans/error-reduction.md).
+**Status (2026-05-26): all code items complete + shipped in v0.2.77 build 79.** Firebase preview release `1mv39v3urujkg` distributed to the `early-access-preview` group; tester sign-off received 2026-05-26. Full plan history lives at [`docs/plans/error-reduction.md`](docs/plans/error-reduction.md).
 
-This file is the punch list of what's **left**, not what's done.
+Original framing was "punch list of what's left, not what's done". Now inverted: the **Done** list below is the source of truth for the session-61 closeout; the **Remaining items** sections are kept for historical context but only contain non-code follow-ups (Sentry dashboard config, optional processing rules, and TODO refactors).
 
 ## Done in this round (for context)
 
