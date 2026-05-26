@@ -59,7 +59,12 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   avoidUnpaved: false,
   avoidHills: false,
   locale: 'en',
-  countryHint: 'RO',
+  // Intentionally undefined so cold-start search isn't locked to a single
+  // country before GPS resolves. `useResolvedCountry` writes the resolved
+  // origin country (RO or ES) back onto this field once GPS lands; outside
+  // a supported country it stays undefined so Mapbox autocomplete falls
+  // back to proximity-only global search.
+  countryHint: undefined,
 };
 
 export type WeatherNotice = {

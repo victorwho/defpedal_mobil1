@@ -465,6 +465,134 @@ describe('directPreviewRoute', () => {
   });
 });
 
+describe('country-aware OSRM dispatch', () => {
+  it('routes Spanish safe requests to osrm-es', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    // Madrid → Barcelona
+    await directPreviewRoute({
+      origin: { lat: 40.4168, lon: -3.7038 },
+      destination: { lat: 41.3851, lon: 2.1734 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm-es.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-es-flat');
+  });
+
+  it('routes Spanish flat requests to osrm-es-flat', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 40.4168, lon: -3.7038 },
+      destination: { lat: 41.3851, lon: 2.1734 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm-es-flat.defensivepedal.com');
+  });
+
+  it('keeps RO requests on osrm.defensivepedal.com (not osrm-es)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-es');
+  });
+
+  it('falls back to Mapbox when safe is requested in an unsupported country', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    // Paris → Paris (both unsupported)
+    const result = await directPreviewRoute({
+      origin: { lat: 48.8566, lon: 2.3522 },
+      destination: { lat: 48.86, lon: 2.36 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('api.mapbox.com');
+    expect(firstCallUrl).not.toContain('osrm');
+    expect(result.selectedMode).toBe('fast');
+    expect(result.routes[0].source).toBe('mapbox');
+    expect(result.coverage.safeRouting).toBe(false);
+    expect(result.coverage.status).toBe('unsupported');
+  });
+
+  it('falls back to Mapbox on a cross-border RO -> ES request', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
+      destination: { lat: 40.4168, lon: -3.7038 }, // Madrid
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('api.mapbox.com');
+    expect(result.coverage.safeRouting).toBe(false);
+  });
+
+  it('suppresses safe-vs-fast comparison for ES (no risk data yet)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 40.4168, lon: -3.7038 },
+      destination: { lat: 41.3851, lon: 2.1734 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      showRouteComparison: true,
+    });
+
+    // Only 3 calls: OSRM-ES + elevation + risk. No 4th comparison fetch.
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+    expect(result.comparisonLabel).toBeUndefined();
+  });
+});
+
 describe('directReroute', () => {
   it('delegates to directPreviewRoute', async () => {
     setupFetchMock([

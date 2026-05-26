@@ -51,6 +51,12 @@ export const ro: TranslationKeys = {
     savedRoutes: 'Trasee salvate',
     reportHazard: 'Raportează pericol',
     centerLocation: 'Centrează pe locația curentă',
+    coverageOriginUnsupported:
+      'Rutarea sigură nu este încă disponibilă în zona ta — folosim rute standard de ciclism.',
+    coverageDestinationUnsupported:
+      'Destinația ta este în afara zonei cu rutare sigură — folosim rute standard de ciclism.',
+    coverageCrossBorder:
+      'Rutarea sigură funcționează într-o singură țară — folosim rute standard pentru această cursă transfrontalieră.',
   },
 
   // ── Route Preview ──

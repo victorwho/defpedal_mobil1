@@ -48,6 +48,16 @@ export const config = {
       ['SAFE_OSRM_FLAT_BASE_URL'],
       'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
     ),
+  safeOsrmEsBaseUrl:
+    resolveConfigValue(
+      ['SAFE_OSRM_ES_BASE_URL'],
+      'https://osrm-es.defensivepedal.com/route/v1/bicycle',
+    ),
+  safeOsrmEsFlatBaseUrl:
+    resolveConfigValue(
+      ['SAFE_OSRM_ES_FLAT_BASE_URL'],
+      'https://osrm-es-flat.defensivepedal.com/route/v1/bicycle',
+    ),
   mapboxAccessToken: resolveConfigValue(
     ['MAPBOX_ACCESS_TOKEN', 'VITE_MAPBOX_ACCESS_TOKEN', 'EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN'],
     '',
@@ -77,7 +87,7 @@ export const config = {
     userId: resolveConfigValue(['DEV_AUTH_BYPASS_USER_ID'], 'dev-auth-user'),
     email: resolveConfigValue(['DEV_AUTH_BYPASS_EMAIL'], ''),
   },
-  supportedSafeCountries: splitCsv(resolveConfigValue(['SUPPORTED_SAFE_COUNTRIES']), ['RO']),
+  supportedSafeCountries: splitCsv(resolveConfigValue(['SUPPORTED_SAFE_COUNTRIES']), ['RO', 'ES']),
   routeResponseCache: {
     previewTtlMs: parsePositiveNumber(
       resolveConfigValue(['ROUTE_PREVIEW_CACHE_TTL_MS'], '45000'),

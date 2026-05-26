@@ -21,6 +21,7 @@ import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
+import { useResolvedCountry } from '../src/hooks/useResolvedCountry';
 import { useWeather } from '../src/hooks/useWeather';
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
@@ -116,6 +117,32 @@ export default function RoutePlanningScreen() {
   const reorderWaypoints = useAppStore((state) => state.reorderWaypoints);
   const customStartEnabled = hasStartOverride(routeRequest);
   const waypoints = routeRequest.waypoints ?? [];
+  const resolvedCountry = useResolvedCountry();
+  const setRoutePreview = useAppStore((state) => state.setRoutePreview);
+
+  // When the rider drifts into / out of a supported country (or picks a
+  // destination outside it), force `fast` mode so they can't accidentally
+  // request a Safe/Flat route that the dispatcher would have to silently
+  // downgrade. Also clear any stale preview so they don't see a Romania
+  // route while standing in Madrid.
+  useEffect(() => {
+    if (resolvedCountry.routeSupported) return;
+    if (routeRequest.mode !== 'fast') {
+      setAvoidHills(false);
+      setRoutingMode('fast');
+    }
+    if (resolvedCountry.unsupportedReason === 'origin_unsupported') {
+      // Origin moved out of coverage — previous preview is no longer relevant
+      setRoutePreview(null);
+    }
+  }, [
+    resolvedCountry.routeSupported,
+    resolvedCountry.unsupportedReason,
+    routeRequest.mode,
+    setAvoidHills,
+    setRoutingMode,
+    setRoutePreview,
+  ]);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
@@ -1245,39 +1272,57 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat routing toggle */}
+          {/* Safe / Fast / Flat routing toggle — gated by country support.
+              Outside RO/ES we hide Safe + Flat (no OSRM data) and surface a
+              banner so the rider understands why only Fast is on offer. */}
           {hasValidDestination ? (
-            <View>
-              <View style={styles.modeToggleRow}>
-                <ModeTogglePill
-                  iconName="shield-checkmark-outline"
-                  label={t('planning.safe')}
-                  isActive={routeRequest.mode === 'safe' && !avoidHills}
-                  activeBgColor={safetyTints.infoLight}
-                  activeFgColor={colors.info}
-                  onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
-                  accessibilityLabel="Safe routing"
-                />
-                <ModeTogglePill
-                  iconName="flash-outline"
-                  label={t('planning.fast')}
-                  isActive={routeRequest.mode === 'fast'}
-                  activeBgColor={safetyTints.infoLight}
-                  activeFgColor={colors.info}
-                  onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
-                  accessibilityLabel="Fast routing"
-                />
-                <ModeTogglePill
-                  iconName="trending-down-outline"
-                  label={t('planning.flat')}
-                  isActive={avoidHills && routeRequest.mode === 'safe'}
-                  activeBgColor={safetyTints.safeGreenLight}
-                  activeFgColor={colors.safe}
-                  onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
-                  accessibilityLabel="Flat routing — avoid hills"
-                />
+            resolvedCountry.routeSupported ? (
+              <View>
+                <View style={styles.modeToggleRow}>
+                  <ModeTogglePill
+                    iconName="shield-checkmark-outline"
+                    label={t('planning.safe')}
+                    isActive={routeRequest.mode === 'safe' && !avoidHills}
+                    activeBgColor={safetyTints.infoLight}
+                    activeFgColor={colors.info}
+                    onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
+                    accessibilityLabel="Safe routing"
+                  />
+                  <ModeTogglePill
+                    iconName="flash-outline"
+                    label={t('planning.fast')}
+                    isActive={routeRequest.mode === 'fast'}
+                    activeBgColor={safetyTints.infoLight}
+                    activeFgColor={colors.info}
+                    onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
+                    accessibilityLabel="Fast routing"
+                  />
+                  <ModeTogglePill
+                    iconName="trending-down-outline"
+                    label={t('planning.flat')}
+                    isActive={avoidHills && routeRequest.mode === 'safe'}
+                    activeBgColor={safetyTints.safeGreenLight}
+                    activeFgColor={colors.safe}
+                    onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
+                    accessibilityLabel="Flat routing — avoid hills"
+                  />
+                </View>
               </View>
-            </View>
+            ) : (
+              <View
+                style={styles.coverageNotice}
+                accessibilityLiveRegion="polite"
+              >
+                <Ionicons name="information-circle-outline" size={16} color={gray[600]} />
+                <Text style={styles.coverageNoticeText}>
+                  {resolvedCountry.unsupportedReason === 'cross_border'
+                    ? t('planning.coverageCrossBorder')
+                    : resolvedCountry.unsupportedReason === 'destination_unsupported'
+                      ? t('planning.coverageDestinationUnsupported')
+                      : t('planning.coverageOriginUnsupported')}
+                </Text>
+              </View>
+            )
           ) : null}
         </View>
       }
@@ -1704,6 +1749,21 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.full,
       padding: 3,
       ...shadows.sm,
+    },
+    coverageNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      backgroundColor: surfaceTints.glassLight,
+      borderRadius: radii.md,
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      ...shadows.sm,
+    },
+    coverageNoticeText: {
+      ...textXs,
+      flex: 1,
+      color: gray[700],
     },
     searchOverlay: {
       backgroundColor: MAP_OVERLAY_BG,

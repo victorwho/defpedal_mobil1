@@ -21,6 +21,7 @@ import { useBicycleRental } from '../src/hooks/useBicycleRental';
 import { useBikeShops } from '../src/hooks/useBikeShops';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
+import { useResolvedCountry } from '../src/hooks/useResolvedCountry';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useWeather } from '../src/hooks/useWeather';
 import { BrandLogo } from '../src/components/BrandLogo';
@@ -101,6 +102,7 @@ function RoutePreviewScreen() {
   const avoidHills = useAppStore((state) => state.avoidHills);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const setAvoidHills = useAppStore((state) => state.setAvoidHills);
+  const resolvedCountry = useResolvedCountry();
 
   const { isOnline } = useConnectivity();
 
@@ -446,6 +448,10 @@ function RoutePreviewScreen() {
   }, [currentDisplayMode, setAvoidHills, setRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
+  // Outside RO/ES we only have Mapbox fast routing — the cycle pill becomes
+  // a passive label so taps don't kick the request through unavailable
+  // Safe/Flat profiles. The route-planning gate already forced mode to fast.
+  const modeCycleDisabled = isCyclingMode || !resolvedCountry.routeSupported;
   const currentMode = modeDisplay[currentDisplayMode];
   const nextMode = modeDisplay[currentMode.next];
 
@@ -460,7 +466,7 @@ function RoutePreviewScreen() {
       accessibilityHint="Recomputes the route with the new profile"
       hapticOnPress="snap"
       hitSlop={8}
-      disabled={isCyclingMode}
+      disabled={modeCycleDisabled}
     >
       <Badge
         variant={currentMode.variant}

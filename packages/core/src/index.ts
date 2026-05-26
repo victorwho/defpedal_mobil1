@@ -3,6 +3,7 @@ export * from './cyclingWeather';
 export * from './microlives';
 export * from './contracts';
 export * from './contrast';
+export * from './countryCoverage';
 export * from './distance';
 export * from './formatters';
 export * from './mapboxStaticImageUrl';

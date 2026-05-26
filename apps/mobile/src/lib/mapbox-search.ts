@@ -33,7 +33,33 @@ const MIN_QUERY_LENGTH = 2;
  * Countries where Pedala Defensiva provides safe-routing coverage.
  * Extend this set as new regions are added.
  */
-const SUPPORTED_COUNTRIES: ReadonlySet<string> = new Set(['BR', 'RO']);
+const SUPPORTED_COUNTRIES: ReadonlySet<string> = new Set(['BR', 'RO', 'ES']);
+
+/**
+ * Countries we ship dedicated OSRM safety profiles for. When the rider is
+ * physically inside ANY of these (their `countryHint` resolves to RO or ES),
+ * we expand the Mapbox `country` filter to ALL of them — so a Romanian
+ * rider can autocomplete "Madrid" and a Spanish rider can autocomplete
+ * "Bucharest" without us having to expose a separate country picker.
+ * Proximity bias keeps local results on top, so the noise tradeoff is
+ * negligible. Riders outside these countries (e.g. France, UK) keep
+ * unrestricted global search, biased by GPS proximity.
+ */
+const ROUTING_COUNTRIES = ['RO', 'ES'] as const;
+const ROUTING_COUNTRY_SET: ReadonlySet<string> = new Set(ROUTING_COUNTRIES);
+const ROUTING_COUNTRY_LIST = ROUTING_COUNTRIES.join(',');
+
+/**
+ * Convert a `countryHint` into the Mapbox `country` query value. When the
+ * hint matches a routing country (RO or ES), return the full RO,ES list so
+ * cross-country search works. Otherwise pass the hint through verbatim
+ * (legacy / future single-country use cases).
+ */
+const expandSearchCountries = (hint: string | undefined): string | undefined => {
+  if (!hint) return undefined;
+  const upper = hint.toUpperCase();
+  return ROUTING_COUNTRY_SET.has(upper) ? ROUTING_COUNTRY_LIST : upper;
+};
 
 // ---------------------------------------------------------------------------
 // Mapbox Search Box API v1 response types
@@ -390,8 +416,9 @@ export const mapboxAutocomplete = async (
     suggestParams.set('language', payload.locale);
   }
 
-  if (payload.countryHint) {
-    suggestParams.set('country', payload.countryHint.toUpperCase());
+  const searchCountries = expandSearchCountries(payload.countryHint);
+  if (searchCountries) {
+    suggestParams.set('country', searchCountries);
   }
 
   const suggestUrl = `${MAPBOX_SEARCHBOX_BASE}/suggest?${suggestParams.toString()}`;
@@ -534,8 +561,9 @@ export const mapboxReverseGeocode = async (
     params.set('language', payload.locale);
   }
 
-  if (payload.countryHint) {
-    params.set('country', payload.countryHint.toUpperCase());
+  const reverseCountries = expandSearchCountries(payload.countryHint);
+  if (reverseCountries) {
+    params.set('country', reverseCountries);
   }
 
   const url = `${MAPBOX_GEOCODING_BASE}/reverse?${params.toString()}`;

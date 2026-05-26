@@ -15,8 +15,9 @@ import type {
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
+  SupportedCountry,
 } from '@defensivepedal/core';
-import { encodePolyline, extractRouteFeatures } from '@defensivepedal/core';
+import { encodePolyline, extractRouteFeatures, isRouteSupported } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -26,8 +27,26 @@ import { getAccessToken } from './supabase';
 // Constants
 // ---------------------------------------------------------------------------
 
-const OSRM_API_BASE = 'https://osrm.defensivepedal.com/route/v1/bicycle';
-const OSRM_FLAT_API_BASE = 'https://osrm-flat.defensivepedal.com/route/v1/bicycle';
+/**
+ * Per-country OSRM endpoints. Both endpoints of a ride must resolve to the
+ * same country (OSRM data is partitioned per server) — see `isRouteSupported`
+ * in `@defensivepedal/core`. Adding a new country = one entry here + one
+ * bbox in `countryCoverage.ts`.
+ *
+ * Risk segments are currently RO-only; ES routes still render but without
+ * colored risk overlays until `road_risk_data` is populated for Spain.
+ */
+const OSRM_BASES: Record<SupportedCountry, { safe: string; flat: string }> = {
+  RO: {
+    safe: 'https://osrm.defensivepedal.com/route/v1/bicycle',
+    flat: 'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
+  },
+  ES: {
+    safe: 'https://osrm-es.defensivepedal.com/route/v1/bicycle',
+    flat: 'https://osrm-es-flat.defensivepedal.com/route/v1/bicycle',
+  },
+};
+
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -130,6 +149,7 @@ const buildCoordString = (
 };
 
 const fetchOsrmRoutes = async (
+  country: SupportedCountry,
   origin: Coordinate,
   destination: Coordinate,
   avoidUnpaved: boolean,
@@ -140,7 +160,7 @@ const fetchOsrmRoutes = async (
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
   // Use flat-profile endpoint when avoidHills is set (separate OSRM instance)
-  const base = avoidHills ? OSRM_FLAT_API_BASE : OSRM_API_BASE;
+  const base = avoidHills ? OSRM_BASES[country].flat : OSRM_BASES[country].safe;
   let url = `${base}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
@@ -347,16 +367,28 @@ export const directPreviewRoute = async (
 ): Promise<RoutePreviewResponse> => {
   const origin = request.startOverride ?? request.origin;
   const destination = request.destination;
-  const mode = request.mode;
-
-  const source: 'custom_osrm' | 'mapbox' =
-    mode === 'safe' ? 'custom_osrm' : 'mapbox';
-
+  const requestedMode = request.mode;
   const waypoints = request.waypoints;
 
+  // Resolve country support up-front. UI gates upstream should prevent a
+  // safe/flat request landing outside a supported country, but we degrade
+  // here too as defense-in-depth: silent fall-back to Mapbox fast routing.
+  const support = isRouteSupported(origin, destination);
+  const canUseOsrm = support.supported;
+  const effectiveMode = requestedMode === 'safe' && !canUseOsrm ? 'fast' : requestedMode;
+  const source: 'custom_osrm' | 'mapbox' =
+    effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
+
   const rawRoutes =
-    mode === 'safe'
-      ? await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, request.avoidHills, waypoints)
+    effectiveMode === 'safe' && support.supported
+      ? await fetchOsrmRoutes(
+          support.country,
+          origin,
+          destination,
+          request.avoidUnpaved,
+          request.avoidHills,
+          waypoints,
+        )
       : await fetchMapboxRoutes(origin, destination, waypoints);
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
@@ -377,9 +409,18 @@ export const directPreviewRoute = async (
     ),
   );
 
-  // Compute safe vs fast risk comparison if enabled
+  // Compute safe vs fast risk comparison if enabled — only meaningful when
+  // we actually have an OSRM safe route to compare against, AND the country
+  // has road_risk_data populated. Today that's RO only; suppress for ES until
+  // Spanish risk data ships, otherwise the comparison runs against empty
+  // segments and produces misleading "similar safety" labels.
+  const comparisonEligible =
+    request.showRouteComparison &&
+    support.supported &&
+    support.country === 'RO';
+
   let comparisonLabel: string | undefined;
-  if (request.showRouteComparison && enrichedRoutes.length > 0) {
+  if (comparisonEligible && enrichedRoutes.length > 0) {
     try {
       const avgRisk = (segments: readonly RiskSegment[]) => {
         if (segments.length === 0) return 0;
@@ -390,7 +431,7 @@ export const directPreviewRoute = async (
       const currentSegments = enrichedRoutes[0].riskSegments;
       let comparisonSegments: readonly RiskSegment[] = [];
 
-      if (mode === 'safe') {
+      if (effectiveMode === 'safe') {
         // Fetch fast route for comparison
         const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints);
         if (fastRawRoutes.length > 0) {
@@ -399,8 +440,15 @@ export const directPreviewRoute = async (
           comparisonSegments = fastEnriched.riskSegments;
         }
       } else {
-        // Fetch safe route for comparison
-        const safeRawRoutes = await fetchOsrmRoutes(origin, destination, request.avoidUnpaved, request.avoidHills, waypoints);
+        // Fetch safe route for comparison — guarded by support.supported above
+        const safeRawRoutes = await fetchOsrmRoutes(
+          support.country,
+          origin,
+          destination,
+          request.avoidUnpaved,
+          request.avoidHills,
+          waypoints,
+        );
         if (safeRawRoutes.length > 0) {
           const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0);
           const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);
@@ -416,7 +464,7 @@ export const directPreviewRoute = async (
           ? Math.round(Math.abs(1 - currentAvg / comparisonAvg) * 100)
           : 0;
 
-        if (mode === 'safe') {
+        if (effectiveMode === 'safe') {
           if (currentAvg < comparisonAvg) {
             comparisonLabel = diffPercent >= 1
               ? `${diffPercent}% safer than fast route`
@@ -427,7 +475,7 @@ export const directPreviewRoute = async (
           } else {
             comparisonLabel = 'Same safety as fast route';
           }
-        } else if (mode === 'fast') {
+        } else if (effectiveMode === 'fast') {
           if (currentAvg > comparisonAvg) {
             comparisonLabel = diffPercent >= 1
               ? `${diffPercent}% less safe than safe route`
@@ -444,16 +492,24 @@ export const directPreviewRoute = async (
     }
   }
 
+  // Country code reflects what we resolved from GPS, not what the client
+  // hinted. Falls back to the legacy `countryHint` for backwards-compat with
+  // request shapes that pre-date GPS-based resolution.
+  const resolvedCountryCode =
+    support.supported
+      ? support.country
+      : support.originCountry ?? request.countryHint?.toUpperCase() ?? 'UNKNOWN';
+
   const coverage: CoverageRegion = {
-    countryCode: request.countryHint?.toUpperCase() ?? 'UNKNOWN',
-    status: 'supported',
-    safeRouting: true,
+    countryCode: resolvedCountryCode,
+    status: support.supported ? 'supported' : 'unsupported',
+    safeRouting: support.supported,
     fastRouting: true,
   };
 
   return {
     routes: enrichedRoutes,
-    selectedMode: mode,
+    selectedMode: effectiveMode,
     coverage,
     comparisonLabel,
     generatedAt: new Date().toISOString(),
