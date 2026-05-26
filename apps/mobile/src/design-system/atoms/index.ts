@@ -66,3 +66,6 @@ export type { HoloStickerProps } from './HoloSticker';
 
 export { BadgeVisual } from './BadgeVisual';
 export type { BadgeVisualProps } from './BadgeVisual';
+
+export { HoloMedallion } from './HoloMedallion';
+export type { HoloMedallionProps } from './HoloMedallion';

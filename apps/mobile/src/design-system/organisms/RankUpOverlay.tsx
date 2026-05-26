@@ -8,7 +8,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -16,14 +15,13 @@ import {
   useWindowDimensions,
   AccessibilityInfo,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { RiderTierName } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
+import { HoloMedallion } from '../atoms/HoloMedallion';
 import { TierPill } from '../atoms/TierPill';
 import { riderTiers, type RiderTierKey } from '../tokens/tierColors';
-import { hasTierImage, tierImages } from '../tokens/tierImages';
 import { fontFamily } from '../tokens/typography';
 import { space } from '../tokens/spacing';
 import { radii } from '../tokens/radii';
@@ -185,17 +183,11 @@ export const RankUpOverlay = React.memo(function RankUpOverlay({
         <TierPill tier={oldTier} size="md" />
       </Animated.View>
 
-      {/* Mascot / fallback icon */}
+      {/* Holographic medallion — frame + engraved tier name + drop shadow
+          are baked into the source PNG, so we render it flush at hero size
+          without the legacy white circle wrapper or Ionicons fallback. */}
       <Animated.View style={{ transform: [{ scale: mascotScale }], marginBottom: space[3] }}>
-        {hasTierImage(tierKey) ? (
-          <View style={styles.mascotImageWrap}>
-            <Image source={tierImages[tierKey]} style={styles.mascotImageInner} resizeMode="cover" />
-          </View>
-        ) : (
-          <View style={[styles.mascotCircle, { borderColor: tierColor }]}>
-            <Ionicons name="bicycle" size={64} color={tierColor} />
-          </View>
-        )}
+        <HoloMedallion tier={tierKey} size={160} />
       </Animated.View>
 
       {/* New tier pill */}
@@ -268,28 +260,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  mascotImageWrap: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  },
-  mascotImageInner: {
-    width: 156,
-    height: 156,
-  },
-  mascotCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   tierName: {
     fontSize: 24,

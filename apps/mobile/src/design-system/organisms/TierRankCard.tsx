@@ -7,20 +7,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   type LayoutChangeEvent,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type { RiderTierName } from '@defensivepedal/core';
 
+import { HoloMedallion } from '../atoms/HoloMedallion';
 import { useTheme, type ThemeColors } from '../ThemeContext';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { riderTiers, getNextTier, getTierProgress, getXpToNextTier, type RiderTierKey } from '../tokens/tierColors';
-import { hasTierImage, tierImages } from '../tokens/tierImages';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
@@ -102,18 +100,13 @@ export const TierRankCard = React.memo(function TierRankCard({
   return (
     <View style={s.container}>
       <View style={s.row}>
-        {/* Left column: icon + tier name */}
+        {/* Left column: holographic medallion + tier name. The medallion
+            PNG bakes in the iridescent frame + engraved tier name + drop
+            shadow, so we drop the legacy white circle wrapper and the
+            tier-color fallback ring — the medallion is self-contained. */}
         {showMascot && (
           <View style={s.leftCol}>
-            {hasTierImage(key) ? (
-              <View style={s.mascotCircle}>
-                <Image source={tierImages[key]} style={s.mascotImage} resizeMode="cover" />
-              </View>
-            ) : (
-              <View style={[s.mascotFallback, { borderColor: tierDef.color }]}>
-                <Ionicons name="bicycle" size={28} color={tierDef.color} />
-              </View>
-            )}
+            <HoloMedallion tier={key} size={64} />
             <Text style={[s.tierName, { color: tierDef.color }]}>{tierDef.displayName}</Text>
           </View>
         )}
@@ -178,28 +171,6 @@ const createStyles = (colors: ThemeColors) =>
     leftCol: {
       alignItems: 'center',
       gap: space[2],
-    },
-    mascotCircle: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      backgroundColor: '#FFFFFF',
-      overflow: 'hidden' as const,
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-    },
-    mascotImage: {
-      width: 72,
-      height: 72,
-    },
-    mascotFallback: {
-      width: 56,
-      height: 56,
-      borderRadius: radii.md,
-      borderWidth: 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.bgSecondary,
     },
     tierName: {
       fontSize: 12,
