@@ -1,0 +1,33 @@
+v0.2.81 — Spain search fix #2 (preview)
+
+v0.2.80 only helped when GPS hadn't resolved or the rider was outside
+RO/ES. Once GPS landed in Romania, the autocomplete locked to Romania
+and Spanish addresses (e.g. "Madrid") still returned nothing.
+
+Fix: Mapbox's `country=` filter now always carries BOTH supported
+routing countries (`country=RO,ES`) whenever the rider is inside any
+one of them. That way:
+
+  - Romanian rider typing "Madrid" → Madrid shows up.
+  - Spanish rider typing "Bucharest" → Bucharest shows up.
+  - Local autocomplete is unaffected — proximity bias keeps nearby
+    results on top, the cross-country addresses just become reachable
+    too.
+  - Rider outside RO + ES (e.g. France) → no country restriction at
+    all, global proximity-biased search (same as v0.2.80).
+
+Reverse-geocode (the "what address is this point?" labeller used
+during long-press destination picking and recent-location naming)
+got the same expansion.
+
+What to test:
+
+  - Romania (physical GPS): type "Atocha" or "Plaza Mayor" — Madrid
+    addresses should now appear in destination autocomplete.
+  - Spain (mock-location Madrid): type "Calea Victoriei" — Bucharest
+    should show up.
+  - Both directions: regional autocomplete ("Strada Lipscani" in RO,
+    "Calle Mayor" in ES) should still return clean local results.
+
+The osrm-es routing dispatch and the unsupported-region banner from
+v0.2.79 are unchanged.

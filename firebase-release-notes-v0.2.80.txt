@@ -1,0 +1,41 @@
+v0.2.80 — Spain search fix (preview)
+
+Fixes the v0.2.79 bug where destination + start-override autocomplete only
+returned Romanian addresses, even when the rider was in Spain.
+
+Root cause: the `countryHint` field on the persisted route request defaulted
+to 'RO', which got piped straight into Mapbox's `country=` filter — locking
+all autocomplete to Romania regardless of GPS. The `useResolvedCountry` hook
+updated the hint to 'ES' once GPS resolved, but until then (and across
+fresh installs, and for anyone outside RO/ES), search stayed RO-only.
+
+What changed:
+
+  - Default `countryHint` is now `undefined`, so a cold-start search with
+    no GPS gives proximity-biased global results (no country filter).
+  - When GPS resolves to Romania → `countryHint='RO'` (Romania-restricted).
+  - When GPS resolves to Spain → `countryHint='ES'` (Spain-restricted).
+  - When GPS resolves outside RO/ES → `countryHint` is CLEARED to undefined
+    (no longer leaves a stale value behind), so the rider gets global
+    search again instead of accidentally Romanian results.
+
+What to test:
+
+  - Spain (mock-location Madrid)
+    Type "Atocha", "Plaza Mayor", or any Spanish street/POI in either the
+    destination field or the "Change start" field. Should return Spanish
+    addresses near the mock GPS, not Romanian ones.
+
+  - Romania (regression check)
+    Type "Piața Unirii", "Calea Victoriei", or any Romanian destination.
+    Should work exactly as before — Romanian results biased to your GPS.
+
+  - Outside RO + ES (e.g. mock-location Paris)
+    Type "Eiffel" or any local street name. Should now return French
+    results (was returning nothing or Romanian junk in v0.2.79).
+
+  - Recent destinations and saved routes are unaffected — they replay
+    from persisted state, no Mapbox lookup.
+
+Spain routing dispatch (osrm-es / osrm-es-flat) is unchanged from v0.2.79.
+This build is purely the search fix.

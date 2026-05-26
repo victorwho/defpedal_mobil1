@@ -1,0 +1,73 @@
+v0.2.79 — Spain routing support (preview)
+
+This build adds Defensive Pedal's safe-routing coverage to Spain. Two new
+OSRM servers are now live: osrm-es.defensivepedal.com for safety-optimal
+routing and osrm-es-flat.defensivepedal.com for climb-avoidance. The app
+automatically picks the right server based on the rider's location.
+
+What to test:
+
+  - Romania (unchanged baseline)
+    Plan and start a ride anywhere in Romania. Safe / Fast / Flat pills
+    should appear as before. The routes themselves and the safe-vs-fast
+    comparison label should be identical to v0.2.78. Nothing should
+    have regressed.
+
+  - Spain (the new path)
+    If you can set a mock location to Madrid or Barcelona, plan a ride
+    locally. Expected:
+      - Safe / Fast / Flat pills are visible.
+      - "Safe" calls osrm-es.defensivepedal.com under the hood.
+      - "Flat" calls osrm-es-flat.defensivepedal.com under the hood.
+      - "Fast" still calls Mapbox cycling.
+      - Risk distribution card may show empty / be hidden — Spain
+        road_risk_data isn't populated yet. The safe-vs-fast comparison
+        label is intentionally suppressed for ES routes for the same
+        reason. Both behaviours are expected, not bugs.
+
+  - Outside Romania and Spain
+    If you can mock a location in France, Germany, or anywhere not RO /
+    ES, plan a ride. Expected:
+      - Safe and Flat pills are HIDDEN.
+      - A coverage-notice strip appears under the search field with
+        the message: "Safe routing isn't available in your area yet —
+        using standard cycling routes."
+      - Only Mapbox cycling routes are returned.
+
+  - Destination in unsupported country
+    Origin in Bucharest, destination in Paris (or any non-RO/ES point).
+    Expected: a coverage-notice reading "Your destination is outside
+    our safe-routing coverage — using standard cycling routes." Safe /
+    Flat pills hidden, Fast forced.
+
+  - Cross-border RO <-> ES
+    Origin in Bucharest, destination in Madrid (silly cycling route
+    but useful as a test). Expected: a coverage-notice reading "Safe
+    routing works within a single country — using standard cycling
+    routes for this cross-border ride."
+
+  - Coverage drift mid-session
+    Plan a Bucharest route, then mock-move your location to Madrid
+    without restarting. Expected: any stale Romanian preview should
+    clear, mode flips to Fast, banner appears, pills hidden.
+
+Known limitations:
+
+  - Spanish UI strings are deferred. The coverage banner ships in EN
+    and RO only this build.
+  - Spain road_risk_data is empty in Supabase. When that ships, the
+    safe-vs-fast comparison + risk distribution card will turn back
+    on for ES rides automatically.
+  - Canary Islands are intentionally excluded from the Spain bbox for
+    v1 (no OSRM data shipped there yet). A Canary-Islands ride will
+    fall back to Mapbox cycling like any unsupported region.
+
+Implementation notes for the curious:
+
+  - All routing dispatch lives in apps/mobile/src/lib/mapbox-routing.ts.
+  - Country resolution is a pure bounding-box function in
+    packages/core/src/countryCoverage.ts (16 unit tests).
+  - Server side mirrors the dispatch in
+    services/mobile-api/src/lib/clients/customOsrm.ts.
+  - 25/25 mobile-routing tests + 16/16 country-coverage tests pass.
+  - typecheck, bundle check, and 504 server tests pass.

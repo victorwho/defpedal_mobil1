@@ -1,0 +1,38 @@
+v0.2.82 — Cross-border check now follows the effective routing origin (preview)
+
+Fixes the v0.2.81 bug where the "Safe routing works within a single country
+— using standard cycling routes for this cross-border ride" banner triggered
+on intra-Spain routes planned from a Romanian phone (or vice versa).
+
+Root cause: the country-support check used `routeRequest.origin` (your
+physical GPS), but the actual route uses `getPreviewOrigin(routeRequest)` —
+which honors `startOverride ?? origin`. If you tapped "Change start" and
+set a Spanish address while sitting in Romania, the hook still saw
+Romania → Spain and flagged it as cross-border, even though the routed
+ride was Madrid → Barcelona (intra-Spain, fully supported).
+
+What changed:
+
+  - `useResolvedCountry` now resolves country support from the EFFECTIVE
+    origin (the one the router will actually use), matching what the OSRM
+    dispatcher does. Intra-Spain routes planned via Change-Start now
+    correctly show Safe / Fast / Flat pills, no cross-border banner.
+  - The `countryHint` side-effect (which biases Mapbox autocomplete)
+    stays on the PHYSICAL origin — search should follow where you are,
+    not where you're planning from on the map. With the v0.2.81 RO+ES
+    expansion, this only affects which single ISO code is stored
+    internally; autocomplete restricts to both regardless.
+
+What to test:
+
+  - Change-Start = Madrid, Destination = Barcelona, physical GPS = Romania:
+    cross-border banner should NOT appear. Safe / Fast / Flat pills are
+    visible. Route uses osrm-es.
+  - Change-Start = Barcelona, Destination = Madrid, physical GPS = Romania:
+    same as above — supported intra-Spain ride.
+  - Change-Start = Bucharest, Destination = Madrid (genuine cross-border):
+    cross-border banner DOES appear, Fast forced. (Still correct.)
+  - No Change-Start, physical GPS = Spain, Destination = Barcelona:
+    works as before (v0.2.79 behavior).
+
+Search expansion (RO,ES) from v0.2.81 is unchanged.

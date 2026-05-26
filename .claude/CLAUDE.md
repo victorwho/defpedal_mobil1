@@ -569,13 +569,16 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 - Key tables: `road_risk_data`, `hazards`, `trips`, `trip_tracks`, `navigation_feedback`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `profiles`, `push_tokens`, `leaderboard_snapshots`
 - Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`, `get_neighborhood_leaderboard`, `check_champion_repeat_badges`
 
-### OSRM Server
-- Standard (safe): `https://osrm.defensivepedal.com/route/v1/bicycle` (Caddy + Let's Encrypt TLS in front of port 5000)
-- Flat (avoid hills): `https://osrm-flat.defensivepedal.com/route/v1/bicycle` (Caddy in front of port 5001 — same path; the subdomain alone selects the container)
-- Direct IP (debugging only, plaintext): `http://34.116.139.172:5000` and `:5001` — not used by the app, exceptions removed from manifests
+### OSRM Servers (per country)
+- **Romania safe**: `https://osrm.defensivepedal.com/route/v1/bicycle` (Caddy + Let's Encrypt TLS in front of port 5000)
+- **Romania flat**: `https://osrm-flat.defensivepedal.com/route/v1/bicycle` (Caddy in front of port 5001 — same path; the subdomain alone selects the container)
+- **Spain safe**: `https://osrm-es.defensivepedal.com/route/v1/bicycle`
+- **Spain flat**: `https://osrm-es-flat.defensivepedal.com/route/v1/bicycle`
+- Direct IP (RO, debugging only, plaintext): `http://34.116.139.172:5000` and `:5001` — not used by the app, exceptions removed from manifests
 - Hosted on GCP project `osrmro1` in `europe-central2-c`
 - Custom safety profile using OSM road attributes
 - Supports `&exclude=unpaved` parameter
+- **Country dispatch**: both client (`apps/mobile/src/lib/mapbox-routing.ts` `OSRM_BASES`) and server (`services/mobile-api/src/lib/clients/customOsrm.ts`) resolve country from the ride's origin+destination via `isRouteSupported` in `@defensivepedal/core` (`packages/core/src/countryCoverage.ts`). Both endpoints must resolve to the same country — cross-border rides fall back to Mapbox cycling with a banner notice on `route-planning`. Bbox coverage = RO mainland + ES mainland + Balearics. **Canary Islands excluded** for v1 (no OSRM data shipped). Adding a new country = one entry in `OSRM_BASES` + one bbox in `COUNTRY_BBOXES`. `road_risk_data` is RO-only today; Spain routes render without colored risk segments and the safe-vs-fast comparison label is suppressed until ES risk data ships.
 
 ### GitHub
 - Repo: `victorwho/defpedal_mobil1`
