@@ -40,3 +40,13 @@ jobs:
 
       - name: Run validation suite
         run: npm run validate
+
+      - name: Run unit tests
+        # Phase 4 (error-reduction plan, completed 2026-05-25) — runs vitest
+        # in every workspace that has a `test` script (core, mobile-api,
+        # mobile). The mobile workspace excludes 3 collection-failing test
+        # files (LeaderboardSection / HazardDetailSheet / FeedCard.champion)
+        # via vitest.config.ts; ConnectivityMonitor.test.tsx skips 4 specs
+        # that need the production NetInfo guard refactored to be mockable.
+        # See sentryfix.md > "P3b Day 3 + mobile test rescue" for context.
+        run: npm test
