@@ -12,6 +12,7 @@ export * from './routeFeatures';
 export * from './routeRequest';
 export * from './routeAnalysis';
 export * from './reviewEligibility';
+export * from './ridePattern';
 export * from './riskDistribution';
 export * from './shareCaption';
 export * from './shareCodeGenerator';

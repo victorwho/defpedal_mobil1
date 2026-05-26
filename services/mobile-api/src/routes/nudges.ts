@@ -22,6 +22,7 @@
 
 import type { ErrorResponse, NudgeTrigger } from '@defensivepedal/core';
 import {
+  computeRidePattern,
   getTriggerPriority,
   isAfterSunset,
   isBadCyclingWeather,
@@ -304,6 +305,35 @@ export const buildNudgeRoutes = (
               }
               return true;
             });
+
+            // daily_ride_reminder: load this user's ride pattern and add
+            // the candidate if (a) we have a confident pattern, (b) the
+            // current local hour is ~1h before their typical start, (c)
+            // they haven't qualified today, and (d) we haven't already
+            // fired this trigger in the last 22h.
+            if (!qualifiedToday) {
+              const shouldAddDailyRide = await isDailyRideReminderEligible(
+                db,
+                userId,
+                profile.timezone,
+              );
+              if (shouldAddDailyRide) {
+                liveCandidates.push('daily_ride_reminder');
+              }
+            }
+
+            // community_signal: surface a once-per-week ping when the
+            // rider's leaderboard rank dropped ≥3 positions between the
+            // two most recent weekly snapshots. Skip if we already fired
+            // it this week.
+            const shouldAddCommunitySignal = await isCommunitySignalEligible(
+              db,
+              userId,
+            );
+            if (shouldAddCommunitySignal) {
+              liveCandidates.push('community_signal');
+            }
+
             if (liveCandidates.length === 0) continue;
 
             const pushesLast24h = await countPushesLast24h(db, userId);
@@ -526,7 +556,7 @@ export const buildNudgeRoutes = (
       },
     );
 
-    // ───────────────────────── POST /v1/nudges/recompute-pattern (cron stub) ─────────────────────────
+    // ───────────────────────── POST /v1/nudges/recompute-pattern (cron) ─────────────────────────
     app.post<{ Reply: { updated: number } | ErrorResponse }>(
       '/nudges/recompute-pattern',
       {
@@ -541,10 +571,92 @@ export const buildNudgeRoutes = (
       },
       async (request) => {
         ensureCronAuth(request.headers.authorization);
-        // Phase 1 stub. The user_ride_pattern table is in place; the
-        // computation logic (14-day mode of ride-start hour, confidence)
-        // lands in Phase 2 with the adaptive-timing feature.
-        return { updated: 0 };
+
+        if (!areNudgesEnabled()) {
+          request.log.info(
+            { event: 'nudge_pattern_kill_switch' },
+            'nudges disabled — /recompute-pattern no-op',
+          );
+          return { updated: 0 };
+        }
+
+        const db = ensureSupabase();
+
+        // Walk profiles opted into streak nudges (notify_streak=true). The
+        // pattern only matters for these riders since daily_ride_reminder
+        // is the only consumer. Cap at 5000 / run to keep latency bounded.
+        const { data: profileRows, error } = await db
+          .from('profiles')
+          .select('id, quiet_hours_timezone')
+          .eq('notify_streak', true)
+          .limit(5000);
+
+        if (error) {
+          request.log.error(
+            { event: 'nudge_pattern_query_error', error: error.message },
+            'recompute-pattern query failed',
+          );
+          throw new HttpError('Pattern query failed.', {
+            statusCode: 500,
+            code: 'INTERNAL_ERROR',
+            details: [error.message],
+          });
+        }
+
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+        let updated = 0;
+
+        for (const row of (profileRows ?? []) as Array<{
+          id: string;
+          quiet_hours_timezone: string | null;
+        }>) {
+          try {
+            const tz = row.quiet_hours_timezone ?? 'Europe/Bucharest';
+            const { data: trips } = await db
+              .from('trips')
+              .select('started_at')
+              .eq('user_id', row.id)
+              .gte('started_at', fourteenDaysAgo)
+              .not('started_at', 'is', null)
+              .limit(200);
+
+            const starts = (trips ?? [])
+              .map((t: { started_at: string | null }) => t.started_at)
+              .filter((s): s is string => !!s);
+
+            if (starts.length === 0) continue;
+
+            const pattern = computeRidePattern(starts, tz);
+            if (!pattern) continue;
+
+            await db.from('user_ride_pattern').upsert(
+              {
+                user_id: row.id,
+                typical_start_hour: pattern.typicalStartHour,
+                confidence: pattern.confidence,
+                sample_count: pattern.sampleCount,
+                last_computed_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id' },
+            );
+            updated++;
+          } catch (err) {
+            request.log.warn(
+              {
+                event: 'nudge_pattern_user_error',
+                userId: row.id,
+                error: (err as Error).message,
+              },
+              'pattern recompute failed for user',
+            );
+          }
+        }
+
+        request.log.info(
+          { event: 'nudge_pattern_complete', updated },
+          'nudges/recompute-pattern complete',
+        );
+        return { updated };
       },
     );
   };
@@ -765,6 +877,103 @@ const daysBetween = (lastDate: string | null, today: Date): number | undefined =
   if (!lastDate) return undefined;
   const last = new Date(`${lastDate}T00:00:00Z`).getTime();
   return Math.floor((today.getTime() - last) / (24 * 60 * 60 * 1000));
+};
+
+/**
+ * Daily-ride-reminder candidate gate. Returns true when:
+ *   - user_ride_pattern.typical_start_hour is set with confidence >= 0.4
+ *   - current local hour == typical_start_hour - 1
+ *   - no daily_ride_reminder fired in the last 22h
+ *
+ * Lookup is cheap (single-row), and we only call this for users already
+ * in the candidate map so the load is bounded by the cron's user cap.
+ */
+const RIDE_REMINDER_MIN_CONFIDENCE = 0.4;
+
+const isDailyRideReminderEligible = async (
+  db: ReturnType<typeof ensureSupabase>,
+  userId: string,
+  timezone: string,
+  now: Date = new Date(),
+): Promise<boolean> => {
+  const { data } = await db
+    .from('user_ride_pattern')
+    .select('typical_start_hour, confidence')
+    .eq('user_id', userId)
+    .maybeSingle();
+  const row = data as {
+    typical_start_hour: number | null;
+    confidence: number | null;
+  } | null;
+  if (!row || row.typical_start_hour === null) return false;
+  if ((row.confidence ?? 0) < RIDE_REMINDER_MIN_CONFIDENCE) return false;
+
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    hour12: false,
+    timeZone: timezone,
+  });
+  const currentHour = Number.parseInt(fmt.format(now), 10);
+  if (!Number.isFinite(currentHour)) return false;
+
+  // Fire window: exactly one hour before typical start. Cron runs every
+  // 30 min so the user's "1h before" hour gets two evaluation chances.
+  const targetHour = (row.typical_start_hour - 1 + 24) % 24;
+  if (currentHour !== targetHour) return false;
+
+  // Dedup — don't fire twice within the same 22h window.
+  return !(await hasRecentNudge(
+    db,
+    userId,
+    'daily_ride_reminder',
+    22 * 60 * 60 * 1000,
+  ));
+};
+
+/**
+ * community_signal candidate gate. Returns true when the user's CO2-metric
+ * leaderboard rank dropped by 3+ positions between their two most recent
+ * weekly snapshots. Once-per-week dedup via nudge_log lookback.
+ *
+ * Returns false when the user has fewer than 2 snapshots — can't compute
+ * a delta — or when the delta is too small to be motivating.
+ *
+ * Note: badge_proximity is intentionally NOT wired in this phase. The
+ * server has no badge-progress calculation today (mobile computes it
+ * client-side), so generic "1 unit to unlock X" detection is a separate
+ * scoped piece of work tracked for a follow-up PR.
+ */
+const COMMUNITY_RANK_DROP_THRESHOLD = 3;
+
+const isCommunitySignalEligible = async (
+  db: ReturnType<typeof ensureSupabase>,
+  userId: string,
+): Promise<boolean> => {
+  // Dedup — once per 6 days minimum.
+  const alreadyFired = await hasRecentNudge(
+    db,
+    userId,
+    'community_signal',
+    6 * 24 * 60 * 60 * 1000,
+  );
+  if (alreadyFired) return false;
+
+  const { data } = await db
+    .from('leaderboard_snapshots')
+    .select('rank, period_end')
+    .eq('user_id', userId)
+    .eq('period_type', 'weekly')
+    .eq('metric', 'co2')
+    .order('period_end', { ascending: false })
+    .limit(2);
+
+  const rows = (data ?? []) as Array<{ rank: number; period_end: string }>;
+  if (rows.length < 2) return false;
+
+  const currentRank = rows[0]!.rank;
+  const priorRank = rows[1]!.rank;
+  // Higher rank number = worse position. Dropping = rank increases.
+  return currentRank - priorRank >= COMMUNITY_RANK_DROP_THRESHOLD;
 };
 
 /**
