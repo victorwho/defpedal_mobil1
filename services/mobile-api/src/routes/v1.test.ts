@@ -590,11 +590,17 @@ describe('mobile-api v1 routes', () => {
       });
 
       expect(endResponse.statusCode).toBe(200);
+      // earlyEndReason / earlyEndReasonNote are appended to the payload by
+      // the route handler (added 2026-05-23, session 57 — early end-of-ride
+      // reason capture). The client doesn't send them on a 'completed' end,
+      // so the route fills both with null before persisting.
       expect(finishTripRecord).toHaveBeenCalledWith({
         clientTripId: 'client-trip-1',
         tripId: 'trip-123',
         endedAt: '2026-03-14T10:45:00.000Z',
         reason: 'completed',
+        earlyEndReason: null,
+        earlyEndReasonNote: null,
       }, 'user-123');
     } finally {
       await app.close();
