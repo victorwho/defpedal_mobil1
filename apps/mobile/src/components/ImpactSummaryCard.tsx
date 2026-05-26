@@ -8,6 +8,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { AnimatedCounter } from '../design-system/atoms/AnimatedCounter';
 import { BadgeVisual } from '../design-system/atoms/BadgeVisual';
 import { Mascot } from '../design-system/atoms/Mascot';
+import { StreakFlame } from '../design-system/atoms/StreakFlame';
 import { brandColors, darkTheme, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { shadows } from '../design-system/tokens/shadows';
@@ -28,6 +29,12 @@ type ImpactSummaryCardProps = {
   readonly rideImpact: RideImpact;
   readonly staggerDelayMs?: number;
   readonly newBadges?: readonly BadgeUnlockEvent[];
+  /**
+   * Current streak day count post-save. When provided, a tier-aware
+   * StreakFlame block animates above the existing impact stagger,
+   * reinforcing the streak +1 win at the moment of victory.
+   */
+  readonly streakCount?: number;
 };
 
 // ---------------------------------------------------------------------------
@@ -138,10 +145,43 @@ const StaggeredBadge = ({
   );
 };
 
+// ---------------------------------------------------------------------------
+// StreakFlash — animated entry that springs from N-1 to N on mount so the
+// "+1 streak" moment lands at the start of the impact celebration.
+// ---------------------------------------------------------------------------
+
+const StreakFlash = ({ count }: { count: number }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 320, useNativeDriver: true }),
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 6,
+        tension: 60,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [opacity, scale]);
+
+  return (
+    <Animated.View
+      style={[styles.streakFlash, { opacity, transform: [{ scale }] }]}
+      accessibilityLabel={`Streak day ${count}`}
+    >
+      <StreakFlame streakDays={count} size="lg" animated />
+      <Text style={styles.streakFlashLabel}>day streak</Text>
+    </Animated.View>
+  );
+};
+
 export const ImpactSummaryCard = ({
   rideImpact,
   staggerDelayMs = 800,
   newBadges,
+  streakCount,
 }: ImpactSummaryCardProps) => {
   const tierKey = rideImpact.riderTier as RiderTierKey;
   const tierDef = riderTiers[tierKey];
@@ -155,6 +195,11 @@ export const ImpactSummaryCard = ({
       <View style={styles.stickerStamp} pointerEvents="none">
         <Mascot pose="sticker" size="sm" />
       </View>
+
+      {/* Streak day +1 — animated tier-aware flame on save */}
+      {typeof streakCount === 'number' && streakCount > 0 ? (
+        <StreakFlash count={streakCount} />
+      ) : null}
 
       {/* Badges earned this ride */}
       {newBadges && newBadges.length > 0 ? (
@@ -271,6 +316,22 @@ const styles = StyleSheet.create({
     right: -8,
     transform: [{ rotate: '8deg' }],
     zIndex: 2,
+  },
+  streakFlash: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[3],
+    paddingVertical: space[3],
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(212, 168, 67, 0.08)',
+  },
+  streakFlashLabel: {
+    ...textSm,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   sectionTitle: {
     ...textSm,

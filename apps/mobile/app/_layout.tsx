@@ -23,6 +23,7 @@ import { tierColors } from '../src/design-system/tokens/badgeColors';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
+import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
@@ -266,9 +267,28 @@ const RootLayoutInner = () => {
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
       <WeatherNoticeManager />
+      <MeetPedalCardManager />
       <RouteShareDeepLinkHandler />
     </>
   );
+};
+
+/**
+ * Shows MeetPedalCard once after the first completed ride. Gates on
+ * `hasSeenMeetPedalCard` (persisted) + completedRideCount + appState.
+ * Suppressed during NAVIGATING per the mascot quarantine rule.
+ */
+const MeetPedalCardManager = () => {
+  const hasSeen = useAppStore((s) => s.hasSeenMeetPedalCard);
+  const setHasSeen = useAppStore((s) => s.setHasSeenMeetPedalCard);
+  const completedRides = useAppStore((s) => s.completedRideCount);
+  const appState = useAppStore((s) => s.appState);
+
+  // Only fire after the rider has saved at least one ride. Suppressed
+  // during navigation so it never appears over the live HUD.
+  if (hasSeen || completedRides < 1 || appState === 'NAVIGATING') return null;
+
+  return <MeetPedalCard visible onDismiss={() => setHasSeen(true)} />;
 };
 
 /** Shows the RankUpOverlay when a tier promotion is queued in appStore. */

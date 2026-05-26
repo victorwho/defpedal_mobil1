@@ -98,6 +98,7 @@ export const profileUpdateRequestSchema = {
     quietHoursTimezone: { type: ['string', 'null'] },
     shareConversionFeedOptin: { type: 'boolean' },
     keepFullGpsHistory: { type: 'boolean' },
+    pedalVoiceSassy: { type: 'boolean' },
   },
 } as const;
 
