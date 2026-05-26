@@ -151,7 +151,11 @@ export const Dimensions = {
   get: () => ({ width: 375, height: 812 }),
 };
 
-export const NativeModules = {};
+// `RNCNetInfo` is populated by default so ConnectivityProvider (and its tests)
+// proceed past its native-module guard. The actual NetInfo behaviour is
+// supplied by `vi.mock('@react-native-community/netinfo', ...)` per test.
+// Set to a plain object — only its truthiness matters to the guard.
+export const NativeModules: Record<string, unknown> = { RNCNetInfo: {} };
 export const Platform = { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default };
 export const Easing = {
   bezier: () => (t: number) => t,

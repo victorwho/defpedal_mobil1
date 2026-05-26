@@ -176,7 +176,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.77',
+    version: '0.2.79',
     icon: './assets/icon.png',
     // Global default is unlocked so non-map screens (history, community,
     // profile, settings, trophy case, onboarding) follow the OS auto-rotate
@@ -228,6 +228,12 @@ export default () => ({
       // transitive dep ever pulls it in. firebase-analytics is intentionally
       // NOT declared in app/build.gradle.
       './plugins/withAndroidFirebaseAnalyticsDisabled',
+      // P3f (sentryfix.md, 2026-05-25): inject io.sentry.tags.app_variant /
+      // app_env meta-data so native Sentry events captured before the JS
+      // beforeSend hook fires still carry the right variant tag. Values
+      // are filled in per gradle flavor via manifestPlaceholders in
+      // android/app/build.gradle.
+      './plugins/withAndroidSentryTags',
       [
         'expo-secure-store',
         {

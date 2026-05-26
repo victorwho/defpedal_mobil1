@@ -1,22 +1,23 @@
-v0.2.57 — Route feature icons
+v0.2.77 — error-reduction punch list
 
-Replaces the 2-letter placeholder labels (TN, BR, LT etc.) with proper icons:
+Big internal hardening drop. Nothing user-facing should feel different; you should be able to ride exactly as before.
 
-- Tunnel = arch shape
-- Bridge = pillars + arch
-- Traffic light = vertical 3-dot housing (will activate once data ships)
-- Left turn = curved arrow
-- Railway = X crossbuck (will activate once data ships)
+Under the hood:
+- Unified API client (apiFetch + mobileApiFetch). All 65 endpoint calls now share one timeout / retry / typed-error path.
+- Android native fatal tagging — crashes that fire before the JS bundle finishes loading now carry the right "preview" tag so we can triage them.
+- ConnectivityMonitor + offline sync touched indirectly via the new error envelope; behaviour preserved.
 
-Each icon is a single SDF master, recolored at render time to stay white against whatever tier color the marker uses (slate for tunnel, amber for bridge, red for unprotected left).
-
-Same alerts as before — bottom-right card slides in 200m / 150m / 100m before each feature. Profile > Display > "Show route features" still controls everything, on by default.
+User-visible changes (small):
+- Privacy & analytics consent SPLIT. Crash reports default ON (legitimate-interest, to help us fix bugs); product analytics defaults OFF, opt-in. If you already made a choice, it's preserved.
+- Privacy policy page updated to match.
 
 Please confirm:
-- Icons read clearly at the map zoom you actually ride at
-- The white-on-tier-color contrast looks right in both day and night map themes
-- Nothing weird happens when the alert card icon resizes during the slide-in
+- Cold-launch reaches route-planning within ~3s
+- Plan + start + end a ride works unchanged
+- Profile → Privacy & analytics: both toggles visible, crash on by default, analytics off by default (fresh install only; existing testers keep their saved values)
+- Community feed, leaderboard, trophy case all load normally (these endpoints were touched by the API client migration)
+- Hazard reporting + voting still feels normal
 
-If any icon looks off, let me know which one and I'll iterate.
+If anything crashes or feels off, screenshot + tell me which screen you were on.
 
 Feedback to the early-access invitation email.

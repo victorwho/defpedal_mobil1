@@ -1,0 +1,67 @@
+Defensive Pedal Preview v0.2.77 (build 79)
+
+ERROR-REDUCTION PLAN — PUNCH LIST COMPLETE
+
+The bulk of this build is internal hardening from the sentryfix.md
+punch list. Six big concerns landed at once. Nothing user-facing
+changes meaningfully; you should be able to use the app exactly as
+before with no UX shift to learn.
+
+INTERNAL CHANGES (no behaviour shift expected)
+
+- Unified API client: every mobileApi.* call now flows through
+  apiFetch (typed error envelope: timeout / network / http) and
+  mobileApiFetch (auth + 401-refresh). 65 call sites migrated; the
+  legacy requestJson + XHR transport are deleted. Errors now carry
+  err.kind, err.status, err.body so Sentry events are easier to
+  group instead of fanning out as "Network request failed" copies.
+  +25 unit tests; existing offline-sync classification preserved.
+
+- Native fatal tagging (Android): AndroidManifest now emits
+  io.sentry.tags.app_variant and io.sentry.tags.app_env per gradle
+  flavor (development / preview / production). Helps us triage
+  crashes that fire before the JS bundle finishes loading.
+
+- Cold-start ANR audit: closed with no code change — the cold-start
+  path was already lean. Documented in sentryfix.md so it isn't
+  re-investigated.
+
+PRIVACY & ANALYTICS — DEFAULTS SPLIT
+
+Crash reports and product analytics no longer share a single toggle.
+
+- Crash reports: ON by default. Legitimate-interest basis under
+  GDPR Art 6(1)(f) — anonymised stack traces help us fix bugs.
+  You can still disable it: Profile → Privacy & analytics.
+- Product analytics: OFF by default, opt-in. ePrivacy basis.
+
+Existing testers who already made an explicit choice keep their
+saved values verbatim. Only users who never made a choice see the
+new defaults applied (one-shot Zustand persist v1 migration).
+
+Privacy policy (https://defensivepedal.com/privacy) updated to match.
+
+WHAT TO VERIFY ON YOUR PHONE
+
+- Cold-launch the app — should reach route-planning within ~3 s.
+- Plan + start + end a ride — nothing in the API client refactor
+  should change the trip flow.
+- Settings → Profile → Privacy & analytics — both toggles visible,
+  crash reports default on, analytics default off (if you're a
+  fresh install). If you're upgrading, your saved values are
+  preserved.
+- Pull-to-refresh on community feed, leaderboard, trophy case —
+  these endpoints had their boundary validation kept while the
+  underlying transport was rewritten.
+
+CI + TEST INFRA (no tester impact)
+
+- Root `npm test` gate flipped on in CI. 2088 passing across core,
+  mobile-api, and mobile. 4 specs skipped + 3 files excluded with
+  TODO notes; the runtime behaviour is otherwise covered.
+- Phase 4 pre-release smoke checklist now lives at
+  apkreleases/release-notes-template.txt.
+- CLAUDE.md > Play Store Release documents the crash-free ≥ 99.5%
+  / ANR ≤ 0.47% rollout gate before bumping tier.
+
+If anything feels off, screenshot + tell me what you tapped.

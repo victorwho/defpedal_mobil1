@@ -74,6 +74,8 @@ export const buildFeedProfileRoutes = (
           updates.share_conversion_feed_optin = request.body.shareConversionFeedOptin;
         if (request.body.keepFullGpsHistory !== undefined)
           updates.keep_full_gps_history = request.body.keepFullGpsHistory;
+        if (request.body.pedalVoiceSassy !== undefined)
+          updates.pedal_voice_sassy = request.body.pedalVoiceSassy;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db

@@ -22,6 +22,19 @@ vi.mock('../../design-system/hooks/useReducedMotion', () => ({
   useReducedMotion: () => true,
 }));
 
+// StreakFlame transitively imports @expo/vector-icons/Ionicons which contains
+// Flow syntax Vite can't parse. Stub the subpath import.
+vi.mock('@expo/vector-icons/Ionicons', () => ({
+  default: ({ name, testID }: { name: string; testID?: string }) =>
+    React.createElement('span', { 'data-icon': name, 'data-testid': testID ?? name }, name),
+}));
+
+// Mascot pulls from the Zustand store. Default to mascot-on / IDLE.
+vi.mock('../../store/appStore', () => ({
+  useAppStore: (selector: (s: { showMascot: boolean; appState: string }) => unknown) =>
+    selector({ showMascot: true, appState: 'IDLE' }),
+}));
+
 // expo-router (Pressable "View all achievements" link)
 vi.mock('expo-router', () => ({
   router: { push: vi.fn(), replace: vi.fn() },
@@ -37,6 +50,14 @@ vi.mock('react-native-svg', () => ({
   Defs: () => null,
   LinearGradient: () => null,
   Stop: () => null,
+}));
+
+// Mascot atom — pose tokens are PNG `require()`s that the vitest stub plugin
+// resolves to `1`, but the import chain through mascotPoses.ts pulls in
+// `useAppStore` and other module-init paths that flake under happy-dom.
+// The mascot is decorative (no assertions touch it) so a null mock is fine.
+vi.mock('../../design-system/atoms/Mascot', () => ({
+  Mascot: () => null,
 }));
 
 const { ImpactSummaryCard } = await import('../ImpactSummaryCard');

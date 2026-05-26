@@ -1,0 +1,71 @@
+v0.2.78 — Pedal Nudge System (preview)
+
+This build contains the mobile-facing pieces of a Duolingo-style retention
+engine voiced by Pedal. The server side (cron + push delivery) isn't
+deployed yet, so nudges WON'T actually arrive on your phone in this
+preview — but the in-app surfaces are all here for visual review.
+
+What to test:
+
+  - Post-ride streak +1 animation
+    Save any ride end-to-end. The impact summary card now opens with a
+    new tier-aware streak block at the top: a colored flame icon that
+    flickers, the streak number that springs in from a 0.9 scale, and
+    the day count. Color tier should follow:
+      Day 1-6     yellow flame
+      Day 7-20    orange (Spark)
+      Day 21-41   red (Commute Habit)
+      Day 42-87   blue
+      Day 88-99   purple
+      Day 100-364 gold
+      Day 365+    rainbow gold
+
+  - Refreshed Streak card on Impact dashboard
+    Go to History tab > Impact. The streak card now uses the same flame
+    atom plus a tier label ("Spark", "Commute Habit", "Century" etc.)
+    in accent yellow under the day count. Flame animates gently when
+    streak >= 1.
+
+  - Meet Pedal one-time onboarding card
+    For testers signed in already with at least one saved ride, the
+    card may not appear (you've already "seen" it implicitly because
+    completed-ride count is >= 1 and the flag hadn't been set when you
+    first saved). Easiest way to see it: dev variant, fresh install,
+    save your first ride. A modal pops up: hero Pedal wave pose, title
+    "Meet Pedal", body explaining the voice, "Got it" dismisses.
+    Settings: hasSeenMeetPedalCard persists, so it never repeats.
+
+  - Profile > Pedal Nudges section
+    Profile screen has a new section between Display and Account. Two
+    toggles:
+      - Pedal voice (sassy/neutral) — flips a server-synced flag that
+        the cron will read when picking message variants once we ship
+        the back-end.
+      - Streak reminders — category opt-out for all streak-related
+        nudges (mirrors profiles.notify_streak server-side).
+
+What's NOT in this build:
+
+  - The actual nudges. They're written and tested but not delivered
+    yet. The cron endpoint, the priority queue, the message catalog,
+    the safety floor (no pushes in bad weather or after dark), the
+    streak-loss apology, the lapsed re-engagement, the rally-friends
+    share — all server-side, all tested in mocha/vitest, all dark
+    until ops wires the Cloud Scheduler jobs.
+
+Please confirm:
+
+  - The streak animation is delightful, not distracting
+  - The tier label is readable
+  - The Pedal Nudges section feels at home alongside the existing
+    Display rows (not jarring)
+  - The Meet Pedal modal copy reads right (especially "I keep things
+    light" — does it land or feel forced?)
+
+Known gaps:
+
+  - "Rainbow" flame for the Legend tier (365+ days) renders as
+    saturated gold for now. The multi-stop gradient SVG is a polish
+    item not in this build.
+  - We don't ship the Pedal pose poses for "podium" and "legend"
+    tiers yet; the atom falls back to existing trophy/excited art.

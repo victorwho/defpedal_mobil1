@@ -1,0 +1,42 @@
+Defensive Pedal <TRACK> v<VERSION> (build <BUILD>)
+
+<HEADLINE — one short uppercase line describing the theme of this release>
+
+<2–4 short paragraphs or bullets, free-form. Lead with the user-visible
+change, then call out anything reviewers/testers need to know (data-safety
+form changes, new permissions, new server revisions, native deps added).>
+
+<Optional: "Net for the JS bundle: ..." or "Cloud Run revision: ..."
+or "Migration: ..." footers when relevant.>
+
+---
+
+PRE-RELEASE SMOKE CHECKLIST  (Phase 4, error-reduction plan)
+
+Do all of the following on the just-built APK before promoting the build
+beyond your own device. Sign in with a fresh anonymous session AND a real
+Google account. Test on at least one preview-track install.
+
+  [ ] Cold launch — app reaches route-planning within ~3s, no blank screen.
+  [ ] Plan a route — destination autocomplete works; Safe/Fast/Flat toggle
+       refetches; preview screen shows risk/elevation/weather.
+  [ ] Start navigation — 3D follow camera engages; HUD shows distance/ETA;
+       hazard alerts surface if any nearby.
+  [ ] End ride — End-Ride dialog appears; Save/Discard branches both reach
+       feedback or route-planning without freezing; ride lands in History.
+  [ ] View trips — History tab loads list; tapping a card opens the replay
+       map with the GPS trail rendered.
+  [ ] Community — Community feed loads without permission prompts on the
+       second visit; City Heartbeat dashboard renders.
+  [ ] Sign in / sign out — Google sign-in succeeds (no `…supabase.co` URL
+       visible to the user); sign-out clears profile + returns to anonymous.
+
+  [ ] (production AAB only) Verify cert owner matches the upload keystore.
+       Without `DEFPEDAL_UPLOAD_*` set, Gradle silently falls back to debug
+       signing and Play will reject the bundle.
+  [ ] (production AAB only) Wait for the rollout to go live BEFORE
+       updating the Data Safety form. Hard rule: form change AFTER live
+       AAB — see CLAUDE.md > Play Store Release.
+
+If any box is unchecked, do NOT promote past 5%. File a bug, fix on a new
+build, re-run the checklist from the top.

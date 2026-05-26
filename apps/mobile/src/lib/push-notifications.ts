@@ -151,6 +151,12 @@ export const handleNotificationResponse = (
         const tone = data.tone === 'caution' ? 'caution' : 'good';
         useAppStore.getState().setWeatherNotice({ title, body, tone });
       }
+      // Explicit nav (matches every other case). On cold-start the modal
+      // would otherwise mount over a still-loading `app/index.tsx` whose
+      // `<Redirect>` can drop silently when an overlay is up — leaving the
+      // user "stuck at loading screen". OnboardingGuard still imperatively
+      // redirects anonymous users if needed.
+      router.push('/route-planning');
       break;
     }
     default:

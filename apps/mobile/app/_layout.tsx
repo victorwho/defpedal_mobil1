@@ -23,6 +23,7 @@ import { tierColors } from '../src/design-system/tokens/badgeColors';
 import { surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
+import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
@@ -32,6 +33,7 @@ import {
   useOnboardingGate,
 } from '../src/hooks/useOnboardingGate';
 import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
+import { useStoreHydrated } from '../src/hooks/useStoreHydrated';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -266,9 +268,28 @@ const RootLayoutInner = () => {
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
       <WeatherNoticeManager />
+      <MeetPedalCardManager />
       <RouteShareDeepLinkHandler />
     </>
   );
+};
+
+/**
+ * Shows MeetPedalCard once after the first completed ride. Gates on
+ * `hasSeenMeetPedalCard` (persisted) + completedRideCount + appState.
+ * Suppressed during NAVIGATING per the mascot quarantine rule.
+ */
+const MeetPedalCardManager = () => {
+  const hasSeen = useAppStore((s) => s.hasSeenMeetPedalCard);
+  const setHasSeen = useAppStore((s) => s.setHasSeenMeetPedalCard);
+  const completedRides = useAppStore((s) => s.completedRideCount);
+  const appState = useAppStore((s) => s.appState);
+
+  // Only fire after the rider has saved at least one ride. Suppressed
+  // during navigation so it never appears over the live HUD.
+  if (hasSeen || completedRides < 1 || appState === 'NAVIGATING') return null;
+
+  return <MeetPedalCard visible onDismiss={() => setHasSeen(true)} />;
 };
 
 /** Shows the RankUpOverlay when a tier promotion is queued in appStore. */
@@ -298,7 +319,14 @@ const WeatherNoticeManager = () => {
   const notice = useAppStore((s) => s.weatherNotice);
   const clearNotice = useAppStore((s) => s.clearWeatherNotice);
   const appState = useAppStore((s) => s.appState);
+  const storeHydrated = useStoreHydrated();
+  const authCtx = useAuthSessionOptional();
 
+  // Defer the Modal until persist + auth have settled. Otherwise a cold-start
+  // notification tap can mount this Modal over a still-loading `app/index.tsx`
+  // before its `<Redirect>` fires — the user sees the dark backdrop with no
+  // screen behind it and perceives the app as stuck at the loading screen.
+  if (!storeHydrated || authCtx?.isLoading) return null;
   // Suppress over the live nav HUD (same safety rule as other overlays); the
   // notice stays queued and shows once the user leaves NAVIGATING.
   if (!notice || appState === 'NAVIGATING') return null;

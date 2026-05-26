@@ -38,7 +38,8 @@
     "bundle:production": "bash ./scripts/build-preview.sh prod bundle",
     "bundle:production:apk": "bash ./scripts/build-preview.sh prod bundle apk",
     "validate:mobile": "npm run typecheck && npm run build:api",
-    "validate": "npm run validate:mobile"
+    "validate": "npm run validate:mobile",
+    "test": "npm test --workspaces --if-present"
   },
   "dependencies": {
     "@supabase/supabase-js": "2",

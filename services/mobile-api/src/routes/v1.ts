@@ -107,6 +107,7 @@ type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
 
 // Streak helpers (shared with feed.ts)
 import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
+import { fireP0Event, firePostRideEventsAsync } from '../lib/nudges/eventFirer';
 import { QUIZ_QUESTIONS, findQuizQuestion } from '../data/quiz-questions';
 
 const buildEmptyRouteResponse = (
@@ -502,6 +503,9 @@ export const buildV1Routes = (
         try {
           const result = await dependencies.finishTripRecord(normalizeTripEndRequest(request.body), user.id);
           qualifyStreakAsync(user.id, 'ride', getTimezone(request), request.log);
+          // P0 nudges: post-ride celebration + milestone (if streak just crossed one).
+          // Fire-and-forget; never blocks the response.
+          firePostRideEventsAsync(user.id, request.log);
           return result;
         } catch (error) {
           throw new HttpError('Trip completion failed.', {
@@ -757,6 +761,8 @@ export const buildV1Routes = (
           // Streak qualification (fire-and-forget)
           if (user?.id) {
             qualifyStreakAsync(user.id, 'hazard_report', getTimezone(request), request.log);
+            // P0 nudge: thank-you push within seconds of submit.
+            fireP0Event(user.id, 'post_hazard_thanks', {}, request.log);
             // XP award (fire-and-forget)
             if (supabaseAdmin) {
               void (async () => {

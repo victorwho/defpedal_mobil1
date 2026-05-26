@@ -12,6 +12,7 @@
     "lint:fix": "eslint app --ext .ts,.tsx --fix",
     "lint:check": "node scripts/lint-ratchet.mjs",
     "lint:baseline": "node scripts/lint-ratchet.mjs --write",
+    "test": "vitest run",
     "check:contrast": "vitest run src/design-system/tokens/__tests__/contrast.test.ts"
   },
   "dependencies": {

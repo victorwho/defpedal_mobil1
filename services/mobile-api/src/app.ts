@@ -11,6 +11,7 @@ import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
 import { buildFirstRideNotificationRoutes } from './routes/firstRideNotifications';
 import { buildModerationRoutes } from './routes/moderation';
+import { buildNudgeRoutes } from './routes/nudges';
 import { buildRetentionRoutes } from './routes/retention';
 import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
 import { buildV1Routes } from './routes/v1';
@@ -142,6 +143,10 @@ export const buildApp = (options: {
   });
 
   void app.register(buildModerationRoutes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildNudgeRoutes(dependencies), {
     prefix: '/v1',
   });
 
