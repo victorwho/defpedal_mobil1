@@ -145,12 +145,19 @@ describe('Index route — baseline routing (real account, gate silent)', () => {
     expect(lastRedirectHref).toBe('/navigation');
   });
 
-  it('redirects to /feedback when app state is AWAITING_FEEDBACK', () => {
+  it('clears stale AWAITING_FEEDBACK and redirects to /route-planning on real-account cold start', () => {
+    // Behavioural change (see app/index.tsx:39-50): for real-account users, a
+    // persisted ROUTE_PREVIEW or AWAITING_FEEDBACK on cold start is treated
+    // as stale — the component fires `resetFlow()` and the same render falls
+    // through to /route-planning instead of redirecting to /feedback. This
+    // keeps real accounts from resuming a half-finished post-ride flow they
+    // expected to be done. Anonymous sessions skip this clear (their persist
+    // state intentionally nudges them toward signing up).
     useAppStore.setState({ appState: 'AWAITING_FEEDBACK' });
 
     render(<Index />);
 
-    expect(lastRedirectHref).toBe('/feedback');
+    expect(lastRedirectHref).toBe('/route-planning');
   });
 
   it('redirects to /route-planning as default fallback', () => {
