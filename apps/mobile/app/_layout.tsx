@@ -32,6 +32,7 @@ import {
   useOnboardingGate,
 } from '../src/hooks/useOnboardingGate';
 import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
+import { useStoreHydrated } from '../src/hooks/useStoreHydrated';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -298,7 +299,14 @@ const WeatherNoticeManager = () => {
   const notice = useAppStore((s) => s.weatherNotice);
   const clearNotice = useAppStore((s) => s.clearWeatherNotice);
   const appState = useAppStore((s) => s.appState);
+  const storeHydrated = useStoreHydrated();
+  const authCtx = useAuthSessionOptional();
 
+  // Defer the Modal until persist + auth have settled. Otherwise a cold-start
+  // notification tap can mount this Modal over a still-loading `app/index.tsx`
+  // before its `<Redirect>` fires — the user sees the dark backdrop with no
+  // screen behind it and perceives the app as stuck at the loading screen.
+  if (!storeHydrated || authCtx?.isLoading) return null;
   // Suppress over the live nav HUD (same safety rule as other overlays); the
   // notice stays queued and shows once the user leaves NAVIGATING.
   if (!notice || appState === 'NAVIGATING') return null;
