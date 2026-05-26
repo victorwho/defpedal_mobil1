@@ -260,6 +260,20 @@ export const ro: TranslationKeys = {
     keepFullGpsHistory: 'Păstrează istoricul GPS complet',
     keepFullGpsHistoryOn: 'Urmele GPS brute sunt păstrate pentru fiecare cursă până când îți ștergi contul.',
     keepFullGpsHistoryOff: 'Rezumatele curselor sunt păstrate pentru totdeauna; urmele GPS brute sunt eliminate automat după 90 de zile. Distanța, CO2 și insignele nu sunt afectate.',
+    // ── Pedal Nudges section ──
+    sectionPedalNudges: 'Notificări Pedal',
+    pedalVoice: 'Vocea lui Pedal',
+    pedalVoiceSassy: 'Cu umor',
+    pedalVoiceNeutral: 'Neutră',
+    pedalVoiceSassyDesc: 'Pedal te tachinează, nu te judecă. Vocea brandului.',
+    pedalVoiceNeutralDesc: 'Mesaje funcționale, fără glume. Aceleași triggere, formulate simplu.',
+    nudgeCategoryStreak: 'Reamintiri streak',
+    nudgeCategoryStreakDesc: 'Streak în pericol + scuze post-pierdere + etape',
+    nudgeCategoryStreakOff: 'Fără notificări legate de streak',
+    // ── Meet Pedal one-time onboarding card ──
+    meetPedalTitle: 'Salut, sunt Pedal',
+    meetPedalBody: 'Țin lucrurile relaxate — un mic ghiont când streak-ul tău e în pericol, un strigăt de bucurie când finalizezi o cursă. Mă poți potoli oricând din Profil dacă devin enervant.',
+    meetPedalCta: 'Am înțeles',
   },
 
   // ── Report sheet ──

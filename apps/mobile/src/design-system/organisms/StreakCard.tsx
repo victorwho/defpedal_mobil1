@@ -1,63 +1,25 @@
 /**
  * Design System v1.0 — StreakCard Organism
  *
- * Compact streak summary card with flame icon, current streak number,
- * abbreviated 7-day chain preview, longest streak, and freeze status.
+ * Tier-aware streak summary card: flame icon tinted by the locked tier
+ * ladder (kindling → spark → commute → endurance → binary → century →
+ * legend), current streak number, 7-day chain preview, longest streak,
+ * and freeze status. Powered by the shared `StreakFlame` atom so the
+ * post-ride impact card and the dashboard card share visual logic.
  */
-import type { StreakState } from '@defensivepedal/core';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { getTierForStreak, type StreakState } from '@defensivepedal/core';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { brandColors, darkTheme, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
-import { fontFamily, textDataLg, textSm, textXs } from '../tokens/typography';
-import { useReducedMotion } from '../hooks/useReducedMotion';
+import { fontFamily, textSm, textXs } from '../tokens/typography';
 
 import { StreakChain } from './StreakChain';
 import { Mascot } from '../atoms/Mascot';
+import { StreakFlame } from '../atoms/StreakFlame';
 import { useT } from '../../hooks/useTranslation';
-
-// ---------------------------------------------------------------------------
-// FlickerFlame — gentle looping opacity + scale on the flame icon when the
-// streak is "alive" (>=3 days). Suppressed under reduced motion.
-// ---------------------------------------------------------------------------
-
-const FlickerFlame = ({ active }: { active: boolean }) => {
-  const reduced = useReducedMotion();
-  const opacity = useRef(new Animated.Value(1)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (!active || reduced) {
-      opacity.setValue(1);
-      scale.setValue(1);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(opacity, { toValue: 0.85, duration: 800, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 0.96, duration: 800, useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-          Animated.timing(scale, { toValue: 1.04, duration: 800, useNativeDriver: true }),
-        ]),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, reduced, opacity, scale]);
-
-  return (
-    <Animated.View style={{ opacity, transform: [{ scale }] }}>
-      <Ionicons name="flame" size={24} color={brandColors.accent} />
-    </Animated.View>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -70,6 +32,7 @@ export interface StreakCardProps {
 export const StreakCard = ({ streakState }: StreakCardProps) => {
   const t = useT();
   const hasStreak = streakState.currentStreak > 0;
+  const tier = getTierForStreak(streakState.currentStreak);
 
   const freezeLabel = streakState.freezeAvailable
     ? t('streak.freezeReady')
@@ -79,12 +42,20 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
 
   return (
     <View style={styles.card}>
-      {/* Top row: flame + streak number + label */}
+      {/* Top row: tier-aware flame + streak number + tier label */}
       <View style={styles.topRow}>
-        <View style={styles.streakNumberSection}>
-          <FlickerFlame active={streakState.currentStreak >= 3} />
-          <Text style={styles.streakNumber}>{streakState.currentStreak}</Text>
-          <Text style={styles.streakUnit}>{t('streak.dayStreak', { count: streakState.currentStreak })}</Text>
+        <StreakFlame
+          streakDays={streakState.currentStreak}
+          size="lg"
+          animated
+        />
+        <View style={styles.labelStack}>
+          <Text style={styles.streakUnit}>
+            {t('streak.dayStreak', { count: streakState.currentStreak })}
+          </Text>
+          {hasStreak ? (
+            <Text style={styles.tierLabel}>{tier.label}</Text>
+          ) : null}
         </View>
       </View>
 
@@ -141,23 +112,25 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: space[3],
   },
-  streakNumberSection: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: space[2],
-  },
-  streakNumber: {
-    ...textDataLg,
-    fontFamily: fontFamily.mono.bold,
-    color: brandColors.accent,
+  labelStack: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: space[1] / 2,
   },
   streakUnit: {
     ...textSm,
     fontFamily: fontFamily.body.medium,
     color: darkTheme.textSecondary,
+  },
+  tierLabel: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+    color: brandColors.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   encouragement: {
     ...textSm,

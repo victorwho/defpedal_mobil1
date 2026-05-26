@@ -176,7 +176,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.77',
+    version: '0.2.78',
     icon: './assets/icon.png',
     // Global default is unlocked so non-map screens (history, community,
     // profile, settings, trophy case, onboarding) follow the OS auto-rotate

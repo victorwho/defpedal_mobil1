@@ -110,9 +110,11 @@ type ImpactStepProps = {
   readonly isSharing: boolean;
   readonly styles: ThemedStyles;
   readonly colors: ThemeColors;
+  /** Current streak count post-save. Drives the +1 celebration animation. */
+  readonly streakCount?: number;
 };
 
-const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors, streakCount }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -124,7 +126,11 @@ const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors
         {t('feedback.positiveImpact')}
       </Text>
 
-      <ImpactSummaryCard rideImpact={rideImpact} newBadges={rideImpact.newBadges} />
+      <ImpactSummaryCard
+        rideImpact={rideImpact}
+        newBadges={rideImpact.newBadges}
+        streakCount={streakCount}
+      />
 
       <View style={styles.impactActions}>
         <Button
@@ -672,6 +678,7 @@ export default function FeedbackScreen() {
             isSharing={shareRide.isSharing}
             styles={styles}
             colors={colors}
+            streakCount={dashboard?.streak.currentStreak}
           />
         ) : (
           <RatingStep

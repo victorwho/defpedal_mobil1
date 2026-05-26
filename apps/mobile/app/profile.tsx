@@ -135,6 +135,7 @@ export default function ProfileScreen() {
     shareTripsPublicly, themePreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
+    pedalVoiceSassy, notifyStreak,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -155,6 +156,8 @@ export default function ProfileScreen() {
     quietHoursEnd: state.quietHoursEnd,
     shareConversionFeedOptin: state.shareConversionFeedOptin,
     reviewPromptOptedOut: state.reviewPromptState.optedOut,
+    pedalVoiceSassy: state.pedalVoiceSassy,
+    notifyStreak: state.notifyStreak,
   })));
 
   // Actions - stable references, single selector with shallow comparison
@@ -164,6 +167,7 @@ export default function ProfileScreen() {
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
+    setPedalVoiceSassy, setNotifyStreak,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -183,6 +187,8 @@ export default function ProfileScreen() {
     setQuietHours: state.setQuietHours,
     setShareConversionFeedOptin: state.setShareConversionFeedOptin,
     setReviewOptOut: state.setReviewOptOut,
+    setPedalVoiceSassy: state.setPedalVoiceSassy,
+    setNotifyStreak: state.setNotifyStreak,
   })));
 
   // Sync a single notification preference to the backend (fire-and-forget).
@@ -662,6 +668,45 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="time-outline" size={20} color={gray[400]} />
             </View>
+          </View>
+
+          {/* ── Section 2b: Pedal Nudges ─────────────────────────── */}
+          <View style={styles.section}>
+            <SectionTitle variant="accent">{t('profile.sectionPedalNudges')}</SectionTitle>
+
+            <SettingRow
+              label={t('profile.pedalVoice')}
+              description={
+                pedalVoiceSassy
+                  ? t('profile.pedalVoiceSassyDesc')
+                  : t('profile.pedalVoiceNeutralDesc')
+              }
+              checked={pedalVoiceSassy}
+              onChange={(checked) => {
+                setPedalVoiceSassy(checked);
+                if (user) {
+                  void mobileApi
+                    .updateProfile({ pedalVoiceSassy: checked } as Parameters<
+                      typeof mobileApi.updateProfile
+                    >[0])
+                    .catch(() => {/* best-effort */});
+                }
+              }}
+            />
+
+            <SettingRow
+              label={t('profile.nudgeCategoryStreak')}
+              description={
+                notifyStreak
+                  ? t('profile.nudgeCategoryStreakDesc')
+                  : t('profile.nudgeCategoryStreakOff')
+              }
+              checked={notifyStreak}
+              onChange={(checked) => {
+                setNotifyStreak(checked);
+                syncNotifPref({ notifyStreak: checked });
+              }}
+            />
           </View>
 
           {/* ── Section 3: Account ────────────────────────────────── */}

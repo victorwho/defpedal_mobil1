@@ -198,6 +198,19 @@ type AppStore = QueueSlice & {
   setNotifyHazard: (enabled: boolean) => void;
   setNotifyCommunity: (enabled: boolean) => void;
   setQuietHours: (start: string, end: string) => void;
+  // ── Pedal Nudge System (Phase 4) ──
+  /** Pedal's witty/sassy voice. Default ON; toggle to neutral for the
+   * functional first-variant copy. Mirrors profiles.pedal_voice_sassy. */
+  pedalVoiceSassy: boolean;
+  setPedalVoiceSassy: (enabled: boolean) => void;
+  /** Streak-category opt-out for streak-at-risk / milestone / apology
+   * nudges. Mirrors profiles.notify_streak. */
+  notifyStreak: boolean;
+  setNotifyStreak: (enabled: boolean) => void;
+  /** One-time onboarding card explaining Pedal's voice. Persisted so the
+   * card only ever appears once per device. */
+  hasSeenMeetPedalCard: boolean;
+  setHasSeenMeetPedalCard: (seen: boolean) => void;
   setShowBicycleLanes: (enabled: boolean) => void;
   showRouteFeatures: boolean;
   setShowRouteFeatures: (enabled: boolean) => void;
@@ -304,6 +317,10 @@ export const useAppStore = create<AppStore>()(
       notifyCommunity: true,
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
+      // Pedal Nudge System defaults
+      pedalVoiceSassy: true,
+      notifyStreak: true,
+      hasSeenMeetPedalCard: false,
       onboardingCompleted: false,
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
@@ -496,6 +513,9 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ notifyCommunity: enabled })),
       setQuietHours: (start, end) =>
         set(() => ({ quietHoursStart: start, quietHoursEnd: end })),
+      setPedalVoiceSassy: (enabled) => set(() => ({ pedalVoiceSassy: enabled })),
+      setNotifyStreak: (enabled) => set(() => ({ notifyStreak: enabled })),
+      setHasSeenMeetPedalCard: (seen) => set(() => ({ hasSeenMeetPedalCard: seen })),
       showBicycleLanes: true,
       poiVisibility: {
         hydration: false,
@@ -917,6 +937,9 @@ export const useAppStore = create<AppStore>()(
         notifyCommunity: state.notifyCommunity,
         quietHoursStart: state.quietHoursStart,
         quietHoursEnd: state.quietHoursEnd,
+        pedalVoiceSassy: state.pedalVoiceSassy,
+        notifyStreak: state.notifyStreak,
+        hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         avoidUnpaved: state.avoidUnpaved,

@@ -7,6 +7,10 @@ export default defineConfig({
     // Suppress Fastify JSON log output during test runs
     env: {
       LOG_LEVEL: 'silent',
+      // Disable the Pedal Nudge System during tests so fire-and-forget
+      // P0 paths from feedback/hazard handlers don't consume mocked
+      // Supabase chains and pollute other tests in the same file.
+      NUDGES_ENABLED: 'false',
     },
     coverage: {
       provider: 'istanbul',

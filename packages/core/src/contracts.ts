@@ -855,6 +855,10 @@ export interface ProfileUpdateRequest {
   // cron truncates trip_tracks.gps_trail on rides older than 90d.
   // Trip summaries (distance, duration, CO2, badges) are unaffected.
   keepFullGpsHistory?: boolean;
+  // Pedal Nudge System: witty/sassy voice toggle. Default true. Mirrors
+  // profiles.pedal_voice_sassy. The server-side voice renderer reads
+  // this column when picking message variants.
+  pedalVoiceSassy?: boolean;
 }
 
 export interface ProfileResponse {

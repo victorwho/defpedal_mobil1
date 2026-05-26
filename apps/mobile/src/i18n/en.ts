@@ -258,6 +258,20 @@ export const en = {
     keepFullGpsHistory: 'Keep full GPS history',
     keepFullGpsHistoryOn: 'Raw GPS breadcrumbs are kept for every ride until you delete your account.',
     keepFullGpsHistoryOff: 'Trip summaries are kept forever; raw GPS breadcrumbs are auto-truncated after 90 days. Distance, CO2 and badges are unaffected.',
+    // ── Pedal Nudges section ──
+    sectionPedalNudges: 'Pedal Nudges',
+    pedalVoice: 'Pedal voice',
+    pedalVoiceSassy: 'Sassy',
+    pedalVoiceNeutral: 'Neutral',
+    pedalVoiceSassyDesc: 'Pedal teases, never preaches. The brand voice.',
+    pedalVoiceNeutralDesc: 'Functional copy, no jokes. Same triggers, plainer wording.',
+    nudgeCategoryStreak: 'Streak reminders',
+    nudgeCategoryStreakDesc: 'Streak-at-risk + post-loss apology + milestones',
+    nudgeCategoryStreakOff: 'No streak-related pushes',
+    // ── Meet Pedal one-time onboarding card ──
+    meetPedalTitle: 'Meet Pedal',
+    meetPedalBody: 'I keep things light — a friendly nudge when your streak is at risk, a cheer when you finish a ride. Turn me down in Profile anytime if I get on your nerves.',
+    meetPedalCta: 'Got it',
   },
 
   // ── Report sheet ──
