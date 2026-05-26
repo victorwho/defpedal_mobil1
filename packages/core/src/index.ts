@@ -1,4 +1,5 @@
 export * from './co2';
+export * from './cyclingWeather';
 export * from './microlives';
 export * from './contracts';
 export * from './contrast';
@@ -18,6 +19,7 @@ export * from './shareDeepLinkBuilder';
 export * from './mascotPose';
 export * from './pedalVoice';
 export * from './sharePrivacy';
+export * from './solarTime';
 export * from './streakTiers';
 export * from './trimEndpointsForShare';
 export * from './routeShareContract';

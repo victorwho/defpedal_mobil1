@@ -23,6 +23,8 @@
 import type { ErrorResponse, NudgeTrigger } from '@defensivepedal/core';
 import {
   getTriggerPriority,
+  isAfterSunset,
+  isBadCyclingWeather,
   isMilestoneDay,
   type NudgeContext,
   type NudgeLocale,
@@ -31,10 +33,12 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { fetchCyclingForecast } from '../lib/clients/openMeteo';
 import { dispatchNudge } from '../lib/nudges/dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from '../lib/nudges/eligibility';
 import { areNudgesEnabled } from '../lib/nudges/killSwitch';
 import { pickHighestPriorityTrigger } from '../lib/nudges/priorityQueue';
+import { resolveUserLocation } from '../lib/nudges/userLocation';
 import {
   errorResponseSchema,
   nudgesAttributeRequestSchema,
@@ -304,13 +308,22 @@ export const buildNudgeRoutes = (
 
             const pushesLast24h = await countPushesLast24h(db, userId);
 
+            // Safety floor: resolve the rider's lat/lon (recent trip start
+            // or Bucharest fallback) and check sunset + bad-weather. Both
+            // checks fail closed on missing data — eligibility suppresses
+            // the ride-asking triggers when conditions are unknown.
+            const location = await resolveUserLocation(db, userId);
+            const afterSunset = isAfterSunset(location.lat, location.lon);
+            const forecast = await fetchCyclingForecast(location.lat, location.lon);
+            const badWeatherNow = forecast ? isBadCyclingWeather(forecast) : true;
+
             const decision = pickHighestPriorityTrigger({
               candidates: liveCandidates,
               profile,
               window: {
                 pushesLast24h,
-                badWeatherNow: false, // Wired in a future session (Open-Meteo client)
-                afterSunset: false,
+                badWeatherNow,
+                afterSunset,
                 qualifiedStreakToday: qualifiedToday,
               },
             });
