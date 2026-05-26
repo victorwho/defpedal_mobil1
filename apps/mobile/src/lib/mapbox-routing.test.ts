@@ -571,11 +571,22 @@ describe('country-aware OSRM dispatch', () => {
     expect(result.coverage.safeRouting).toBe(false);
   });
 
-  it('suppresses safe-vs-fast comparison for ES (no risk data yet)', async () => {
+  it('attempts safe-vs-fast comparison for ES once the country gate allows it', async () => {
+    // 5 calls expected for an ES safe ride with comparison enabled:
+    //   1. OSRM-ES safe route
+    //   2. elevation profile
+    //   3. risk segments
+    //   4. Mapbox fast route (comparison)
+    //   5. risk segments for comparison route
+    // ES has no road_risk_data yet so the inner length>0 guard suppresses
+    // the label — but the OSRM-ES → Mapbox path is now exercised, so the
+    // label will turn on automatically the moment Spain data ships.
     setupFetchMock([
-      { data: createRouteResponse() },
-      { data: createElevationResponse() },
-      { data: createRiskResponse() },
+      { data: createRouteResponse() },          // OSRM-ES
+      { data: createElevationResponse() },      // elevation
+      { data: { riskSegments: [] } },           // risk (empty for ES)
+      { data: createRouteResponse() },          // Mapbox comparison
+      { data: { riskSegments: [] } },           // risk for comparison (empty)
     ]);
 
     const result = await directPreviewRoute({
@@ -587,8 +598,8 @@ describe('country-aware OSRM dispatch', () => {
       showRouteComparison: true,
     });
 
-    // Only 3 calls: OSRM-ES + elevation + risk. No 4th comparison fetch.
-    expect(vi.mocked(fetch).mock.calls).toHaveLength(3);
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(5);
+    // Empty risk arrays → no label produced (graceful)
     expect(result.comparisonLabel).toBeUndefined();
   });
 });

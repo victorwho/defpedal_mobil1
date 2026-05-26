@@ -411,13 +411,18 @@ export const directPreviewRoute = async (
 
   // Compute safe vs fast risk comparison if enabled — only meaningful when
   // we actually have an OSRM safe route to compare against, AND the country
-  // has road_risk_data populated. Today that's RO only; suppress for ES until
-  // Spanish risk data ships, otherwise the comparison runs against empty
-  // segments and produces misleading "similar safety" labels.
+  // has road_risk_data populated. ES rows are being ingested via the external
+  // OSM scoring pipeline (same one that produced ~975k RO rows); until the
+  // bulk-insert lands the inner `currentSegments.length > 0 &&
+  // comparisonSegments.length > 0` guard means the eligibility check passes
+  // but no label is produced — graceful no-op. Once Spanish risk data ships,
+  // the comparison + RiskDistributionCard activate automatically with no
+  // further code change.
+  const COMPARISON_ELIGIBLE_COUNTRIES: readonly SupportedCountry[] = ['RO', 'ES'];
   const comparisonEligible =
     request.showRouteComparison &&
     support.supported &&
-    support.country === 'RO';
+    COMPARISON_ELIGIBLE_COUNTRIES.includes(support.country);
 
   let comparisonLabel: string | undefined;
   if (comparisonEligible && enrichedRoutes.length > 0) {
