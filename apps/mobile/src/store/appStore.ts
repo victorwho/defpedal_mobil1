@@ -41,6 +41,7 @@ import {
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 
+import type { Locale } from '../i18n';
 import { zustandStorage } from '../lib/storage';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
 
@@ -124,7 +125,7 @@ type AppStore = QueueSlice & {
     totalMoneyEur: number;
     totalHazardsWarned: number;
   } | null;
-  locale: 'en' | 'ro';
+  locale: Locale;
   themePreference: 'system' | 'dark' | 'light';
   // Daily safety quiz country pool.
   //
@@ -183,7 +184,7 @@ type AppStore = QueueSlice & {
   weatherNotice: WeatherNotice | null;
   setWeatherNotice: (notice: WeatherNotice | null) => void;
   clearWeatherNotice: () => void;
-  setLocale: (locale: 'en' | 'ro') => void;
+  setLocale: (locale: Locale) => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
   setQuizCountryPreference: (pref: QuizCountryPreference) => void;
   setShowMascot: (show: boolean) => void;
@@ -449,7 +450,13 @@ export const useAppStore = create<AppStore>()(
       weatherNotice: null,
       setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
       clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
-      setLocale: (locale) => set(() => ({ locale })),
+      setLocale: (locale) =>
+        set((state) => ({
+          locale,
+          // Mirror the UI locale into routeRequest so Mapbox autocomplete +
+          // turn-by-turn instructions follow the rider's language choice.
+          routeRequest: { ...state.routeRequest, locale },
+        })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
       setQuizCountryPreference: (pref) =>
         set(() => ({ quizCountryPreference: pref })),
@@ -912,31 +919,53 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 1,
+      version: 2,
       migrate: (persistedState, version) => {
-        if (version >= 1) return persistedState;
-        // Narrow the persisted blob just enough to inspect the consent slot
-        // without dragging the full store type into scope.
-        const state = persistedState as
-          | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
-          | undefined;
-        const consent = state?.analyticsConsent;
-        if (
-          consent &&
-          (consent.capturedAt ?? null) === null &&
-          consent.sentry === false
-        ) {
-          return {
-            ...(state as object),
-            analyticsConsent: { ...consent, sentry: true },
-          };
+        let next = persistedState as Record<string, unknown> | undefined;
+
+        // v0 → v1: analytics consent default flip.
+        if (version < 1) {
+          const state = next as
+            | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
+            | undefined;
+          const consent = state?.analyticsConsent;
+          if (
+            consent &&
+            (consent.capturedAt ?? null) === null &&
+            consent.sentry === false
+          ) {
+            next = {
+              ...(state as object),
+              analyticsConsent: { ...consent, sentry: true },
+            };
+          }
         }
-        return persistedState;
+
+        // v1 → v2: routing-mode default reset. Existing installs had
+        // `routeRequest.mode` persisted as whatever the rider last picked
+        // (often 'fast'); we now want every cold start to land on 'safe'.
+        if (version < 2) {
+          const state = next as
+            | { routeRequest?: { mode?: string } & Record<string, unknown> }
+            | undefined;
+          if (state?.routeRequest) {
+            next = {
+              ...(state as object),
+              routeRequest: { ...state.routeRequest, mode: 'safe' },
+            };
+          }
+        }
+
+        return next;
       },
       partialize: (state) => ({
         appState: state.appState,
         voiceGuidanceEnabled: state.voiceGuidanceEnabled,
-        routeRequest: state.routeRequest,
+        // Persist routeRequest, but force `mode` back to 'safe' so cold-start
+        // always boots into the Safe pill. The rider's Profile preference for
+        // avoidHills/avoidUnpaved is preserved separately, so someone who
+        // prefers Flat (Safe + avoidHills) still gets Flat highlighted.
+        routeRequest: { ...state.routeRequest, mode: 'safe' as const },
         routePreview: state.routePreview,
         selectedRouteId: state.selectedRouteId,
         navigationSession: state.navigationSession,

@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-05-26 (session 68)
+Last updated: 2026-05-27 (session 64)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
@@ -1667,3 +1667,75 @@ Wired the existing 44-question Spanish quiz pool through the daily-quiz pipeline
 - **`quiz_questions` table is left in place.** It's tiny, RLS-guarded, and may still be useful as a future content catalogue. Only the FK to `user_quiz_history` is dropped.
 - **Default country is `'RO'`** at every level (server when query missing, resolver fallback, Zustand initial state migration). Existing app builds without country awareness keep working unchanged.
 - **Daily-quiz screen** doesn't yet show the rider what country the question came from. If you want a "this question is for Romania" hint, add a `Badge` reading `country` (returned from the resolver hook) to the question card. Out of scope for this session.
+
+### Session 64 — Spanish UI language + multilingual quiz content + Safe-by-default routing (2026-05-27)
+
+Spanish (`es`) added as a third UI locale across the mobile app, and the quiz content layer became fully multilingual (country picks WHAT — Romanian-law vs Spanish-law content — locale picks the LANGUAGE that content is presented in). Two Cloud Run deploys (rev `defpedal-api-00086-l24` for an initial wholesale-translated pass, then `defpedal-api-00087-h5f` for the multilingual `StaticQuizQuestion` schema). One unrelated polish at the end: routing-mode default resets to Safe on every cold start.
+
+#### Spanish UI locale
+
+- **Type widening** — `Locale` in `apps/mobile/src/i18n/index.ts` is now `'en' | 'ro' | 'es'`; `SUPPORTED_LOCALES` exported as a readonly tuple; `getDeviceLocale()` maps `es*` → `'es'`. `Locale` type imported into `appStore.ts` and the inline `'en' | 'ro'` literals on `locale: …` and `setLocale: …` replaced with it.
+- **New `apps/mobile/src/i18n/es.ts`** (~700 lines) — full mirror of `ro.ts` with `TranslationKeys` type enforcement. `tú` register (informal), cheeky-but-friendly Pedal tone preserved. Covers every namespace already in `en.ts` / `ro.ts` (common, errorBoundary, tabs, planning, preview, nav, feedback, reviewPrompt, profile, report, blockedUsers, onboardingConsent, privacyAnalytics, deleteAccount, history, tripsScreen, communityScreen, communityStats, cityHeartbeat, feedCard, hazard, search, weather, stats, streak, guardian, auth, legal, settings, diag, offlineMaps, onboarding, impact, faq, microlives, compare, userProfile, leaderboard, mia, share, citySuggestion, mapA11y).
+- **Profile language picker** widened 2 → 3 pills (English / Română / Español); a11y labels English / Romana / Spanish.
+- **`packages/core/src/pedalVoice.ts`** — `NudgeLocale` widened to `'en' | 'ro' | 'es'`; `TriggerCatalog.variants` adds an `es` branch for every one of the 10 nudge triggers (3 variants each × 10 triggers = 30 new Spanish strings, hand-written to keep the brand voice — e.g., "Mírate a ti / {streakCount} días seguidos. No estoy llorando, lloras tú."). `FALLBACKS` map extended with Spanish placeholders (riderName `'ciclista'`, city `'tu ciudad'`, etc.). Test suite (`pedalVoice.test.ts`) widened: every `for (const locale of …)` loop now iterates `['en', 'ro', 'es']` and 2 new ES-specific assertions added (neutral copy, fallback). All 23 tests pass.
+- **`services/mobile-api/src/lib/nudgeSchemas.ts`** — JSON Schema enum for `locale` widened to include `'es'`.
+
+#### i18n wiring — surfaces that had hardcoded English
+
+Wired `useT()` into surfaces the tester flagged after the initial rollout:
+
+- **Profile achievements row + Confident Cyclist referral** (`apps/mobile/app/profile.tsx`) — 6 new `profile.*` keys (`achievementsLabel`, `badgesEarned`, `confidentCyclistTitle`, `helpAFriend`, `helpAFriendSub`, `referralShareMessage`).
+- **City Heartbeat** (`apps/mobile/app/city-heartbeat.tsx`) — no new keys needed, the `cityHeartbeat.*` namespace already existed; just wired `useT()` through every section header, StatCell label, loading/empty/hotspot copy, contributor stats.
+- **LeaderboardSection** (`design-system/organisms/LeaderboardSection.tsx`) — `leaderboard.*` keys also already existed; refactored the module-level `METRICS` / `PERIODS` constants into in-component arrays so they can call `t()`. Title, tab labels, period pills, Your-Rank separator, empty state, retry — all localized.
+- **Achievements screen** (`apps/mobile/app/achievements.tsx` + TrophyCaseHeader + CategoryTabBar + BadgeDetailModal) — 22 new `achievements.*` keys (`screenTitle`, `yourAchievements`, `moreToUnlock`, `emptyAllTitle`, `emptyCategory`, time-ago units `timeJustNow/timeMinsAgo/timeHoursAgo/timeDaysAgo`, 9 category tab labels `tabAll/Firsts/Riding/Consistency/Impact/Safety/Community/Explore/Events`, `secretName`/`secretFlavor`, `rarityLine`, `earnedDate`, `share`, `progressA11y`). `CategoryTabBar` refactored from a hardcoded `TABS` array to a `TAB_KEYS` + `TAB_LABEL_KEY` map pattern so labels resolve at render time. **Local-variable collision in `BadgeDetailModal`** — `handleShare` had a local `t: BadgeTier = ...`; renamed to `shareTier` to free up `t` for the i18n hook.
+- **WeatherWarningModal + refactored warning emission** — `WeatherWarning` in `apps/mobile/src/lib/weather.ts` now carries `{ messageKey, messageParams }` instead of a pre-rendered English `message` string. `getWeatherWarnings` builds the params; the modal calls `t(w.messageKey, w.messageParams)`. 16 new `weatherWarning.*` keys (rain, cold, hot, warmingUp/coolingDown/tempSwing, 6 wind variants for breezy/strong/hazardous × with/without gust, airQualityPoor/airQualityModerate, pm25). Modal title + subtitle + Start-anyway CTA also localized. `useWeather.test.ts` fixture updated to the new shape.
+- **ImpactSummaryCard** post-ride — 9 new `impact.*` keys (`thisRideImpact`, `badgesEarnedTitle`, `viewAllAchievements`, `xpEarnedTitle`, `xpTotal`, `legendMaxRank`, `dayStreakShort`, `streakDayA11y`, `lifeEarnedFmt`, `donatedSecondsFmt`).
+- **Route preview** (`apps/mobile/app/route-preview.tsx`) — 17 new `preview.*` keys spanning peek strip, sheet header, switch-to-safe pill, offline download card states (available/downloading/error/idle), warning panels, save-route modal title + Cancel/Save/Saving buttons + dismiss a11y.
+- **Navigation hazard sheet** (`apps/mobile/app/navigation.tsx`) — 11 new `hazard.*` keys for the quick-report sheet (`describeTitle/Subtitle/Placeholder/A11y/A11yHint`, `reportShort`, `backToTypes/A11y`, `dismissPickerA11y`, `cancelReportA11y`, `reportItemA11y`). The 6 in-grid hazard type labels now read from the existing `hazard.types.*` keys.
+- **Daily-quiz UI** (`apps/mobile/app/daily-quiz.tsx`) — 7 new `quiz.*` keys (`title`, `loadFailed`, `retry`, `correct`, `notQuite`, `done`, `streakMaintained`). Quiz CONTENT is handled separately, see below.
+
+#### Mapbox turn-by-turn instructions follow the UI locale
+
+- `fetchMapboxRoutes` in `apps/mobile/src/lib/mapbox-routing.ts` now appends `&language=<locale>` when calling Mapbox Directions, gated by a `MAPBOX_DIRECTIONS_LANGUAGES` allow-set of `{en, ro, es}`. Locale flows through `directPreviewRoute(request)` from `request.locale` (Zustand `routeRequest.locale`) into both the primary fetch and the comparison fetch for risk-vs-fast scoring.
+- `mapStep` previously hand-built English instruction strings (`Head ${modifier} on ${name}`, `Arrive at your destination`, `${capitalize(modifier)} onto ${name}`) and threw away Mapbox's localized `maneuver.instruction`. Reversed: it now prefers Mapbox's localized text when present and only falls back to the hand-built English string when the field is empty (which is the OSRM case — our custom OSRM build doesn't ship `osrm-text-instructions`, so safe-mode rides still see English fallback strings. Separate ticket to wrap those phrases in `t()`).
+- `setLocale` in `appStore.ts` now mirrors the UI locale into `routeRequest.locale` so the change actually reaches Mapbox without the user having to re-search.
+
+#### Multilingual quiz content
+
+The initial pass translated each quiz pool wholesale (`quiz-questions.ts` → Romanian, `quiz-questions-es.ts` → Spanish). That was wrong: country picks the BODY of content (Romanian law vs Spanish law), but the LANGUAGE that body is rendered in should follow the UI locale. A Spanish-speaking rider in Bucharest expects Romanian-law content in Spanish.
+
+- **`StaticQuizQuestion` schema** in `services/mobile-api/src/data/quiz-questions.ts` refactored. New `LocalizedText = { en, ro, es }` and `LocalizedOptions = { en, ro, es }` types. `questionText`, `options`, `explanation` are now per-locale triples. `id`, `correctIndex`, `category`, `difficulty` stay locale-independent. `quiz-questions-es.ts` re-exports the type to keep one source of truth.
+- Both pool files rewritten with all 3 locales per question. 30 RO-content questions × 3 languages + 30 ES-content questions × 3 languages = 180 strings hand-translated. Codul Rutier (RO pool) and Reglamento General de Circulación / DGT (ES pool) terminology preserved across all three locales.
+- **API endpoints** `/v1/quiz/daily` and `/v1/quiz/answer` accept a `locale=en|ro|es` query/body param (default `'en'` for backward compat with old app builds). Fastify JSON Schema enums updated. Handlers do `q.questionText[locale]` / `q.options[locale]` / `question.explanation[locale]` and return flat strings — the wire-shape API contract is unchanged.
+- **Mobile client** `mobileApi.fetchDailyQuiz(country, locale)` and `mobileApi.submitQuizAnswer(questionId, selectedIndex, country, locale)` now take an explicit locale arg. The daily-quiz screen reads `useLocale()` and passes it; `queryKey` includes the locale so flipping UI language refetches a fresh question.
+- 17 quiz-route tests pass against the new schema (no test changes needed — they assert on `id` + `correctIndex` only).
+
+#### Routing-mode default — boot into Safe
+
+Tester noted that the routing mode pill on route-planning defaulted to whatever was last selected (often Fast), because Zustand persisted `routeRequest.mode`. Fix:
+
+- `partialize` in `appStore.ts` now overrides `routeRequest.mode` to `'safe' as const` before persisting. Every persist write snapshots Safe regardless of in-session value.
+- Persist version bumped `1 → 2`. New `v1 → v2` migration step resets `routeRequest.mode` on existing installs so the tester's persisted `mode: 'fast'` flips to Safe on the first hydrate after this code ships.
+- Profile preference for "Avoid hills" (top-level `avoidHills` field) is untouched, so a rider who prefers Flat (Safe + avoidHills) still boots into Flat.
+
+#### Validation
+
+- `npm run typecheck` — clean (api + mobile + web).
+- `npm run check:bundle` — HTTP 200.
+- `packages/core` vitest — `pedalVoice` 23/23 pass with new ES assertions.
+- `services/mobile-api` vitest — `nudges` 47/47, quiz routes 17/17, `appStore` 88/88. 1 pre-existing unrelated failure (`/v1/rides/.../impact` `equivalentText` test at line 497) — present before this session, untouched by this work.
+- `apps/mobile` vitest — same 10 pre-existing failures in HoloSticker / BadgeCard / BadgeInlineChip suites (PanResponder mock issue in vitest env). Documented in `project_holo-badges-todo.md`; not introduced by this session.
+
+#### Cloud Run
+
+- Build + deploy 1 (initial wholesale-translated pools, before multilingual refactor): `defpedal-api-00086-l24` — superseded.
+- Build + deploy 2 (final multilingual schema): `defpedal-api-00087-h5f`. 100% traffic.
+
+#### Known not-yet-done (deliberate scope cuts)
+
+- **OSRM safe-mode maneuver instructions** stay English. Mapbox routes (Fast) pick up `&language=es`; OSRM doesn't return localized text. Wrapping the per-maneuver phrases (Turn left onto X, Arrive at your destination) in `t()` with a maneuver-type map is a separate ticket.
+- **`profiles.locale` backend column** — server-rendered nudges still hardcode `locale: 'en'` in `eventFirer.ts:112`. Pre-existing TODO unchanged by this session.
+- **Store-listing `es-ES/`** directory — separate marketing task.
+- **Date-format helpers** still use hardcoded `'en-GB'` / `'en-US'` (`TripCard.tsx`, `BadgeDetailModal.formatDate`). Cosmetic; separate cleanup pass.
+- **Daily-weather notification titles** (`daily-weather-messages.ts`) are 40 English title strings, not keyed by locale. Separate ticket.
+- **Spanish native-speaker review** of Pedal voice catalog + quiz content. Translations land the meaning but a native reviewer should sanity-check tone, especially the cheeky variants.
