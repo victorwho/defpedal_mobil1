@@ -1,0 +1,90 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"/>
+  <uses-permission android:name="android.permission.VIBRATE"/>
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" tools:replace="android:maxSdkVersion"/>
+  <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
+  <!--
+    expo-sensors's bundled manifest declares ACTIVITY_RECOGNITION because the
+    Pedometer module needs it on Android 10+. We use only the DeviceMotion API
+    (gyroscope tilt for holographic badges) and never call the Pedometer, so
+    we strip the permission to avoid the Play Console health declaration and
+    the install-time permission listing that would scare riders for no reason.
+    If a future feature actually starts step-counting, remove this node and
+    file the Play Console declaration.
+  -->
+  <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" tools:node="remove"/>
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.VIEW"/>
+      <category android:name="android.intent.category.BROWSABLE"/>
+      <data android:scheme="https"/>
+    </intent>
+  </queries>
+  <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false" android:fullBackupContent="@xml/secure_store_backup_rules" android:dataExtractionRules="@xml/secure_store_data_extraction_rules">
+    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/notification_icon"/>
+    <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <!--
+      Belt-and-suspenders defence against transitive Firebase Analytics pull-ins.
+      firebase-analytics is intentionally not declared in build.gradle; this
+      meta-data ensures any module that does end up pulling it stays inert
+      until the user opts in (consent flow at /onboarding/consent + Profile
+      → Privacy & analytics).
+    -->
+    <meta-data android:name="firebase_analytics_collection_enabled" android:value="false"/>
+    <meta-data android:name="firebase_analytics_collection_deactivated" android:value="true"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_icon" android:resource="@drawable/notification_icon"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <meta-data android:name="expo.modules.updates.ENABLED" android:value="true"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
+    <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://u.expo.dev/f8bcd740-c785-47a3-beed-26891c89425a"/>
+    <meta-data android:name="expo.modules.updates.EXPO_RUNTIME_VERSION" android:value="@string/expo_runtime_version"/>
+    <!--
+      P3f (error-reduction plan, 2026-05-25): pre-JS fatal tagging.
+
+      `@sentry/react-native` sets `io.sentry.auto-init=false` in its merged
+      manifest so the native SDK waits for the JS bridge to call
+      `Sentry.init({...})` from `enableSentry()` in `lib/telemetry.ts`. That
+      JS init also installs the `beforeSend` hook that tags every event
+      (including ApplicationExitInfo-captured ANRs from prior process boots)
+      with `app_variant` + `app_env` — see error-log #46.
+
+      The tags below are belt-and-suspenders: when the native SDK initialises
+      via the bridge, `SentryAndroidOptions` reads any `io.sentry.tags.KEY`
+      meta-data and applies them to the initial scope BEFORE the JS-side
+      `beforeSend` hook runs. That closes the narrow window between native
+      crash-handler install and JS hook registration. The values are injected
+      per flavor via `manifestPlaceholders` in `android/app/build.gradle`.
+    -->
+    <meta-data android:name="io.sentry.tags.app_variant" android:value="${SENTRY_APP_VARIANT}"/>
+    <meta-data android:name="io.sentry.tags.app_env" android:value="${SENTRY_APP_ENV}"/>
+    <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN"/>
+        <category android:name="android.intent.category.LAUNCHER"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="defensivepedal-dev"/>
+      </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="routes.defensivepedal.com" android:pathPrefix="/r/"/>
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>
