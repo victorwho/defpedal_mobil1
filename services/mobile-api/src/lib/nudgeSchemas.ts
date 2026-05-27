@@ -63,7 +63,7 @@ export const nudgesEventRequestSchema = {
         lapsedDays: { type: 'integer', minimum: 0 },
       },
     },
-    locale: { type: 'string', enum: ['en', 'ro'] },
+    locale: { type: 'string', enum: ['en', 'ro', 'es'] },
   },
 } as const;
 

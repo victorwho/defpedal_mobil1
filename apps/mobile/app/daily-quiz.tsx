@@ -29,6 +29,7 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { useResolvedQuizCountry } from '../src/hooks/useResolvedQuizCountry';
+import { useLocale, useT } from '../src/hooks/useTranslation';
 import { mobileApi } from '../src/lib/api';
 import { brandTints, safetyTints } from '../src/design-system/tokens/tints';
 
@@ -103,15 +104,17 @@ export default function DailyQuizScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const queryClient = useQueryClient();
+  const t = useT();
+  const { locale } = useLocale();
 
-  // Resolve which country pool to serve. queryKey includes country so flipping
-  // the Profile override (or crossing a border with GPS on) refetches a fresh
-  // question from the right catalogue.
+  // Resolve which country pool to serve. queryKey includes country + locale:
+  // country picks the CONTENT (Romanian law vs Spanish law); locale picks the
+  // LANGUAGE that content is presented in.
   const { country: quizCountry } = useResolvedQuizCountry();
 
   const { data: question, isLoading, error, refetch } = useQuery<QuizQuestion>({
-    queryKey: [QUIZ_KEY, quizCountry],
-    queryFn: () => mobileApi.fetchDailyQuiz(quizCountry),
+    queryKey: [QUIZ_KEY, quizCountry, locale],
+    queryFn: () => mobileApi.fetchDailyQuiz(quizCountry, locale),
     staleTime: 30 * 60_000,
   });
 
@@ -129,7 +132,7 @@ export default function DailyQuizScreen() {
     setIsSubmitting(true);
 
     try {
-      const result = await mobileApi.submitQuizAnswer(question.id, index, quizCountry);
+      const result = await mobileApi.submitQuizAnswer(question.id, index, quizCountry, locale);
       setAnswer(result);
 
       // Animate feedback in
@@ -167,7 +170,7 @@ export default function DailyQuizScreen() {
   };
 
   return (
-    <Screen title="Daily Quiz" headerVariant="close">
+    <Screen title={t('quiz.title')} headerVariant="close">
       {/* Loading */}
       {isLoading ? (
         <View style={styles.centerContainer}>
@@ -175,9 +178,9 @@ export default function DailyQuizScreen() {
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>Failed to load quiz</Text>
+          <Text style={styles.errorText}>{t('quiz.loadFailed')}</Text>
           <Button variant="secondary" size="md" onPress={() => void refetch()}>
-            Retry
+            {t('quiz.retry')}
           </Button>
         </View>
       ) : question ? (
@@ -224,12 +227,12 @@ export default function DailyQuizScreen() {
                     { color: answer.isCorrect ? colors.safe : colors.caution },
                   ]}
                 >
-                  {answer.isCorrect ? 'Correct!' : 'Not quite'}
+                  {answer.isCorrect ? t('quiz.correct') : t('quiz.notQuite')}
                 </Text>
               </View>
               <Text style={styles.feedbackExplanation}>{answer.explanation}</Text>
               <Button variant="primary" size="lg" fullWidth onPress={handleDone}>
-                Done
+                {t('quiz.done')}
               </Button>
             </Animated.View>
           ) : null}
@@ -240,7 +243,7 @@ export default function DailyQuizScreen() {
       {showStreakToast ? (
         <View style={styles.toastContainer}>
           <Toast
-            message="Streak maintained! Keep it up."
+            message={t('quiz.streakMaintained')}
             variant="success"
             durationMs={3000}
             onDismiss={() => setShowStreakToast(false)}

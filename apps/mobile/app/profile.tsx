@@ -338,24 +338,24 @@ export default function ProfileScreen() {
         <View style={styles.achievementsRow}>
           <Ionicons name="checkmark-circle" size={24} color={colors.safe} />
           <View style={styles.achievementsTextCol}>
-            <Text style={styles.achievementsCount}>Confident Cyclist</Text>
+            <Text style={styles.achievementsCount}>{t('profile.confidentCyclistTitle')}</Text>
           </View>
         </View>
         <Pressable
           onPress={() => {
             void Share.share({
-              message: `Try Defensive Pedal — safer cycling routes for any city. ${PLAY_STORE_URL} #DefensivePedal`,
+              message: t('profile.referralShareMessage', { url: PLAY_STORE_URL }),
             });
           }}
           style={styles.helpFaqRow}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Help a friend start their journey"
+          accessibilityLabel={t('profile.helpAFriend')}
         >
           <Ionicons name="heart-outline" size={22} color={colors.accent} />
           <View style={styles.settingTextCol}>
-            <Text style={styles.settingLabel}>Help a friend start their journey</Text>
-            <Text style={styles.settingDescription}>Share Defensive Pedal with a friend</Text>
+            <Text style={styles.settingLabel}>{t('profile.helpAFriend')}</Text>
+            <Text style={styles.settingDescription}>{t('profile.helpAFriendSub')}</Text>
           </View>
           <Ionicons name="share-social-outline" size={18} color={gray[400]} />
         </Pressable>
@@ -373,14 +373,14 @@ export default function ProfileScreen() {
         onPress={() => router.push('/achievements' as any)}
         accessible={true}
         accessibilityRole="button"
-        accessibilityLabel="Achievements"
+        accessibilityLabel={t('profile.achievementsLabel')}
       >
         <View style={styles.achievementsCard}>
           <View style={styles.achievementsRow}>
             <Ionicons name="trophy-outline" size={24} color={colors.accent} />
             <View style={styles.achievementsTextCol}>
               <Text style={styles.achievementsCount}>
-                {earned} / {total} badges earned
+                {t('profile.badgesEarned', { earned, total })}
               </Text>
               <View style={styles.achievementsBarTrack}>
                 <View
@@ -567,21 +567,27 @@ export default function ProfileScreen() {
             <SectionTitle variant="accent">{t('profile.sectionDisplay')}</SectionTitle>
 
             <View style={styles.languageRow}>
-              {(['en', 'ro'] as const).map((loc) => (
-                <Pressable
-                  key={loc}
-                  style={[styles.languagePill, locale === loc && styles.languagePillActive]}
-                  onPress={() => setLocale(loc)}
-                  accessible={true}
-                  accessibilityRole="button"
-                  accessibilityLabel={loc === 'en' ? 'English' : 'Romana'}
-                  accessibilityState={{ selected: locale === loc }}
-                >
-                  <Text style={[styles.languagePillText, locale === loc && styles.languagePillTextActive]}>
-                    {loc === 'en' ? 'English' : 'Română'}
-                  </Text>
-                </Pressable>
-              ))}
+              {(['en', 'ro', 'es'] as const).map((loc) => {
+                const label =
+                  loc === 'en' ? 'English' : loc === 'ro' ? 'Română' : 'Español';
+                const a11yLabel =
+                  loc === 'en' ? 'English' : loc === 'ro' ? 'Romana' : 'Spanish';
+                return (
+                  <Pressable
+                    key={loc}
+                    style={[styles.languagePill, locale === loc && styles.languagePillActive]}
+                    onPress={() => setLocale(loc)}
+                    accessible={true}
+                    accessibilityRole="button"
+                    accessibilityLabel={a11yLabel}
+                    accessibilityState={{ selected: locale === loc }}
+                  >
+                    <Text style={[styles.languagePillText, locale === loc && styles.languagePillTextActive]}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* Theme picker */}

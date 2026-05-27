@@ -50,7 +50,13 @@ export interface WeatherData {
 export interface WeatherWarning {
   readonly type: 'rain' | 'freezing' | 'heat' | 'temp_drop' | 'wind' | 'air_quality' | 'pm25';
   readonly icon: string;
-  readonly message: string;
+  /**
+   * Translation key under `weatherWarning.*` namespace. The modal renders it
+   * via `t(messageKey, messageParams)` so the rider sees the warning in
+   * their selected UI locale.
+   */
+  readonly messageKey: string;
+  readonly messageParams?: Record<string, string | number>;
 }
 
 type WmoMapping = { readonly label: string; readonly icon: string };
@@ -316,7 +322,8 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
     warnings.push({
       type: 'rain',
       icon: 'rainy',
-      message: `High chance of rain later today (${data.remainingPrecipMax}%) — pack rain gear and ride with caution`,
+      messageKey: 'weatherWarning.rain',
+      messageParams: { percent: data.remainingPrecipMax },
     });
   }
 
@@ -331,7 +338,8 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'freezing',
         icon: 'snow',
-        message: `Cold conditions: ${data.remainingTempMin}°C — dress warmly and ride with caution`,
+        messageKey: 'weatherWarning.cold',
+        messageParams: { temp: data.remainingTempMin },
       });
     }
 
@@ -339,23 +347,28 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'heat',
         icon: 'thermometer',
-        message: `Hot conditions: ${data.remainingTempMax}°C — hydrate and ride with caution`,
+        messageKey: 'weatherWarning.hot',
+        messageParams: { temp: data.remainingTempMax },
       });
     }
 
     if (data.remainingTempMax - data.remainingTempMin > TEMP_SWING_THRESHOLD) {
-      let message: string;
+      let messageKey: string;
       if (data.remainingTempTrend === 'rising') {
-        message = `Warming up later today: ${data.remainingTempMin}°C → ${data.remainingTempMax}°C — start in light layers and pack water`;
+        messageKey = 'weatherWarning.warmingUp';
       } else if (data.remainingTempTrend === 'falling') {
-        message = `Cooling down later today: ${data.remainingTempMax}°C → ${data.remainingTempMin}°C — pack a layer and ride with caution`;
+        messageKey = 'weatherWarning.coolingDown';
       } else {
-        message = `Big temperature swing: ${data.remainingTempMin}°C – ${data.remainingTempMax}°C — dress in layers and ride with caution`;
+        messageKey = 'weatherWarning.tempSwing';
       }
       warnings.push({
         type: 'temp_drop',
         icon: 'thermometer',
-        message,
+        messageKey,
+        messageParams: {
+          min: data.remainingTempMin,
+          max: data.remainingTempMax,
+        },
       });
     }
   }
@@ -383,19 +396,20 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
   }
 
   if (windTier !== null) {
-    const gustSuffix =
-      data.remainingGustMax >= GUST_NOTABLE_THRESHOLD
-        ? `, gusts to ${data.remainingGustMax} km/h`
-        : '';
-    const windCopy: Record<typeof windTier, string> = {
-      breezy: `Breezy: ${data.remainingWindMax} km/h${gustSuffix} — ride with caution`,
-      strong: `Strong wind: ${data.remainingWindMax} km/h${gustSuffix} — ride with caution`,
-      hazardous: `Hazardous wind: ${data.remainingWindMax} km/h${gustSuffix} — extreme caution, prefer sheltered routes`,
+    const hasGust = data.remainingGustMax >= GUST_NOTABLE_THRESHOLD;
+    const windKeyByTier: Record<typeof windTier, string> = {
+      breezy: hasGust ? 'weatherWarning.windBreezyGust' : 'weatherWarning.windBreezy',
+      strong: hasGust ? 'weatherWarning.windStrongGust' : 'weatherWarning.windStrong',
+      hazardous: hasGust ? 'weatherWarning.windHazardousGust' : 'weatherWarning.windHazardous',
     };
     warnings.push({
       type: 'wind',
       icon: 'flag',
-      message: windCopy[windTier],
+      messageKey: windKeyByTier[windTier],
+      messageParams: {
+        wind: data.remainingWindMax,
+        gust: data.remainingGustMax,
+      },
     });
   }
 
@@ -404,13 +418,15 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'air_quality',
         icon: 'cloud',
-        message: `Poor air quality (AQI ${data.airQuality.europeanAqi}) — limit exertion and ride with caution`,
+        messageKey: 'weatherWarning.airQualityPoor',
+        messageParams: { aqi: data.airQuality.europeanAqi },
       });
     } else if (data.airQuality.europeanAqi > AQI_MODERATE_THRESHOLD) {
       warnings.push({
         type: 'air_quality',
         icon: 'cloud',
-        message: `Moderate air quality (AQI ${data.airQuality.europeanAqi}) — sensitive groups should ride with caution`,
+        messageKey: 'weatherWarning.airQualityModerate',
+        messageParams: { aqi: data.airQuality.europeanAqi },
       });
     }
 
@@ -418,7 +434,8 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       warnings.push({
         type: 'pm25',
         icon: 'alert-circle',
-        message: `High fine particulate matter: PM2.5 ${data.airQuality.pm25} μg/m³ — ride with caution`,
+        messageKey: 'weatherWarning.pm25',
+        messageParams: { pm: data.airQuality.pm25 },
       });
     }
   }

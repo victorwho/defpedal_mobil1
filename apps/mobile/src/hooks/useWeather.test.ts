@@ -122,8 +122,8 @@ describe('useWeather', () => {
       remainingWindMax: 35,
     };
     const expectedWarnings = [
-      { type: 'rain', icon: 'rainy', message: 'High chance of rain later today (75%)' },
-      { type: 'wind', icon: 'flag', message: 'Strong wind expected: 35 km/h' },
+      { type: 'rain' as const, icon: 'rainy', messageKey: 'weatherWarning.rain', messageParams: { percent: 75 } },
+      { type: 'wind' as const, icon: 'flag', messageKey: 'weatherWarning.windStrong', messageParams: { wind: 35, gust: 0 } },
     ];
     mockFetchWeather.mockResolvedValue(warningWeather);
     mockGetWeatherWarnings.mockReturnValue(expectedWarnings);

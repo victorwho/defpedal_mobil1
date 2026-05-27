@@ -52,6 +52,7 @@ import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
 import { useShareRoute } from '../src/hooks/useShareRoute';
+import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -79,6 +80,7 @@ function RoutePreviewScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { user } = useAuthSession();
+  const t = useT();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
   // (brief transitional state while router.push('/navigation') is in flight).
   // Without NAVIGATING here, the guard fires router.replace('/route-planning')
@@ -521,7 +523,7 @@ function RoutePreviewScreen() {
             {formatDuration(selectedRoute.adjustedDurationSeconds)}
           </Text>
           <View style={styles.peekSpacer} />
-          <Text style={styles.peekHint}>Swipe up</Text>
+          <Text style={styles.peekHint}>{t('preview.peekSwipeUp')}</Text>
         </View>
       ) : null}
       map={
@@ -551,12 +553,12 @@ function RoutePreviewScreen() {
             disabled={!selectedRoute}
             onPress={beginNavigation}
           >
-            {selectedRoute ? 'Start navigation' : 'No route selected'}
+            {selectedRoute ? t('preview.startNavigation') : t('preview.noRouteSelected')}
           </Button>
           <View style={styles.footerSecondaryRow}>
             <View style={styles.footerSecondaryButton}>
               <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
-                Back
+                {t('common.back')}
               </Button>
             </View>
             {selectedRoute ? (
@@ -571,11 +573,11 @@ function RoutePreviewScreen() {
               <Pressable
                 style={styles.saveRouteButton}
                 onPress={() => setSaveModalVisible(true)}
-                accessibilityLabel="Save this route"
+                accessibilityLabel={t('preview.saveRouteA11y')}
                 accessibilityRole="button"
               >
                 <Ionicons name="bookmark-outline" size={18} color={colors.accent} />
-                <Text style={styles.saveRouteLabel}>Save</Text>
+                <Text style={styles.saveRouteLabel}>{t('common.save')}</Text>
               </Pressable>
             ) : null}
           </View>
@@ -585,13 +587,13 @@ function RoutePreviewScreen() {
       {previewQuery.isPending ? (
         <View style={styles.sheetHero}>
           <Spinner size={32} />
-          <Text style={styles.sheetEyebrow}>Preview loading</Text>
+          <Text style={styles.sheetEyebrow}>{t('preview.previewLoading')}</Text>
         </View>
       ) : null}
 
       {previewQuery.isError ? (
         <View style={styles.warningPanel}>
-          <Text style={styles.warningTitle}>Preview failed</Text>
+          <Text style={styles.warningTitle}>{t('preview.previewFailed')}</Text>
           <Text style={styles.warningBody}>{previewQuery.error.message}</Text>
           <Button
             variant="ghost"
@@ -600,7 +602,7 @@ function RoutePreviewScreen() {
               void previewQuery.refetch();
             }}
           >
-            Retry preview
+            {t('preview.retryPreview')}
           </Button>
         </View>
       ) : null}
@@ -650,7 +652,7 @@ function RoutePreviewScreen() {
           <Text style={[styles.statValue, { color: colors.accent }]}>
             +{Math.round(selectedRoute.distanceMeters / 1000 * 0.4 * 30)} min
           </Text>
-          <Text style={styles.lifeLabel}>life earned</Text>
+          <Text style={styles.lifeLabel}>{t('preview.lifeEarnedShort')}</Text>
         </View>
       ) : null}
 
@@ -687,17 +689,17 @@ function RoutePreviewScreen() {
               disabled={switchingToSafe}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel="Switch to safe route"
+              accessibilityLabel={t('preview.switchToSafe')}
             >
               {switchingToSafe ? (
                 <>
                   <Spinner size={16} />
-                  <Text style={styles.switchToSafeText}>Switching to safe route...</Text>
+                  <Text style={styles.switchToSafeText}>{t('preview.switchingToSafe')}</Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="shield-checkmark" size={16} color={colors.safe} />
-                  <Text style={styles.switchToSafeText}>Switch to safe route</Text>
+                  <Text style={styles.switchToSafeText}>{t('preview.switchToSafe')}</Text>
                 </>
               )}
             </Pressable>
@@ -718,14 +720,14 @@ function RoutePreviewScreen() {
           {isRouteOfflineReady || offlineDownloadStatus === 'complete' ? (
             <View style={styles.offlineReadyRow}>
               <Ionicons name="checkmark-circle" size={18} color={colors.safe} />
-              <Text style={styles.offlineReadyText}>Available offline</Text>
+              <Text style={styles.offlineReadyText}>{t('preview.availableOffline')}</Text>
             </View>
           ) : offlineDownloadStatus === 'downloading' ? (
             <View style={styles.offlineDownloadingWrap}>
               <View style={styles.offlineDownloadingRow}>
                 <Spinner size={16} />
                 <Text style={styles.offlineDownloadingText}>
-                  Downloading... {offlineDownloadProgress}%
+                  {t('preview.downloadingPct', { percent: offlineDownloadProgress })}
                 </Text>
               </View>
               <View style={styles.offlineProgressTrack}>
@@ -742,12 +744,12 @@ function RoutePreviewScreen() {
               <View style={styles.offlineErrorRow}>
                 <Ionicons name="alert-circle" size={16} color={colors.danger} />
                 <Text style={styles.offlineErrorText}>
-                  {offlineDownloadError ?? 'Download failed'}
+                  {offlineDownloadError ?? t('preview.downloadFailed')}
                 </Text>
               </View>
               <Pressable style={styles.offlineRetryButton} onPress={handleDownloadOffline}>
                 <Ionicons name="refresh" size={14} color={colors.accent} />
-                <Text style={styles.offlineRetryLabel}>Retry</Text>
+                <Text style={styles.offlineRetryLabel}>{t('common.retry')}</Text>
               </Pressable>
             </View>
           ) : (
@@ -755,10 +757,10 @@ function RoutePreviewScreen() {
               style={styles.offlineDownloadButton}
               onPress={handleDownloadOffline}
               accessibilityRole="button"
-              accessibilityLabel="Download route for offline use"
+              accessibilityLabel={t('preview.downloadForOfflineA11y')}
             >
               <Ionicons name="cloud-download-outline" size={18} color={colors.accent} />
-              <Text style={styles.offlineDownloadLabel}>Download for offline</Text>
+              <Text style={styles.offlineDownloadLabel}>{t('preview.downloadForOffline')}</Text>
             </Pressable>
           )}
         </View>
@@ -766,19 +768,16 @@ function RoutePreviewScreen() {
 
       {isMissingApi ? (
         <View style={styles.warningPanel}>
-          <Text style={styles.warningTitle}>Missing configuration</Text>
-          <Text style={styles.warningBody}>
-            Set `EXPO_PUBLIC_MOBILE_API_URL` before requesting route previews.
-          </Text>
+          <Text style={styles.warningTitle}>{t('preview.missingConfigTitle')}</Text>
+          <Text style={styles.warningBody}>{t('preview.missingConfigBody')}</Text>
         </View>
       ) : null}
 
       {isEmpty ? (
         <View style={styles.warningPanel}>
-          <Text style={styles.warningTitle}>No routes available</Text>
+          <Text style={styles.warningTitle}>{t('preview.noRoutes')}</Text>
           <Text style={styles.warningBody}>
-            {routePreview?.coverage.message ??
-              'The backend returned no alternatives for this request. Try fast mode or a different destination.'}
+            {routePreview?.coverage.message ?? t('preview.noRoutesBody')}
           </Text>
         </View>
       ) : null}
@@ -791,23 +790,23 @@ function RoutePreviewScreen() {
       onPress={() => setSaveModalVisible(false)}
       accessible={true}
       accessibilityRole="button"
-      accessibilityLabel="Dismiss save route dialog"
+      accessibilityLabel={t('preview.dismissSaveRouteA11y')}
     >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalAvoidingView}>
         <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()} accessible={false}>
-          <Text style={styles.modalTitle}>Save Route</Text>
+          <Text style={styles.modalTitle}>{t('preview.saveRouteTitle')}</Text>
           <TextInput
             style={styles.modalInput}
             value={saveRouteName}
             onChangeText={setSaveRouteName}
-            placeholder="Route name (e.g. Morning commute)"
+            placeholder={t('preview.routeName')}
             placeholderTextColor={colors.textMuted}
             autoFocus
             maxLength={100}
           />
           <View style={styles.modalButtonRow}>
             <Button variant="ghost" size="md" onPress={() => setSaveModalVisible(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -815,7 +814,7 @@ function RoutePreviewScreen() {
               disabled={!saveRouteName.trim() || savingRoute}
               onPress={handleSaveRoute}
             >
-              {savingRoute ? 'Saving...' : 'Save'}
+              {savingRoute ? t('preview.saving') : t('common.save')}
             </Button>
           </View>
         </Pressable>

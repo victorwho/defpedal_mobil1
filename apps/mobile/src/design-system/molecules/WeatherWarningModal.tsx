@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useT } from '../../hooks/useTranslation';
 import type { WeatherWarning } from '../../lib/weather';
 import { Mascot } from '../atoms/Mascot';
 import { brandColors, gray, safetyColors } from '../tokens/colors';
@@ -19,6 +20,7 @@ export const WeatherWarningModal = ({
   visible,
   onDismiss,
 }: WeatherWarningModalProps) => {
+  const t = useT();
   if (warnings.length === 0) return null;
 
   return (
@@ -32,24 +34,22 @@ export const WeatherWarningModal = ({
         <View style={styles.card}>
           <View style={styles.header}>
             <Mascot pose="rain" size="sm" />
-            <Text style={styles.title}>Weather Warning</Text>
+            <Text style={styles.title}>{t('weatherWarning.title')}</Text>
           </View>
 
           <View style={styles.warningList}>
             {warnings.map((w) => (
               <View key={w.type} style={styles.warningRow}>
                 <Ionicons name={w.icon as any} size={20} color={safetyColors.caution} />
-                <Text style={styles.warningText}>{w.message}</Text>
+                <Text style={styles.warningText}>{t(w.messageKey, w.messageParams)}</Text>
               </View>
             ))}
           </View>
 
-          <Text style={styles.subtitle}>
-            Stay alert and ride with caution.
-          </Text>
+          <Text style={styles.subtitle}>{t('weatherWarning.subtitle')}</Text>
 
           <Pressable style={styles.button} onPress={onDismiss}>
-            <Text style={styles.buttonText}>Start anyway</Text>
+            <Text style={styles.buttonText}>{t('weatherWarning.startAnyway')}</Text>
           </Pressable>
         </View>
       </View>

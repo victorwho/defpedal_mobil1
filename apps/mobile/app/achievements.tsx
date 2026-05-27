@@ -39,6 +39,7 @@ import { useTheme, type ThemeColors } from '../src/design-system';
 import { space, layout } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { useBadges } from '../src/hooks/useBadges';
+import { useT } from '../src/hooks/useTranslation';
 
 // Grid sizing reacts to rotation via useWindowDimensions inside the component.
 // 3 columns in portrait, 5 columns once the viewport is wide enough — covers
@@ -151,6 +152,7 @@ export default function AchievementsScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const { width: screenWidth } = useWindowDimensions();
   const numColumns =
     screenWidth >= LANDSCAPE_BREAKPOINT_DP ? LANDSCAPE_GRID_COLUMNS : PORTRAIT_GRID_COLUMNS;
@@ -280,7 +282,7 @@ export default function AchievementsScreen() {
         onPress={() => setShowAllLocked(true)}
       >
         <Text style={styles.showMoreText}>
-          + {hiddenLockedCount} more to unlock
+          {t('achievements.moreToUnlock', { count: hiddenLockedCount })}
         </Text>
       </Pressable>
     );
@@ -288,7 +290,7 @@ export default function AchievementsScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenHeader variant="back" title="Achievements" />
+      <ScreenHeader variant="back" title={t('achievements.screenTitle')} />
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -319,7 +321,7 @@ export default function AchievementsScreen() {
                 <View style={styles.pedalIntroContainer}>
                   <Mascot pose="binoculars" size="lg" />
                   <Text style={styles.pedalIntroText}>
-                    No badges yet — let&apos;s spot your first one.
+                    {t('achievements.emptyAllTitle')}
                   </Text>
                 </View>
               ) : null}
@@ -337,7 +339,7 @@ export default function AchievementsScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
-                No badges in this category yet. Keep riding!
+                {t('achievements.emptyCategory')}
               </Text>
             </View>
           }

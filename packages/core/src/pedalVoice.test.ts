@@ -88,6 +88,30 @@ describe('pickMessage — placeholder fallback', () => {
     expect(msg.body).toContain('prietene');
   });
 
+  it('renders ES neutral copy for post_ride_celebration', () => {
+    const msg = pickMessage({
+      trigger: 'post_ride_celebration',
+      locale: 'es',
+      sassy: false,
+      userId: 'user-x',
+      context: { riderName: 'Ana', streakCount: 3 },
+    });
+    expect(msg.variantId).toBe('v1');
+    expect(msg.title).toBe('Ruta guardada');
+    expect(msg.body).toBe('Día 3 de racha. Bien hecho, Ana.');
+  });
+
+  it('substitutes "ciclista" when riderName is missing in ES', () => {
+    const msg = pickMessage({
+      trigger: 'post_ride_celebration',
+      locale: 'es',
+      sassy: false,
+      userId: 'user-x',
+      context: { streakCount: 1 },
+    });
+    expect(msg.body).toContain('ciclista');
+  });
+
   it('substitutes city fallback when city is missing', () => {
     const msg = pickMessage({
       trigger: 'daily_ride_reminder',
@@ -102,7 +126,7 @@ describe('pickMessage — placeholder fallback', () => {
 
   it('never leaks raw placeholders for any variant or locale', () => {
     for (const trigger of TRIGGER_LIST) {
-      for (const locale of ['en', 'ro'] as const) {
+      for (const locale of ['en', 'ro', 'es'] as const) {
         // Pass empty context — every placeholder should fall back gracefully
         for (let i = 0; i < 3; i++) {
           const msg = pickMessage({
@@ -256,7 +280,7 @@ describe('No emoji in any catalog string', () => {
 
   it('renders no emoji across all triggers/locales/variants', () => {
     for (const trigger of TRIGGER_LIST) {
-      for (const locale of ['en', 'ro'] as const) {
+      for (const locale of ['en', 'ro', 'es'] as const) {
         for (let i = 0; i < 3; i++) {
           const msg = pickMessage({
             trigger,

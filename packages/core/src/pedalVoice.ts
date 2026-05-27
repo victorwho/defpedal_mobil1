@@ -39,7 +39,7 @@ export type NudgeTrigger =
   | 'community_signal'
   | 'streak_lost_apology';
 
-export type NudgeLocale = 'en' | 'ro';
+export type NudgeLocale = 'en' | 'ro' | 'es';
 
 export type NudgePriority = 0 | 1 | 2 | 3;
 
@@ -83,6 +83,7 @@ interface TriggerCatalog {
   readonly variants: {
     readonly en: readonly VariantTemplate[];
     readonly ro: readonly VariantTemplate[];
+    readonly es: readonly VariantTemplate[];
   };
 }
 
@@ -91,7 +92,7 @@ interface TriggerCatalog {
 // ---------------------------------------------------------------------------
 
 /**
- * Master message catalog. 10 triggers × 2 locales × 3 variants = 60 entries.
+ * Master message catalog. 10 triggers × 3 locales × 3 variants = 90 entries.
  * Title and body templates use `{placeholder}` interpolation.
  *
  * IMPORTANT: When adding a placeholder, also list it in the renderer's
@@ -137,6 +138,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: '{streakCount} zile. Îmi schimb biografia să spună că te cunosc.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Ruta guardada',
+          body: 'Día {streakCount} de racha. Bien hecho, {riderName}.',
+        },
+        {
+          id: 'v2',
+          title: 'Mírate a ti',
+          body: '{streakCount} días seguidos. No estoy llorando, lloras tú.',
+        },
+        {
+          id: 'v3',
+          title: 'Pedal está encantado',
+          body: '{streakCount} días. Voy a actualizar mi LinkedIn diciendo que te conozco.',
+        },
+      ],
     },
   },
 
@@ -176,6 +194,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           id: 'v3',
           title: 'Ai salvat o roată azi',
           body: 'Raportul e activ. Pedal te salută cu o lăbuță.',
+        },
+      ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Peligro reportado',
+          body: 'Gracias, {riderName}. Los demás ciclistas cerca lo verán.',
+        },
+        {
+          id: 'v2',
+          title: 'Aviso público',
+          body: 'Pedal lo ha registrado. El próximo ciclista por {city} te debe una caña.',
+        },
+        {
+          id: 'v3',
+          title: 'Has salvado una rueda hoy',
+          body: 'Tu reporte está en directo. Pedal te saluda con una pata.',
         },
       ],
     },
@@ -219,6 +254,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: '{streakCount} zile. {city} e chiar aici. Doar zic.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Recordatorio de racha',
+          body: 'Tu racha de {streakCount} días necesita una ruta hoy, {riderName}.',
+        },
+        {
+          id: 'v2',
+          title: 'Oye, {riderName}',
+          body: 'Una ruta corta, gran cosa. {streakCount} días seguidos. No me dejes estropear la hoja de cálculo.',
+        },
+        {
+          id: 'v3',
+          title: 'Pequeño recordatorio',
+          body: '{streakCount} días. {city} está ahí mismo. Solo digo.',
+        },
+      ],
     },
   },
 
@@ -258,6 +310,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           id: 'v3',
           title: 'Pedal e îngrijorat',
           body: '{streakCount} zile pedalat. Azi e singurul lucru între tine și zero.',
+        },
+      ],
+      es: [
+        {
+          id: 'v1',
+          title: 'La racha está a punto de acabar',
+          body: 'Tu racha de {streakCount} días termina pronto. Hora de montar, {riderName}.',
+        },
+        {
+          id: 'v2',
+          title: '{riderName}',
+          body: '{streakCount} días. {city} está seco. Estoy junto a la ventana. Estoy esperando.',
+        },
+        {
+          id: 'v3',
+          title: 'Pedal está preocupado',
+          body: '{streakCount} días pedaleando. Hoy es lo único entre tú y el cero.',
         },
       ],
     },
@@ -301,6 +370,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: 'La fel ca ieri, {riderName}? Ți-am păstrat locul cald.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Ventana para rodar',
+          body: 'Tu hora habitual, {riderName}. Las condiciones pintan bien en {city}.',
+        },
+        {
+          id: 'v2',
+          title: 'Es la hora',
+          body: '{city} te llama. La bici está lista. Pedal también.',
+        },
+        {
+          id: 'v3',
+          title: 'Chequeo rápido',
+          body: '¿Misma hora que ayer, {riderName}? Pedal te guardó el sitio calentito.',
+        },
+      ],
     },
   },
 
@@ -340,6 +426,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           id: 'v3',
           title: 'Pedal te întreabă',
           body: 'Ce sunt {milestoneDay} zile de pedalat? O mișcare. Bine ai venit, {riderName}.',
+        },
+      ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Racha de {milestoneDay} días',
+          body: 'Hito desbloqueado, {riderName}. {milestoneDay} días seguidos.',
+        },
+        {
+          id: 'v2',
+          title: '{milestoneDay}. ¡{milestoneDay}!',
+          body: '{riderName}, eres oficialmente un hábito. Voy a tatuarme tu cara.',
+        },
+        {
+          id: 'v3',
+          title: 'Pregunta de Pedal',
+          body: '¿Qué son {milestoneDay} días de rodar? Un movimiento. Bienvenido, {riderName}.',
         },
       ],
     },
@@ -383,6 +486,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: 'Următoarea cursă finalizează {badgeLabel}. Fără presiune.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'A una ruta',
+          body: 'Una ruta más desbloquea {badgeLabel}, {riderName}.',
+        },
+        {
+          id: 'v2',
+          title: 'Estás así de cerca',
+          body: '{badgeLabel} está a una ruta. Pedal ya ha escrito el discurso.',
+        },
+        {
+          id: 'v3',
+          title: 'Casi lo tienes',
+          body: 'Tu próxima ruta cierra {badgeLabel}. Sin presión, eh.',
+        },
+      ],
     },
   },
 
@@ -422,6 +542,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           id: 'v3',
           title: 'Fără presiune',
           body: 'Când ești gata, {riderName}. Pedal are răbdare.',
+        },
+      ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Pedal te echa de menos',
+          body: '{lapsedDays} días. Tu bici sigue donde la dejaste, {riderName}.',
+        },
+        {
+          id: 'v2',
+          title: 'Comprobación de bienestar',
+          body: 'Comprobado. La bici sigue ahí. {city} también. Solo digo.',
+        },
+        {
+          id: 'v3',
+          title: 'Sin presión',
+          body: 'Cuando estés listo, {riderName}. Pedal es paciente.',
         },
       ],
     },
@@ -465,6 +602,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: 'Activitatea crește în {city} săptămâna asta. Pedal recomandă să te alături.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Tu barrio',
+          body: 'Los ciclistas de {city} están activos. Tu puesto en el ranking ha cambiado.',
+        },
+        {
+          id: 'v2',
+          title: 'Atención',
+          body: 'Alguien en {city} acaba de alcanzar un hito. El barrio se mueve.',
+        },
+        {
+          id: 'v3',
+          title: 'Noticias locales',
+          body: 'La actividad sube en {city} esta semana. Pedal recomienda unirse.',
+        },
+      ],
     },
   },
 
@@ -506,6 +660,23 @@ const CATALOG: Record<NudgeTrigger, TriggerCatalog> = {
           body: 'Streak resetat. Trei curse, trei zile, restart lent. Pedal e cu tine.',
         },
       ],
+      es: [
+        {
+          id: 'v1',
+          title: 'Empezamos de nuevo',
+          body: 'Tu racha se ha reseteado. ¿Listo para tres días, {riderName}? Luego vemos.',
+        },
+        {
+          id: 'v2',
+          title: '{riderName}',
+          body: 'Sobre lo de ayer. Pasa. ¿Probamos 3 días, sin presión? Pedal lo lleva con calma.',
+        },
+        {
+          id: 'v3',
+          title: 'Pedal se reagrupa',
+          body: 'Racha reseteada. Tres rutas, tres días, reinicio suave. Pedal está contigo.',
+        },
+      ],
     },
   },
 };
@@ -544,13 +715,13 @@ export const pickVariantIndex = (
 // Template interpolation
 // ---------------------------------------------------------------------------
 
-const FALLBACKS: Record<keyof NudgeContext, { en: string; ro: string }> = {
-  riderName: { en: 'rider', ro: 'prietene' },
-  streakCount: { en: '0', ro: '0' },
-  milestoneDay: { en: '0', ro: '0' },
-  city: { en: 'your city', ro: 'orașul tău' },
-  badgeLabel: { en: 'your next badge', ro: 'următoarea insignă' },
-  lapsedDays: { en: 'a few', ro: 'câteva' },
+const FALLBACKS: Record<keyof NudgeContext, { en: string; ro: string; es: string }> = {
+  riderName: { en: 'rider', ro: 'prietene', es: 'ciclista' },
+  streakCount: { en: '0', ro: '0', es: '0' },
+  milestoneDay: { en: '0', ro: '0', es: '0' },
+  city: { en: 'your city', ro: 'orașul tău', es: 'tu ciudad' },
+  badgeLabel: { en: 'your next badge', ro: 'următoarea insignă', es: 'tu próxima insignia' },
+  lapsedDays: { en: 'a few', ro: 'câteva', es: 'unos cuantos' },
 };
 
 const PLACEHOLDER_RE = /\{(riderName|streakCount|milestoneDay|city|badgeLabel|lapsedDays)\}/g;

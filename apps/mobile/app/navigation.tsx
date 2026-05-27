@@ -1243,7 +1243,7 @@ function NavigationScreen() {
           }}
           accessible={true}
           accessibilityRole="button"
-          accessibilityLabel="Dismiss hazard picker"
+          accessibilityLabel={t('hazard.dismissPickerA11y')}
         >
           <Surface
             variant="panel"
@@ -1255,19 +1255,19 @@ function NavigationScreen() {
           >
             {hazardDescribeMode ? (
               <>
-                <Text style={styles.hazardGridTitle}>Describe the hazard</Text>
-                <Text style={styles.hazardGridSubtitle}>Optional — a short note helps other cyclists.</Text>
+                <Text style={styles.hazardGridTitle}>{t('hazard.describeTitle')}</Text>
+                <Text style={styles.hazardGridSubtitle}>{t('hazard.describeSubtitle')}</Text>
                 <TextInput
                   style={styles.hazardDescribeInput}
                   value={hazardDescription}
                   onChangeText={setHazardDescription}
-                  placeholder="e.g. loose dog, glass shards, closed gate…"
+                  placeholder={t('hazard.describePlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   multiline
                   maxLength={280}
                   autoFocus
-                  accessibilityLabel="Hazard description, optional"
-                  accessibilityHint="Type a short description of the hazard, or leave blank"
+                  accessibilityLabel={t('hazard.describeA11y')}
+                  accessibilityHint={t('hazard.describeA11yHint')}
                 />
                 <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
                 <Pressable
@@ -1277,9 +1277,9 @@ function NavigationScreen() {
                   ]}
                   onPress={() => queueHazardReport('other', hazardDescription)}
                   accessibilityRole="button"
-                  accessibilityLabel="Report hazard"
+                  accessibilityLabel={t('hazard.title')}
                 >
-                  <Text style={styles.hazardDescribeSubmitText}>Report</Text>
+                  <Text style={styles.hazardDescribeSubmitText}>{t('hazard.reportShort')}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.hazardGridCancel}
@@ -1289,22 +1289,22 @@ function NavigationScreen() {
                   }}
                   accessible
                   accessibilityRole="button"
-                  accessibilityLabel="Back to hazard types"
+                  accessibilityLabel={t('hazard.backToTypesA11y')}
                 >
-                  <Text style={styles.hazardGridCancelText}>Back</Text>
+                  <Text style={styles.hazardGridCancelText}>{t('hazard.backToTypes')}</Text>
                 </Pressable>
               </>
             ) : (
               <>
-                <Text style={styles.hazardGridTitle}>Report hazard</Text>
+                <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
                 <View style={styles.hazardGrid}>
                   {([
-                    { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
-                    { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
-                    { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
-                    { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
-                    { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
-                    { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+                    { value: 'illegally_parked_car' as HazardType, label: t('hazard.types.illegally_parked_car'), icon: 'car-outline' as const },
+                    { value: 'blocked_bike_lane' as HazardType, label: t('hazard.types.blocked_bike_lane'), icon: 'remove-circle-outline' as const },
+                    { value: 'pothole' as HazardType, label: t('hazard.types.pothole'), icon: 'alert-circle-outline' as const },
+                    { value: 'aggro_dogs' as HazardType, label: t('hazard.types.aggro_dogs'), icon: 'paw-outline' as const },
+                    { value: 'aggressive_traffic' as HazardType, label: t('hazard.types.aggressive_traffic'), icon: 'speedometer-outline' as const },
+                    { value: 'other' as HazardType, label: t('hazard.other'), icon: 'ellipsis-horizontal' as const },
                   ]).map((item) => (
                     <Pressable
                       key={item.value}
@@ -1314,7 +1314,7 @@ function NavigationScreen() {
                       ]}
                       onPress={() => handleHazardGridItemPress(item.value)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Report ${item.label}`}
+                      accessibilityLabel={t('hazard.reportItemA11y', { label: item.label })}
                     >
                       <Ionicons name={item.icon} size={24} color={colors.accent} />
                       <Text style={styles.hazardGridLabel}>{item.label}</Text>
@@ -1326,9 +1326,9 @@ function NavigationScreen() {
                   onPress={() => setHazardPickerOpen(false)}
                   accessible={true}
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel hazard report"
+                  accessibilityLabel={t('hazard.cancelReportA11y')}
                 >
-                  <Text style={styles.hazardGridCancelText}>Cancel</Text>
+                  <Text style={styles.hazardGridCancelText}>{t('common.cancel')}</Text>
                 </Pressable>
               </>
             )}

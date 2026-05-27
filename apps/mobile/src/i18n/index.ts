@@ -1,7 +1,7 @@
 /**
  * Lightweight i18n system for Defensive Pedal.
  *
- * - Two locales: 'en' (default) and 'ro'
+ * - Three locales: 'en' (default), 'ro', 'es'
  * - Detects device locale via React Native NativeModules (no native dependency)
  * - Persisted locale override via Zustand appStore
  * - Simple dot-path key lookup with {{variable}} interpolation
@@ -9,11 +9,14 @@
 import { NativeModules, Platform } from 'react-native';
 
 import { en, type TranslationKeys } from './en';
+import { es } from './es';
 import { ro } from './ro';
 
-export type Locale = 'en' | 'ro';
+export type Locale = 'en' | 'ro' | 'es';
 
-const translations: Record<Locale, TranslationKeys> = { en, ro };
+export const SUPPORTED_LOCALES: readonly Locale[] = ['en', 'ro', 'es'] as const;
+
+const translations: Record<Locale, TranslationKeys> = { en, ro, es };
 
 /**
  * Detect the device's preferred locale, falling back to 'en'.
@@ -25,7 +28,9 @@ export const getDeviceLocale = (): Locale => {
       ? NativeModules.I18nManager?.localeIdentifier?.split('_')[0]
       : NativeModules.SettingsManager?.settings?.AppleLocale?.split('_')[0] ??
         NativeModules.SettingsManager?.settings?.AppleLanguages?.[0]?.split('-')[0];
-  return deviceLang === 'ro' ? 'ro' : 'en';
+  if (deviceLang === 'ro') return 'ro';
+  if (deviceLang === 'es') return 'es';
+  return 'en';
 };
 
 /**

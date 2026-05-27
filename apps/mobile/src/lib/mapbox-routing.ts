@@ -80,22 +80,31 @@ const generateRouteId = (source: 'custom_osrm' | 'mapbox', index: number): strin
 
 /**
  * Map an OSRM/Mapbox step to our NavigationStep.
+ *
+ * Mapbox Directions returns a localized `maneuver.instruction` when called
+ * with `&language=<code>` — prefer that so the rider's UI locale flows
+ * through to turn-by-turn text. Falls back to a hand-built English string
+ * for safe-mode (OSRM) routes that don't ship an instruction field.
  */
-const mapStep = (step: Step, index: number): NavigationStep => ({
-  id: `step-${index}`,
-  instruction:
+const mapStep = (step: Step, index: number): NavigationStep => {
+  const mapboxInstruction = (step.maneuver as { instruction?: string }).instruction;
+  const fallback =
     step.maneuver.type === 'depart'
       ? `Head ${step.maneuver.modifier ?? 'straight'} on ${step.name || 'the road'}`
       : step.maneuver.type === 'arrive'
         ? 'Arrive at your destination'
-        : `${capitalizeFirst(step.maneuver.modifier ?? step.maneuver.type)} onto ${step.name || 'the road'}`,
-  streetName: step.name || '',
-  distanceMeters: step.distance,
-  durationSeconds: step.duration,
-  maneuver: step.maneuver,
-  geometry: step.geometry,
-  mode: step.mode,
-});
+        : `${capitalizeFirst(step.maneuver.modifier ?? step.maneuver.type)} onto ${step.name || 'the road'}`;
+  return {
+    id: `step-${index}`,
+    instruction: mapboxInstruction && mapboxInstruction.length > 0 ? mapboxInstruction : fallback,
+    streetName: step.name || '',
+    distanceMeters: step.distance,
+    durationSeconds: step.duration,
+    maneuver: step.maneuver,
+    geometry: step.geometry,
+    mode: step.mode,
+  };
+};
 
 const capitalizeFirst = (s: string): string =>
   s.charAt(0).toUpperCase() + s.slice(1);
@@ -189,10 +198,16 @@ const fetchOsrmRoutes = async (
 // Fetch routes from Mapbox Directions (fast mode)
 // ---------------------------------------------------------------------------
 
+// Mapbox Directions supports a fixed set of language codes for step
+// instructions. Anything else falls back silently — so we keep the surface
+// to the locales we actually translate the UI into.
+const MAPBOX_DIRECTIONS_LANGUAGES = new Set(['en', 'ro', 'es']);
+
 const fetchMapboxRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
   waypoints?: readonly Coordinate[],
+  locale?: string,
 ): Promise<Route[]> => {
   const token = mobileEnv.mapboxPublicToken;
 
@@ -209,6 +224,12 @@ const fetchMapboxRoutes = async (
     overview: 'full',
     access_token: token,
   });
+
+  // Localize maneuver `instruction` text. Default to EN when the caller's
+  // locale isn't in Mapbox's supported set.
+  const language =
+    locale && MAPBOX_DIRECTIONS_LANGUAGES.has(locale) ? locale : 'en';
+  params.set('language', language);
 
   const url = `${MAPBOX_DIRECTIONS_BASE}/${coords}?${params.toString()}`;
   const response = await fetchWithTimeout(url);
@@ -389,7 +410,7 @@ export const directPreviewRoute = async (
           request.avoidHills,
           waypoints,
         )
-      : await fetchMapboxRoutes(origin, destination, waypoints);
+      : await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
     mapRoute(route, source, index),
@@ -438,7 +459,7 @@ export const directPreviewRoute = async (
 
       if (effectiveMode === 'safe') {
         // Fetch fast route for comparison
-        const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints);
+        const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
         if (fastRawRoutes.length > 0) {
           const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);

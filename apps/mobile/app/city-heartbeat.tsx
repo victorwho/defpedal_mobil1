@@ -35,6 +35,7 @@ import {
   textDataMd,
 } from '../src/design-system/tokens/typography';
 import { useCityHeartbeat } from '../src/hooks/useCityHeartbeat';
+import { useT } from '../src/hooks/useTranslation';
 import { HAZARD_TYPE_OPTIONS, type HazardType } from '@defensivepedal/core';
 
 // ---------------------------------------------------------------------------
@@ -56,13 +57,15 @@ export default function CityHeartbeatScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { heartbeat, isLoading, error, refetch } = useCityHeartbeat();
+  const t = useT();
+  const screenTitle = t('cityHeartbeat.title');
 
   if (isLoading && !heartbeat) {
     return (
-      <Screen title="City Heartbeat" headerVariant="back">
+      <Screen title={screenTitle} headerVariant="back">
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} size="large" />
-          <Text style={styles.loadingText}>Loading heartbeat...</Text>
+          <Text style={styles.loadingText}>{t('cityHeartbeat.loading')}</Text>
         </View>
       </Screen>
     );
@@ -70,7 +73,7 @@ export default function CityHeartbeatScreen() {
 
   if (error && !heartbeat) {
     return (
-      <Screen title="City Heartbeat" headerVariant="back">
+      <Screen title={screenTitle} headerVariant="back">
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
@@ -80,16 +83,16 @@ export default function CityHeartbeatScreen() {
 
   if (!heartbeat) {
     return (
-      <Screen title="City Heartbeat" headerVariant="back">
+      <Screen title={screenTitle} headerVariant="back">
         <View style={styles.center}>
-          <Text style={styles.loadingText}>No data available</Text>
+          <Text style={styles.loadingText}>{t('cityHeartbeat.noData')}</Text>
         </View>
       </Screen>
     );
   }
 
   return (
-    <Screen title="City Heartbeat" headerVariant="back">
+    <Screen title={screenTitle} headerVariant="back">
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -113,10 +116,10 @@ export default function CityHeartbeatScreen() {
         {/* Today's live stats */}
         <FadeSlideIn delay={100}>
           <Surface>
-            <Text style={styles.sectionLabel}>TODAY'S PULSE</Text>
+            <Text style={styles.sectionLabel}>{t('cityHeartbeat.todayPulse')}</Text>
             <View style={styles.statGrid}>
               <StatCell
-                label="Rides"
+                label={t('cityHeartbeat.rides')}
                 value={heartbeat.today.rides}
                 suffix=""
                 decimals={0}
@@ -124,7 +127,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="Distance"
+                label={t('cityHeartbeat.distance')}
                 value={heartbeat.today.distanceMeters / 1000}
                 suffix=" km"
                 decimals={1}
@@ -132,7 +135,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="CO2 saved"
+                label={t('cityHeartbeat.co2Saved')}
                 value={heartbeat.today.co2SavedKg}
                 suffix=" kg"
                 decimals={1}
@@ -140,7 +143,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="Donated"
+                label={t('cityHeartbeat.donated')}
                 value={heartbeat.today.communitySeconds}
                 suffix=" sec"
                 decimals={0}
@@ -159,10 +162,10 @@ export default function CityHeartbeatScreen() {
         {/* Cumulative totals */}
         <FadeSlideIn delay={300}>
           <Surface>
-            <Text style={styles.sectionLabel}>ALL TIME</Text>
+            <Text style={styles.sectionLabel}>{t('cityHeartbeat.allTime')}</Text>
             <View style={styles.statGrid}>
               <StatCell
-                label="Total rides"
+                label={t('cityHeartbeat.totalRides')}
                 value={heartbeat.totals.rides}
                 suffix=""
                 decimals={0}
@@ -170,7 +173,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="Distance"
+                label={t('cityHeartbeat.distance')}
                 value={heartbeat.totals.distanceMeters / 1000}
                 suffix=" km"
                 decimals={0}
@@ -178,7 +181,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="CO2 saved"
+                label={t('cityHeartbeat.co2Saved')}
                 value={heartbeat.totals.co2SavedKg}
                 suffix=" kg"
                 decimals={1}
@@ -186,7 +189,7 @@ export default function CityHeartbeatScreen() {
                 styles={styles}
               />
               <StatCell
-                label="Riders"
+                label={t('cityHeartbeat.riders')}
                 value={heartbeat.totals.uniqueRiders}
                 suffix=""
                 decimals={0}
@@ -201,8 +204,8 @@ export default function CityHeartbeatScreen() {
         {heartbeat.hazardHotspots.length > 0 && (
           <FadeSlideIn delay={400}>
             <Surface style={{ gap: space[2] }}>
-              <Text style={styles.sectionLabel}>HAZARD HOTSPOTS</Text>
-              <Text style={styles.sectionSub}>Most reported in the last 7 days</Text>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.hazardHotspots')}</Text>
+              <Text style={styles.sectionSub}>{t('cityHeartbeat.hazardHotspotsSub')}</Text>
               {heartbeat.hazardHotspots.map((h, i) => (
                 <View key={`${h.hazardType}-${i}`} style={styles.hazardRow}>
                   <View style={styles.hazardBadge}>
@@ -219,7 +222,7 @@ export default function CityHeartbeatScreen() {
         {heartbeat.topContributors.length > 0 && (
           <FadeSlideIn delay={500}>
             <Surface style={{ gap: space[2] }}>
-              <Text style={styles.sectionLabel}>TOP CONTRIBUTORS</Text>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.topContributors')}</Text>
               {heartbeat.topContributors.map((c, i) => (
                 <View key={`contributor-${i}`} style={styles.contributorRow}>
                   <View style={styles.rankBadge}>
@@ -242,7 +245,7 @@ export default function CityHeartbeatScreen() {
                       {c.displayName}
                     </Text>
                     <Text style={styles.contributorStats}>
-                      {c.rideCount} rides · {c.distanceKm} km
+                      {c.rideCount} {t('cityHeartbeat.rides').toLowerCase()} · {c.distanceKm} km
                     </Text>
                   </View>
                 </View>

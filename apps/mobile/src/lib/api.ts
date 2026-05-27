@@ -360,13 +360,18 @@ export const mobileApi = {
     return mobileApiFetch<ImpactDashboard>(`/v1/impact-dashboard${params}`);
   },
 
-  fetchDailyQuiz: (country: QuizCountry) =>
-    mobileApiFetch<QuizQuestion>(`/v1/quiz/daily?country=${country}`),
+  fetchDailyQuiz: (country: QuizCountry, locale: 'en' | 'ro' | 'es' = 'en') =>
+    mobileApiFetch<QuizQuestion>(`/v1/quiz/daily?country=${country}&locale=${locale}`),
 
-  submitQuizAnswer: (questionId: string, selectedIndex: number, country: QuizCountry) =>
+  submitQuizAnswer: (
+    questionId: string,
+    selectedIndex: number,
+    country: QuizCountry,
+    locale: 'en' | 'ro' | 'es' = 'en',
+  ) =>
     mobileApiFetch<QuizAnswer>('/v1/quiz/answer', {
       method: 'POST',
-      body: JSON.stringify({ questionId, selectedIndex, country }),
+      body: JSON.stringify({ questionId, selectedIndex, country, locale }),
     }),
 
   // ── Social ──

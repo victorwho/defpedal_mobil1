@@ -8,6 +8,7 @@ import { Text, View, StyleSheet } from 'react-native';
 
 import type { BadgeDefinition } from '@defensivepedal/core';
 
+import { useT } from '../../hooks/useTranslation';
 import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import { type BadgeTier } from '../tokens/badgeColors';
@@ -16,6 +17,8 @@ import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
 import { fontFamily, textSm, textXs } from '../tokens/typography';
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 export interface TrophyCaseHeaderProps {
   earned: number;
@@ -35,57 +38,60 @@ const TIER_FROM_LEVEL: Record<number, BadgeTier> = {
   5: 'diamond',
 };
 
-function formatTimeAgo(date: Date): string {
+function formatTimeAgo(date: Date, t: TFn): string {
   const diffMs = Date.now() - date.getTime();
   const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('achievements.timeJustNow');
+  if (mins < 60) return t('achievements.timeMinsAgo', { count: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('achievements.timeHoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return t('achievements.timeDaysAgo', { count: days });
 }
 
 export const TrophyCaseHeader: React.FC<TrophyCaseHeaderProps> = ({
   earned,
   total,
   recentBadge,
-}) => (
-  <View style={[styles.container, shadows.md]}>
-    <Text style={styles.sectionTitle}>YOUR ACHIEVEMENTS</Text>
+}) => {
+  const t = useT();
+  return (
+    <View style={[styles.container, shadows.md]}>
+      <Text style={styles.sectionTitle}>{t('achievements.yourAchievements')}</Text>
 
-    <View style={styles.countRow}>
-      <Text style={styles.countEarned}>{earned}</Text>
-      <Text style={styles.countTotal}> / {total}</Text>
-    </View>
-
-    <BadgeProgressBar
-      current={earned}
-      target={total}
-      tierColor={brandColors.accent}
-      height={6}
-    />
-
-    {recentBadge ? (
-      <View style={styles.recentCard}>
-        <BadgeVisual
-          badgeKey={recentBadge.badge.badgeKey}
-          tierFamily={recentBadge.badge.tierFamily}
-          tier={recentBadge.tier ?? TIER_FROM_LEVEL[recentBadge.badge.tier] ?? 'bronze'}
-          size="sm"
-        />
-        <View style={styles.recentTextCol}>
-          <Text style={styles.recentName} numberOfLines={1}>
-            {recentBadge.badge.name}
-          </Text>
-          <Text style={styles.recentTime}>
-            {formatTimeAgo(recentBadge.earnedAt)}
-          </Text>
-        </View>
+      <View style={styles.countRow}>
+        <Text style={styles.countEarned}>{earned}</Text>
+        <Text style={styles.countTotal}> / {total}</Text>
       </View>
-    ) : null}
-  </View>
-);
+
+      <BadgeProgressBar
+        current={earned}
+        target={total}
+        tierColor={brandColors.accent}
+        height={6}
+      />
+
+      {recentBadge ? (
+        <View style={styles.recentCard}>
+          <BadgeVisual
+            badgeKey={recentBadge.badge.badgeKey}
+            tierFamily={recentBadge.badge.tierFamily}
+            tier={recentBadge.tier ?? TIER_FROM_LEVEL[recentBadge.badge.tier] ?? 'bronze'}
+            size="sm"
+          />
+          <View style={styles.recentTextCol}>
+            <Text style={styles.recentName} numberOfLines={1}>
+              {recentBadge.badge.name}
+            </Text>
+            <Text style={styles.recentTime}>
+              {formatTimeAgo(recentBadge.earnedAt, t)}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

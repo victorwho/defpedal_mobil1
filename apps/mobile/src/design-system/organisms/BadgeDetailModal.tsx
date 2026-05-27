@@ -11,6 +11,7 @@ import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
 
 import { BadgeShareCard } from '../../components/BadgeShareCard';
 import { useShareCard } from '../../hooks/useShareCard';
+import { useT } from '../../hooks/useTranslation';
 import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import { claimHoloFocus } from '../hooks/useHoloTilt';
@@ -79,6 +80,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
   onClose,
 }) => {
   const { share: shareCard, isSharing } = useShareCard();
+  const t = useT();
 
   // Claim exclusive holo tilt while the modal is up — grid stickers behind
   // the backdrop suspend their gyro so only the hero responds to the phone's
@@ -90,8 +92,8 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 
   const handleShare = useCallback(async () => {
     if (!badge) return;
-    const t: BadgeTier = earnedTier ?? TIER_FROM_LEVEL[badge.tier] ?? 'bronze';
-    const tierLabel = TIER_LABELS[t];
+    const shareTier: BadgeTier = earnedTier ?? TIER_FROM_LEVEL[badge.tier] ?? 'bronze';
+    const tierLabel = TIER_LABELS[shareTier];
     const rarity = rarityPercent != null ? getRarity(rarityPercent) : null;
 
     const result = await shareCard({
@@ -103,7 +105,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
         <BadgeShareCard
           variant="capture"
           badge={badge}
-          tier={t}
+          tier={shareTier}
           rarityPercent={rarityPercent}
         />
       ),
@@ -169,7 +171,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 
             {/* Badge name */}
             <Text style={styles.badgeName}>
-              {isSecret ? '???' : badge.name}
+              {isSecret ? t('achievements.secretName') : badge.name}
             </Text>
 
             {/* Tier label */}
@@ -181,9 +183,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 
             {/* Flavor text */}
             <Text style={styles.flavorText}>
-              {isSecret
-                ? 'This badge is a mystery. Keep riding to discover it!'
-                : badge.flavorText}
+              {isSecret ? t('achievements.secretFlavor') : badge.flavorText}
             </Text>
 
             {/* Divider */}
@@ -205,7 +205,12 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
                 />
                 <Text
                   style={[styles.progressText, { color: tierColor }]}
-                  accessibilityLabel={`${progress.current} of ${progress.target} ${badge.criteriaUnit ?? ''}, ${Math.round(progress.progress * 100)}% complete`}
+                  accessibilityLabel={t('achievements.progressA11y', {
+                    current: progress.current,
+                    target: progress.target,
+                    unit: badge.criteriaUnit ?? '',
+                    percent: Math.round(progress.progress * 100),
+                  })}
                 >
                   {progress.current} / {progress.target}
                   {badge.criteriaUnit ? ` ${badge.criteriaUnit}` : ''}
@@ -221,7 +226,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
               <Text style={styles.rarityText}>
                 <Text style={{ color: rarity.color }}>{'◆ '}</Text>
                 <Text style={styles.rarityLabel}>
-                  Only {rarityPercent.toFixed(0)}% of cyclists have this badge
+                  {t('achievements.rarityLine', { percent: rarityPercent.toFixed(0) })}
                 </Text>
               </Text>
             ) : null}
@@ -229,7 +234,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
             {/* Earned date */}
             {earnedAt ? (
               <Text style={styles.earnedDate}>
-                Earned {formatDate(earnedAt)}
+                {t('achievements.earnedDate', { date: formatDate(earnedAt) })}
               </Text>
             ) : null}
 
@@ -244,7 +249,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
                 {isSharing ? (
                   <ActivityIndicator size="small" color="#111827" />
                 ) : (
-                  <Text style={styles.shareButtonText}>Share</Text>
+                  <Text style={styles.shareButtonText}>{t('achievements.share')}</Text>
                 )}
               </Pressable>
             ) : null}

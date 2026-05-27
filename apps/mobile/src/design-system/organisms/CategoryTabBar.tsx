@@ -12,6 +12,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet } from 'react-native';
 
+import { useT } from '../../hooks/useTranslation';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { PressableScale } from '../atoms/PressableScale';
 import { categoryColors, type BadgeCategory } from '../tokens/badgeColors';
@@ -27,17 +28,29 @@ export interface CategoryTabBarProps {
   counts: Record<BadgeCategory | 'all', { earned: number; total: number }>;
 }
 
-const TABS: ReadonlyArray<{ key: BadgeCategory | 'all'; label: string }> = [
-  { key: 'all', label: 'All' },
-  { key: 'firsts', label: 'Firsts' },
-  { key: 'riding', label: 'Riding' },
-  { key: 'consistency', label: 'Consistency' },
-  { key: 'impact', label: 'Impact' },
-  { key: 'safety', label: 'Safety' },
-  { key: 'community', label: 'Community' },
-  { key: 'explore', label: 'Explore' },
-  { key: 'events', label: 'Events' },
+const TAB_KEYS: ReadonlyArray<BadgeCategory | 'all'> = [
+  'all',
+  'firsts',
+  'riding',
+  'consistency',
+  'impact',
+  'safety',
+  'community',
+  'explore',
+  'events',
 ];
+
+const TAB_LABEL_KEY: Record<BadgeCategory | 'all', string> = {
+  all: 'achievements.tabAll',
+  firsts: 'achievements.tabFirsts',
+  riding: 'achievements.tabRiding',
+  consistency: 'achievements.tabConsistency',
+  impact: 'achievements.tabImpact',
+  safety: 'achievements.tabSafety',
+  community: 'achievements.tabCommunity',
+  explore: 'achievements.tabExplore',
+  events: 'achievements.tabEvents',
+};
 
 // Add ~20% alpha hex suffix to category color for the active pill background
 const ACTIVE_BG_ALPHA = '33';
@@ -105,31 +118,34 @@ export const CategoryTabBar: React.FC<CategoryTabBarProps> = ({
   selected,
   onSelect,
   counts,
-}) => (
-  <ScrollView
-    horizontal
-    showsHorizontalScrollIndicator={false}
-    contentContainerStyle={styles.scrollContent}
-  >
-    {TABS.map((tab) => {
-      const catColor =
-        tab.key === 'all' ? brandColors.accent : categoryColors[tab.key];
-      const count = counts[tab.key];
+}) => {
+  const t = useT();
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+    >
+      {TAB_KEYS.map((tabKey) => {
+        const catColor =
+          tabKey === 'all' ? brandColors.accent : categoryColors[tabKey];
+        const count = counts[tabKey];
 
-      return (
-        <Pill
-          key={tab.key}
-          label={tab.label}
-          catColor={catColor}
-          isSelected={selected === tab.key}
-          earned={count?.earned}
-          total={count?.total}
-          onPress={() => onSelect(tab.key)}
-        />
-      );
-    })}
-  </ScrollView>
-);
+        return (
+          <Pill
+            key={tabKey}
+            label={t(TAB_LABEL_KEY[tabKey])}
+            catColor={catColor}
+            isSelected={selected === tabKey}
+            earned={count?.earned}
+            total={count?.total}
+            onPress={() => onSelect(tabKey)}
+          />
+        );
+      })}
+    </ScrollView>
+  );
+};
 
 const styles = StyleSheet.create({
   scrollContent: {

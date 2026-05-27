@@ -61,19 +61,35 @@ export const en = {
   preview: {
     startNavigation: 'Start navigation',
     switchToSafe: 'Switch to safe route',
+    switchingToSafe: 'Switching to safe route...',
     saveRoute: 'Save route',
+    saveRouteTitle: 'Save Route',
+    saveRouteA11y: 'Save this route',
+    saving: 'Saving...',
+    dismissSaveRouteA11y: 'Dismiss save route dialog',
     riskDistribution: 'Risk distribution',
     elevationProfile: 'Elevation profile',
     routeComparison: 'Route comparison',
     previewLoading: 'Preview loading',
     previewFailed: 'Preview failed',
     noRoutes: 'No routes available',
+    noRoutesBody: 'The backend returned no alternatives for this request. Try fast mode or a different destination.',
     noRouteSelected: 'No route selected',
     backToPlanning: 'Back to planning',
     retryPreview: 'Retry preview',
     coverage: 'Coverage:',
     coveragePending: 'Coverage pending',
     routeName: 'Route name (e.g. Morning commute)',
+    peekSwipeUp: 'Swipe up',
+    lifeEarnedShort: 'life earned',
+    missingConfigTitle: 'Missing configuration',
+    missingConfigBody: 'Set `EXPO_PUBLIC_MOBILE_API_URL` before requesting route previews.',
+    // Offline download card
+    availableOffline: 'Available offline',
+    downloadingPct: 'Downloading... {{percent}}%',
+    downloadFailed: 'Download failed',
+    downloadForOffline: 'Download for offline',
+    downloadForOfflineA11y: 'Download route for offline use',
   },
 
   // ── Navigation ──
@@ -290,6 +306,13 @@ export const en = {
     meetPedalTitle: 'Meet Pedal',
     meetPedalBody: 'I keep things light — a friendly nudge when your streak is at risk, a cheer when you finish a ride. Turn me down in Profile anytime if I get on your nerves.',
     meetPedalCta: 'Got it',
+    // ── Achievements / referral row ──
+    achievementsLabel: 'Achievements',
+    badgesEarned: '{{earned}} / {{total}} badges earned',
+    confidentCyclistTitle: 'Confident Cyclist',
+    helpAFriend: 'Help a friend start their journey',
+    helpAFriendSub: 'Share Defensive Pedal with a friend',
+    referralShareMessage: 'Try Defensive Pedal — safer cycling routes for any city. {{url}} #DefensivePedal',
   },
 
   // ── Report sheet ──
@@ -543,6 +566,18 @@ export const en = {
     upvoteHint: 'Confirms the hazard is still present',
     downvoteLabel: 'Dismiss hazard',
     downvoteHint: 'Reports the hazard as no longer present',
+    // Quick-report sheet during navigation
+    describeTitle: 'Describe the hazard',
+    describeSubtitle: 'Optional — a short note helps other cyclists.',
+    describePlaceholder: 'e.g. loose dog, glass shards, closed gate…',
+    describeA11y: 'Hazard description, optional',
+    describeA11yHint: 'Type a short description of the hazard, or leave blank',
+    reportShort: 'Report',
+    backToTypes: 'Back',
+    backToTypesA11y: 'Back to hazard types',
+    dismissPickerA11y: 'Dismiss hazard picker',
+    cancelReportA11y: 'Cancel hazard report',
+    reportItemA11y: 'Report {{label}}',
     communityScore: 'Community score',
     reportedAgo: 'Reported {{time}}',
     lastConfirmedAgo: 'Last confirmed {{time}}',
@@ -576,6 +611,29 @@ export const en = {
     aqi: 'AQI',
     precipitation: 'Precipitation',
     loadingWeather: 'Loading weather...',
+  },
+
+  // ── Weather Warning Modal ──
+  weatherWarning: {
+    title: 'Weather Warning',
+    subtitle: 'Stay alert and ride with caution.',
+    startAnyway: 'Start anyway',
+    // Individual warning messages
+    rain: 'High chance of rain later today ({{percent}}%) — pack rain gear and ride with caution',
+    cold: 'Cold conditions: {{temp}}°C — dress warmly and ride with caution',
+    hot: 'Hot conditions: {{temp}}°C — hydrate and ride with caution',
+    warmingUp: 'Warming up later today: {{min}}°C → {{max}}°C — start in light layers and pack water',
+    coolingDown: 'Cooling down later today: {{max}}°C → {{min}}°C — pack a layer and ride with caution',
+    tempSwing: 'Big temperature swing: {{min}}°C – {{max}}°C — dress in layers and ride with caution',
+    windBreezy: 'Breezy: {{wind}} km/h — ride with caution',
+    windBreezyGust: 'Breezy: {{wind}} km/h, gusts to {{gust}} km/h — ride with caution',
+    windStrong: 'Strong wind: {{wind}} km/h — ride with caution',
+    windStrongGust: 'Strong wind: {{wind}} km/h, gusts to {{gust}} km/h — ride with caution',
+    windHazardous: 'Hazardous wind: {{wind}} km/h — extreme caution, prefer sheltered routes',
+    windHazardousGust: 'Hazardous wind: {{wind}} km/h, gusts to {{gust}} km/h — extreme caution, prefer sheltered routes',
+    airQualityPoor: 'Poor air quality (AQI {{aqi}}) — limit exertion and ride with caution',
+    airQualityModerate: 'Moderate air quality (AQI {{aqi}}) — sensitive groups should ride with caution',
+    pm25: 'High fine particulate matter: PM2.5 {{pm}} μg/m³ — ride with caution',
   },
 
   // ── Stats Dashboard ──
@@ -719,12 +777,65 @@ export const en = {
     moneySaved: 'Money saved',
     hazardsReported: 'Hazards reported',
     equivalent: 'equivalent to',
+    // Post-ride ImpactSummaryCard
+    thisRideImpact: "This ride's impact",
+    badgesEarnedTitle: 'Badges earned',
+    viewAllAchievements: 'View all achievements >',
+    xpEarnedTitle: 'XP earned',
+    xpTotal: 'Total',
+    legendMaxRank: 'Legend — Maximum rank',
+    dayStreakShort: 'day streak',
+    streakDayA11y: 'Streak day {{count}}',
+    lifeEarnedFmt: '+{{time}} of life earned',
+    donatedSecondsFmt: '+{{seconds}}s donated to city',
   },
 
   // ── FAQ ──
   faq: {
     title: 'FAQ',
     subtitle: 'Frequently asked questions',
+  },
+
+  // ── Daily Safety Quiz ──
+  quiz: {
+    title: 'Daily Quiz',
+    loadFailed: 'Failed to load quiz',
+    retry: 'Retry',
+    correct: 'Correct!',
+    notQuite: 'Not quite',
+    done: 'Done',
+    streakMaintained: 'Streak maintained! Keep it up.',
+  },
+
+  // ── Achievements / Trophy Case ──
+  achievements: {
+    screenTitle: 'Achievements',
+    yourAchievements: 'YOUR ACHIEVEMENTS',
+    moreToUnlock: '+ {{count}} more to unlock',
+    emptyAllTitle: 'No badges yet — let’s spot your first one.',
+    emptyCategory: 'No badges in this category yet. Keep riding!',
+    // Time-ago for the recent-unlock banner
+    timeJustNow: 'just now',
+    timeMinsAgo: '{{count}}m ago',
+    timeHoursAgo: '{{count}}h ago',
+    timeDaysAgo: '{{count}}d ago',
+    // Category tab labels
+    tabAll: 'All',
+    tabFirsts: 'Firsts',
+    tabRiding: 'Riding',
+    tabConsistency: 'Consistency',
+    tabImpact: 'Impact',
+    tabSafety: 'Safety',
+    tabCommunity: 'Community',
+    tabExplore: 'Explore',
+    tabEvents: 'Events',
+    // Badge detail modal
+    secretName: '???',
+    secretFlavor: 'This badge is a mystery. Keep riding to discover it!',
+    rarityLine: 'Only {{percent}}% of cyclists have this badge',
+    earnedDate: 'Earned {{date}}',
+    share: 'Share',
+    progressA11y: '{{current}} of {{target}} {{unit}}, {{percent}}% complete',
   },
 
   // ── Microlives ──

@@ -2913,7 +2913,7 @@ export const buildV1Routes = (
     // one pool is invisible to the other — that's intentional: switching pools
     // mid-life simply re-opens the catalogue rather than orphaning history.
     app.get<{
-      Querystring: { country?: QuizCountry };
+      Querystring: { country?: QuizCountry; locale?: 'en' | 'ro' | 'es' };
       Reply: QuizQuestion | ErrorResponse;
     }>(
       '/quiz/daily',
@@ -2924,6 +2924,7 @@ export const buildV1Routes = (
             additionalProperties: false,
             properties: {
               country: { type: 'string', enum: ['RO', 'ES'] },
+              locale: { type: 'string', enum: ['en', 'ro', 'es'] },
             },
           },
           response: {
@@ -2950,6 +2951,7 @@ export const buildV1Routes = (
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
         const country: QuizCountry = request.query?.country ?? 'RO';
+        const locale: 'en' | 'ro' | 'es' = request.query?.locale ?? 'en';
         const pool = getQuizPool(country);
 
         // Get question IDs answered in the last 30 days from user_quiz_history
@@ -2982,8 +2984,8 @@ export const buildV1Routes = (
 
         return {
           id: q.id,
-          questionText: q.questionText,
-          options: q.options as string[],
+          questionText: q.questionText[locale],
+          options: q.options[locale] as string[],
           category: q.category,
           difficulty: q.difficulty,
         };
@@ -2998,7 +3000,7 @@ export const buildV1Routes = (
     // cross-checking pools (we won't validate a RO question against an ES
     // pool's correctIndex).
     app.post<{
-      Body: { questionId: string; selectedIndex: number; country?: QuizCountry };
+      Body: { questionId: string; selectedIndex: number; country?: QuizCountry; locale?: 'en' | 'ro' | 'es' };
       Reply: QuizAnswer | ErrorResponse;
     }>(
       '/quiz/answer',
@@ -3012,6 +3014,7 @@ export const buildV1Routes = (
               questionId: { type: 'string', format: 'uuid' },
               selectedIndex: { type: 'integer', minimum: 0, maximum: 3 },
               country: { type: 'string', enum: ['RO', 'ES'] },
+              locale: { type: 'string', enum: ['en', 'ro', 'es'] },
             },
           },
           response: {
@@ -3042,6 +3045,7 @@ export const buildV1Routes = (
 
         const { questionId, selectedIndex } = request.body;
         const country: QuizCountry = request.body.country ?? 'RO';
+        const locale: 'en' | 'ro' | 'es' = request.body.locale ?? 'en';
 
         // Look up from the country's pool only. We don't fall back to the
         // other pool — a mismatched country should surface as 404 so the
@@ -3111,7 +3115,7 @@ export const buildV1Routes = (
           questionId,
           selectedIndex,
           isCorrect,
-          explanation: question.explanation,
+          explanation: question.explanation[locale],
         };
       },
     );

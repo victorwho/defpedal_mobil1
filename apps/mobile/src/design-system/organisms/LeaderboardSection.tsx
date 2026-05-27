@@ -30,21 +30,7 @@ import { space } from '../tokens/spacing';
 import { fontFamily, textSm, textXs } from '../tokens/typography';
 import { brandTints } from '../tokens/tints';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-const METRICS: readonly { readonly key: LeaderboardMetric; readonly label: string }[] = [
-  { key: 'co2', label: 'CO2 Saved' },
-  { key: 'hazards', label: 'Hazards Reported' },
-];
-
-const PERIODS: readonly { readonly key: LeaderboardPeriod; readonly label: string }[] = [
-  { key: 'week', label: 'This Week' },
-  { key: 'month', label: 'This Month' },
-  { key: 'all', label: 'All Time' },
-];
+import { useT } from '../../hooks/useTranslation';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -53,6 +39,18 @@ const PERIODS: readonly { readonly key: LeaderboardPeriod; readonly label: strin
 export function LeaderboardSection() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
+
+  const METRICS: readonly { readonly key: LeaderboardMetric; readonly label: string }[] = [
+    { key: 'co2', label: t('leaderboard.tabs.co2') },
+    { key: 'hazards', label: t('leaderboard.tabs.hazards') },
+  ];
+
+  const PERIODS: readonly { readonly key: LeaderboardPeriod; readonly label: string }[] = [
+    { key: 'week', label: t('leaderboard.periods.week') },
+    { key: 'month', label: t('leaderboard.periods.month') },
+    { key: 'all', label: t('leaderboard.periods.all') },
+  ];
 
   const [metric, setMetric] = useState<LeaderboardMetric>('co2');
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
@@ -83,7 +81,7 @@ export function LeaderboardSection() {
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
-        <SectionTitle variant="accent">Neighborhood Leaderboard</SectionTitle>
+        <SectionTitle variant="accent">{t('leaderboard.title')}</SectionTitle>
         {userIsChampion ? (
           <View style={styles.championStamp}>
             <Mascot pose="trophy" size="sm" />
@@ -146,14 +144,14 @@ export function LeaderboardSection() {
       {error && !isLoading && (
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
-          <Button onPress={refetch} variant="secondary" size="sm">Retry</Button>
+          <Button onPress={refetch} variant="secondary" size="sm">{t('common.retry')}</Button>
         </View>
       )}
 
       {/* Empty state */}
       {!isLoading && !error && data && data.entries.length === 0 && (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>No activity in your area yet</Text>
+          <Text style={styles.emptyText}>{t('leaderboard.emptyState')}</Text>
         </View>
       )}
 
@@ -179,7 +177,7 @@ export function LeaderboardSection() {
             <>
               <View style={styles.separator}>
                 <View style={styles.separatorLine} />
-                <Text style={styles.separatorText}>Your Rank</Text>
+                <Text style={styles.separatorText}>{t('leaderboard.ghostRankSeparator')}</Text>
                 <View style={styles.separatorLine} />
               </View>
               <LeaderboardRow

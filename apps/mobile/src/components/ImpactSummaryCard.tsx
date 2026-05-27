@@ -9,6 +9,7 @@ import { AnimatedCounter } from '../design-system/atoms/AnimatedCounter';
 import { BadgeVisual } from '../design-system/atoms/BadgeVisual';
 import { Mascot } from '../design-system/atoms/Mascot';
 import { StreakFlame } from '../design-system/atoms/StreakFlame';
+import { useT } from '../hooks/useTranslation';
 import { brandColors, darkTheme, safetyColors } from '../design-system/tokens/colors';
 import { radii } from '../design-system/tokens/radii';
 import { shadows } from '../design-system/tokens/shadows';
@@ -151,6 +152,7 @@ const StaggeredBadge = ({
 // ---------------------------------------------------------------------------
 
 const StreakFlash = ({ count }: { count: number }) => {
+  const t = useT();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.9)).current;
 
@@ -169,10 +171,10 @@ const StreakFlash = ({ count }: { count: number }) => {
   return (
     <Animated.View
       style={[styles.streakFlash, { opacity, transform: [{ scale }] }]}
-      accessibilityLabel={`Streak day ${count}`}
+      accessibilityLabel={t('impact.streakDayA11y', { count })}
     >
       <StreakFlame streakDays={count} size="lg" animated />
-      <Text style={styles.streakFlashLabel}>day streak</Text>
+      <Text style={styles.streakFlashLabel}>{t('impact.dayStreakShort')}</Text>
     </Animated.View>
   );
 };
@@ -183,6 +185,7 @@ export const ImpactSummaryCard = ({
   newBadges,
   streakCount,
 }: ImpactSummaryCardProps) => {
+  const t = useT();
   const tierKey = rideImpact.riderTier as RiderTierKey;
   const tierDef = riderTiers[tierKey];
   const progress = tierDef ? getTierProgress(rideImpact.currentTotalXp, tierKey) : 0;
@@ -204,7 +207,7 @@ export const ImpactSummaryCard = ({
       {/* Badges earned this ride */}
       {newBadges && newBadges.length > 0 ? (
         <View style={styles.badgesSection}>
-          <Text style={styles.sectionTitle}>Badges earned</Text>
+          <Text style={styles.sectionTitle}>{t('impact.badgesEarnedTitle')}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -215,14 +218,14 @@ export const ImpactSummaryCard = ({
             ))}
           </ScrollView>
           <Pressable onPress={() => router.push('/achievements' as any)}>
-            <Text style={styles.viewAllLink}>View all achievements &gt;</Text>
+            <Text style={styles.viewAllLink}>{t('impact.viewAllAchievements')}</Text>
           </Pressable>
         </View>
       ) : null}
 
       {/* XP earned — always visible */}
       <View style={styles.xpSection}>
-        <Text style={styles.sectionTitle}>XP earned</Text>
+        <Text style={styles.sectionTitle}>{t('impact.xpEarnedTitle')}</Text>
         {rideImpact.xpBreakdown && rideImpact.xpBreakdown.length > 0 ? (
           <>
             {rideImpact.xpBreakdown.map((item, i) => (
@@ -240,7 +243,7 @@ export const ImpactSummaryCard = ({
           </>
         ) : null}
         <View style={styles.xpRow}>
-          <Text style={[styles.xpLabel, styles.xpTotalLabel]}>Total</Text>
+          <Text style={[styles.xpLabel, styles.xpTotalLabel]}>{t('impact.xpTotal')}</Text>
           <Text style={[styles.xpValue, styles.xpTotalValue]}>+{rideImpact.totalXpEarned} XP</Text>
         </View>
         {/* Progress bar to next tier */}
@@ -254,21 +257,27 @@ export const ImpactSummaryCard = ({
                 {tierDef.displayName} → {nextDef.displayName}  ·  {rideImpact.currentTotalXp.toLocaleString()} / {nextDef.xp.toLocaleString()} XP
               </Text>
             ) : (
-              <Text style={styles.xpProgressLabel}>Legend — Maximum rank</Text>
+              <Text style={styles.xpProgressLabel}>{t('impact.legendMaxRank')}</Text>
             )}
           </View>
         ) : null}
       </View>
 
       {/* This ride's impact — microlives first, then CO2/money */}
-      <Text style={styles.sectionTitle}>This ride's impact</Text>
+      <Text style={styles.sectionTitle}>{t('impact.thisRideImpact')}</Text>
 
       <View style={styles.countersColumn}>
         <StaggeredCounter
           targetValue={rideImpact.personalMicrolives}
           decimals={1}
-          label={`+${formatMicrolivesAsTime(rideImpact.personalMicrolives)} of life earned`}
-          equivalentText={rideImpact.communitySeconds > 0 ? `+${Math.round(rideImpact.communitySeconds)}s donated to city` : null}
+          label={t('impact.lifeEarnedFmt', {
+            time: formatMicrolivesAsTime(rideImpact.personalMicrolives),
+          })}
+          equivalentText={
+            rideImpact.communitySeconds > 0
+              ? t('impact.donatedSecondsFmt', { seconds: Math.round(rideImpact.communitySeconds) })
+              : null
+          }
           color="#F2C30F"
           delayMs={0}
           suffix=" ML"
@@ -277,7 +286,7 @@ export const ImpactSummaryCard = ({
           targetValue={rideImpact.co2SavedKg}
           suffix=" kg"
           decimals={2}
-          label="CO2 saved"
+          label={t('impact.co2Saved')}
           equivalentText={rideImpact.equivalentText}
           color={safetyColors.safe}
           delayMs={staggerDelayMs}
@@ -286,7 +295,7 @@ export const ImpactSummaryCard = ({
           targetValue={rideImpact.moneySavedEur}
           prefix="EUR "
           decimals={2}
-          label="Money saved"
+          label={t('impact.moneySaved')}
           equivalentText={null}
           color={brandColors.accent}
           delayMs={staggerDelayMs * 2}
