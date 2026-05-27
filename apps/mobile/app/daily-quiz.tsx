@@ -28,6 +28,7 @@ import {
   textSm,
   textXs,
 } from '../src/design-system/tokens/typography';
+import { useResolvedQuizCountry } from '../src/hooks/useResolvedQuizCountry';
 import { mobileApi } from '../src/lib/api';
 import { brandTints, safetyTints } from '../src/design-system/tokens/tints';
 
@@ -103,9 +104,14 @@ export default function DailyQuizScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const queryClient = useQueryClient();
 
+  // Resolve which country pool to serve. queryKey includes country so flipping
+  // the Profile override (or crossing a border with GPS on) refetches a fresh
+  // question from the right catalogue.
+  const { country: quizCountry } = useResolvedQuizCountry();
+
   const { data: question, isLoading, error, refetch } = useQuery<QuizQuestion>({
-    queryKey: [QUIZ_KEY],
-    queryFn: () => mobileApi.fetchDailyQuiz(),
+    queryKey: [QUIZ_KEY, quizCountry],
+    queryFn: () => mobileApi.fetchDailyQuiz(quizCountry),
     staleTime: 30 * 60_000,
   });
 
@@ -123,7 +129,7 @@ export default function DailyQuizScreen() {
     setIsSubmitting(true);
 
     try {
-      const result = await mobileApi.submitQuizAnswer(question.id, index);
+      const result = await mobileApi.submitQuizAnswer(question.id, index, quizCountry);
       setAnswer(result);
 
       // Animate feedback in

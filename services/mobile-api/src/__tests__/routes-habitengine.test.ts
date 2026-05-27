@@ -771,6 +771,153 @@ describe('POST /v1/quiz/answer', () => {
 });
 
 // ===========================================================================
+// Country-aware quiz pool dispatch
+// ===========================================================================
+
+describe('Quiz country dispatch', () => {
+  it('GET /v1/quiz/daily?country=ES serves a question whose UUID lives in the ES pool', async () => {
+    mockFrom.mockReturnValueOnce(chainResult([]));
+
+    const { QUIZ_QUESTIONS_ES } = await import('../data/quiz-questions-es');
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const esIds = new Set(QUIZ_QUESTIONS_ES.map((q) => q.id));
+    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily?country=ES',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(esIds.has(body.id)).toBe(true);
+    expect(roIds.has(body.id)).toBe(false);
+  });
+
+  it('GET /v1/quiz/daily?country=RO serves a question from the RO pool', async () => {
+    mockFrom.mockReturnValueOnce(chainResult([]));
+
+    const { QUIZ_QUESTIONS_ES } = await import('../data/quiz-questions-es');
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const esIds = new Set(QUIZ_QUESTIONS_ES.map((q) => q.id));
+    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily?country=RO',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(roIds.has(body.id)).toBe(true);
+    expect(esIds.has(body.id)).toBe(false);
+  });
+
+  it('GET /v1/quiz/daily defaults to RO when no country query is provided', async () => {
+    mockFrom.mockReturnValueOnce(chainResult([]));
+
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(roIds.has(response.json().id)).toBe(true);
+  });
+
+  it('GET /v1/quiz/daily?country=FR returns 400 (unsupported enum value)', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily?country=FR',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('POST /v1/quiz/answer with an ES question id + country=ES returns the correct answer', async () => {
+    mockFrom.mockReturnValueOnce(chainResult(null));
+
+    const { QUIZ_QUESTIONS_ES } = await import('../data/quiz-questions-es');
+    const esQuestion = QUIZ_QUESTIONS_ES[0];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: {
+        questionId: esQuestion.id,
+        selectedIndex: esQuestion.correctIndex,
+        country: 'ES',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().isCorrect).toBe(true);
+  });
+
+  it('POST /v1/quiz/answer with an ES question id submitted under country=RO returns 404 (no cross-pool fallback)', async () => {
+    const { QUIZ_QUESTIONS_ES } = await import('../data/quiz-questions-es');
+    const esQuestion = QUIZ_QUESTIONS_ES[0];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: {
+        questionId: esQuestion.id,
+        selectedIndex: esQuestion.correctIndex,
+        country: 'RO',
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /v1/quiz/answer with a RO question id submitted under country=ES returns 404', async () => {
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const roQuestion = QUIZ_QUESTIONS[0];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: {
+        questionId: roQuestion.id,
+        selectedIndex: roQuestion.correctIndex,
+        country: 'ES',
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('POST /v1/quiz/answer rejects unknown country enum value with 400', async () => {
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const roQuestion = QUIZ_QUESTIONS[0];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: {
+        questionId: roQuestion.id,
+        selectedIndex: roQuestion.correctIndex,
+        country: 'FR',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+});
+
+// ===========================================================================
 // Streak qualification wiring verification
 // ===========================================================================
 

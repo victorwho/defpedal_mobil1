@@ -30,6 +30,7 @@ import type {
   ProfileResponse,
   ProfileUpdateRequest,
   QuizAnswer,
+  QuizCountry,
   QuizQuestion,
   ReverseGeocodeRequest,
   ReverseGeocodeResponse,
@@ -359,13 +360,13 @@ export const mobileApi = {
     return mobileApiFetch<ImpactDashboard>(`/v1/impact-dashboard${params}`);
   },
 
-  fetchDailyQuiz: () =>
-    mobileApiFetch<QuizQuestion>('/v1/quiz/daily'),
+  fetchDailyQuiz: (country: QuizCountry) =>
+    mobileApiFetch<QuizQuestion>(`/v1/quiz/daily?country=${country}`),
 
-  submitQuizAnswer: (questionId: string, selectedIndex: number) =>
+  submitQuizAnswer: (questionId: string, selectedIndex: number, country: QuizCountry) =>
     mobileApiFetch<QuizAnswer>('/v1/quiz/answer', {
       method: 'POST',
-      body: JSON.stringify({ questionId, selectedIndex }),
+      body: JSON.stringify({ questionId, selectedIndex, country }),
     }),
 
   // ── Social ──

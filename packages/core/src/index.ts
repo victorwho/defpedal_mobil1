@@ -20,6 +20,7 @@ export * from './shareCodeGenerator';
 export * from './shareDeepLinkBuilder';
 export * from './mascotPose';
 export * from './pedalVoice';
+export * from './quizCountry';
 export * from './sharePrivacy';
 export * from './solarTime';
 export * from './streakTiers';

@@ -190,6 +190,18 @@ export const en = {
     themeDark: 'Dark',
     themeLight: 'Light',
     themeSystem: 'System',
+    // Daily safety quiz country picker.
+    // NOTE: this is a CONTENT-language switch (Romanian vs Spanish quiz
+    // questions). The app's UI locale list is still EN + RO only — wiring
+    // Spanish content here does NOT imply a Spanish UI translation.
+    quizRegion: 'Quiz region',
+    quizRegionAuto: 'Auto',
+    quizRegionRO: 'Romania',
+    quizRegionES: 'Spain',
+    quizRegionSubtitleAuto: 'Auto · detected: {{country}}',
+    quizRegionSubtitleOverride: 'Pinned to {{country}}',
+    quizRegionRomania: 'Romania',
+    quizRegionSpain: 'Spain',
     pointsOfInterest: 'Points of Interest',
     notifications: 'Notifications',
     dailyWeather: 'Daily Weather Brief',

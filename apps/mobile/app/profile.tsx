@@ -22,7 +22,8 @@ import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { PLAY_STORE_URL } from '@defensivepedal/core';
+import { PLAY_STORE_URL, resolveQuizCountry, type QuizCountryPreference } from '@defensivepedal/core';
+import { getDeviceRegion } from '../src/i18n';
 import { mobileApi } from '../src/lib/api';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
@@ -132,7 +133,7 @@ export default function ProfileScreen() {
   // State values - grouped by section with shallow comparison
   const {
     locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
-    shareTripsPublicly, themePreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
+    shareTripsPublicly, themePreference, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
     pedalVoiceSassy, notifyStreak,
@@ -145,6 +146,7 @@ export default function ProfileScreen() {
     showRouteComparison: state.showRouteComparison,
     shareTripsPublicly: state.shareTripsPublicly,
     themePreference: state.themePreference,
+    quizCountryPreference: state.quizCountryPreference,
     showMascot: state.showMascot,
     showBicycleLanes: state.showBicycleLanes,
     showRouteFeatures: state.showRouteFeatures,
@@ -163,7 +165,7 @@ export default function ProfileScreen() {
   // Actions - stable references, single selector with shallow comparison
   const {
     setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
-    setShowRouteComparison, setShareTripsPublicly, setThemePreference, setShowMascot,
+    setShowRouteComparison, setShareTripsPublicly, setThemePreference, setQuizCountryPreference, setShowMascot,
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
@@ -177,6 +179,7 @@ export default function ProfileScreen() {
     setShowRouteComparison: state.setShowRouteComparison,
     setShareTripsPublicly: state.setShareTripsPublicly,
     setThemePreference: state.setThemePreference,
+    setQuizCountryPreference: state.setQuizCountryPreference,
     setShowMascot: state.setShowMascot,
     setShowBicycleLanes: state.setShowBicycleLanes,
     setShowRouteFeatures: state.setShowRouteFeatures,
@@ -600,6 +603,14 @@ export default function ProfileScreen() {
               ))}
             </View>
 
+            {/* Quiz region picker */}
+            <QuizRegionPicker
+              preference={quizCountryPreference}
+              setPreference={setQuizCountryPreference}
+              t={t}
+              styles={styles}
+            />
+
             <SettingRow
               label={t('profile.showMascot')}
               description={showMascot ? t('profile.showMascotOn') : t('profile.showMascotOff')}
@@ -990,6 +1001,102 @@ function PrivateProfileSection({ isPrivate, onToggle, styles, colors }: PrivateP
 }
 
 // ---------------------------------------------------------------------------
+// Quiz region picker
+// ---------------------------------------------------------------------------
+//
+// 3-pill (Auto / Romania / Spain) picker for the daily-quiz content pool.
+//
+// We intentionally do NOT call `useResolvedQuizCountry()` here: that hook
+// drives `useCurrentLocation()`, which would surface an OS location-permission
+// prompt the moment a user opens the Profile screen. The subtitle's
+// "detected: X" hint uses the cheap, permissionless device-locale path only
+// (`getDeviceRegion()` → `resolveQuizCountry({ coords: null, ... })`). The
+// real runtime resolver (with GPS) still runs on the quiz screen itself, so
+// the served pool can be more accurate than what the subtitle implies — which
+// is fine: a rider holidaying in Spain with a Romanian phone will see "Auto ·
+// detected: Romania" here but get Spanish questions on the quiz screen.
+
+interface QuizRegionPickerProps {
+  readonly preference: QuizCountryPreference;
+  readonly setPreference: (pref: QuizCountryPreference) => void;
+  readonly t: (key: string, vars?: Record<string, string | number>) => string;
+  readonly styles: ReturnType<typeof createThemedStyles>;
+}
+
+const QUIZ_REGION_OPTIONS: readonly QuizCountryPreference[] = ['auto', 'RO', 'ES'];
+
+const formatQuizRegionLabel = (
+  pref: QuizCountryPreference,
+  t: QuizRegionPickerProps['t'],
+): string => {
+  switch (pref) {
+    case 'RO':
+      return t('profile.quizRegionRO');
+    case 'ES':
+      return t('profile.quizRegionES');
+    case 'auto':
+    default:
+      return t('profile.quizRegionAuto');
+  }
+};
+
+const formatQuizCountryName = (
+  country: 'RO' | 'ES',
+  t: QuizRegionPickerProps['t'],
+): string => (country === 'ES' ? t('profile.quizRegionSpain') : t('profile.quizRegionRomania'));
+
+function QuizRegionPicker({ preference, setPreference, t, styles }: QuizRegionPickerProps) {
+  // Resolve the LOCALE-ONLY hint for the subtitle. No GPS — see component
+  // header for the reason.
+  const localeResolved = useMemo(
+    () =>
+      resolveQuizCountry({
+        preference,
+        coords: null,
+        deviceLocaleRegion: getDeviceRegion(),
+      }),
+    [preference],
+  );
+
+  const subtitle =
+    preference === 'auto'
+      ? t('profile.quizRegionSubtitleAuto', {
+          country: formatQuizCountryName(localeResolved.country, t),
+        })
+      : t('profile.quizRegionSubtitleOverride', {
+          country: formatQuizCountryName(preference, t),
+        });
+
+  return (
+    <View>
+      <View style={styles.languageRow}>
+        {QUIZ_REGION_OPTIONS.map((pref) => (
+          <Pressable
+            key={pref}
+            style={[styles.languagePill, preference === pref && styles.languagePillActive]}
+            onPress={() => setPreference(pref)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('profile.quizRegion')}: ${formatQuizRegionLabel(pref, t)}`}
+            accessibilityState={{ selected: preference === pref }}
+          >
+            <Text
+              style={[
+                styles.languagePillText,
+                preference === pref && styles.languagePillTextActive,
+              ]}
+            >
+              {formatQuizRegionLabel(pref, t)}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.quizRegionSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Themed style factory — colors come from useTheme(), layout stays static
 // ---------------------------------------------------------------------------
 
@@ -1108,6 +1215,11 @@ const createThemedStyles = (colors: ThemeColors) =>
     languagePillTextActive: {
       color: colors.textInverse,
       fontFamily: fontFamily.body.bold,
+    },
+    quizRegionSubtitle: {
+      ...textXs,
+      marginTop: space[1],
+      color: colors.textSecondary,
     },
     settingRow: {
       flexDirection: 'row',

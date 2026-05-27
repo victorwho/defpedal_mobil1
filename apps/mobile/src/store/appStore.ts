@@ -4,6 +4,7 @@ import type {
   HazardVoteDirection,
   OfflineRegion,
   NavigationLocationSample,
+  QuizCountryPreference,
   RecentDestination,
   ReviewPromptState,
   ReviewSentiment,
@@ -125,6 +126,14 @@ type AppStore = QueueSlice & {
   } | null;
   locale: 'en' | 'ro';
   themePreference: 'system' | 'dark' | 'light';
+  // Daily safety quiz country pool.
+  //
+  // 'auto' lets `useResolvedQuizCountry` pick via GPS → device-locale → default;
+  // 'RO' / 'ES' pins the choice for expats and tourists. Device-scoped — NOT
+  // reset by `resetUserScopedState` because this is a location-driven content
+  // preference, not user-account state, and shouldn't get re-asked just
+  // because the rider signed out and back in.
+  quizCountryPreference: QuizCountryPreference;
   showMascot: boolean;
   ratingSkipCount: number;
   // ── Play Store review prompt (device-scoped) ──
@@ -176,6 +185,7 @@ type AppStore = QueueSlice & {
   clearWeatherNotice: () => void;
   setLocale: (locale: 'en' | 'ro') => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
+  setQuizCountryPreference: (pref: QuizCountryPreference) => void;
   setShowMascot: (show: boolean) => void;
   incrementRatingSkipCount: () => void;
   // ── Review prompt actions ──
@@ -345,6 +355,7 @@ export const useAppStore = create<AppStore>()(
       cachedImpact: null,
       locale: 'en',
       themePreference: 'dark',
+      quizCountryPreference: 'auto',
       showMascot: true,
       ratingSkipCount: 0,
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
@@ -440,6 +451,8 @@ export const useAppStore = create<AppStore>()(
       clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
       setLocale: (locale) => set(() => ({ locale })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
+      setQuizCountryPreference: (pref) =>
+        set(() => ({ quizCountryPreference: pref })),
       setShowMascot: (show) => set(() => ({ showMascot: show })),
       incrementRatingSkipCount: () =>
         set((state) => ({ ratingSkipCount: state.ratingSkipCount + 1 })),
@@ -960,6 +973,7 @@ export const useAppStore = create<AppStore>()(
         completedRideCount: state.completedRideCount,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
+        quizCountryPreference: state.quizCountryPreference,
         showMascot: state.showMascot,
         anonymousOpenCount: state.anonymousOpenCount,
         earnedMilestones: state.earnedMilestones,

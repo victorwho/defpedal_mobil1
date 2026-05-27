@@ -22,6 +22,7 @@ import type {
   NeighborhoodSafetyScore,
   RideImpact,
   ImpactDashboard,
+  QuizCountry,
   QuizQuestion,
   QuizAnswer,
   SavedRoute,
@@ -108,7 +109,7 @@ type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
 // Streak helpers (shared with feed.ts)
 import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
 import { fireP0Event, firePostRideEventsAsync } from '../lib/nudges/eventFirer';
-import { QUIZ_QUESTIONS, findQuizQuestion } from '../data/quiz-questions';
+import { findQuizQuestionInPool, getQuizPool } from '../data/quiz-pool';
 
 const buildEmptyRouteResponse = (
   mode: RoutePreviewBody['mode'],
@@ -2905,10 +2906,26 @@ export const buildV1Routes = (
     );
 
     // GET /v1/quiz/daily — random unasked question (30-day cooldown)
-    app.get<{ Reply: QuizQuestion | ErrorResponse }>(
+    //
+    // `country` query param selects the question pool (RO or ES). Defaults to
+    // RO when omitted so older app builds without country awareness keep
+    // working. Pool IDs do not collide, so a `user_quiz_history` row scoped to
+    // one pool is invisible to the other — that's intentional: switching pools
+    // mid-life simply re-opens the catalogue rather than orphaning history.
+    app.get<{
+      Querystring: { country?: QuizCountry };
+      Reply: QuizQuestion | ErrorResponse;
+    }>(
       '/quiz/daily',
       {
         schema: {
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              country: { type: 'string', enum: ['RO', 'ES'] },
+            },
+          },
           response: {
             200: {
               type: 'object',
@@ -2932,6 +2949,9 @@ export const buildV1Routes = (
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
+        const country: QuizCountry = request.query?.country ?? 'RO';
+        const pool = getQuizPool(country);
+
         // Get question IDs answered in the last 30 days from user_quiz_history
         let excludeIds: string[] = [];
         if (supabaseAdmin) {
@@ -2945,10 +2965,10 @@ export const buildV1Routes = (
           excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
         }
 
-        // Filter static question pool, excluding recently answered
+        // Filter the chosen country's pool, excluding recently answered.
         const available = excludeIds.length > 0
-          ? QUIZ_QUESTIONS.filter((q) => !excludeIds.includes(q.id))
-          : QUIZ_QUESTIONS;
+          ? pool.filter((q) => !excludeIds.includes(q.id))
+          : pool;
 
         if (available.length === 0) {
           throw new HttpError('No quiz questions available.', {
@@ -2971,8 +2991,14 @@ export const buildV1Routes = (
     );
 
     // POST /v1/quiz/answer — record answer, qualify streak, return result
+    //
+    // `country` selects which pool to look up the question in. The client must
+    // submit with the same country it fetched the question under: pool IDs
+    // don't collide, so a mismatched country returns 404 rather than silently
+    // cross-checking pools (we won't validate a RO question against an ES
+    // pool's correctIndex).
     app.post<{
-      Body: { questionId: string; selectedIndex: number };
+      Body: { questionId: string; selectedIndex: number; country?: QuizCountry };
       Reply: QuizAnswer | ErrorResponse;
     }>(
       '/quiz/answer',
@@ -2985,6 +3011,7 @@ export const buildV1Routes = (
             properties: {
               questionId: { type: 'string', format: 'uuid' },
               selectedIndex: { type: 'integer', minimum: 0, maximum: 3 },
+              country: { type: 'string', enum: ['RO', 'ES'] },
             },
           },
           response: {
@@ -3014,9 +3041,12 @@ export const buildV1Routes = (
         }
 
         const { questionId, selectedIndex } = request.body;
+        const country: QuizCountry = request.body.country ?? 'RO';
 
-        // Look up from static question pool
-        const question = findQuizQuestion(questionId);
+        // Look up from the country's pool only. We don't fall back to the
+        // other pool — a mismatched country should surface as 404 so the
+        // client can correct itself (see route-level comment above).
+        const question = findQuizQuestionInPool(country, questionId);
 
         if (!question) {
           throw new HttpError('Question not found.', {

@@ -29,6 +29,35 @@ export const getDeviceLocale = (): Locale => {
 };
 
 /**
+ * Detect the device locale's region code (e.g. `'RO'`, `'ES'`, `'US'`).
+ *
+ * Returns the uppercase two-letter region segment of the locale identifier,
+ * or `null` when no region is set (e.g. `'en'` with no country) or when the
+ * native module isn't available. Used by the quiz country resolver as a
+ * fallback when GPS is unavailable.
+ *
+ * Why not `expo-localization`?
+ * The existing `getDeviceLocale()` already extracts the language via
+ * `NativeModules`; reusing the same path avoids adding a native module that
+ * would also need an `hasExpoNativeModule` guard for bridgeless release builds
+ * (see `.claude/error-log.md` #21).
+ */
+export const getDeviceRegion = (): string | null => {
+  const identifier =
+    Platform.OS === 'android'
+      ? (NativeModules.I18nManager?.localeIdentifier as string | undefined)
+      : ((NativeModules.SettingsManager?.settings?.AppleLocale as string | undefined) ??
+          (NativeModules.SettingsManager?.settings?.AppleLanguages?.[0] as string | undefined));
+
+  if (!identifier) return null;
+
+  // Locale identifiers come as `ro_RO` (Android), `en_US@calendar=gregorian`,
+  // or `en-US` (some iOS variants). The region is the segment after `_` or `-`.
+  const match = identifier.match(/[_-]([A-Za-z]{2})(?=[_@]|$)/);
+  return match ? match[1].toUpperCase() : null;
+};
+
+/**
  * Resolve a dot-path key (e.g. "profile.title") to the translated string.
  * Supports {{variable}} interpolation.
  */
