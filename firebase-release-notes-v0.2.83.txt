@@ -1,0 +1,54 @@
+v0.2.83 — Country-aware daily quiz (RO + ES)
+
+The daily safety quiz now serves Romanian OR Spanish content depending on
+where the rider is. Spain pool is a full 44-question catalogue covering
+the Reglamento General de Circulación, EuroVelo routes through Iberia,
+costa crosswinds and Mediterranean heat, autovía restrictions, etc.
+
+What to test:
+
+  - Auto-detect
+    Just open the daily quiz like before. If your phone has GPS access
+    and you're in mainland Romania, you'll keep getting RO questions.
+    If you're in Spain (mainland, Balearics, or Canary Islands) you'll
+    get ES questions. If GPS is off, the device-locale region picks
+    (ro_RO → Romania, es_ES → Spain). Falls back to Romania otherwise.
+
+  - Manual override
+    Profile > Display > "Quiz region" (sits right under the theme
+    picker). Three pills: Auto / Romania / Spain. Pick Spain — return
+    to the quiz screen — you should now see Spanish questions. Pin it
+    on Auto to revert.
+
+  - Subtitle hint
+    On Auto, the "Quiz region" row should read "Auto · detected: Romania"
+    or "Auto · detected: Spain" depending on your device's region setting
+    (not your GPS — the picker stays permissionless). On a manual override
+    it reads "Pinned to Romania" / "Pinned to Spain".
+
+  - Cross-mode persistence
+    Toggle Auto → Spain → Auto a few times. The setting should persist
+    across app restarts (same Zustand pattern as theme + show-mascot).
+
+Translation note:
+
+  The UI is still English/Romanian only. The "Spain" option is the
+  question CONTENT switch, not a UI-language switch. The picker label
+  in Romanian reads "Regiunea quiz-ului".
+
+Known good:
+
+  - Existing RO questions / your 30-day cooldown / streak qualification
+    all unchanged. Default behavior for everyone who doesn't touch the
+    picker is exactly the same as v0.2.82.
+  - Submitting an ES answer correctly hits the ES pool — the FK that
+    previously would have blocked this (user_quiz_history.question_id →
+    quiz_questions) was dropped server-side as part of this release.
+
+Backend:
+
+  - Cloud Run revision unchanged on disk — only mobile client knows
+    about the new ?country= query param, but the server already serves
+    it (deployed as part of this build's commit).
+  - Supabase migration 202605270005_drop_quiz_questions_fk.sql applied
+    to production live DB.
