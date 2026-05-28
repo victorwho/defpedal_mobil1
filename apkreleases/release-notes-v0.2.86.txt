@@ -1,0 +1,50 @@
+Defensive Pedal Preview v0.2.86 (build 88)
+
+FIX — "SIGN UP WITH EMAIL" NO LONGER A NO-OP
+
+When an anonymous user reached the mandatory signup prompt (after 3 app
+opens) and tapped "Sign up with email", nothing visibly happened. The
+OnboardingGuard was bouncing them straight back to the same prompt
+because /auth was not in the gate's exempt-paths list — every navigation
+to /auth was intercepted in the same frame.
+
+Fix: /auth is now exempt from the gate (joins /onboarding/*, /feedback,
+/navigation). The user reaches the email form, signs up, and the
+mandatory gate then passes naturally because hasRealAccount becomes true.
+
+Net for the JS bundle: tiny — one extra string match in isExemptPath,
+removal of one redundant store write in handleEmailSignUp.
+
+No server change. No native deps changed. No new permissions.
+
+---
+
+PRE-RELEASE SMOKE — FOCUSED ON THE FIX
+
+Critical path to verify the regression:
+
+  [ ] Fresh anonymous install. From Diagnostics, set anonymousOpenCount
+       to 3 (or open the app 3 times across 5+ min idle periods to trigger
+       the AppState path).
+  [ ] App lands on the mandatory signup prompt with "Maybe later" hidden.
+  [ ] Tap "Sign up with email" — /auth screen MUST render (form visible,
+       email + password fields).
+  [ ] Without signing up, tap the close (×) header or hardware-back —
+       must return to the mandatory prompt (the gate still works).
+  [ ] Sign up with email + password. After the Supabase confirm flow the
+       app should leave the mandatory loop and reach route-planning.
+  [ ] "Continue with Google" on the mandatory prompt still works as
+       before (Google was unaffected — it auths first, then navigates).
+  [ ] Dismissible prompt at count == 2 unchanged: "Maybe later" still
+       visible, still dismissible.
+
+General smoke (broader regression check):
+
+  [ ] Cold launch — app reaches route-planning within ~3s, no blank
+       screen, no infinite-loop redirect.
+  [ ] Plan a route — Safe/Fast/Flat toggle, preview, start navigation,
+       end ride, see feedback summary.
+  [ ] History tab + Community feed render without errors.
+
+If any of the gate-related checks fail, do NOT promote. Roll back to
+v0.2.85 — production is already there.

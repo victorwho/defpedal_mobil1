@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Linking,
   Pressable,
@@ -136,6 +137,22 @@ export default function AuthScreen() {
     }
   };
 
+  // The close (×) header button: prefer popping the stack when there's
+  // history (e.g. user reached /auth via Profile > Account, which uses
+  // router.push). When there is no history — the common case for users
+  // routed here by the mandatory signup prompt, which uses router.replace —
+  // fall back to the root index route so OnboardingGuard re-evaluates and
+  // sends them to the correct surface (mandatory prompt for count >= 3,
+  // route-planning for everyone else). router.back() on its own no-ops in
+  // that case and looks broken to the user.
+  const handleClose = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  }, []);
+
   const handleSignOut = async () => {
     if (!authCtx) return;
     try {
@@ -151,7 +168,7 @@ export default function AuthScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenHeader variant="close" title={t('settings.account')} />
+      <ScreenHeader variant="close" title={t('settings.account')} onBack={handleClose} />
 
       <ScrollView
         contentContainerStyle={styles.content}

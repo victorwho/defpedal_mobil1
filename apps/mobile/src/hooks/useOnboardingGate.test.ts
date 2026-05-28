@@ -60,6 +60,7 @@ describe('computeOnboardingGateTarget', () => {
     '/onboarding/signup-prompt',
     '/feedback',
     '/navigation',
+    '/auth',
   ])('does not redirect away from exempt path %s', (pathname) => {
     expect(
       computeOnboardingGateTarget(
@@ -184,6 +185,23 @@ describe('computeOnboardingGateTarget', () => {
       computeOnboardingGateTarget(
         fresh({
           pathname: '/feedback',
+          onboardingCompleted: true,
+          anonymousOpenCount: 10,
+        }),
+        false,
+      ),
+    ).toBeNull();
+  });
+
+  it('never bounces an anonymous user off /auth even at count >= 3 — they are actively complying with the gate', () => {
+    // Regression test: tapping "Sign up with email" on the mandatory prompt
+    // navigates to /auth. Without an /auth exemption, the guard re-fires the
+    // mandatory branch immediately and bounces the user back to the prompt,
+    // making the button look like a no-op.
+    expect(
+      computeOnboardingGateTarget(
+        fresh({
+          pathname: '/auth',
           onboardingCompleted: true,
           anonymousOpenCount: 10,
         }),

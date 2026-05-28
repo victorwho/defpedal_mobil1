@@ -1,0 +1,28 @@
+Defensive Pedal Preview v0.2.87 (build 89)
+
+FIX — CLOSE (×) BUTTON ON /auth NOW WORKS WHEN ROUTED FROM THE
+MANDATORY SIGNUP PROMPT
+
+Follow-up to v0.2.86. The "Sign up with email" path on the mandatory
+prompt navigated via router.replace, which does NOT push a back-stack
+entry. The /auth screen's close (×) header was wired to router.back(),
+so it silently no-op'd whenever there was no history to pop.
+
+Fix: /auth's close handler now falls back to router.replace('/') when
+router.canGoBack() is false. The index route re-runs OnboardingGuard,
+which sends count >= 3 anonymous users straight back to the mandatory
+prompt (gate still locks). Real accounts and count < 3 anonymous users
+land on /route-planning as expected.
+
+When the user reached /auth via Profile > Account (which uses router.push),
+the close button still pops the stack as before — no behavior change there.
+
+---
+
+PRE-RELEASE SMOKE — TWO FOCUSED CHECKS
+
+  [ ] Anonymous, count >= 3 — tap "Sign up with email" on the mandatory
+       prompt → /auth renders. Tap × (close) without signing up →
+       returns to the mandatory prompt (NOT a stuck/blank screen).
+  [ ] Real account — Profile > Account → /auth → × → returns to Profile
+       (pre-existing behavior, must not regress).

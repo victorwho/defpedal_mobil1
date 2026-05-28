@@ -20,11 +20,16 @@ export interface OnboardingGateState {
  * - `/feedback` — post-ride summary. Users land here from navigation via the
  *   state machine, NOT from signup. Redirecting away would drop their feedback.
  * - `/navigation` — active navigation. Redirecting away would kill the ride.
+ * - `/auth` — the email signup/signin surface. Users routed here by the
+ *   mandatory prompt's "Sign up with email" button are actively complying
+ *   with the gate; bouncing them back would silently strand them on the
+ *   prompt with no apparent reaction (the bug this exemption fixes).
  */
 const isExemptPath = (pathname: string): boolean =>
   pathname.startsWith('/onboarding') ||
   pathname === '/feedback' ||
-  pathname === '/navigation';
+  pathname === '/navigation' ||
+  pathname === '/auth';
 
 /**
  * Pure decision function for the signup gate.

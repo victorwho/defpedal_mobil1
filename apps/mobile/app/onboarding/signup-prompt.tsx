@@ -122,7 +122,6 @@ export default function OnboardingSignupPromptScreen() {
   };
 
   const handleEmailSignUp = () => {
-    setOnboardingCompleted(true);
     router.replace('/auth');
   };
 
