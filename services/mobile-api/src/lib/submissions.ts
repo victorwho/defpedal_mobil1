@@ -224,6 +224,7 @@ export const submitNavigationFeedback = async (
         duration_minutes: Math.max(1, Math.round(request.durationSeconds / 60)),
         rating: request.rating,
         feedback_text: request.feedbackText,
+        user_id: userId,
       },
     ]);
 

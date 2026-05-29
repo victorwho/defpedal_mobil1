@@ -47,7 +47,6 @@ import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useShareCard } from '../src/hooks/useShareCard';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
-import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
 import { useT } from '../src/hooks/useTranslation';
 import { useConfirmation } from '../src/hooks/useConfirmation';
@@ -176,7 +175,6 @@ type RatingStepProps = {
 
 const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingStepProps) => {
   const t = useT();
-  const { user } = useAuthSession();
   const [rating, setRating] = useState(0);
   const [comments, setComments] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -212,7 +210,12 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
   const handleSubmit = () => {
     if (!navigationSession) return;
 
-    if (user && !feedbackQueued) {
+    // Enqueue regardless of immediate session state — the offline queue is the
+    // durable layer, and the drain attaches the bearer token at request time.
+    // If no session is ever recovered, the queue's permanent-error path
+    // (isPermanentError on 4xx) kills the mutation cleanly after the first
+    // 401 instead of retrying forever.
+    if (!feedbackQueued) {
       enqueueMutation('feedback', {
         clientTripId: activeTripClientId ?? undefined,
         tripId: activeTripClientId ? tripServerIds[activeTripClientId] : undefined,
