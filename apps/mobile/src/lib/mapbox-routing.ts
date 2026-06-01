@@ -21,6 +21,8 @@ import { encodePolyline, extractRouteFeatures, isRouteSupported } from '@defensi
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
+import { SUPPORTED_LOCALES, type Locale } from '../i18n';
+import { buildManeuverInstruction } from './maneuverInstructions';
 import { getAccessToken } from './supabase';
 
 // ---------------------------------------------------------------------------
@@ -83,20 +85,18 @@ const generateRouteId = (source: 'custom_osrm' | 'mapbox', index: number): strin
  *
  * Mapbox Directions returns a localized `maneuver.instruction` when called
  * with `&language=<code>` — prefer that so the rider's UI locale flows
- * through to turn-by-turn text. Falls back to a hand-built English string
- * for safe-mode (OSRM) routes that don't ship an instruction field.
+ * through to turn-by-turn text. Falls back to a locale-aware string built from
+ * the raw maneuver `type` + `modifier` for safe-mode (OSRM) routes, which
+ * don't ship an instruction field. See `maneuverInstructions.ts`.
  */
-const mapStep = (step: Step, index: number): NavigationStep => {
+const mapStep = (step: Step, index: number, locale: Locale): NavigationStep => {
   const mapboxInstruction = (step.maneuver as { instruction?: string }).instruction;
-  const fallback =
-    step.maneuver.type === 'depart'
-      ? `Head ${step.maneuver.modifier ?? 'straight'} on ${step.name || 'the road'}`
-      : step.maneuver.type === 'arrive'
-        ? 'Arrive at your destination'
-        : `${capitalizeFirst(step.maneuver.modifier ?? step.maneuver.type)} onto ${step.name || 'the road'}`;
   return {
     id: `step-${index}`,
-    instruction: mapboxInstruction && mapboxInstruction.length > 0 ? mapboxInstruction : fallback,
+    instruction:
+      mapboxInstruction && mapboxInstruction.length > 0
+        ? mapboxInstruction
+        : buildManeuverInstruction(step, locale),
     streetName: step.name || '',
     distanceMeters: step.distance,
     durationSeconds: step.duration,
@@ -106,9 +106,6 @@ const mapStep = (step: Step, index: number): NavigationStep => {
   };
 };
 
-const capitalizeFirst = (s: string): string =>
-  s.charAt(0).toUpperCase() + s.slice(1);
-
 /**
  * Map an OSRM/Mapbox route to our RouteOption.
  */
@@ -116,6 +113,7 @@ const mapRoute = (
   route: Route,
   source: 'custom_osrm' | 'mapbox',
   index: number,
+  locale: Locale,
 ): RouteOption => {
   const allSteps = route.legs.flatMap((leg) => leg.steps);
 
@@ -131,7 +129,7 @@ const mapRoute = (
     durationSeconds: route.duration,
     adjustedDurationSeconds: route.duration,
     totalClimbMeters: null,
-    steps: allSteps.map(mapStep),
+    steps: allSteps.map((step, stepIndex) => mapStep(step, stepIndex, locale)),
     riskSegments: [],
     // Route-feature awareness markers (tunnels, bridges, unprotected lefts).
     // OSRM safe profile populates `annotation.classes` so tunnel/bridge runs
@@ -390,6 +388,11 @@ export const directPreviewRoute = async (
   const destination = request.destination;
   const requestedMode = request.mode;
   const waypoints = request.waypoints;
+  // Drives the safe-mode (OSRM) maneuver-instruction fallback language. Mapbox
+  // routes carry their own localized instruction (see `fetchMapboxRoutes`).
+  const locale: Locale = (SUPPORTED_LOCALES as readonly string[]).includes(request.locale)
+    ? (request.locale as Locale)
+    : 'en';
 
   // Resolve country support up-front. UI gates upstream should prevent a
   // safe/flat request landing outside a supported country, but we degrade
@@ -413,7 +416,7 @@ export const directPreviewRoute = async (
       : await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
-    mapRoute(route, source, index),
+    mapRoute(route, source, index, locale),
   );
 
   // Enrich all routes with elevation data in parallel (non-blocking)
@@ -461,7 +464,7 @@ export const directPreviewRoute = async (
         // Fetch fast route for comparison
         const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
         if (fastRawRoutes.length > 0) {
-          const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0);
+          const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0, locale);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
           comparisonSegments = fastEnriched.riskSegments;
         }
@@ -476,7 +479,7 @@ export const directPreviewRoute = async (
           waypoints,
         );
         if (safeRawRoutes.length > 0) {
-          const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0);
+          const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0, locale);
           const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);
           comparisonSegments = safeEnriched.riskSegments;
         }

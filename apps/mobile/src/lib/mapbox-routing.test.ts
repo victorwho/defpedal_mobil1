@@ -406,8 +406,10 @@ describe('directPreviewRoute', () => {
     expect(steps[0].instruction).toContain('Head');
     expect(steps[0].instruction).toContain('Main Street');
     expect(steps[0].streetName).toBe('Main Street');
-    expect(steps[1].instruction).toContain('Left');
-    expect(steps[1].instruction).toContain('Oak Avenue');
+    // Safe-mode (OSRM) fallback now builds a localized phrase via i18n
+    // (defaults to EN here since no locale is passed) — "Turn left onto …"
+    // rather than the old bare-capitalized "Left onto …".
+    expect(steps[1].instruction).toBe('Turn left onto Oak Avenue');
   });
 
   it('handles route with arrive maneuver', async () => {

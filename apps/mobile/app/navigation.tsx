@@ -1,7 +1,6 @@
 import type { Coordinate, EarlyEndReason, HazardType } from '@defensivepedal/core';
 import {
   AUTO_REROUTE_DELAY_MS,
-  HAZARD_TYPE_OPTIONS,
   buildRerouteRequest,
   calculateTrailDistanceMeters,
   getNavigationProgress,
@@ -330,14 +329,6 @@ function NavigationScreen() {
   const [endActionPending, setEndActionPending] = useState<'save' | 'discard' | null>(null);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hazardTypeLabels = HAZARD_TYPE_OPTIONS.reduce<Record<HazardType, string>>(
-    (accumulator, option) => {
-      accumulator[option.value] = option.label;
-      return accumulator;
-    },
-    {} as Record<HazardType, string>,
-  );
-
   const showHazardBanner = (
     tone: 'success' | 'warning' | 'error',
     message: string,
@@ -498,7 +489,7 @@ function NavigationScreen() {
 
   const queueHazardReport = (hazardType: HazardType, description?: string) => {
     if (!mapUserCoordinate) {
-      showHazardBanner('error', 'Cannot report hazard because GPS is unavailable.');
+      showHazardBanner('error', t('nav.hazardGpsUnavailable'));
       return;
     }
 
@@ -522,11 +513,12 @@ function NavigationScreen() {
       has_description: Boolean(trimmed && trimmed.length > 0),
       signed_in: Boolean(user),
     });
+    const hazardLabel = t(`hazard.types.${hazardType}`);
     showHazardBanner(
       user ? 'success' : 'warning',
       user
-        ? `${hazardTypeLabels[hazardType]} recorded and will sync automatically.`
-        : `${hazardTypeLabels[hazardType]} recorded. It will sync anonymously when the API is reachable.`,
+        ? t('nav.hazardRecordedSync', { label: hazardLabel })
+        : t('nav.hazardRecordedAnon', { label: hazardLabel }),
     );
   };
 
@@ -540,7 +532,7 @@ function NavigationScreen() {
 
   const openHazardPicker = () => {
     if (!mapUserCoordinate) {
-      showHazardBanner('error', 'Cannot report hazard because GPS is unavailable.');
+      showHazardBanner('error', t('nav.hazardGpsUnavailable'));
       return;
     }
 
@@ -856,9 +848,9 @@ function NavigationScreen() {
   if (!selectedRoute || !navigationSession) {
     return (
       <Screen
-        title="Navigate"
-        eyebrow="Active ride"
-        subtitle="Start from route preview to enter the live turn-by-turn shell."
+        title={t('nav.guardTitle')}
+        eyebrow={t('nav.guardEyebrow')}
+        subtitle={t('nav.guardSubtitle')}
       >
         <View
           style={{
@@ -1008,7 +1000,7 @@ function NavigationScreen() {
           {!isOnline && navigationSession.rerouteEligible && !offlineBannerDismissed ? (
             <View style={[styles.warningBanner, shadows.md]}>
               <Text style={[textSm, styles.warningBannerText]}>
-                No connection — follow the planned route
+                {t('nav.offlineFollowRoute')}
               </Text>
               <Button
                 variant="ghost"
@@ -1028,7 +1020,7 @@ function NavigationScreen() {
             style={styles.roundButton}
             accessible
             accessibilityRole="button"
-            accessibilityLabel={navigationSession.isFollowing ? 'Free map' : 'Recenter'}
+            accessibilityLabel={navigationSession.isFollowing ? t('nav.freeMap') : t('nav.recenter')}
           >
             <IconButton
               icon={
@@ -1041,7 +1033,7 @@ function NavigationScreen() {
               onPress={() => {
                 setFollowing(!(navigationSession.isFollowing ?? true));
               }}
-              accessibilityLabel={navigationSession.isFollowing ? 'Free map' : 'Recenter'}
+              accessibilityLabel={navigationSession.isFollowing ? t('nav.freeMap') : t('nav.recenter')}
               variant="secondary"
             />
           </View>
@@ -1058,7 +1050,7 @@ function NavigationScreen() {
             <IconButton
               icon={<Ionicons name="warning" size={26} color={colors.textInverse} />}
               onPress={openHazardPicker}
-              accessibilityLabel="Report hazard"
+              accessibilityLabel={t('nav.reportHazard')}
               variant="accent"
             />
           </View>
@@ -1069,7 +1061,7 @@ function NavigationScreen() {
               <IconButton
                 icon={<Ionicons name={showElevationProgress ? 'analytics' : 'analytics-outline'} size={22} color={showElevationProgress ? colors.accent : gray[300]} />}
                 onPress={() => setShowElevationProgress((prev) => !prev)}
-                accessibilityLabel={showElevationProgress ? 'Hide elevation' : 'Show elevation'}
+                accessibilityLabel={showElevationProgress ? t('nav.hideElevation') : t('nav.showElevation')}
                 variant="secondary"
               />
             </View>
@@ -1082,7 +1074,7 @@ function NavigationScreen() {
                 <IconButton
                   icon={<Ionicons name="time-outline" size={22} color={gray[300]} />}
                   onPress={() => { setShowMenu(false); router.push('/history'); }}
-                  accessibilityLabel="History"
+                  accessibilityLabel={t('tabs.history')}
                   variant="secondary"
                 />
               </View>
@@ -1090,7 +1082,7 @@ function NavigationScreen() {
                 <IconButton
                   icon={<Ionicons name="people-outline" size={22} color={gray[300]} />}
                   onPress={() => { setShowMenu(false); router.push('/community'); }}
-                  accessibilityLabel="Community"
+                  accessibilityLabel={t('tabs.community')}
                   variant="secondary"
                 />
               </View>
@@ -1098,7 +1090,7 @@ function NavigationScreen() {
                 <IconButton
                   icon={<Ionicons name="person-outline" size={22} color={gray[300]} />}
                   onPress={() => { setShowMenu(false); router.push('/profile'); }}
-                  accessibilityLabel="Profile"
+                  accessibilityLabel={t('tabs.profile')}
                   variant="secondary"
                 />
               </View>
@@ -1108,7 +1100,7 @@ function NavigationScreen() {
             <IconButton
               icon={<Ionicons name={showMenu ? 'close' : 'menu'} size={22} color={gray[300]} />}
               onPress={() => setShowMenu((prev) => !prev)}
-              accessibilityLabel={showMenu ? 'Hide menu' : 'Show menu'}
+              accessibilityLabel={showMenu ? t('nav.hideMenu') : t('nav.showMenu')}
               variant="secondary"
             />
           </View>

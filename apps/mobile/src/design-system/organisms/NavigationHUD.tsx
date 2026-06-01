@@ -24,6 +24,10 @@ import {
 } from '../tokens/typography';
 import { darkTheme, gray } from '../tokens/colors';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useT } from '../../hooks/useTranslation';
+
+/** Translator function shape returned by `useT()`. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,32 +67,34 @@ const getManeuverIcon = (step: NavigationStep | null): ManeuverIconName => {
   return 'arrow-up';
 };
 
-const getManeuverDescription = (step: NavigationStep | null): string => {
-  if (!step) return 'Continue';
+const getManeuverDescription = (step: NavigationStep | null, t: Translate): string => {
+  if (!step) return t('nav.maneuverShort.continue');
   const type = step.maneuver.type?.toLowerCase() ?? '';
   const mod = step.maneuver.modifier?.toLowerCase() ?? '';
 
-  if (type === 'arrive') return 'Arrive';
-  if (type === 'depart') return 'Depart';
+  if (type === 'arrive') return t('nav.maneuverShort.arrive');
+  if (type === 'depart') return t('nav.maneuverShort.depart');
   if (type === 'roundabout' || type === 'rotary') {
     const exit = step.maneuver.exit;
-    return exit ? `Exit ${exit}` : 'Roundabout';
+    return exit
+      ? t('nav.maneuverShort.roundaboutExit', { exit })
+      : t('nav.maneuverShort.roundabout');
   }
 
-  if (mod.includes('slight left')) return 'Slight left';
-  if (mod.includes('slight right')) return 'Slight right';
-  if (mod.includes('sharp left')) return 'Sharp left';
-  if (mod.includes('sharp right')) return 'Sharp right';
-  if (mod.includes('left')) return 'Turn left';
-  if (mod.includes('right')) return 'Turn right';
-  if (mod.includes('uturn')) return 'U-turn';
-  if (mod.includes('straight') || type === 'continue') return 'Continue';
+  if (mod.includes('slight left')) return t('nav.maneuverShort.slightLeft');
+  if (mod.includes('slight right')) return t('nav.maneuverShort.slightRight');
+  if (mod.includes('sharp left')) return t('nav.maneuverShort.sharpLeft');
+  if (mod.includes('sharp right')) return t('nav.maneuverShort.sharpRight');
+  if (mod.includes('left')) return t('nav.maneuverShort.turnLeft');
+  if (mod.includes('right')) return t('nav.maneuverShort.turnRight');
+  if (mod.includes('uturn')) return t('nav.maneuverShort.uturn');
+  if (mod.includes('straight') || type === 'continue') return t('nav.maneuverShort.continue');
 
-  return 'Continue';
+  return t('nav.maneuverShort.continue');
 };
 
-const formatETA = (remainingSec: number): string => {
-  if (remainingSec <= 0) return 'Now';
+const formatETA = (remainingSec: number, t: Translate): string => {
+  if (remainingSec <= 0) return t('nav.etaNow');
   return new Date(Date.now() + remainingSec * 1000).toLocaleTimeString([], {
     hour: 'numeric',
     minute: '2-digit',
@@ -182,8 +188,9 @@ export const ManeuverCard: React.FC<{
   isOffline?: boolean;
   onPress?: () => void;
 }> = ({ currentStep, distanceToManeuverMeters, gpsAccuracyMeters, isOffline, onPress }) => {
+  const t = useT();
   const iconName = getManeuverIcon(currentStep);
-  const description = getManeuverDescription(currentStep);
+  const description = getManeuverDescription(currentStep, t);
   const distance =
     distanceToManeuverMeters !== null
       ? formatDistance(Math.round(distanceToManeuverMeters))
@@ -201,12 +208,20 @@ export const ManeuverCard: React.FC<{
       onPress={onPress}
       style={[styles.maneuverCard, shadows.lg]}
       accessibilityRole="summary"
-      accessibilityLabel={`${description}, in ${distance}`}
+      accessibilityLabel={t('nav.maneuverA11y', { description, distance })}
       accessibilityLiveRegion="assertive"
-      accessibilityHint={onPress ? 'Tap to hear instruction again' : undefined}
+      accessibilityHint={onPress ? t('nav.tapReplay') : undefined}
     >
       <Ionicons name={iconName} size={32} color={darkTheme.accent} />
-      <Text style={styles.maneuverDesc} numberOfLines={1}>
+      {/* adjustsFontSizeToFit shrinks the maneuver text to keep the whole
+          phrase on one line — longer locales (ro/es) would otherwise truncate
+          with an ellipsis. minimumFontScale floors it at a still-legible size. */}
+      <Text
+        style={styles.maneuverDesc}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.55}
+      >
         {description}
       </Text>
       <Text style={styles.maneuverDivider}>·</Text>
@@ -215,8 +230,18 @@ export const ManeuverCard: React.FC<{
         style={styles.gpsIndicator}
         accessibilityLabel={
           isOffline
-            ? 'Offline — no internet connection'
-            : `GPS signal ${gpsAccuracyMeters == null ? 'unavailable' : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD ? 'strong' : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD ? 'fair' : 'poor'}`
+            ? t('nav.offlineNoInternet')
+            : t('nav.gpsSignal', {
+                quality: t(
+                  gpsAccuracyMeters == null
+                    ? 'nav.gpsUnavailable'
+                    : gpsAccuracyMeters <= GPS_STRONG_THRESHOLD
+                      ? 'nav.gpsStrong'
+                      : gpsAccuracyMeters <= GPS_FAIR_THRESHOLD
+                        ? 'nav.gpsFair'
+                        : 'nav.gpsPoor',
+                ),
+              })
         }
       >
         {isOffline ? (
@@ -239,20 +264,26 @@ export const ManeuverCard: React.FC<{
 export const ThenStrip: React.FC<{
   nextStep: NavigationStep | null;
 }> = ({ nextStep }) => {
+  const t = useT();
   if (!nextStep) return null;
 
   const nextIconName = getManeuverIcon(nextStep);
   const nextDist = formatDistance(Math.round(nextStep.distanceMeters));
-  const nextDesc = getManeuverDescription(nextStep);
+  const nextDesc = getManeuverDescription(nextStep, t);
 
   return (
     <View
       style={[styles.thenStripStandalone, shadows.md]}
-      accessibilityLabel={`Then ${nextDesc} in ${nextDist}`}
+      accessibilityLabel={`${t('nav.then')} ${nextDesc} · ${nextDist}`}
     >
-      <Text style={styles.thenPrefix}>Then</Text>
+      <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
       <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
-      <Text style={[textSm, styles.thenText]} numberOfLines={1}>
+      <Text
+        style={[textSm, styles.thenText]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+      >
         {nextDesc}
       </Text>
       <Text style={[textDataSm, { color: gray[300] }]}>{nextDist}</Text>
@@ -281,20 +312,26 @@ export const FooterCard: React.FC<{
   isClimbLive = false,
   speedKmh,
 }) => {
+  const t = useT();
   const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
   const nextDist = nextStep
     ? formatDistance(Math.round(nextStep.distanceMeters))
     : null;
-  const nextDesc = nextStep ? getManeuverDescription(nextStep) : null;
+  const nextDesc = nextStep ? getManeuverDescription(nextStep, t) : null;
 
   return (
     <View style={[styles.footerCard, shadows.md]}>
       {/* "Then" strip */}
       {nextStep && nextIconName ? (
         <View style={styles.thenStripInline}>
-          <Text style={styles.thenPrefix}>Then</Text>
+          <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
           <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
-          <Text style={[textSm, styles.thenText]} numberOfLines={1}>
+          <Text
+            style={[textSm, styles.thenText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
             {nextDesc}
           </Text>
           <Text style={[textDataSm, { color: gray[300] }]}>{nextDist}</Text>
@@ -304,20 +341,20 @@ export const FooterCard: React.FC<{
       {/* Metrics row */}
       <View style={styles.metricRow}>
         <MetricCell
-          label="Speed"
+          label={t('nav.metricSpeed')}
           value={speedKmh != null ? `${Math.round(speedKmh)}` : '—'}
           unit="km/h"
         />
         <View style={styles.metricDivider} />
-        <MetricCell label="ETA" value={formatETA(remainingDurationSeconds)} />
+        <MetricCell label={t('nav.metricEta')} value={formatETA(remainingDurationSeconds, t)} />
         <View style={styles.metricDivider} />
         <MetricCell
-          label="Dist"
+          label={t('nav.metricDist')}
           value={`${(remainingDistanceMeters / 1000).toFixed(1)} km`}
         />
         <View style={styles.metricDivider} />
         <MetricCell
-          label="Climb"
+          label={t('nav.metricClimb')}
           value={
             totalClimbMeters !== null
               ? isClimbLive
@@ -364,6 +401,7 @@ const STEEP_DOWNHILL_THRESHOLD = 7; // %
 export const SteepGradeIndicator: React.FC<{ gradePercent: number | null }> = ({
   gradePercent,
 }) => {
+  const t = useT();
   if (gradePercent == null) return null;
 
   const isSteepUp = gradePercent >= STEEP_UPHILL_THRESHOLD;
@@ -371,7 +409,7 @@ export const SteepGradeIndicator: React.FC<{ gradePercent: number | null }> = ({
 
   if (!isSteepUp && !isSteepDown) return null;
 
-  const label = isSteepUp ? '↑ Steep' : '↓ Steep';
+  const label = `${isSteepUp ? '↑' : '↓'} ${t('nav.steepLabel')}`;
   const bgColor = isSteepUp ? '#92400E' : '#991B1B'; // amber-800 / red-800
   const textColor = isSteepUp ? '#FDE68A' : '#FCA5A5'; // amber-200 / red-300
   const iconName = isSteepUp ? 'trending-up' : 'trending-down';
@@ -379,7 +417,10 @@ export const SteepGradeIndicator: React.FC<{ gradePercent: number | null }> = ({
   return (
     <View
       style={[steepStyles.pill, { backgroundColor: bgColor }]}
-      accessibilityLabel={`Steep ${isSteepUp ? 'uphill' : 'downhill'}: ${Math.abs(gradePercent)} percent grade`}
+      accessibilityLabel={t('nav.steepGradeA11y', {
+        direction: t(isSteepUp ? 'nav.steepUphill' : 'nav.steepDownhill'),
+        percent: Math.abs(gradePercent),
+      })}
       accessibilityRole="text"
     >
       <Ionicons name={iconName} size={14} color={textColor} />

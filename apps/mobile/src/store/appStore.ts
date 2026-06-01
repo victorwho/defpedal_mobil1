@@ -41,7 +41,7 @@ import {
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 
-import type { Locale } from '../i18n';
+import { getDeviceLocale, type Locale } from '../i18n';
 import { zustandStorage } from '../lib/storage';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
 
@@ -60,7 +60,7 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   mode: 'safe',
   avoidUnpaved: false,
   avoidHills: false,
-  locale: 'en',
+  locale: getDeviceLocale(),
   // Intentionally undefined so cold-start search isn't locked to a single
   // country before GPS resolves. `useResolvedCountry` writes the resolved
   // origin country (RO or ES) back onto this field once GPS lands; outside
@@ -126,6 +126,11 @@ type AppStore = QueueSlice & {
     totalHazardsWarned: number;
   } | null;
   locale: Locale;
+  // True once the rider has explicitly picked a language in Profile. Until
+  // then the app follows the device locale (auto-detected on first run +
+  // healed via the persist migration). Prevents an explicit choice from being
+  // overwritten by device-locale detection on a later boot.
+  localeExplicitlySet: boolean;
   themePreference: 'system' | 'dark' | 'light';
   // Daily safety quiz country pool.
   //
@@ -354,7 +359,10 @@ export const useAppStore = create<AppStore>()(
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
-      locale: 'en',
+      // Fresh installs follow the device language; overridden by persisted
+      // value on hydration, and by an explicit pick via `setLocale`.
+      locale: getDeviceLocale(),
+      localeExplicitlySet: false,
       themePreference: 'dark',
       quizCountryPreference: 'auto',
       showMascot: true,
@@ -453,6 +461,9 @@ export const useAppStore = create<AppStore>()(
       setLocale: (locale) =>
         set((state) => ({
           locale,
+          // An explicit pick locks out device-locale auto-detection on future
+          // boots (see `localeExplicitlySet`).
+          localeExplicitlySet: true,
           // Mirror the UI locale into routeRequest so Mapbox autocomplete +
           // turn-by-turn instructions follow the rider's language choice.
           routeRequest: { ...state.routeRequest, locale },
@@ -919,7 +930,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 2,
+      version: 3,
       migrate: (persistedState, version) => {
         let next = persistedState as Record<string, unknown> | undefined;
 
@@ -954,6 +965,35 @@ export const useAppStore = create<AppStore>()(
               routeRequest: { ...state.routeRequest, mode: 'safe' },
             };
           }
+        }
+
+        // v2 → v3: device-locale auto-detection. Older installs defaulted to
+        // 'en' and only changed on an explicit Profile pick, so a rider on a
+        // Romanian/Spanish phone saw English until they changed it by hand. A
+        // *non-English* persisted locale could only have come from an explicit
+        // pick (default was 'en', nothing else wrote it), so we respect it and
+        // mark `localeExplicitlySet`. For the untouched 'en' default we adopt
+        // the device locale once. Also reconciles `routeRequest.locale` (it
+        // mirrors `locale` but the mirror only ran on `setLocale`, so it could
+        // have drifted) — this heals the turn-by-turn instruction language.
+        if (version < 3) {
+          const state = next as
+            | {
+                locale?: string;
+                routeRequest?: Record<string, unknown>;
+              }
+            | undefined;
+          const persistedLocale = state?.locale;
+          const explicit = !!persistedLocale && persistedLocale !== 'en';
+          const resolved: Locale = explicit
+            ? (persistedLocale as Locale)
+            : getDeviceLocale();
+          next = {
+            ...(state as object),
+            locale: resolved,
+            localeExplicitlySet: explicit,
+            routeRequest: { ...(state?.routeRequest ?? {}), locale: resolved },
+          };
         }
 
         return next;
@@ -1012,6 +1052,7 @@ export const useAppStore = create<AppStore>()(
         pendingBadgeUnlocks: state.pendingBadgeUnlocks,
         pendingTierPromotion: state.pendingTierPromotion,
         locale: state.locale,
+        localeExplicitlySet: state.localeExplicitlySet,
         homeLocation: state.homeLocation,
         // pendingShareClaim persisted — survives redirect-to-onboarding
         // that can drop in-memory state before auth finishes. Attempts
