@@ -1,3 +1,4 @@
+export * from './breadcrumbs';
 export * from './co2';
 export * from './cyclingWeather';
 export * from './microlives';

@@ -20,6 +20,7 @@ import {
   createNavigationSession,
   DEFAULT_REVIEW_PROMPT_STATE,
   ensureInstalledAt,
+  isPlausibleStep,
   resetNavigationSession,
   recordError as reviewRecordError,
   recordPromptShown as reviewRecordPromptShown,
@@ -766,7 +767,8 @@ export const useAppStore = create<AppStore>()(
       appendGpsBreadcrumb: (sample) =>
         set((state) => {
           if (!state.navigationSession) return state;
-          const crumbs = state.navigationSession.gpsBreadcrumbs;
+          const session = state.navigationSession;
+          const crumbs = session.gpsBreadcrumbs;
           const newCrumb = {
             lat: sample.coordinate.lat,
             lon: sample.coordinate.lon,
@@ -775,6 +777,19 @@ export const useAppStore = create<AppStore>()(
             spd: sample.speedMetersPerSecond ?? null,
             hdg: sample.heading ?? null,
           };
+          // Reject stale/cached GPS fixes before they corrupt the trail distance.
+          // The foreground location hook hydrates the *previous* ride's last-known
+          // location (possibly a different city) into the sample stream; Android's
+          // fused provider can also re-surface that cached fix after a signal gap.
+          // Either one would add a phantom inter-city "teleport" segment.
+          const startedAtMs = Date.parse(session.startedAt);
+          if (Number.isFinite(startedAtMs) && newCrumb.ts < startedAtMs) {
+            return state; // captured before this ride began → stale
+          }
+          const lastCrumb = crumbs[crumbs.length - 1];
+          if (lastCrumb && !isPlausibleStep(lastCrumb, newCrumb)) {
+            return state; // implausible jump → cached/outlier fix
+          }
           // Ring-buffer: drop oldest when at capacity so long rides keep recording
           const MAX_BREADCRUMBS = 2000;
           const updatedCrumbs =
@@ -783,7 +798,7 @@ export const useAppStore = create<AppStore>()(
               : [...crumbs, newCrumb];
           return {
             navigationSession: {
-              ...state.navigationSession,
+              ...session,
               gpsBreadcrumbs: updatedCrumbs,
             },
           };

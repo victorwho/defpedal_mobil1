@@ -5,6 +5,7 @@
  * Cycling direct emissions are effectively 0 g/km.
  */
 
+import { sanitizeBreadcrumbs, type SanitisableCrumb } from './breadcrumbs';
 import { haversineDistance } from './distance';
 
 /** EU average CO2 emissions for new passenger cars (grams per km). */
@@ -40,18 +41,22 @@ export function formatCo2Saved(co2Kg: number): string {
 
 /**
  * Calculate total distance in meters from a GPS breadcrumb trail.
- * Sums haversine distances between consecutive points.
- * @param breadcrumbs - Array of {lat, lon} points
+ * Sums haversine distances between consecutive points, after dropping
+ * physically-impossible "teleport" segments (stale/cached GPS fixes — see
+ * `sanitizeBreadcrumbs`). This keeps the total honest even for trails already
+ * persisted with a bad fix, so every read surface self-corrects.
+ * @param breadcrumbs - Array of {lat, lon} points (optionally with `ts`)
  * @returns Total distance in meters
  */
 export function calculateTrailDistanceMeters(
-  breadcrumbs: ReadonlyArray<{ readonly lat: number; readonly lon: number }>,
+  breadcrumbs: ReadonlyArray<SanitisableCrumb>,
 ): number {
-  if (breadcrumbs.length < 2) return 0;
+  const clean = sanitizeBreadcrumbs(breadcrumbs);
+  if (clean.length < 2) return 0;
   let total = 0;
-  for (let i = 1; i < breadcrumbs.length; i++) {
-    const prev = breadcrumbs[i - 1];
-    const curr = breadcrumbs[i];
+  for (let i = 1; i < clean.length; i++) {
+    const prev = clean[i - 1];
+    const curr = clean[i];
     total += haversineDistance([prev.lat, prev.lon], [curr.lat, curr.lon]);
   }
   return total;

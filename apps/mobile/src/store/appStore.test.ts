@@ -401,15 +401,20 @@ describe('useAppStore', () => {
 
     it('appends GPS breadcrumbs during navigation', () => {
       useAppStore.getState().startNavigation(createRoute('safe-1'));
+      // Timestamps must be at/after the session start, or the stale-fix guard
+      // drops them — derive them from the freshly-stamped startedAt.
+      const startedAtMs = Date.parse(
+        useAppStore.getState().navigationSession!.startedAt,
+      );
       useAppStore.getState().appendGpsBreadcrumb({
         coordinate: { lat: 44.4268, lon: 26.1025 },
         speedMetersPerSecond: 5.0,
-        timestamp: 1710400000000,
+        timestamp: startedAtMs + 1000,
       });
       useAppStore.getState().appendGpsBreadcrumb({
         coordinate: { lat: 44.4270, lon: 26.1027 },
         speedMetersPerSecond: 5.2,
-        timestamp: 1710400001000,
+        timestamp: startedAtMs + 6000, // ~28 m over 5 s → ~5.6 m/s, plausible
       });
 
       const breadcrumbs = useAppStore.getState().navigationSession?.gpsBreadcrumbs;
@@ -418,26 +423,78 @@ describe('useAppStore', () => {
       expect(breadcrumbs?.[1].lat).toBe(44.4270);
     });
 
+    it('rejects a stale GPS fix captured before the ride began', () => {
+      useAppStore.getState().startNavigation(createRoute('safe-1'));
+      const startedAtMs = Date.parse(
+        useAppStore.getState().navigationSession!.startedAt,
+      );
+      // A hydrated last-known location from a previous ride (timestamp predates start).
+      useAppStore.getState().appendGpsBreadcrumb({
+        coordinate: { lat: 44.4268, lon: 26.1025 }, // stale Bucharest fix
+        speedMetersPerSecond: 0,
+        timestamp: startedAtMs - 60_000,
+      });
+      // A real fix during the ride.
+      useAppStore.getState().appendGpsBreadcrumb({
+        coordinate: { lat: 40.4168, lon: -3.7038 }, // Madrid
+        speedMetersPerSecond: 4,
+        timestamp: startedAtMs + 1_000,
+      });
+
+      const breadcrumbs = useAppStore.getState().navigationSession?.gpsBreadcrumbs;
+      expect(breadcrumbs).toHaveLength(1);
+      expect(breadcrumbs?.[0].lat).toBe(40.4168);
+    });
+
+    it('rejects an implausible teleport jump mid-ride', () => {
+      useAppStore.getState().startNavigation(createRoute('safe-1'));
+      const startedAtMs = Date.parse(
+        useAppStore.getState().navigationSession!.startedAt,
+      );
+      useAppStore.getState().appendGpsBreadcrumb({
+        coordinate: { lat: 40.4168, lon: -3.7038 }, // Madrid
+        speedMetersPerSecond: 4,
+        timestamp: startedAtMs + 1_000,
+      });
+      // Cached Bucharest fix re-surfaced after a signal gap: 2,470 km in 2 s.
+      useAppStore.getState().appendGpsBreadcrumb({
+        coordinate: { lat: 44.4268, lon: 26.1025 },
+        speedMetersPerSecond: 0,
+        timestamp: startedAtMs + 3_000,
+      });
+
+      const breadcrumbs = useAppStore.getState().navigationSession?.gpsBreadcrumbs;
+      expect(breadcrumbs).toHaveLength(1);
+      expect(breadcrumbs?.[0].lat).toBe(40.4168);
+    });
+
     it('caps GPS breadcrumbs at 2000', () => {
       useAppStore.getState().startNavigation(createRoute('safe-1'));
-      // Manually set near cap
+      // Manually set near cap, with a session start before the crumb timestamps
+      // so the new (plausible) crumb passes the stale-fix guard.
       const session = useAppStore.getState().navigationSession!;
+      const baseTs = 1710400000000;
       const bigCrumbs = Array.from({ length: 2000 }, (_, i) => ({
         lat: 44 + i * 0.0001,
         lon: 26,
-        ts: 1710400000000 + i,
+        ts: baseTs + i * 1000,
         acc: null,
         spd: null,
         hdg: null,
       }));
       useAppStore.setState({
-        navigationSession: { ...session, gpsBreadcrumbs: bigCrumbs },
+        navigationSession: {
+          ...session,
+          startedAt: new Date(baseTs - 1000).toISOString(),
+          gpsBreadcrumbs: bigCrumbs,
+        },
       });
 
+      // Plausible continuation of the last crumb (lat 44.1999) a couple seconds later.
       useAppStore.getState().appendGpsBreadcrumb({
-        coordinate: { lat: 99, lon: 99 },
+        coordinate: { lat: 44.2001, lon: 26 },
         speedMetersPerSecond: 1,
-        timestamp: Date.now(),
+        timestamp: baseTs + 2000 * 1000,
       });
 
       // Should still be 2000, not 2001

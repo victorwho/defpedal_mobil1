@@ -109,13 +109,13 @@ describe('calculateTrailDistanceMeters', () => {
   });
 
   it('calculates distance between two points', () => {
-    // ~111 km between lat 44 and lat 45 at same lon
+    // ~1.1 km between lat 44.00 and lat 44.01 at same lon
     const dist = calculateTrailDistanceMeters([
       { lat: 44.0, lon: 26.0 },
-      { lat: 45.0, lon: 26.0 },
+      { lat: 44.01, lon: 26.0 },
     ]);
-    expect(dist).toBeGreaterThan(110_000);
-    expect(dist).toBeLessThan(112_000);
+    expect(dist).toBeGreaterThan(1_100);
+    expect(dist).toBeLessThan(1_120);
   });
 
   it('sums consecutive segments', () => {
@@ -128,5 +128,29 @@ describe('calculateTrailDistanceMeters', () => {
     // Two ~111m segments
     expect(total).toBeGreaterThan(200);
     expect(total).toBeLessThan(250);
+  });
+
+  it('ignores a stale fix from another city at the head of the trail', () => {
+    // Bucharest cached fix injected before a ~1.1 km Madrid ride. Without the
+    // outlier guard the Bucharest→Madrid hop would add ~2,470 km.
+    const total = calculateTrailDistanceMeters([
+      { lat: 44.4268, lon: 26.1025 }, // stale Bucharest
+      { lat: 40.4168, lon: -3.7038 }, // Madrid start
+      { lat: 40.4268, lon: -3.7038 }, // ~1.1 km north
+    ]);
+    expect(total).toBeGreaterThan(1_100);
+    expect(total).toBeLessThan(1_120);
+  });
+
+  it('uses the implied-speed gate when breadcrumbs carry timestamps', () => {
+    const base = 1_700_000_000_000;
+    const total = calculateTrailDistanceMeters([
+      { lat: 40.4168, lon: -3.7038, ts: base }, // Madrid start
+      { lat: 44.4268, lon: 26.1025, ts: base + 2_000 }, // 2,470 km in 2 s → rejected
+      { lat: 40.4268, lon: -3.7038, ts: base + 220_000 }, // ~1.1 km @ ~5 m/s → kept
+    ]);
+    // Only the plausible Madrid segment (start → +1.1 km) survives.
+    expect(total).toBeGreaterThan(1_100);
+    expect(total).toBeLessThan(1_120);
   });
 });

@@ -14,7 +14,11 @@ import type {
   UserStats,
   WriteAckResponse,
 } from '@defensivepedal/core';
-import { calculateCo2SavedKg, calculateTrailDistanceMeters } from '@defensivepedal/core';
+import {
+  calculateCo2SavedKg,
+  calculateTrailDistanceMeters,
+  sanitizeBreadcrumbs,
+} from '@defensivepedal/core';
 
 import { supabaseAdmin } from './supabaseAdmin';
 
@@ -248,8 +252,17 @@ export const saveTripTrack = async (
   userId: string,
 ): Promise<WriteAckResponse> => {
   if (supabaseAdmin) {
-    const actualDistance = request.gpsBreadcrumbs.length >= 2
-      ? calculateTrailDistanceMeters(request.gpsBreadcrumbs)
+    // Drop stale/cached GPS fixes (e.g. a previous-ride last-known location from
+    // another city) before they corrupt the stored distance AND the persisted
+    // trail that History/trip-replay draws. Defence-in-depth: the client gates
+    // these at append time too, but a stale or offline-queued client could send
+    // an un-sanitised trail.
+    const cleanTrail = sanitizeBreadcrumbs(
+      request.gpsBreadcrumbs,
+      Date.parse(request.startedAt),
+    );
+    const actualDistance = cleanTrail.length >= 2
+      ? calculateTrailDistanceMeters(cleanTrail)
       : null;
 
     // Idempotent on trip_id (one trip → one track). Retries upsert the latest
@@ -264,7 +277,7 @@ export const saveTripTrack = async (
           planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
           planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
           actual_distance_meters: actualDistance,
-          gps_trail: request.gpsBreadcrumbs,
+          gps_trail: cleanTrail,
           end_reason: request.endReason,
           started_at: request.startedAt,
           ended_at: request.endedAt,
