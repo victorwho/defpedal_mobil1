@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-03 — Reject stale/teleport GPS fixes that inflate trip distance — v0.2.89 (build 91)
+
+### Behavior
+- A ride could record a wildly inflated distance (a ~12 km Madrid ride read as **2,441 km**) when the first GPS fix was a stale cached location from a previous ride in another city, or when Android's fused provider re-surfaced a cached fix after a mid-ride signal gap. The trail now drops such physically-impossible "teleport" points before distance is measured or stored, so trip distance, CO2/money/microlives totals, XP, badges, and the map trail stay accurate.
+- Already-stored trails self-correct on every read surface (History, trips, trip detail, feed) because `calculateTrailDistanceMeters` now sanitizes internally.
+
+### Files
+- `packages/core/src/breadcrumbs.ts` (new) — `sanitizeBreadcrumbs` / `isPlausibleStep`: drops pre-ride fixes (`ts < startedAt`), trims a lone leading outlier, rejects teleport jumps (implied-speed gate >30 m/s when timestamps exist, 50 km distance cap when they don't).
+- `packages/core/src/co2.ts` — `calculateTrailDistanceMeters` sanitizes internally.
+- `apps/mobile/src/store/appStore.ts` — `appendGpsBreadcrumb` rejects stale/teleport samples before they enter a live ride.
+- `services/mobile-api/src/lib/submissions.ts` — `saveTripTrack` sanitizes before computing `actual_distance_meters` and before storing `gps_trail`.
+
+### Tests
+- New `packages/core/src/breadcrumbs.test.ts` (10) + additions to `co2.test.ts` / `appStore.test.ts`; `apps/mobile/src/store/teleport-distance.regression.test.ts` runs 10 routes through the client append, server sanitize, and read-back gates (incl. a clean control + a legit 8 km GPS-gap route to prove the filter doesn't over-trim). `npm run typecheck` clean; lint ratchet 0 regressions; `npm run check:bundle` HTTP 200.
+
+### Data repair (2026-06-03)
+- The one corrupted production ride (Madrid trip `19dd024d`, 2,441.6 → 12.333 km) and its full cascade were repaired/unwound: `trip_tracks` + `trip_shares`, `ride_impacts` + `ride_microlives`, profile totals (CO2 330.9→39.4 kg, money €965→€115, XP 21,345→20,245), **8 falsely-awarded badges** + their 1,100 XP + the badge-unlock feed posts. Tier stayed `trail_blazer`. See progress.md Session 70.
+
+### Release
+- **Preview**: v0.2.89 / build 91 built from `C:\dpb` (dev-leak audit passed). Distributed via Firebase App Distribution to `early-access-preview`.
+
 ## 2026-05-21 — Native Google Sign-In (replaces browser/PKCE OAuth flow) — v0.2.62 (build 64)
 
 ### Behavior

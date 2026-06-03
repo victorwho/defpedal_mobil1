@@ -393,6 +393,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 7. **Windows 260-char CMake path limit** — build from `C:\dpb` (full copy) for release APKs
 8. **`expo-notifications` native module crash** — guard with `hasNotificationsNativeModule()` (Expo Modules API probe) before `require()`. NEVER use `NativeModules.ExpoPushTokenManager` — it's `undefined` on bridgeless preview/production builds and silently disables all notifications (error-log #21 + #2b)
 9. **Fastify strips unknown response fields** — add new fields to JSON Schema in `feedSchemas.ts` or they'll be silently dropped
+10. **Stale/cached GPS fix inflates trip distance** — never seed the breadcrumb trail from a hydrated last-known location, and always measure distance via `calculateTrailDistanceMeters` (which sanitizes) or call `sanitizeBreadcrumbs` first. A stale first fix from a previous city adds thousands of km and can award phantom badges/XP (error-log #53)
 
 ## Rules
 
