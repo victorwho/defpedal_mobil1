@@ -5,6 +5,7 @@ import {
   calculateTrailDistanceMeters,
   getNavigationProgress,
   getPreviewOrigin,
+  computeNextStopProgress,
   computeRemainingClimb,
   computeRemainingDescent,
   computeCurrentGrade,
@@ -46,7 +47,7 @@ import { useAppStore } from '../src/store/appStore';
 import { useShallow } from 'zustand/shallow';
 
 // Design system imports
-import { ManeuverCard, FooterCard, SteepGradeIndicator } from '../src/design-system/organisms/NavigationHUD';
+import { ManeuverCard, FooterCard, SteepGradeIndicator, type FooterNextStop } from '../src/design-system/organisms/NavigationHUD';
 
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
@@ -141,6 +142,7 @@ function NavigationScreen() {
   })));
 
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
+  const removeWaypoint = useAppStore((state) => state.removeWaypoint);
   const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
   const updateNavigationProgress = useAppStore((state) => state.updateNavigationProgress);
   const markPreAnnouncement = useAppStore((state) => state.markPreAnnouncement);
@@ -290,6 +292,39 @@ function NavigationScreen() {
     getPreviewOrigin(routeRequest);
   const mapUserCoordinate =
     locationState.sample?.coordinate ?? navigationSession?.lastKnownCoordinate ?? null;
+
+  // Multi-stop: distance/ETA/climb to the NEXT intermediate stop (rather than
+  // the final destination). Returns hasNextStop=false for no-stop routes or
+  // once every stop is behind, in which case the HUD falls back to totals.
+  const nextStopProgress = useMemo(() => {
+    if (!selectedRoute || routeCoordinates.length < 2) return null;
+    const waypoints = routeRequest.waypoints ?? [];
+    if (waypoints.length === 0) return null;
+    const loc = mapUserCoordinate;
+    if (!loc) return null;
+    return computeNextStopProgress(
+      {
+        distanceMeters: selectedRoute.distanceMeters,
+        durationSeconds: selectedRoute.adjustedDurationSeconds ?? selectedRoute.durationSeconds,
+        elevationProfile: selectedRoute.elevationProfile,
+      },
+      routeCoordinates,
+      waypoints,
+      loc,
+    );
+  }, [selectedRoute, routeCoordinates, routeRequest.waypoints, mapUserCoordinate]);
+
+  const footerNextStop: FooterNextStop | null =
+    nextStopProgress?.hasNextStop
+      ? {
+          stopIndex: nextStopProgress.stopIndex,
+          stopCount: nextStopProgress.stopCount,
+          distanceMeters: nextStopProgress.distanceToNextStopMeters,
+          durationSeconds: nextStopProgress.durationToNextStopSeconds,
+          climbMeters: nextStopProgress.climbToNextStopMeters,
+        }
+      : null;
+
   const offRouteCountdownSeconds =
     navigationSession?.offRouteSince != null
       ? Math.max(
@@ -589,8 +624,24 @@ function NavigationScreen() {
   }, [routeRequest, avoidHills, avoidUnpaved]);
 
   const rerouteMutation = useMutation({
-    mutationFn: (origin: Coordinate) =>
-      mobileApi.reroute(buildRerouteRequest(effectiveRouteRequest, selectedRoute?.id, origin, routeCoordinates)),
+    mutationFn: (origin: Coordinate) => {
+      // Read fresh store state at execution time so a just-skipped waypoint
+      // (removeWaypoint runs synchronously, but this component's memoized
+      // effectiveRouteRequest hasn't re-rendered yet) is excluded from the
+      // reroute. Mirrors the effectiveRouteRequest profile transform.
+      const s = useAppStore.getState();
+      const base = s.routeRequest;
+      const isFlat = base.mode === 'safe' && s.avoidHills;
+      const freshRequest = {
+        ...base,
+        avoidUnpaved: s.avoidUnpaved,
+        mode: isFlat ? ('fast' as const) : base.mode,
+        avoidHills: isFlat ? false : s.avoidHills,
+      };
+      return mobileApi.reroute(
+        buildRerouteRequest(freshRequest, selectedRoute?.id, origin, routeCoordinates),
+      );
+    },
     onMutate: () => {
       recordNavigationReroute();
       telemetry.capture('reroute_requested', {
@@ -823,6 +874,33 @@ function NavigationScreen() {
   rerouteMutateRef.current = rerouteMutation.mutate;
   const isReroutePending = rerouteMutation.isPending;
 
+  // Skip the next intermediate stop: confirm, drop that waypoint, and reroute
+  // from the rider's current position to the following stop (or the final
+  // destination if it was the last one). The reroute's mutationFn re-reads the
+  // store, so the just-removed waypoint is excluded.
+  const handleSkipStop = useCallback(() => {
+    if (!nextStopProgress?.hasNextStop || nextStopProgress.nextWaypointIndex == null) return;
+    if (!isOnline) return; // reroute needs the network; the button is also disabled
+    const waypointIndex = nextStopProgress.nextWaypointIndex;
+    const stopLabel = nextStopProgress.stopIndex;
+    Alert.alert(
+      t('nav.skipStopConfirmTitle'),
+      t('nav.skipStopConfirmBody', { index: stopLabel }),
+      [
+        { text: t('nav.skipStopCancel'), style: 'cancel' },
+        {
+          text: t('nav.skipStop'),
+          style: 'destructive',
+          onPress: () => {
+            removeWaypoint(waypointIndex);
+            const coord = locationState.sample?.coordinate;
+            if (coord) rerouteMutateRef.current(coord);
+          },
+        },
+      ],
+    );
+  }, [nextStopProgress, isOnline, t, removeWaypoint, locationState.sample]);
+
   useEffect(() => {
     if (
       !navigationSession ||
@@ -942,6 +1020,7 @@ function NavigationScreen() {
         selectedRouteId={selectedRouteId}
         origin={liveCoordinate}
         destination={routeRequest.destination}
+        waypoints={routeRequest.waypoints}
         userLocation={mapUserCoordinate}
         followUser={navigationSession.isFollowing}
         offRouteDetails={offRouteDetails}
@@ -1179,6 +1258,9 @@ function NavigationScreen() {
                 ? locationState.sample.speedMetersPerSecond * 3.6
                 : null
             }
+            nextStop={footerNextStop}
+            onSkipStop={handleSkipStop}
+            skipDisabled={!isOnline}
           />
         </View>
       </View>

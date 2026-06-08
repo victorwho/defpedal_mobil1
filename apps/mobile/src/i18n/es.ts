@@ -173,6 +173,13 @@ export const es: TranslationKeys = {
     metricEta: 'Llegada',
     metricDist: 'Dist.',
     metricClimb: 'Subida',
+    // Navegación con varias paradas
+    stopXofN: 'Parada {{index}} de {{count}}',
+    toFinish: 'hasta el final: {{dist}} · {{eta}}',
+    skipStop: 'Saltar parada',
+    skipStopCancel: 'Mantener',
+    skipStopConfirmTitle: '¿Saltar esta parada?',
+    skipStopConfirmBody: '¿Saltar la parada {{index}} y recalcular hacia la siguiente?',
     guardTitle: 'Navegar',
     guardEyebrow: 'Trayecto activo',
     guardSubtitle: 'Empieza desde la vista previa de la ruta para entrar en la navegación paso a paso.',

@@ -9,6 +9,7 @@ import {
   findClosestPointIndex,
   haversineDistance,
   polylineSegmentDistance,
+  type PolylineSnapResult,
 } from './distance';
 import { decodePolyline } from './polyline';
 
@@ -583,4 +584,151 @@ export const computeCurrentGrade = (
   const grade = (rise / segmentLengthMeters) * 100;
 
   return Math.round(grade * 10) / 10; // one decimal
+};
+
+/**
+ * Sum the positive elevation deltas of the profile window between two route
+ * fractions (0 = route start, 1 = route end). Generalizes
+ * `computeRemainingClimb` (which always runs to the route end) so callers can
+ * measure climb up to an intermediate point such as the next stop.
+ */
+export const climbBetweenFractions = (
+  elevationProfile: readonly number[],
+  startFraction: number,
+  endFraction: number,
+): number => {
+  if (elevationProfile.length < 2) return 0;
+  const segments = elevationProfile.length - 1;
+  const start = Math.max(0, Math.min(1, startFraction));
+  const end = Math.max(start, Math.min(1, endFraction));
+  const startIndex = Math.floor(start * segments);
+  const endIndex = Math.floor(end * segments);
+
+  let climb = 0;
+  for (let i = startIndex; i < endIndex; i++) {
+    const delta = elevationProfile[i + 1] - elevationProfile[i];
+    if (delta > 0) climb += delta;
+  }
+  return Math.round(climb);
+};
+
+export interface NextStopProgress {
+  /** 1-based label of the stop the rider is heading to ("Stop {stopIndex} of {stopCount}"). 0 when none. */
+  readonly stopIndex: number;
+  /** Total intermediate stops on the route (0 when none). */
+  readonly stopCount: number;
+  /** True when at least one intermediate stop is still ahead of the rider. */
+  readonly hasNextStop: boolean;
+  /**
+   * Index of the next stop inside the original `waypoints` array, or null when
+   * none remain ahead. The "skip stop" action removes exactly this index so the
+   * displayed next stop and the skipped stop never disagree.
+   */
+  readonly nextWaypointIndex: number | null;
+  /** Along-route distance to the next stop in meters (0 when no stop ahead). */
+  readonly distanceToNextStopMeters: number;
+  /** Pace-scaled seconds to the next stop (0 when no stop ahead). */
+  readonly durationToNextStopSeconds: number;
+  /** Positive elevation gain between the rider and the next stop (0 when no stop ahead). */
+  readonly climbToNextStopMeters: number;
+}
+
+const EMPTY_NEXT_STOP = (stopCount: number, stopIndex: number): NextStopProgress => ({
+  stopIndex,
+  stopCount,
+  hasNextStop: false,
+  nextWaypointIndex: null,
+  distanceToNextStopMeters: 0,
+  durationToNextStopSeconds: 0,
+  climbToNextStopMeters: 0,
+});
+
+/** Along-route distance from the route start to a snapped point (full segments + partial). */
+const alongRouteDistanceToSnap = (
+  routeCoordinates: readonly [number, number][],
+  snap: PolylineSnapResult,
+): number => {
+  const fullSegments = polylineSegmentDistance(routeCoordinates, 0, snap.segmentIndex);
+  const vertex = routeCoordinates[snap.segmentIndex];
+  if (!vertex) return fullSegments;
+  // vertex is [lon, lat]; haversine + projectedPoint expect [lat, lon].
+  const partial = haversineDistance([vertex[1], vertex[0]], snap.projectedPoint);
+  return fullSegments + partial;
+};
+
+/**
+ * Compute distance / ETA / climb from the rider to the NEXT intermediate stop
+ * (rather than the final destination). Pure + client-derivable: leg boundaries
+ * are inferred from the route geometry + waypoints, so no engine `legs` data is
+ * required. "Passed" semantics match `stripPassedWaypoints` (the reroute path),
+ * so the next stop shown here is the same one a reroute would keep.
+ *
+ * Returns `hasNextStop: false` (and zeroed metrics) when there are no stops or
+ * none remain ahead — callers should fall back to their to-destination totals.
+ *
+ * @param routeCoordinates decoded route geometry as [lon, lat] (GeoJSON order)
+ */
+export const computeNextStopProgress = (
+  route: Pick<RouteOption, 'distanceMeters' | 'durationSeconds' | 'elevationProfile'>,
+  routeCoordinates: readonly [number, number][],
+  waypoints: readonly Coordinate[],
+  location: Coordinate,
+): NextStopProgress => {
+  const stopCount = waypoints.length;
+  if (stopCount === 0 || routeCoordinates.length < 2) return EMPTY_NEXT_STOP(stopCount, 0);
+
+  const riderSnap = closestPointOnPolyline([location.lat, location.lon], routeCoordinates);
+  if (!riderSnap) return EMPTY_NEXT_STOP(stopCount, 0);
+
+  const riderIndex = findClosestPointIndex(
+    [location.lat, location.lon],
+    routeCoordinates as [number, number][],
+  );
+
+  // First waypoint still ahead of the rider (mirror of stripPassedWaypoints).
+  let nextWaypointIndex = -1;
+  for (let i = 0; i < waypoints.length; i++) {
+    const wpIndex = findClosestPointIndex(
+      [waypoints[i].lat, waypoints[i].lon],
+      routeCoordinates as [number, number][],
+    );
+    if (wpIndex > riderIndex) {
+      nextWaypointIndex = i;
+      break;
+    }
+  }
+
+  // All stops passed → heading to the destination; keep stopCount for context.
+  if (nextWaypointIndex === -1) return EMPTY_NEXT_STOP(stopCount, stopCount);
+
+  const wp = waypoints[nextWaypointIndex];
+  const wpSnap = closestPointOnPolyline([wp.lat, wp.lon], routeCoordinates);
+
+  const riderAlong = alongRouteDistanceToSnap(routeCoordinates, riderSnap);
+  const wpAlong = wpSnap ? alongRouteDistanceToSnap(routeCoordinates, wpSnap) : riderAlong;
+  const distanceToNextStopMeters = Math.max(0, wpAlong - riderAlong);
+
+  const pace =
+    route.distanceMeters > 0 ? route.durationSeconds / route.distanceMeters : 0;
+  const durationToNextStopSeconds = Math.round(distanceToNextStopMeters * pace);
+
+  const profile = route.elevationProfile ?? [];
+  const climbToNextStopMeters =
+    route.distanceMeters > 0 && profile.length >= 2
+      ? climbBetweenFractions(
+          profile,
+          riderAlong / route.distanceMeters,
+          wpAlong / route.distanceMeters,
+        )
+      : 0;
+
+  return {
+    stopIndex: nextWaypointIndex + 1,
+    stopCount,
+    hasNextStop: true,
+    nextWaypointIndex,
+    distanceToNextStopMeters,
+    durationToNextStopSeconds,
+    climbToNextStopMeters,
+  };
 };

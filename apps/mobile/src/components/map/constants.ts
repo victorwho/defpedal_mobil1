@@ -23,11 +23,17 @@ export const toMarkerFeature = (
     return null;
   }
 
+  // Waypoint kinds carry a 0-based index ("waypoint-0"); surface it as a
+  // 1-based `label` so the marker renders a numbered pin ("Stop 1, 2, 3…").
+  const waypointIndex =
+    typeof kind === 'string' && kind.startsWith('waypoint-')
+      ? Number(kind.slice('waypoint-'.length))
+      : NaN;
+  const label = Number.isInteger(waypointIndex) ? String(waypointIndex + 1) : undefined;
+
   return {
     type: 'Feature' as const,
-    properties: {
-      kind,
-    },
+    properties: label !== undefined ? { kind, label } : { kind },
     geometry: {
       type: 'Point' as const,
       coordinates: [coordinate.lon, coordinate.lat] as [number, number],

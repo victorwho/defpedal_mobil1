@@ -173,6 +173,13 @@ export const ro: TranslationKeys = {
     metricEta: 'Sosire',
     metricDist: 'Dist.',
     metricClimb: 'Urcare',
+    // Navigare cu opriri multiple
+    stopXofN: 'Oprirea {{index}} din {{count}}',
+    toFinish: 'până la final: {{dist}} · {{eta}}',
+    skipStop: 'Sari oprirea',
+    skipStopCancel: 'Păstrează',
+    skipStopConfirmTitle: 'Sari peste această oprire?',
+    skipStopConfirmBody: 'Sari oprirea {{index}} și recalculează spre următoarea?',
     guardTitle: 'Navigare',
     guardEyebrow: 'Cursă activă',
     guardSubtitle: 'Pornește din previzualizarea rutei ca să intri în navigația pas cu pas.',

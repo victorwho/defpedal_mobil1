@@ -295,6 +295,19 @@ export const ThenStrip: React.FC<{
  * Bottom card: "then" strip + summary metrics row (ETA, distance, climb).
  * Rendered at the bottom of the navigation screen.
  */
+/**
+ * Per-stop metrics for a multi-stop route. When present, the FooterCard shows
+ * distance/ETA/climb to the NEXT stop (with a "Stop X of N" header + a subtle
+ * total-to-finish line) instead of straight to the final destination.
+ */
+export interface FooterNextStop {
+  stopIndex: number;
+  stopCount: number;
+  distanceMeters: number;
+  durationSeconds: number;
+  climbMeters: number | null;
+}
+
 export const FooterCard: React.FC<{
   nextStep: NavigationStep | null;
   remainingDurationSeconds: number;
@@ -303,6 +316,12 @@ export const FooterCard: React.FC<{
   totalDescentMeters?: number | null;
   isClimbLive?: boolean;
   speedKmh?: number | null;
+  /** When set, primary metrics retarget to this stop. Null/undefined = to destination (legacy). */
+  nextStop?: FooterNextStop | null;
+  /** Confirm-gated skip of the next stop. Hidden when absent. */
+  onSkipStop?: () => void;
+  /** Disable the skip control (e.g. offline — reroute needs the network). */
+  skipDisabled?: boolean;
 }> = ({
   nextStep,
   remainingDurationSeconds,
@@ -311,6 +330,9 @@ export const FooterCard: React.FC<{
   totalDescentMeters,
   isClimbLive = false,
   speedKmh,
+  nextStop,
+  onSkipStop,
+  skipDisabled = false,
 }) => {
   const t = useT();
   const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
@@ -319,9 +341,17 @@ export const FooterCard: React.FC<{
     : null;
   const nextDesc = nextStep ? getManeuverDescription(nextStep, t) : null;
 
+  // Retarget the primary metrics to the next stop when one is ahead.
+  const targetingStop = nextStop != null;
+  const etaSeconds = targetingStop ? nextStop!.durationSeconds : remainingDurationSeconds;
+  const distMeters = targetingStop ? nextStop!.distanceMeters : remainingDistanceMeters;
+  const climbMeters = targetingStop ? nextStop!.climbMeters : totalClimbMeters;
+  // Next-stop climb is always recomputed live; the route total may be an estimate.
+  const climbLive = targetingStop ? true : isClimbLive;
+
   return (
     <View style={[styles.footerCard, shadows.md]}>
-      {/* "Then" strip */}
+      {/* "Then" strip — the upcoming maneuver (turn), distinct from the next stop */}
       {nextStep && nextIconName ? (
         <View style={styles.thenStripInline}>
           <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
@@ -338,7 +368,42 @@ export const FooterCard: React.FC<{
         </View>
       ) : null}
 
-      {/* Metrics row */}
+      {/* Stop header: "STOP X of N" + skip control */}
+      {targetingStop ? (
+        <View style={styles.stopHeaderRow}>
+          <View style={styles.stopBadge}>
+            <Ionicons name="flag" size={12} color={darkTheme.accent} />
+            <Text style={styles.stopBadgeText}>
+              {t('nav.stopXofN', { index: nextStop!.stopIndex, count: nextStop!.stopCount })}
+            </Text>
+          </View>
+          {onSkipStop ? (
+            <Pressable
+              onPress={onSkipStop}
+              disabled={skipDisabled}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.skipBtn,
+                pressed && !skipDisabled ? styles.skipBtnPressed : null,
+                skipDisabled ? styles.skipBtnDisabled : null,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.skipStop')}
+            >
+              <Ionicons
+                name="play-skip-forward"
+                size={13}
+                color={skipDisabled ? gray[500] : darkTheme.accent}
+              />
+              <Text style={[styles.skipBtnText, skipDisabled ? { color: gray[500] } : null]}>
+                {t('nav.skipStop')}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Metrics row (next stop when targeting one, else final destination) */}
       <View style={styles.metricRow}>
         <MetricCell
           label={t('nav.metricSpeed')}
@@ -346,24 +411,34 @@ export const FooterCard: React.FC<{
           unit="km/h"
         />
         <View style={styles.metricDivider} />
-        <MetricCell label={t('nav.metricEta')} value={formatETA(remainingDurationSeconds, t)} />
+        <MetricCell label={t('nav.metricEta')} value={formatETA(etaSeconds, t)} />
         <View style={styles.metricDivider} />
         <MetricCell
           label={t('nav.metricDist')}
-          value={`${(remainingDistanceMeters / 1000).toFixed(1)} km`}
+          value={`${(distMeters / 1000).toFixed(1)} km`}
         />
         <View style={styles.metricDivider} />
         <MetricCell
           label={t('nav.metricClimb')}
           value={
-            totalClimbMeters !== null
-              ? isClimbLive
-                ? `↑${Math.round(totalClimbMeters)} m`
-                : `~↑${Math.round(totalClimbMeters)} m`
+            climbMeters !== null
+              ? climbLive
+                ? `↑${Math.round(climbMeters)} m`
+                : `~↑${Math.round(climbMeters)} m`
               : '—'
           }
         />
       </View>
+
+      {/* Subtle total-to-finish line (only when primary metrics target a stop) */}
+      {targetingStop ? (
+        <Text style={styles.toFinishText} numberOfLines={1}>
+          {t('nav.toFinish', {
+            dist: `${(remainingDistanceMeters / 1000).toFixed(1)} km`,
+            eta: formatETA(remainingDurationSeconds, t),
+          })}
+        </Text>
+      ) : null}
     </View>
   );
 };
@@ -518,6 +593,56 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: darkTheme.borderDefault,
     overflow: 'hidden',
+  },
+  stopHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: darkTheme.borderDefault,
+    backgroundColor: darkTheme.bgSecondary,
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+  },
+  stopBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  stopBadgeText: {
+    ...textXs,
+    fontFamily: fontFamily.heading.semiBold,
+    color: darkTheme.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  skipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: space[2],
+    paddingVertical: 6,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: darkTheme.borderDefault,
+  },
+  skipBtnPressed: {
+    opacity: 0.6,
+  },
+  skipBtnDisabled: {
+    opacity: 0.4,
+  },
+  skipBtnText: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.accent,
+  },
+  toFinishText: {
+    ...textXs,
+    color: gray[400],
+    textAlign: 'center',
+    paddingTop: 2,
+    paddingBottom: space[2],
   },
   thenStripInline: {
     flexDirection: 'row',

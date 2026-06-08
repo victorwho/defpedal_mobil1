@@ -22,10 +22,21 @@ const originMarkerStyle = {
 
 const waypointMarkerStyle = {
   circleColor: brandColors.accent,
-  circleRadius: 5,
+  circleRadius: 10,
   circleStrokeColor: gray[50],
   circleStrokeWidth: 2,
   circleEmissiveStrength: 1,
+};
+
+// Numbered "Stop N" label centered in the waypoint pin. Dark text on the
+// yellow accent disc (mirrors the SearchedPoi / Overpass POI label pattern).
+const waypointLabelStyle = {
+  textField: ['get', 'label'] as any,
+  textSize: 12,
+  textColor: '#1A1A1A',
+  textAllowOverlap: true,
+  textIgnorePlacement: true,
+  textEmissiveStrength: 1,
 };
 
 const userMarkerStyle = {
@@ -151,6 +162,7 @@ const MarkerLayersInner = ({
           <Mapbox.CircleLayer id="route-marker-destination-outer" existing filter={destinationFilter} style={destinationOuterStyle} />
           <Mapbox.CircleLayer id="route-marker-destination-inner" existing filter={destinationFilter} style={destinationInnerStyle} />
           <Mapbox.CircleLayer id="route-marker-waypoint" existing filter={waypointFilter} style={waypointMarkerStyle} />
+          <Mapbox.SymbolLayer id="route-marker-waypoint-label" existing filter={waypointFilter} style={waypointLabelStyle} />
           <Mapbox.CircleLayer id="route-marker-user" existing filter={userFilter} style={userMarkerStyle} />
         </Mapbox.ShapeSource>
       ) : null}

@@ -175,6 +175,13 @@ export const en = {
     metricEta: 'ETA',
     metricDist: 'Dist',
     metricClimb: 'Climb',
+    // Multi-stop navigation
+    stopXofN: 'Stop {{index}} of {{count}}',
+    toFinish: 'to finish: {{dist}} · {{eta}}',
+    skipStop: 'Skip stop',
+    skipStopCancel: 'Keep stop',
+    skipStopConfirmTitle: 'Skip this stop?',
+    skipStopConfirmBody: 'Skip Stop {{index}} and recalculate to the next one?',
     // Navigation screen chrome
     guardTitle: 'Navigate',
     guardEyebrow: 'Active ride',

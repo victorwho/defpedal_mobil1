@@ -554,6 +554,7 @@ function RoutePreviewScreen() {
           selectedRouteId={selectedRouteId}
           origin={previewOrigin}
           destination={routeRequest.destination}
+          waypoints={routeRequest.waypoints}
           fullBleed
           showRouteOverlay={false}
           bicycleParkingLocations={parkingLocations}
