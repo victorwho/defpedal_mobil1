@@ -30,7 +30,7 @@ import type {
   XpAwardResult,
   TiersResponse,
 } from '@defensivepedal/core';
-import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS } from '../lib/xp';
+import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS, normalizeXpAwardResult } from '../lib/xp';
 import { getPreviewOrigin } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -2297,15 +2297,15 @@ export const buildV1Routes = (
             p_multiplier: multiplier,
             p_source_id: tripId,
           });
-          const rideXp = rideXpResult as XpAwardResult;
-          lastAwardResult = rideXp;
+          const rideXp = normalizeXpAwardResult(rideXpResult);
+          if (rideXp) lastAwardResult = rideXp;
 
           xpBreakdown.push({
             action: rideAction,
             label: XP_ACTION_LABELS[rideAction],
             baseXp: rideBaseXp,
             multiplier,
-            finalXp: rideXp.xpAwarded,
+            finalXp: rideXp?.xpAwarded ?? 0,
           });
 
           // 7. Award XP for each new badge earned
@@ -2332,15 +2332,15 @@ export const buildV1Routes = (
                 p_source_id: badge.badgeKey,
               });
 
-              const bxp = badgeXpResult as XpAwardResult;
-              if (bxp.promoted) lastAwardResult = bxp;
+              const bxp = normalizeXpAwardResult(badgeXpResult);
+              if (bxp?.promoted) lastAwardResult = bxp;
 
               xpBreakdown.push({
                 action: badgeAction,
                 label: `${XP_ACTION_LABELS[badgeAction]}: ${badge.name}`,
                 baseXp: badgeXpValue,
                 multiplier: 1.0,
-                finalXp: bxp.xpAwarded,
+                finalXp: bxp?.xpAwarded ?? 0,
                 sourceId: badge.badgeKey,
               });
             }
@@ -2355,15 +2355,15 @@ export const buildV1Routes = (
               p_multiplier: 1.0,
               p_source_id: `streak_day_${currentStreak}`,
             });
-            const sxp = streakXp as XpAwardResult;
-            if (sxp.promoted) lastAwardResult = sxp;
+            const sxp = normalizeXpAwardResult(streakXp);
+            if (sxp?.promoted) lastAwardResult = sxp;
 
             xpBreakdown.push({
               action: 'streak_day',
               label: `Streak day (Day ${currentStreak})`,
               baseXp: XP_VALUES.streak_day,
               multiplier: 1.0,
-              finalXp: sxp.xpAwarded,
+              finalXp: sxp?.xpAwarded ?? 0,
             });
           }
         } catch {

@@ -1,3 +1,35 @@
+import type { RiderTierName, XpAwardResult } from '@defensivepedal/core';
+
+/**
+ * Normalize the raw JSONB returned by the `award_xp` Postgres RPC into the
+ * camelCase `XpAwardResult` contract.
+ *
+ * The RPC emits **snake_case** keys (`xp_awarded`, `total_xp`, `old_tier`,
+ * `new_tier`, `tier_display_name`, …). Casting that object straight to
+ * `XpAwardResult` with `as` is a TYPE-only assertion — it does no runtime
+ * key mapping, so every camelCase read (`.totalXp`, `.newTier`, `.xpAwarded`)
+ * silently returns `undefined`. That bug made the post-ride impact card show
+ * 0 XP progress and tier 1 for everyone, because `currentTotalXp` fell back to
+ * 0 and `riderTier` fell back to 'kickstand'. Always route the RPC result
+ * through this mapper. Returns null when the RPC returned nothing.
+ */
+export function normalizeXpAwardResult(raw: unknown): XpAwardResult | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  return {
+    xpAwarded:       Number(r.xp_awarded ?? 0),
+    totalXp:         Number(r.total_xp ?? 0),
+    oldTier:         String(r.old_tier ?? 'kickstand') as RiderTierName,
+    newTier:         String(r.new_tier ?? 'kickstand') as RiderTierName,
+    promoted:        Boolean(r.promoted ?? false),
+    tierDisplayName: r.tier_display_name != null ? String(r.tier_display_name) : undefined,
+    tierTagline:     r.tier_tagline != null ? String(r.tier_tagline) : undefined,
+    tierColor:       r.tier_color != null ? String(r.tier_color) : undefined,
+    tierLevel:       r.tier_level != null ? Number(r.tier_level) : undefined,
+    tierPerk:        r.tier_perk != null ? String(r.tier_perk) : undefined,
+  };
+}
+
 /** XP values for each action type. Canonical source — matches DB seeding. */
 export const XP_VALUES = {
   ride_safe:       100,
