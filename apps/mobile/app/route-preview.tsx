@@ -157,10 +157,32 @@ function RoutePreviewScreen() {
     routeRequest.origin.lon,
   );
   const [weatherWarningDismissed, setWeatherWarningDismissed] = useState(false);
+  const weatherWarningSeenThisSession = useAppStore((state) => state.weatherWarningSeenThisSession);
+  const markWeatherWarningSeen = useAppStore((state) => state.markWeatherWarningSeen);
+  // Snapshot the session flag at mount so marking it seen (below) doesn't
+  // retroactively hide the modal that's currently up. If the warning was
+  // already shown earlier this session, this screen instance never presents
+  // it — so it appears once per session, not on every route calculation
+  // (route-preview remounts per calc, which is why the old screen-local
+  // dismissed flag re-showed it every time).
+  const weatherWarningAllowedRef = useRef(!weatherWarningSeenThisSession);
   const [switchingToSafe, setSwitchingToSafe] = useState(false);
   const isFocused = useIsFocused();
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
+
+  const showWeatherWarning =
+    isFocused &&
+    weatherWarnings.length > 0 &&
+    weatherWarningAllowedRef.current &&
+    !weatherWarningDismissed;
+
+  // Mark the warning seen the first time it actually appears this session, so
+  // a later route calculation (a fresh route-preview mount) won't re-show it —
+  // even if the user leaves without tapping "Start anyway".
+  useEffect(() => {
+    if (showWeatherWarning) markWeatherWarningSeen();
+  }, [showWeatherWarning, markWeatherWarningSeen]);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
   const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, showRouteComparison };
@@ -498,7 +520,7 @@ function RoutePreviewScreen() {
     <>
     <WeatherWarningModal
       warnings={weatherWarnings}
-      visible={isFocused && weatherWarnings.length > 0 && !weatherWarningDismissed}
+      visible={showWeatherWarning}
       onDismiss={() => setWeatherWarningDismissed(true)}
     />
     <ShareOptionsModal

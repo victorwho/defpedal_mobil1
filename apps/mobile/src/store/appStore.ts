@@ -190,6 +190,13 @@ type AppStore = QueueSlice & {
   weatherNotice: WeatherNotice | null;
   setWeatherNotice: (notice: WeatherNotice | null) => void;
   clearWeatherNotice: () => void;
+  // Session-scoped: true once the route-preview weather-warning modal has been
+  // shown once. Gates the modal so it appears at most once per app session
+  // instead of on every route calculation (route-preview remounts per calc,
+  // which is why a screen-local dismissed flag re-showed it every time).
+  // NOT persisted — resets on app restart so each fresh session warns once.
+  weatherWarningSeenThisSession: boolean;
+  markWeatherWarningSeen: () => void;
   setLocale: (locale: Locale) => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
   setQuizCountryPreference: (pref: QuizCountryPreference) => void;
@@ -459,6 +466,13 @@ export const useAppStore = create<AppStore>()(
       weatherNotice: null,
       setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
       clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
+      weatherWarningSeenThisSession: false,
+      markWeatherWarningSeen: () =>
+        set((state) =>
+          state.weatherWarningSeenThisSession
+            ? state
+            : { weatherWarningSeenThisSession: true },
+        ),
       setLocale: (locale) =>
         set((state) => ({
           locale,

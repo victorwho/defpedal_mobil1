@@ -1158,4 +1158,22 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().userHazardVotes).toEqual({});
     });
   });
+
+  describe('weather warning session flag', () => {
+    it('defaults to not-seen so the warning can appear once per session', () => {
+      useAppStore.setState({ weatherWarningSeenThisSession: false });
+      expect(useAppStore.getState().weatherWarningSeenThisSession).toBe(false);
+    });
+
+    it('markWeatherWarningSeen sets the flag and is idempotent', () => {
+      useAppStore.setState({ weatherWarningSeenThisSession: false });
+
+      useAppStore.getState().markWeatherWarningSeen();
+      expect(useAppStore.getState().weatherWarningSeenThisSession).toBe(true);
+
+      // Calling again is a no-op (stays true, no error).
+      useAppStore.getState().markWeatherWarningSeen();
+      expect(useAppStore.getState().weatherWarningSeenThisSession).toBe(true);
+    });
+  });
 });
