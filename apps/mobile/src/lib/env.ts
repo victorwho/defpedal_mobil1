@@ -11,6 +11,7 @@ const extra =
     supabaseUrl?: string;
     supabaseAnonKey?: string;
     googleWebClientId?: string;
+    googleIosClientId?: string;
     sentryDsn?: string;
     sentryEnvironment?: string;
     sentryTracesSampleRate?: string;
@@ -62,6 +63,8 @@ export const mobileEnv = {
     publicEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? extra.supabaseAnonKey ?? '',
   googleWebClientId:
     publicEnv.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? extra.googleWebClientId ?? '',
+  googleIosClientId:
+    publicEnv.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? extra.googleIosClientId ?? '',
   sentryDsn: publicEnv.EXPO_PUBLIC_SENTRY_DSN ?? extra.sentryDsn ?? '',
   sentryEnvironment:
     publicEnv.EXPO_PUBLIC_SENTRY_ENVIRONMENT ??

@@ -103,6 +103,46 @@ const resolveMapboxDownloadToken = () => {
 const appEnv = resolveExpoExtraValue(['EXPO_PUBLIC_APP_ENV'], appVariant);
 const mobileApiUrl = resolveExpoExtraValue(['EXPO_PUBLIC_MOBILE_API_URL']);
 
+// Google iOS OAuth client for native Google Sign-In on iOS. This is DISTINCT
+// from the web client (googleWebClientId): iOS needs its own OAuth client,
+// created in the SAME GCP project as the web/Android clients
+// (gen-lang-client-0895796477 — NOT Firebase). The reversed-client-id URL
+// scheme used by the redirect is derived from it. Both stay empty until that
+// iOS client is created — in which case the iOS-only Info.plist keys further
+// down are simply omitted, so the build still succeeds and Google sign-in just
+// reports "not configured" on iOS. Android is never touched (ios-only keys).
+const googleIosClientId = resolveExpoExtraValue([
+  'EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID',
+  'GOOGLE_IOS_CLIENT_ID',
+]);
+const googleIosUrlScheme = (() => {
+  const explicit = resolveExpoExtraValue([
+    'EXPO_PUBLIC_GOOGLE_IOS_URL_SCHEME',
+    'GOOGLE_IOS_URL_SCHEME',
+  ]);
+  if (explicit) {
+    return explicit;
+  }
+  // Derive the reversed client id:
+  //   "<n>-<hash>.apps.googleusercontent.com" → "com.googleusercontent.apps.<n>-<hash>"
+  const suffix = '.apps.googleusercontent.com';
+  if (googleIosClientId.endsWith(suffix)) {
+    return `com.googleusercontent.apps.${googleIosClientId.slice(0, -suffix.length)}`;
+  }
+  return '';
+})();
+
+// iOS-only Info.plist block for native Google Sign-In, gated on the iOS client
+// id being present. Lives under expo.ios.infoPlist exclusively — the Android
+// build graph never sees it.
+const iosGoogleSignInInfoPlist =
+  googleIosClientId && googleIosUrlScheme
+    ? {
+        GIDClientID: googleIosClientId,
+        CFBundleURLTypes: [{ CFBundleURLSchemes: [googleIosUrlScheme] }],
+      }
+    : {};
+
 // Sentry config plugin slugs. Read from env so we never commit org/project
 // values; activate the plugin only when both are set. SENTRY_AUTH_TOKEN is
 // expected to be an EAS secret (set via `eas secret:create`) for source-map
@@ -252,13 +292,33 @@ export default () => ({
     ios: {
       supportsTablet: false,
       bundleIdentifier: appIdentifierByVariant[appVariant],
+      // iOS-specific marketing/app icon. Apple rejects icons with an alpha
+      // channel; ./assets/icon.png is RGBA (kept for Android, which allows
+      // alpha), so iOS uses a flattened opaque variant. Android is unaffected —
+      // it keeps ./assets/icon.png + the adaptiveIcon below.
+      icon: './assets/icon-ios.png',
       associatedDomains: ['applinks:routes.defensivepedal.com'],
+      // Injects the com.apple.developer.applesignin entitlement into the
+      // provisioning profile. Required for Sign in with Apple (Guideline 4.8,
+      // obligatory because the app offers Google sign-in). iOS-only.
+      usesAppleSignIn: true,
       infoPlist: {
         UIBackgroundModes: ['location', 'processing', 'remote-notification'],
         NSPhotoLibraryUsageDescription:
           'Defensive Pedal needs access to your photos so you can attach images to hazard reports and ride shares.',
         NSPhotoLibraryAddUsageDescription:
           'Defensive Pedal saves share cards to your photo library so you can post them later.',
+        // Holographic achievement badges use the gyroscope (DeviceMotion via
+        // expo-sensors) for a subtle 3D tilt. CoreMotion device-motion requires
+        // this string on iOS or the app is rejected / crashes on first access.
+        NSMotionUsageDescription:
+          'Defensive Pedal uses motion to add a subtle 3D tilt effect to your achievement badges.',
+        // Export compliance: the app uses only standard HTTPS/TLS (exempt
+        // encryption). Declaring this skips the per-upload encryption interview.
+        ITSAppUsesNonExemptEncryption: false,
+        // Native Google Sign-In keys (GIDClientID + reversed-client-id URL
+        // scheme), present only once the iOS OAuth client id is configured.
+        ...iosGoogleSignInInfoPlist,
       },
     },
     android: {
@@ -333,6 +393,10 @@ export default () => ({
         'EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID',
         'GOOGLE_WEB_CLIENT_ID',
       ]),
+      // iOS-only Google OAuth client id, passed to GoogleSignin.configure as
+      // iosClientId. Ignored on Android (which keys off the package + SHA-1
+      // client). Empty until the iOS OAuth client is created.
+      googleIosClientId,
       sentryDsn: resolveExpoExtraValue(['EXPO_PUBLIC_SENTRY_DSN']),
       sentryEnvironment: resolveExpoExtraValue(
         ['EXPO_PUBLIC_SENTRY_ENVIRONMENT'],

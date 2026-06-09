@@ -258,7 +258,15 @@ export const signInWithGoogle = async (): Promise<{
 
   try {
     if (!googleSigninConfigured) {
-      GoogleSignin.configure({ webClientId });
+      GoogleSignin.configure({
+        webClientId,
+        // iOS needs its own OAuth client id (iosClientId); it is ignored on
+        // Android, which keys off package name + signing SHA-1. Only include it
+        // when configured — an empty iosClientId is invalid.
+        ...(mobileEnv.googleIosClientId
+          ? { iosClientId: mobileEnv.googleIosClientId }
+          : {}),
+      });
       googleSigninConfigured = true;
     }
 
@@ -292,6 +300,37 @@ export const signInWithGoogle = async (): Promise<{
       error: err instanceof Error ? err : new Error('Google sign-in failed.'),
     };
   }
+};
+
+/**
+ * Exchange an Apple identity token (obtained natively via
+ * `expo-apple-authentication` on iOS) for a Supabase session.
+ *
+ * Deliberately free of any native-module import so this shared module stays
+ * Android-safe: the iOS-only Apple Authentication call lives in
+ * `components/AppleSignInButton.ios.tsx`, which hands the raw identity token +
+ * the raw (un-hashed) nonce here. Supabase validates the token audience against
+ * the Apple provider configured in the dashboard, so no extra client config is
+ * needed. Mirrors `signInWithGoogle`'s return shape.
+ */
+export const signInWithAppleIdToken = async (
+  idToken: string,
+  rawNonce?: string,
+): Promise<{ error: Error | null }> => {
+  const client = requireSupabaseClient();
+  await clearDeveloperBypassSession();
+
+  const { error } = await client.auth.signInWithIdToken({
+    provider: 'apple',
+    token: idToken,
+    nonce: rawNonce,
+  });
+  if (error) {
+    return { error };
+  }
+
+  emitAuthSessionChange();
+  return { error: null };
 };
 
 export const signOut = async () => {

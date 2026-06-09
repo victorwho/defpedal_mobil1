@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { AppleSignInButton } from '../src/components/AppleSignInButton';
 import { BrandLogo } from '../src/components/BrandLogo';
 import { Button, Mascot, Surface, TextInput, ScreenHeader } from '../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -270,6 +271,22 @@ export default function AuthScreen() {
                   Supabase is not configured for this build. Auth is unavailable.
                 </Text>
               </View>
+            ) : null}
+
+            {/* Sign in with Apple — iOS only (renders null on Android/web).
+                Required by App Store Guideline 4.8 because Google sign-in is
+                offered; placed at equal prominence to Google. Shown only when
+                Supabase auth is configured. */}
+            {isSupabaseConfigured ? (
+              <AppleSignInButton
+                onStart={() => {
+                  setErrorMessage(null);
+                  setStatusMessage(null);
+                  authCtx?.clearAuthError();
+                }}
+                onSuccess={() => setStatusMessage('Signed in with Apple.')}
+                onError={(message) => setErrorMessage(message)}
+              />
             ) : null}
 
             {/* Google Sign-in */}
