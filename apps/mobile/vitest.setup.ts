@@ -73,6 +73,45 @@ vi.mock('expo-clipboard', () => ({
   setString: vi.fn(),
 }));
 
+// @sentry/react-native + posthog-react-native are imported top-level by
+// `lib/telemetry.ts`, which is reached by almost anything that touches the
+// API client (`schemas/responseValidation` → telemetry) or the app store.
+// Both packages do a CJS `require('react-native')` at module load — and that
+// require is run by Node (the packages are externalized), so it bypasses the
+// `^react-native$` Vite alias and resolves to the REAL react-native, whose
+// `Libraries/Promise.js` then does an extensionless
+// `require('promise/setimmediate/es6-extensions')` the Node/Vite resolver
+// can't follow → collection fails. Stubbing the two packages here means the
+// real modules are never loaded, so their `require('react-native')` never
+// fires. This is what previously blocked LeaderboardSection / HazardDetailSheet
+// (re-enabled 2026-06-09).
+vi.mock('@sentry/react-native', () => {
+  const scope = { setContext: vi.fn(), setTag: vi.fn(), setExtra: vi.fn(), setLevel: vi.fn(), setUser: vi.fn() };
+  return {
+    init: vi.fn(),
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    setUser: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    withScope: (cb: (s: typeof scope) => void) => cb(scope),
+    flush: vi.fn().mockResolvedValue(true),
+    close: vi.fn().mockResolvedValue(true),
+  };
+});
+
+vi.mock('posthog-react-native', () => {
+  class PostHog {
+    capture = vi.fn();
+    screen = vi.fn();
+    identify = vi.fn();
+    reset = vi.fn();
+    optIn = vi.fn();
+    optOut = vi.fn();
+    flush = vi.fn().mockResolvedValue(undefined);
+  }
+  return { __esModule: true, default: PostHog };
+});
+
 // Mock react-native-safe-area-context
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),

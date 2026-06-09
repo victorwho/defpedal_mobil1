@@ -28,25 +28,16 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
-    // The 2 files below fail at MODULE LOAD time: a transitive import escapes
-    // the `react-native` shim alias and pulls in real
-    // `react-native/Libraries/Promise.js`, whose
-    // `require('promise/setimmediate/es6-extensions')` (no extension) the
-    // Vite/Node resolver can't resolve. The chain (per each file's header) is
-    // roughly ReportSheet → Modal organism → Button → useHaptics → expo-haptics
-    // + i18n → useAppStore → supabase; mocking the obvious links (ReportSheet,
-    // useHaptics, useTranslation, vector-icons) does NOT stop it — a deeper
-    // externalized dep `require`s real react-native, bypassing the alias.
-    // Needs the dep pinned to deps.inline or the exact link bisected. The
-    // FeedCard.champion file quarantined alongside these was a different bug
-    // (mock paths resolved relative to __tests__/ instead of the SUT dir) and
-    // was fixed + re-enabled 2026-06-09. Production paths run at runtime/on-device.
-    // TRACKED ISSUE (diagnosis + next steps): sentryfix.md → "OPEN ISSUE —
-    // re-enable the last 2 quarantined mobile tests".
+    // No test files are quarantined. LeaderboardSection + HazardDetailSheet —
+    // the last two excluded here — were re-enabled 2026-06-09 after fixing two
+    // stacked causes: (1) `@sentry/react-native` + `posthog-react-native`
+    // (imported top-level by lib/telemetry.ts, reached via the API client)
+    // CJS-require real react-native and pulled in Libraries/Promise.js — both
+    // are now stubbed in vitest.setup.ts; (2) LeaderboardSection's mock paths
+    // were a directory level short (the test sits in `__tests__/`), so the real
+    // useLeaderboard → useCurrentLocation → expo-location loaded anyway.
     exclude: [
       'node_modules/**',
-      'src/design-system/organisms/__tests__/LeaderboardSection.test.tsx',
-      'src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx',
     ],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],

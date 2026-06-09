@@ -5,7 +5,15 @@ import { render, screen, fireEvent } from "@testing-library/react";
 
 const mockUseLeaderboard = vi.fn();
 
-vi.mock("../../hooks/useLeaderboard", () => ({
+// NOTE ON MOCK PATHS: this test file lives in `organisms/__tests__/`, one
+// level deeper than the SUT (`organisms/LeaderboardSection.tsx`). Mock
+// specifiers must therefore carry one MORE `../` than the SUT's own import to
+// resolve to the same module. `useLeaderboard` is `src/hooks/...` (three up);
+// the atoms are `design-system/atoms/...` (two up). Getting this wrong silently
+// lets the REAL module load — which is exactly how the real `useLeaderboard`
+// (→ useCurrentLocation → expo-location) leaked in and blocked collection
+// before 2026-06-09.
+vi.mock("../../../hooks/useLeaderboard", () => ({
   useLeaderboard: (...args: unknown[]) => mockUseLeaderboard(...args),
 }));
 
@@ -31,23 +39,23 @@ vi.mock("../../ThemeContext", () => ({
 vi.mock("@expo/vector-icons", () => ({
   Ionicons: ({ name }: { name: string }) => React.createElement("span", { "data-icon": name }, name),
 }));
-vi.mock("../atoms/FadeSlideIn", () => ({
+vi.mock("../../atoms/FadeSlideIn", () => ({
   FadeSlideIn: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
 }));
 // Mascot pulls `useAppStore` → supabase → expo-secure-store at module load.
 // The mascot is decorative on this surface, so a null mock is fine and avoids
 // dragging native modules into the test environment.
-vi.mock("../atoms/Mascot", () => ({ Mascot: () => null }));
-vi.mock("../atoms/TierPill", () => ({
+vi.mock("../../atoms/Mascot", () => ({ Mascot: () => null }));
+vi.mock("../../atoms/TierPill", () => ({
   TierPill: ({ tier }: { tier: string }) => React.createElement("span", null, tier),
 }));
-vi.mock("../atoms/LeaderboardRow", () => ({
+vi.mock("../../atoms/LeaderboardRow", () => ({
   LeaderboardRow: ({ entry }: { entry: { displayName: string } }) => React.createElement("div", { "data-testid": "leaderboard-row" }, entry.displayName),
 }));
-vi.mock("../atoms/SectionTitle", () => ({
+vi.mock("../../atoms/SectionTitle", () => ({
   SectionTitle: ({ children }: { children: React.ReactNode }) => React.createElement("h2", null, children),
 }));
-vi.mock("../atoms/Button", () => ({
+vi.mock("../../atoms/Button", () => ({
   Button: ({ children, onPress }: { children: React.ReactNode; onPress: () => void }) => React.createElement("button", { onClick: onPress }, children),
 }));
 
@@ -62,17 +70,16 @@ beforeEach(() => {
   mockUseLeaderboard.mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: vi.fn() });
 });
 
-// SKIPPED 2026-05-25: LeaderboardSection transitively pulls react-native's
-// Libraries/Promise.js through some chain inside its non-mocked atoms
-// (Button → useHaptics → react-native NativeModules), which the vitest
-// `^react-native/` alias doesn't intercept in time. Even with the global
-// expo-secure-store / expo-constants / expo-router stubs in vitest.setup.ts,
-// the chain bottoms out on `promise/setimmediate/es6-extensions` (a
-// Node-resolver quirk: the file exists but needs the `.js` extension).
-// Component-level behaviour is exercised by integration in city-heartbeat.
-// TODO: either DI-out the heavy atoms (Button, SectionTitle) from
-// LeaderboardSection, or move this test under a Detox/RN-render harness.
-describe.skip("LeaderboardSection (collection blocked on react-native subpath resolver — see file note)", () => {
+// RE-ENABLED 2026-06-09: the collection failure had two stacked causes, both
+// now fixed: (1) `lib/telemetry.ts` (reached via the API client) top-level
+// imports `@sentry/react-native` + `posthog-react-native`, which CJS-require
+// the REAL react-native and dragged in `Libraries/Promise.js` — both packages
+// are now stubbed globally in `vitest.setup.ts`; (2) the mock specifiers above
+// were missing one `../` (this file is a directory deeper than the SUT), so
+// the real `useLeaderboard` (→ useCurrentLocation → expo-location) and real
+// atoms loaded anyway. Paths corrected above. `useT` is intentionally left
+// unmocked so the assertions below match the real en.ts strings.
+describe("LeaderboardSection", () => {
   it("shows loading indicator when isLoading is true", () => {
     mockUseLeaderboard.mockReturnValue({ data: undefined, isLoading: true, error: null, refetch: vi.fn() });
     render(React.createElement(LeaderboardSection, null));

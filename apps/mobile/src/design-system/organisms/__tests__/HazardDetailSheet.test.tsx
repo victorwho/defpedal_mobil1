@@ -33,6 +33,17 @@ vi.mock('react-native', async () => {
   };
 });
 
+// HazardDetailSheet renders <ReportSheet> (hidden) at the bottom of its tree.
+// ReportSheet calls useReportContent() → useMutation, which needs a
+// QueryClientProvider this unit test doesn't set up. The report flow isn't
+// under test here, so stub it out to keep this a true unit test of the sheet
+// and avoid dragging react-query + the whole API surface into a UI test.
+// (Path is `../../molecules` — one deeper than the SUT's `../molecules`,
+// since this file lives in `organisms/__tests__/`.)
+vi.mock('../../molecules/ReportSheet', () => ({
+  ReportSheet: () => null,
+}));
+
 vi.mock('../../hooks/useReducedMotion', () => ({
   useReducedMotion: () => true,
 }));
@@ -137,15 +148,13 @@ const hazard: NearbyHazard = {
 // Tests
 // ---------------------------------------------------------------------------
 
-// SKIPPED 2026-05-25: HazardDetailSheet's chain (ReportSheet → Modal organism →
-// Button → useHaptics → expo-haptics + ./i18n → useAppStore → supabase)
-// pulls real react-native Libraries/Promise.js even with global stubs for
-// expo-secure-store / expo-constants / expo-router in vitest.setup.ts. The
-// runtime path is production-tested (hazard voting is live, MOBILE-9 bridge
-// crash fix shipped in v0.2.62). Component unit coverage will need a
-// Detox/RN-render harness or a DI-friendly refactor of the atoms chain.
-// TODO: same as LeaderboardSection — DI the heavy atoms, then re-enable.
-describe.skip('HazardDetailSheet (collection blocked on react-native subpath resolver — see file note)', () => {
+// RE-ENABLED 2026-06-09: the real blocker was `lib/telemetry.ts` (reached via
+// ReportSheet → useReportContent → mobileApi → schemas/responseValidation →
+// telemetry) top-level importing `@sentry/react-native` + `posthog-react-native`,
+// which CJS-require the REAL react-native and pulled in `Libraries/Promise.js`.
+// Both packages are now stubbed globally in `vitest.setup.ts`, so the real
+// modules never load. The mock paths in this file were already correct.
+describe('HazardDetailSheet', () => {
   it('renders the hazard score when visible', () => {
     render(
       <HazardDetailSheet

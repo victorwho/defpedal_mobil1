@@ -157,50 +157,53 @@ Original framing was "punch list of what's left, not what's done". Now inverted:
 
 ---
 
-### 🔧 OPEN ISSUE — re-enable the last 2 quarantined mobile tests
+### ✅ RESOLVED 2026-06-09 — last 2 quarantined mobile tests re-enabled
 
-**Files (excluded in `apps/mobile/vitest.config.ts`):**
-- `src/design-system/organisms/__tests__/LeaderboardSection.test.tsx`
-- `src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx`
+**Files (now collecting + passing; removed from `apps/mobile/vitest.config.ts` `exclude`):**
+- `src/design-system/organisms/__tests__/LeaderboardSection.test.tsx` — 5 tests
+- `src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx` — 6 tests
 
-**Symptom:** both fail at MODULE LOAD (collection), 0 tests run:
-```
-Error: Cannot find module '.../node_modules/promise/setimmediate/es6-extensions'
-  imported from .../node_modules/react-native/Libraries/Promise.js
-```
-i.e. **real** `react-native` is loading despite the `^react-native$` → `vitest.mock-rn.ts`
-shim alias, and real RN's `Promise.js` does an extensionless
-`require('promise/setimmediate/es6-extensions')` the Vite/Node SSR resolver can't follow.
+**Root cause = two stacked bugs, not one:**
 
-**Investigation done (2026-06-09) — ruled OUT:**
-- `vi.importActual('react-native')` (HazardDetailSheet) — removing it didn't help, and
-  `useShareRoute.test.ts` uses the same call and passes (importActual resolves to the shim).
-- Mocking `ReportSheet`, `useHaptics`, `useTranslation`, `@expo/vector-icons[/Ionicons]` — already
-  mocked / adding them changes nothing.
-- The badge/share/weather harness gaps (svg / clipboard / Image / PanResponder / Modal / View ARIA) —
-  all fixed this session; these 2 are a different, deeper failure.
+1. **The `react-native`/`Promise.js` collection failure** was caused by `@sentry/react-native` +
+   `posthog-react-native`, which are imported top-level by `apps/mobile/src/lib/telemetry.ts`.
+   `telemetry` is reached by both files via the API client (`schemas/responseValidation.ts` →
+   `telemetry`) — HazardDetailSheet through `ReportSheet → useReportContent → mobileApi`, and (after
+   bug #2 below) LeaderboardSection through the real `useLeaderboard → mobileApi`. Both packages do a
+   CJS `require('react-native')` at module load. Because Vitest **externalizes** node_modules, that
+   require runs in Node and bypasses the `^react-native$` Vite alias → it resolves to the REAL
+   react-native, whose `Libraries/Promise.js` then does the extensionless
+   `require('promise/setimmediate/es6-extensions')` the resolver can't follow.
+   The earlier hypothesis (expo-haptics via the atoms chain) was wrong — `@sentry/react-native` /
+   `posthog-react-native` were the actual externalized requirers, consistent with the `api.test.ts`
+   fix that had to mock `./schemas/responseValidation` to block the same `→ telemetry → sentry/posthog`
+   chain.
 
-**Working hypothesis:** a node_modules dependency in the chain (`ReportSheet → Modal organism →
-Button → useHaptics → expo-haptics`, and/or `i18n → useAppStore → supabase`) is **externalized by
-Vitest** and does a CJS `require('react-native')` that Node resolves to the REAL package — Vite
-`resolve.alias` does not apply to externalized Node requires.
+2. **LeaderboardSection's mock paths were a directory level short.** The test sits in
+   `organisms/__tests__/`, one level deeper than the SUT (`organisms/LeaderboardSection.tsx`), so its
+   mock specifiers needed one MORE `../` than the SUT's own imports. `vi.mock("../../hooks/useLeaderboard")`
+   resolved to `design-system/hooks/...` (nonexistent) instead of `src/hooks/...`, and
+   `vi.mock("../atoms/X")` resolved to `organisms/atoms/...` instead of `design-system/atoms/...`. So
+   the **real** `useLeaderboard → useCurrentLocation → expo-location` loaded, surfacing a
+   `Cannot find native module 'ExpoLocation'` error once bug #1 was fixed. (Same class of bug as the
+   FeedCard.champion fix earlier the same day.)
 
-**Next steps (pick one):**
-1. **Bisect the dep.** Temporarily make the shim alias throw (`replacement` → a file that
-   `throw new Error('REAL RN')`) and read the stack to see which module `require`s it; or comment
-   the SUT's imports one at a time in a scratch copy until collection succeeds.
-2. **Pin to `deps.inline`.** Once the dep is known, add it to
-   `test.server.deps.inline` (e.g. `[/expo-haptics/, /<dep>/]`) so Vitest processes it through the
-   alias instead of externalizing it. (Do NOT inline `react-native` itself — its Flow source won't
-   parse.)
-3. **DI the leaf.** If it's `expo-haptics` (or another Expo native module), wrap it behind the
-   existing `hasExpoNativeModule()` lazy-require pattern so the import never resolves at module load
-   in tests — consistent with error-log #21.
+**Fix:**
+- `apps/mobile/vitest.setup.ts` — added global `vi.mock('@sentry/react-native', …)` +
+  `vi.mock('posthog-react-native', …)` stubs (mirrors the existing react-native-svg / expo-clipboard
+  stub pattern). Benefits the whole suite, since anything touching the API client or app store reaches
+  telemetry.
+- `LeaderboardSection.test.tsx` — corrected all mock specifiers (`../../hooks/useLeaderboard` →
+  `../../../hooks/useLeaderboard`; `../atoms/*` → `../../atoms/*`), un-skipped, kept `useT` unmocked
+  so assertions match the real en.ts strings.
+- `HazardDetailSheet.test.tsx` — added `vi.mock('../../molecules/ReportSheet', () => ({ ReportSheet: () => null }))`
+  to isolate the unit (the hidden `ReportSheet` calls `useReportContent → useMutation`, which would
+  otherwise need a `QueryClientProvider`), un-skipped.
+- `vitest.config.ts` — removed both paths from `exclude`; refreshed the explanatory comment.
 
-**Acceptance:** remove the 2 paths from `vitest.config.ts` `exclude`; `npx vitest run` green with
-both collecting + passing; full mobile suite still 0 failures.
-
-Production behaviour is exercised at runtime / on-device (leaderboard + hazard voting are live).
+**Validation:** `npx vitest run` green on both files; full mobile suite **89 files / 1114 passed +
+4 skipped, 0 failures** (the 4 skipped are the unrelated ConnectivityMonitor `it.skip` specs); root
+`npm test` exit 0 (core 733 / mobile-api 516 / mobile 1114+4skip); `npm run typecheck` clean.
    - **Global `vitest.setup.ts` improvements** (benefit ALL tests): added `globalThis.__DEV__ = true`, `globalThis.expo = { EventEmitter, NativeModule, SharedObject, SharedRef, modules: {} }`, default mocks for `expo-secure-store` / `expo-constants` / `expo-router`. Plus `vitest.mock-rn.ts` now sets `NativeModules.RNCNetInfo = {}` by default.
 
    **Final root `npm test` result: 2088 passing / 4 skipped, exit 0** across core (24 files / 570) / mobile-api (24 files / 457) / mobile (83 files / 1061+4skip). 3 mobile test files excluded.
