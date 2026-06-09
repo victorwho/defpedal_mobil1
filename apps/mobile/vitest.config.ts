@@ -41,6 +41,8 @@ export default defineConfig({
     // FeedCard.champion file quarantined alongside these was a different bug
     // (mock paths resolved relative to __tests__/ instead of the SUT dir) and
     // was fixed + re-enabled 2026-06-09. Production paths run at runtime/on-device.
+    // TRACKED ISSUE (diagnosis + next steps): sentryfix.md → "OPEN ISSUE —
+    // re-enable the last 2 quarantined mobile tests".
     exclude: [
       'node_modules/**',
       'src/design-system/organisms/__tests__/LeaderboardSection.test.tsx',

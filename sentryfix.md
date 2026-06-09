@@ -152,7 +152,55 @@ Original framing was "punch list of what's left, not what's done". Now inverted:
    - **`ImpactSummaryCard.test.tsx`** (5 specs): added `vi.mock('../../design-system/atoms/Mascot')` — the new Mascot atom (2026-05-11) pulls `useAppStore` → supabase chain.
    - **`api.test.ts`** (40 specs, was a collection failure): added `vi.mock('./mobileApiFetch')` (inline fetch-based stub) and `vi.mock('./schemas/responseValidation')` (pass-through; blocks the `./telemetry` → sentry/posthog/expo-constants chain). Updated 3 `error handling` specs to assert `ApiClientError`-shaped `{status, body}` instead of the legacy `HttpError` message concat (removed in Day 3).
    - **`ConnectivityMonitor.test.tsx`** (4 specs `it.skip`'d): production `getNetInfo()` calls `require('@react-native-community/netinfo')` after a `NativeModules.RNCNetInfo` guard. Vitest's `vi.mock` doesn't reliably intercept that `require()` call — tried `vi.hoisted`, `vi.mock('react-native', ...)`, and patching `NativeModules.RNCNetInfo = {}` in the shim; none made the mocked `addEventListener` fire. The 2 specs that don't depend on the callback stay enabled. TODO: refactor `getNetInfo` to use dynamic `import()` or DI.
-   - **`vitest.config.ts` exclude list** (3 collection failures): `LeaderboardSection.test.tsx`, `HazardDetailSheet.test.tsx`, `FeedCard.champion.test.tsx`. Each pulls a chain of design-system atoms (Mascot, Button → useHaptics, ReportSheet → Modal, Ionicons) that transitively loads real react-native's `Libraries/Promise.js` (Node resolver chokes on missing `.js` extension in `promise/setimmediate/es6-extensions`) or trips Rollup's parser ("Expression expected"). `describe.skip` doesn't help — the file's top-level imports throw before the runner sees a describe. Excluding via the config is the only option. Each file has a header note + TODO. Production behaviour is exercised at runtime; the components are all live.
+   - **`vitest.config.ts` exclude list** (originally 3 collection failures): `LeaderboardSection.test.tsx`, `HazardDetailSheet.test.tsx`, `FeedCard.champion.test.tsx`. Each pulls a chain of design-system atoms (Mascot, Button → useHaptics, ReportSheet → Modal, Ionicons) that transitively loads real react-native's `Libraries/Promise.js` (Node resolver chokes on missing `.js` extension in `promise/setimmediate/es6-extensions`) or trips Rollup's parser ("Expression expected"). `describe.skip` doesn't help — the file's top-level imports throw before the runner sees a describe.
+     - **UPDATE 2026-06-09:** `FeedCard.champion.test.tsx` **fixed + re-enabled** — root cause was a mock-path bug, NOT the resolver chain: `vi.mock("./map")` / `vi.mock("./LikeButton")` resolved relative to the test dir (`__tests__/`) instead of `FeedCard.tsx` (`src/components/`), so they targeted non-existent paths and let the REAL RouteMap (@rnmapbox/maps, Flow) load → "Expression expected". Corrected to `../map` / `../LikeButton`, un-skipped (3 tests). See "OPEN ISSUE" below for the remaining 2.
+
+---
+
+### 🔧 OPEN ISSUE — re-enable the last 2 quarantined mobile tests
+
+**Files (excluded in `apps/mobile/vitest.config.ts`):**
+- `src/design-system/organisms/__tests__/LeaderboardSection.test.tsx`
+- `src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx`
+
+**Symptom:** both fail at MODULE LOAD (collection), 0 tests run:
+```
+Error: Cannot find module '.../node_modules/promise/setimmediate/es6-extensions'
+  imported from .../node_modules/react-native/Libraries/Promise.js
+```
+i.e. **real** `react-native` is loading despite the `^react-native$` → `vitest.mock-rn.ts`
+shim alias, and real RN's `Promise.js` does an extensionless
+`require('promise/setimmediate/es6-extensions')` the Vite/Node SSR resolver can't follow.
+
+**Investigation done (2026-06-09) — ruled OUT:**
+- `vi.importActual('react-native')` (HazardDetailSheet) — removing it didn't help, and
+  `useShareRoute.test.ts` uses the same call and passes (importActual resolves to the shim).
+- Mocking `ReportSheet`, `useHaptics`, `useTranslation`, `@expo/vector-icons[/Ionicons]` — already
+  mocked / adding them changes nothing.
+- The badge/share/weather harness gaps (svg / clipboard / Image / PanResponder / Modal / View ARIA) —
+  all fixed this session; these 2 are a different, deeper failure.
+
+**Working hypothesis:** a node_modules dependency in the chain (`ReportSheet → Modal organism →
+Button → useHaptics → expo-haptics`, and/or `i18n → useAppStore → supabase`) is **externalized by
+Vitest** and does a CJS `require('react-native')` that Node resolves to the REAL package — Vite
+`resolve.alias` does not apply to externalized Node requires.
+
+**Next steps (pick one):**
+1. **Bisect the dep.** Temporarily make the shim alias throw (`replacement` → a file that
+   `throw new Error('REAL RN')`) and read the stack to see which module `require`s it; or comment
+   the SUT's imports one at a time in a scratch copy until collection succeeds.
+2. **Pin to `deps.inline`.** Once the dep is known, add it to
+   `test.server.deps.inline` (e.g. `[/expo-haptics/, /<dep>/]`) so Vitest processes it through the
+   alias instead of externalizing it. (Do NOT inline `react-native` itself — its Flow source won't
+   parse.)
+3. **DI the leaf.** If it's `expo-haptics` (or another Expo native module), wrap it behind the
+   existing `hasExpoNativeModule()` lazy-require pattern so the import never resolves at module load
+   in tests — consistent with error-log #21.
+
+**Acceptance:** remove the 2 paths from `vitest.config.ts` `exclude`; `npx vitest run` green with
+both collecting + passing; full mobile suite still 0 failures.
+
+Production behaviour is exercised at runtime / on-device (leaderboard + hazard voting are live).
    - **Global `vitest.setup.ts` improvements** (benefit ALL tests): added `globalThis.__DEV__ = true`, `globalThis.expo = { EventEmitter, NativeModule, SharedObject, SharedRef, modules: {} }`, default mocks for `expo-secure-store` / `expo-constants` / `expo-router`. Plus `vitest.mock-rn.ts` now sets `NativeModules.RNCNetInfo = {}` by default.
 
    **Final root `npm test` result: 2088 passing / 4 skipped, exit 0** across core (24 files / 570) / mobile-api (24 files / 457) / mobile (83 files / 1061+4skip). 3 mobile test files excluded.
