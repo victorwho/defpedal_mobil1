@@ -7,39 +7,12 @@
  */
 import type { PropsWithChildren } from 'react';
 import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
-import { NativeModules, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 import { Toast } from '../design-system/molecules/Toast';
 import { zIndex } from '../design-system/tokens/zIndex';
 import { space } from '../design-system/tokens/spacing';
-
-// ---------------------------------------------------------------------------
-// Lazy-load NetInfo — native module may not be compiled into the APK yet.
-// Check NativeModules.RNCNetInfo BEFORE require() — the netinfo JS module
-// throws an invariant error on evaluation if the native bridge is absent,
-// and that throw can escape try/catch in some RN runtimes (error-log #2b).
-// ---------------------------------------------------------------------------
-
-type NetInfoState = { isConnected: boolean | null; isInternetReachable: boolean | null };
-type NetInfoUnsubscribe = () => void;
-
-interface NetInfoModule {
-  addEventListener: (cb: (state: NetInfoState) => void) => NetInfoUnsubscribe;
-}
-
-function getNetInfo(): NetInfoModule | null {
-  // Gate on native module existence — same pattern as push-notifications.ts
-  if (!NativeModules.RNCNetInfo) {
-    return null;
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('@react-native-community/netinfo') as { default?: NetInfoModule } & NetInfoModule;
-    return mod.default ?? mod;
-  } catch {
-    return null;
-  }
-}
+import { loadNetInfo, type NetInfoState, type NetInfoUnsubscribe } from '../lib/netInfoModule';
 
 // ---------------------------------------------------------------------------
 // Context
@@ -86,7 +59,7 @@ export function ConnectivityProvider({ children }: PropsWithChildren): React.Rea
   }, []);
 
   useEffect(() => {
-    const netInfo = getNetInfo();
+    const netInfo = loadNetInfo();
     if (!netInfo) {
       // Native module not available — assume online (graceful fallback)
       return;

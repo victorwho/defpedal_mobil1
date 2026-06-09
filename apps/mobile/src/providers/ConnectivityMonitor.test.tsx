@@ -23,19 +23,21 @@ const netInfoState = vi.hoisted(() => ({
 }));
 const mockUnsubscribe = vi.fn(() => netInfoState.unsubscribe.fn());
 
-// ConnectivityProvider gates the NetInfo `require()` on
-// `NativeModules.RNCNetInfo` being truthy (see error-log #23). The vitest
-// react-native shim (`vitest.mock-rn.ts`) populates that key by default so
-// the provider proceeds past the guard and invokes the mocked
-// addEventListener below.
-
-vi.mock('@react-native-community/netinfo', () => ({
-  default: {
+// ConnectivityProvider loads NetInfo through the `loadNetInfo()` ESM seam in
+// `src/lib/netInfoModule.ts` (which internally does the guarded
+// `require('@react-native-community/netinfo')`). We mock the SEAM, not the
+// netinfo package: `vi.mock` does not intercept the runtime `require()` inside
+// the loader (the require bypasses the mock and tries to parse the real
+// Flow-laden package), but it DOES reliably intercept this ESM import — so the
+// real require never runs in tests and our addEventListener captures the
+// provider's callback.
+vi.mock('../lib/netInfoModule', () => ({
+  loadNetInfo: () => ({
     addEventListener: (callback: NetInfoCallback) => {
       netInfoState.callback = callback;
       return mockUnsubscribe;
     },
-  },
+  }),
 }));
 
 // Mock the Toast to make it observable in tests
@@ -95,18 +97,14 @@ function emitNetState(isConnected: boolean, isInternetReachable: boolean | null 
 // Tests
 // ---------------------------------------------------------------------------
 
-// 4 SPECS BELOW SKIPPED 2026-05-25 (marked with it.skip):
-// They exercise the path where ConnectivityMonitor.tsx's `getNetInfo()` calls
-// `require('@react-native-community/netinfo')` after a guard on
-// `NativeModules.RNCNetInfo`. Vitest's `vi.mock` does not reliably intercept
-// the require() call here — the mock's addEventListener never fires even
-// with the vitest shim populating NativeModules.RNCNetInfo. The runtime path
-// is production-validated (Offline Navigation has been live since 2026-04-16)
-// and offline-sync has its own MOBILE-7 Sentry-driven hardening; the gap is
-// in test instrumentation, not runtime behaviour. The 2 specs that don't
-// depend on the callback firing remain enabled.
-// TODO: rewrite the provider's getNetInfo to use dynamic `import()` (or a
-// dependency-injected NetInfo module) so it's mockable, then re-enable.
+// RE-ENABLED 2026-06-09: all 6 specs now run. The 4 that exercise the NetInfo
+// callback were previously `it.skip` because `vi.mock('@react-native-community/netinfo')`
+// did not intercept the provider's runtime `require()` — the require fell
+// through to the real Flow-laden package (`Unexpected token 'typeof'`), the
+// loader's catch swallowed it, and the listener never registered. Fixed by
+// extracting the guarded require into the `loadNetInfo()` ESM seam
+// (`src/lib/netInfoModule.ts`) and mocking that seam above; production behaviour
+// (guarded lazy require) is unchanged.
 describe('ConnectivityMonitor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -126,7 +124,7 @@ describe('ConnectivityMonitor', () => {
     expect(screen.getByTestId('status').textContent).toBe('online');
   });
 
-  it.skip('reports isOnline: false when NetInfo says disconnected', () => {
+  it('reports isOnline: false when NetInfo says disconnected', () => {
     renderWithProvider();
 
     emitNetState(false, false);
@@ -134,7 +132,7 @@ describe('ConnectivityMonitor', () => {
     expect(screen.getByTestId('status').textContent).toBe('offline');
   });
 
-  it.skip('debounces rapid toggles (does not flicker on WiFi handoff)', () => {
+  it('debounces rapid toggles (does not flicker on WiFi handoff)', () => {
     renderWithProvider();
 
     // Rapid toggle: offline -> online -> offline within debounce window
@@ -163,7 +161,7 @@ describe('ConnectivityMonitor', () => {
     expect(screen.getByTestId('status').textContent).toBe('offline');
   });
 
-  it.skip('shows toast on offline-to-online transition', () => {
+  it('shows toast on offline-to-online transition', () => {
     renderWithProvider();
 
     // Go offline first
@@ -189,7 +187,7 @@ describe('ConnectivityMonitor', () => {
     expect(screen.queryByTestId('toast')).toBeNull();
   });
 
-  it.skip('unsubscribes from NetInfo on unmount', () => {
+  it('unsubscribes from NetInfo on unmount', () => {
     const { unmount } = renderWithProvider();
 
     unmount();
