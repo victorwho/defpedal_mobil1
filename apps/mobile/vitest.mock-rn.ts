@@ -222,6 +222,24 @@ export const Linking = {
   createURL: (path: string, _opts?: unknown) => `exp://localhost${path}`,
 };
 
+export const Image = React.forwardRef(
+  (
+    { source: _source, style: _style, testID, ...props }: { source?: unknown; style?: unknown; testID?: string },
+    ref,
+  ) => React.createElement('img', { ref, 'data-testid': testID, ...props }),
+);
+
+// Gesture system stub. Components that build a PanResponder (e.g. HoloSticker)
+// only need `.create(config).panHandlers` to be a spreadable object in tests;
+// the gesture callbacks are never driven by the jsdom event model here.
+export const PanResponder = {
+  create: (_config: unknown) => ({ panHandlers: {} }),
+};
+
 // ViewStyle / TextStyle type exports (runtime no-ops)
 export type ViewStyle = Record<string, unknown>;
 export type TextStyle = Record<string, unknown>;
+// Additional type-only exports consumed by components (erased at runtime).
+export type GestureResponderEvent = unknown;
+export type PanResponderGestureState = unknown;
+export type ImageSourcePropType = unknown;

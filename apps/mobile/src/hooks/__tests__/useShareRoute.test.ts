@@ -44,13 +44,20 @@ const shareShareSpy = vi.fn<
     | { action: 'dismissedAction' }
   >
 >();
-vi.mock('react-native', () => ({
-  Share: {
-    share: (...args: unknown[]) => shareShareSpy(...(args as [])),
-    sharedAction: 'sharedAction',
-    dismissedAction: 'dismissedAction',
-  },
-}));
+// Spread the shared react-native shim (Platform, Linking, etc. — resolved via
+// the vitest.config alias) so the SUT's other RN imports stay defined; only
+// override Share to spy on it.
+vi.mock('react-native', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('react-native');
+  return {
+    ...actual,
+    Share: {
+      share: (...args: unknown[]) => shareShareSpy(...(args as [])),
+      sharedAction: 'sharedAction',
+      dismissedAction: 'dismissedAction',
+    },
+  };
+});
 
 // ---------------------------------------------------------------------------
 // SUT import — after mocks

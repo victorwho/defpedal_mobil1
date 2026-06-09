@@ -20,23 +20,7 @@ vi.mock('../../ThemeContext', () => ({
   }),
 }));
 
-vi.mock('react-native-svg', () => {
-  const React = require('react');
-  const createSvgComponent = (name: string) =>
-    React.forwardRef((props: Record<string, unknown>, ref: React.Ref<unknown>) =>
-      React.createElement(name.toLowerCase(), { ref, ...props }, props.children),
-    );
-  return {
-    __esModule: true,
-    default: createSvgComponent('svg'),
-    Svg: createSvgComponent('svg'),
-    Path: createSvgComponent('path'),
-    Circle: createSvgComponent('circle'),
-    Defs: createSvgComponent('defs'),
-    LinearGradient: createSvgComponent('lineargradient'),
-    Stop: createSvgComponent('stop'),
-  };
-});
+// react-native-svg is mocked comprehensively in vitest.setup.ts (all elements).
 
 vi.mock('../../tokens/badgeIcons', () => ({
   getBadgeIcon: () => ({

@@ -35,6 +35,44 @@ import { vi } from 'vitest';
   modules: {},
 };
 
+// react-native-svg ships Flow syntax (`import typeof`) in its entry that
+// Vite/Rollup can't parse — any component importing Svg/Path/etc. (badges,
+// holo stickers, charts, share cards) fails to collect. Stub every element as
+// a passthrough host component so the tree renders without the native canvas.
+vi.mock('react-native-svg', () => {
+  const React = require('react');
+  const make = (name: string) => {
+    const Comp = React.forwardRef(
+      ({ children, ...props }: { children?: unknown }, ref: unknown) =>
+        React.createElement(`svg-${name.toLowerCase()}`, { ref, ...props }, children),
+    );
+    Comp.displayName = name;
+    return Comp;
+  };
+  const Svg = make('Svg');
+  return {
+    __esModule: true,
+    default: Svg,
+    Svg,
+    Path: make('Path'), Circle: make('Circle'), Rect: make('Rect'),
+    Ellipse: make('Ellipse'), Line: make('Line'), Polygon: make('Polygon'),
+    Polyline: make('Polyline'), G: make('G'), Text: make('Text'),
+    TSpan: make('TSpan'), TextPath: make('TextPath'), Defs: make('Defs'),
+    LinearGradient: make('LinearGradient'), RadialGradient: make('RadialGradient'),
+    Stop: make('Stop'), ClipPath: make('ClipPath'), Mask: make('Mask'),
+    Use: make('Use'), Image: make('Image'), Pattern: make('Pattern'),
+    Symbol: make('Symbol'), ForeignObject: make('ForeignObject'),
+    Marker: make('Marker'),
+  };
+});
+
+// expo-clipboard calls into native at module load; share hooks import it.
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: vi.fn().mockResolvedValue(true),
+  getStringAsync: vi.fn().mockResolvedValue(''),
+  setString: vi.fn(),
+}));
+
 // Mock react-native-safe-area-context
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),

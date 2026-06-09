@@ -41,16 +41,7 @@ vi.mock('expo-router', () => ({
 }));
 
 // react-native-svg (BadgeIcon uses Svg/Path/etc.)
-vi.mock('react-native-svg', () => ({
-  __esModule: true,
-  default: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('svg', null, children),
-  Path: () => null,
-  Circle: () => null,
-  Defs: () => null,
-  LinearGradient: () => null,
-  Stop: () => null,
-}));
+// react-native-svg is mocked comprehensively in vitest.setup.ts (all elements).
 
 // Mascot atom — pose tokens are PNG `require()`s that the vitest stub plugin
 // resolves to `1`, but the import chain through mascotPoses.ts pulls in
