@@ -90,6 +90,13 @@ cp -pf "$SRC/package-lock.json" "$DST/package-lock.json" 2>/dev/null || true
 # install step inherits the same resolver behavior as SRC.
 cp -f "$SRC/.npmrc" "$DST/.npmrc" 2>/dev/null || true
 
+# Sync patch-package patches. These carry native fixes applied on top of
+# node_modules (e.g. the react-native-play-install-referrer "Service not
+# connected" crash guard). Must exist on DST BEFORE the npm install postinstall
+# (patch-package) runs, and is re-applied explicitly after the install block so
+# skipped-install builds still get the patch.
+robocopy "$SRC/patches" "$DST/patches" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
+
 # Sync workspace package.json files (in case new deps were added)
 cp -f "$SRC/apps/mobile/package.json" "$DST/apps/mobile/package.json" 2>/dev/null || true
 cp -f "$SRC/packages/core/package.json" "$DST/packages/core/package.json" 2>/dev/null || true
@@ -119,6 +126,19 @@ if [ "${SKIP_NPM_INSTALL:-0}" != "1" ]; then
   else
     echo "── Step 1a: DST node_modules up to date with lockfile (skipping npm install) ──"
   fi
+fi
+
+# Apply patch-package patches to DST node_modules explicitly. The npm install
+# above runs the postinstall (patch-package) on a fresh install, but a skipped
+# install would leave the native patch unapplied — so re-apply here. Idempotent:
+# patch-package no-ops a patch that's already applied. Verify a key patch landed.
+echo "── Step 1a2: Apply patch-package patches on DST ──"
+( cd "$DST" && npx patch-package ) || echo "  WARNING: patch-package apply reported an issue"
+if grep -q "catch (Exception ex)" \
+  "$DST/node_modules/react-native-play-install-referrer/android/src/main/java/com/uerceg/play_install_referrer/PlayInstallReferrer.java" 2>/dev/null; then
+  echo "  ✓ install-referrer crash patch present"
+else
+  echo "  WARNING: install-referrer crash patch NOT applied — check patches/"
 fi
 
 # Sync the entire Android source + config tree (icons, manifest, gradle, etc.)

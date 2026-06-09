@@ -1,0 +1,5 @@
+# patch-package patches MUST stay LF. With core.autocrlf=true on Windows a
+# checkout would otherwise rewrite them to CRLF, and the release build
+# robocopies patches/ verbatim to C:\dpb — a CRLF patch fails to apply against
+# the LF source in node_modules. See error-log #56.
+*.patch text eol=lf

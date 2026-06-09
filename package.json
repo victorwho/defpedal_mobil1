@@ -10,6 +10,7 @@
     "services/*"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "npm run dev:mobile",
     "dev:mobile": "npm run start --workspace @defensivepedal/mobile",
     "dev:mobile:preview": "node ./scripts/start-mobile-preview.mjs",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "patch-package": "^8.0.1",
     "sharp": "^0.34.5",
     "typescript": "~5.8.2"
   }

@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-play-install-referrer/android/src/main/java/com/uerceg/play_install_referrer/PlayInstallReferrer.java b/node_modules/react-native-play-install-referrer/android/src/main/java/com/uerceg/play_install_referrer/PlayInstallReferrer.java
+index 1905ce1..350cdf4 100644
+--- a/node_modules/react-native-play-install-referrer/android/src/main/java/com/uerceg/play_install_referrer/PlayInstallReferrer.java
++++ b/node_modules/react-native-play-install-referrer/android/src/main/java/com/uerceg/play_install_referrer/PlayInstallReferrer.java
+@@ -78,7 +78,14 @@ public class PlayInstallReferrer extends ReactContextBaseJavaModule {
+                                             error.putString("message", "Response from install referrer library was null");
+                                             sendEvent(getReactApplicationContext(), "play_install_referrer_error", error);
+                                         }
+-                                    } catch (RemoteException ex) {
++                                    } catch (Exception ex) {
++                                        // Widened from RemoteException: getInstallReferrer() throws
++                                        // IllegalStateException ("Service not connected") when the Play
++                                        // service disconnects between setup-finished and this background
++                                        // thread running. That RuntimeException is NOT a RemoteException,
++                                        // so the original catch let it escape the thread → uncaught →
++                                        // app crash (Sentry). Catch any Exception and report it as a JS
++                                        // error event instead of crashing.
+                                         WritableMap error = Arguments.createMap();
+                                         error.putString("message", "Exception while reading install referrer info: " + ex.getMessage());
+                                         sendEvent(getReactApplicationContext(), "play_install_referrer_error", error);
