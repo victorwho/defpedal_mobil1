@@ -28,23 +28,23 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
-    // The 3 files below fail at MODULE LOAD time (before any describe / it
-    // runs): a transitive import escapes the `react-native` shim alias and
-    // pulls in real `react-native/Libraries/Promise.js`, whose
+    // The 2 files below fail at MODULE LOAD time: a transitive import escapes
+    // the `react-native` shim alias and pulls in real
+    // `react-native/Libraries/Promise.js`, whose
     // `require('promise/setimmediate/es6-extensions')` (no extension) the
-    // Vite/Node resolver can't resolve — "Cannot find module
-    // 'promise/setimmediate/es6-extensions'". `describe.skip` is too late
-    // (top-level imports throw before the runner sees a describe). The badge /
-    // share / weather files quarantined alongside these were re-enabled
-    // 2026-06-09 once the svg/clipboard/Image/PanResponder mocks + View ARIA
-    // mapping landed; THESE 3 need the deeper resolver fix (alias the offending
-    // internal, or mock the component that reaches it). Production behaviour is
-    // exercised at runtime / on-device.
+    // Vite/Node resolver can't resolve. The chain (per each file's header) is
+    // roughly ReportSheet → Modal organism → Button → useHaptics → expo-haptics
+    // + i18n → useAppStore → supabase; mocking the obvious links (ReportSheet,
+    // useHaptics, useTranslation, vector-icons) does NOT stop it — a deeper
+    // externalized dep `require`s real react-native, bypassing the alias.
+    // Needs the dep pinned to deps.inline or the exact link bisected. The
+    // FeedCard.champion file quarantined alongside these was a different bug
+    // (mock paths resolved relative to __tests__/ instead of the SUT dir) and
+    // was fixed + re-enabled 2026-06-09. Production paths run at runtime/on-device.
     exclude: [
       'node_modules/**',
       'src/design-system/organisms/__tests__/LeaderboardSection.test.tsx',
       'src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx',
-      'src/components/__tests__/FeedCard.champion.test.tsx',
     ],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],

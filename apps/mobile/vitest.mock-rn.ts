@@ -260,6 +260,21 @@ export const PanResponder = {
   create: (_config: unknown) => ({ panHandlers: {} }),
 };
 
+// Modal renders its children inline (in a div) when visible, else nothing —
+// enough for tests to query the sheet content without a portal.
+export const Modal = ({
+  children,
+  visible,
+  testID,
+}: {
+  children?: React.ReactNode;
+  visible?: boolean;
+  testID?: string;
+}) =>
+  visible === false
+    ? null
+    : React.createElement('div', { 'data-testid': testID ?? 'modal', role: 'dialog' }, children);
+
 // ViewStyle / TextStyle type exports (runtime no-ops)
 export type ViewStyle = Record<string, unknown>;
 export type TextStyle = Record<string, unknown>;

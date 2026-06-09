@@ -19,8 +19,12 @@ vi.mock("../../design-system", () => ({
   }),
 }));
 vi.mock("../../design-system/atoms/TierPill", () => ({ TierPill: () => null }));
-vi.mock("./LikeButton", () => ({ ReactionBar: () => null }));
-vi.mock("./map", () => ({
+// Paths are relative to FeedCard.tsx (src/components/), NOT this test file in
+// __tests__/, so they must be `../` — `./map` here resolved to a non-existent
+// __tests__/map and let the REAL RouteMap (@rnmapbox/maps, Flow syntax) load,
+// which crashed collection with a Rollup "Expression expected" parse error.
+vi.mock("../LikeButton", () => ({ ReactionBar: () => null }));
+vi.mock("../map", () => ({
   RouteMap: () => React.createElement("div", { "data-testid": "route-map" }),
 }));
 vi.mock("@expo/vector-icons", () => ({
@@ -85,19 +89,12 @@ const makeFeedItem = (overrides: Record<string, unknown> = {}) => ({
 
 const noop = () => {};
 
-// SKIPPED 2026-05-25: FeedCard.tsx pulls many design-system atoms +
-// components (RouteMap, ReactionBar, ReportSheet, TierPill, Ionicons),
-// some of which transitively load files vitest's Rollup parser chokes on
-// ("Expression expected" without a file path — likely a Flow-typed RN
-// internal). Even with extensive per-test mocks for ReportSheet,
-// useBlockUser, useT, expo-router, design-system, and @expo/vector-icons,
-// the parser fails before any code runs. Champion trophy rendering is a
-// 2-test verification of an icon being present when `isWeeklyChampion`
-// is set — non-critical for CI. Production behaviour is live since
-// leaderboard launch (2026-04-14) and unchanged.
-// TODO: rewrite this as a pure-logic test against a `getChampionIconKey`
-// helper extracted from FeedCard, or wait for a working RN test harness.
-describe.skip("FeedCard champion trophy (collection blocked by Rollup parse error in transitive RN file — see file note)", () => {
+// FIXED 2026-06-09: the parse error was the real RouteMap (@rnmapbox/maps,
+// Flow syntax) loading because the `./map` / `./LikeButton` mock paths were
+// resolved relative to this test dir (__tests__/) instead of FeedCard.tsx
+// (src/components/) — they needed `../`. With that corrected (+ the restored
+// RN harness) collection succeeds, so these specs are un-skipped.
+describe("FeedCard champion trophy", () => {
   it("renders trophy icon when isWeeklyChampion is true", () => {
     render(React.createElement(FeedCard, {
       item: makeFeedItem({ isWeeklyChampion: true }) as any,
