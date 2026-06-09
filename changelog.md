@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-09 — Multi-stop navigation, once-per-session weather warning, impact-card tier/XP fix, install-referrer crash fix — v0.2.90 (build 93)
+
+First production release since v0.2.88 (build 90). Bundles everything below.
+
+### Behavior
+- **Multi-stop navigation.** Intermediate stops now show as numbered pins on the map during route preview AND live navigation (previously they vanished after the route was calculated). The nav HUD counts down distance / ETA / climb to your **next stop** (with a "Stop x of N" header and a subtle "to finish" total), retargeting to the following stop after you pass one. A confirm-gated **"Skip stop"** drops the next stop and reroutes from your current position.
+- **Weather warning once per session.** The bad-weather warning before a ride now appears at most once per app session instead of on every route you calculate.
+- **Post-ride impact card shows the correct rider tier + XP.** It previously showed "Kickstand / 0%" for everyone regardless of real rank (a display bug; stored XP/tier were always correct). Fixed server-side.
+- **Accurate ride distance after GPS hiccups** (carried up from the v0.2.89 preview): stale/teleport GPS fixes no longer inflate trip distance.
+- **Install-referrer crash fixed.** `IllegalStateException: Service not connected` from `react-native-play-install-referrer` (thrown on a background thread when the Play service disconnects mid-read) no longer crashes the app — patched to report a JS error event instead.
+
+### Files (highlights)
+- Client: `packages/core/src/navigation.ts` (`computeNextStopProgress`), `apps/mobile/app/{navigation,route-preview}.tsx`, `NavigationHUD.tsx`, map marker layers, `appStore.ts` (weather-warning session flag).
+- Server: `services/mobile-api/src/lib/xp.ts` (`normalizeXpAwardResult`) + `routes/v1.ts` — deployed to Cloud Run `defpedal-api-00089-9lc`.
+- Native: `patches/react-native-play-install-referrer+1.1.9.patch` (widens `catch (RemoteException)` → `catch (Exception)`), applied via patch-package in `scripts/build-preview.sh`.
+
+### Release
+- **Production AAB**: v0.2.90 / **build 93**, signed with the upload keystore (`CN=Victor Rotariu`, SHA-256 `82:7C:FD:…:35:73`), dev-leak audit passed. Archived `apkreleases/DefensivePedal-Production-v0.2.90.aab`.
+- Build 92 was rejected on re-upload ("Version code 92 has already been used") because Play Console permanently reserves a versionCode once uploaded to any release — even a discarded draft. Re-built at 93; versionName stays 0.2.90. See error-log #57.
+- Server award_xp fix is already live on Cloud Run (version-independent). Data Safety form needs no change (no new collection).
+
 ## 2026-06-03 — Reject stale/teleport GPS fixes that inflate trip distance — v0.2.89 (build 91)
 
 ### Behavior
