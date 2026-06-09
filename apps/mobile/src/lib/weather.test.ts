@@ -339,14 +339,17 @@ describe('getWeatherWarnings', () => {
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0].type).toBe('rain');
-    expect(warnings[0].message).toContain('70%');
+    expect(warnings[0].messageKey).toBe('weatherWarning.rain');
+    expect(warnings[0].messageParams).toEqual({ percent: 70 });
   });
 
   it('warns about freezing temperatures', () => {
     const warnings = getWeatherWarnings(makeWeatherData({ remainingTempMin: -3 }));
 
     expect(warnings.some((w) => w.type === 'freezing')).toBe(true);
-    expect(warnings.find((w) => w.type === 'freezing')!.message).toContain('-3');
+    const freezing = warnings.find((w) => w.type === 'freezing')!;
+    expect(freezing.messageKey).toBe('weatherWarning.cold');
+    expect(freezing.messageParams).toEqual({ temp: -3 });
   });
 
   it('warns about temperature swing', () => {
@@ -367,9 +370,8 @@ describe('getWeatherWarnings', () => {
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
-    expect(swing!.message).toContain('Warming up');
-    expect(swing!.message).toContain('14°C → 32°C');
-    expect(swing!.message).not.toContain('layer up');
+    expect(swing!.messageKey).toBe('weatherWarning.warmingUp');
+    expect(swing!.messageParams).toEqual({ min: 14, max: 32 });
   });
 
   it('uses cooling-down copy for a falling-temperature swing', () => {
@@ -381,11 +383,10 @@ describe('getWeatherWarnings', () => {
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
-    expect(swing!.message).toContain('Cooling down');
-    // Falling-trend wording shows max → min so the listed sequence reads like
-    // the user's actual experience over the day.
-    expect(swing!.message).toContain('24°C → 8°C');
-    expect(swing!.message).toContain('pack a layer');
+    expect(swing!.messageKey).toBe('weatherWarning.coolingDown');
+    // The warning carries min/max params; the i18n template renders the
+    // falling-trend max → min order (this asserts the data, not the copy).
+    expect(swing!.messageParams).toEqual({ min: 8, max: 24 });
   });
 
   it('falls back to neutral swing copy when trend is mixed', () => {
@@ -397,8 +398,8 @@ describe('getWeatherWarnings', () => {
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
-    expect(swing!.message).toContain('Big temperature swing');
-    expect(swing!.message).toContain('6°C – 22°C');
+    expect(swing!.messageKey).toBe('weatherWarning.tempSwing');
+    expect(swing!.messageParams).toEqual({ min: 6, max: 22 });
   });
 
   it('does not warn about small temperature swing', () => {
@@ -441,7 +442,8 @@ describe('getWeatherWarnings', () => {
 
     const cold = warnings.find((w) => w.type === 'freezing');
     expect(cold).toBeDefined();
-    expect(cold!.message).toContain('caution');
+    expect(cold!.messageKey).toBe('weatherWarning.cold');
+    expect(cold!.messageParams).toEqual({ temp: 4 });
   });
 
   it('warns about heat above 30°C', () => {
@@ -452,8 +454,8 @@ describe('getWeatherWarnings', () => {
 
     const heat = warnings.find((w) => w.type === 'heat');
     expect(heat).toBeDefined();
-    expect(heat!.message).toContain('32');
-    expect(heat!.message).toContain('caution');
+    expect(heat!.messageKey).toBe('weatherWarning.hot');
+    expect(heat!.messageParams).toEqual({ temp: 32 });
   });
 
   it('does not warn about heat at or below 30°C', () => {
@@ -482,8 +484,8 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message.toLowerCase()).toContain('breezy');
-    expect(wind!.message).toContain('20');
+    expect(wind!.messageKey).toBe('weatherWarning.windBreezy');
+    expect(wind!.messageParams).toEqual({ wind: 20, gust: 22 });
   });
 
   it('warns at the strong tier (30 km/h)', () => {
@@ -494,8 +496,8 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message.toLowerCase()).toContain('strong wind');
-    expect(wind!.message).toContain('30');
+    expect(wind!.messageKey).toBe('weatherWarning.windStrong');
+    expect(wind!.messageParams).toEqual({ wind: 30, gust: 22 });
   });
 
   it('warns at the hazardous tier (45 km/h) with cautionary wording', () => {
@@ -506,8 +508,9 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message.toLowerCase()).toContain('hazardous');
-    expect(wind!.message).toContain('caution');
+    // gust 50 ≥ notable (35) → "…Gust" variant.
+    expect(wind!.messageKey).toBe('weatherWarning.windHazardousGust');
+    expect(wind!.messageParams).toEqual({ wind: 45, gust: 50 });
   });
 
   it('elevates a low-mean / high-gust day into the strong tier', () => {
@@ -521,8 +524,9 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message.toLowerCase()).toContain('strong wind');
-    expect(wind!.message).toContain('gusts to 40');
+    // gust 40 elevates to strong AND ≥ notable (35) → "…Gust" variant.
+    expect(wind!.messageKey).toBe('weatherWarning.windStrongGust');
+    expect(wind!.messageParams).toEqual({ wind: 18, gust: 40 });
   });
 
   it('elevates a calm-mean / extreme-gust day into the hazardous tier', () => {
@@ -533,8 +537,9 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message.toLowerCase()).toContain('hazardous');
-    expect(wind!.message).toContain('gusts to 60');
+    // gust 60 ≥ hazardous-gust (55) → hazardous + "…Gust" variant.
+    expect(wind!.messageKey).toBe('weatherWarning.windHazardousGust');
+    expect(wind!.messageParams).toEqual({ wind: 22, gust: 60 });
   });
 
   it('omits gust suffix when gusts are below the notable threshold', () => {
@@ -545,7 +550,9 @@ describe('getWeatherWarnings', () => {
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
-    expect(wind!.message).not.toContain('gusts to');
+    // gust 30 < notable (35) → plain (non-gust) variant.
+    expect(wind!.messageKey).toBe('weatherWarning.windStrong');
+    expect(wind!.messageKey).not.toMatch(/Gust$/);
   });
 
   it('warns about poor air quality with cautionary wording', () => {
@@ -563,9 +570,9 @@ describe('getWeatherWarnings', () => {
 
     const aqWarning = warnings.find((w) => w.type === 'air_quality');
     expect(aqWarning).toBeDefined();
-    expect(aqWarning!.message).toContain('caution');
-    // Wording must advise caution, not discourage the ride.
-    expect(aqWarning!.message).not.toContain('postpon');
+    // AQI 110 > poor threshold (100) → poor variant.
+    expect(aqWarning!.messageKey).toBe('weatherWarning.airQualityPoor');
+    expect(aqWarning!.messageParams).toEqual({ aqi: 110 });
   });
 
   it('warns about moderate air quality', () => {
@@ -582,7 +589,9 @@ describe('getWeatherWarnings', () => {
     }));
 
     expect(warnings.some((w) => w.type === 'air_quality')).toBe(true);
-    expect(warnings.find((w) => w.type === 'air_quality')!.message).toContain('sensitive groups');
+    const aq = warnings.find((w) => w.type === 'air_quality')!;
+    expect(aq.messageKey).toBe('weatherWarning.airQualityModerate');
+    expect(aq.messageParams).toEqual({ aqi: 60 });
   });
 
   it('warns about high PM2.5', () => {
@@ -599,7 +608,9 @@ describe('getWeatherWarnings', () => {
     }));
 
     expect(warnings.some((w) => w.type === 'pm25')).toBe(true);
-    expect(warnings.find((w) => w.type === 'pm25')!.message).toContain('PM2.5');
+    const pm = warnings.find((w) => w.type === 'pm25')!;
+    expect(pm.messageKey).toBe('weatherWarning.pm25');
+    expect(pm.messageParams).toEqual({ pm: 30 });
   });
 
   it('can trigger multiple warnings simultaneously', () => {

@@ -107,7 +107,9 @@ describe('BadgeShareCard — preview variant', () => {
     expect(screen.getByText('Gold')).toBeTruthy();
     expect(screen.getByText('Complete your first ride')).toBeTruthy();
     expect(screen.getByTestId('brand-logo')).toBeTruthy();
-    expect(screen.getByTestId('badge-icon-first_ride-gold-lg')).toBeTruthy();
+    // Earned first_ride badge → BadgeVisual renders the HoloSticker (a11y
+    // label "<key> badge"), not the SVG BadgeIcon (holo migration v0.2.69+).
+    expect(screen.getByLabelText('first_ride badge')).toBeTruthy();
   });
 
   it('renders rarity line when rarityPercent provided', () => {
@@ -159,7 +161,9 @@ describe('BadgeShareCard — capture variant', () => {
       />,
     );
     expect(screen.getByText('DEFENSIVE PEDAL')).toBeTruthy();
-    expect(screen.getByText('defensivepedal.com')).toBeTruthy();
+    // Capture variant's footer is the Play Store install URL — the image-based
+    // share can't carry body text, so the install path lives in the PNG itself.
+    expect(screen.getByText(/play\.google\.com/)).toBeTruthy();
   });
 
   it('renders simplified rarity line without em-dashes', () => {
@@ -182,7 +186,7 @@ describe('BadgeShareCard — capture variant', () => {
         variant="capture"
       />,
     );
-    expect(screen.getByTestId('badge-icon-first_ride-gold-lg')).toBeTruthy();
+    expect(screen.getByLabelText('first_ride badge')).toBeTruthy();
   });
 });
 

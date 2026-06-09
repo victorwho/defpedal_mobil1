@@ -68,7 +68,31 @@ export const View = React.forwardRef(
   (
     { children, style: _style, testID, ...props }: { children?: React.ReactNode; style?: unknown; testID?: string },
     ref,
-  ) => React.createElement('div', { ref, 'data-testid': testID, ...props }, children),
+  ) => {
+    const p = props as Record<string, unknown>;
+    const accessibilityRole = p.accessibilityRole as string | undefined;
+    const accessibilityState = p.accessibilityState as
+      | { disabled?: boolean; checked?: boolean; selected?: boolean }
+      | undefined;
+    return React.createElement(
+      'div',
+      {
+        ref,
+        'data-testid': testID,
+        // Spread the raw RN props first (preserves the lowercased
+        // `accessibilitylabel` / `accessibilityrole` attributes that some tests
+        // query directly), THEN add ARIA equivalents so @testing-library
+        // getByLabelText / getByRole also work. RN's `image` role is ARIA `img`.
+        ...p,
+        'aria-label': p.accessibilityLabel as string | undefined,
+        role: accessibilityRole === 'image' ? 'img' : accessibilityRole,
+        'aria-disabled': accessibilityState?.disabled,
+        'aria-checked': accessibilityState?.checked,
+        'aria-selected': accessibilityState?.selected,
+      },
+      children,
+    );
+  },
 );
 
 export const Text = React.forwardRef(

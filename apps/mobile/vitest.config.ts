@@ -29,32 +29,22 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
     // The 3 files below fail at MODULE LOAD time (before any describe / it
-    // runs) because they import production components whose transitive
-    // chains hit either real react-native (Libraries/Promise.js — Node
-    // resolver chokes on the missing `.js` extension in
-    // `promise/setimmediate/es6-extensions`) or trip Rollup's parser
-    // ("Expression expected" in an RN-internal file). `describe.skip` is
-    // too late — the file's top-level imports throw before the runner sees
-    // a describe. Excluding here is the only way to keep CI green. The
-    // production behaviour is exercised at runtime; see each file's header
-    // for the validation status and the TODO for re-enabling once the
-    // atoms-chain is DI'd or a proper RN test harness is in place.
+    // runs): a transitive import escapes the `react-native` shim alias and
+    // pulls in real `react-native/Libraries/Promise.js`, whose
+    // `require('promise/setimmediate/es6-extensions')` (no extension) the
+    // Vite/Node resolver can't resolve — "Cannot find module
+    // 'promise/setimmediate/es6-extensions'". `describe.skip` is too late
+    // (top-level imports throw before the runner sees a describe). The badge /
+    // share / weather files quarantined alongside these were re-enabled
+    // 2026-06-09 once the svg/clipboard/Image/PanResponder mocks + View ARIA
+    // mapping landed; THESE 3 need the deeper resolver fix (alias the offending
+    // internal, or mock the component that reaches it). Production behaviour is
+    // exercised at runtime / on-device.
     exclude: [
       'node_modules/**',
       'src/design-system/organisms/__tests__/LeaderboardSection.test.tsx',
       'src/design-system/organisms/__tests__/HazardDetailSheet.test.tsx',
       'src/components/__tests__/FeedCard.champion.test.tsx',
-      // RN test harness restored (svg/clipboard/Image/PanResponder mocks added
-      // 2026-06-09) — 5 of the 7 previously-quarantined files are re-enabled.
-      // These 2 remain excluded for a SEPARATE reason: stale test CONTENT, not a
-      // harness gap. The production code is correct.
-      //   - weather.test.ts: asserts a removed `.message` field on WeatherWarning;
-      //     getWeatherWarnings now emits i18n `messageKey` + `messageParams`. Needs
-      //     ~16 assertions rewritten to the current contract.
-      //   - BadgeShareCard.test.tsx: 3/11 specs query text the card no longer
-      //     renders that way (e.g. tier label). Needs test/component reconciliation.
-      'src/lib/weather.test.ts',
-      'src/components/__tests__/BadgeShareCard.test.tsx',
     ],
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
