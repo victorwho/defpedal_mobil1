@@ -184,8 +184,27 @@ afterAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks() resets call history but NOT the mockReturnValueOnce /
+  // mockResolvedValueOnce queues. A once-value a prior test queued but the
+  // handler never consumed leaks into the next test, causing order-dependent
+  // failures (POST /v1/quiz/answer → 500, intermittently — passes locally,
+  // failed on CI). Reset the shared Supabase mocks to DRAIN their once-queues;
+  // mockFrom returns to its pristine undefined default, mockRpc's default is
+  // re-established below.
+  mockRpc.mockReset();
+  mockFrom.mockReset();
   // Default: RPC calls succeed, streak qualify is fire-and-forget
   mockRpc.mockResolvedValue({ data: null, error: null });
+  // Permissive default for from(): a fresh empty chain per call. Handlers run
+  // fire-and-forget async blocks (autoPublish in /rides/impact, /trips/end,
+  // /hazards) that `await supabaseAdmin.from(...)` AFTER the response is sent —
+  // i.e. during the NEXT test. Without a default those stray calls would consume
+  // a later test's single `mockReturnValueOnce` and leave its handler's from()
+  // undefined → 500 (POST /v1/quiz/answer flaked exactly this way). A standing
+  // empty-result default means stray calls always get a valid (empty) chain and
+  // can't starve a test's own mock. Tests that need specific data still set
+  // mockReturnValueOnce, which takes precedence over this default.
+  mockFrom.mockImplementation(() => chainResult(null));
 });
 
 // ===========================================================================
