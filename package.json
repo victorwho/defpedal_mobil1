@@ -10,6 +10,7 @@
     "services/*"
   ],
   "scripts": {
+    "eas-build-pre-install": "chmod -R u+w . 2>/dev/null || true",
     "postinstall": "patch-package",
     "dev": "npm run dev:mobile",
     "dev:mobile": "npm run start --workspace @defensivepedal/mobile",
