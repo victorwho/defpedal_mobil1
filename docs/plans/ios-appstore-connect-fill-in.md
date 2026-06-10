@@ -113,13 +113,14 @@ Declare these data types — each is **Linked to user = Yes**, **Used for tracki
 | Contact Info → **Name** | App Functionality |
 | Identifiers → **User ID** | App Functionality, Analytics |
 | Identifiers → **Device ID** (Expo push token) | App Functionality, Analytics |
+| User Content → **Photos or Videos** (profile avatar upload → Supabase Storage; verified `profile.tsx:100`) | App Functionality |
 | User Content → **Other User Content** (hazards, shares, comments) | App Functionality |
 | Browsing/Search → **Search History** (destination autocomplete) | App Functionality |
 | Usage Data → **Product Interaction** | Analytics, App Functionality |
 | Diagnostics → **Crash Data** (Sentry) | App Functionality, Analytics — *mark **Not** linked* |
 | Diagnostics → **Performance Data** | App Functionality, Analytics — *mark **Not** linked* |
 
-> **Photos:** only declare a Photos/User-Content item if a user-attached image actually uploads to our backend. If photo-attach isn't wired to a real upload yet, **leave Photos out** (the iOS usage-string alone doesn't require a declaration). I'll confirm this from the code and tell you — don't guess.
+> **Photos — CONFIRMED collected (2026-06-10):** the profile avatar uploads to Supabase Storage (`profile.tsx:100` `.from('avatars').upload(...)`), so **Photos or Videos must be declared** (Linked to user = Yes, tracking = No, App Functionality). The Diagnostics rows reflect the consent split: Sentry crash/perf is on by default (opt-out) and anonymised → mark **Not Linked**; PostHog product analytics is opt-in (off by default) but still declared since it *can* collect Product Interaction.
 
 ---
 
