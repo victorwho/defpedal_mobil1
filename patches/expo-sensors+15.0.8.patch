@@ -1,0 +1,16 @@
+diff --git a/node_modules/expo-sensors/ios/EXMotionPermissionRequester.m b/node_modules/expo-sensors/ios/EXMotionPermissionRequester.m
+index 7fe183e..ac2ca23 100644
+--- a/node_modules/expo-sensors/ios/EXMotionPermissionRequester.m
++++ b/node_modules/expo-sensors/ios/EXMotionPermissionRequester.m
+@@ -21,7 +21,10 @@
+     // Related: NSFallDetectionUsageDescription
+     if (!(motionUsageDescription)) {
+       // TODO: Make aware of plugins, FYI link.
+-      EXFatal(EXErrorWithMessage(@"This app is missing the 'NSMotionUsageDescription' so CMPedometer services will fail. Ensure this key exist in the app's Info.plist."));
++      // patched: EXFatal/EXErrorWithMessage were removed from expo-modules-core 55,
++      // breaking compilation under Xcode 16 strict clang. Replaced with NSLog — this
++      // path is unreachable in our app (NSMotionUsageDescription is always present).
++      NSLog(@"This app is missing the 'NSMotionUsageDescription' so CMPedometer services will fail. Ensure this key exist in the app's Info.plist.");
+       status = EXPermissionStatusDenied;
+     } else {
+       switch ([CMPedometer authorizationStatus]) {
