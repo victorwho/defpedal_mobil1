@@ -303,7 +303,13 @@ export default () => ({
       // obligatory because the app offers Google sign-in). iOS-only.
       usesAppleSignIn: true,
       infoPlist: {
-        UIBackgroundModes: ['location', 'processing', 'remote-notification'],
+        // 'location' keeps turn-by-turn navigation alive on the lock screen
+        // (expo-location startLocationUpdatesAsync in backgroundNavigation.ts);
+        // 'remote-notification' lets push wake the app. Do NOT add 'processing':
+        // the app registers no BGTaskScheduler task, and declaring it without a
+        // matching BGTaskSchedulerPermittedIdentifiers list gets the binary
+        // rejected at upload (ITMS-90771 — build 10, 2026-06-10).
+        UIBackgroundModes: ['location', 'remote-notification'],
         NSPhotoLibraryUsageDescription:
           'Defensive Pedal needs access to your photos so you can attach images to hazard reports and ride shares.',
         NSPhotoLibraryAddUsageDescription:
