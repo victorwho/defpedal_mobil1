@@ -18,20 +18,32 @@
  * The return value is a discriminator so the caller can update Zustand and
  * telemetry uniformly regardless of which path actually fired.
  */
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { hasExpoNativeModule } from './expoNativeModule';
 
 /**
- * Production Play Store listing. We intentionally hardcode the production
- * package name rather than reading from `applicationId` — preview/dev
- * variants point at the same review pool as production for this prompt.
- * Users on a dev variant shouldn't even reach the Stage 2 button (the card
- * lives behind eligibility gates), but if they do, sending them to the
+ * Production Play Store listing (Android URL fallback). We intentionally
+ * hardcode the production package name rather than reading from `applicationId`
+ * — preview/dev variants point at the same review pool as production for this
+ * prompt. Users on a dev variant shouldn't even reach the Stage 2 button (the
+ * card lives behind eligibility gates), but if they do, sending them to the
  * production listing is the safe default.
  */
 const PLAY_STORE_REVIEW_URL =
   'https://play.google.com/store/apps/details?id=com.defensivepedal.mobile';
+
+/**
+ * Numeric App Store app id (App Store Connect → App Information → "Apple ID").
+ * Empty until the App Store Connect app record exists. While empty the iOS URL
+ * fallback is skipped — the native SKStoreReviewController path still works, and
+ * crucially we never send iOS users to the Play Store. Fill in once the record
+ * is created, e.g. '6740123456'.
+ */
+const IOS_APP_STORE_APP_ID = '';
+const IOS_APP_STORE_REVIEW_URL = IOS_APP_STORE_APP_ID
+  ? `https://apps.apple.com/app/id${IOS_APP_STORE_APP_ID}?action=write-review`
+  : null;
 
 export type ReviewRequestResult =
   /** Native Play in-app review sheet was successfully invoked. */
@@ -56,9 +68,15 @@ const loadStoreReviewModule = (): ExpoStoreReviewModule | null => {
   }
 };
 
-const openPlayStoreListing = async (): Promise<boolean> => {
+const openStoreListing = async (): Promise<boolean> => {
+  const url =
+    Platform.OS === 'ios' ? IOS_APP_STORE_REVIEW_URL : PLAY_STORE_REVIEW_URL;
+  // On iOS before the App Store id is set there's no valid fallback URL — do
+  // NOT send the user to the Play Store. The native review sheet is the primary
+  // iOS path regardless.
+  if (!url) return false;
   try {
-    await Linking.openURL(PLAY_STORE_REVIEW_URL);
+    await Linking.openURL(url);
     return true;
   } catch {
     return false;
@@ -90,6 +108,6 @@ export async function requestPlayStoreReview(): Promise<ReviewRequestResult> {
     }
   }
 
-  const opened = await openPlayStoreListing();
+  const opened = await openStoreListing();
   return opened ? 'fallback' : 'failed';
 }

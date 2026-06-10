@@ -28,7 +28,10 @@ services/mobile-api/.env.*
 .expo
 .expo-shared
 android
-ios
+# Anchor the iOS-native-dir ignore to the app path so the bare `ios` pattern
+# doesn't also swallow unrelated dirs like docs/plans/ios/. EAS prebuild
+# generates apps/mobile/ios/ in the cloud; it's never committed (managed workflow).
+apps/mobile/ios/
 *.tsbuildinfo
 
 # Editor directories and files
