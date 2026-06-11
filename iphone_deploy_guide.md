@@ -2,19 +2,24 @@
 
 > **Purpose:** a self-contained runbook to take Defensive Pedal from "first build is on TestFlight" to "live on the App Store," to be executed **once the physical iPhone is available**. Written so a **fresh Claude session with no prior context** can drive it. Read this top-to-bottom first.
 >
-> **Last updated:** 2026-06-10. **Owner:** Victor (victorrotariu@gmail.com). Repo: `C:\dev\defpedal` (branch `main`).
+> **Last updated:** 2026-06-11. **Owner:** Victor (victorrotariu@gmail.com). Repo: `C:\dev\defpedal` (branch `main`).
+>
+> **Current status (2026-06-11):** build **11** (v0.2.90) is uploaded and **`VALID` on TestFlight**. Next action is on-device install + Phase C smoke test, to be done when the physical iPhone is available.
 
 ---
 
 ## 0. TL;DR — where we are, what's left
 
-**DONE (committed `9d3bbe5`→`85bdb17`, build live on TestFlight):**
-- iOS Phase A config + all 10 first-build blockers fixed. First iOS build (#10, v0.2.90) **built on EAS and submitted to TestFlight** from Windows (no Mac, no iPhone).
+**DONE (build 11 uploaded + `VALID` on TestFlight as of 2026-06-11):**
+- iOS Phase A config + all 10 first-build blockers fixed. Built on EAS from Windows (no Mac, no iPhone).
+- **First submit (build 10) was REJECTED by Apple during processing — ITMS-90771:** `app.config.ts` declared `UIBackgroundModes: ['location', 'processing', 'remote-notification']` but the app registers no `BGTaskScheduler` task, so `'processing'` was spurious (needs a matching `BGTaskSchedulerPermittedIdentifiers` list, which doesn't exist). Fixed by dropping `'processing'` (commit `3ade853`) → rebuilt as **build 11** → resubmitted. Build 11 reached `processingState=VALID` in ~3 min.
 - App Store Connect app record created (Apple ID **6778694757**). Listing copy + privacy labels drafted (paste-ready). Support/privacy/terms web pages live.
 
+> ⚠️ **History correction:** an earlier version of this guide (and the `reference_ios-build-submit-recipe` memory) claimed build 10 was "LIVE on TestFlight." That was inaccurate — the EAS **build** finished, but the `eas submit` step had **never actually completed**, so no binary ever reached Apple. Confirmed via the ASC API (`GET /v1/builds?filter[app]=6778694757` returned zero builds). The submit is now genuinely done with build 11.
+
 **REMAINING (this guide):**
-1. Install the TestFlight build on the iPhone and **smoke-test on the real device (Phase C)**.
-2. Fix any iOS-specific bugs (rebuild→resubmit loop — now a 1-command build).
+1. **[USER — needs physical iPhone]** Install build 11 via TestFlight and **smoke-test on the real device (Phase C)**.
+2. Fix any iOS-specific bugs (rebuild→resubmit loop — now a proven 1-command build + 1-command submit).
 3. Finalize the App Store listing (screenshots from the device, demo account).
 4. **Submit for App Store review** + phased release.
 
@@ -35,7 +40,7 @@
 | ASC key env vars | Persisted in Windows **User** env: `EXPO_ASC_API_KEY_PATH`, `EXPO_ASC_KEY_ID`, `EXPO_ASC_ISSUER_ID` (a *new* terminal has them automatically) |
 | Mapbox download token | Scoped `Downloads:Read` `sk.` token in `apps/mobile/.env` (gitignored) + all 3 EAS env secrets `RNMAPBOX_MAPS_DOWNLOAD_TOKEN` |
 | Google iOS OAuth client | `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` in `.env` + EAS envs (id `1081412761678-n4eo50jdpcjdm7ambk640qtuq9v5p08m...`) |
-| Last EAS iOS build | id `46cdd14b-034b-4449-896e-c5901e38576f`, build number 10, `.ipa` artifact on EAS |
+| Last EAS iOS build | id `00299248-9138-4469-ae4c-04c89abef11a`, build number **11** (v0.2.90), `.ipa` on EAS — **`VALID` on TestFlight**. Rejected predecessor: build 10 `46cdd14b-034b-4449-896e-c5901e38576f` (ITMS-90771) |
 
 **Secrets policy:** the `.p8` and the Mapbox `sk.` token are NOT in git (referenced by path / live in `.env` + EAS). Never paste them into committed files. The Key ID / Issuer ID above are identifiers (useless without the `.p8`).
 
@@ -62,7 +67,7 @@ If `eas whoami` is empty → the user must run `npx eas login` (interactive). If
 
 The submitted build is a production/store build (embedded bundle → Cloud Run prod API), so **TestFlight is the install path** (no USB, no Metro, no device registration).
 
-1. In App Store Connect → the app → **TestFlight** tab → confirm the build (v0.2.90 build 10) shows **"Ready to Test"** (after Apple finishes processing; if it shows "Missing Compliance", set Export Compliance → exempt/standard-HTTPS).
+1. In App Store Connect → the app → **TestFlight** tab → confirm build **v0.2.90 (11)** shows **"Ready to Test"**. (As of 2026-06-11 it is already `VALID`; export compliance is pre-declared via `ITSAppUsesNonExemptEncryption: false` in `app.config.ts`, so the "Missing Compliance" prompt should NOT appear. If it ever does on a future build, set Export Compliance → exempt/standard-HTTPS.)
 2. **TestFlight → Internal Testing →** create a group (or use the default) → add the user's Apple ID (`victorrotariu@gmail.com`) as an internal tester → add the build to the group.
 3. On the iPhone: install the **TestFlight** app from the App Store → sign in with that Apple ID → accept the invite → install Defensive Pedal.
 
@@ -175,6 +180,8 @@ Only after Phase C is green and the listing is complete:
 8. Provisioning profile missing **Associated Domains** → capability enabled on App ID + interactive profile regen (done).
 9. Xcode-16 `EXFatal` undeclared → `patches/expo-sensors+15.0.8.patch` (postinstall patch-package applies it).
 10. `eas submit` → needs `APP_VARIANT=production` + ASC key in `eas.json` (see STEP 3).
+
+**11. First *submit* rejection — ITMS-90771 (post-build, fixed 2026-06-11, commit `3ade853`).** Build 10 compiled fine but Apple rejected the binary *during processing* (you get an email, and the build never appears in TestFlight — rejected binaries are invisible there, so "no build in TestFlight" can mean "rejected," not "still processing"; verify with `GET /v1/builds`). Cause: `app.config.ts` → `ios.infoPlist.UIBackgroundModes` listed `'processing'` with no matching `BGTaskSchedulerPermittedIdentifiers`. The app registers **no** `BGTaskScheduler` task — background navigation is `expo-location`'s `startLocationUpdatesAsync` (`src/lib/backgroundNavigation.ts`), which is covered by the `'location'` mode — so `'processing'` was spurious. Fix = remove it; modes are now `['location', 'remote-notification']`. **Do NOT re-add `'processing'`** unless a real BGTaskScheduler task is registered AND its identifiers are declared in `BGTaskSchedulerPermittedIdentifiers`.
 
 ## 10. "Done" definition
 App Store listing public (phased release ramping/complete), crash-free ≥ 99.5% on iOS in Sentry, no open P0/P1 from Phase C. Then update `progress.md`, `todo.md` (move "iPhone validation" to Completed), and this guide's status.
