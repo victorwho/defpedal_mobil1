@@ -745,6 +745,22 @@ export const ro: TranslationKeys = {
 
   // ── Auth ──
   auth: {
+    forgotPassword: 'Ai uitat parola?',
+    resetEnterEmailFirst: 'Introdu mai întâi emailul de mai sus, apoi apasă din nou pe „Ai uitat parola?".',
+    resetEmailSent: 'Email de resetare trimis — verifică-ți inboxul și deschide linkul pe acest telefon.',
+    resetPasswordTitle: 'Setează o parolă nouă',
+    resetPasswordSubtitle: 'Alege o parolă nouă pentru contul tău.',
+    resetPasswordNew: 'Parolă nouă',
+    resetPasswordConfirm: 'Confirmă parola',
+    resetPasswordSubmit: 'Salvează parola nouă',
+    resetPasswordTooShort: 'Parola trebuie să aibă cel puțin 6 caractere.',
+    resetPasswordMismatch: 'Parolele nu coincid.',
+    resetPasswordDoneTitle: 'Parolă actualizată',
+    resetPasswordDoneBody: 'Ești autentificat cu noua parolă.',
+    resetPasswordContinue: 'Continuă',
+    resetPasswordExpiredTitle: 'Link expirat',
+    resetPasswordExpiredBody: 'Acest link de resetare nu mai este valid. Solicită unul nou din ecranul de autentificare.',
+    resetPasswordBackToSignIn: 'Înapoi la autentificare',
     signIn: 'Conectare',
     signUp: 'Înregistrare',
     email: 'Email',

@@ -95,7 +95,7 @@ export const buildApp = (options: {
     generatedAt: new Date().toISOString(),
   }));
 
-  app.setErrorHandler((error: FastifyError, _request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     if (Array.isArray((error as { validation?: unknown[] }).validation)) {
       return reply.status(400).send(
         toErrorResponse(
@@ -107,9 +107,29 @@ export const buildApp = (options: {
     }
 
     if (error instanceof HttpError) {
+      // Review 2026-06-12 P2 (information disclosure): ~60 handler sites put
+      // raw upstream/PostgREST error strings into HttpError.details — table,
+      // column, and constraint names included. Client-useful details are all
+      // 4xx (validation hints, rate-limit retry-afters, share-state
+      // discriminators); 5xx details are internals. Centralized policy: log
+      // 5xx details server-side, never send them to the client. Handlers can
+      // keep attaching details for the log without re-leaking.
+      const isServerError = error.statusCode >= 500;
+      if (isServerError && error.details && error.details.length > 0) {
+        request.log.error(
+          { event: 'http_error_details', statusCode: error.statusCode, code: error.code, details: error.details },
+          error.message,
+        );
+      }
       return reply
         .status(error.statusCode)
-        .send(toErrorResponse(error.message, error.code, error.details));
+        .send(
+          toErrorResponse(
+            error.message,
+            error.code,
+            isServerError ? undefined : error.details,
+          ),
+        );
     }
 
     app.log.error(error);

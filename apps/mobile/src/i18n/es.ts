@@ -745,6 +745,22 @@ export const es: TranslationKeys = {
 
   // ── Auth ──
   auth: {
+    forgotPassword: '¿Olvidaste la contraseña?',
+    resetEnterEmailFirst: 'Introduce primero tu email arriba y vuelve a tocar "¿Olvidaste la contraseña?".',
+    resetEmailSent: 'Email de restablecimiento enviado — revisa tu bandeja y abre el enlace en este teléfono.',
+    resetPasswordTitle: 'Establece una nueva contraseña',
+    resetPasswordSubtitle: 'Elige una nueva contraseña para tu cuenta.',
+    resetPasswordNew: 'Nueva contraseña',
+    resetPasswordConfirm: 'Confirmar contraseña',
+    resetPasswordSubmit: 'Guardar nueva contraseña',
+    resetPasswordTooShort: 'La contraseña debe tener al menos 6 caracteres.',
+    resetPasswordMismatch: 'Las contraseñas no coinciden.',
+    resetPasswordDoneTitle: 'Contraseña actualizada',
+    resetPasswordDoneBody: 'Has iniciado sesión con tu nueva contraseña.',
+    resetPasswordContinue: 'Continuar',
+    resetPasswordExpiredTitle: 'Enlace caducado',
+    resetPasswordExpiredBody: 'Este enlace de restablecimiento ya no es válido. Solicita uno nuevo desde la pantalla de inicio de sesión.',
+    resetPasswordBackToSignIn: 'Volver a iniciar sesión',
     signIn: 'Iniciar sesión',
     signUp: 'Crear cuenta',
     email: 'Correo electrónico',

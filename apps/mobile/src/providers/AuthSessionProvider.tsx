@@ -2,8 +2,10 @@ import type { PropsWithChildren } from 'react';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { router } from 'expo-router';
 
 import type { MobileAuthSession, MobileAuthUser } from '../lib/devAuth';
+import { consumePendingPasswordReset } from '../lib/passwordReset';
 import { registerForPushNotifications } from '../lib/push-notifications';
 import {
   activateDeveloperBypassSession,
@@ -161,6 +163,14 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
         const tokenHash = params.get('token_hash');
         const type = params.get('type');
 
+        // Password-recovery detection (review 2026-06-12). Cross-device
+        // links carry an explicit type=recovery; same-device PKCE redirects
+        // carry only ?code=, so we fall back to the persisted "reset was
+        // requested recently" flag written by requestPasswordReset. Consume
+        // BEFORE the exchange so the flag can't linger on failure paths.
+        const isRecovery =
+          type === 'recovery' || (await consumePendingPasswordReset());
+
         if (code) {
           // PKCE flow (OAuth + email confirmation on same device).
           const { error } = await supabaseClient.auth.exchangeCodeForSession(code);
@@ -191,6 +201,12 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
         // onAuthStateChange also fires, but this avoids a visible delay.
         const newSession = await getCurrentSession();
         setSession(newSession);
+
+        // The user now holds a recovery session — send them straight to the
+        // set-new-password screen before anything else grabs navigation.
+        if (isRecovery) {
+          router.replace('/reset-password');
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         setAuthError(`Sign-in failed: ${message}`);

@@ -1,9 +1,10 @@
 import type { ErrorResponse } from '@defensivepedal/core';
-import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import type { FastifyPluginAsync } from 'fastify';
 
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { verifyCronAuth } from '../lib/cronAuth';
 import { ensureSupabase } from './feed-helpers';
 
 /**
@@ -40,22 +41,7 @@ import { ensureSupabase } from './feed-helpers';
  * Cloud Scheduler config: see docs/ops/retention-runbook.md.
  */
 
-const verifyCronAuth = (request: FastifyRequest): void => {
-  const cronSecret = process.env.CRON_SECRET ?? '';
-  if (!cronSecret) {
-    throw new HttpError('Cron secret not configured.', {
-      statusCode: 500,
-      code: 'INTERNAL_ERROR',
-    });
-  }
-  const auth = request.headers.authorization;
-  if (auth !== `Bearer ${cronSecret}`) {
-    throw new HttpError('Unauthorized cron call.', {
-      statusCode: 401,
-      code: 'UNAUTHORIZED',
-    });
-  }
-};
+// Shared timing-safe implementation — see lib/cronAuth.ts (review 2026-06-12).
 
 const acceptedAtSchema = {
   type: 'object',

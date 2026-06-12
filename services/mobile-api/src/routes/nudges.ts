@@ -34,6 +34,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { verifyBearerSecret } from '../lib/cronAuth';
 import { fetchCyclingForecast } from '../lib/clients/openMeteo';
 import { dispatchNudge } from '../lib/nudges/dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from '../lib/nudges/eligibility';
@@ -60,20 +61,9 @@ import { supabaseAdmin } from '../lib/supabaseAdmin';
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Timing-safe shared implementation (review 2026-06-12) — lib/cronAuth.ts.
 const ensureCronAuth = (auth: string | undefined) => {
-  const secret = process.env.CRON_SECRET ?? '';
-  if (!secret) {
-    throw new HttpError('Cron secret not configured.', {
-      statusCode: 500,
-      code: 'INTERNAL_ERROR',
-    });
-  }
-  if (auth !== `Bearer ${secret}`) {
-    throw new HttpError('Unauthorized cron call.', {
-      statusCode: 401,
-      code: 'UNAUTHORIZED',
-    });
-  }
+  verifyBearerSecret(auth, process.env.CRON_SECRET);
 };
 
 const ensureSupabase = () => {

@@ -28,6 +28,8 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { PRIVACY_URL, TERMS_URL } from '../src/lib/legal-urls';
+import { markPasswordResetRequested } from '../src/lib/passwordReset';
+import { requestPasswordReset } from '../src/lib/supabase';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 
@@ -109,6 +111,33 @@ export default function AuthScreen() {
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('auth.devSignInFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Forgot-password (review 2026-06-12 P1: there was no recovery path at
+  // all). Sends the Supabase recovery email and stamps the persisted flag
+  // that lets AuthSessionProvider recognize the returning auth/callback deep
+  // link as a recovery (the PKCE redirect carries no type discriminator).
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setErrorMessage(t('auth.resetEnterEmailFirst'));
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const { error } = await requestPasswordReset(email);
+      if (error) {
+        setErrorMessage(error.message);
+        return;
+      }
+      await markPasswordResetRequested();
+      setStatusMessage(t('auth.resetEmailSent'));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t('auth.authFailed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -340,6 +369,18 @@ export default function AuthScreen() {
                   <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
                 }
               />
+              {mode === 'sign-in' ? (
+                <Pressable
+                  onPress={() => void handleForgotPassword()}
+                  disabled={isSubmitting || !isSupabaseConfigured}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('auth.forgotPassword')}
+                  style={styles.forgotRow}
+                >
+                  <Text style={styles.toggleLink}>{t('auth.forgotPassword')}</Text>
+                </Pressable>
+              ) : null}
             </View>
 
             {/* Status / error messages */}
@@ -636,6 +677,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       color: colors.accent,
       fontFamily: fontFamily.body.bold,
+    },
+    forgotRow: {
+      alignSelf: 'flex-end',
     },
     // Dev card
     devCard: {

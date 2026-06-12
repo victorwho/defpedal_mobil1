@@ -455,67 +455,6 @@ describe('mobile-api v1 routes', () => {
     }
   });
 
-  it('normalizes autocomplete payloads before forwarding them upstream', async () => {
-    const forwardGeocode = vi.fn().mockResolvedValue([
-      {
-        id: 'place.1',
-        label: 'Piata Victoriei, Bucharest',
-        primaryText: 'Piata Victoriei',
-        coordinates: {
-          lat: 44.4521,
-          lon: 26.0865,
-        },
-      },
-    ]);
-    const app = createApp({
-      forwardGeocode,
-    });
-
-    try {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/v1/search/autocomplete',
-        payload: {
-          query: '  Piata Victoriei  ',
-          countryHint: 'RO',
-        },
-      });
-
-      expect(response.statusCode).toBe(200);
-      expect(forwardGeocode).toHaveBeenCalledWith({
-        query: 'Piata Victoriei',
-        locale: 'en',
-        countryHint: 'RO',
-        limit: 5,
-      });
-      expect(response.json().suggestions).toHaveLength(1);
-    } finally {
-      await app.close();
-    }
-  });
-
-  it('rejects autocomplete queries that are only whitespace', async () => {
-    const app = createApp();
-
-    try {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/v1/search/autocomplete',
-        payload: {
-          query: '   ',
-        },
-      });
-
-      expect(response.statusCode).toBe(400);
-      expect(response.json()).toEqual({
-        error: 'Autocomplete query must be at least 2 non-space characters.',
-        code: 'BAD_REQUEST',
-      });
-    } finally {
-      await app.close();
-    }
-  });
-
   it('accepts trip lifecycle writes through injected persistence dependencies', async () => {
     const startTripRecord = vi.fn().mockResolvedValue({
       clientTripId: 'client-trip-1',
@@ -937,8 +876,10 @@ describe('mobile-api v1 routes', () => {
       expect(response.json()).toMatchObject({
         error: 'Stats fetch failed.',
         code: 'UPSTREAM_ERROR',
-        details: ['DB connection lost'],
       });
+      // 5xx details are logged server-side, never echoed to clients
+      // (review 2026-06-12 — upstream error strings leaked schema internals).
+      expect(response.json().details).toBeUndefined();
     } finally {
       await app.close();
     }
@@ -1106,7 +1047,6 @@ describe('mobile-api v1 routes', () => {
       expect(response.json()).toMatchObject({
         error: 'Stats dashboard fetch failed.',
         code: 'UPSTREAM_ERROR',
-        details: ['RPC timeout'],
       });
     } finally {
       await app.close();

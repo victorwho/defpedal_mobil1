@@ -147,8 +147,13 @@ export default function OnboardingSignupPromptScreen() {
           <Text style={styles.eyebrow}>Almost there</Text>
           <Text style={styles.title}>Create your account</Text>
           <Text style={styles.subtitle}>
+            {/* Review 2026-06-12 P1: this used to promise "Your data will be
+                preserved", but no anonymous→account merge exists — sign-in
+                switches to a fresh user id and anonymous rides/XP/badges are
+                left behind. Don't promise what we don't do. A real merge
+                endpoint is tracked as future work (review Phase 1 item 17). */}
             {isMandatory
-              ? 'Create an account to continue using Defensive Pedal. Your data will be preserved.'
+              ? 'Create an account to continue using Defensive Pedal and start syncing your rides from here on.'
               : 'Sync your rides, earn streaks, and join the community. You can always do this later.'}
           </Text>
         </View>

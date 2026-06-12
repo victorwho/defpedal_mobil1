@@ -754,6 +754,22 @@ export const en = {
 
   // ── Auth ──
   auth: {
+    forgotPassword: 'Forgot password?',
+    resetEnterEmailFirst: 'Enter your email above first, then tap "Forgot password?" again.',
+    resetEmailSent: 'Password reset email sent — check your inbox and open the link on this phone.',
+    resetPasswordTitle: 'Set a new password',
+    resetPasswordSubtitle: 'Choose a new password for your account.',
+    resetPasswordNew: 'New password',
+    resetPasswordConfirm: 'Confirm password',
+    resetPasswordSubmit: 'Save new password',
+    resetPasswordTooShort: 'Password must be at least 6 characters.',
+    resetPasswordMismatch: 'Passwords do not match.',
+    resetPasswordDoneTitle: 'Password updated',
+    resetPasswordDoneBody: "You're signed in with your new password.",
+    resetPasswordContinue: 'Continue',
+    resetPasswordExpiredTitle: 'Link expired',
+    resetPasswordExpiredBody: 'This password reset link is no longer valid. Request a new one from the sign-in screen.',
+    resetPasswordBackToSignIn: 'Back to sign in',
     signIn: 'Sign in',
     signUp: 'Sign up',
     email: 'Email',

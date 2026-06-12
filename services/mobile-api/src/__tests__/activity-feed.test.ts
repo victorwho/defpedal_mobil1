@@ -77,11 +77,18 @@ const noopRateLimiter: RateLimiter = {
   clear: vi.fn(),
 };
 
+const openPolicy = { limit: 100, windowMs: 60_000 };
 const rateLimitPolicies: RateLimitPolicies = {
-  routePreview: { limit: 100, windowMs: 60_000 },
-  routeReroute: { limit: 100, windowMs: 60_000 },
-  write: { limit: 100, windowMs: 60_000 },
+  routePreview: openPolicy,
+  routeReroute: openPolicy,
+  write: openPolicy,
   hazardVote: { limit: 100, windowMs: 600_000 },
+  leaderboard: openPolicy,
+  report: openPolicy,
+  block: openPolicy,
+  // The hardened v2 comment endpoint consumes this bucket (review 2026-06-12).
+  comment: openPolicy,
+  citySuggestion: openPolicy,
 };
 
 const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) =>
@@ -690,6 +697,77 @@ describe('POST /v1/v2/feed/:id/comment', () => {
     });
     expect(response.statusCode).toBe(502);
     expect(response.json().code).toBe('UPSTREAM_ERROR');
+
+    await app.close();
+  });
+
+  // Review 2026-06-12 P1: this endpoint shipped without the v1 comment
+  // pipeline's gates. These tests pin the hardened behavior so it can't
+  // silently regress again.
+
+  it('returns 403 for anonymous Supabase sessions (requireFullUser)', async () => {
+    const app = buildTestApp({
+      // Anonymous sessions authenticate but carry no email.
+      authenticateUser: vi.fn().mockResolvedValue({ id: DEV_USER_ID, email: null }),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/v2/feed/${ACTIVITY_ID}/comment`,
+      headers: authHeaders,
+      payload: { body: 'anon spam' },
+    });
+    expect(response.statusCode).toBe(403);
+
+    await app.close();
+  });
+
+  it('returns 429 when the comment rate-limit bucket is exhausted', async () => {
+    const throttledLimiter: RateLimiter = {
+      backend: 'memory',
+      consume: vi.fn().mockResolvedValue({
+        allowed: false,
+        limit: 3,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfterMs: 60_000,
+      }),
+      clear: vi.fn(),
+    };
+    const app = buildTestApp({ rateLimiter: throttledLimiter });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/v2/feed/${ACTIVITY_ID}/comment`,
+      headers: authHeaders,
+      payload: { body: 'rapid fire' },
+    });
+    expect(response.statusCode).toBe(429);
+    expect(throttledLimiter.consume).toHaveBeenCalledWith(
+      expect.objectContaining({ bucket: 'comment' }),
+    );
+
+    await app.close();
+  });
+
+  it('auto-hides comments that trip the content filter and still returns 200', async () => {
+    // insert().select('id').single() consumes one queued result.
+    enqueueResult({ data: { id: 'comment-1' }, error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/v2/feed/${ACTIVITY_ID}/comment`,
+      headers: authHeaders,
+      payload: { body: 'Buy followers now!!! https://spam.example https://spam2.example https://spam3.example' },
+    });
+    // The comment lands (per-row hidden) rather than erroring — the author
+    // shouldn't see their post vanish.
+    expect(response.statusCode).toBe(200);
 
     await app.close();
   });

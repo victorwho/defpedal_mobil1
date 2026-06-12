@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { verifyCronAuth } from '../lib/cronAuth';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import {
   evaluateFirstRideNotifications,
@@ -66,21 +67,7 @@ export const buildFirstRideNotificationRoutes = (
         },
       },
       async (request) => {
-        const cronSecret = process.env.CRON_SECRET ?? '';
-        if (!cronSecret) {
-          throw new HttpError('Cron secret not configured.', {
-            statusCode: 500,
-            code: 'INTERNAL_ERROR',
-          });
-        }
-
-        const auth = request.headers.authorization;
-        if (auth !== `Bearer ${cronSecret}`) {
-          throw new HttpError('Unauthorized cron call.', {
-            statusCode: 401,
-            code: 'UNAUTHORIZED',
-          });
-        }
+        verifyCronAuth(request);
 
         const db = ensureSupabase();
 

@@ -5,6 +5,7 @@ import { requireFullUser } from '../lib/auth';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { verifyCronAuth } from '../lib/cronAuth';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import {
   errorResponseSchema,
@@ -269,22 +270,7 @@ export const buildLeaderboardRoutes = (
         },
       },
       async (request) => {
-        // Authenticate via CRON_SECRET header (same pattern as cron endpoints in v1.ts)
-        const cronSecret = process.env.CRON_SECRET ?? '';
-        if (!cronSecret) {
-          throw new HttpError('Cron secret not configured.', {
-            statusCode: 500,
-            code: 'INTERNAL_ERROR',
-          });
-        }
-
-        const auth = request.headers.authorization;
-        if (auth !== `Bearer ${cronSecret}`) {
-          throw new HttpError('Unauthorized cron call.', {
-            statusCode: 401,
-            code: 'UNAUTHORIZED',
-          });
-        }
+        verifyCronAuth(request);
 
         const db = ensureSupabase();
 

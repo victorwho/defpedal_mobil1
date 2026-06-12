@@ -21,9 +21,13 @@ import {
   type ReactBody,
   type ReactionTypeParams,
 } from '../lib/activityFeedSchemas';
+import { requireFullUser } from '../lib/auth';
+import { sanitiseComment } from '../lib/commentSanitize';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { feedCommentRequestSchema, feedCommentsResponseSchema, type FeedCommentBody } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { checkContentAgainstFilter } from '../lib/moderationFilter';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { XP_VALUES } from '../lib/xp';
 import { ensureSupabase, requireUser } from './feed-helpers';
@@ -256,6 +260,9 @@ export const buildActivityFeedRoutes = (
           .from('activity_comments')
           .select('id, user_id, body, created_at')
           .eq('activity_id', request.params.id)
+          // Auto-moderated comments are per-row hidden (visible only to the
+          // moderator via service-role queries) — same model as feed_comments.
+          .eq('is_hidden', false)
           .order('created_at', { ascending: true })
           .limit(100);
 
@@ -343,21 +350,54 @@ export const buildActivityFeedRoutes = (
               properties: { acceptedAt: { type: 'string', format: 'date-time' } },
             },
             401: errorResponseSchema,
+            403: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
-        const user = await requireUser(request, dependencies);
+      async (request, reply) => {
+        // Review 2026-06-12 P1: this endpoint shipped with requireUser (which
+        // admits anonymous Supabase sessions), no rate limit, and no content
+        // moderation — while its v1 sibling (feed-comments.ts) enforces all
+        // three per compliance plan item 7. Mirror the v1 pipeline exactly:
+        // full account, 'comment' bucket, sanitise + filter with per-row
+        // is_hidden auto-hide and a content_reports row for review.
+        const user = await requireFullUser(request, dependencies.authenticateUser);
+
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: 'comment',
+          key: buildRateLimitIdentity({ userId: user.id }),
+          limit: dependencies.rateLimitPolicies.comment.limit,
+          windowMs: dependencies.rateLimitPolicies.comment.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rl.limit);
+        reply.header('x-ratelimit-remaining', rl.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rl.resetAt / 1000));
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for comments.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
+        const sanitised = sanitiseComment(request.body.body);
+        const filterResult = checkContentAgainstFilter(sanitised.body);
+        const autoHide = sanitised.flagged || filterResult.flagged;
+
         const db = ensureSupabase();
 
-        const { error } = await db
+        const { data: insertedRow, error } = await db
           .from('activity_comments')
           .insert({
             activity_id: request.params.id,
             user_id: user.id,
-            body: request.body.body.trim(),
-          });
+            body: sanitised.body,
+            is_hidden: autoHide,
+          })
+          .select('id')
+          .single();
 
         if (error) {
           throw new HttpError('Comment failed.', {
@@ -365,6 +405,34 @@ export const buildActivityFeedRoutes = (
             code: 'UPSTREAM_ERROR',
             details: [error.message],
           });
+        }
+
+        // Auto-filter hit — queue a content_reports row for moderator review
+        // (fire-and-forget; the comment itself already landed, hidden).
+        if (autoHide && insertedRow) {
+          void (async () => {
+            try {
+              await db.from('content_reports').insert([
+                {
+                  reporter_user_id: user.id, // self-reported via auto-filter
+                  target_type: 'comment',
+                  target_id: insertedRow.id as string,
+                  reason: filterResult.flagged ? 'hate' : 'spam',
+                  details: filterResult.pattern
+                    ? `auto-filter pattern: ${filterResult.pattern}`
+                    : sanitised.reason
+                      ? `auto-filter: ${sanitised.reason}`
+                      : null,
+                  auto_filter: true,
+                },
+              ]);
+            } catch (autoFilterError) {
+              request.log.warn(
+                { event: 'auto_filter_report_insert_failed', err: autoFilterError },
+                'failed to insert auto-filter content_reports row for activity comment',
+              );
+            }
+          })();
         }
 
         return { acceptedAt: new Date().toISOString() };

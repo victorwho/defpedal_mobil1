@@ -48,7 +48,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Which countries are supported?',
         answer:
-          'Safe routing is currently available in Romania, Bulgaria, Hungary, and Serbia. Fast routing works worldwide via Mapbox.',
+          'Safe routing is currently available in Romania and Spain (mainland and the Balearic Islands). Fast routing works worldwide via Mapbox. More countries are on the way.',
       },
       {
         question: 'What does "Avoid unpaved" do?',
@@ -87,9 +87,9 @@ const FAQ_SECTIONS: FaqSection[] = [
           'Every kilometre you cycle instead of driving prevents air pollution that would shorten the lives of people around you. We calculate this as 4.5 seconds of community life expectancy donated per km. These are aggregated city-wide to show collective impact.',
       },
       {
-        question: 'What does the Time Bank show?',
+        question: 'Where can I see my lifetime impact?',
         answer:
-          'The Time Bank is your cumulative life expectancy earned from all your rides. It shows the total extra minutes, hours, or days of life you have gained through cycling. This number only goes up \u2014 every ride adds to it.',
+          'The Impact Dashboard (History tab \u2192 Your Impact) shows your cumulative totals from every ride: CO2 saved, money saved, Microlives earned, and community seconds donated. These numbers only go up \u2014 every ride adds to them.',
       },
       {
         question: 'How is CO2 saved calculated?',
@@ -120,7 +120,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'How do I earn badges?',
         answer:
-          'Badges are awarded automatically for reaching milestones across 8 categories: distance, streaks, hazard reporting, community engagement, weather riding, time of day, exploration, and special achievements. Visit the Trophy Case in your profile to see all 137 badges and your progress.',
+          'Badges are awarded automatically for reaching milestones across 8 categories: distance, streaks, hazard reporting, community engagement, weather riding, time of day, exploration, and special achievements. Visit the Trophy Case in your profile to see the full catalog of 140+ badges and your progress.',
       },
       {
         question: 'How do streaks work?',
@@ -151,7 +151,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: 'Do you collect crash reports or product analytics?',
         answer:
-          'Both default ON during onboarding, but you can turn either off on the same screen or anytime later in Profile \u2192 Privacy & analytics; turning a switch off stops new events for that channel immediately. Crash reports include stack traces and device info to help us fix bugs faster \u2014 never your location and no personal data. Product analytics is anonymous, aggregated usage data with no GPS tracks. We never sell your data.',
+          'Crash reports default ON (so we can fix bugs that affect you) and product analytics defaults OFF until you opt in during onboarding. You can change either anytime in Profile \u2192 Privacy & analytics; turning a switch off stops new events for that channel immediately. Crash reports include stack traces and device info \u2014 never your location and no personal data. Product analytics is anonymous, aggregated usage data with no GPS tracks. We never sell your data.',
       },
     ],
   },

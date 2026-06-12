@@ -5,6 +5,7 @@ import { requireFullUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { verifyCronAuth } from '../lib/cronAuth';
 import { checkContentAgainstFilter } from '../lib/moderationFilter';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { ensureSupabase } from './feed-helpers';
@@ -294,20 +295,7 @@ export const buildModerationRoutes = (
         },
       },
       async (request) => {
-        const cronSecret = process.env.CRON_SECRET ?? '';
-        if (!cronSecret) {
-          throw new HttpError('Cron secret not configured.', {
-            statusCode: 500,
-            code: 'INTERNAL_ERROR',
-          });
-        }
-        const auth = request.headers.authorization;
-        if (auth !== `Bearer ${cronSecret}`) {
-          throw new HttpError('Unauthorized cron call.', {
-            statusCode: 401,
-            code: 'UNAUTHORIZED',
-          });
-        }
+        verifyCronAuth(request);
 
         const db = ensureSupabase();
         const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

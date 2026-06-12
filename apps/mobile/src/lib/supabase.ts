@@ -193,6 +193,27 @@ export const signUpWithEmail = async (email: string, password: string) => {
   });
 };
 
+/**
+ * Send a password-recovery email (review 2026-06-12: there was previously NO
+ * reset path — forgotten password = permanent lockout). Routes through the
+ * same email-confirm edge function as signup so the link opens the app at
+ * auth/callback; recovery detection happens via lib/passwordReset.ts.
+ * redirectTo is kept byte-identical to the signup emailRedirectTo so the
+ * Supabase redirect allow-list treats both the same.
+ */
+export const requestPasswordReset = async (email: string) => {
+  const client = requireSupabaseClient();
+  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
+  const redirectTo = `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
+  return client.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+};
+
+/** Set a new password on the current (recovery) session. */
+export const updatePassword = async (newPassword: string) => {
+  const client = requireSupabaseClient();
+  return client.auth.updateUser({ password: newPassword });
+};
+
 // GoogleSignin.configure() only needs to run once per process; guard so we
 // don't reconfigure on every sign-in attempt. This intentionally never resets:
 // there is exactly one webClientId per process lifetime, so don't try to swap

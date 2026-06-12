@@ -1,5 +1,4 @@
 import type {
-  AutocompleteResponse,
   BadgeResponse,
   CitySuggestionRequest,
   CitySuggestionResponse,
@@ -17,7 +16,6 @@ import type {
   TripStatsDashboard,
   UserStats,
   WriteAckResponse,
-  ReverseGeocodeResponse,
   RoutePreviewResponse,
   NeighborhoodSafetyScore,
   RideImpact,
@@ -36,6 +34,7 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
 import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullUser } from '../lib/auth';
+import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
@@ -45,38 +44,30 @@ import {
   sendSocialImpactDigest,
 } from '../lib/scheduledNotifications';
 import {
-  autocompleteRequestSchema,
-  autocompleteResponseSchema,
   coverageQuerystringSchema,
   coverageResponseSchema,
   errorResponseSchema,
   hazardReportRequestSchema,
   hazardReportResponseSchema,
   HttpError,
-  normalizeAutocompleteRequest,
   normalizeHazardReportRequest,
   normalizeNavigationFeedbackRequest,
   normalizeRerouteRequest,
-  normalizeReverseGeocodeRequest,
   normalizeTripEndRequest,
   normalizeTripStartRequest,
   normalizeRoutePreviewRequest,
   navigationFeedbackRequestSchema,
   rerouteRequestSchema,
-  reverseGeocodeRequestSchema,
-  reverseGeocodeResponseSchema,
   routePreviewRequestSchema,
   routePreviewResponseSchema,
   tripEndRequestSchema,
   tripEndResponseSchema,
   tripStartRequestSchema,
   tripStartResponseSchema,
-  type AutocompleteBody,
   type CoverageQuerystring,
   type HazardReportBody,
   type NavigationFeedbackBody,
   type RerouteBody,
-  type ReverseGeocodeBody,
   type RoutePreviewBody,
   type TripEndBody,
   type TripStartBody,
@@ -360,64 +351,14 @@ export const buildV1Routes = (
         ),
     );
 
-    app.post<{ Body: AutocompleteBody; Reply: AutocompleteResponse | ErrorResponse }>(
-      '/search/autocomplete',
-      {
-        schema: {
-          body: autocompleteRequestSchema,
-          response: {
-            200: autocompleteResponseSchema,
-            400: errorResponseSchema,
-            502: errorResponseSchema,
-            500: errorResponseSchema,
-          },
-        },
-      },
-      async (request) => {
-        const normalizedRequest = normalizeAutocompleteRequest(request.body);
-
-        try {
-          return {
-            suggestions: await dependencies.forwardGeocode(normalizedRequest),
-            generatedAt: new Date().toISOString(),
-          };
-        } catch (error) {
-          throw new HttpError('Search autocomplete failed.', {
-            statusCode: 502,
-            code: 'UPSTREAM_ERROR',
-            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
-          });
-        }
-      },
-    );
-
-    app.post<{ Body: ReverseGeocodeBody; Reply: ReverseGeocodeResponse | ErrorResponse }>(
-      '/search/reverse-geocode',
-      {
-        schema: {
-          body: reverseGeocodeRequestSchema,
-          response: {
-            200: reverseGeocodeResponseSchema,
-            400: errorResponseSchema,
-            502: errorResponseSchema,
-            500: errorResponseSchema,
-          },
-        },
-      },
-      async (request) => {
-        try {
-          return await dependencies.reverseGeocode(
-            normalizeReverseGeocodeRequest(request.body),
-          );
-        } catch (error) {
-          throw new HttpError('Reverse geocode failed.', {
-            statusCode: 502,
-            code: 'UPSTREAM_ERROR',
-            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
-          });
-        }
-      },
-    );
+    // /search/autocomplete + /search/reverse-geocode DELETED 2026-06-12
+    // (review P1, downgraded P2): they were unauthenticated, unthrottled
+    // proxies to the metered Mapbox Geocoding API — and dead surface: the
+    // mobile app calls Mapbox directly client-side (lib/mapbox-search.ts)
+    // and nothing else referenced these routes. The geocoding client
+    // plumbing (dependencies.forwardGeocode/reverseGeocode) is retained for
+    // potential server-side reuse; any future re-exposure MUST gate with
+    // requireWriteUser + applyRateLimit.
 
     app.post<{ Body: RoutePreviewBody; Reply: RoutePreviewResponse | ErrorResponse }>(
       '/routes/preview',
@@ -834,7 +775,15 @@ export const buildV1Routes = (
     }, async (request, reply) => {
       const lat = parseFloat(request.query.lat);
       const lon = parseFloat(request.query.lon);
-      const radiusMeters = parseFloat(request.query.radiusMeters ?? '1000');
+      // Review 2026-06-12 P2: radiusMeters was unbounded and NaN-unchecked —
+      // an anonymous caller could drive arbitrarily expensive ST_DWithin
+      // scans. NaN/invalid falls back to the client default; the cap is 5x
+      // the client's 1000m usage, generous for any legitimate alert radius.
+      const MAX_HAZARD_RADIUS_METERS = 5000;
+      const parsedRadius = parseFloat(request.query.radiusMeters ?? '1000');
+      const radiusMeters = Number.isFinite(parsedRadius) && parsedRadius > 0
+        ? Math.min(parsedRadius, MAX_HAZARD_RADIUS_METERS)
+        : 1000;
 
       if (Number.isNaN(lat) || Number.isNaN(lon)) {
         return reply.status(400).send({
@@ -846,6 +795,12 @@ export const buildV1Routes = (
 
       // Optional caller identity so we can surface `userVote` for signed-in users.
       const caller = await getAuthenticatedUserFromRequest(request, dependencies.authenticateUser);
+
+      // Rate limit keyed by user when signed in, IP otherwise — this was the
+      // only DB-hitting read endpoint with no throttle (review 2026-06-12).
+      await applyRateLimit(request, reply, dependencies, 'routePreview', {
+        userId: caller?.id,
+      });
 
       try {
         if (!supabaseAdmin) throw new Error('Supabase admin client not available');
@@ -1212,20 +1167,7 @@ export const buildV1Routes = (
         },
       },
     }, async (request) => {
-      const cronSecret = process.env.CRON_SECRET ?? '';
-      if (!cronSecret) {
-        throw new HttpError('Cron secret not configured.', {
-          statusCode: 500,
-          code: 'INTERNAL_ERROR',
-        });
-      }
-      const auth = request.headers.authorization;
-      if (auth !== `Bearer ${cronSecret}`) {
-        throw new HttpError('Unauthorized cron call.', {
-          statusCode: 401,
-          code: 'UNAUTHORIZED',
-        });
-      }
+      verifyCronAuth(request);
 
       if (!supabaseAdmin) {
         throw new HttpError('Database unavailable.', {
@@ -1519,8 +1461,11 @@ export const buildV1Routes = (
         );
 
       if (error) {
+        // Already logged above; never echo upstream internals to the client
+        // (review 2026-06-12 — this direct send bypassed the central
+        // error-handler's 5xx detail-stripping).
         request.log.error({ error }, 'push token upsert failed');
-        return reply.status(500).send({ error: 'Failed to register push token.', code: 'UPSTREAM_ERROR', details: [error.message] });
+        return reply.status(500).send({ error: 'Failed to register push token.', code: 'UPSTREAM_ERROR' });
       }
 
       return reply.send({ acceptedAt: new Date().toISOString() });
@@ -1583,7 +1528,9 @@ export const buildV1Routes = (
         ? authHeader.slice(7).trim()
         : '';
 
-      if (!accessToken || accessToken !== adminSecret) {
+      // Constant-time compare (review 2026-06-12): plain !== short-circuits
+      // on the first differing byte, enabling byte-at-a-time secret probing.
+      if (!accessToken || !timingSafeStringEqual(accessToken, adminSecret)) {
         return reply.status(403).send({
           error: 'Admin access required.',
           code: 'UNAUTHORIZED',
@@ -2084,14 +2031,19 @@ export const buildV1Routes = (
             additionalProperties: false,
             required: ['distanceMeters'],
             properties: {
-              distanceMeters:   { type: 'number', minimum: 0 },
-              elevationGainM:   { type: 'number', minimum: 0 },
+              // Review 2026-06-12 P2: these were unbounded above and feed
+              // straight into record_ride_impact (CO2 / money / microlives /
+              // XP / badge eligibility) — a forged request could inflate all
+              // of them arbitrarily. Caps are generous for any real ride:
+              // 500 km distance, 10 km climb, 300 km/h wind, 24 h duration.
+              distanceMeters:   { type: 'number', minimum: 0, maximum: 500_000 },
+              elevationGainM:   { type: 'number', minimum: 0, maximum: 10_000 },
               weatherCondition: { type: 'string', maxLength: 64 },
-              windSpeedKmh:     { type: 'number', minimum: 0 },
-              temperatureC:     { type: 'number' },
+              windSpeedKmh:     { type: 'number', minimum: 0, maximum: 300 },
+              temperatureC:     { type: 'number', minimum: -60, maximum: 60 },
               aqiLevel:         { type: 'string', maxLength: 32 },
               rideStartHour:    { type: 'integer', minimum: 0, maximum: 23 },
-              durationMinutes:  { type: 'number', minimum: 0 },
+              durationMinutes:  { type: 'number', minimum: 0, maximum: 1_440 },
               routeType:        { type: 'string', enum: ['safe', 'fast'] },
               hadDestination:   { type: 'boolean' },
             },
@@ -3666,17 +3618,7 @@ export const buildV1Routes = (
     // Called by Cloud Scheduler with a shared secret in the Authorization header.
     // These are NOT user-facing — they process all eligible users in batch.
 
-    const CRON_SECRET = process.env.CRON_SECRET ?? '';
-
-    const verifyCronAuth = (request: FastifyRequest): void => {
-      if (!CRON_SECRET) {
-        throw new HttpError('Cron secret not configured.', { statusCode: 500, code: 'INTERNAL_ERROR' });
-      }
-      const auth = request.headers.authorization;
-      if (auth !== `Bearer ${CRON_SECRET}`) {
-        throw new HttpError('Unauthorized cron call.', { statusCode: 401, code: 'UNAUTHORIZED' });
-      }
-    };
+    // Timing-safe shared implementation (review 2026-06-12) — lib/cronAuth.ts.
 
     // POST /v1/cron/streak-reminders — 8 PM daily
     app.post(
