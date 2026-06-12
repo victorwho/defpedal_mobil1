@@ -203,15 +203,23 @@ describe('NavigationResumeGuard', () => {
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  it('calls finishNavigation + clears cache when session exists but no cached route', async () => {
-    const session = makeNavigationSession(5 * 60 * 1000);
+  it('closes the ride (trip_end + trip_track) and resets flow when session exists but no cached route', async () => {
+    const session = {
+      ...makeNavigationSession(5 * 60 * 1000),
+      gpsBreadcrumbs: [{ lat: 44.43, lon: 26.1, ts: Date.now() - 60_000, acc: null, spd: null, hdg: null }],
+    };
     useAppStore.setState({
       appState: 'NAVIGATING',
       navigationSession: session as any,
+      activeTripClientId: 'client-trip-1',
+      queuedMutations: [],
       onboardingCompleted: true,
     });
     mockLoadCachedRoute.mockResolvedValue(null);
 
+    // Must NOT route through finishNavigation: that would bump
+    // completedRideCount and strand appState in AWAITING_FEEDBACK
+    // (review 2026-06-12 P1 #5).
     const finishSpy = vi.spyOn(useAppStore.getState(), 'finishNavigation');
 
     render(<NavigationResumeGuard />);
@@ -220,7 +228,12 @@ describe('NavigationResumeGuard', () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    expect(finishSpy).toHaveBeenCalled();
+    expect(finishSpy).not.toHaveBeenCalled();
+    const queued = useAppStore.getState().queuedMutations;
+    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    // Automatic cleanup preserves the GPS trail (ride lands in History).
+    expect(queued.some((m) => m.type === 'trip_track')).toBe(true);
+    expect(useAppStore.getState().appState).toBe('IDLE');
     expect(mockClearCachedRoute).toHaveBeenCalled();
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
@@ -264,14 +277,22 @@ describe('NavigationResumeGuard', () => {
     expect(mockRouter.replace).toHaveBeenCalledWith('/navigation');
   });
 
-  it('calls finishNavigation + clearCachedRoute when Discard is tapped', async () => {
-    const session = makeNavigationSession(FIFTEEN_MINUTES_MS + 60_000);
+  it('Discard queues trip_end only (no trip_track), resets to IDLE, and never calls finishNavigation', async () => {
+    const session = {
+      ...makeNavigationSession(FIFTEEN_MINUTES_MS + 60_000),
+      gpsBreadcrumbs: [{ lat: 44.43, lon: 26.1, ts: Date.now() - FIFTEEN_MINUTES_MS, acc: null, spd: null, hdg: null }],
+    };
     useAppStore.setState({
       appState: 'NAVIGATING',
       navigationSession: session as any,
+      activeTripClientId: 'client-trip-2',
+      queuedMutations: [],
+      completedRideCount: 3,
       onboardingCompleted: true,
     });
     mockLoadCachedRoute.mockResolvedValue(makeCachedRoute());
+
+    const finishSpy = vi.spyOn(useAppStore.getState(), 'finishNavigation');
 
     render(<NavigationResumeGuard />);
 
@@ -282,8 +303,55 @@ describe('NavigationResumeGuard', () => {
     const discardBtn = screen.getByTestId('btn-ghost');
     fireEvent.click(discardBtn);
 
+    expect(finishSpy).not.toHaveBeenCalled();
+    const state = useAppStore.getState();
+    const queued = state.queuedMutations;
+    // The orphaned server trip is closed...
+    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    // ...but an explicit discard mirrors in-ride discard semantics: no
+    // History trail, no impact/XP.
+    expect(queued.some((m) => m.type === 'trip_track')).toBe(false);
+    // resetFlow (not finishNavigation): IDLE, no completed-ride inflation,
+    // route-preview stays reachable.
+    expect(state.appState).toBe('IDLE');
+    expect(state.completedRideCount).toBe(3);
     expect(mockClearCachedRoute).toHaveBeenCalled();
     // After discard, modal should no longer be visible
     expect(screen.queryByTestId('resume-modal')).toBeNull();
+  });
+
+  it('does not double-queue trip_end when one is already queued for the same trip', async () => {
+    const session = {
+      ...makeNavigationSession(5 * 60 * 1000),
+      gpsBreadcrumbs: [{ lat: 44.43, lon: 26.1, ts: Date.now() - 60_000, acc: null, spd: null, hdg: null }],
+    };
+    useAppStore.setState({
+      appState: 'NAVIGATING',
+      navigationSession: session as any,
+      activeTripClientId: 'client-trip-3',
+      onboardingCompleted: true,
+    });
+    // Pre-queue a trip_end for the same trip (kill happened mid-End-Ride).
+    useAppStore.getState().enqueueMutation('trip_end', {
+      clientTripId: 'client-trip-3',
+      endedAt: new Date().toISOString(),
+      reason: 'stopped',
+    } as any);
+    const queuedBefore = useAppStore
+      .getState()
+      .queuedMutations.filter((m) => m.type === 'trip_end').length;
+    mockLoadCachedRoute.mockResolvedValue(null);
+
+    render(<NavigationResumeGuard />);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const queuedAfter = useAppStore
+      .getState()
+      .queuedMutations.filter((m) => m.type === 'trip_end').length;
+    expect(queuedAfter).toBe(queuedBefore);
+    expect(useAppStore.getState().appState).toBe('IDLE');
   });
 });

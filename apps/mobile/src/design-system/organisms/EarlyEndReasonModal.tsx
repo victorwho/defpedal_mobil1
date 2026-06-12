@@ -35,6 +35,14 @@ export interface EarlyEndReasonModalProps {
   readonly skipLabel: string;
   readonly otherPlaceholder: string;
   readonly onSubmit: (reason: EarlyEndReason | null, note: string | null) => void;
+  /**
+   * Optional abort path: closes the modal WITHOUT ending the ride (the rider
+   * changed their mind after tapping Save/Discard in the End Ride dialog).
+   * Rendered as an explicit button — backdrop-dismiss stays disabled because
+   * of the Android Alert touch-propagation issue documented below.
+   */
+  readonly cancelLabel?: string;
+  readonly onCancel?: () => void;
 }
 
 export const EarlyEndReasonModal: React.FC<EarlyEndReasonModalProps> = ({
@@ -45,6 +53,8 @@ export const EarlyEndReasonModal: React.FC<EarlyEndReasonModalProps> = ({
   skipLabel,
   otherPlaceholder,
   onSubmit,
+  cancelLabel,
+  onCancel,
 }) => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -80,6 +90,11 @@ export const EarlyEndReasonModal: React.FC<EarlyEndReasonModalProps> = ({
           <Button variant="ghost" size="md" onPress={() => onSubmit(null, null)}>
             {skipLabel}
           </Button>
+          {cancelLabel && onCancel ? (
+            <Button variant="ghost" size="md" onPress={onCancel}>
+              {cancelLabel}
+            </Button>
+          ) : null}
         </View>
       }
     >

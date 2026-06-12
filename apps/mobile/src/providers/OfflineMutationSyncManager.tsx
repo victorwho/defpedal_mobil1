@@ -94,7 +94,12 @@ const withMutationTimeout = async <TResponse,>(
   promise: Promise<TResponse>,
   mutationType: QueuedMutation['type'],
 ) => {
-  const timeoutMs = getMutationTimeoutMs(mutationType);
+  // Backstop only: the per-type timeout is threaded into the request itself
+  // (api.ts passes timeoutMs to apiFetch's AbortController for trip_*), so
+  // this outer race should never win against a healthy abort. The +5s buffer
+  // guarantees the inner abort fires first and surfaces as ApiClientError
+  // (kind 'timeout', retryable) rather than this generic Error.
+  const timeoutMs = getMutationTimeoutMs(mutationType) + 5_000;
   return new Promise<TResponse>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(

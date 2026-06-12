@@ -1,13 +1,32 @@
 /**
  * NavigationResumeGuard — app restart recovery for in-progress navigation.
  *
- * On mount, checks for a persisted navigation session (Zustand) AND a cached
- * route (OfflineRouteCache). Based on session age:
+ * SINGLE OWNER of restart-during-NAVIGATING recovery (review 2026-06-12,
+ * P1 #3/#4): the old `useAppKilledRecovery` in NavigationLifecycleManager
+ * force-ended every interrupted ride with no age threshold and raced both
+ * AsyncStorage persist hydration and this guard — whether a killed ride was
+ * silently ended or offered for resume was nondeterministic. That hook is
+ * gone; this component now owns the whole decision, gated on store hydration.
+ *
+ * On mount (after hydration + auth + onboarding settle), checks for a
+ * persisted navigation session (Zustand) AND a cached route
+ * (OfflineRouteCache). Based on session age:
  *
  *   < 15 min  → auto-resume (navigate to /navigation silently)
  *   >= 15 min → show modal prompt "Resume or Discard?"
  *
- * If state is inconsistent (only one of session/cache exists), discards both.
+ * If state is inconsistent (NAVIGATING session without a resumable cached
+ * route), the interrupted ride is closed out server-side (trip_end +
+ * trip_track with end_reason 'app_killed' — the old kill-recovery behavior,
+ * so the ride still lands in History) and the flow resets to IDLE.
+ *
+ * Discard semantics: an explicit user "Discard" queues trip_end only (no
+ * trip_track — matching the in-ride End Ride → Discard path: no History row,
+ * no impact/XP/badges) and resets to IDLE via resetFlow. It must NEVER call
+ * finishNavigation(): that transitions to AWAITING_FEEDBACK (stranding the
+ * app — route-preview's guard excludes that state) and increments
+ * completedRideCount (review-prompt / MeetPedal gates) for a ride the user
+ * just threw away (review 2026-06-12, P1 #5).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -15,6 +34,7 @@ import { router } from 'expo-router';
 
 import { loadCachedRoute, clearCachedRoute } from '../lib/offlineRouteCache';
 import { useAppStore } from '../store/appStore';
+import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useAuthSessionOptional } from '../providers/AuthSessionProvider';
 import { Modal } from '../design-system/organisms/Modal';
 import { Button } from '../design-system/atoms/Button';
@@ -46,6 +66,65 @@ const getSessionAgeMs = (session: {
   return Date.now() - referenceTime;
 };
 
+/**
+ * Close out an interrupted/discarded ride: queue trip_end (and, when
+ * `saveTrack` is set, the trip_track GPS trail with end_reason 'app_killed')
+ * for the active trip, then reset the flow to IDLE and clear the route cache.
+ *
+ * `saveTrack: true`  — automatic cleanup paths (no user input): preserve the
+ *                      old kill-recovery behavior so the interrupted ride
+ *                      still shows up in History.
+ * `saveTrack: false` — explicit user Discard: mirror the in-ride discard
+ *                      semantics (trip closed server-side, nothing in
+ *                      History, no impact/XP).
+ *
+ * Anonymous rides (no activeTripClientId) have no server trip to close —
+ * only the local reset runs.
+ */
+const closeInterruptedRide = (saveTrack: boolean): void => {
+  const state = useAppStore.getState();
+  const session = state.navigationSession;
+  const clientTripId = state.activeTripClientId;
+
+  if (session && clientTripId) {
+    // Dedup against an already-queued trip_end for this trip (same guard as
+    // navigation.tsx queueTripEnd) so recovery after a kill that happened
+    // mid-End-Ride doesn't double-close the trip.
+    const alreadyQueuedTripEnd = state.queuedMutations.some(
+      (mutation) =>
+        mutation.type === 'trip_end' &&
+        (mutation.payload as { clientTripId?: string }).clientTripId === clientTripId,
+    );
+
+    if (!alreadyQueuedTripEnd) {
+      const endedAt = new Date().toISOString();
+
+      state.enqueueMutation('trip_end', {
+        clientTripId,
+        endedAt,
+        reason: 'stopped',
+      });
+
+      if (saveTrack && session.gpsBreadcrumbs.length > 0) {
+        // routeRequest.mode is in the persist whitelist so the mode survives
+        // the kill — read it from the rehydrated store rather than
+        // defaulting to 'fast' (which mislabeled kill-recovered safe rides).
+        state.enqueueMutation('trip_track', {
+          clientTripId,
+          routingMode: state.routeRequest?.mode ?? 'fast',
+          gpsBreadcrumbs: session.gpsBreadcrumbs,
+          endReason: 'app_killed',
+          startedAt: session.startedAt,
+          endedAt,
+        });
+      }
+    }
+  }
+
+  state.resetFlow();
+  void clearCachedRoute();
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -55,6 +134,10 @@ export const NavigationResumeGuard: React.FC = () => {
   const [destinationLabel, setDestinationLabel] = useState('');
   const hasCheckedRef = useRef(false);
 
+  // Wait for persist hydration — reading appState/navigationSession before
+  // the AsyncStorage rehydrate lands would see the IDLE defaults and skip
+  // recovery entirely (the race that made the old kill-recovery flaky).
+  const hydrated = useStoreHydrated();
   // Wait for auth to settle before checking — prevents race with OnboardingGuard
   const authCtx = useAuthSessionOptional();
   const isAuthLoading = authCtx?.isLoading ?? true;
@@ -62,6 +145,7 @@ export const NavigationResumeGuard: React.FC = () => {
 
   useEffect(() => {
     if (hasCheckedRef.current) return;
+    if (!hydrated) return;
     // Defer until auth has resolved — OnboardingGuard needs to run first
     if (isAuthLoading) return;
     // Skip if onboarding isn't complete — let OnboardingGuard handle the flow
@@ -73,24 +157,26 @@ export const NavigationResumeGuard: React.FC = () => {
       const session = state.navigationSession;
       const cachedRoute = await loadCachedRoute();
 
-      // Inconsistent state: only one exists — discard both
-      if ((session != null) !== (cachedRoute != null)) {
-        if (session != null) {
-          state.finishNavigation();
-        }
-        await clearCachedRoute();
-        return;
-      }
-
-      // Neither exists — nothing to resume
-      if (session == null || cachedRoute == null) {
-        return;
-      }
-
-      // Both exist — check if the app state is still NAVIGATING
+      // Not mid-ride: nothing to recover — just drop any stale cached route.
       if (state.appState !== 'NAVIGATING') {
-        // State machine moved past navigation — clean up stale cache
+        if (cachedRoute != null) {
+          await clearCachedRoute();
+        }
+        return;
+      }
+
+      // NAVIGATING with no session — inconsistent; nothing recoverable.
+      if (session == null) {
+        state.resetFlow();
         await clearCachedRoute();
+        return;
+      }
+
+      // NAVIGATING session but no cached route — can't rebuild the map/route
+      // for a resume. Close the interrupted ride out (keeps the GPS trail so
+      // the ride still lands in History, like the old kill recovery).
+      if (cachedRoute == null) {
+        closeInterruptedRide(true);
         return;
       }
 
@@ -107,7 +193,7 @@ export const NavigationResumeGuard: React.FC = () => {
     };
 
     void check();
-  }, [isAuthLoading, onboardingCompleted]);
+  }, [hydrated, isAuthLoading, onboardingCompleted]);
 
   const handleResume = useCallback(() => {
     setShowPrompt(false);
@@ -116,9 +202,8 @@ export const NavigationResumeGuard: React.FC = () => {
 
   const handleDiscard = useCallback(() => {
     setShowPrompt(false);
-    const state = useAppStore.getState();
-    state.finishNavigation();
-    void clearCachedRoute();
+    // Explicit discard: close the server trip, skip the History trail.
+    closeInterruptedRide(false);
   }, []);
 
   if (!showPrompt) return null;

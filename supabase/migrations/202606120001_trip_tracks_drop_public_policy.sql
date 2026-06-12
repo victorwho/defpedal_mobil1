@@ -1,0 +1,24 @@
+-- P0 security fix (full-app review 2026-06-12, finding P0-1):
+--
+-- The "Service role full access" policy on trip_tracks was created WITHOUT a
+-- `TO service_role` clause (202603240001_create_trip_tracks.sql:32-35), so it
+-- applied to PUBLIC — all roles. Permissive RLS policies are OR-combined, so
+-- its USING (true) / WITH CHECK (true) overrode the owner-scoped policies for
+-- any role holding table privileges. Since `authenticated` holds SELECT,
+-- INSERT (line 39) and Supabase anonymous sign-in issues role=authenticated
+-- JWTs, ANY account (including anonymous ones) could read — and forge — every
+-- user's full GPS trail.
+--
+-- The policy is also useless for its stated purpose: service_role BYPASSES
+-- RLS entirely (rolbypassrls), so it never needed a policy. Dropping it
+-- restores the owner-scoped policies ("Users can insert own tracks" /
+-- "Users can read own tracks") as the only client-reachable paths. The API
+-- server talks to this table exclusively through the service-role client
+-- (services/mobile-api/src/lib/submissions.ts) and is unaffected.
+--
+-- Audit note: all other "Service role full access" policies in this schema
+-- (ride_microlives, community_seconds_daily) correctly carry TO service_role;
+-- the remaining USING (true) policies are intentional SELECT-only policies on
+-- public reference tables. trip_tracks was the sole offender.
+
+DROP POLICY IF EXISTS "Service role full access" ON trip_tracks;

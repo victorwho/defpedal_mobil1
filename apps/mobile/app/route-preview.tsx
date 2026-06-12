@@ -1,6 +1,6 @@
 import type { RiskSegment } from '@defensivepedal/core';
 import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
-import { router, useIsFocused } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -133,6 +133,18 @@ function RoutePreviewScreen() {
 
   // ── Route Preview Telemetry: route_generated_not_started ──
   const navigationStartedRef = useRef(false);
+  const appState = useAppStore((state) => state.appState);
+
+  // Re-arm the one-shot start lock whenever this screen regains focus
+  // (error-log #36 pattern). Expo Router keeps route-preview mounted under
+  // the pushed /navigation screen, so without this an iOS swipe-back (or any
+  // pop) landed on a preview whose Start button was permanently dead — the
+  // ref stayed true from the first start (review 2026-06-12, P1 #2).
+  useFocusEffect(
+    useCallback(() => {
+      navigationStartedRef.current = false;
+    }, []),
+  );
 
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
@@ -350,6 +362,13 @@ function RoutePreviewScreen() {
 
   const beginNavigation = () => {
     if (!selectedRoute) {
+      return;
+    }
+    // A ride is already running — the rider backed out of /navigation (system
+    // back / swipe-back) onto this still-mounted preview. Don't enqueue a
+    // second trip_start; just return to the HUD (review 2026-06-12, P1 #2).
+    if (appState === 'NAVIGATING') {
+      router.push('/navigation');
       return;
     }
     // Double-tap guard. A second tap before React re-renders would otherwise
@@ -576,7 +595,11 @@ function RoutePreviewScreen() {
             disabled={!selectedRoute}
             onPress={beginNavigation}
           >
-            {selectedRoute ? t('preview.startNavigation') : t('preview.noRouteSelected')}
+            {appState === 'NAVIGATING'
+              ? t('preview.returnToNavigation')
+              : selectedRoute
+                ? t('preview.startNavigation')
+                : t('preview.noRouteSelected')}
           </Button>
           <View style={styles.footerSecondaryRow}>
             <View style={styles.footerSecondaryButton}>

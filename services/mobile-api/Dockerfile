@@ -5,6 +5,10 @@ COPY package.json package.json
 COPY apps/mobile/package.json apps/mobile/package.json
 COPY packages packages
 COPY services/mobile-api/package.json services/mobile-api/package.json
+# Root postinstall wrapper: tolerates patch-package being absent in this
+# image (root devDependencies are never installed here; the patches/ dir only
+# targets React Native libraries). Without it, npm install exits 127.
+COPY scripts/run-patch-package.cjs scripts/run-patch-package.cjs
 
 RUN npm install --workspaces --include-workspace-root=false --legacy-peer-deps
 
@@ -26,6 +30,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/services/mobile-api/package.json ./services/mobile-api/package.json
 COPY --from=builder /app/services/mobile-api/dist ./services/mobile-api/dist
+COPY --from=builder /app/scripts/run-patch-package.cjs ./scripts/run-patch-package.cjs
 
 RUN npm install --workspaces --include-workspace-root=false --legacy-peer-deps --omit=dev
 

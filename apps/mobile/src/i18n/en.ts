@@ -60,6 +60,7 @@ export const en = {
   // ── Route Preview ──
   preview: {
     startNavigation: 'Start navigation',
+    returnToNavigation: 'Return to navigation',
     switchToSafe: 'Switch to safe route',
     switchingToSafe: 'Switching to safe route...',
     saveRoute: 'Save route',
@@ -106,6 +107,7 @@ export const en = {
     endRideSaveMessage: 'Save it to your history, or discard it. If you discard, no impact, XP, or badges will be recorded.',
     endRideSave: 'Save',
     endRideDiscard: 'Discard',
+    endRideKeepRiding: 'Keep riding',
     earlyEndTitle: 'Why did you end your route early?',
     earlyEndReachedDestination: 'I reached my destination',
     earlyEndFoundBetterRoute: 'I found a better route on my own',

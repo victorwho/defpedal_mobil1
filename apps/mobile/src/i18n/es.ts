@@ -62,6 +62,7 @@ export const es: TranslationKeys = {
   // ── Route Preview ──
   preview: {
     startNavigation: 'Iniciar navegación',
+    returnToNavigation: 'Volver a la navegación',
     switchToSafe: 'Cambiar a ruta segura',
     switchingToSafe: 'Cambiando a ruta segura...',
     saveRoute: 'Guardar ruta',
@@ -108,6 +109,7 @@ export const es: TranslationKeys = {
     endRideSaveMessage: 'Guárdala en tu historial o descártala. Si la descartas, no se registra impacto, XP ni insignias.',
     endRideSave: 'Guardar',
     endRideDiscard: 'Descartar',
+    endRideKeepRiding: 'Seguir pedaleando',
     earlyEndTitle: '¿Por qué has terminado la ruta antes de tiempo?',
     earlyEndReachedDestination: 'He llegado a mi destino',
     earlyEndFoundBetterRoute: 'He encontrado una ruta mejor por mi cuenta',

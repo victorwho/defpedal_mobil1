@@ -11,7 +11,7 @@
   ],
   "scripts": {
     "eas-build-pre-install": "chmod -R u+w ${EAS_BUILD_WORKINGDIR:-.} 2>/dev/null || true",
-    "postinstall": "patch-package",
+    "postinstall": "node scripts/run-patch-package.cjs",
     "dev": "npm run dev:mobile",
     "dev:mobile": "npm run start --workspace @defensivepedal/mobile",
     "dev:mobile:preview": "node ./scripts/start-mobile-preview.mjs",

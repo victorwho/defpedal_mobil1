@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 import {
   startBackgroundNavigationUpdates,
@@ -7,61 +7,19 @@ import {
 import { useAppStore } from '../store/appStore';
 
 /**
- * Detects if the app was killed during navigation and recovers by
- * queueing trip_end + trip_track mutations with end_reason 'app_killed'.
+ * App-killed-during-navigation recovery used to live here as
+ * `useAppKilledRecovery`, force-ending any interrupted ride on cold start
+ * with no age threshold. It raced AsyncStorage persist hydration AND
+ * NavigationResumeGuard's documented <15-min auto-resume — whichever ran
+ * first won, nondeterministically (review 2026-06-12, P1 #3/#4).
+ * NavigationResumeGuard is now the single owner of restart recovery: it
+ * waits for hydration, auto-resumes fresh sessions, prompts for stale ones,
+ * and closes out unresumable rides (trip_end + trip_track 'app_killed').
  */
-const useAppKilledRecovery = () => {
-  const recoveredRef = useRef(false);
-
-  useEffect(() => {
-    if (recoveredRef.current) return;
-
-    const state = useAppStore.getState();
-    const session = state.navigationSession;
-
-    // If app opens with NAVIGATING state + breadcrumbs, the previous
-    // session was interrupted (app killed / crash / force close)
-    if (
-      state.appState === 'NAVIGATING' &&
-      session &&
-      session.gpsBreadcrumbs.length > 0 &&
-      state.activeTripClientId
-    ) {
-      recoveredRef.current = true;
-      const endedAt = new Date().toISOString();
-
-      // Queue trip end as stopped
-      state.enqueueMutation('trip_end', {
-        clientTripId: state.activeTripClientId,
-        endedAt,
-        reason: 'stopped',
-      });
-
-      // Queue trip track with app_killed reason. routeRequest.mode is in the
-      // persist whitelist so the mode survives the kill — read it from the
-      // rehydrated store rather than defaulting to 'fast' (which silently
-      // mislabeled every kill-recovered safe ride).
-      state.enqueueMutation('trip_track', {
-        clientTripId: state.activeTripClientId,
-        routingMode: state.routeRequest?.mode ?? 'fast',
-        gpsBreadcrumbs: session.gpsBreadcrumbs,
-        endReason: 'app_killed',
-        startedAt: session.startedAt,
-        endedAt,
-      });
-
-      // Reset to idle
-      state.resetFlow();
-    }
-  }, []);
-};
-
 export const NavigationLifecycleManager = () => {
   const isNavigating = useAppStore(
     (state) => state.appState === 'NAVIGATING' && Boolean(state.navigationSession),
   );
-
-  useAppKilledRecovery();
 
   useEffect(() => {
     const syncLifecycle = async () => {

@@ -59,6 +59,7 @@ import type {
 
 import { ApiClientError } from './apiFetch';
 import { mobileApiFetch } from './mobileApiFetch';
+import { getMutationTimeoutMs } from './offlineSyncHelpers';
 import {
   ActivityFeedResponseSchema,
   FeedResponseSchema,
@@ -93,15 +94,21 @@ export const mobileApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  // Trip mutations carry their per-type sync timeout (30s) so the underlying
+  // apiFetch AbortController survives Cloud Run cold starts (15-25s). Without
+  // this, apiFetch's 8s default re-introduces MOBILE-7 regardless of the
+  // outer withMutationTimeout ceiling in OfflineMutationSyncManager.
   startTrip: (payload: TripStartRequest) =>
     mobileApiFetch<TripStartResponse>('/v1/trips/start', {
       method: 'POST',
       body: JSON.stringify(payload),
+      timeoutMs: getMutationTimeoutMs('trip_start'),
     }),
   endTrip: (payload: TripEndRequest) =>
     mobileApiFetch<TripEndResponse>('/v1/trips/end', {
       method: 'POST',
       body: JSON.stringify(payload),
+      timeoutMs: getMutationTimeoutMs('trip_end'),
     }),
   getTripHistory: () =>
     mobileApiFetch<TripHistoryItem[]>('/v1/trips/history'),
@@ -117,6 +124,7 @@ export const mobileApi = {
     mobileApiFetch<WriteAckResponse>('/v1/trips/track', {
       method: 'POST',
       body: JSON.stringify(payload),
+      timeoutMs: getMutationTimeoutMs('trip_track'),
     }),
   submitFeedback: (payload: NavigationFeedbackRequest) =>
     mobileApiFetch<WriteAckResponse>('/v1/feedback', {

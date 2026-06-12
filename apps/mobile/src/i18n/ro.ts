@@ -62,6 +62,7 @@ export const ro: TranslationKeys = {
   // ── Route Preview ──
   preview: {
     startNavigation: 'Începe navigarea',
+    returnToNavigation: 'Înapoi la navigare',
     switchToSafe: 'Schimbă pe traseu sigur',
     switchingToSafe: 'Se schimbă pe traseu sigur...',
     saveRoute: 'Salvează traseu',
@@ -108,6 +109,7 @@ export const ro: TranslationKeys = {
     endRideSaveMessage: 'Salveaz-o în istoric sau renunță. Dacă renunți, nu se înregistrează impact, XP sau insigne.',
     endRideSave: 'Salvează',
     endRideDiscard: 'Renunță',
+    endRideKeepRiding: 'Continuă cursa',
     earlyEndTitle: 'De ce ai încheiat traseul mai devreme?',
     earlyEndReachedDestination: 'Am ajuns la destinație',
     earlyEndFoundBetterRoute: 'Am găsit singur un traseu mai bun',

@@ -587,6 +587,8 @@ export const buildV1Routes = (
             endReason: 'completed' | 'stopped' | 'app_killed';
             startedAt: string;
             endedAt: string;
+            bikeType?: string;
+            aqiAtStart?: number | null;
             earlyEndReason?: EarlyEndReason | null;
             earlyEndReasonNote?: string | null;
           };
@@ -602,6 +604,11 @@ export const buildV1Routes = (
               endReason: body.endReason,
               startedAt: body.startedAt,
               endedAt: body.endedAt,
+              // Review 2026-06-12 P1: the schema accepted these and the client
+              // sends them, but the handler never forwarded them — trip_tracks
+              // stored null bike_type/aqi_at_start for every ride.
+              bikeType: body.bikeType,
+              aqiAtStart: body.aqiAtStart ?? null,
               earlyEndReason: body.earlyEndReason ?? null,
               earlyEndReasonNote: body.earlyEndReasonNote ?? null,
             },
@@ -2015,6 +2022,39 @@ export const buildV1Routes = (
       },
     );
 
+    // Shared item schemas for the ride-impact POST and GET responses.
+    // Gotcha #9: a bare `items: { type: 'object' }` makes fast-json-stringify
+    // serialize every element as `{}` — the GET endpoint shipped that way and
+    // stripped all badge/XP fields (review 2026-06-12, P1 #8). Single source
+    // of truth so the two endpoints can't drift again.
+    const rideImpactNewBadgeItemSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['badgeKey', 'name', 'flavorText', 'iconKey', 'earnedAt'],
+      properties: {
+        badgeKey:   { type: 'string' },
+        tier:       { type: ['string', 'null'] },
+        name:       { type: 'string' },
+        flavorText: { type: 'string' },
+        iconKey:    { type: 'string' },
+        earnedAt:   { type: 'string' },
+      },
+    } as const;
+
+    const rideImpactXpBreakdownItemSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['action', 'label', 'baseXp', 'multiplier', 'finalXp'],
+      properties: {
+        action:     { type: 'string' },
+        label:      { type: 'string' },
+        baseXp:     { type: 'integer' },
+        multiplier: { type: 'number' },
+        finalXp:    { type: 'integer' },
+        sourceId:   { type: 'string' },
+      },
+    } as const;
+
     // POST /v1/rides/:tripId/impact — record ride impact and return with random equivalent + new badges
     app.post<{
       Params: { tripId: string };
@@ -2070,38 +2110,8 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
-                newBadges: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['badgeKey', 'name', 'flavorText', 'iconKey', 'earnedAt'],
-                    properties: {
-                      badgeKey:   { type: 'string' },
-                      tier:       { type: ['string', 'null'] },
-                      name:       { type: 'string' },
-                      flavorText: { type: 'string' },
-                      iconKey:    { type: 'string' },
-                      earnedAt:   { type: 'string' },
-                    },
-                  },
-                },
-                xpBreakdown: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    required: ['action', 'label', 'baseXp', 'multiplier', 'finalXp'],
-                    properties: {
-                      action:     { type: 'string' },
-                      label:      { type: 'string' },
-                      baseXp:     { type: 'integer' },
-                      multiplier: { type: 'number' },
-                      finalXp:    { type: 'integer' },
-                      sourceId:   { type: 'string' },
-                    },
-                  },
-                },
+                newBadges: { type: 'array', items: rideImpactNewBadgeItemSchema },
+                xpBreakdown: { type: 'array', items: rideImpactXpBreakdownItemSchema },
                 totalXpEarned: { type: 'integer' },
                 currentTotalXp: { type: 'integer' },
                 riderTier: { type: 'string' },
@@ -2531,8 +2541,8 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
-                newBadges: { type: 'array', items: { type: 'object' } },
-                xpBreakdown: { type: 'array', items: { type: 'object' } },
+                newBadges: { type: 'array', items: rideImpactNewBadgeItemSchema },
+                xpBreakdown: { type: 'array', items: rideImpactXpBreakdownItemSchema },
                 totalXpEarned: { type: 'integer' },
                 currentTotalXp: { type: 'integer' },
                 riderTier: { type: 'string' },

@@ -232,6 +232,37 @@ const computeTrimmedPolyline6 = (fullPolyline6: string): string => {
   return encodePolyline(trimmed);
 };
 
+/**
+ * First/last coordinates of the trimmed polyline, in the payload's
+ * `{lat, lon}` shape. Stored alongside the trimmed polyline so the RPCs can
+ * substitute privacy-safe endpoints for the raw `origin`/`destination` when
+ * `hide_endpoints` is true (full-app review 2026-06-12, finding P0-2: the
+ * RPCs previously swapped only the polyline, leaking the sharer's exact
+ * home/work coordinates through the untouched origin/destination keys).
+ *
+ * `decodePolyline` returns `[lon, lat]` (GeoJSON order) — note the swap.
+ * Returns null endpoints for degenerate (empty) geometry; the RPCs COALESCE
+ * back to the raw values in that case, matching trimPrivacyZone's own
+ * short-route no-op behavior where trimmed endpoints equal raw endpoints.
+ */
+const computeTrimmedEndpoints = (
+  trimmedPolyline6: string,
+): {
+  trimmedOrigin: { lat: number; lon: number } | null;
+  trimmedDestination: { lat: number; lon: number } | null;
+} => {
+  const points = decodePolyline(trimmedPolyline6) as [number, number][];
+  if (points.length === 0) {
+    return { trimmedOrigin: null, trimmedDestination: null };
+  }
+  const [firstLon, firstLat] = points[0];
+  const [lastLon, lastLat] = points[points.length - 1];
+  return {
+    trimmedOrigin: { lat: firstLat, lon: firstLon },
+    trimmedDestination: { lat: lastLat, lon: lastLon },
+  };
+};
+
 export const createRouteShareService = (
   options: CreateRouteShareServiceOptions,
 ): RouteShareService => {
@@ -308,6 +339,8 @@ export const createRouteShareService = (
 
     const fullPolyline = request.route.geometryPolyline6;
     const trimmedPolyline = computeTrimmedPolyline6(fullPolyline);
+    const { trimmedOrigin, trimmedDestination } =
+      computeTrimmedEndpoints(trimmedPolyline);
 
     // Payload mirrors the shape documented in migration 2026041801_route_shares.sql
     // The RPC picks geometryPolyline6 vs trimmedGeometryPolyline6 based on hide_endpoints.
@@ -321,6 +354,11 @@ export const createRouteShareService = (
       destination: request.route.destination,
       geometryPolyline6: fullPolyline,
       trimmedGeometryPolyline6: trimmedPolyline,
+      // Privacy-safe endpoint substitutes used by the RPCs when
+      // hide_endpoints=true. Never returned to clients verbatim — the RPCs
+      // strip these keys and fold them into origin/destination as needed.
+      trimmedOrigin,
+      trimmedDestination,
       distanceMeters: request.route.distanceMeters,
       durationSeconds: request.route.durationSeconds,
       routingMode: request.route.routingMode,

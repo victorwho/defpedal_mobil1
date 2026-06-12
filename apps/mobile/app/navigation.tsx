@@ -15,11 +15,11 @@ import {
 } from '@defensivepedal/core';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, BackHandler, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
@@ -150,6 +150,7 @@ function NavigationScreen() {
   const recordNavigationReroute = useAppStore((state) => state.recordNavigationReroute);
   const syncNavigationRoute = useAppStore((state) => state.syncNavigationRoute);
   const finishNavigation = useAppStore((state) => state.finishNavigation);
+  const resetFlow = useAppStore((state) => state.resetFlow);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setFollowing = useAppStore((state) => state.setFollowing);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
@@ -510,9 +511,59 @@ function NavigationScreen() {
       early_end_reason: earlyEndReason ?? 'skipped',
     });
     void clearCachedRoute();
-    finishNavigation();
+    if (isDiscard) {
+      // Discard must NOT go through finishNavigation: that transitions to
+      // AWAITING_FEEDBACK and bumps completedRideCount (review-prompt /
+      // MeetPedal gates), so a discarded ride would count as completed and
+      // leave AWAITING_FEEDBACK persisted with no feedback screen to clear
+      // it. resetFlow returns straight to IDLE (review 2026-06-12, P1 #5).
+      resetFlow();
+    } else {
+      finishNavigation();
+    }
     router.replace(isDiscard ? '/route-planning' : '/feedback');
-  }, [endActionPending, queueTripEnd, selectedRoute, navigationSession, finishNavigation]);
+  }, [endActionPending, queueTripEnd, selectedRoute, navigationSession, finishNavigation, resetFlow]);
+
+  // End Ride confirmation. Both Save and Discard route through
+  // finalizeEarlyEnd via the reason modal; endActionPending tells finalize
+  // which outcome to apply. "Keep riding" (and tapping outside / system back
+  // on the dialog) aborts without ending — review 2026-06-12 P1 #1: dismiss
+  // used to be mapped to Save, making an accidental brush of the 40px stop
+  // button irreversibly end the ride.
+  const confirmEndRide = useCallback(() => {
+    const saveAndEnd = () => {
+      setEndActionPending('save');
+      setEarlyEndPromptOpen(true);
+    };
+    const discardAndEnd = () => {
+      setEndActionPending('discard');
+      setEarlyEndPromptOpen(true);
+    };
+    Alert.alert(
+      t('nav.endRideSaveTitle'),
+      t('nav.endRideSaveMessage'),
+      [
+        { text: t('nav.endRideKeepRiding'), style: 'cancel' },
+        { text: t('nav.endRideDiscard'), style: 'destructive', onPress: discardAndEnd },
+        { text: t('nav.endRideSave'), style: 'default', onPress: saveAndEnd },
+      ],
+      { cancelable: true },
+    );
+  }, [t]);
+
+  // Android hardware back during a ride opens the End Ride dialog instead of
+  // popping the stack. Without this there was no BackHandler anywhere: back
+  // popped to route-preview while appState stayed NAVIGATING and GPS kept
+  // recording — a zombie ride with no HUD (review 2026-06-12, P1 #2).
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        confirmEndRide();
+        return true; // consume — never pop mid-ride
+      });
+      return () => subscription.remove();
+    }, [confirmEndRide]),
+  );
 
   const earlyEndReasonOptions: ReadonlyArray<EarlyEndReasonOption> = [
     { value: 'reached_destination', label: t('nav.earlyEndReachedDestination') },
@@ -1188,41 +1239,7 @@ function NavigationScreen() {
           <View style={styles.endRideButton}>
             <IconButton
               icon={<Ionicons name="stop-circle" size={24} color={gray[50]} />}
-              onPress={() => {
-                // Both Save and Discard route through finalizeEarlyEnd via
-                // the reason modal; endActionPending tells finalize which
-                // outcome to apply. This lets us capture the reason even
-                // when the rider discards (the trip_track is skipped but
-                // trip_end still writes the reason onto the trips row).
-                const saveAndEnd = () => {
-                  setEndActionPending('save');
-                  setEarlyEndPromptOpen(true);
-                };
-                const discardAndEnd = () => {
-                  setEndActionPending('discard');
-                  setEarlyEndPromptOpen(true);
-                };
-                Alert.alert(
-                  t('nav.endRideSaveTitle'),
-                  t('nav.endRideSaveMessage'),
-                  [
-                    {
-                      text: t('nav.endRideDiscard'),
-                      style: 'destructive',
-                      onPress: discardAndEnd,
-                    },
-                    {
-                      text: t('nav.endRideSave'),
-                      style: 'default',
-                      onPress: saveAndEnd,
-                    },
-                  ],
-                  // Android: tapping outside / system-back dismisses the dialog
-                  // and we treat that as "save by default" per product spec.
-                  // iOS: Alert.alert can't be dismissed without tapping a button.
-                  { cancelable: true, onDismiss: saveAndEnd },
-                );
-              }}
+              onPress={confirmEndRide}
               accessibilityLabel={t('nav.endRide')}
               variant="danger"
             />
@@ -1419,6 +1436,13 @@ function NavigationScreen() {
         skipLabel={t('nav.earlyEndSkip')}
         otherPlaceholder={t('nav.earlyEndOtherPlaceholder')}
         onSubmit={finalizeEarlyEnd}
+        cancelLabel={t('nav.endRideKeepRiding')}
+        onCancel={() => {
+          // Rider changed their mind after Save/Discard — abort the whole
+          // End Ride flow and keep navigating.
+          setEarlyEndPromptOpen(false);
+          setEndActionPending(null);
+        }}
       />
 
     </View>
