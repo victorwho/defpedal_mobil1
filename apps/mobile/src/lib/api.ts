@@ -126,6 +126,15 @@ export const mobileApi = {
       body: JSON.stringify(payload),
       timeoutMs: getMutationTimeoutMs('trip_track'),
     }),
+  // Pedal Nudge tap telemetry (review 2026-06-12 item 23): the funnel was
+  // dead end-to-end — no nudgeLogId in the push payload and no mobile caller.
+  // Now the dispatcher stamps nudgeLogId into the push data and the tap
+  // handler reports 'tapped' here so the attribution sweep can close the loop.
+  postNudgeTelemetry: (nudgeLogId: string, event: 'tapped' | 'action_completed') =>
+    mobileApiFetch<{ ok: boolean }>('/v1/nudges/telemetry', {
+      method: 'POST',
+      body: JSON.stringify({ nudgeLogId, event }),
+    }),
   submitFeedback: (payload: NavigationFeedbackRequest) =>
     mobileApiFetch<WriteAckResponse>('/v1/feedback', {
       method: 'POST',

@@ -47,6 +47,8 @@ export interface PickRequest {
   readonly profile: UserNudgeProfile;
   readonly window: NudgeWindowContext;
   readonly dailyCap?: number;
+  /** Cron path: make P0 triggers respect quiet hours (review 2026-06-12). */
+  readonly enforceQuietHours?: boolean;
   readonly now?: Date;
 }
 
@@ -73,6 +75,7 @@ export const pickHighestPriorityTrigger = (req: PickRequest): QueueDecision => {
       profile: req.profile,
       window: req.window,
       dailyCap: req.dailyCap,
+      enforceQuietHours: req.enforceQuietHours,
       now: req.now,
     });
     return { trigger, priority, result };

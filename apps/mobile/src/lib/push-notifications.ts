@@ -159,6 +159,30 @@ export const handleNotificationResponse = (
       router.push('/route-planning');
       break;
     }
+    case 'nudge': {
+      // Pedal Nudge tap (review 2026-06-12 item 23): report the tap so the
+      // attribution sweep can close the funnel, then route by trigger —
+      // celebrations to the impact dashboard, everything else (ride-asking
+      // streak/reminder nudges) to route-planning where the user can ride.
+      const nudgeLogId = typeof data.nudgeLogId === 'string' ? data.nudgeLogId : null;
+      if (nudgeLogId) {
+        void mobileApi.postNudgeTelemetry(nudgeLogId, 'tapped').catch(() => {
+          // Non-fatal — the server-side 2h attribution sweep is the backstop.
+        });
+      }
+      const triggerId = typeof data.triggerId === 'string' ? data.triggerId : '';
+      if (
+        triggerId === 'milestone_celebration' ||
+        triggerId === 'post_ride_celebration' ||
+        triggerId === 'post_hazard_thanks' ||
+        triggerId === 'community_signal'
+      ) {
+        router.push('/impact-dashboard');
+      } else {
+        router.push('/route-planning');
+      }
+      break;
+    }
     default:
       break;
   }

@@ -195,6 +195,33 @@ describe('evaluateEligibility — P0 bypass governance', () => {
     });
     expect(result.eligible).toBe(true);
   });
+
+  // Review 2026-06-12: cron-sourced P0 (milestone backstop) must respect
+  // quiet hours so it never buzzes overnight, while keeping the cap + safety
+  // bypass and while real-time P0 still bypasses everything.
+  it('cron P0 (enforceQuietHours) is suppressed during quiet hours', () => {
+    const result = evaluateEligibility({
+      trigger: 'milestone_celebration',
+      priority: 0,
+      profile: baseProfile,
+      window: baseWindow,
+      enforceQuietHours: true,
+      now: MIDNIGHT_BUCHAREST,
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.outcome).toBe('suppressed_quiet_hours');
+  });
+  it('cron P0 (enforceQuietHours) still bypasses cap + safety outside quiet hours', () => {
+    const result = evaluateEligibility({
+      trigger: 'milestone_celebration',
+      priority: 0,
+      profile: baseProfile,
+      window: { ...baseWindow, pushesLast24h: 99, badWeatherNow: true, afterSunset: true },
+      enforceQuietHours: true,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.eligible).toBe(true);
+  });
 });
 
 describe('evaluateEligibility — safety gating', () => {

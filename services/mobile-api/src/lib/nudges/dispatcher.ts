@@ -17,7 +17,7 @@ import {
 } from '@defensivepedal/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { sendPushNotification } from '../push';
+import { isDeadTokenError, sendPushNotification } from '../push';
 
 export interface DispatchRequest {
   readonly userId: string;
@@ -121,58 +121,74 @@ export const dispatchNudge = async (
     };
   }
 
-  // Send to every registered device for the user; succeed if at least one ticket lands.
-  let firstTicketId: string | null = null;
-  for (const token of req.pushTokens) {
-    const ticket = await sendPushNotification({
-      to: token,
-      title: message.title,
-      body: message.body,
-      data: {
-        type: 'nudge',
-        triggerId: req.trigger,
-        variantId: message.variantId,
-        context: req.context,
-      },
-      categoryId: 'nudge',
-    });
-    if (ticket && !firstTicketId) {
-      firstTicketId = ticket;
-    }
-  }
-
-  const finalOutcome: DispatchRequest['outcome'] = firstTicketId ? 'sent' : 'expo_error';
-  const now = new Date().toISOString();
-
-  const { data, error } = await db
+  // Insert the nudge_log row FIRST with outcome 'scheduled' (review
+  // 2026-06-12 item 23): the row id must ride in the push `data` payload so
+  // the mobile tap handler can POST it back to /v1/nudges/telemetry — the
+  // funnel was previously dead because the row was inserted AFTER the send.
+  const { data: scheduledRow } = await db
     .from('nudge_log')
     .insert({
       user_id: req.userId,
       trigger_id: req.trigger,
       variant_id: message.variantId,
       priority: message.priority,
-      outcome: finalOutcome,
-      sent_at: finalOutcome === 'sent' ? now : null,
-      expo_ticket_id: firstTicketId,
+      outcome: 'scheduled',
       context: req.context,
     })
     .select('id')
     .single();
+  const nudgeLogId = (scheduledRow as { id: string } | null)?.id ?? null;
 
-  if (error) {
-    // The push has fired; log row failure is non-fatal but worth surfacing.
-    return {
-      nudgeLogId: null,
-      outcome: finalOutcome,
-      ticketId: firstTicketId,
+  // Send to every registered device for the user; succeed if at least one
+  // ticket lands. Collect dead tokens from the in-ticket DeviceNotRegistered
+  // signal so we can prune them (item 22).
+  let firstTicketId: string | null = null;
+  const deadTokens: string[] = [];
+  for (const token of req.pushTokens) {
+    const result = await sendPushNotification({
+      to: token,
       title: message.title,
       body: message.body,
-      variantId: message.variantId,
-    };
+      data: {
+        type: 'nudge',
+        nudgeLogId,
+        triggerId: req.trigger,
+        variantId: message.variantId,
+        context: req.context,
+      },
+      categoryId: 'nudge',
+    });
+    if (result.ticketId && !firstTicketId) firstTicketId = result.ticketId;
+    if (isDeadTokenError(result.errorCode)) deadTokens.push(result.token);
+  }
+
+  // Prune dead tokens immediately (item 22) — Expo throttles high-error-rate
+  // senders, so stale tokens degrade delivery for every user.
+  if (deadTokens.length > 0) {
+    await db
+      .from('push_tokens')
+      .delete()
+      .eq('user_id', req.userId)
+      .in('expo_push_token', deadTokens);
+  }
+
+  const finalOutcome: DispatchRequest['outcome'] = firstTicketId ? 'sent' : 'expo_error';
+  const now = new Date().toISOString();
+
+  // Update the scheduled row to its final post-send state.
+  if (nudgeLogId) {
+    await db
+      .from('nudge_log')
+      .update({
+        outcome: finalOutcome,
+        sent_at: finalOutcome === 'sent' ? now : null,
+        expo_ticket_id: firstTicketId,
+      })
+      .eq('id', nudgeLogId);
   }
 
   return {
-    nudgeLogId: (data as { id: string } | null)?.id ?? null,
+    nudgeLogId,
     outcome: finalOutcome,
     ticketId: firstTicketId,
     title: message.title,

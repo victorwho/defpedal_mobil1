@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { sendPushNotification } from './push';
+import { isDeadTokenError, sendPushNotification } from './push';
 
 type NotificationCategory = 'weather' | 'hazard' | 'community' | 'system' | 'mia';
 
@@ -166,7 +166,7 @@ export const dispatchNotification = async (
 
   // Send to all devices
   for (const token of tokens) {
-    const ticketId = await sendPushNotification({
+    const result = await sendPushNotification({
       to: token.expo_push_token,
       title: payload.title,
       body: payload.body,
@@ -174,14 +174,27 @@ export const dispatchNotification = async (
       categoryId: category,
     });
 
+    // Prune dead tokens immediately from the in-ticket DeviceNotRegistered
+    // signal — Expo deprioritizes senders with high error rates, so leaving
+    // dead tokens in the table degrades delivery for everyone (review
+    // 2026-06-12). Other error codes (throttling, transport) are not the
+    // token's fault, so we don't prune on those.
+    if (isDeadTokenError(result.errorCode)) {
+      await supabase
+        .from('push_tokens')
+        .delete()
+        .eq('user_id', userId)
+        .eq('expo_push_token', token.expo_push_token);
+    }
+
     await logNotification(
       supabase,
       userId,
       category,
       payload,
-      ticketId ? 'sent' : 'failed',
+      result.ticketId ? 'sent' : 'failed',
       undefined,
-      ticketId ?? undefined,
+      result.ticketId ?? undefined,
     );
   }
 };

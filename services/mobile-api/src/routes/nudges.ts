@@ -346,6 +346,9 @@ export const buildNudgeRoutes = (
                 afterSunset,
                 qualifiedStreakToday: qualifiedToday,
               },
+              // Cron path: cron-sourced P0 (milestone backstop) must respect
+              // quiet hours so it never buzzes overnight (review 2026-06-12).
+              enforceQuietHours: true,
             });
 
             const baseContext: NudgeContext = {
@@ -747,6 +750,7 @@ const buildUserCandidateMap = async (
     );
   }
 
+  const DAY_MS = 24 * 60 * 60 * 1000;
   for (const row of (activeRows ?? []) as Array<{
     user_id: string;
     current_streak: number | null;
@@ -754,11 +758,29 @@ const buildUserCandidateMap = async (
   }>) {
     const streakCount = row.current_streak ?? 0;
     const candidates: NudgeTrigger[] = [];
-    if (isMilestoneDay(streakCount)) candidates.push('milestone_celebration');
-    if (streakCount >= 4) {
-      candidates.push(
-        streakCount >= 7 ? 'streak_at_risk_dramatic' : 'streak_at_risk_mild',
+
+    // Per-trigger dedup (review 2026-06-12). Without it, Bucket A re-queued
+    // these on EVERY 30-min tick, bounded only by the 2/24h cap — so
+    // milestone_celebration (P0, bypasses the cap) re-sent all day including
+    // overnight, and streak_at_risk fired twice ~30 min apart each morning.
+    if (isMilestoneDay(streakCount)) {
+      // The P0 post-ride fast path already fires this within seconds of the
+      // qualifying ride; the cron is only a backstop. 24h dedup.
+      const recentMilestone = await hasRecentNudge(
+        db,
+        row.user_id,
+        'milestone_celebration',
+        DAY_MS,
       );
+      if (!recentMilestone) candidates.push('milestone_celebration');
+    }
+    if (streakCount >= 4) {
+      const atRisk: NudgeTrigger =
+        streakCount >= 7 ? 'streak_at_risk_dramatic' : 'streak_at_risk_mild';
+      // 22h dedup (same pattern as daily_ride_reminder) — one streak-at-risk
+      // ping per day, not one per tick.
+      const recentAtRisk = await hasRecentNudge(db, row.user_id, atRisk, 22 * 60 * 60 * 1000);
+      if (!recentAtRisk) candidates.push(atRisk);
     }
     if (candidates.length === 0) continue;
     map.set(row.user_id, {

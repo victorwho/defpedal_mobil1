@@ -147,6 +147,14 @@ export interface EligibilityRequest {
   readonly window: NudgeWindowContext;
   /** Daily cap (rolling 24 h) for non-P0 triggers. Locked default = 2. */
   readonly dailyCap?: number;
+  /**
+   * When true, P0 triggers still respect quiet hours (but keep bypassing the
+   * cap + safety floor). Set by the CRON path: a cron-sourced P0 (e.g. the
+   * milestone-celebration backstop) must never buzz the user overnight. The
+   * real-time P0 fast path leaves this false — those fire within seconds of a
+   * completed action while the user is demonstrably awake (review 2026-06-12).
+   */
+  readonly enforceQuietHours?: boolean;
   /** Clock injection — defaults to wall-clock now. */
   readonly now?: Date;
 }
@@ -173,10 +181,18 @@ export const evaluateEligibility = (req: EligibilityRequest): EligibilityResult 
     return { eligible: false, outcome: 'suppressed_qualified_already' };
   }
 
-  // P0 triggers skip the remaining time-of-day / cap / safety rules.
-  // They fire reactively from completed actions, never on a schedule, so
-  // governance rules don't apply.
+  // P0 triggers skip the cap + safety rules — they celebrate a completed
+  // action, never ask for a ride. Real-time P0 (post-ride/hazard) also skips
+  // quiet hours because it fires within seconds while the user is awake. A
+  // CRON-sourced P0 (the milestone backstop) sets enforceQuietHours so it
+  // can't buzz overnight (review 2026-06-12).
   if (isP0(req.priority)) {
+    if (req.enforceQuietHours) {
+      const currentTime = currentHHMMInTimezone(req.profile.timezone, req.now);
+      if (isInQuietHours(currentTime, req.profile.quietHoursStart, req.profile.quietHoursEnd)) {
+        return { eligible: false, outcome: 'suppressed_quiet_hours' };
+      }
+    }
     return { eligible: true, outcome: 'eligible' };
   }
 
