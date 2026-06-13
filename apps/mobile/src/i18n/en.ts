@@ -1217,6 +1217,16 @@ export const en = {
     historical: 'Past ride. {{distance}} covered.',
     userLocationKnown: 'Your location is shown on the map.',
   },
+
+  // ── Ride-loss recovery banner (unsynced trip data) ──
+  rideLoss: {
+    title: "A ride didn't save",
+    body: "Some of your ride data couldn't reach the server. Retry to save it.",
+    retry: 'Retry',
+    dismiss: 'Dismiss',
+    a11yLabel:
+      "A ride didn't save. Retry to save your ride data, or dismiss this notice.",
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

@@ -1205,4 +1205,14 @@ export const es: TranslationKeys = {
     historical: 'Ruta pasada. {{distance}} recorridos.',
     userLocationKnown: 'Tu ubicación se muestra en el mapa.',
   },
+
+  // ── Ride-loss recovery banner (unsynced trip data) ──
+  rideLoss: {
+    title: 'Una ruta no se guardó',
+    body: 'Parte de los datos de tu ruta no llegaron al servidor. Reintenta para guardarlos.',
+    retry: 'Reintentar',
+    dismiss: 'Descartar',
+    a11yLabel:
+      'Una ruta no se guardó. Reintenta para guardar los datos de tu ruta o descarta este aviso.',
+  },
 };

@@ -1205,4 +1205,14 @@ export const ro: TranslationKeys = {
     historical: 'Cursă anterioară. {{distance}} parcurși.',
     userLocationKnown: 'Locația ta este afișată pe hartă.',
   },
+
+  // ── Ride-loss recovery banner (unsynced trip data) ──
+  rideLoss: {
+    title: 'O cursă nu s-a salvat',
+    body: 'O parte din datele cursei nu au ajuns pe server. Reîncearcă pentru a le salva.',
+    retry: 'Reîncearcă',
+    dismiss: 'Închide',
+    a11yLabel:
+      'O cursă nu s-a salvat. Reîncearcă pentru a salva datele cursei sau închide această notificare.',
+  },
 };

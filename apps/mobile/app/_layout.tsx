@@ -6,13 +6,16 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Sentry from '@sentry/react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState as RNAppState, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mobileEnv } from '../src/lib/env';
 import { mobileApi } from '../src/lib/api';
 import { cleanupOfflinePacks } from '../src/lib/offlinePackCleanup';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
 import { loadCachedRoute } from '../src/lib/offlineRouteCache';
+import { hasUndismissedRideLoss, selectDeadCriticalMutations } from '../src/lib/rideLoss';
 import { flushPersistedWrites } from '../src/lib/storage';
+import { useT } from '../src/hooks/useTranslation';
 import { AppProviders } from '../src/providers/AppProviders';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -23,7 +26,9 @@ import { fontAssets } from '../src/design-system/fonts';
 import { darkTheme } from '../src/design-system/tokens/colors';
 import { tierColors } from '../src/design-system/tokens/badgeColors';
 import { surfaceTints } from '../src/design-system/tokens/tints';
+import { space } from '../src/design-system/tokens/spacing';
 import { zIndex } from '../src/design-system/tokens/zIndex';
+import { RideLossBanner } from '../src/design-system/molecules/RideLossBanner';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
@@ -309,8 +314,66 @@ const RootLayoutInner = () => {
       <RankUpOverlayManager />
       <WeatherNoticeManager />
       <MeetPedalCardManager />
+      <RideLossBannerManager />
       <RouteShareDeepLinkHandler />
     </>
+  );
+};
+
+/**
+ * Surfaces the ride-loss recovery banner when a trip-critical mutation has
+ * died in the offline queue (review 2026-06-12 P2). A dead `trip_start`
+ * cascade-kills the whole ride's server record, and the only prior recovery
+ * path was the dev Diagnostics screen. Retry re-queues every dead mutation;
+ * Dismiss hides it for the session (it re-appears next launch if still unsynced
+ * — appropriate for a data-loss warning, and non-destructive).
+ *
+ * Suppressed during NAVIGATING (mascot-style quarantine — never distract a
+ * riding user). Dismissal is tracked by mutation id so a *new* dead ride after
+ * a prior dismissal re-triggers the banner.
+ */
+const RideLossBannerManager = () => {
+  const queuedMutations = useAppStore((s) => s.queuedMutations);
+  const retryDeadMutations = useAppStore((s) => s.retryDeadMutations);
+  const appState = useAppStore((s) => s.appState);
+  const insets = useSafeAreaInsets();
+  const t = useT();
+  const [dismissedIds, setDismissedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
+  // Never overlay the live nav HUD; the banner stays queued and shows once the
+  // rider leaves NAVIGATING.
+  if (appState === 'NAVIGATING') return null;
+  if (!hasUndismissedRideLoss(queuedMutations, dismissedIds)) return null;
+
+  const handleRetry = () => {
+    retryDeadMutations();
+    // Every dead mutation is now back to 'queued'; clear dismissals so a
+    // subsequent failure re-surfaces cleanly.
+    setDismissedIds(new Set());
+  };
+
+  const handleDismiss = () => {
+    const deadIds = selectDeadCriticalMutations(queuedMutations).map((m) => m.id);
+    setDismissedIds((prev) => new Set([...prev, ...deadIds]));
+  };
+
+  return (
+    <View
+      style={[styles.rideLossBanner, { top: insets.top + space[2] }]}
+      pointerEvents="box-none"
+    >
+      <RideLossBanner
+        title={t('rideLoss.title')}
+        body={t('rideLoss.body')}
+        retryLabel={t('rideLoss.retry')}
+        dismissLabel={t('rideLoss.dismiss')}
+        a11yLabel={t('rideLoss.a11yLabel')}
+        onRetry={handleRetry}
+        onDismiss={handleDismiss}
+      />
+    </View>
   );
 };
 
@@ -418,6 +481,12 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: darkTheme.bgDeep,
+  },
+  rideLossBanner: {
+    position: 'absolute',
+    left: space[4],
+    right: space[4],
+    zIndex: zIndex.toast,
   },
   validationOverlay: {
     position: 'absolute',
