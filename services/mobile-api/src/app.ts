@@ -88,12 +88,52 @@ export const buildApp = (options: {
     done();
   });
 
+  // Shallow liveness probe — stays cheap and dependency-free on purpose. A
+  // deep check here would cause Cloud Run restart storms during an upstream
+  // (Supabase) outage, which doesn't help.
   app.get('/health', async () => ({
     ok: true,
     service: 'mobile-api',
     sharedStoreBackend: dependencies.sharedStoreBackend,
     generatedAt: new Date().toISOString(),
   }));
+
+  // Readiness probe (review 2026-06-12): a cheap Supabase round-trip so an
+  // uptime monitor can distinguish "process up" from "process up but every
+  // request fails" (Supabase down / revoked service-role key). 503 on failure.
+  app.get('/health/deep', async (_request, reply) => {
+    const { supabaseAdmin } = await import('./lib/supabaseAdmin');
+    if (!supabaseAdmin) {
+      return reply.status(503).send({
+        ok: false,
+        service: 'mobile-api',
+        checks: { supabase: 'unconfigured' },
+        generatedAt: new Date().toISOString(),
+      });
+    }
+    try {
+      // Lightweight, RLS-exempt (service role) count — no rows transferred.
+      const { error } = await supabaseAdmin
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .limit(1);
+      if (error) throw error;
+      return {
+        ok: true,
+        service: 'mobile-api',
+        checks: { supabase: 'ok' },
+        generatedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      app.log.error({ event: 'health_deep_supabase_error', err: error }, 'deep health check failed');
+      return reply.status(503).send({
+        ok: false,
+        service: 'mobile-api',
+        checks: { supabase: 'error' },
+        generatedAt: new Date().toISOString(),
+      });
+    }
+  });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (Array.isArray((error as { validation?: unknown[] }).validation)) {
