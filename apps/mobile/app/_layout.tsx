@@ -12,6 +12,7 @@ import { mobileApi } from '../src/lib/api';
 import { cleanupOfflinePacks } from '../src/lib/offlinePackCleanup';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
 import { loadCachedRoute } from '../src/lib/offlineRouteCache';
+import { flushPersistedWrites } from '../src/lib/storage';
 import { AppProviders } from '../src/providers/AppProviders';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -245,6 +246,18 @@ const RootLayoutInner = () => {
         // Non-blocking — cleanup failure is acceptable.
       }
     })();
+  }, []);
+
+  // Persisted writes are debounced (see lib/storage.ts) to spare the JS thread
+  // during navigation — flush them the moment the app leaves the foreground so
+  // an OS kill from the background loses nothing.
+  useEffect(() => {
+    const subscription = RNAppState.addEventListener('change', (next) => {
+      if (next === 'background' || next === 'inactive') {
+        flushPersistedWrites();
+      }
+    });
+    return () => subscription.remove();
   }, []);
 
   if (__DEV__ && showValidationOverlay) {

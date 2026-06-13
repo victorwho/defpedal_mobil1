@@ -310,6 +310,16 @@ export default function AchievementsScreen() {
           ]}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
+          // Virtualization tuning (review 2026-06-12 perf): the catalog is
+          // 140+ cells, each a HoloSticker (3 Image copies + 2 SVG layers +
+          // PanResponder + a 30Hz gyro subscriber). Without these props
+          // FlatList mounted them all up front. removeClippedSubviews unmounts
+          // off-screen rows on Android; the window/batch caps bound how many
+          // heavy cells render per frame.
+          initialNumToRender={12}
+          maxToRenderPerBatch={9}
+          windowSize={7}
+          removeClippedSubviews
           ListHeaderComponent={
             <View style={styles.headerSection}>
               <TrophyCaseHeader

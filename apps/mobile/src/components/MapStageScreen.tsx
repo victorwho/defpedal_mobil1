@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../design-system';
+import { useT } from '../hooks/useTranslation';
 import { useReducedMotion } from '../design-system/hooks/useReducedMotion';
 import { radii } from '../design-system/tokens/radii';
 import { space } from '../design-system/tokens/spacing';
@@ -60,6 +61,7 @@ const CollapsibleSheet = ({
   borderColor: string;
 }) => {
   const reducedMotion = useReducedMotion();
+  const t = useT();
   const [expanded, setExpanded] = useState(true);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
   // Use a ref so panResponder closures always read the current collapsed height,
@@ -132,7 +134,16 @@ const CollapsibleSheet = ({
     >
       <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, backgroundColor: sheetBg, borderColor }]}>
         <View {...panResponder.panHandlers}>
-          <Pressable onPress={() => snapTo(!expandedRef.current)} style={styles.handleTouchArea}>
+          <Pressable
+            onPress={() => snapTo(!expandedRef.current)}
+            style={styles.handleTouchArea}
+            // The sheet is otherwise driven by a PanResponder, which is
+            // invisible to TalkBack/VoiceOver. This tap target is the only
+            // accessible expand/collapse path, so label it (review 2026-06-12).
+            accessibilityRole="button"
+            accessibilityLabel={t('common.routeDetailsSheet')}
+            accessibilityState={{ expanded }}
+          >
             <Animated.View
               style={[styles.handle, { backgroundColor: handleColor, opacity: handleOpacity }]}
             />

@@ -2,6 +2,8 @@ import type { NavigationLocationSample } from '@defensivepedal/core';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
+import { translate, type Locale } from '../i18n';
+import { useAppStore } from '../store/appStore';
 import { keyValueStorage } from './storage';
 
 export const BACKGROUND_NAVIGATION_TASK = 'defensivepedal.background-navigation';
@@ -182,6 +184,11 @@ export const startBackgroundNavigationUpdates = async () => {
       // Fresh ride — drop any leftover trail from a previous ride so the
       // breadcrumb merge can't import stale samples (review 2026-06-12).
       await clearPersistedNavigationHistory();
+      // Localize the lock-screen notification — the single most-visible string
+      // during a screen-off ride, previously hardcoded English (review
+      // 2026-06-12). Runs in normal app context (NavigationLifecycleManager),
+      // so the locale store is available.
+      const locale = useAppStore.getState().locale as Locale;
       await Location.startLocationUpdatesAsync(BACKGROUND_NAVIGATION_TASK, {
         accuracy: Location.Accuracy.BestForNavigation,
         activityType: Location.ActivityType.Fitness,
@@ -192,9 +199,8 @@ export const startBackgroundNavigationUpdates = async () => {
         deferredUpdatesInterval: 0,
         showsBackgroundLocationIndicator: true,
         foregroundService: {
-          notificationTitle: 'Defensive Pedal navigation active',
-          notificationBody:
-            'Tracking your ride so turn-by-turn navigation stays available in the background.',
+          notificationTitle: translate(locale, 'nav.bgServiceTitle'),
+          notificationBody: translate(locale, 'nav.bgServiceBody'),
           // Stop the foreground location service when the user swipes the app
           // away from recents (onTaskRemoved). Without this it defaulted to
           // false, and START_REDELIVER_INTENT restarted the service after

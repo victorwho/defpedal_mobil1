@@ -130,7 +130,12 @@ export const Button: React.FC<ButtonProps> = ({
   const effectivePressedBg = variant === 'ghost' ? ghostPressedBg : v.pressedBg;
 
   const containerStyle: ViewStyle = {
-    height: s.height,
+    // minHeight (not a fixed height) + vertical padding so the pill grows with
+    // the OS font scale instead of clipping the label at large Dynamic Type /
+    // Android font-scale settings (review 2026-06-12 a11y). allowFontScaling
+    // stays on everywhere, so the label can be up to ~2x.
+    minHeight: s.height,
+    paddingVertical: space[2],
     paddingHorizontal: s.px,
     borderRadius: radii.full,
     borderCurve: 'continuous', // Smooth squircle corners on iOS
