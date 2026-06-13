@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Surface } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
+import { useT } from '../../src/hooks/useTranslation';
 import { gray, safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
@@ -25,6 +26,7 @@ export default function ChooseUsernameScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const [username, setUsername] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,11 +104,9 @@ export default function ChooseUsernameScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.headerSection}>
-        <Text style={styles.eyebrow}>One more thing</Text>
-        <Text style={styles.title}>Choose a username</Text>
-        <Text style={styles.subtitle}>
-          This is how other cyclists will see you in the community.
-        </Text>
+        <Text style={styles.eyebrow}>{t('onboarding.oneMoreThing')}</Text>
+        <Text style={styles.title}>{t('onboarding.chooseUsername')}</Text>
+        <Text style={styles.subtitle}>{t('onboarding.usernameCommunitySub')}</Text>
       </View>
 
       <Surface style={{ gap: space[2] }}>
@@ -119,7 +119,7 @@ export default function ChooseUsernameScreen() {
               setUsername(text.replace(/[^a-zA-Z0-9_]/g, ''));
               setError(null);
             }}
-            placeholder="your_username"
+            placeholder={t('onboarding.usernamePlaceholder')}
             placeholderTextColor={gray[500]}
             autoCapitalize="none"
             autoCorrect={false}
@@ -128,7 +128,7 @@ export default function ChooseUsernameScreen() {
           />
         </View>
         {username.length > 0 && !isValid ? (
-          <Text style={styles.hintText}>Min 3 characters. Letters, numbers, underscore only.</Text>
+          <Text style={styles.hintText}>{t('onboarding.usernameHint')}</Text>
         ) : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </Surface>
@@ -142,10 +142,10 @@ export default function ChooseUsernameScreen() {
           onPress={() => void handleSubmit()}
           disabled={!isValid || isSubmitting}
         >
-          Continue
+          {t('onboarding.continue')}
         </Button>
         <Pressable onPress={navigateToApp} hitSlop={12}>
-          <Text style={styles.skipText}>Skip for now</Text>
+          <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
         </Pressable>
       </View>
     </View>

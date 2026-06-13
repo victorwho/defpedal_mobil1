@@ -30,11 +30,11 @@ import { useAppStore } from '../../src/store/appStore';
 // ---------------------------------------------------------------------------
 
 const PROGRESS_STEPS = [
-  { label: 'Location enabled', completed: true },
-  { label: 'Safety score viewed', completed: true },
-  { label: 'Goal selected', completed: true },
-  { label: 'First route explored', completed: false },
-  { label: 'Account created', completed: false },
+  { labelKey: 'onboarding.locationEnabled', completed: true },
+  { labelKey: 'onboarding.safetyScoreViewed', completed: true },
+  { labelKey: 'onboarding.goalSelected', completed: true },
+  { labelKey: 'onboarding.firstRouteExplored', completed: false },
+  { labelKey: 'onboarding.accountCreated', completed: false },
 ] as const;
 
 const COMPLETED_COUNT = PROGRESS_STEPS.filter((s) => s.completed).length;
@@ -144,8 +144,8 @@ export default function OnboardingSignupPromptScreen() {
           <View style={styles.mascotRow}>
             <Mascot pose="point" size="md" />
           </View>
-          <Text style={styles.eyebrow}>Almost there</Text>
-          <Text style={styles.title}>Create your account</Text>
+          <Text style={styles.eyebrow}>{t('onboarding.almostThere')}</Text>
+          <Text style={styles.title}>{t('onboarding.createYourAccount')}</Text>
           <Text style={styles.subtitle}>
             {/* Review 2026-06-12 P1: this used to promise "Your data will be
                 preserved", but no anonymous→account merge exists — sign-in
@@ -153,8 +153,8 @@ export default function OnboardingSignupPromptScreen() {
                 left behind. Don't promise what we don't do. A real merge
                 endpoint is tracked as future work (review Phase 1 item 17). */}
             {isMandatory
-              ? 'Create an account to continue using Defensive Pedal and start syncing your rides from here on.'
-              : 'Sync your rides, earn streaks, and join the community. You can always do this later.'}
+              ? t('onboarding.signupSubMandatory')
+              : t('onboarding.signupSub')}
           </Text>
         </View>
 
@@ -163,11 +163,11 @@ export default function OnboardingSignupPromptScreen() {
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${PROGRESS_PERCENT}%` }]} />
           </View>
-          <Text style={styles.progressLabel}>{PROGRESS_PERCENT}% complete</Text>
+          <Text style={styles.progressLabel}>{t('onboarding.percentComplete', { percent: PROGRESS_PERCENT })}</Text>
 
           <View style={styles.stepList}>
             {PROGRESS_STEPS.map((step) => (
-              <View key={step.label} style={styles.stepRow}>
+              <View key={step.labelKey} style={styles.stepRow}>
                 <Ionicons
                   name={step.completed ? 'checkmark-circle' : 'ellipse-outline'}
                   size={18}
@@ -179,7 +179,7 @@ export default function OnboardingSignupPromptScreen() {
                     step.completed && styles.stepLabelCompleted,
                   ]}
                 >
-                  {step.label}
+                  {t(step.labelKey)}
                 </Text>
               </View>
             ))}
@@ -198,24 +198,24 @@ export default function OnboardingSignupPromptScreen() {
             onPress={() => void handleGoogleSignIn()}
             disabled={isSubmitting}
             accessibilityRole="button"
-            accessibilityLabel="Sign in with Google"
+            accessibilityLabel={t('onboarding.a11yGoogle')}
           >
             <View style={styles.googleIconWrap}>
               <Text style={styles.googleG}>G</Text>
             </View>
-            <Text style={styles.googleLabel}>Continue with Google</Text>
+            <Text style={styles.googleLabel}>{t('onboarding.continueWithGoogle')}</Text>
           </Pressable>
 
           {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>{t('onboarding.or')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
           {/* Email */}
           <Button variant="secondary" size="lg" fullWidth onPress={handleEmailSignUp}>
-            Sign up with email
+            {t('onboarding.signUpWithEmail')}
           </Button>
 
           {errorMessage ? (
@@ -254,9 +254,9 @@ export default function OnboardingSignupPromptScreen() {
             onPress={finishOnboarding}
             hitSlop={16}
             accessibilityRole="button"
-            accessibilityLabel="Skip account creation for now"
+            accessibilityLabel={t('onboarding.a11ySkipAccount')}
           >
-            <Text style={styles.dismissText}>Maybe later</Text>
+            <Text style={styles.dismissText}>{t('onboarding.maybeLater')}</Text>
           </Pressable>
         </View>
       ) : null}

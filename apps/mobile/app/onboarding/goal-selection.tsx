@@ -21,32 +21,33 @@ import {
 } from '../../src/design-system/tokens/typography';
 import { useAppStore } from '../../src/store/appStore';
 import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
+import { useT } from '../../src/hooks/useTranslation';
 
 type GoalOption = {
   readonly goal: CyclingGoal;
   readonly icon: keyof typeof Ionicons.glyphMap;
-  readonly title: string;
-  readonly description: string;
+  readonly titleKey: string;
+  readonly descKey: string;
 };
 
 const GOAL_OPTIONS: readonly GoalOption[] = [
   {
     goal: 'commute',
     icon: 'briefcase-outline',
-    title: 'Commute safely',
-    description: 'Find the safest route to work every day',
+    titleKey: 'onboarding.commuteSafely',
+    descKey: 'onboarding.goalCommuteSub',
   },
   {
     goal: 'explore',
     icon: 'compass-outline',
-    title: 'Explore new routes',
-    description: 'Discover safe cycling paths around your city',
+    titleKey: 'onboarding.exploreRoutes',
+    descKey: 'onboarding.goalExploreSub',
   },
   {
     goal: 'beginner',
     icon: 'bicycle-outline',
-    title: "Start cycling (I'm nervous)",
-    description: 'Get comfortable with low-risk beginner routes',
+    titleKey: 'onboarding.startCycling',
+    descKey: 'onboarding.goalBeginnerSub',
   },
 ] as const;
 
@@ -54,6 +55,7 @@ export default function OnboardingGoalSelectionScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const setCyclingGoal = useAppStore((s) => s.setCyclingGoal);
   const skipOnboarding = useSkipOnboarding();
 
@@ -88,7 +90,7 @@ export default function OnboardingGoalSelectionScreen() {
       <View style={styles.glowTop} />
 
       <View style={styles.headerRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel={t('onboarding.a11yBack')} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Pressable
@@ -96,9 +98,9 @@ export default function OnboardingGoalSelectionScreen() {
           onPress={skipOnboarding}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel="Skip onboarding"
+          accessibilityLabel={t('onboarding.a11ySkip')}
         >
-          <Text style={styles.skipPillText}>Skip</Text>
+          <Text style={styles.skipPillText}>{t('onboarding.skipShort')}</Text>
         </Pressable>
       </View>
 
@@ -106,37 +108,38 @@ export default function OnboardingGoalSelectionScreen() {
         <View style={styles.mascotRow}>
           <Mascot pose="ride" size="md" />
         </View>
-        <Text style={styles.eyebrow}>Your cycling goal</Text>
-        <Text style={styles.title}>What brings you here?</Text>
-        <Text style={styles.subtitle}>
-          This helps us personalize your routes and safety tips.
-        </Text>
+        <Text style={styles.eyebrow}>{t('onboarding.goalEyebrow')}</Text>
+        <Text style={styles.title}>{t('onboarding.whatBringsYou')}</Text>
+        <Text style={styles.subtitle}>{t('onboarding.goalSubtitle')}</Text>
       </View>
 
       <View style={styles.cardList}>
-        {GOAL_OPTIONS.map((option) => (
-          <Surface
-            key={option.goal}
-            onPress={() => handleSelect(option.goal)}
-            accessibilityLabel={option.title}
-            style={styles.goalCard}
-            pressedStyle={styles.goalCardPressed}
-          >
-            <View style={styles.goalIconWrap}>
-              <Ionicons name={option.icon} size={24} color={colors.accent} />
-            </View>
-            <View style={styles.goalText}>
-              <Text style={styles.goalTitle}>{option.title}</Text>
-              <Text style={styles.goalDesc}>{option.description}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </Surface>
-        ))}
+        {GOAL_OPTIONS.map((option) => {
+          const title = t(option.titleKey);
+          return (
+            <Surface
+              key={option.goal}
+              onPress={() => handleSelect(option.goal)}
+              accessibilityLabel={title}
+              style={styles.goalCard}
+              pressedStyle={styles.goalCardPressed}
+            >
+              <View style={styles.goalIconWrap}>
+                <Ionicons name={option.icon} size={24} color={colors.accent} />
+              </View>
+              <View style={styles.goalText}>
+                <Text style={styles.goalTitle}>{title}</Text>
+                <Text style={styles.goalDesc}>{t(option.descKey)}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </Surface>
+          );
+        })}
       </View>
 
       <View style={styles.footer}>
         <Pressable onPress={handleDismiss} hitSlop={12}>
-          <Text style={styles.skipText}>Skip this step</Text>
+          <Text style={styles.skipText}>{t('onboarding.skipStep')}</Text>
         </Pressable>
       </View>
     </View>

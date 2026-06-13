@@ -7,6 +7,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
 import { useTheme, type ThemeColors } from '../../src/design-system';
+import { useT } from '../../src/hooks/useTranslation';
 import { Mascot } from '../../src/design-system/atoms/Mascot';
 import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
@@ -47,6 +48,7 @@ export default function OnboardingSafetyScoreScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const { location } = useCurrentLocation();
 
   const skipOnboarding = useSkipOnboarding();
@@ -183,9 +185,9 @@ export default function OnboardingSafetyScoreScreen() {
         onPress={skipOnboarding}
         hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel="Skip onboarding"
+        accessibilityLabel={t('onboarding.a11ySkip')}
       >
-        <Text style={styles.skipPillText}>Skip</Text>
+        <Text style={styles.skipPillText}>{t('onboarding.skipShort')}</Text>
       </Pressable>
 
       {/* Loading indicator */}
@@ -193,7 +195,7 @@ export default function OnboardingSafetyScoreScreen() {
         <View style={styles.loadingContainer}>
           <Mascot pose="map" size="md" />
           <ActivityIndicator color={colors.accent} size="large" />
-          <Text style={styles.loadingText}>Analyzing your neighborhood...</Text>
+          <Text style={styles.loadingText}>{t('onboarding.analyzing')}</Text>
         </View>
       ) : null}
 
@@ -202,7 +204,7 @@ export default function OnboardingSafetyScoreScreen() {
         <Animated.View style={[styles.cardContainer, { opacity: fadeIn, bottom: insets.bottom + space[4] }]}>
           <Pressable style={styles.card} onPress={navigateNext}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardEyebrow}>Your neighborhood</Text>
+              <Text style={styles.cardEyebrow}>{t('onboarding.yourNeighborhood')}</Text>
               <View style={styles.scoreRow}>
                 <Animated.Text style={[styles.scoreValue, { color: scoreColor }]}>
                   {animatedValue.interpolate({
@@ -217,27 +219,27 @@ export default function OnboardingSafetyScoreScreen() {
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: colors.safe }]}>{safeCount}</Text>
-                <Text style={styles.statLabel}>safe</Text>
+                <Text style={styles.statLabel}>{t('onboarding.statSafe')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: colors.accent }]}>{averageCount}</Text>
-                <Text style={styles.statLabel}>average</Text>
+                <Text style={styles.statLabel}>{t('onboarding.statAverage')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: colors.caution }]}>{riskyCount}</Text>
-                <Text style={styles.statLabel}>risky</Text>
+                <Text style={styles.statLabel}>{t('onboarding.statRisky')}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Text style={[styles.statValue, { color: colors.danger }]}>{veryRiskyCount}</Text>
-                <Text style={styles.statLabel}>v.risky</Text>
+                <Text style={styles.statLabel}>{t('onboarding.statVeryRisky')}</Text>
               </View>
             </View>
 
             <View style={styles.continueRow}>
-              <Text style={styles.tapHint}>Continue</Text>
+              <Text style={styles.tapHint}>{t('onboarding.continue')}</Text>
               <Ionicons name="chevron-forward" size={16} color={colors.accent} />
             </View>
           </Pressable>

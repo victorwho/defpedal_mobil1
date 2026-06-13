@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { RouteMap } from '../../src/components/map';
 import { Button, Surface } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
+import { useT } from '../../src/hooks/useTranslation';
 import { safetyColors } from '../../src/design-system/tokens/colors';
 import { radii } from '../../src/design-system/tokens/radii';
 import { shadows } from '../../src/design-system/tokens/shadows';
@@ -104,6 +105,7 @@ export default function OnboardingFirstRouteScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const { location } = useCurrentLocation();
   const cyclingGoal = useAppStore((s) => s.cyclingGoal);
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
@@ -260,7 +262,7 @@ export default function OnboardingFirstRouteScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.headerRow}>
-        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel={t('onboarding.a11yBack')} accessibilityRole="button">
           <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
         </Pressable>
         <Pressable
@@ -268,21 +270,23 @@ export default function OnboardingFirstRouteScreen() {
           onPress={skipOnboarding}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel="Skip onboarding"
+          accessibilityLabel={t('onboarding.a11ySkip')}
         >
-          <Text style={styles.skipPillText}>Skip</Text>
+          <Text style={styles.skipPillText}>{t('onboarding.skipShort')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.headerSection}>
-        <Text style={styles.eyebrow}>Your first route</Text>
+        <Text style={styles.eyebrow}>{t('onboarding.firstRouteEyebrow')}</Text>
         <Text style={styles.title}>
-          {destinationName ? `Safe route to ${destinationName} and back` : 'A safe route near you and back'}
+          {destinationName
+            ? t('onboarding.firstRouteTitleNamed', { name: destinationName })
+            : t('onboarding.firstRouteTitleGeneric')}
         </Text>
         <Text style={styles.subtitle}>
           {cyclingGoal === 'beginner'
-            ? 'A short, safe route to get you started.'
-            : 'The safest cycling route to a nearby destination.'}
+            ? t('onboarding.firstRouteSubBeginner')
+            : t('onboarding.firstRouteSub')}
         </Text>
       </View>
 
@@ -291,7 +295,7 @@ export default function OnboardingFirstRouteScreen() {
         {isLoading ? (
           <View style={styles.mapLoadingOverlay}>
             <ActivityIndicator color={colors.accent} size="large" />
-            <Text style={styles.mapLoadingText}>Finding a safe route nearby...</Text>
+            <Text style={styles.mapLoadingText}>{t('onboarding.findingRoute')}</Text>
           </View>
         ) : null}
         {location && routeResponse && destination ? (
@@ -309,9 +313,7 @@ export default function OnboardingFirstRouteScreen() {
           />
         ) : !isLoading ? (
           <View style={styles.mapFallback}>
-            <Text style={styles.mapFallbackText}>
-              Route unavailable — continue to explore manually.
-            </Text>
+            <Text style={styles.mapFallbackText}>{t('onboarding.routeUnavailable')}</Text>
           </View>
         ) : null}
       </View>
@@ -321,31 +323,31 @@ export default function OnboardingFirstRouteScreen() {
         <View style={styles.routeStats}>
           <View style={styles.routeStat}>
             <Text style={styles.routeStatValue}>{distanceKm} km</Text>
-            <Text style={styles.routeStatLabel}>Distance</Text>
+            <Text style={styles.routeStatLabel}>{t('onboarding.statDistance')}</Text>
           </View>
           <View style={styles.routeStatDivider} />
           <View style={styles.routeStat}>
             <Text style={styles.routeStatValue}>{durationMin} min</Text>
-            <Text style={styles.routeStatLabel}>Duration</Text>
+            <Text style={styles.routeStatLabel}>{t('onboarding.statDuration')}</Text>
           </View>
           <View style={styles.routeStatDivider} />
           <View style={styles.routeStat}>
             <Text style={[styles.routeStatValue, { color: scoreColor }]}>
               {safetyScore ?? '—'}
             </Text>
-            <Text style={styles.routeStatLabel}>Safety</Text>
+            <Text style={styles.routeStatLabel}>{t('onboarding.statSafety')}</Text>
           </View>
         </View>
       </Surface>
 
       {/* Impact counters */}
       <View style={styles.impactRow}>
-        <ImpactTile value={String(co2Kg)} unit="kg" label="CO2 saved" color={safetyColors.safe} />
-        <ImpactTile value={String(moneyEur)} unit="EUR" label="Money saved" color={colors.accent} />
+        <ImpactTile value={String(co2Kg)} unit="kg" label={t('onboarding.impactCo2')} color={safetyColors.safe} />
+        <ImpactTile value={String(moneyEur)} unit="EUR" label={t('onboarding.impactMoney')} color={colors.accent} />
         <ImpactTile
           value={selectedRoute ? String(selectedRoute.riskSegments.filter((s) => s.riskScore >= 60).length) : '—'}
           unit=""
-          label="Hazards on route"
+          label={t('onboarding.impactRiskySegments')}
           color={safetyColors.caution}
         />
       </View>
@@ -353,7 +355,7 @@ export default function OnboardingFirstRouteScreen() {
       {/* Actions */}
       <View style={styles.footer}>
         <Button variant="primary" size="lg" fullWidth onPress={handleContinue}>
-          Continue
+          {t('onboarding.continue')}
         </Button>
       </View>
     </View>

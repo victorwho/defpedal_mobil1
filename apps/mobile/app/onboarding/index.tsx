@@ -20,11 +20,13 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
+import { useT } from '../../src/hooks/useTranslation';
 
 export default function OnboardingPermissionScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const t = useT();
   const [denied, setDenied] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
   const skipOnboarding = useSkipOnboarding();
@@ -82,9 +84,9 @@ export default function OnboardingPermissionScreen() {
         onPress={skipOnboarding}
         hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel="Skip onboarding"
+        accessibilityLabel={t('onboarding.a11ySkip')}
       >
-        <Text style={styles.skipPillText}>Skip</Text>
+        <Text style={styles.skipPillText}>{t('onboarding.skipShort')}</Text>
       </Pressable>
 
       <ScrollView
@@ -96,10 +98,8 @@ export default function OnboardingPermissionScreen() {
           <Mascot pose="wave" size="lg" />
           <BrandLogo size={48} />
           <Text style={styles.eyebrow}>Defensive Pedal</Text>
-          <Text style={styles.title}>See how safe your streets are</Text>
-          <Text style={styles.subtitle}>
-            We use your location to show a live safety score for your neighborhood and find the safest cycling routes nearby.
-          </Text>
+          <Text style={styles.title}>{t('onboarding.locationTitle')}</Text>
+          <Text style={styles.subtitle}>{t('onboarding.locationSubtitle')}</Text>
         </View>
 
         <View style={styles.card}>
@@ -108,8 +108,8 @@ export default function OnboardingPermissionScreen() {
               <Ionicons name="shield-checkmark" size={20} color={colors.accent} />
             </View>
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>Neighborhood safety score</Text>
-              <Text style={styles.featureDesc}>See how your area ranks for cycling safety</Text>
+              <Text style={styles.featureTitle}>{t('onboarding.featureSafetyScore')}</Text>
+              <Text style={styles.featureDesc}>{t('onboarding.featureSafetyScoreSub')}</Text>
             </View>
           </View>
           <View style={styles.featureRow}>
@@ -117,8 +117,8 @@ export default function OnboardingPermissionScreen() {
               <Ionicons name="navigate" size={20} color={colors.accent} />
             </View>
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>Safety-first routes</Text>
-              <Text style={styles.featureDesc}>Routes scored by real road risk data</Text>
+              <Text style={styles.featureTitle}>{t('onboarding.featureRoutes')}</Text>
+              <Text style={styles.featureDesc}>{t('onboarding.featureRoutesSub')}</Text>
             </View>
           </View>
           <View style={styles.featureRow}>
@@ -126,8 +126,8 @@ export default function OnboardingPermissionScreen() {
               <Ionicons name="warning" size={20} color={colors.accent} />
             </View>
             <View style={styles.featureText}>
-              <Text style={styles.featureTitle}>Hazard alerts</Text>
-              <Text style={styles.featureDesc}>Community-reported hazards near your route</Text>
+              <Text style={styles.featureTitle}>{t('onboarding.featureHazards')}</Text>
+              <Text style={styles.featureDesc}>{t('onboarding.featureHazardsSub')}</Text>
             </View>
           </View>
         </View>
@@ -136,11 +136,9 @@ export default function OnboardingPermissionScreen() {
       <View style={styles.footer}>
         {denied ? (
           <>
-            <Text style={styles.deniedText}>
-              Location not available. You can still explore routes by searching for a city.
-            </Text>
+            <Text style={styles.deniedText}>{t('onboarding.locationDenied')}</Text>
             <Button variant="primary" size="lg" fullWidth onPress={handleSkip}>
-              Continue without location
+              {t('onboarding.continueWithoutLocation')}
             </Button>
           </>
         ) : (
@@ -152,10 +150,10 @@ export default function OnboardingPermissionScreen() {
               loading={isRequesting}
               onPress={() => void handleEnableLocation()}
             >
-              Enable Location
+              {t('onboarding.enableLocation')}
             </Button>
             <Pressable onPress={handleSkip} hitSlop={12}>
-              <Text style={styles.skipText}>Skip for now</Text>
+              <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
             </Pressable>
           </>
         )}
