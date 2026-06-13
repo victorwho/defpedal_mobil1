@@ -83,6 +83,43 @@ describe('offlinePackCleanup', () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
+  it('never deletes a protected (active-ride) pack even if expired', async () => {
+    const oldProtected = makeRegion('old-protected', {
+      routeId: 'route-abc',
+      updatedAt: new Date(Date.now() - (FIVE_DAYS_MS + 1000)).toISOString(),
+    });
+    const oldUnprotected = makeRegionWithAge('old-unprotected', FIVE_DAYS_MS + 1000);
+
+    const deleted = await cleanupOfflinePacks(
+      [oldProtected, oldUnprotected],
+      new Set(['route-abc']),
+    );
+
+    expect(deleted).toEqual(['old-unprotected']);
+    expect(mockDelete).not.toHaveBeenCalledWith('old-protected');
+  });
+
+  it('does not LRU-evict a protected pack even when over the storage cap', async () => {
+    const resourcesFor150MB = Math.ceil((150 * 1024 * 1024) / BYTES_PER_RESOURCE);
+    // Protected oldest (150MB) + unprotected newer (150MB) = 300MB, over cap.
+    const protectedOldest = makeRegion('protected-oldest', {
+      routeId: 'route-active',
+      updatedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+      completedResourceCount: resourcesFor150MB,
+      requiredResourceCount: resourcesFor150MB,
+    });
+    const unprotectedNewer = makeRegionWithAge('unprotected-newer', 60_000, resourcesFor150MB);
+
+    const deleted = await cleanupOfflinePacks(
+      [protectedOldest, unprotectedNewer],
+      new Set(['route-active']),
+    );
+
+    // The protected (older) pack is skipped; the unprotected one is evicted
+    // even though it's newer.
+    expect(deleted).toEqual(['unprotected-newer']);
+  });
+
   it('evicts oldest packs first when over 200MB cap', async () => {
     // Each resource = 15KB, so ~13,654 resources = ~200MB
     // Create regions that together exceed 200MB, all recent (not expired)

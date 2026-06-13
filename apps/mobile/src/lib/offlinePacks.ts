@@ -14,6 +14,12 @@ type OfflinePackMetadata = {
   maxZoom: number;
   routeId?: string | null;
   styleURL: string;
+  // Real download time, baked into the Mapbox pack metadata so it survives.
+  // Previously absent — `toStatus` stamped `updatedAt` as the moment of
+  // LISTING, so every pack always looked ~0ms old: the 5-day auto-delete
+  // never fired and LRU eviction compared identical timestamps (arbitrary
+  // order). Review 2026-06-12.
+  createdAt?: string;
 };
 
 if (mobileEnv.mapboxPublicToken) {
@@ -50,7 +56,10 @@ const toStatus = (
   requiredResourceCount: progress?.requiredResourceCount,
   styleURL: metadata.styleURL,
   routeId: metadata.routeId ?? null,
-  updatedAt: new Date().toISOString(),
+  // Carry the real, stable download time so age-based cleanup + LRU eviction
+  // work. Legacy packs created before createdAt existed fall back to "now"
+  // (treated as fresh, so they're never wrongly deleted).
+  updatedAt: metadata.createdAt ?? new Date().toISOString(),
   ...overrides,
 });
 
@@ -97,6 +106,7 @@ const getPackMetadata = (pack: { metadata?: unknown; name?: string }): OfflinePa
     maxZoom: metadata.maxZoom ?? 16,
     routeId: metadata.routeId ?? null,
     styleURL: metadata.styleURL ?? Mapbox.StyleURL.Street,
+    createdAt: metadata.createdAt ?? undefined,
   };
 };
 
@@ -118,6 +128,7 @@ export const buildOfflineRegionFromRoute = (
     maxZoom: options.maxZoom ?? 16,
     routeId: route.id,
     styleURL: options.styleURL ?? Mapbox.StyleURL.Street,
+    createdAt: new Date().toISOString(),
   };
 
   return toStatus(metadata, undefined, {
@@ -137,6 +148,9 @@ export const downloadOfflineRegion = async (
     maxZoom: region.maxZoom,
     routeId: region.routeId ?? null,
     styleURL: region.styleURL ?? Mapbox.StyleURL.Street,
+    // Stamp the real download time (carried from the queued region when
+    // present) so the pack can be aged/evicted correctly later.
+    createdAt: region.updatedAt ?? new Date().toISOString(),
   };
 
   const existingPack = await Mapbox.offlineManager.getPack(metadata.id);

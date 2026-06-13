@@ -11,6 +11,7 @@ import { mobileEnv } from '../src/lib/env';
 import { mobileApi } from '../src/lib/api';
 import { cleanupOfflinePacks } from '../src/lib/offlinePackCleanup';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
+import { loadCachedRoute } from '../src/lib/offlineRouteCache';
 import { AppProviders } from '../src/providers/AppProviders';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -212,13 +213,38 @@ const RootLayoutInner = () => {
   const reducedMotion = useReducedMotion();
   const showValidationOverlay = mobileEnv.validationMode === 'android-native-validate';
 
-  // Fire-and-forget offline pack cleanup on app launch
+  // Fire-and-forget offline pack cleanup on app launch.
   useEffect(() => {
-    void listOfflineRegions()
-      .then((regions) => cleanupOfflinePacks(regions))
-      .catch(() => {
-        // Non-blocking — cleanup failure is acceptable
-      });
+    void (async () => {
+      try {
+        // Protect the in-progress / resumable ride's pack from eviction —
+        // cleanup runs at the same moment NavigationResumeGuard may auto-resume
+        // a recent ride (review 2026-06-12).
+        const state = useAppStore.getState();
+        const cached = await loadCachedRoute();
+        const protectedRouteIds = new Set<string>(
+          [
+            state.navigationSession?.routeId,
+            state.selectedRouteId,
+            cached?.routeId,
+          ].filter((id): id is string => Boolean(id)),
+        );
+
+        const regions = await listOfflineRegions();
+        const deletedIds = await cleanupOfflinePacks(regions, protectedRouteIds);
+
+        // Sync the store so evicted packs stop reporting "offline ready" —
+        // route-preview's isRouteOfflineReady reads the store directly, so a
+        // stale 'ready' region hid the re-download button after the tiles were
+        // already gone (review 2026-06-12).
+        if (deletedIds.length > 0) {
+          const remove = useAppStore.getState().removeOfflineRegion;
+          for (const id of deletedIds) remove(id);
+        }
+      } catch {
+        // Non-blocking — cleanup failure is acceptable.
+      }
+    })();
   }, []);
 
   if (__DEV__ && showValidationOverlay) {

@@ -41,11 +41,21 @@ const estimateRegionSizeBytes = (region: OfflineRegion): number => {
 
 export async function cleanupOfflinePacks(
   regions: readonly OfflineRegion[],
+  // Route ids whose pack must never be evicted — the in-progress / resumable
+  // ride's pack (review 2026-06-12). Cleanup runs at the same launch moment
+  // NavigationResumeGuard auto-resumes a <15-min-old ride, so without this an
+  // arbitrary-ordered eviction could delete the very pack that ride needs.
+  protectedRouteIds: ReadonlySet<string> = new Set(),
 ): Promise<readonly string[]> {
   const deletedIds: string[] = [];
 
-  // ── Phase 1: Delete packs older than 5 days ──
-  const expiredRegions = regions.filter((region) => getRegionAge(region) > MAX_AGE_MS);
+  const isProtected = (region: OfflineRegion): boolean =>
+    region.routeId != null && protectedRouteIds.has(region.routeId);
+
+  // ── Phase 1: Delete packs older than 5 days (never a protected pack) ──
+  const expiredRegions = regions.filter(
+    (region) => !isProtected(region) && getRegionAge(region) > MAX_AGE_MS,
+  );
 
   for (const region of expiredRegions) {
     try {
@@ -57,22 +67,25 @@ export async function cleanupOfflinePacks(
   }
 
   // ── Phase 2: LRU eviction if over storage budget ──
-  // Work with surviving regions (exclude already-deleted ones)
+  // Protected packs still consume disk, so they count toward the total — but
+  // only non-protected packs are eviction candidates.
   const deletedIdSet = new Set(deletedIds);
-  const survivingRegions = regions.filter((region) => !deletedIdSet.has(region.id));
+  const remainingRegions = regions.filter((region) => !deletedIdSet.has(region.id));
 
-  let totalSizeBytes = survivingRegions.reduce(
+  let totalSizeBytes = remainingRegions.reduce(
     (sum, region) => sum + estimateRegionSizeBytes(region),
     0,
   );
 
   if (totalSizeBytes > MAX_STORAGE_BYTES) {
-    // Sort by updatedAt ascending (least recently used first)
-    const sortedByAge = [...survivingRegions].sort((a, b) => {
-      const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return aTime - bTime;
-    });
+    // Sort evictable (non-protected) by updatedAt ascending (LRU first).
+    const sortedByAge = remainingRegions
+      .filter((region) => !isProtected(region))
+      .sort((a, b) => {
+        const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return aTime - bTime;
+      });
 
     for (const region of sortedByAge) {
       if (totalSizeBytes <= MAX_STORAGE_BYTES) {
