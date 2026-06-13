@@ -177,6 +177,20 @@ export const config = {
       ),
     },
   },
+  // Sentry error tracking (review 2026-06-12 P2 observability). Entirely
+  // inert until SENTRY_DSN is set — without it, init is skipped and every
+  // captureException is a no-op, so this is safe to ship before the secret is
+  // configured on Cloud Run. `release` defaults to the Cloud Run revision
+  // (K_REVISION) so issues group by deploy automatically.
+  sentry: {
+    dsn: resolveConfigValue(['SENTRY_DSN'], ''),
+    environment: resolveConfigValue(['SENTRY_ENVIRONMENT', 'NODE_ENV'], 'production'),
+    release: resolveConfigValue(['SENTRY_RELEASE', 'K_REVISION'], ''),
+    tracesSampleRate: parsePositiveNumber(
+      resolveConfigValue(['SENTRY_TRACES_SAMPLE_RATE'], '0'),
+      0,
+    ),
+  },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),
     keyPrefix: resolveConfigValue(

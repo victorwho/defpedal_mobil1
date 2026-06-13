@@ -1,5 +1,8 @@
+// MUST be first: initializes Sentry before Fastify/http are imported.
+import './instrument';
 import { buildApp } from './app';
 import { config, validateConfig } from './config';
+import { flushSentry } from './lib/sentry';
 
 const start = async () => {
   // Fail fast on missing required env. Without this, the server boots with
@@ -30,6 +33,9 @@ const start = async () => {
     } catch (err) {
       app.log.error(err, 'error during graceful shutdown');
     }
+    // Flush any buffered Sentry events before the process exits (no-op when
+    // Sentry is disabled).
+    await flushSentry();
     process.exit(0);
   };
 

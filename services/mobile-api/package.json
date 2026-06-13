@@ -15,6 +15,7 @@
   "dependencies": {
     "@defensivepedal/core": "file:../../packages/core",
     "@fastify/cors": "^11.0.0",
+    "@sentry/node": "^10.57.0",
     "@supabase/supabase-js": "^2.56.1",
     "fastify": "^5.6.1",
     "pngjs": "^7.0.0",

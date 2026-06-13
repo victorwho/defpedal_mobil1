@@ -79,6 +79,7 @@ import {
   writeAckResponseSchema,
 } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
+import { captureServerException } from '../lib/sentry';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import {
   hazardExpireResponseSchema,
@@ -1465,6 +1466,7 @@ export const buildV1Routes = (
         // (review 2026-06-12 — this direct send bypassed the central
         // error-handler's 5xx detail-stripping).
         request.log.error({ error }, 'push token upsert failed');
+        captureServerException(error, { route: 'push-token-register', userId: user.id });
         return reply.status(500).send({ error: 'Failed to register push token.', code: 'UPSTREAM_ERROR' });
       }
 
@@ -1565,6 +1567,7 @@ export const buildV1Routes = (
         return reply.send({ sent: count });
       } catch (err) {
         request.log.error({ err }, 'notification send failed');
+        captureServerException(err, { route: 'admin-notification-send', category });
         return reply.status(500).send({ error: 'Failed to send notification' });
       }
     },

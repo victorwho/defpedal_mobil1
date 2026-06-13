@@ -4,6 +4,7 @@ import Fastify, { type FastifyError } from 'fastify';
 import { config } from './config';
 import { createMobileApiDependencies, type MobileApiDependencies } from './lib/dependencies';
 import { formatValidationDetails, HttpError, toErrorResponse } from './lib/http';
+import { captureServerException } from './lib/sentry';
 import { buildRequestTelemetry } from './lib/telemetry';
 import { buildActivityFeedRoutes } from './routes/activity-feed';
 import { buildFeedRoutes } from './routes/feed';
@@ -155,11 +156,21 @@ export const buildApp = (options: {
       // 5xx details server-side, never send them to the client. Handlers can
       // keep attaching details for the log without re-leaking.
       const isServerError = error.statusCode >= 500;
-      if (isServerError && error.details && error.details.length > 0) {
-        request.log.error(
-          { event: 'http_error_details', statusCode: error.statusCode, code: error.code, details: error.details },
-          error.message,
-        );
+      if (isServerError) {
+        if (error.details && error.details.length > 0) {
+          request.log.error(
+            { event: 'http_error_details', statusCode: error.statusCode, code: error.code, details: error.details },
+            error.message,
+          );
+        }
+        // Surface server-side failures in Sentry (4xx client errors are not
+        // captured — they're expected). No-op when Sentry is disabled.
+        captureServerException(error, {
+          statusCode: error.statusCode,
+          code: error.code,
+          method: request.method,
+          url: request.raw.url ?? request.url,
+        });
       }
       return reply
         .status(error.statusCode)
@@ -173,6 +184,10 @@ export const buildApp = (options: {
     }
 
     app.log.error(error);
+    captureServerException(error, {
+      method: request.method,
+      url: request.raw.url ?? request.url,
+    });
     return reply
       .status(500)
       .send(toErrorResponse('Unexpected server error.', 'INTERNAL_ERROR'));
