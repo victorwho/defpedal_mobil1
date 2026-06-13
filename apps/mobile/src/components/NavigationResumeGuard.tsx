@@ -33,6 +33,7 @@ import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 
 import { loadCachedRoute, clearCachedRoute } from '../lib/offlineRouteCache';
+import { mergeBackgroundBreadcrumbsIntoSession } from '../lib/mergeBackgroundBreadcrumbs';
 import { useAppStore } from '../store/appStore';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
 import { useAuthSessionOptional } from '../providers/AuthSessionProvider';
@@ -81,7 +82,14 @@ const getSessionAgeMs = (session: {
  * Anonymous rides (no activeTripClientId) have no server trip to close —
  * only the local reset runs.
  */
-const closeInterruptedRide = (saveTrack: boolean): void => {
+const closeInterruptedRide = async (saveTrack: boolean): Promise<void> => {
+  // Drain any background-recorded samples (the screen-off / process-dead
+  // stretch) into the trail BEFORE building the trip_track, so a kill-recovered
+  // ride keeps the distance it covered while locked (review 2026-06-12 P1).
+  if (saveTrack) {
+    await mergeBackgroundBreadcrumbsIntoSession();
+  }
+
   const state = useAppStore.getState();
   const session = state.navigationSession;
   const clientTripId = state.activeTripClientId;
@@ -176,7 +184,7 @@ export const NavigationResumeGuard: React.FC = () => {
       // for a resume. Close the interrupted ride out (keeps the GPS trail so
       // the ride still lands in History, like the old kill recovery).
       if (cachedRoute == null) {
-        closeInterruptedRide(true);
+        await closeInterruptedRide(true);
         return;
       }
 
@@ -203,7 +211,7 @@ export const NavigationResumeGuard: React.FC = () => {
   const handleDiscard = useCallback(() => {
     setShowPrompt(false);
     // Explicit discard: close the server trip, skip the History trail.
-    closeInterruptedRide(false);
+    void closeInterruptedRide(false);
   }, []);
 
   if (!showPrompt) return null;

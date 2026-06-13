@@ -1,0 +1,76 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// In-memory keyValueStorage so the persist read-modify-write is observable.
+const store = new Map<string, string>();
+vi.mock('../storage', () => ({
+  keyValueStorage: {
+    getString: vi.fn(async (k: string) => store.get(k) ?? null),
+    setString: vi.fn(async (k: string, v: string) => {
+      store.set(k, v);
+    }),
+    delete: vi.fn(async (k: string) => {
+      store.delete(k);
+    }),
+  },
+}));
+
+// expo-location / task-manager are native — the module's top-level
+// defineTask guard must not throw under the test runtime.
+vi.mock('expo-location', () => ({
+  Accuracy: { BestForNavigation: 4 },
+  ActivityType: { Fitness: 3 },
+}));
+vi.mock('expo-task-manager', () => ({
+  isTaskDefined: () => true,
+  defineTask: vi.fn(),
+}));
+
+import {
+  clearPersistedNavigationHistory,
+  getPersistedNavigationLocationHistory,
+  persistNavigationLocationSamples,
+} from '../backgroundNavigation';
+
+const sample = (ts: number, lat = 44.4, lon = 26.1) => ({
+  coordinate: { lat, lon },
+  accuracyMeters: 5,
+  speedMetersPerSecond: 4,
+  heading: 90,
+  timestamp: ts,
+});
+
+describe('persistNavigationLocationSamples', () => {
+  beforeEach(() => {
+    store.clear();
+  });
+
+  it('appends every sample in a batch (not just the last)', async () => {
+    await persistNavigationLocationSamples([sample(1000), sample(2000), sample(3000)]);
+    const history = await getPersistedNavigationLocationHistory();
+    expect(history.map((s) => s.timestamp)).toEqual([1000, 2000, 3000]);
+  });
+
+  it('de-dups against the existing tail by timestamp (redelivered batch)', async () => {
+    await persistNavigationLocationSamples([sample(1000), sample(2000)]);
+    // Batch 2 redelivers ts 2000 and adds 3000.
+    await persistNavigationLocationSamples([sample(2000), sample(3000)]);
+    const history = await getPersistedNavigationLocationHistory();
+    expect(history.map((s) => s.timestamp)).toEqual([1000, 2000, 3000]);
+  });
+
+  it('ring-buffers at the cap, keeping the most recent samples', async () => {
+    const batch = Array.from({ length: 1100 }, (_, i) => sample(i + 1));
+    await persistNavigationLocationSamples(batch);
+    const history = await getPersistedNavigationLocationHistory();
+    expect(history.length).toBe(1000);
+    expect(history[0].timestamp).toBe(101); // oldest 100 dropped
+    expect(history[history.length - 1].timestamp).toBe(1100);
+  });
+
+  it('clearPersistedNavigationHistory empties the trail', async () => {
+    await persistNavigationLocationSamples([sample(1000)]);
+    await clearPersistedNavigationHistory();
+    const history = await getPersistedNavigationLocationHistory();
+    expect(history).toEqual([]);
+  });
+});

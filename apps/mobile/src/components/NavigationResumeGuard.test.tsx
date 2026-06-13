@@ -26,6 +26,15 @@ vi.mock('../lib/offlineRouteCache', () => ({
   clearCachedRoute: (...args: unknown[]) => mockClearCachedRoute(...args),
 }));
 
+// Stub the breadcrumb merge (its real impl pulls in expo-location, whose
+// native side-effects throw under the test runtime). The merge appends to the
+// same session breadcrumbs the assertions read, so a no-op is correct here —
+// dedicated merge behaviour is covered in backgroundNavigation.test.ts.
+const mockMergeBackground = vi.fn(async () => 0);
+vi.mock('../lib/mergeBackgroundBreadcrumbs', () => ({
+  mergeBackgroundBreadcrumbsIntoSession: (...args: unknown[]) => mockMergeBackground(...args),
+}));
+
 vi.mock('../providers/AuthSessionProvider', () => ({
   useAuthSessionOptional: vi.fn(),
 }));

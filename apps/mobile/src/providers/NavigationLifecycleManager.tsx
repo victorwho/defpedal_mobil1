@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 import {
   startBackgroundNavigationUpdates,
   stopBackgroundNavigationUpdates,
 } from '../lib/backgroundNavigation';
+import { mergeBackgroundBreadcrumbsIntoSession } from '../lib/mergeBackgroundBreadcrumbs';
 import { useAppStore } from '../store/appStore';
 
 /**
@@ -36,6 +38,19 @@ export const NavigationLifecycleManager = () => {
     };
 
     void syncLifecycle();
+  }, [isNavigating]);
+
+  // When the app returns to the foreground during a ride, drain the
+  // background-recorded samples (screen-off / locked stretch) into the trip
+  // trail — otherwise that distance is silently lost (review 2026-06-12 P1).
+  useEffect(() => {
+    if (!isNavigating) return;
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') {
+        void mergeBackgroundBreadcrumbsIntoSession();
+      }
+    });
+    return () => subscription.remove();
   }, [isNavigating]);
 
   return null;
