@@ -1,28 +1,33 @@
 /**
  * ShareFallbackBootstrap — deferred deep-link fallback driver.
  *
- * Fires ONCE on first mount after Zustand hydration:
+ * Fires ONCE per install after Zustand hydration:
  *   - On Android: reads the Play Store install-referrer and extracts
  *     `share=<code>` (only for production Play Store installs).
- *   - On iOS: reads the system clipboard for a `{dp_share, ts}` JSON
- *     payload written by the web viewer.
+ *   - iOS clipboard fallback is currently disabled (see note below).
  *
- * Either fallback calls `setPendingShareClaim(code)` so the existing
+ * The fallback calls `setPendingShareClaim(code)` so the existing
  * `ShareClaimProcessor` picks up the claim via its useEffect watcher.
  *
- * Gated by `hasCheckedInstallReferrer` (non-persisted) so a single app
- * lifetime only runs the checks once. Skipped entirely when a code is
- * already queued (deep-link handler fired first) — the processor is
- * already working on that code.
+ * Gated by `hasCheckedInstallReferrer` (PERSISTED as of review 2026-06-12)
+ * so a single INSTALL only runs the check once — the Play Install Referrer
+ * API returns the same referrer for ~90 days, so a non-persisted guard
+ * re-fired the claim on every cold start. Skipped entirely when a code is
+ * already queued (deep-link handler fired first).
  *
  * Fire-and-forget — no UI rendered. Returns null.
  */
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 
-import {
-  checkClipboardShareFallback,
-} from '../lib/clipboardShareFallback';
+// NOTE: the iOS clipboard fallback (checkClipboardShareFallback) is
+// intentionally NOT wired here. Reading the system clipboard on every iOS
+// cold start triggers iOS 14+'s "pasted from …" banner, and the web viewer
+// (apps/web) never actually writes the {dp_share, ts} payload the reader
+// expects — so the read was a pure privacy-cost no-op (review 2026-06-12 P1).
+// The reader + its parser tests are kept in lib/clipboardShareFallback.ts so
+// re-enabling is a one-line change once apps/web writes the payload on a user
+// gesture.
 import { readInstallReferrer } from '../lib/installReferrer';
 import { useAppStore } from '../store/appStore';
 
@@ -51,14 +56,8 @@ export const ShareFallbackBootstrap = () => {
       try {
         if (Platform.OS === 'android') {
           code = await readInstallReferrer();
-        } else if (Platform.OS === 'ios') {
-          // Skip clipboard if something landed in pendingShareClaim while
-          // we were in-flight (e.g. a universal-link arrived).
-          const latestPending = useAppStore.getState().pendingShareClaim;
-          code = await checkClipboardShareFallback({
-            skip: latestPending != null,
-          });
         }
+        // iOS clipboard fallback disabled — see the import-level note.
       } catch {
         // Defensive — both helpers already swallow their errors, but if
         // something unexpected escapes we still want to mark as checked

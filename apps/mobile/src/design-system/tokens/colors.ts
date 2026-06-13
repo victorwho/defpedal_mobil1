@@ -95,12 +95,19 @@ export const lightTheme = {
   /** Accent — darker for contrast against white */
   accent: '#CA8A04',
   accentHover: '#A16207',
-  accentText: '#CA8A04',
+  // accentText: standalone accent-colored TEXT on a light screen (e.g. ghost
+  // buttons). Darker than `accent` because text needs WCAG AA 4.5:1 on the
+  // near-white light bg, where #CA8A04 only reaches ~2.8:1 (review 2026-06-12
+  // a11y P1). `accent` stays #CA8A04 for fills/borders where dark text sits
+  // on top of it.
+  accentText: '#845A04',
 
   /** Text on light backgrounds */
   textPrimary: '#111827',
   textSecondary: '#6B7280',
-  textMuted: '#737B85',
+  // textMuted darkened #737B85 → #667080 for WCAG AA on white (#737B85 was
+  // 4.28:1, below 4.5) and on bgSecondary (review 2026-06-12 a11y P2).
+  textMuted: '#667080',
   textInverse: '#FFFFFF',
 
   /** Borders */

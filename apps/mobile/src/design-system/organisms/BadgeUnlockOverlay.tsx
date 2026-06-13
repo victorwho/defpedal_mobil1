@@ -310,9 +310,18 @@ export const BadgeUnlockOverlayManager: React.FC = () => {
   const shownCountRef = useRef(0);
   const [current, setCurrent] = useState<BadgeUnlockEvent | null>(null);
 
+  // Highest-priority celebration. We "want" the stage while we have a badge
+  // showing OR queued (and haven't hit the per-session cap). Registering the
+  // want keeps lower-priority overlays (rank-up, meet-Pedal) off-screen until
+  // every badge has been shown (review 2026-06-12 P2).
+  const wantsStage =
+    appState !== 'NAVIGATING' &&
+    shownCountRef.current < MAX_OVERLAYS_PER_SESSION &&
+    (current != null || pendingBadgeUnlocks.length > 0);
+  const canShow = useCelebrationStage('badge', wantsStage);
+
   useEffect(() => {
-    // Suppress during navigation
-    if (appState === 'NAVIGATING') return;
+    if (!canShow) return;
     // Already showing one
     if (current) return;
     // Reached session limit
@@ -325,7 +334,7 @@ export const BadgeUnlockOverlayManager: React.FC = () => {
       setCurrent(next);
       shownCountRef.current++;
     }
-  }, [appState, pendingBadgeUnlocks, current]);
+  }, [canShow, pendingBadgeUnlocks, current, shiftBadgeUnlock]);
 
   if (!current) return null;
 
@@ -339,6 +348,7 @@ export const BadgeUnlockOverlayManager: React.FC = () => {
 
 // Need appStore import for the manager
 import { useAppStore } from '../../store/appStore';
+import { useCelebrationStage } from '../hooks/useCelebrationStage';
 
 const styles = StyleSheet.create({
   container: {

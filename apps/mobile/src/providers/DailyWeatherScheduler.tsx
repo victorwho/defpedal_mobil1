@@ -9,9 +9,18 @@ import { hasNotificationsNativeModule } from '../lib/notificationNativeModule';
  */
 export const DailyWeatherScheduler = () => {
   const notifyWeather = useAppStore((state) => state.notifyWeather);
+  const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
 
   useEffect(() => {
     if (!notifyWeather) return;
+    // Gate the OS notification-permission prompt on completed onboarding
+    // (review 2026-06-12). Previously this fired ~3s into the very first
+    // cold launch — surfacing the Android 13+ POST_NOTIFICATIONS dialog
+    // contextless, stacked on top of the onboarding location-permission
+    // ask, before the user knew what the app does. Contextless first-launch
+    // permission asks have the highest denial rates. After onboarding the
+    // user has seen the value prop, so this is a far better moment.
+    if (!onboardingCompleted) return;
     if (!hasNotificationsNativeModule()) return;
 
     const timer = setTimeout(async () => {
@@ -46,7 +55,7 @@ export const DailyWeatherScheduler = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [notifyWeather]);
+  }, [notifyWeather, onboardingCompleted]);
 
   return null;
 };

@@ -44,6 +44,10 @@ import { create } from 'zustand';
 
 import { getDeviceLocale, type Locale } from '../i18n';
 import { zustandStorage } from '../lib/storage';
+import {
+  INITIAL_CELEBRATION_WANTS,
+  resolveActiveCelebration,
+} from './celebrationStage';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
 
 const MAX_RECENT_DESTINATIONS = 3;
@@ -184,6 +188,19 @@ type AppStore = QueueSlice & {
   pendingTierPromotion: import('@defensivepedal/core').XpAwardResult | null;
   setTierPromotion: (promotion: import('@defensivepedal/core').XpAwardResult | null) => void;
   clearTierPromotion: () => void;
+  // ── Celebration coordinator (review 2026-06-12) ──
+  // The badge-unlock, rank-up, and meet-Pedal overlays used to be independent
+  // siblings whose only shared gate was `appState !== 'NAVIGATING'`, so after
+  // a first ride a new user could get ALL of them stacked at once. Each
+  // overlay now registers whether it WANTS the stage; exactly one holds it at
+  // a time, by priority (badge > rankup > meetpedal) and without preempting an
+  // overlay that's already showing. Transient, not persisted.
+  celebrationWants: Record<import('./celebrationStage').CelebrationKind, boolean>;
+  activeCelebration: import('./celebrationStage').CelebrationKind | null;
+  setCelebrationWant: (
+    kind: import('./celebrationStage').CelebrationKind,
+    wants: boolean,
+  ) => void;
   // Transient: set when the user taps the daily weather notification, so the
   // app can re-show the same content in-app. Not persisted — derived from the
   // live tap (NotificationProvider re-reads the tap on cold start anyway).
@@ -315,10 +332,12 @@ type AppStore = QueueSlice & {
   // ── Deferred Deep Link Fallbacks (slice 2 route-share PRD) ──
   //
   // One-shot guard so the Android install-referrer + iOS clipboard
-  // fallbacks only run once per app lifetime. NOT persisted — resets on
-  // cold start. In practice install-referrer only populates on the first
-  // post-install launch anyway, so re-running on subsequent cold starts
-  // is a cheap no-op.
+  // fallbacks only run once per INSTALL lifetime. PERSISTED (review
+  // 2026-06-12 P1): the Play Install Referrer API returns the same referrer
+  // for ~90 days, so a non-persisted flag re-fired the fallback on every
+  // cold start and re-hijacked the user into the claimed route. The referrer
+  // is a one-time post-install attribution signal — once checked, never
+  // again.
   hasCheckedInstallReferrer: boolean;
   markInstallReferrerChecked: () => void;
 };
@@ -463,6 +482,20 @@ export const useAppStore = create<AppStore>()(
       pendingTierPromotion: null,
       setTierPromotion: (promotion) => set(() => ({ pendingTierPromotion: promotion })),
       clearTierPromotion: () => set(() => ({ pendingTierPromotion: null })),
+      celebrationWants: { ...INITIAL_CELEBRATION_WANTS },
+      activeCelebration: null,
+      setCelebrationWant: (kind, wants) =>
+        set((state) => {
+          if (state.celebrationWants[kind] === wants) return state;
+          const nextWants = { ...state.celebrationWants, [kind]: wants };
+          return {
+            celebrationWants: nextWants,
+            activeCelebration: resolveActiveCelebration(
+              state.activeCelebration,
+              nextWants,
+            ),
+          };
+        }),
       weatherNotice: null,
       setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
       clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
@@ -1087,6 +1120,15 @@ export const useAppStore = create<AppStore>()(
         // that can drop in-memory state before auth finishes. Attempts
         // are intentionally NOT persisted (reset on cold start).
         pendingShareClaim: state.pendingShareClaim,
+        // hasCheckedInstallReferrer PERSISTED (review 2026-06-12 P1): the
+        // Play Install Referrer API returns the SAME referrer for ~90 days
+        // after install, so a non-persisted flag re-ran the deferred-deep-link
+        // fallbacks on every cold start — re-queuing the same share code and
+        // re-hijacking the user into the claimed route preview with a success
+        // toast on every app open. The install-referrer / clipboard fallbacks
+        // are a once-per-install attribution signal, so the guard belongs in
+        // persisted state (device-scoped: NOT reset on account switch).
+        hasCheckedInstallReferrer: state.hasCheckedInstallReferrer,
       }),
     },
   ),

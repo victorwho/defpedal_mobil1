@@ -62,9 +62,11 @@ const buttonPairs: ComponentPairs = {
     { name: 'danger text', fg: brandColors.textPrimary, bg: safetyColors.danger, size: 'body', theme: 'all' },
     // Safe — green bg with white text.
     { name: 'safe text', fg: brandColors.textPrimary, bg: safetyColors.safe, size: 'body', theme: 'all' },
-    // Ghost — accent text on dark deep bg (rendered against the screen background).
+    // Ghost — accent text on the deep screen bg (no button bg of its own).
+    // Light mode uses the dedicated darker `accentText` token (review
+    // 2026-06-12 a11y); dark mode keeps the bright accent.
     { name: 'ghost text on dark', fg: darkTheme.accent, bg: darkTheme.bgDeep, size: 'body', theme: 'dark' },
-    { name: 'ghost text on light', fg: lightTheme.accent, bg: lightTheme.bgDeep, size: 'body', theme: 'light' },
+    { name: 'ghost text on light', fg: lightTheme.accentText, bg: lightTheme.bgDeep, size: 'body', theme: 'light' },
   ],
 };
 
@@ -183,11 +185,6 @@ const KNOWN_REGRESSIONS: ReadonlyArray<KnownRegression> = [
     key: 'Button::safe text::all',
     currentRatio: 2.28,
     fixHint: 'White on #22C55E is only 2.28:1. Use a darker green for the button bg (try green-700 #15803D ≈ 4.6:1) or use textInverse instead of white.',
-  },
-  {
-    key: 'Button::ghost text on light::light',
-    currentRatio: 2.81,
-    fixHint: 'lightTheme.accent (#CA8A04) on near-white bgDeep is 2.81:1. Darken accentText for light mode to ≥ #845A04 (4.5:1).',
   },
   {
     key: 'HazardAlertPill::safe::all',

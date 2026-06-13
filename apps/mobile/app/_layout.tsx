@@ -34,6 +34,7 @@ import {
 } from '../src/hooks/useOnboardingGate';
 import { extractRouteShareCode } from '../src/lib/shareDeepLinkParser';
 import { useStoreHydrated } from '../src/hooks/useStoreHydrated';
+import { useCelebrationStage } from '../src/design-system/hooks/useCelebrationStage';
 
 // Keep splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync();
@@ -286,8 +287,13 @@ const MeetPedalCardManager = () => {
   const appState = useAppStore((s) => s.appState);
 
   // Only fire after the rider has saved at least one ride. Suppressed
-  // during navigation so it never appears over the live HUD.
-  if (hasSeen || completedRides < 1 || appState === 'NAVIGATING') return null;
+  // during navigation so it never appears over the live HUD. Lowest-priority
+  // celebration — waits behind any pending badge / rank-up overlay so the
+  // first-ride trio shows one at a time (review 2026-06-12 P2).
+  const wants = !hasSeen && completedRides >= 1 && appState !== 'NAVIGATING';
+  const canShow = useCelebrationStage('meetpedal', wants);
+
+  if (!canShow) return null;
 
   return <MeetPedalCard visible onDismiss={() => setHasSeen(true)} />;
 };
@@ -298,8 +304,13 @@ const RankUpOverlayManager = () => {
   const clearPromotion = useAppStore((s) => s.clearTierPromotion);
   const appState = useAppStore((s) => s.appState);
 
-  // Suppress during navigation (same as badges)
-  if (!promotion || !promotion.promoted || appState === 'NAVIGATING') return null;
+  // Suppress during navigation (same as badges). Mid-priority celebration:
+  // shows after any pending badge overlay, before the meet-Pedal card.
+  const wants =
+    promotion != null && promotion.promoted && appState !== 'NAVIGATING';
+  const canShow = useCelebrationStage('rankup', wants);
+
+  if (!canShow || !promotion) return null;
 
   return (
     <RankUpOverlay

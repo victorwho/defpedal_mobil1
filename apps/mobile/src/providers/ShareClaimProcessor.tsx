@@ -25,7 +25,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 
 import type { BadgeUnlockEvent, RouteShareClaimInviteeRewards } from '@defensivepedal/core';
 
@@ -113,6 +113,8 @@ export const ShareClaimProcessor = () => {
   const setRoutePreview = useAppStore((s) => s.setRoutePreview);
   const enqueueBadgeUnlocks = useAppStore((s) => s.enqueueBadgeUnlocks);
   const appState = useAppStore((s) => s.appState);
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const pathname = usePathname();
 
   const [toast, setToast] = useState<ToastState>(null);
   // Slice 3: floating "+50 XP" indicator for the invitee's referral welcome.
@@ -171,11 +173,23 @@ export const ShareClaimProcessor = () => {
               already_claimed: result.data.alreadyClaimed,
               follow_pending: result.data.rewards.followPending,
             });
-            // Seed store with the claimed route + navigate to route-preview
-            // so the user lands directly on the map (PRD E2E AC). Suppress
-            // navigation if the user is already NAVIGATING a different ride —
-            // don't hijack an in-progress trip.
-            if (appState !== 'NAVIGATING') {
+
+            // The RPC has already written saved_routes / user_follows / XP /
+            // badges server-side, so the rewards land regardless of what we
+            // surface here. Suppress the visible celebration (navigation +
+            // toast + XP/badge overlays) while the user is mid-onboarding —
+            // otherwise a fresh-install share-link claim yanks the brand-new
+            // user off /onboarding/* (including the consent screen) onto
+            // /route-preview, and piles badge/XP overlays over onboarding
+            // (review 2026-06-12 P1). Also suppressed during NAVIGATING so we
+            // never hijack an in-progress ride.
+            const isOnboarding =
+              onboardingCompleted === false || pathname.startsWith('/onboarding');
+            const suppressNavigation = appState === 'NAVIGATING' || isOnboarding;
+
+            if (!suppressNavigation) {
+              // Seed store with the claimed route + navigate to route-preview
+              // so the user lands directly on the map (PRD E2E AC).
               const mapped = mapShareClaimToPreview(result.data);
               setRouteRequest(mapped.request);
               setRoutePreview(mapped.response, {
@@ -183,31 +197,36 @@ export const ShareClaimProcessor = () => {
               });
               router.push('/route-preview');
             }
-            // Slice 4: toast copy branches on the sharer's privacy setting.
-            // Idempotent re-claims keep the standard copy — the follow state
-            // was settled on the first claim, so promising "Follow request
-            // sent" a second time would be misleading.
-            const isPendingFollow =
-              !result.data.alreadyClaimed && result.data.rewards.followPending;
-            setToast({
-              message: isPendingFollow
-                ? TOAST_MESSAGES.okFollowPending
-                : TOAST_MESSAGES.ok,
-              variant: 'success',
-            });
 
-            // Slice 3: surface invitee-side rewards. Skip if alreadyClaimed
-            // (replay path returns empty rewards from the server, but
-            // defensive skip keeps the UI idle on re-taps).
-            if (!result.data.alreadyClaimed) {
-              const { rewards } = result.data;
-              if (rewards.inviteeXpAwarded != null && rewards.inviteeXpAwarded > 0) {
-                setXpGain(rewards.inviteeXpAwarded);
-              }
-              if (rewards.inviteeNewBadges.length > 0) {
-                enqueueBadgeUnlocks(
-                  toBadgeUnlockEvents(rewards, new Date().toISOString()),
-                );
+            // During onboarding, stay silent — the rewards are banked and the
+            // route is in Saved; we just don't interrupt the first-run flow.
+            if (!isOnboarding) {
+              // Slice 4: toast copy branches on the sharer's privacy setting.
+              // Idempotent re-claims keep the standard copy — the follow state
+              // was settled on the first claim, so promising "Follow request
+              // sent" a second time would be misleading.
+              const isPendingFollow =
+                !result.data.alreadyClaimed && result.data.rewards.followPending;
+              setToast({
+                message: isPendingFollow
+                  ? TOAST_MESSAGES.okFollowPending
+                  : TOAST_MESSAGES.ok,
+                variant: 'success',
+              });
+
+              // Slice 3: surface invitee-side rewards. Skip if alreadyClaimed
+              // (replay path returns empty rewards from the server, but
+              // defensive skip keeps the UI idle on re-taps).
+              if (!result.data.alreadyClaimed) {
+                const { rewards } = result.data;
+                if (rewards.inviteeXpAwarded != null && rewards.inviteeXpAwarded > 0) {
+                  setXpGain(rewards.inviteeXpAwarded);
+                }
+                if (rewards.inviteeNewBadges.length > 0) {
+                  enqueueBadgeUnlocks(
+                    toBadgeUnlockEvents(rewards, new Date().toISOString()),
+                  );
+                }
               }
             }
             break;
@@ -269,6 +288,8 @@ export const ShareClaimProcessor = () => {
     userId,
     isAuthLoading,
     appState,
+    onboardingCompleted,
+    pathname,
     clearPendingShareClaim,
     incrementClaimAttempts,
     setRouteRequest,

@@ -18,6 +18,7 @@ import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily } from '../tokens/typography';
 import { brandColors, darkTheme, safetyColors } from '../tokens/colors';
+import { useTheme } from '../ThemeContext';
 import { PressableScale } from './PressableScale';
 
 // Pressed-state variants (darker shades of safety colors, not in main token set)
@@ -55,7 +56,15 @@ const sizeStyles: Record<ButtonSize, { height: number; px: number; fontSize: num
 };
 
 // ---------------------------------------------------------------------------
-// Variant colors (static — always dark theme since buttons carry their own bg)
+// Variant colors
+//
+// FILLED variants (primary / secondary / danger / safe) carry their own
+// opaque background, so their colors are static — they read correctly on any
+// screen regardless of theme. The GHOST variant has a transparent background
+// and therefore inherits the SCREEN behind it: on a light-theme screen the
+// static dark-theme accent (#FACC15) measured only 1.5:1 on white, well below
+// the 4.5:1 AA threshold (review 2026-06-12 a11y P1). Ghost text/press tint
+// are resolved per-theme below via `useTheme()`.
 // ---------------------------------------------------------------------------
 
 const variantStyles: Record<
@@ -73,6 +82,7 @@ const variantStyles: Record<
     pressedBg: darkTheme.bgTertiary,
   },
   ghost: {
+    // text + pressedBg overridden per-theme at render time (see below).
     bg: 'transparent',
     text: darkTheme.accent,
     pressedBg: 'rgba(250, 204, 21, 0.1)',
@@ -107,6 +117,17 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const s = sizeStyles[size];
   const v = variantStyles[variant];
+  const { colors, mode } = useTheme();
+
+  // Ghost has no background, so its text must contrast with the live screen.
+  // Dark theme keeps the bright accent (#FACC15, AA-pass on the dark deep bg).
+  // Light theme uses the dedicated darker `accentText` token (≥4.5:1 on the
+  // near-white light bg) — the bright accent measured only ~1.5:1 there.
+  const ghostText = mode === 'dark' ? darkTheme.accent : colors.accentText;
+  const ghostPressedBg =
+    mode === 'dark' ? 'rgba(250, 204, 21, 0.12)' : 'rgba(132, 90, 4, 0.10)';
+  const effectiveText = variant === 'ghost' ? ghostText : v.text;
+  const effectivePressedBg = variant === 'ghost' ? ghostPressedBg : v.pressedBg;
 
   const containerStyle: ViewStyle = {
     height: s.height,
@@ -125,7 +146,7 @@ export const Button: React.FC<ButtonProps> = ({
   const textStyle: TextStyle = {
     fontFamily: fontFamily.body.semiBold,
     fontSize: s.fontSize,
-    color: v.text,
+    color: effectiveText,
   };
 
   return (
@@ -136,12 +157,12 @@ export const Button: React.FC<ButtonProps> = ({
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, busy: loading }}
       style={containerStyle}
-      pressedStyle={{ backgroundColor: v.pressedBg }}
+      pressedStyle={{ backgroundColor: effectivePressedBg }}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={v.text}
+          color={effectiveText}
           accessibilityLabel="Loading"
         />
       ) : (

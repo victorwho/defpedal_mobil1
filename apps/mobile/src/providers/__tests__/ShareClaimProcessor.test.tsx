@@ -20,6 +20,9 @@ vi.mock('expo-router', () => ({
     replace: vi.fn(),
     back: vi.fn(),
   },
+  // Non-onboarding path by default so the claim's navigation/celebration is
+  // exercised. The onboarding-suppression branch is covered by its own test.
+  usePathname: () => '/',
 }));
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -174,6 +177,10 @@ const resetState = () => {
     routePreview: null,
     selectedRouteId: null,
     appState: 'IDLE',
+    // Onboarding complete by default — the claim's celebration/navigation is
+    // suppressed during onboarding (review 2026-06-12), which the dedicated
+    // onboarding test sets up explicitly.
+    onboardingCompleted: true,
   });
 };
 
@@ -288,6 +295,31 @@ describe('ShareClaimProcessor', () => {
     const toast = screen.getByTestId('toast');
     expect(toast.getAttribute('data-variant')).toBe('success');
     expect(toast.getAttribute('data-message')).toMatch(/saved routes/i);
+  });
+
+  it('suppresses navigation + celebration during onboarding (claim still lands)', async () => {
+    // Review 2026-06-12 P1: a fresh-install share-link claim used to yank the
+    // brand-new user off /onboarding/* onto /route-preview. The RPC already
+    // banked saved_routes/XP/badges server-side, so we clear the claim but
+    // skip the navigation + toast while onboarding is incomplete.
+    claimRouteShareSpy.mockResolvedValue({ status: 'ok', data: okClaimData });
+    useAppStore.setState({
+      pendingShareClaim: 'abcd1234',
+      onboardingCompleted: false,
+    });
+    render(<ShareClaimProcessor />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(claimRouteShareSpy).toHaveBeenCalledTimes(1);
+    // Claim consumed so it doesn't re-fire.
+    expect(useAppStore.getState().pendingShareClaim).toBeNull();
+    // No navigation, no route-preview seeding, no toast over onboarding.
+    expect(routerPushSpy).not.toHaveBeenCalled();
+    expect(useAppStore.getState().routePreview).toBeNull();
+    expect(screen.queryByTestId('toast')).toBeNull();
   });
 
   it('does NOT navigate when user is already NAVIGATING (preserves in-progress ride)', async () => {
