@@ -1,0 +1,33 @@
+Defensive Pedal Preview v0.2.91 (build 94)
+
+This build ships the fixes from the full-app review (Phases 0-4). Highlights to test:
+
+RIDE FLOW
+- Lock-screen recording: lock the phone and keep riding for a few minutes,
+  then unlock — the distance you covered while locked is now counted.
+- Swipe the app away from recents mid-ride: the tracking notification now
+  stops (no more lingering notification / battery drain).
+- End Ride now has a "Keep riding" option; tapping outside the dialog keeps
+  riding instead of ending. Android back during a ride opens End Ride instead
+  of dropping you to a dead screen.
+
+ACCOUNTS
+- New "Forgot password?" on the email sign-in screen (reset by email link).
+
+ONBOARDING & LANGUAGE
+- The whole onboarding flow is now translated (try Romanian / Spanish in
+  Profile > Display).
+- After your first ride, the celebration pop-ups (badges, rank-up, meet Pedal)
+  now appear ONE AT A TIME instead of stacking.
+
+PRIVACY / SECURITY (under the hood)
+- Shared-route links no longer expose the sharer's exact start/end address.
+- Community comments are moderated and rate-limited consistently.
+
+PERFORMANCE & POLISH
+- Smoother during navigation (fewer background writes), faster Trophy Case,
+  better text scaling on large font sizes, screen-reader labels on the route
+  sheet, localized lock-screen notification.
+
+Please report anything that looks off — especially around ending a ride,
+lock-screen tracking, and the onboarding flow in Romanian.

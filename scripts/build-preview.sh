@@ -97,6 +97,13 @@ cp -f "$SRC/.npmrc" "$DST/.npmrc" 2>/dev/null || true
 # skipped-install builds still get the patch.
 robocopy "$SRC/patches" "$DST/patches" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
 
+# Sync the root postinstall wrapper. The root package.json "postinstall" runs
+# `node scripts/run-patch-package.cjs` (review 2026-06-12 — tolerates
+# patch-package being absent in pruned installs). It must exist on DST BEFORE
+# the npm install below, or the install fails with MODULE_NOT_FOUND.
+mkdir -p "$DST/scripts"
+cp -f "$SRC/scripts/run-patch-package.cjs" "$DST/scripts/run-patch-package.cjs" 2>/dev/null || true
+
 # Sync workspace package.json files (in case new deps were added)
 cp -f "$SRC/apps/mobile/package.json" "$DST/apps/mobile/package.json" 2>/dev/null || true
 cp -f "$SRC/packages/core/package.json" "$DST/packages/core/package.json" 2>/dev/null || true
