@@ -4,7 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useHaptics } from '../design-system/hooks/useHaptics';
 import { useReducedMotion } from '../design-system/hooks/useReducedMotion';
-import { brandColors, gray, safetyColors } from '../design-system/tokens/colors';
+import { brandColors, gray } from '../design-system/tokens/colors';
 import { springs } from '../design-system/tokens/motion';
 
 type ReactionButtonProps = {
@@ -13,9 +13,10 @@ type ReactionButtonProps = {
   onPress: () => void;
   icon: 'thumbs-up' | 'heart';
   activeColor: string;
+  label?: string;
 };
 
-const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionButtonProps) => {
+const ReactionButton = ({ active, count, onPress, icon, activeColor, label }: ReactionButtonProps) => {
   const reduced = useReducedMotion();
   const haptics = useHaptics();
   const scale = useRef(new Animated.Value(1)).current;
@@ -24,7 +25,7 @@ const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionB
     ? (icon === 'thumbs-up' ? 'thumbs-up' : 'heart')
     : (icon === 'thumbs-up' ? 'thumbs-up-outline' : 'heart-outline');
 
-  const label = icon === 'thumbs-up' ? 'Like' : 'Love';
+  const a11yLabel = label ?? (icon === 'thumbs-up' ? 'Like' : 'Love');
 
   const handlePress = () => {
     haptics.confirm();
@@ -52,7 +53,7 @@ const ReactionButton = ({ active, count, onPress, icon, activeColor }: ReactionB
       style={[styles.button, active && styles.buttonActive]}
       onPress={handlePress}
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${count}`}
+      accessibilityLabel={`${a11yLabel}, ${count}`}
       accessibilityState={{ selected: active }}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
@@ -69,56 +70,42 @@ type LikeButtonProps = {
   onPress: () => void;
 };
 
+// Single consolidated reaction (review P3): one heart in the brand accent.
+// (Safety red is reserved for hazards, so the heart uses the accent, not red.)
 export const LikeButton = ({ liked, count, onPress }: LikeButtonProps) => (
   <ReactionButton
     active={liked}
     count={count}
     onPress={onPress}
-    icon="thumbs-up"
-    activeColor={brandColors.accent}
-  />
-);
-
-type LoveButtonProps = {
-  loved: boolean;
-  count: number;
-  onPress: () => void;
-};
-
-export const LoveButton = ({ loved, count, onPress }: LoveButtonProps) => (
-  <ReactionButton
-    active={loved}
-    count={count}
-    onPress={onPress}
     icon="heart"
-    activeColor={safetyColors.danger}
+    activeColor={brandColors.accent}
+    label="Like"
   />
 );
 
 type ReactionBarProps = {
   likeCount: number;
-  loveCount: number;
   commentCount: number;
   likedByMe: boolean;
-  lovedByMe: boolean;
   onLike: () => void;
-  onLove: () => void;
   onComment: () => void;
+  // Deprecated — reactions consolidated to a single heart (review P3). Kept
+  // optional so existing callers (FeedCard, ActivityFeedCard) compile without
+  // change; ignored. Remove once those call sites drop the love props.
+  loveCount?: number;
+  lovedByMe?: boolean;
+  onLove?: () => void;
 };
 
 export const ReactionBar = ({
   likeCount,
-  loveCount,
   commentCount,
   likedByMe,
-  lovedByMe,
   onLike,
-  onLove,
   onComment,
 }: ReactionBarProps) => (
   <View style={styles.bar}>
     <LikeButton liked={likedByMe} count={likeCount} onPress={onLike} />
-    <LoveButton loved={lovedByMe} count={loveCount} onPress={onLove} />
     <Pressable
       style={styles.button}
       onPress={onComment}

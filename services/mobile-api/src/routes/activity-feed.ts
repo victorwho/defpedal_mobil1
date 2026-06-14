@@ -147,13 +147,18 @@ export const buildActivityFeedRoutes = (
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
 
+        // Reactions consolidated to a single "like" (review P3): coerce 'love'
+        // to 'like' so old app versions sending love create likes and the love
+        // reaction never refills.
+        const reactionType = request.body.type === 'love' ? 'like' : request.body.type;
+
         const { error } = await db
           .from('activity_reactions')
           .upsert(
             {
               activity_id: request.params.id,
               user_id: user.id,
-              reaction_type: request.body.type,
+              reaction_type: reactionType,
             },
             { onConflict: 'activity_id,user_id,reaction_type' },
           );
@@ -172,7 +177,7 @@ export const buildActivityFeedRoutes = (
             try {
               await supabaseAdmin.rpc('award_xp', {
                 p_user_id: user.id,
-                p_action: request.body.type,
+                p_action: reactionType,
                 p_base_xp: XP_VALUES.like,
                 p_multiplier: 1.0,
                 p_source_id: request.params.id,
@@ -209,12 +214,15 @@ export const buildActivityFeedRoutes = (
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
 
+        // Coerce 'love' → 'like' (reactions consolidated — see POST react above).
+        const reactionType = request.params.type === 'love' ? 'like' : request.params.type;
+
         const { error } = await db
           .from('activity_reactions')
           .delete()
           .eq('activity_id', request.params.id)
           .eq('user_id', user.id)
-          .eq('reaction_type', request.params.type);
+          .eq('reaction_type', reactionType);
 
         if (error) {
           throw new HttpError('Remove reaction failed.', {

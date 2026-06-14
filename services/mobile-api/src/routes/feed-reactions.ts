@@ -158,9 +158,12 @@ export const buildFeedReactionRoutes = (
         },
       },
       async (request) => {
+        // Reactions consolidated to a single "like" (review P3): /love is now an
+        // alias that writes feed_likes, so old app versions tapping love create
+        // likes and trip_loves never refills (love_count stays 0).
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
-        const { error } = await db.from('trip_loves').upsert(
+        const { error } = await db.from('feed_likes').upsert(
           { trip_share_id: request.params.id, user_id: user.id },
           { onConflict: 'trip_share_id,user_id' },
         );
@@ -170,7 +173,7 @@ export const buildFeedReactionRoutes = (
         if (supabaseAdmin) {
           void (async () => {
             try { await supabaseAdmin.rpc('award_xp', {
-              p_user_id: user.id, p_action: 'love',
+              p_user_id: user.id, p_action: 'like',
               p_base_xp: XP_VALUES.like, p_multiplier: 1.0,
               p_source_id: request.params.id,
             }); } catch { /* non-fatal */ }
@@ -204,9 +207,10 @@ export const buildFeedReactionRoutes = (
         },
       },
       async (request) => {
+        // Alias to feed_likes (reactions consolidated — see POST /love above).
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
-        const { error } = await db.from('trip_loves').delete().eq('trip_share_id', request.params.id).eq('user_id', user.id);
+        const { error } = await db.from('feed_likes').delete().eq('trip_share_id', request.params.id).eq('user_id', user.id);
         if (error) throw new HttpError('Unlove failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
         return { acceptedAt: new Date().toISOString() };
       },
