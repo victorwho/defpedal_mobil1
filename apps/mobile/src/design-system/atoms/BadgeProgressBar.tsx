@@ -11,6 +11,7 @@ import { Animated, View, type ViewStyle } from 'react-native';
 import { badgeSpace } from '../tokens/badgeColors';
 import { brandColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,14 +40,20 @@ export const BadgeProgressBar: React.FC<BadgeProgressBarProps> = ({
 }) => {
   const fraction = target > 0 ? Math.min(current / target, 1) : 0;
   const animatedScale = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) {
+      // Snap the fill to its final value — no growth animation.
+      animatedScale.setValue(fraction);
+      return;
+    }
     Animated.timing(animatedScale, {
       toValue: fraction,
       duration: 600,
       useNativeDriver: true, // GPU-accelerated with transform
     }).start();
-  }, [fraction]);
+  }, [fraction, reducedMotion]);
 
   const trackStyle: ViewStyle = {
     height,

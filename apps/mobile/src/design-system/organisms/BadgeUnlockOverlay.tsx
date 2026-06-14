@@ -18,6 +18,7 @@ import type { BadgeUnlockEvent } from '@defensivepedal/core';
 
 import { BadgeVisual } from '../atoms/BadgeVisual';
 import { Mascot } from '../atoms/Mascot';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import {
   tierColors,
   badgeAnimations,
@@ -136,7 +137,26 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
     createParticles(badgeAnimations.particleBurst.count),
   );
 
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
+    if (reducedMotion) {
+      // Reduce Motion: render the final composed overlay with no particle
+      // burst and no spring/slide/fade. The particles keep their initial
+      // scale 0 (invisible) since animateParticles never runs. Still tappable
+      // to dismiss; the celebration is just static.
+      bgOpacity.setValue(1);
+      shieldOpacity.setValue(1);
+      shieldScale.setValue(1);
+      iconOpacity.setValue(1);
+      nameOpacity.setValue(1);
+      nameTranslateY.setValue(0);
+      tierOpacity.setValue(1);
+      flavorOpacity.setValue(1);
+      dismissOpacity.setValue(1);
+      return;
+    }
+
     const animation = Animated.sequence([
       // T+0ms: Background dims
       Animated.timing(bgOpacity, {
@@ -211,7 +231,7 @@ export const BadgeUnlockOverlay: React.FC<BadgeUnlockOverlayProps> = ({
       animation.stop();
       clearTimeout(particleTimer);
     };
-  }, []);
+  }, [reducedMotion]);
 
   return (
     <Pressable style={styles.container} onPress={onDismiss}>
