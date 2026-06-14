@@ -15,6 +15,8 @@ import React, { forwardRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { BrandLogo } from '../BrandLogo';
+import { intlLocaleTag } from '../../lib/dateFormat';
+import type { Locale } from '../../i18n';
 import { brandColors, darkTheme } from '../../design-system/tokens/colors';
 import { space } from '../../design-system/tokens/spacing';
 import { fontFamily } from '../../design-system/tokens/typography';
@@ -40,11 +42,11 @@ const formatDuration = (minutes: number): string => {
   const h = Math.floor(total / 60);
   return `${h}h ${total - h * 60}m`;
 };
-const formatDateLabel = (iso?: string): string => {
+const formatDateLabel = (iso: string | undefined, locale: Locale): string => {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString(intlLocaleTag(locale), { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +63,8 @@ export interface RideShareCardProps {
   readonly originLabel?: string;
   readonly destinationLabel?: string;
   readonly dateIso?: string;
+  /** App locale for the date label. Defaults to 'en' so the card stays pure. */
+  readonly dateLocale?: Locale;
   readonly width?: number;
   readonly height?: number;
 }
@@ -107,11 +111,12 @@ export const RideShareCard = forwardRef<View, RideShareCardProps>(
       originLabel,
       destinationLabel,
       dateIso,
+      dateLocale = 'en',
       width = DEFAULT_SIZE,
       height = DEFAULT_SIZE,
     } = props;
 
-    const dateLabel = formatDateLabel(dateIso);
+    const dateLabel = formatDateLabel(dateIso, dateLocale);
 
     const tiles: TileSpec[] = [
       { key: 'distance', value: formatDistanceKm(distanceKm), label: 'Distance' },

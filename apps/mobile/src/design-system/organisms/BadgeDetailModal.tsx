@@ -11,7 +11,9 @@ import type { BadgeDefinition, BadgeProgress } from '@defensivepedal/core';
 
 import { BadgeShareCard } from '../../components/BadgeShareCard';
 import { useShareCard } from '../../hooks/useShareCard';
-import { useT } from '../../hooks/useTranslation';
+import { useT, useLocale } from '../../hooks/useTranslation';
+import { intlLocaleTag } from '../../lib/dateFormat';
+import type { Locale } from '../../i18n';
 import { BadgeVisual } from '../atoms/BadgeVisual';
 import { BadgeProgressBar } from '../atoms/BadgeProgressBar';
 import { claimHoloFocus } from '../hooks/useHoloTilt';
@@ -60,9 +62,9 @@ const TIER_FROM_LEVEL: Record<number, BadgeTier> = {
   5: 'diamond',
 };
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: Locale): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(intlLocaleTag(locale), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -81,6 +83,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
 }) => {
   const { share: shareCard, isSharing } = useShareCard();
   const t = useT();
+  const { locale } = useLocale();
 
   // Claim exclusive holo tilt while the modal is up — grid stickers behind
   // the backdrop suspend their gyro so only the hero responds to the phone's
@@ -234,7 +237,7 @@ export const BadgeDetailModal: React.FC<BadgeDetailModalProps> = ({
             {/* Earned date */}
             {earnedAt ? (
               <Text style={styles.earnedDate}>
-                {t('achievements.earnedDate', { date: formatDate(earnedAt) })}
+                {t('achievements.earnedDate', { date: formatDate(earnedAt, locale) })}
               </Text>
             ) : null}
 

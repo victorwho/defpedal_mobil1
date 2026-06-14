@@ -36,6 +36,8 @@ import { mobileEnv } from '../lib/env';
 import { shareImage, type ShareImageResult } from '../lib/shareImage';
 import { useConnectivity } from '../providers/ConnectivityMonitor';
 import { useCaptureHost } from '../providers/OffScreenCaptureHost';
+import { useAppStore } from '../store/appStore';
+import type { Locale } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -165,6 +167,7 @@ export function useShareRide(): UseShareRideReturn {
           originLabel: input.originLabel,
           destinationLabel: input.destinationLabel,
           dateIso: input.dateIso,
+          dateLocale: useAppStore.getState().locale as Locale,
         });
 
         const fileUri = await captureHost.capture(cardElement, {

@@ -9,6 +9,9 @@ import {
 } from '@defensivepedal/core';
 import type { TripStatsBucket, TripStatsDashboard } from '@defensivepedal/core';
 
+import { useLocale } from '../hooks/useTranslation';
+import { intlLocaleTag } from '../lib/dateFormat';
+import type { Locale } from '../i18n';
 import { brandColors, safetyColors } from '../design-system/tokens/colors';
 import {
   fontFamily,
@@ -241,18 +244,20 @@ type RideFrequencyChartProps = {
   readonly period: StatsPeriod;
 };
 
-const formatBucketLabel = (periodStart: string, period: StatsPeriod): string => {
+const formatBucketLabel = (periodStart: string, period: StatsPeriod, locale: Locale): string => {
   const date = new Date(periodStart + 'T00:00:00');
+  const tag = intlLocaleTag(locale);
   if (period === 'week') {
-    return date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 2);
+    return date.toLocaleDateString(tag, { weekday: 'short' }).slice(0, 2);
   }
   if (period === 'month') {
     return `W${Math.ceil(date.getDate() / 7)}`;
   }
-  return date.toLocaleDateString('en-US', { month: 'short' }).slice(0, 3);
+  return date.toLocaleDateString(tag, { month: 'short' }).slice(0, 3);
 };
 
 function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
+  const { locale } = useLocale();
   const chartData = useMemo(() => {
     if (buckets.length === 0) return null;
 
@@ -275,14 +280,14 @@ function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
         width: barWidth,
         height: Math.max(barHeight, 2),
         trips: bucket.trips,
-        label: formatBucketLabel(bucket.periodStart, period),
+        label: formatBucketLabel(bucket.periodStart, period, locale),
       };
     });
 
     const gridLines = [0, Math.round(maxTrips / 2), maxTrips];
 
     return { bars, maxTrips, plotH, gridLines };
-  }, [buckets, period]);
+  }, [buckets, period, locale]);
 
   if (!chartData) {
     return (

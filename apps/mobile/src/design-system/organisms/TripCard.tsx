@@ -5,6 +5,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useTheme, type ThemeColors } from '..';
+import { useLocale } from '../../hooks/useTranslation';
+import { intlLocaleTag } from '../../lib/dateFormat';
+import type { Locale } from '../../i18n';
 import { Co2Badge } from '../atoms/Co2Badge';
 import { RouteMap } from '../../components/map';
 import { safetyColors, gray } from '../tokens/colors';
@@ -28,18 +31,18 @@ type TripCardProps = {
   readonly deleteLabel?: string;
 };
 
-const formatDate = (iso: string): string => {
+const formatDate = (iso: string, locale: Locale): string => {
   const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', {
+  return d.toLocaleDateString(intlLocaleTag(locale), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
 };
 
-const formatTime = (iso: string): string => {
+const formatTime = (iso: string, locale: Locale): string => {
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(intlLocaleTag(locale), { hour: '2-digit', minute: '2-digit' });
 };
 
 const formatDuration = (start: string, end: string | null): string => {
@@ -80,6 +83,7 @@ export const TripCard = memo(({
   deleteLabel = 'Delete trip',
 }: TripCardProps) => {
   const { colors } = useTheme();
+  const { locale } = useLocale();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
   const hasGpsTrail = trip.gpsBreadcrumbs.length > 0;
@@ -104,8 +108,8 @@ export const TripCard = memo(({
     <View style={styles.card}>
       <Pressable onPress={onToggle} style={styles.row}>
         <View style={styles.dateCol}>
-          <Text style={styles.dateText}>{formatDate(trip.startedAt)}</Text>
-          <Text style={styles.timeText}>{formatTime(trip.startedAt)}</Text>
+          <Text style={styles.dateText}>{formatDate(trip.startedAt, locale)}</Text>
+          <Text style={styles.timeText}>{formatTime(trip.startedAt, locale)}</Text>
         </View>
 
         <View style={styles.metricsCol}>

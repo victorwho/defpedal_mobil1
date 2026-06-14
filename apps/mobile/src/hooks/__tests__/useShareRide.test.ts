@@ -84,6 +84,15 @@ vi.mock('../../components/share/RideShareCard', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// App store — only used to read the current locale for the card's date label.
+// Mocked so the test doesn't construct the real persisted store.
+// ---------------------------------------------------------------------------
+
+vi.mock('../../store/appStore', () => ({
+  useAppStore: { getState: () => ({ locale: 'en' }) },
+}));
+
+// ---------------------------------------------------------------------------
 // SUT import — after mocks
 // ---------------------------------------------------------------------------
 
