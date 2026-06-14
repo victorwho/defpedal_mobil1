@@ -85,7 +85,16 @@ const StaggeredCounter = ({
         suffix={suffix}
         decimals={decimals}
         duration={1200}
-        style={{ ...textDataMd, fontFamily: fontFamily.mono.bold, fontSize: 28, color }}
+        style={{
+          ...textDataMd,
+          fontFamily: fontFamily.mono.bold,
+          fontSize: 28,
+          // textDataMd carries lineHeight 24 (tuned for fontSize 20). Without
+          // bumping it to match the 28px override, iOS clips the glyph tops &
+          // bottoms inside the too-short line box. ~1.2x keeps the ratio.
+          lineHeight: 34,
+          color,
+        }}
       />
       <Text style={styles.counterLabel}>{label}</Text>
       {equivalentText ? (
