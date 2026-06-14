@@ -1227,6 +1227,35 @@ export const en = {
     a11yLabel:
       "A ride didn't save. Retry to save your ride data, or dismiss this notice.",
   },
+
+  // ── Impact Dashboard screen ──
+  impactDashboard: {
+    title: 'Your Impact',
+    loadError: 'Failed to load dashboard',
+    timeBank: 'Time Bank',
+    lifeEarned: '+{{time}} of life earned',
+    donatedToCity: '{{time}} donated to your city',
+    experience: 'Experience',
+    xpToGo: '{{tier}} · {{xp}} XP to go',
+    maxRank: 'Maximum rank achieved',
+    lifetimeImpact: 'Lifetime impact',
+    co2Saved: 'CO2 saved',
+    treesEquivalent: 'Like {{count}} trees absorbing CO2 for a year',
+    moneySaved: 'Money saved',
+    ridersProtected: 'Riders protected',
+    ridersProtectedSub: 'Cyclists kept safe by your reports',
+    thisWeek: 'This week',
+    recentBadges: 'Recent badges',
+    viewAll: 'View all',
+    weekRidesUnit: 'rides',
+    weekCompleted: 'Completed',
+    weekCo2Saved: 'CO2 saved',
+    weekSaved: 'Saved',
+    weekHazards: 'Hazards reported',
+    quizTitle: 'Daily Safety Quiz',
+    quizSubtext: 'Answer to maintain your streak',
+    quizA11y: "Take today's daily quiz",
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

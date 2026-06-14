@@ -1215,4 +1215,33 @@ export const es: TranslationKeys = {
     a11yLabel:
       'Una ruta no se guardó. Reintenta para guardar los datos de tu ruta o descarta este aviso.',
   },
+
+  // ── Impact Dashboard screen ──
+  impactDashboard: {
+    title: 'Tu impacto',
+    loadError: 'No se pudo cargar el panel',
+    timeBank: 'Banco de tiempo',
+    lifeEarned: '+{{time}} de vida ganados',
+    donatedToCity: '{{time}} donados a tu ciudad',
+    experience: 'Experiencia',
+    xpToGo: '{{tier}} · {{xp}} XP restantes',
+    maxRank: 'Rango máximo alcanzado',
+    lifetimeImpact: 'Impacto total',
+    co2Saved: 'CO2 ahorrado',
+    treesEquivalent: 'Como {{count}} árboles absorbiendo CO2 durante un año',
+    moneySaved: 'Dinero ahorrado',
+    ridersProtected: 'Ciclistas protegidos',
+    ridersProtectedSub: 'Ciclistas protegidos por tus reportes',
+    thisWeek: 'Esta semana',
+    recentBadges: 'Insignias recientes',
+    viewAll: 'Ver todo',
+    weekRidesUnit: 'viajes',
+    weekCompleted: 'Completados',
+    weekCo2Saved: 'CO2 ahorrado',
+    weekSaved: 'Ahorrado',
+    weekHazards: 'Peligros reportados',
+    quizTitle: 'Cuestionario diario de seguridad',
+    quizSubtext: 'Responde para mantener tu racha',
+    quizA11y: 'Haz el cuestionario diario',
+  },
 };

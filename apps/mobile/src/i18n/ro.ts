@@ -1215,4 +1215,33 @@ export const ro: TranslationKeys = {
     a11yLabel:
       'O cursă nu s-a salvat. Reîncearcă pentru a salva datele cursei sau închide această notificare.',
   },
+
+  // ── Impact Dashboard screen ──
+  impactDashboard: {
+    title: 'Impactul tău',
+    loadError: 'Nu s-a putut încărca panoul',
+    timeBank: 'Banca de timp',
+    lifeEarned: '+{{time}} de viață câștigate',
+    donatedToCity: '{{time}} donate orașului tău',
+    experience: 'Experiență',
+    xpToGo: '{{tier}} · {{xp}} XP rămași',
+    maxRank: 'Rang maxim atins',
+    lifetimeImpact: 'Impact total',
+    co2Saved: 'CO2 economisit',
+    treesEquivalent: 'Cât {{count}} copaci care absorb CO2 timp de un an',
+    moneySaved: 'Bani economisiți',
+    ridersProtected: 'Bicicliști protejați',
+    ridersProtectedSub: 'Bicicliști ținuți în siguranță de raportările tale',
+    thisWeek: 'Săptămâna aceasta',
+    recentBadges: 'Insigne recente',
+    viewAll: 'Vezi tot',
+    weekRidesUnit: 'curse',
+    weekCompleted: 'Finalizate',
+    weekCo2Saved: 'CO2 economisit',
+    weekSaved: 'Economisit',
+    weekHazards: 'Pericole raportate',
+    quizTitle: 'Quiz zilnic de siguranță',
+    quizSubtext: 'Răspunde ca să-ți menții seria',
+    quizA11y: 'Începe quizul zilnic',
+  },
 };

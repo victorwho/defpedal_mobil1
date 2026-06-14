@@ -21,6 +21,7 @@ import { ScreenHeader } from '../src/design-system/atoms/ScreenHeader';
 import { Button } from '../src/design-system/atoms/Button';
 import { Surface } from '../src/design-system/atoms/Card';
 import { useBadges } from '../src/hooks/useBadges';
+import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
@@ -76,6 +77,7 @@ const TIER_FROM_LEVEL: Record<number, 'bronze' | 'silver' | 'gold' | 'platinum' 
 
 const RecentBadgesSection = ({ styles }: { readonly styles: ReturnType<typeof createThemedStyles> }) => {
   const { data } = useBadges();
+  const t = useT();
   if (!data || data.earned.length === 0) return null;
 
   // Sort earned by date descending, take first 5
@@ -88,7 +90,7 @@ const RecentBadgesSection = ({ styles }: { readonly styles: ReturnType<typeof cr
 
   return (
     <View style={styles.card}>
-      <Text style={styles.cardHeader}>Recent badges</Text>
+      <Text style={styles.cardHeader}>{t('impactDashboard.recentBadges')}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -107,7 +109,7 @@ const RecentBadgesSection = ({ styles }: { readonly styles: ReturnType<typeof cr
         })}
       </ScrollView>
       <Pressable onPress={() => router.push('/achievements' as any)}>
-        <Text style={styles.viewAllBadgesLink}>View all &gt;</Text>
+        <Text style={styles.viewAllBadgesLink}>{t('impactDashboard.viewAll')} ›</Text>
       </Pressable>
     </View>
   );
@@ -118,6 +120,7 @@ const DASHBOARD_KEY = 'impact-dashboard';
 export default function ImpactDashboardScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const t = useT();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -131,7 +134,7 @@ export default function ImpactDashboardScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScreenHeader variant="back" title="Your Impact" />
+      <ScreenHeader variant="back" title={t('impactDashboard.title')} />
 
       {/* Loading */}
       {isLoading ? (
@@ -140,9 +143,9 @@ export default function ImpactDashboardScreen() {
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Failed to load dashboard</Text>
+          <Text style={styles.errorText}>{t('impactDashboard.loadError')}</Text>
           <Button variant="secondary" size="md" onPress={() => void refetch()}>
-            Retry
+            {t('common.retry')}
           </Button>
         </View>
       ) : data ? (
@@ -161,7 +164,7 @@ export default function ImpactDashboardScreen() {
           {/* 0. Time Bank — Microlives */}
           {data ? (
             <View style={styles.card}>
-              <Text style={styles.cardHeader}>Time Bank</Text>
+              <Text style={styles.cardHeader}>{t('impactDashboard.timeBank')}</Text>
               <View style={styles.counterBlock}>
                 <AnimatedCounter
                   targetValue={data.totalMicrolives}
@@ -171,7 +174,7 @@ export default function ImpactDashboardScreen() {
                   style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.accent }}
                 />
                 <Text style={styles.counterLabel}>
-                  +{formatMicrolivesAsTime(data.totalMicrolives)} of life earned
+                  {t('impactDashboard.lifeEarned', { time: formatMicrolivesAsTime(data.totalMicrolives) })}
                 </Text>
               </View>
               <View style={styles.counterBlock}>
@@ -183,7 +186,7 @@ export default function ImpactDashboardScreen() {
                     style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.info }}
                   />
                   <Text style={styles.counterLabel}>
-                    {formatCommunitySeconds(data.totalCommunitySeconds)} donated to your city
+                    {t('impactDashboard.donatedToCity', { time: formatCommunitySeconds(data.totalCommunitySeconds) })}
                   </Text>
                 </View>
             </View>
@@ -200,7 +203,7 @@ export default function ImpactDashboardScreen() {
             const xpLeft = getXpToNextTier(data.totalXp, tierKey);
             return (
               <View style={styles.card}>
-                <Text style={styles.cardHeader}>Experience</Text>
+                <Text style={styles.cardHeader}>{t('impactDashboard.experience')}</Text>
                 <View style={styles.counterBlock}>
                   <AnimatedCounter
                     targetValue={data.totalXp}
@@ -217,10 +220,10 @@ export default function ImpactDashboardScreen() {
                   </View>
                   {nextDef ? (
                     <Text style={styles.xpProgressLabel}>
-                      {nextDef.displayName} · {xpLeft?.toLocaleString()} XP to go
+                      {t('impactDashboard.xpToGo', { tier: nextDef.displayName, xp: xpLeft?.toLocaleString() ?? '0' })}
                     </Text>
                   ) : (
-                    <Text style={[styles.xpProgressLabel, { color: colors.accent }]}>Maximum rank achieved</Text>
+                    <Text style={[styles.xpProgressLabel, { color: colors.accent }]}>{t('impactDashboard.maxRank')}</Text>
                   )}
                 </View>
               </View>
@@ -235,7 +238,7 @@ export default function ImpactDashboardScreen() {
 
           {/* 2. Big counters */}
           <View style={styles.card}>
-            <Text style={styles.cardHeader}>Lifetime impact</Text>
+            <Text style={styles.cardHeader}>{t('impactDashboard.lifetimeImpact')}</Text>
 
             <View style={styles.counterBlock}>
               <AnimatedCounter
@@ -245,9 +248,9 @@ export default function ImpactDashboardScreen() {
                 duration={1500}
                 style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.safe }}
               />
-              <Text style={styles.counterLabel}>CO2 saved</Text>
+              <Text style={styles.counterLabel}>{t('impactDashboard.co2Saved')}</Text>
               <Text style={styles.counterSubtext}>
-                Like {treeEquivalent} trees absorbing CO2 for a year
+                {t('impactDashboard.treesEquivalent', { count: treeEquivalent })}
               </Text>
             </View>
 
@@ -259,7 +262,7 @@ export default function ImpactDashboardScreen() {
                 duration={1500}
                 style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.accent }}
               />
-              <Text style={styles.counterLabel}>Money saved</Text>
+              <Text style={styles.counterLabel}>{t('impactDashboard.moneySaved')}</Text>
             </View>
 
             <View style={styles.counterBlock}>
@@ -269,39 +272,39 @@ export default function ImpactDashboardScreen() {
                 duration={1500}
                 style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.info }}
               />
-              <Text style={styles.counterLabel}>Riders protected</Text>
+              <Text style={styles.counterLabel}>{t('impactDashboard.ridersProtected')}</Text>
               <Text style={styles.counterSubtext}>
-                Cyclists kept safe by your reports
+                {t('impactDashboard.ridersProtectedSub')}
               </Text>
             </View>
           </View>
 
           {/* 3. This Week */}
           <View style={styles.card}>
-            <Text style={styles.cardHeader}>This week</Text>
+            <Text style={styles.cardHeader}>{t('impactDashboard.thisWeek')}</Text>
             <View style={styles.weekGrid}>
               <StatTile
                 value={String(data.thisWeek.rides)}
-                unit="rides"
-                label="Completed"
+                unit={t('impactDashboard.weekRidesUnit')}
+                label={t('impactDashboard.weekCompleted')}
                 styles={styles}
               />
               <StatTile
                 value={data.thisWeek.co2SavedKg.toFixed(1)}
                 unit="kg"
-                label="CO2 saved"
+                label={t('impactDashboard.weekCo2Saved')}
                 styles={styles}
               />
               <StatTile
                 value={data.thisWeek.moneySavedEur.toFixed(0)}
                 unit="EUR"
-                label="Saved"
+                label={t('impactDashboard.weekSaved')}
                 styles={styles}
               />
               <StatTile
                 value={String(data.thisWeek.hazardsReported)}
                 unit=""
-                label="Hazards reported"
+                label={t('impactDashboard.weekHazards')}
                 styles={styles}
               />
             </View>
@@ -310,7 +313,7 @@ export default function ImpactDashboardScreen() {
           {/* 5. Daily Quiz */}
           <Surface
             onPress={() => router.push('/daily-quiz')}
-            accessibilityLabel="Take today's daily quiz"
+            accessibilityLabel={t('impactDashboard.quizA11y')}
             style={styles.quizCard}
             pressedStyle={styles.quizCardPressed}
           >
@@ -318,8 +321,8 @@ export default function ImpactDashboardScreen() {
               <Ionicons name="school-outline" size={24} color={colors.accent} />
             </View>
             <View style={styles.quizTextCol}>
-              <Text style={styles.quizTitle}>Daily Safety Quiz</Text>
-              <Text style={styles.quizSubtext}>Answer to maintain your streak</Text>
+              <Text style={styles.quizTitle}>{t('impactDashboard.quizTitle')}</Text>
+              <Text style={styles.quizSubtext}>{t('impactDashboard.quizSubtext')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Surface>
