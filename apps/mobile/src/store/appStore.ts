@@ -992,7 +992,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 3,
+      version: 4,
       migrate: (persistedState, version) => {
         let next = persistedState as Record<string, unknown> | undefined;
 
@@ -1056,6 +1056,27 @@ export const useAppStore = create<AppStore>()(
             localeExplicitlySet: explicit,
             routeRequest: { ...(state?.routeRequest ?? {}), locale: resolved },
           };
+        }
+
+        // v3 → v4: re-apply the 'safe' routing default. The v1 → v2 reset above
+        // was silently undone for most installs by a bug in route-planning.tsx
+        // that force-set `mode: 'fast'` on the empty planning screen (before a
+        // destination was picked, `routeSupported` is false), so the persisted
+        // value drifted back to 'fast'. That screen bug is now fixed (the
+        // force-fast gates on a destination being set). This heals the already-
+        // corrupted persisted value so every rider lands on 'safe' as intended.
+        // 'flat' riders (mode 'safe' + avoidHills) are untouched; only 'fast'
+        // is reset. Riders who want Fast re-select it once and it now sticks.
+        if (version < 4) {
+          const state = next as
+            | { routeRequest?: { mode?: string } & Record<string, unknown> }
+            | undefined;
+          if (state?.routeRequest) {
+            next = {
+              ...(state as object),
+              routeRequest: { ...state.routeRequest, mode: 'safe' },
+            };
+          }
         }
 
         return next;

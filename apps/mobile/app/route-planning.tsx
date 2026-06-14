@@ -120,12 +120,23 @@ export default function RoutePlanningScreen() {
   const resolvedCountry = useResolvedCountry();
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
 
-  // When the rider drifts into / out of a supported country (or picks a
-  // destination outside it), force `fast` mode so they can't accidentally
-  // request a Safe/Flat route that the dispatcher would have to silently
+  // When the rider picks a destination whose route can't be safety-scored
+  // (cross-border, or an endpoint outside RO/ES), force `fast` mode so they
+  // can't request a Safe/Flat route that the dispatcher would silently
   // downgrade. Also clear any stale preview so they don't see a Romania
   // route while standing in Madrid.
+  //
+  // IMPORTANT: gate on a destination actually being set. `routeSupported` is
+  // also `false` on the empty planning screen (no destination yet) and while
+  // GPS is still resolving the origin — forcing `fast` in those states made
+  // `fast` look like the default and clobbered the `safe` default. With no
+  // destination there is no route to downgrade, so the default must stand.
+  const destinationCoord = routeRequest.destination;
+  const hasDestination =
+    !!destinationCoord &&
+    (destinationCoord.lat !== 0 || destinationCoord.lon !== 0);
   useEffect(() => {
+    if (!hasDestination) return;
     if (resolvedCountry.routeSupported) return;
     if (routeRequest.mode !== 'fast') {
       setAvoidHills(false);
@@ -136,6 +147,7 @@ export default function RoutePlanningScreen() {
       setRoutePreview(null);
     }
   }, [
+    hasDestination,
     resolvedCountry.routeSupported,
     resolvedCountry.unsupportedReason,
     routeRequest.mode,
