@@ -1256,6 +1256,37 @@ export const en = {
     quizSubtext: 'Answer to maintain your streak',
     quizA11y: "Take today's daily quiz",
   },
+
+  // ── My Shared Routes screen ──
+  myShares: {
+    title: 'Your shared routes',
+    loadError: "Couldn't load your shares. Pull to refresh.",
+    emptyTitle: 'No shares yet',
+    emptySubtitle: 'Share a route and it will show up here, along with view and signup counts.',
+    emptyCta: 'Plan a route',
+    revokedPill: 'Revoked',
+    opens: 'opens',
+    signups: 'signups',
+    copyLink: 'Copy link',
+    copyLinkA11y: 'Copy share link',
+    shareAgain: 'Share again',
+    revoke: 'Revoke',
+    revokeA11y: 'Revoke share',
+    revokedOn: 'Revoked {{date}}',
+    noExpiry: 'No expiry',
+    expiresToday: 'Expires today',
+    expiresTomorrow: 'Expires tomorrow',
+    expiresInDays: 'Expires in {{days}} days',
+    linkCopiedTitle: 'Link copied',
+    linkCopiedBody: 'Share it anywhere.',
+    copyFailedTitle: 'Copy failed',
+    copyFailedBody: 'Could not copy the link. Please try again.',
+    revokeConfirmTitle: 'Revoke this share?',
+    revokeConfirmBody: 'People opening the link will see a "no longer available" page.',
+    revokeFailedTitle: 'Revoke failed',
+    revokeAuthRequired: 'Please sign in and try again.',
+    revokeNetworkError: 'Check your connection and try again.',
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

@@ -40,6 +40,7 @@ import {
   textDataMd,
 } from '../src/design-system/tokens/typography';
 import { useMyShares } from '../src/hooks/useMyShares';
+import { useT } from '../src/hooks/useTranslation';
 import type { MyShareRowClient, RevokeRouteShareResult } from '../src/lib/api';
 
 // ---------------------------------------------------------------------------
@@ -75,6 +76,7 @@ const daysUntilExpiry = (expiresAt: string | null): number | null => {
 
 export default function MySharesScreen() {
   const { colors } = useTheme();
+  const t = useT();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const router = useRouter();
 
@@ -86,9 +88,9 @@ export default function MySharesScreen() {
     try {
       const { webUrl } = buildShareDeepLinks(row.shortCode);
       await Clipboard.setStringAsync(webUrl);
-      Alert.alert('Link copied', 'Share it anywhere.');
+      Alert.alert(t('myShares.linkCopiedTitle'), t('myShares.linkCopiedBody'));
     } catch {
-      Alert.alert('Copy failed', 'Could not copy the link. Please try again.');
+      Alert.alert(t('myShares.copyFailedTitle'), t('myShares.copyFailedBody'));
     }
   };
 
@@ -108,12 +110,12 @@ export default function MySharesScreen() {
 
   const handleRevoke = (row: MyShareRowClient) => {
     Alert.alert(
-      'Revoke this share?',
-      'People opening the link will see a "no longer available" page.',
+      t('myShares.revokeConfirmTitle'),
+      t('myShares.revokeConfirmBody'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Revoke',
+          text: t('myShares.revoke'),
           style: 'destructive',
           onPress: () => {
             revoke.mutate(
@@ -125,10 +127,10 @@ export default function MySharesScreen() {
                     result?.status === 'auth_required'
                   ) {
                     Alert.alert(
-                      'Revoke failed',
+                      t('myShares.revokeFailedTitle'),
                       result.status === 'auth_required'
-                        ? 'Please sign in and try again.'
-                        : 'Check your connection and try again.',
+                        ? t('myShares.revokeAuthRequired')
+                        : t('myShares.revokeNetworkError'),
                     );
                   }
                 },
@@ -144,14 +146,14 @@ export default function MySharesScreen() {
     const isRevoked = item.revokedAt !== null;
     const days = daysUntilExpiry(item.expiresAt);
     const expiryLine = isRevoked
-      ? `Revoked ${formatDate(item.revokedAt!)}`
+      ? t('myShares.revokedOn', { date: formatDate(item.revokedAt!) })
       : days === null
-        ? 'No expiry'
+        ? t('myShares.noExpiry')
         : days === 0
-          ? 'Expires today'
+          ? t('myShares.expiresToday')
           : days === 1
-            ? 'Expires tomorrow'
-            : `Expires in ${days} days`;
+            ? t('myShares.expiresTomorrow')
+            : t('myShares.expiresInDays', { days });
 
     return (
       <FadeSlideIn
@@ -162,7 +164,7 @@ export default function MySharesScreen() {
           <Text style={styles.rowCode}>{item.shortCode}</Text>
           {isRevoked ? (
             <View style={styles.revokedPill}>
-              <Text style={styles.revokedPillText}>Revoked</Text>
+              <Text style={styles.revokedPillText}>{t('myShares.revokedPill')}</Text>
             </View>
           ) : null}
         </View>
@@ -173,41 +175,41 @@ export default function MySharesScreen() {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Text style={styles.statValue}>{item.viewCount}</Text>
-            <Text style={styles.statLabel}>opens</Text>
+            <Text style={styles.statLabel}>{t('myShares.opens')}</Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statValue}>{item.signupCount}</Text>
-            <Text style={styles.statLabel}>signups</Text>
+            <Text style={styles.statLabel}>{t('myShares.signups')}</Text>
           </View>
         </View>
 
         <View style={styles.actionsRow}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Copy share link"
+            accessibilityLabel={t('myShares.copyLinkA11y')}
             onPress={() => handleCopyLink(item)}
             style={({ pressed }) => [
               styles.actionBtn,
               pressed && styles.actionBtnPressed,
             ]}
           >
-            <Text style={styles.actionBtnText}>Copy link</Text>
+            <Text style={styles.actionBtnText}>{t('myShares.copyLink')}</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Share again"
+            accessibilityLabel={t('myShares.shareAgain')}
             onPress={() => handleShare(item)}
             style={({ pressed }) => [
               styles.actionBtn,
               pressed && styles.actionBtnPressed,
             ]}
           >
-            <Text style={styles.actionBtnText}>Share again</Text>
+            <Text style={styles.actionBtnText}>{t('myShares.shareAgain')}</Text>
           </Pressable>
           {isRevoked ? null : (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Revoke share"
+              accessibilityLabel={t('myShares.revokeA11y')}
               onPress={() => handleRevoke(item)}
               style={({ pressed }) => [
                 styles.actionBtn,
@@ -216,7 +218,7 @@ export default function MySharesScreen() {
               ]}
             >
               <Text style={[styles.actionBtnText, styles.actionBtnTextDanger]}>
-                Revoke
+                {t('myShares.revoke')}
               </Text>
             </Pressable>
           )}
@@ -233,7 +235,7 @@ export default function MySharesScreen() {
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: colors.bgDeep }]}
     >
-      <ScreenHeader variant="back" title="Your shared routes" />
+      <ScreenHeader variant="back" title={t('myShares.title')} />
 
       {query.isLoading && !data ? (
         <View style={styles.centerBox}>
@@ -241,9 +243,7 @@ export default function MySharesScreen() {
         </View>
       ) : query.isError && !data ? (
         <View style={styles.centerBox}>
-          <Text style={styles.errorText}>
-            Couldn&apos;t load your shares. Pull to refresh.
-          </Text>
+          <Text style={styles.errorText}>{t('myShares.loadError')}</Text>
         </View>
       ) : (
         <FlatList
@@ -270,10 +270,9 @@ export default function MySharesScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>No shares yet</Text>
+              <Text style={styles.emptyTitle}>{t('myShares.emptyTitle')}</Text>
               <Text style={styles.emptySubtitle}>
-                Share a route and it will show up here, along with view and
-                signup counts.
+                {t('myShares.emptySubtitle')}
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -283,7 +282,7 @@ export default function MySharesScreen() {
                   pressed && styles.actionBtnPressed,
                 ]}
               >
-                <Text style={styles.emptyCtaText}>Plan a route</Text>
+                <Text style={styles.emptyCtaText}>{t('myShares.emptyCta')}</Text>
               </Pressable>
             </View>
           }
