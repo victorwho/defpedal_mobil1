@@ -230,6 +230,15 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // Pin Material Components 1.13.x. Versions < 1.13 still call the deprecated
+    // Android 15 (API 35) window APIs — Window.setStatusBarColor /
+    // setNavigationBarColor — inside EdgeToEdgeUtils / BottomSheetDialog /
+    // SheetDialog, which Play Console flags as deprecated. 1.13 migrates those
+    // call sites to the modern WindowInsetsControllerCompat path. Requires
+    // compileSdk 36, which is the Expo SDK 55 default (rootProject.ext). See
+    // changestoimplement.md "Android 15 Edge-to-Edge Deprecation".
+    implementation("com.google.android.material:material:1.13.0")
+
     // Import the Firebase BoM. Pins versions for any transitive Firebase
     // libraries autolinked by expo modules (e.g. expo-notifications →
     // firebase-messaging). Keep this even with firebase-analytics dropped.
