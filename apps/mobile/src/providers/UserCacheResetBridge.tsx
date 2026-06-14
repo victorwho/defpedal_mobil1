@@ -65,13 +65,22 @@ export const UserCacheResetBridge = () => {
     // Anonymous → real-account is the same conceptual user being upgraded
     // (the canonical path: anonymous Supabase session generates a demo route
     // in /onboarding/first-route, then user signs in with Google → Supabase
-    // mints a new userId for the real account). Treat it as continuity, not
-    // a switch — otherwise we wipe `routePreview` / `routeRequest` between
-    // signInWithGoogle() returning and the post-signup screen reading them,
-    // which strands the user on a blank planner instead of /route-preview.
-    // Anonymous accounts don't accumulate cross-user TanStack data either,
-    // so skipping the cache clear here is safe.
-    if (previousIsAnonymous && !isAnonymous) return;
+    // mints a new userId for the real account). We must NOT `queryClient.clear()`
+    // + `resetUserScopedState()` here — that wipes `routePreview` / `routeRequest`
+    // between signInWithGoogle() returning and the post-signup screen reading
+    // them, stranding the user on a blank planner instead of /route-preview.
+    //
+    // BUT the anonymous session's cached server queries (['tiers'], ['badges'],
+    // impact-dashboard, trip-history) are NOT user-scoped, so without this the
+    // real account keeps showing the anonymous session's stale XP/tiers/badges
+    // (e.g. 0 XP after signing into an established account — the merge made this
+    // visible, but it happens on any anon→account upgrade). Invalidate so those
+    // queries refetch the real account's data, while leaving Zustand route state
+    // intact.
+    if (previousIsAnonymous && !isAnonymous) {
+      void queryClient.invalidateQueries();
+      return;
+    }
 
     queryClient.clear();
     resetUserScopedState();
