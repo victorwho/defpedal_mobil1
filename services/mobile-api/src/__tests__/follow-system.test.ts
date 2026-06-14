@@ -486,18 +486,27 @@ describe('GET /v1/profile/follow-requests', () => {
   });
 
   it('returns 200 with requests array on success', async () => {
+    // Query 1: pending user_follows rows (no embedded profile — the FK points
+    // at auth.users, not profiles; the handler joins profiles separately).
     enqueueResult({
       data: [
         {
           follower_id: TARGET_USER_ID,
           created_at: new Date().toISOString(),
-          profiles: {
-            id: TARGET_USER_ID,
-            display_name: 'Requester',
-            username: 'requester1',
-            avatar_url: 'https://example.com/avatar.jpg',
-            rider_tier: 'Trailblazer',
-          },
+          source: null,
+        },
+      ],
+      error: null,
+    });
+    // Query 2: profiles batch-fetched by follower id.
+    enqueueResult({
+      data: [
+        {
+          id: TARGET_USER_ID,
+          display_name: 'Requester',
+          username: 'requester1',
+          avatar_url: 'https://example.com/avatar.jpg',
+          rider_tier: 'Trailblazer',
         },
       ],
       error: null,

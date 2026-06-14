@@ -264,20 +264,15 @@ export const buildFollowRoutes = (
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
 
-        const { data, error } = await db
+        // We CANNOT embed `profiles!user_follows_follower_id_fkey(...)` — the FK
+        // on user_follows.follower_id points at auth.users(id), not profiles(id),
+        // so PostgREST returns "Could not find a relationship between
+        // 'user_follows' and 'profiles'" → a 500 on every account with a pending
+        // request (surfaced in Sentry 2026-06-14). Two-query + in-memory join
+        // instead, the same workaround activity-feed comments uses.
+        const { data: pending, error } = await db
           .from('user_follows')
-          .select(`
-            follower_id,
-            created_at,
-            source,
-            profiles!user_follows_follower_id_fkey (
-              id,
-              display_name,
-              username,
-              avatar_url,
-              rider_tier
-            )
-          `)
+          .select('follower_id, created_at, source')
           .eq('following_id', user.id)
           .eq('status', 'pending')
           .order('created_at', { ascending: false });
@@ -290,8 +285,31 @@ export const buildFollowRoutes = (
           });
         }
 
-        const requests: FollowRequest[] = (data ?? []).map((row) => {
-          const profile = row.profiles as unknown as Record<string, unknown> | null;
+        const pendingRows = pending ?? [];
+        const followerIds = [...new Set(pendingRows.map((r) => r.follower_id as string))];
+
+        const profileMap = new Map<string, Record<string, unknown>>();
+        if (followerIds.length > 0) {
+          const { data: profileRows, error: profileError } = await db
+            .from('profiles')
+            .select('id, display_name, username, avatar_url, rider_tier')
+            .in('id', followerIds);
+
+          if (profileError) {
+            throw new HttpError('Failed to load follow requests.', {
+              statusCode: 502,
+              code: 'UPSTREAM_ERROR',
+              details: [profileError.message],
+            });
+          }
+
+          for (const p of profileRows ?? []) {
+            profileMap.set(p.id as string, p as Record<string, unknown>);
+          }
+        }
+
+        const requests: FollowRequest[] = pendingRows.map((row) => {
+          const profile = profileMap.get(row.follower_id as string) ?? null;
           const username = profile?.username as string | null;
           // Slice 4: user_follows.source='route_share_claim' tags pending
           // follows produced by claim_route_share against a private sharer.
