@@ -274,6 +274,11 @@ export default () => ({
       // are filled in per gradle flavor via manifestPlaceholders in
       // android/app/build.gradle.
       './plugins/withAndroidSentryTags',
+      // iOS only: grant modular headers to GoogleUtilities / RecaptchaInterop /
+      // AppCheckCore so the Swift pod AppCheckCore (pulled transitively by
+      // @react-native-google-signin) can link as a static library. Without this,
+      // `pod install` fails on the EAS builder. See the plugin header for detail.
+      './plugins/withIosGoogleModularHeaders',
       [
         'expo-secure-store',
         {
