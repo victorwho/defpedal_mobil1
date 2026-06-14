@@ -748,6 +748,38 @@ function DiagnosticsContent() {
               Queue sample writes
             </Button>
           </View>
+          <View style={[styles.buttonRow, { marginTop: space[2] }]}>
+            <Button
+              variant="danger"
+              size="md"
+              fullWidth
+              accessibilityLabel="Force a dead trip mutation to test the ride-loss banner"
+              onPress={() => {
+                // Inject a trip_start and immediately kill it so the
+                // RideLossBannerManager (app/_layout.tsx) has an undismissed
+                // dead trip-critical mutation to surface. Dev-only test hook
+                // for the ride-loss recovery banner.
+                const store = useAppStore.getState();
+                const stamp = Date.now();
+                const id = store.enqueueMutation('trip_start', {
+                  clientTripId: `dev-deadtest-${stamp}`,
+                  sessionId: `dev-deadtest-${stamp}`,
+                  startLocationText: 'Dev ride-loss banner test',
+                  startCoordinate: store.routeRequest.origin,
+                  destinationText: 'Dev ride-loss banner test',
+                  destinationCoordinate: store.routeRequest.destination,
+                  distanceMeters: 0,
+                  startedAt: new Date().toISOString(),
+                });
+                store.killMutation(id, 'Forced dead for ride-loss banner test (dev)');
+                setDevStatusMessage(
+                  'Injected a dead trip_start. The ride-loss banner appears at the top. Dismiss hides it for the session; Retry re-queues it (it will attempt a real sync when online).',
+                );
+              }}
+            >
+              Force dead trip mutation (banner test)
+            </Button>
+          </View>
         </DiagnosticCard>
       ) : null}
 
