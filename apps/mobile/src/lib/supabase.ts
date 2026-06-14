@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 
+import { markAnonMergePending } from './anonMerge';
 import {
   buildDeveloperBypassSession,
   isDeveloperBypassConfigured,
@@ -110,6 +111,24 @@ const getCurrentSupabaseSession = async (): Promise<MobileAuthSession | null> =>
   return toMobileAuthSession(session.access_token, session.user);
 };
 
+/**
+ * Captures the current anonymous access token before a sign-in replaces the
+ * session, so AnonMergeManager can re-parent the anon account's data to the new
+ * account afterwards. No-op (best-effort) when the current session isn't
+ * anonymous. Call this immediately before any auth op that creates/swaps to a
+ * different user.
+ */
+const captureAnonForMerge = async (): Promise<void> => {
+  try {
+    const current = await getCurrentSupabaseSession();
+    if (current?.isAnonymous && current.accessToken) {
+      await markAnonMergePending(current.accessToken);
+    }
+  } catch {
+    // Best-effort — never block sign-in on the merge capture.
+  }
+};
+
 const clearDeveloperBypassSession = async () => {
   await secureStorage.removeItem(DEV_AUTH_SESSION_KEY);
   emitAuthSessionChange();
@@ -167,6 +186,7 @@ export const signInAnonymously = async (): Promise<MobileAuthSession | null> => 
 
 export const signInWithEmail = async (email: string, password: string) => {
   await clearDeveloperBypassSession();
+  await captureAnonForMerge();
   return requireSupabaseClient().auth.signInWithPassword({
     email,
     password,
@@ -184,6 +204,7 @@ export const signUpWithEmail = async (email: string, password: string) => {
   const supabaseUrl = mobileEnv.supabaseUrl ?? '';
   const emailRedirectTo = `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
 
+  await captureAnonForMerge();
   return client.auth.signUp({
     email,
     password,
@@ -304,6 +325,7 @@ export const signInWithGoogle = async (): Promise<{
       return { error: new Error('Google sign-in did not return an ID token.') };
     }
 
+    await captureAnonForMerge();
     const { error } = await client.auth.signInWithIdToken({
       provider: 'google',
       token: idToken,

@@ -141,6 +141,17 @@ export const mobileApi = {
       body: JSON.stringify(payload),
     }),
 
+  // ── Account ──
+
+  // Re-parents an anonymous account's data onto the caller's (new) account.
+  // Authenticated as the new account; the anonymous access token proves
+  // ownership of the source. Server only merges into a fresh target.
+  mergeAnonymousAccount: (anonymousAccessToken: string) =>
+    mobileApiFetch<{ merged: boolean; reason?: string }>('/v1/account/merge-anonymous', {
+      method: 'POST',
+      body: JSON.stringify({ anonymousAccessToken }),
+    }),
+
   // ── Hazard Alerts ──
 
   getNearbyHazards: (lat: number, lon: number, radiusMeters = 1000) =>

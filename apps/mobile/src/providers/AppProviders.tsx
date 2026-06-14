@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '../design-system';
+import { AnonMergeManager } from './AnonMergeManager';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { ConnectivityProvider } from './ConnectivityMonitor';
 import { NavigationLifecycleManager } from './NavigationLifecycleManager';
@@ -32,6 +33,7 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
                 doesn't see stale badges/tiers/XP/Mia from the previous one.
               */}
               <UserCacheResetBridge />
+              <AnonMergeManager />
               <NavigationLifecycleManager />
               <OfflineMutationSyncManager />
               <NotificationProvider />
