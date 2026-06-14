@@ -1064,17 +1064,6 @@ describe('GET /v1/hazards/my-impact', () => {
 // ===========================================================================
 
 describe('Cron notification endpoints', () => {
-  it('POST /v1/cron/streak-reminders returns 401 without cron secret', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/cron/streak-reminders',
-      headers: authHeaders,
-    });
-
-    // Either 401 (wrong secret) or 500 (CRON_SECRET not configured)
-    expect([401, 500]).toContain(response.statusCode);
-  });
-
   it('POST /v1/cron/weekly-impact returns 401 without cron secret', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -1082,16 +1071,7 @@ describe('Cron notification endpoints', () => {
       headers: authHeaders,
     });
 
-    expect([401, 500]).toContain(response.statusCode);
-  });
-
-  it('POST /v1/cron/social-digest returns 401 without cron secret', async () => {
-    const response = await app.inject({
-      method: 'POST',
-      url: '/v1/cron/social-digest',
-      headers: authHeaders,
-    });
-
+    // Either 401 (wrong secret) or 500 (CRON_SECRET not configured)
     expect([401, 500]).toContain(response.statusCode);
   });
 });

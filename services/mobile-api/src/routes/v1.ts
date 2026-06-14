@@ -38,11 +38,7 @@ import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
-import {
-  sendStreakProtectionReminders,
-  sendWeeklyImpactSummary,
-  sendSocialImpactDigest,
-} from '../lib/scheduledNotifications';
+import { sendWeeklyImpactSummary } from '../lib/scheduledNotifications';
 import {
   coverageQuerystringSchema,
   coverageResponseSchema,
@@ -3623,32 +3619,14 @@ export const buildV1Routes = (
 
     // Timing-safe shared implementation (review 2026-06-12) — lib/cronAuth.ts.
 
-    // POST /v1/cron/streak-reminders — 8 PM daily
-    app.post(
-      '/cron/streak-reminders',
-      async (request) => {
-        verifyCronAuth(request);
-        const result = await sendStreakProtectionReminders(request.log);
-        return { ok: true, ...result };
-      },
-    );
-
-    // POST /v1/cron/weekly-impact — Sunday 9 AM
+    // POST /v1/cron/weekly-impact — Sunday 9 AM (Cloud Scheduler weekly-impact-cron).
+    // streak-reminders + social-digest crons removed 2026-06-14 (streak nudging
+    // moved to the Pedal nudge system; social digest folded into this summary).
     app.post(
       '/cron/weekly-impact',
       async (request) => {
         verifyCronAuth(request);
         const result = await sendWeeklyImpactSummary(request.log);
-        return { ok: true, ...result };
-      },
-    );
-
-    // POST /v1/cron/social-digest — 7 PM daily
-    app.post(
-      '/cron/social-digest',
-      async (request) => {
-        verifyCronAuth(request);
-        const result = await sendSocialImpactDigest(request.log);
         return { ok: true, ...result };
       },
     );

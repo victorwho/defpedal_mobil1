@@ -32,81 +32,14 @@ const isUnderWeeklyCap = async (userId: string): Promise<boolean> => {
 };
 
 /**
- * Streak Protection Reminders (8 PM local time)
- * Sent to users whose streak is >= 2 days and who haven't ridden today.
- */
-export const sendStreakProtectionReminders = async (
-  logger: FastifyBaseLogger,
-): Promise<{ sent: number; skipped: number }> => {
-  if (!supabaseAdmin) return { sent: 0, skipped: 0 };
-
-  // Find users with active streaks who opted in
-  const { data: users, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id, quiet_hours_start, quiet_hours_end, quiet_hours_timezone')
-    .eq('notify_streak', true);
-
-  if (error || !users) {
-    logger.error({ event: 'streak_reminders_query_error', error: error?.message }, 'failed to load users for streak reminders');
-    return { sent: 0, skipped: 0 };
-  }
-
-  let sent = 0;
-  let skipped = 0;
-
-  for (const user of users as UserRow[]) {
-    try {
-      // Check streak state
-      const { data: streak } = await supabaseAdmin
-        .from('streak_state')
-        .select('current_streak, last_qualifying_date')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!streak || streak.current_streak < 2) {
-        skipped++;
-        continue;
-      }
-
-      // Check if already rode today (4AM cutoff in user's TZ)
-      const tz = user.quiet_hours_timezone ?? 'UTC';
-      const todayInTz = new Date(
-        new Date().toLocaleString('en-US', { timeZone: tz }),
-      );
-      todayInTz.setHours(todayInTz.getHours() - 4);
-      const todayStr = todayInTz.toISOString().split('T')[0];
-
-      if (streak.last_qualifying_date === todayStr) {
-        skipped++;
-        continue;
-      }
-
-      // Weekly cap check
-      if (!(await isUnderWeeklyCap(user.id))) {
-        skipped++;
-        continue;
-      }
-
-      await dispatchNotification(user.id, 'system', {
-        title: `${streak.current_streak}-day streak at risk!`,
-        body: 'Take a quick ride to keep your streak alive.',
-        data: { type: 'streak_reminder', screen: 'route-planning' },
-      }, { priority: 'high' });
-
-      sent++;
-    } catch (err) {
-      logger.warn({ event: 'streak_reminder_error', userId: user.id, error: err instanceof Error ? err.message : 'unknown' }, 'streak reminder failed');
-      skipped++;
-    }
-  }
-
-  logger.info({ event: 'streak_reminders_complete', sent, skipped }, 'streak protection reminders sent');
-  return { sent, skipped };
-};
-
-/**
  * Weekly Impact Summary (Sunday 9 AM local time)
  * Sent to users who had at least one ride this week.
+ *
+ * Quiet hours + per-user category prefs + daily budget are enforced inside
+ * `dispatchNotification`; the weekly cap is enforced here. (Streak reminders
+ * and the social digest crons were removed 2026-06-14 — streak nudging is now
+ * owned by the Pedal nudge system, and social interactions are folded into the
+ * `socialSuffix` below.)
  */
 export const sendWeeklyImpactSummary = async (
   logger: FastifyBaseLogger,
@@ -273,115 +206,5 @@ export const sendWeeklyImpactSummary = async (
   }
 
   logger.info({ event: 'weekly_summary_complete', sent, skipped }, 'weekly impact summaries sent');
-  return { sent, skipped };
-};
-
-/**
- * Social Impact Digest — RETIRED
- *
- * Social interaction data (hazard validations, likes) is now merged into the
- * weekly impact summary to respect the 1-notification-per-day budget.
- * This function is kept as a no-op so existing cron configurations don't break.
- */
-export const sendSocialImpactDigest = async (
-  logger: FastifyBaseLogger,
-): Promise<{ sent: number; skipped: number }> => {
-  logger.info({ event: 'social_digest_retired' }, 'social digest merged into weekly impact summary — skipping');
-  return { sent: 0, skipped: 0 };
-
-  // ---------- Original implementation (retained for reference) ----------
-  // eslint-disable-next-line no-unreachable
-  if (!supabaseAdmin) return { sent: 0, skipped: 0 };
-
-  const { data: users, error } = await supabaseAdmin
-    .from('profiles')
-    .select('id, notify_community, quiet_hours_start, quiet_hours_end, quiet_hours_timezone')
-    .eq('notify_community', true);
-
-  if (error || !users) {
-    logger.error({ event: 'social_digest_query_error', error: error?.message }, 'failed to load users for social digest');
-    return { sent: 0, skipped: 0 };
-  }
-
-  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  let sent = 0;
-  let skipped = 0;
-
-  for (const user of users as UserRow[]) {
-    try {
-      // Get user's hazard IDs for subquery
-      const { data: userHazards } = await supabaseAdmin
-        .from('hazards')
-        .select('id')
-        .eq('user_id', user.id);
-
-      const hazardIds = (userHazards ?? []).map((h: Record<string, unknown>) => h.id as string);
-
-      // Count new validations on user's hazards in last 24h
-      let validationCount = 0;
-      if (hazardIds.length > 0) {
-        const { count } = await supabaseAdmin
-          .from('hazard_validations')
-          .select('id', { count: 'exact', head: true })
-          .in('hazard_id', hazardIds)
-          .neq('user_id', user.id)
-          .gte('responded_at', oneDayAgo);
-        validationCount = count ?? 0;
-      }
-
-      // Get user's trip share IDs for subquery
-      const { data: userShares } = await supabaseAdmin
-        .from('trip_shares')
-        .select('id')
-        .eq('user_id', user.id);
-
-      const shareIds = (userShares ?? []).map((s: Record<string, unknown>) => s.id as string);
-
-      // Count new likes on user's shared trips
-      let likeCount = 0;
-      if (shareIds.length > 0) {
-        const { count } = await supabaseAdmin
-          .from('feed_likes')
-          .select('id', { count: 'exact', head: true })
-          .in('trip_share_id', shareIds)
-          .neq('user_id', user.id)
-          .gte('created_at', oneDayAgo);
-        likeCount = count ?? 0;
-      }
-
-      const totalInteractions = (validationCount ?? 0) + (likeCount ?? 0);
-
-      if (totalInteractions === 0) {
-        skipped++;
-        continue;
-      }
-
-      if (!(await isUnderWeeklyCap(user.id))) {
-        skipped++;
-        continue;
-      }
-
-      const parts: string[] = [];
-      if (validationCount && validationCount > 0) {
-        parts.push(`${validationCount} hazard validation${validationCount > 1 ? 's' : ''}`);
-      }
-      if (likeCount && likeCount > 0) {
-        parts.push(`${likeCount} reaction${likeCount > 1 ? 's' : ''}`);
-      }
-
-      await dispatchNotification(user.id, 'community', {
-        title: 'Community activity on your contributions',
-        body: `Today: ${parts.join(' and ')} from fellow cyclists.`,
-        data: { type: 'social_digest', screen: 'impact-dashboard' },
-      });
-
-      sent++;
-    } catch (err) {
-      logger.warn({ event: 'social_digest_error', userId: user.id, error: err instanceof Error ? err.message : 'unknown' }, 'social digest failed');
-      skipped++;
-    }
-  }
-
-  logger.info({ event: 'social_digest_complete', sent, skipped }, 'social impact digests sent');
   return { sent, skipped };
 };
