@@ -6,6 +6,7 @@ import { createMobileApiDependencies, type MobileApiDependencies } from './lib/d
 import { formatValidationDetails, HttpError, toErrorResponse } from './lib/http';
 import { captureServerException } from './lib/sentry';
 import { buildRequestTelemetry } from './lib/telemetry';
+import { buildAccountRoutes } from './routes/account';
 import { buildActivityFeedRoutes } from './routes/activity-feed';
 import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
@@ -194,6 +195,10 @@ export const buildApp = (options: {
   });
 
   void app.register(buildV1Routes(dependencies), {
+    prefix: '/v1',
+  });
+
+  void app.register(buildAccountRoutes(dependencies), {
     prefix: '/v1',
   });
 
