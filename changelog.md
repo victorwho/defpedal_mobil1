@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-14 — Full-app-review backlog + product decisions (backend live; mobile pending next build)
+
+Continuation of the 2026-06-12 full-app review (Phases 0–4 already shipped). Backend changes are live on Cloud Run `defpedal-api-00098-bl5`; mobile changes are committed and reach users on the next preview/production build. No app version bump.
+
+### Behavior
+- **Sign up keeps your progress.** Signing up from an anonymous session now re-parents the anonymous account's rides/XP/badges/streak onto the new account — but only when the new account is brand new (an established account you sign into is never overwritten). Device-verified both ways.
+- **One reaction instead of two.** The community feed's separate "like" and "love" reactions are consolidated into a single heart. Existing loves were folded into likes (nothing lost). Old app versions keep working (their love taps become likes).
+- **Forgot-password flow.** Email/password users who forget their password can now reset it (request email → tap link → set a new password). Email deliverability fixed via custom SMTP.
+- **Localized dates.** Stats/trip/badge/share dates now follow the app language (RO/ES) instead of always US English.
+- **Reduce Motion respected** on badge-unlock / XP / progress-bar celebration animations.
+- **Weekly impact recap** notification scheduled (Sundays); the redundant streak-protection + social-digest crons were removed (streak nudging is handled by the Pedal nudge system).
+
+### Fixes
+- **Follow Requests no longer 500s.** An impossible PostgREST embed (`user_follows → profiles`) broke the endpoint for any account with a pending request; rewritten as a two-query join. Caught immediately by the new API error tracking.
+- Ride-loss recovery banner: if a ride fails to sync, a banner offers Retry instead of silently losing it.
+
+### Infra
+- **API error tracking (Sentry)** added (`@sentry/node`, gated on `SENTRY_DSN`) — server 500s now alert/group instead of being buried in Cloud Run logs. `GET /health/deep` readiness probe added.
+- Live migrations: `202606140001` (anonymous-merge function), `202606140002` (reaction consolidation).
+
 ## 2026-06-09 — Multi-stop navigation, once-per-session weather warning, impact-card tier/XP fix, install-referrer crash fix — v0.2.90 (build 93)
 
 First production release since v0.2.88 (build 90). Bundles everything below.

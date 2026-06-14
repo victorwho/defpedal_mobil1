@@ -55,6 +55,15 @@ If you do nothing else: **the review's critical work is shipped.** The remaining
 
 ## What's LEFT (backlog, prioritized)
 
+> **STATUS UPDATE (2026-06-14, sessions 75f–76 — see progress.md for detail):** Most of this backlog is now DONE.
+> - **A1 Anonymous→account merge** — ✅ BUILT + DEPLOYED + device-verified (fresh-target-only; `merge_anonymous_account` RPC + `POST /v1/account/merge-anonymous` + mobile wiring). Migration `202606140001`.
+> - **A2 3 crons** — ✅ DONE: `streak-reminders` + `social-digest` deleted (dead/superseded); `weekly-impact` kept + scheduled (`weekly-impact-cron`, Sun 9AM).
+> - **A3 CI `--coverage`** — ⏳ still open (needs a coverage audit first).
+> - **A4 Like-vs-Love** — ✅ DONE (consolidated to one heart; migration `202606140002`). **Signup-wall** — ✅ kept as-is (product decision).
+> - **B5 Sentry on API** — ✅ DONE + live (`lib/sentry.ts`, `00094`). **B7 Dead-letter ride-loss banner** — ✅ DONE. **B6 Trip-history payload diet** — ⏳ deferred (re-classified device-needed: `TripCard` renders the trail on expand + uses it as a distance fallback).
+> - **C9 i18n long tail** — ✅ impact-dashboard + my-shares localized; rest (Profile rows, ~97 a11y labels) ⏳ open. **C10 a11y** — ✅ date-locale + Reduce-Motion gating; HoloSticker/ImpactSummaryCard motion ⏳ open. **C8 code-quality** (v1.ts split / Overpass consolidation / `as any`) + **C11 feed-card thumbnail** — ⏳ open.
+> - Plus: forgot-password flow shipped; follow-requests 500 fixed; Cloud Run `00093→00098`.
+
 ### A. Needs a human decision (do these first — they unblock work)
 1. **Anonymous → account data merge endpoint** (review P1 #10, the original L item). Phase 0 only softened the false "your data will be preserved" copy. A real fix is a server endpoint that re-parents anonymous rows to the new user id on sign-in. **Product/scope decision needed** (is the merge worth building, or is the honest copy sufficient?).
 2. **3 unscheduled cron endpoints** (`/v1/cron/streak-reminders|weekly-impact|social-digest`) — defined but no Cloud Scheduler job. **Decide: create the jobs, or delete the endpoints as dead code** (streak-reminders is likely superseded by the Pedal nudge streak triggers).
