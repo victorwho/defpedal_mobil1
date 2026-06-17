@@ -877,7 +877,7 @@ export const ro: TranslationKeys = {
     featureHazardsSub: 'Pericole raportate de comunitate aproape de ruta ta',
     locationDenied: 'Locație indisponibilă. Poți explora în continuare rute căutând un oraș.',
     continueWithoutLocation: 'Continuă fără locație',
-    enableLocation: 'Activează locația',
+    enableLocation: 'Continuă',
     goalEyebrow: 'Obiectivul tău de ciclism',
     goalSubtitle: 'Asta ne ajută să-ți personalizăm rutele și sfaturile de siguranță.',
     goalCommuteSub: 'Găsește cea mai sigură rută spre muncă în fiecare zi',

@@ -877,7 +877,7 @@ export const es: TranslationKeys = {
     featureHazardsSub: 'Peligros reportados por la comunidad cerca de tu ruta',
     locationDenied: 'Ubicación no disponible. Aún puedes explorar rutas buscando una ciudad.',
     continueWithoutLocation: 'Continuar sin ubicación',
-    enableLocation: 'Activar ubicación',
+    enableLocation: 'Continuar',
     goalEyebrow: 'Tu objetivo ciclista',
     goalSubtitle: 'Esto nos ayuda a personalizar tus rutas y consejos de seguridad.',
     goalCommuteSub: 'Encuentra la ruta más segura al trabajo cada día',

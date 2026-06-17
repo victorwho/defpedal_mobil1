@@ -886,7 +886,7 @@ export const en = {
     featureHazardsSub: 'Community-reported hazards near your route',
     locationDenied: 'Location not available. You can still explore routes by searching for a city.',
     continueWithoutLocation: 'Continue without location',
-    enableLocation: 'Enable Location',
+    enableLocation: 'Continue',
     goalEyebrow: 'Your cycling goal',
     goalSubtitle: 'This helps us personalize your routes and safety tips.',
     goalCommuteSub: 'Find the safest route to work every day',
