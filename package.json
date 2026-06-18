@@ -32,6 +32,7 @@
     "lint:mobile:check": "npm run lint:check --workspace @defensivepedal/mobile",
     "lint:mobile:baseline": "npm run lint:baseline --workspace @defensivepedal/mobile",
     "check:contrast": "npm run check:contrast --workspace @defensivepedal/mobile",
+    "audit:ci": "node scripts/audit-ci.mjs",
     "check:bundle": "bash ./scripts/check-bundle.sh",
     "build:preview": "bash ./scripts/build-preview.sh",
     "build:preview:install": "bash ./scripts/build-preview.sh install",
