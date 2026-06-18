@@ -127,6 +127,20 @@ describe('useApproachingRouteFeatures', () => {
     expect(result.current.visible[0].metersAhead).toBeCloseTo(50);
   });
 
+  it('returns empty (no crash) when a hydrated route lacks routeFeatures', () => {
+    // Regression: a routePreview persisted by a pre-v0.2.55 build (before
+    // route-feature awareness) hydrates without routeFeatures, so the field is
+    // `undefined` at runtime despite the type. Previously threw
+    // "Cannot read property 'length' of undefined" mid-navigation (Sentry
+    // d99b1306). Must now degrade silently to EMPTY.
+    const route = buildRoute([feature({ distanceAlongRouteMeters: 1000 })]);
+    delete (route as { routeFeatures?: unknown }).routeFeatures;
+    arm(route, 1050);
+    const { result } = renderHook(() => useApproachingRouteFeatures());
+    expect(result.current.visible).toEqual([]);
+    expect(result.current.hiddenCount).toBe(0);
+  });
+
   it('suppresses alerts while off-route', () => {
     const route = buildRoute([feature({ distanceAlongRouteMeters: 1000 })]);
     arm(route, 1050, { offRouteSince: new Date().toISOString() });

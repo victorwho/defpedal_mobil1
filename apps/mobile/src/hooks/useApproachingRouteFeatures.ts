@@ -70,7 +70,14 @@ export const useApproachingRouteFeatures =
       const selectedRoute =
         routePreview.routes.find((r) => r.id === selectedRouteId) ??
         routePreview.routes[0];
-      if (!selectedRoute || selectedRoute.routeFeatures.length === 0) {
+      // `routeFeatures` is a required field on RouteOption, but a routePreview
+      // persisted by a pre-v0.2.55 build (before route-feature awareness
+      // shipped) hydrates without it — `routeFeatures` is `undefined` at runtime
+      // despite the type. Default to [] so a stale route can't throw
+      // "Cannot read property 'length' of undefined" mid-navigation. Mirrors the
+      // `?? []` guard the map layer already uses (useFeatureCollections.ts).
+      const routeFeatures = selectedRoute?.routeFeatures ?? [];
+      if (!selectedRoute || routeFeatures.length === 0) {
         return EMPTY;
       }
 
@@ -82,7 +89,7 @@ export const useApproachingRouteFeatures =
       );
 
       const approaching = computeApproachingFeatures(
-        selectedRoute.routeFeatures,
+        routeFeatures,
         riderDistanceAlongRouteMeters,
       );
 
