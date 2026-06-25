@@ -22,6 +22,8 @@ const ALLOWLIST = {
     'ws — Memory-exhaustion DoS. Pulled only by Expo/Metro/React-Native dev-server + JS-inspector tooling (@expo/cli, @expo/metro, @react-native/dev-middleware). Not bundled into the shipped Android/iOS app (Hermes bytecode) or invoked in production.',
   'GHSA-wcpc-wj8m-hjx6':
     'protobufjs — DoS via unbounded Any expansion during JSON conversion. Pulled by posthog-js -> @opentelemetry/otlp-transformer (web telemetry export). The vulnerable Any->JSON conversion path is not exercised by our usage.',
+  'GHSA-vxpw-j846-p89q':
+    'undici — WebSocket-client DoS via fragment-count bypass. Pulled only by @sentry/cli (@sentry/react-native -> @sentry/cli -> undici@6.24.1), a BUILD-TIME source-map upload tool — never bundled into the shipped Hermes app. @sentry/cli performs HTTPS uploads to Sentry, not undici WebSocket connections, and the advisory requires connecting undici’s WebSocket client to a malicious server, so the path is unreachable in our usage. `npm audit fix` is destructive here (its dry-run removes vitest/jsdom/@types/react, breaking the test setup) and an npm override does not apply to this nested @sentry sub-tree (npm 11). Re-review when @sentry/react-native is bumped.',
 };
 
 // Use a shell command string so npm resolves on every platform (npm vs
