@@ -161,3 +161,87 @@ feature use, not directive pre-prompts → outside this guideline.
 **App Review reply used:** explained the button changed from "Enable Location" to the neutral
 "Continue" in all languages; the screen now just proceeds to the standard iOS prompt with the user
 in control; app remains usable if location is denied.
+
+---
+
+## Log: 2026-06-25 — Guideline 5.1.1(iv) resubmission (skip-button rejection)
+
+**Rejection.** After build 15 went `VALID` and was reviewed, Apple rejected again under the SAME
+**Guideline 5.1.1(iv)** — this time for the *skip affordances* on the same pre-permission screen
+(`apps/mobile/app/onboarding/index.tsx`), not the button verb. Their wording: *"the user can close
+the message and delay the permission request with the 'Skip for now' or 'Skip' button. The user
+should always proceed to the permission request after the message… revise the permission request
+process to not include an exit button on the message before the permission request."*
+
+The screen had **two** ways to dismiss the priming message without ever reaching the OS dialog:
+1. a top-right "Skip" pill (`skipPill` → `useSkipOnboarding()`), and
+2. a footer "Skip" / "Skip for now" link (`handleSkip` → routed to `/onboarding/consent` without
+   ever calling `requestForegroundPermissionsAsync()`).
+
+**Fix.** Removed both affordances from the priming screen (both platforms — single code path, no
+`Platform.OS` divergence). The screen now has exactly one forward action: the **"Continue"** button,
+which always invokes `Location.requestForegroundPermissionsAsync()` (the OS prompt). The
+**denied branch is unchanged and compliant** because it appears *after* the request — "Continue
+without location" still lets the user proceed, and we **added an "Open Settings" link**
+(`Linking.openSettings()`, Apple-permitted recovery) since iOS won't re-show the dialog once denied.
+The already-granted on-mount auto-advance is untouched. Onboarding-skip is NOT lost overall — the
+very next screen (`onboarding/consent.tsx`) keeps its own skip pill, so users can still exit
+onboarding one step later, after passing through the location prompt.
+
+- i18n: new `onboarding.openSettings` key in EN/RO/ES (`Open Settings` / `Deschide Setări` /
+  `Abrir Ajustes`). The `skipShort` / `a11ySkip` keys stay (still used by `consent.tsx`).
+- Regression guard: `apps/mobile/src/__tests__/app/onboarding-permission.test.tsx` (3 tests) asserts
+  no skip/exit control renders, the sole CTA triggers the permission request, and the denied state
+  exposes the Open Settings recovery. `vitest.mock-rn.ts` `Linking` gained `openSettings`.
+
+**App Review reply to send:** *"The onboarding location screen no longer contains any skip or close
+control. The only action on the screen proceeds to the standard iOS location prompt, leaving the
+user fully in control of the decision. If the user declines, the app remains usable (routes by city
+search) and offers a link to the Settings app to re-enable location."*
+
+**Build/submit trail.** _(fill in at build time)_
+- Build &lt;N&gt; — EAS auto-increments from 15 → 16. Rebuild via the iOS profile, resubmit, reply
+  with the note above.
+
+---
+
+## Log: 2026-06-25 — Guideline 2.1(a) rejection (Google sign-in error on iOS)
+
+**Rejection.** On iPhone 17 Pro Max / iOS 26.5 (active internet), Google sign-in showed a raw red
+error: `RNGoogleSignIn: Unknown error in google sign in., Error Domain=org.openid.appauth.general
+Code=-15 "Issued at time is more than 600 seconds before or after the current time"`.
+
+**Root cause.** The native GoogleSignIn iOS SDK (via AppAuth/OpenID) validates the Google ID
+token's `iat` claim against the **device clock** with a hardcoded ±600 s tolerance. The review
+device's date/time was off by >10 min, so AppAuth rejected the token *before* it ever reached
+Supabase. `auth.tsx` then rendered `error.message` verbatim — the raw native string. There is **no
+JS-level option** to widen the AppAuth leeway in google-signin v16, and **Android is unaffected**
+(Credential Manager tokens carry no client-side `iat` check), consistent with an iOS-only,
+device-clock issue.
+
+**Fix (graceful handling + proactive warning; no browser fallback).**
+- `lib/supabase.ts`: `classifyGoogleSignInError()` maps the failure to a stable `errorCode`
+  (`clock_skew` / `unavailable` / `no_token` / `configuration` / `generic`); `signInWithGoogle()`
+  returns the code and never surfaces the raw native string. Added `GoogleSignin.signOut()` before
+  the interactive `signIn()` so retries always mint a fresh token.
+- `lib/clockSkew.ts` (new): `getServerClockSkewSeconds()` compares the device clock to the mobile
+  API's HTTP `Date` header (best-effort, non-blocking, returns null on any failure).
+- `app/auth.tsx`: maps `errorCode` → localized message (no raw dumps); shows a proactive warning
+  banner when the device clock is skewed ≥ 300 s, telling the user to enable automatic date & time.
+- i18n EN/RO/ES: `auth.googleClockSkew`, `auth.googleUnavailable`, `auth.googleGenericError`,
+  `auth.clockSkewBanner` (`{{minutes}}`).
+- Tests: `googleSignInError.test.ts` (6) + `clockSkew.test.ts` (9).
+
+**App Review reply to send:** *"The error in the screenshot is an OpenID/AppAuth token-validation
+failure (Code=-15, 'Issued at time is more than 600 seconds…'). It occurs when the device's date &
+time are set more than 10 minutes off real time, which causes Google's ID-token validation to
+reject the token on-device. We've updated the app to detect this and show a clear, actionable
+message (and a proactive warning) guiding the user to enable Settings › General › Date & Time › Set
+Automatically. Sign in with Apple and email/password are fully functional independently. On a device
+with the correct (automatic) date & time, Google sign-in completes normally — please verify the
+review device's clock is set automatically and re-test."*
+
+**Build/submit trail.** _(fill in at build time)_
+- Rebuild via the iOS profile (EAS auto-increments the build number), resubmit, reply with the note
+  above. Manual pre-submit check: set a real device's clock +15 min → expect the friendly message +
+  banner (no raw `appauth` string); set clock automatic → Google sign-in succeeds.

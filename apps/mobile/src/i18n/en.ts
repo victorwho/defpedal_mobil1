@@ -784,6 +784,12 @@ export const en = {
     authFailed: 'Authentication failed.',
     devSession: 'Developer session enabled for',
     devSignInFailed: 'Developer sign-in failed.',
+    googleClockSkew:
+      "We couldn't sign you in with Google because your device's date and time look incorrect. Open Settings › General › Date & Time and turn on “Set Automatically”, then try again. You can also use Sign in with Apple or email.",
+    googleUnavailable: 'Google sign-in is unavailable right now. Please use Sign in with Apple or email.',
+    googleGenericError: "We couldn't sign you in with Google. Please try again, or use Sign in with Apple or email.",
+    clockSkewBanner:
+      'Your device clock looks off by about {{minutes}} min. This can block Google sign-in — turn on automatic date & time in Settings.',
   },
 
   // ── Legal ──
@@ -886,6 +892,7 @@ export const en = {
     featureHazardsSub: 'Community-reported hazards near your route',
     locationDenied: 'Location not available. You can still explore routes by searching for a city.',
     continueWithoutLocation: 'Continue without location',
+    openSettings: 'Open Settings',
     enableLocation: 'Continue',
     goalEyebrow: 'Your cycling goal',
     goalSubtitle: 'This helps us personalize your routes and safety tips.',

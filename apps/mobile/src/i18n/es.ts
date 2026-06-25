@@ -775,6 +775,12 @@ export const es: TranslationKeys = {
     authFailed: 'Error de autenticación.',
     devSession: 'Sesión de desarrollador activada para',
     devSignInFailed: 'Error en el inicio de sesión de desarrollador.',
+    googleClockSkew:
+      'No pudimos iniciar tu sesión con Google porque la fecha y la hora del dispositivo parecen incorrectas. Abre Ajustes › General › Fecha y hora y activa «Ajustar automáticamente», luego inténtalo de nuevo. También puedes usar Iniciar sesión con Apple o correo electrónico.',
+    googleUnavailable: 'El inicio de sesión con Google no está disponible ahora. Usa Iniciar sesión con Apple o correo electrónico.',
+    googleGenericError: 'No pudimos iniciar tu sesión con Google. Inténtalo de nuevo o usa Iniciar sesión con Apple o correo electrónico.',
+    clockSkewBanner:
+      'El reloj del dispositivo parece desfasado unos {{minutes}} min. Esto puede bloquear el inicio de sesión con Google: activa la fecha y hora automáticas en Ajustes.',
   },
 
   // ── Legal ──
@@ -877,6 +883,7 @@ export const es: TranslationKeys = {
     featureHazardsSub: 'Peligros reportados por la comunidad cerca de tu ruta',
     locationDenied: 'Ubicación no disponible. Aún puedes explorar rutas buscando una ciudad.',
     continueWithoutLocation: 'Continuar sin ubicación',
+    openSettings: 'Abrir Ajustes',
     enableLocation: 'Continuar',
     goalEyebrow: 'Tu objetivo ciclista',
     goalSubtitle: 'Esto nos ayuda a personalizar tus rutas y consejos de seguridad.',

@@ -240,6 +240,7 @@ export const Share = {
 
 export const Linking = {
   openURL: async (_url: string) => {},
+  openSettings: async () => {},
   canOpenURL: async (_url: string) => true,
   getInitialURL: async () => null,
   addEventListener: () => ({ remove: () => {} }),

@@ -775,6 +775,12 @@ export const ro: TranslationKeys = {
     authFailed: 'Autentificare eșuată.',
     devSession: 'Sesiune dezvoltator activată pentru',
     devSignInFailed: 'Autentificarea dezvoltator a eșuat.',
+    googleClockSkew:
+      'Nu te-am putut autentifica cu Google deoarece data și ora dispozitivului par incorecte. Deschide Setări › General › Dată și oră și activează „Setare automată”, apoi încearcă din nou. Poți folosi și Autentificare cu Apple sau e-mail.',
+    googleUnavailable: 'Autentificarea cu Google nu este disponibilă momentan. Folosește Autentificare cu Apple sau e-mail.',
+    googleGenericError: 'Nu te-am putut autentifica cu Google. Încearcă din nou sau folosește Autentificare cu Apple ori e-mail.',
+    clockSkewBanner:
+      'Ceasul dispozitivului pare decalat cu aproximativ {{minutes}} min. Acest lucru poate bloca autentificarea cu Google — activează data și ora automate în Setări.',
   },
 
   // ── Legal ──
@@ -877,6 +883,7 @@ export const ro: TranslationKeys = {
     featureHazardsSub: 'Pericole raportate de comunitate aproape de ruta ta',
     locationDenied: 'Locație indisponibilă. Poți explora în continuare rute căutând un oraș.',
     continueWithoutLocation: 'Continuă fără locație',
+    openSettings: 'Deschide Setări',
     enableLocation: 'Continuă',
     goalEyebrow: 'Obiectivul tău de ciclism',
     goalSubtitle: 'Asta ne ajută să-ți personalizăm rutele și sfaturile de siguranță.',

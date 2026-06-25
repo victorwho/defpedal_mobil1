@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Pressable,
@@ -27,9 +27,13 @@ import {
   textSm,
   textXs,
 } from '../src/design-system/tokens/typography';
+import {
+  CLOCK_SKEW_WARN_THRESHOLD_SECONDS,
+  getServerClockSkewSeconds,
+} from '../src/lib/clockSkew';
 import { PRIVACY_URL, TERMS_URL } from '../src/lib/legal-urls';
 import { markPasswordResetRequested } from '../src/lib/passwordReset';
-import { requestPasswordReset } from '../src/lib/supabase';
+import { requestPasswordReset, type GoogleSignInErrorCode } from '../src/lib/supabase';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 
@@ -58,10 +62,48 @@ export default function AuthScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Signed device-vs-server clock skew (seconds), or null while unknown. A large
+  // skew breaks native Google sign-in (AppAuth `iat` validation) — we warn the
+  // user proactively. See lib/clockSkew.ts + App Store 2.1(a) note.
+  const [clockSkewSeconds, setClockSkewSeconds] = useState<number | null>(null);
 
   // Merge context-level auth errors (e.g. from cold-start deep link failures)
   // into the local error state.
   const displayError = errorMessage ?? contextAuthError;
+
+  // Best-effort, non-blocking clock-skew probe on mount.
+  useEffect(() => {
+    let cancelled = false;
+    void getServerClockSkewSeconds().then((skew) => {
+      if (!cancelled) setClockSkewSeconds(skew);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const clockSkewMinutes =
+    clockSkewSeconds !== null &&
+    Math.abs(clockSkewSeconds) >= CLOCK_SKEW_WARN_THRESHOLD_SECONDS
+      ? Math.max(1, Math.round(Math.abs(clockSkewSeconds) / 60))
+      : null;
+
+  // Map a Google sign-in failure code to a localized, user-facing message.
+  // The raw native error string (e.g. `org.openid.appauth …`) must never reach
+  // the UI — that was the App Store 2.1(a) rejection.
+  const googleErrorMessage = (code?: GoogleSignInErrorCode): string => {
+    switch (code) {
+      case 'clock_skew':
+        return t('auth.googleClockSkew');
+      case 'unavailable':
+      case 'configuration':
+        return t('auth.googleUnavailable');
+      case 'no_token':
+      case 'generic':
+      default:
+        return t('auth.googleGenericError');
+    }
+  };
 
   const submit = async () => {
     if (!authCtx) return;
@@ -151,17 +193,17 @@ export default function AuthScreen() {
     authCtx.clearAuthError();
 
     try {
-      const { error, cancelled } = await authCtx.signInWithGoogle();
+      const { error, cancelled, errorCode } = await authCtx.signInWithGoogle();
       if (cancelled) {
         return;
       }
       if (error) {
-        setErrorMessage(error.message);
+        setErrorMessage(googleErrorMessage(errorCode));
         return;
       }
       setStatusMessage('Signed in with Google.');
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Google sign-in failed.');
+    } catch {
+      setErrorMessage(googleErrorMessage('generic'));
     } finally {
       setIsSubmitting(false);
     }
@@ -298,6 +340,18 @@ export default function AuthScreen() {
                 <Ionicons name="alert-circle-outline" size={16} color={colors.caution} />
                 <Text style={styles.warningText}>
                   Supabase is not configured for this build. Auth is unavailable.
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Device-clock warning. A large skew breaks native Google sign-in
+                (AppAuth `iat` validation) — warn before the user hits the opaque
+                native failure. App Store 2.1(a). */}
+            {clockSkewMinutes !== null ? (
+              <View style={styles.warningBanner}>
+                <Ionicons name="time-outline" size={16} color={colors.caution} />
+                <Text style={styles.warningText}>
+                  {t('auth.clockSkewBanner', { minutes: String(clockSkewMinutes) })}
                 </Text>
               </View>
             ) : null}

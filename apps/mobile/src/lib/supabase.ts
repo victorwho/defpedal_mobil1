@@ -243,6 +243,54 @@ export const updatePassword = async (newPassword: string) => {
 let googleSigninConfigured = false;
 
 /**
+ * Stable, UI-safe discriminator for a Google sign-in failure. Lets the auth
+ * screen render a localized, actionable message instead of dumping the raw
+ * native error string (App Store Guideline 2.1(a) rejection, 2026-06-25).
+ */
+export type GoogleSignInErrorCode =
+  | 'clock_skew'
+  | 'unavailable'
+  | 'no_token'
+  | 'configuration'
+  | 'generic';
+
+/**
+ * Classify a raw Google sign-in failure.
+ *
+ * The native GoogleSignIn iOS SDK (via AppAuth/OpenID) validates the Google
+ * ID token's `iat` claim against the DEVICE clock with a hardcoded ±600s
+ * tolerance. When the device's date/time is off by >10 min it throws
+ * `Error Domain=org.openid.appauth.general Code=-15 "Issued at time is more
+ * than 600 seconds before or after the current time"`. There is no JS-level
+ * config to widen that leeway (google-signin v16), so we detect it here and
+ * surface guidance to fix the device clock. Android is unaffected (its
+ * Credential Manager token carries no client-side `iat` check). The returned
+ * `message` is an English fallback only — the auth screen localizes by `code`.
+ */
+export const classifyGoogleSignInError = (
+  err: unknown,
+): { code: GoogleSignInErrorCode; message: string } => {
+  const raw =
+    err instanceof Error ? err.message : typeof err === 'string' ? err : '';
+  const lower = raw.toLowerCase();
+
+  if (
+    lower.includes('issued at time') ||
+    lower.includes('600 seconds') ||
+    lower.includes('code=-15') ||
+    (lower.includes('appauth') && lower.includes('-15'))
+  ) {
+    return {
+      code: 'clock_skew',
+      message:
+        "Your device's date and time appear to be incorrect, which blocks Google sign-in. Turn on automatic date & time and try again.",
+    };
+  }
+
+  return { code: 'generic', message: 'Google sign-in failed. Please try again.' };
+};
+
+/**
  * Sign in with Google using the native account picker, then exchange the
  * Google ID token for a Supabase session via signInWithIdToken.
  *
@@ -264,6 +312,7 @@ let googleSigninConfigured = false;
 export const signInWithGoogle = async (): Promise<{
   error: Error | null;
   cancelled?: boolean;
+  errorCode?: GoogleSignInErrorCode;
 }> => {
   const client = requireSupabaseClient();
   await clearDeveloperBypassSession();
@@ -274,6 +323,7 @@ export const signInWithGoogle = async (): Promise<{
       error: new Error(
         'Google sign-in is not configured (missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID).',
       ),
+      errorCode: 'configuration',
     };
   }
 
@@ -295,7 +345,10 @@ export const signInWithGoogle = async (): Promise<{
     isErrorWithCode = mod.isErrorWithCode;
     statusCodes = mod.statusCodes;
   } catch {
-    return { error: new Error('Google sign-in is unavailable in this build.') };
+    return {
+      error: new Error('Google sign-in is unavailable in this build.'),
+      errorCode: 'unavailable',
+    };
   }
 
   try {
@@ -313,6 +366,10 @@ export const signInWithGoogle = async (): Promise<{
     }
 
     await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    // Clear any cached/restored session so the interactive sign-in always mints
+    // a FRESH ID token. A stale cached token's `iat` would itself trip the
+    // OpenID clock-skew validator (#2.1a). Ignore failures — nothing to sign out.
+    await GoogleSignin.signOut().catch(() => {});
     const response = await GoogleSignin.signIn();
 
     // User dismissed the picker — a deliberate cancel, not an error.
@@ -322,7 +379,10 @@ export const signInWithGoogle = async (): Promise<{
 
     const idToken = response.data.idToken;
     if (!idToken) {
-      return { error: new Error('Google sign-in did not return an ID token.') };
+      return {
+        error: new Error('Google sign-in did not return an ID token.'),
+        errorCode: 'no_token',
+      };
     }
 
     await captureAnonForMerge();
@@ -330,7 +390,7 @@ export const signInWithGoogle = async (): Promise<{
       provider: 'google',
       token: idToken,
     });
-    if (error) return { error };
+    if (error) return { error, errorCode: 'generic' };
 
     emitAuthSessionChange();
     return { error: null };
@@ -339,9 +399,10 @@ export const signInWithGoogle = async (): Promise<{
     if (isErrorWithCode(err) && err.code === statusCodes.SIGN_IN_CANCELLED) {
       return { error: null, cancelled: true };
     }
-    return {
-      error: err instanceof Error ? err : new Error('Google sign-in failed.'),
-    };
+    // Map known native failures (esp. the AppAuth clock-skew error) to a stable
+    // code so the UI never shows the raw `org.openid.appauth …` string.
+    const { code, message } = classifyGoogleSignInError(err);
+    return { error: new Error(message), errorCode: code };
   }
 };
 

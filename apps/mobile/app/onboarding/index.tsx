@@ -1,7 +1,7 @@
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -19,7 +19,6 @@ import {
   textSm,
   textXs,
 } from '../../src/design-system/tokens/typography';
-import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
 import { useT } from '../../src/hooks/useTranslation';
 
 export default function OnboardingPermissionScreen() {
@@ -29,7 +28,6 @@ export default function OnboardingPermissionScreen() {
   const t = useT();
   const [denied, setDenied] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
-  const skipOnboarding = useSkipOnboarding();
 
   // If location is already granted (returning user / cleared data but kept permission),
   // auto-advance to the analytics consent step (compliance plan item 8 — consent
@@ -69,25 +67,24 @@ export default function OnboardingPermissionScreen() {
     }
   };
 
-  const handleSkip = () => {
-    // Even when location is denied, route through consent so analytics gating
-    // is captured before the user reaches goal-selection / first-route.
+  // Reachable ONLY after the OS permission request has been shown and denied.
+  // App Store Guideline 5.1.1(iv): the priming screen has no skip/exit — the
+  // single "Continue" CTA always proceeds to the system prompt first. After a
+  // denial the user may continue without location; we still route through
+  // consent so analytics gating is captured before goal-selection / first-route.
+  const handleContinueWithoutLocation = () => {
     router.push('/onboarding/consent' as any);
+  };
+
+  const handleOpenSettings = () => {
+    // Apple-permitted recovery path: once denied at the OS level, the system
+    // dialog won't re-appear, so deep-link to the app's Settings page.
+    void Linking.openSettings();
   };
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
       <View style={styles.glowTop} />
-
-      <Pressable
-        style={styles.skipPill}
-        onPress={skipOnboarding}
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel={t('onboarding.a11ySkip')}
-      >
-        <Text style={styles.skipPillText}>{t('onboarding.skipShort')}</Text>
-      </Pressable>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -137,25 +134,31 @@ export default function OnboardingPermissionScreen() {
         {denied ? (
           <>
             <Text style={styles.deniedText}>{t('onboarding.locationDenied')}</Text>
-            <Button variant="primary" size="lg" fullWidth onPress={handleSkip}>
+            <Button variant="primary" size="lg" fullWidth onPress={handleContinueWithoutLocation}>
               {t('onboarding.continueWithoutLocation')}
             </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={isRequesting}
-              onPress={() => void handleEnableLocation()}
+            <Pressable
+              onPress={handleOpenSettings}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('onboarding.openSettings')}
             >
-              {t('onboarding.enableLocation')}
-            </Button>
-            <Pressable onPress={handleSkip} hitSlop={12}>
-              <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
+              <Text style={styles.settingsLink}>{t('onboarding.openSettings')}</Text>
             </Pressable>
           </>
+        ) : (
+          // No skip/exit affordance here by design — App Store Guideline
+          // 5.1.1(iv) requires the user to always proceed to the system
+          // permission request after the priming message.
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={isRequesting}
+            onPress={() => void handleEnableLocation()}
+          >
+            {t('onboarding.enableLocation')}
+          </Button>
         )}
       </View>
     </View>
@@ -251,27 +254,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       paddingTop: space[4],
     },
-    skipText: {
+    settingsLink: {
       ...textSm,
-      fontFamily: fontFamily.body.medium,
-      color: colors.textMuted,
-    },
-    skipPill: {
-      position: 'absolute',
-      top: space[4],
-      right: space[5],
-      paddingHorizontal: space[3],
-      paddingVertical: space[2],
-      borderRadius: radii.full,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      backgroundColor: colors.bgPrimary,
-      zIndex: 10,
-    },
-    skipPillText: {
-      ...textXs,
       fontFamily: fontFamily.body.semiBold,
-      color: colors.textSecondary,
+      color: colors.accent,
     },
     deniedText: {
       ...textSm,
