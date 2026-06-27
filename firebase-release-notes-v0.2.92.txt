@@ -1,0 +1,26 @@
+Defensive Pedal Preview v0.2.92 (build 95)
+
+This build fixes a serious bug where many completed rides were never saved
+(no GPS track, ride stuck "in progress", missing from History and stats).
+
+WHAT TO TEST — RIDE RECORDING
+- Ride end-to-end: start navigation, ride for a couple of minutes, tap End
+  Ride > Save. Confirm the ride shows up in History with its map trail and
+  counts toward your stats / streak / CO2.
+- Kill recovery: start a ride, then force-close the app from recents (or lock
+  the phone, leave it a while, OS may kill it). Reopen the app — the ride
+  should resume or be closed out and STILL land in History (not vanish).
+- Poor / no signal: ride with the phone in airplane mode for part of the ride,
+  then reconnect. The ride should sync and appear once you're back online.
+
+WHAT CHANGED UNDER THE HOOD
+- End-of-ride uploads now self-heal: if the link between your phone and the
+  saved ride is lost, the app re-resolves it from the server instead of
+  silently dropping the GPS data.
+- Any unsynced rides still queued on your device from older builds should
+  upload automatically the first time you open this build.
+- Ride data is now written to storage immediately at key moments, so an app
+  kill no longer loses the recording.
+
+Please report anything where a ride DOESN'T show up after you finish it —
+include roughly when you rode and whether you saved or discarded.

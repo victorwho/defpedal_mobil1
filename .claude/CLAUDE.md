@@ -22,6 +22,8 @@ npm run check:bundle
 - **Debug APK build:** `cd C:\dev\defpedal\apps\mobile\android && ./gradlew installDebug`
 - **Release APK build:** `npm run build:preview:install` (syncs to `C:\dpb`, cleans cache, builds, installs)
 - **Release APK build (no install):** `npm run build:preview`
+- **Production AAB build:** `npm run build:production` → `C:\dpb\apps\mobile\android\app\build\outputs\bundle\productionRelease\app-production-release.aab`
+- **ALWAYS archive the production artifact:** after every `npm run build:production`, copy the AAB to `apkreleases/DefensivePedal-Production-v<versionName>.aab` (add `-vc<versionCode>` only to disambiguate two builds of the same versionName). The `apkreleases/` dir and all `*.aab`/`*.apk` are gitignored, so this is a **local archive, never committed** — the build script does NOT auto-archive. Do it by hand so every shipped versionCode stays reproducible. Verify the signer first: `keytool -printcert -jarfile <aab>` SHA-256 must equal the upload key `82:7C:FD:44:…:6F:35:73` (never debug-signed).
 
 ## Phone Connection
 
