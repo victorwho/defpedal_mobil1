@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-27 — Trip-recording regression fixed — v0.2.92 (build 95 Android / build 17 iOS)
+
+Fixes a silent bug where many completed rides were never saved — no GPS track, ride stuck "in progress", missing from History and stats. Track-save coverage had fallen from ~85% to 15% by late June (108 users / 190 trips affected).
+
+### Behavior
+- **Rides save reliably again.** End-of-ride GPS upload now self-heals: if the link between the phone and the saved ride is lost (app kill, background eviction), the app re-resolves it from the server instead of silently dropping the data — instead of the ride vanishing.
+- **Retroactive recovery.** Unsynced rides still queued on a device from older builds upload automatically the first time the new build is opened.
+- **No data lost on a hard kill.** Trip-critical state is now written to storage immediately at key moments, so an OS kill mid-ride no longer loses the recording (this was the late-June regression).
+
+### Under the hood
+- New server endpoint `GET /v1/trips/resolve?clientTripId=` (owner-scoped, read-only) resolves the durable `trips.client_trip_id`; the offline queue uses it to recover an orphaned `trip_end`/`trip_track` and dead-letters a truly-missing trip into the ride-loss banner instead of skipping it forever.
+- The persist debounce (added 2026-06-13) is now force-flushed after queue/id-map mutations, so GPS-breadcrumb writes stay coalesced but recovery-critical state is always durable.
+- Pre-existing 310 unrecorded trips left as-is (the actual GPS trail was never sent to the server, so they're not recoverable server-side).
+- Live: Cloud Run `defpedal-api-00099-qns`. Android prod AAB built + signed (not yet uploaded). iOS build 17 VALID on TestFlight.
+
 ## 2026-06-14 — Full-app-review backlog + product decisions (backend live; mobile pending next build)
 
 Continuation of the 2026-06-12 full-app review (Phases 0–4 already shipped). Backend changes are live on Cloud Run `defpedal-api-00098-bl5`; mobile changes are committed and reach users on the next preview/production build. No app version bump.
