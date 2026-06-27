@@ -1,5 +1,6 @@
 import type { QueuedMutation, QueuedMutationType } from '@defensivepedal/core';
 import type { QueuedMutationPayloadByType } from '../lib/offlineQueue';
+import { flushPersistedWrites } from '../lib/storage';
 
 export const MAX_QUEUE_SIZE = 500;
 
@@ -212,6 +213,14 @@ export const createQueueSlice = (
       return { queuedMutations: nextQueue };
     });
 
+    // Force the debounced persist adapter (lib/storage.ts, 3s/8s coalescing)
+    // to flush now. The offline queue is the durable record of an unsynced
+    // ride; if a hard kill lands inside the debounce window the enqueue is
+    // lost and the trip is stranded with no trip_end/trip_track. GPS-breadcrumb
+    // churn stays debounced — only these low-frequency queue/id-map changes
+    // force a write. (No-op under vitest.)
+    flushPersistedWrites();
+
     return mutation.id;
   },
 
@@ -229,12 +238,16 @@ export const createQueueSlice = (
       ),
     })),
 
-  resolveMutation: (mutationId) =>
+  resolveMutation: (mutationId) => {
     set((state) => ({
       queuedMutations: state.queuedMutations.filter(
         (mutation) => mutation.id !== mutationId,
       ),
-    })),
+    }));
+    // Persist the removal immediately so a kill can't replay an already-synced
+    // trip mutation (idempotent server-side, but keeps the queue honest).
+    flushPersistedWrites();
+  },
 
   failMutation: (mutationId, errorMessage) =>
     set((state) => ({
@@ -257,7 +270,7 @@ export const createQueueSlice = (
   // mutations). OfflineMutationSyncManager's cascade-kill relies on this —
   // if a future change makes killMutation throw on dead mutations, wrap the
   // cascade loop in per-id try/catch to preserve correctness.
-  killMutation: (mutationId, errorMessage) =>
+  killMutation: (mutationId, errorMessage) => {
     set((state) => ({
       queuedMutations: state.queuedMutations.map((mutation) =>
         mutation.id === mutationId
@@ -270,7 +283,11 @@ export const createQueueSlice = (
             }
           : mutation,
       ),
-    })),
+    }));
+    // Persist the dead state so the ride-loss banner can surface it after a
+    // restart instead of the kill re-hiding a permanently-failed ride.
+    flushPersistedWrites();
+  },
 
   retryDeadMutations: () => {
     const state = get();
@@ -311,16 +328,26 @@ export const createQueueSlice = (
       ),
     })),
 
-  setTripServerId: (clientTripId, tripId) =>
+  setTripServerId: (clientTripId, tripId) => {
     set((state) => ({
       tripServerIds: {
         ...state.tripServerIds,
         [clientTripId]: tripId,
       },
-    })),
+    }));
+    // The clientTripId→serverId map is what trip_end/trip_track resolve
+    // against. Persist it now so a kill right after trip_start synced doesn't
+    // lose the mapping and orphan the dependent mutations (the dominant cause
+    // of trips stranded `in_progress`).
+    flushPersistedWrites();
+  },
 
-  setActiveTripClientId: (clientTripId) =>
+  setActiveTripClientId: (clientTripId) => {
     set(() => ({
       activeTripClientId: clientTripId,
-    })),
+    }));
+    // activeTripClientId drives kill-recovery (closeInterruptedRide reads it);
+    // persist it durably so an interrupted ride can still be closed out.
+    flushPersistedWrites();
+  },
 });

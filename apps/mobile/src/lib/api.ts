@@ -126,6 +126,16 @@ export const mobileApi = {
       body: JSON.stringify(payload),
       timeoutMs: getMutationTimeoutMs('trip_track'),
     }),
+  // Recover the server trip id for a clientTripId so an orphaned trip_end /
+  // trip_track (whose local clientTripId→serverId map was lost to a kill,
+  // persist debounce, or resetFlow prune) can self-heal instead of skipping
+  // forever. A 404 surfaces as ApiClientError(kind:'http', status:404) — the
+  // offline sync loop treats that as permanent and dead-letters the mutation.
+  resolveTrip: (clientTripId: string) =>
+    mobileApiFetch<{ tripId: string }>(
+      `/v1/trips/resolve?clientTripId=${encodeURIComponent(clientTripId)}`,
+      { timeoutMs: getMutationTimeoutMs('trip_end') },
+    ),
   // Pedal Nudge tap telemetry (review 2026-06-12 item 23): the funnel was
   // dead end-to-end — no nudgeLogId in the push payload and no mobile caller.
   // Now the dispatcher stamps nudgeLogId into the push data and the tap

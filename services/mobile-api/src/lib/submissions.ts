@@ -174,6 +174,45 @@ export const startTripRecord = async (
   };
 };
 
+/**
+ * Resolve the server `trips.id` for a given (user, clientTripId).
+ *
+ * trip_start writes `trips.client_trip_id` durably, so this lets the offline
+ * queue recover a trip_end / trip_track whose local clientTripId→serverId map
+ * was lost (app kill, persist debounce, resetFlow prune). Without it, an
+ * orphaned end/track mutation is skipped on every flush forever and the trip
+ * is stranded as `in_progress` with no GPS track — the dominant cause of the
+ * trip_tracks loss that began when the offline-queue trip flow rolled out
+ * (~2026-05). Returns null (→ 404 at the route layer) when no such trip
+ * exists, which lets the client dead-letter a truly-missing trip instead of
+ * skipping it silently.
+ */
+export const resolveTripIdByClientId = async (
+  clientTripId: string,
+  userId: string,
+): Promise<{ tripId: string } | null> => {
+  if (supabaseAdmin) {
+    const { data, error } = await supabaseAdmin
+      .from('trips')
+      .select('id')
+      // Unique (user_id, client_trip_id) index guarantees at most one row.
+      .eq('user_id', userId)
+      .eq('client_trip_id', clientTripId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return data?.id ? { tripId: data.id as string } : null;
+  }
+
+  const memoryTrip = memoryTrips.get(clientTripId);
+  return memoryTrip && memoryTrip.userId === userId
+    ? { tripId: memoryTrip.tripId }
+    : null;
+};
+
 export const finishTripRecord = async (
   request: TripEndRequest,
   userId: string,

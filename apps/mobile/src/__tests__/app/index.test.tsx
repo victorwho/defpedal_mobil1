@@ -29,6 +29,7 @@ vi.mock('../../../src/lib/storage', () => ({
     setItem: vi.fn(),
     removeItem: vi.fn(),
   },
+  flushPersistedWrites: vi.fn(),
 }));
 
 // The signup gate is hook-driven (reads zustand + auth + hydration).

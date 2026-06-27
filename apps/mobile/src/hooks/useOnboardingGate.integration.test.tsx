@@ -22,6 +22,7 @@ vi.mock('../lib/storage', () => ({
     setItem: vi.fn(),
     removeItem: vi.fn(),
   },
+  flushPersistedWrites: vi.fn(),
 }));
 
 vi.mock('../providers/AuthSessionProvider', () => ({

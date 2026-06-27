@@ -19,6 +19,7 @@ import {
   getTripHistory,
   getTripStatsDashboard,
   getUserStats,
+  resolveTripIdByClientId,
   saveTripTrack,
   startTripRecord,
   submitCitySuggestion,
@@ -42,6 +43,7 @@ export type MobileApiDependencies = {
   submitHazardReport: typeof submitHazardReport;
   startTripRecord: typeof startTripRecord;
   finishTripRecord: typeof finishTripRecord;
+  resolveTripIdByClientId: typeof resolveTripIdByClientId;
   saveTripTrack: typeof saveTripTrack;
   getTripHistory: typeof getTripHistory;
   deleteTripTrack: typeof deleteTripTrack;
@@ -92,6 +94,7 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     submitHazardReport,
     startTripRecord,
     finishTripRecord,
+    resolveTripIdByClientId,
     saveTripTrack,
     getTripHistory,
     deleteTripTrack,

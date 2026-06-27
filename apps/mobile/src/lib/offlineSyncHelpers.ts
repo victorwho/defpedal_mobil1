@@ -95,17 +95,46 @@ export const getResolvedTripId = (
   return null;
 };
 
+/**
+ * True if a non-dead `trip_start` for this clientTripId is still queued. A
+ * dependent trip_end / trip_track must wait for it to land (and populate
+ * tripServerIds) rather than racing a server-side resolve against a trips row
+ * that hasn't been created yet.
+ */
+export const hasPendingTripStart = (
+  queue: readonly QueuedMutation[],
+  clientTripId: string | undefined,
+): boolean => {
+  if (!clientTripId) return false;
+  return queue.some(
+    (m) =>
+      m.type === 'trip_start' &&
+      m.status !== 'dead' &&
+      (m.payload as { clientTripId?: string }).clientTripId === clientTripId,
+  );
+};
+
 export const isMutationReady = (
   mutation: QueuedMutation,
   tripServerIds: Record<string, string>,
+  queue: readonly QueuedMutation[] = [],
 ): boolean => {
   if (mutation.type === 'trip_end' || mutation.type === 'trip_track') {
-    return (
-      getResolvedTripId(
-        mutation.payload as QueuedTripEndPayload,
-        tripServerIds,
-      ) !== null
-    );
+    const payload = mutation.payload as QueuedTripEndPayload;
+
+    // Local clientTripId→serverId mapping present → ready immediately.
+    if (getResolvedTripId(payload, tripServerIds) !== null) {
+      return true;
+    }
+
+    // No local mapping. The mutation is still ready to PROCESS as long as its
+    // trip_start is no longer pending in the queue — the sync loop will then
+    // resolve the server id from the durable trips.client_trip_id and proceed
+    // (or dead-letter on a 404). Previously this returned false unconditionally
+    // whenever the mapping was missing, so a mutation whose mapping was lost
+    // (kill / persist debounce / resetFlow prune) was skipped on every flush
+    // forever and its trip stayed `in_progress` with no GPS track.
+    return !hasPendingTripStart(queue, payload.clientTripId);
   }
 
   return true;
@@ -126,6 +155,7 @@ export const shouldSkipMutation = (
   mutation: QueuedMutation,
   tripServerIds: Record<string, string>,
   now: number = Date.now(),
+  queue: readonly QueuedMutation[] = [],
 ): boolean => {
   if (mutation.status === 'dead' || mutation.status === 'syncing') {
     return true;
@@ -135,7 +165,7 @@ export const shouldSkipMutation = (
     return true;
   }
 
-  if (!isMutationReady(mutation, tripServerIds)) {
+  if (!isMutationReady(mutation, tripServerIds, queue)) {
     return true;
   }
 

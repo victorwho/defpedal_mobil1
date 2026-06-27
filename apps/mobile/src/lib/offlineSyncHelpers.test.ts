@@ -24,6 +24,7 @@ import {
   getBackoffDelay,
   getMutationTimeoutMs,
   getResolvedTripId,
+  hasPendingTripStart,
   isBackoffElapsed,
   isMutationReady,
   isPermanentError,
@@ -165,13 +166,32 @@ describe('getResolvedTripId', () => {
   });
 });
 
+describe('hasPendingTripStart', () => {
+  const start = (clientTripId: string, status: QueuedMutation['status'] = 'queued') =>
+    makeMutation({ id: `start-${clientTripId}`, type: 'trip_start', status, payload: { clientTripId } });
+
+  it('is true when a non-dead trip_start for the clientTripId is queued', () => {
+    expect(hasPendingTripStart([start('cli-1')], 'cli-1')).toBe(true);
+  });
+
+  it('is false when the matching trip_start is dead', () => {
+    expect(hasPendingTripStart([start('cli-1', 'dead')], 'cli-1')).toBe(false);
+  });
+
+  it('is false when no trip_start matches the clientTripId', () => {
+    expect(hasPendingTripStart([start('other')], 'cli-1')).toBe(false);
+    expect(hasPendingTripStart([], 'cli-1')).toBe(false);
+    expect(hasPendingTripStart([start('cli-1')], undefined)).toBe(false);
+  });
+});
+
 describe('isMutationReady', () => {
-  it('blocks trip_end when the trip_start has not landed yet', () => {
-    const mutation = makeMutation({
-      type: 'trip_end',
-      payload: { clientTripId: 'cli-1' },
-    });
-    expect(isMutationReady(mutation, {})).toBe(false);
+  const pendingStart = (clientTripId: string) =>
+    makeMutation({ id: `start-${clientTripId}`, type: 'trip_start', payload: { clientTripId } });
+
+  it('blocks trip_end while its trip_start is still queued', () => {
+    const mutation = makeMutation({ type: 'trip_end', payload: { clientTripId: 'cli-1' } });
+    expect(isMutationReady(mutation, {}, [pendingStart('cli-1'), mutation])).toBe(false);
   });
 
   it('allows trip_end once a server tripId is mapped', () => {
@@ -180,6 +200,26 @@ describe('isMutationReady', () => {
       payload: { clientTripId: 'cli-1' },
     });
     expect(isMutationReady(mutation, { 'cli-1': 'srv-1' })).toBe(true);
+  });
+
+  it('allows an orphaned trip_end (no mapping, no pending trip_start) so it can self-heal via a server resolve', () => {
+    const mutation = makeMutation({ type: 'trip_end', payload: { clientTripId: 'cli-1' } });
+    // The whole regression: when the clientTripId→serverId mapping is lost,
+    // the dependent mutation must be PROCESSED (so the sync loop resolves the
+    // id from trips.client_trip_id), not skipped on every flush forever.
+    expect(isMutationReady(mutation, {}, [mutation])).toBe(true);
+    expect(isMutationReady(mutation, {})).toBe(true); // default-empty queue
+  });
+
+  it('allows trip_track when its trip_start has died (cascade-resolvable / dead-letterable)', () => {
+    const deadStart = makeMutation({
+      id: 'start-dead',
+      type: 'trip_start',
+      status: 'dead',
+      payload: { clientTripId: 'cli-1' },
+    });
+    const mutation = makeMutation({ type: 'trip_track', payload: { clientTripId: 'cli-1' } });
+    expect(isMutationReady(mutation, {}, [deadStart, mutation])).toBe(true);
   });
 
   it('does not block independent mutation types', () => {
@@ -207,12 +247,15 @@ describe('shouldSkipMutation', () => {
     expect(shouldSkipMutation(makeMutation({ retryCount: 1, lastAttemptAt }), {}, now)).toBe(true);
   });
 
-  it('skips trip_end whose trip_start has not landed yet', () => {
-    const mutation = makeMutation({
-      type: 'trip_end',
-      payload: { clientTripId: 'cli-1' },
-    });
-    expect(shouldSkipMutation(mutation, {}, now)).toBe(true);
+  it('skips trip_end while its trip_start is still queued', () => {
+    const mutation = makeMutation({ type: 'trip_end', payload: { clientTripId: 'cli-1' } });
+    const start = makeMutation({ id: 'start-1', type: 'trip_start', payload: { clientTripId: 'cli-1' } });
+    expect(shouldSkipMutation(mutation, {}, now, [start, mutation])).toBe(true);
+  });
+
+  it('does NOT skip an orphaned trip_end (no pending trip_start) so it can self-heal', () => {
+    const mutation = makeMutation({ type: 'trip_end', payload: { clientTripId: 'cli-1' } });
+    expect(shouldSkipMutation(mutation, {}, now, [mutation])).toBe(false);
   });
 
   it('does NOT skip a fresh queued hazard', () => {

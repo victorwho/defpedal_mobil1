@@ -17,6 +17,10 @@ vi.mock('../lib/storage', () => ({
     setItem: vi.fn(),
     removeItem: vi.fn(),
   },
+  // queueSlice now force-flushes the persist adapter after trip-critical
+  // mutations (durable-write fix); the queue actions this test exercises call
+  // it, so the mock must export it.
+  flushPersistedWrites: vi.fn(),
 }));
 
 const mockLoadCachedRoute = vi.fn();

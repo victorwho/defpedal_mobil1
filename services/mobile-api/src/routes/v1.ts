@@ -562,6 +562,73 @@ export const buildV1Routes = (
       },
     );
 
+    // Resolve a server trip id from the client-generated clientTripId. The
+    // offline queue calls this to self-heal a trip_end / trip_track whose
+    // local clientTripId→serverId mapping was lost (kill / persist debounce /
+    // resetFlow prune) — without it those mutations skip forever and the trip
+    // is stranded `in_progress`. Read-only and owner-scoped (only ever returns
+    // the caller's own trip id), so it is intentionally NOT rate-limited: the
+    // recovery sweep may need many lookups in a short window to drain a backlog
+    // of orphaned rides, and the 'write' bucket (20/min) would throttle it.
+    app.get<{ Querystring: { clientTripId: string }; Reply: { tripId: string } | ErrorResponse }>(
+      '/trips/resolve',
+      {
+        schema: {
+          querystring: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['clientTripId'],
+            properties: {
+              clientTripId: { type: 'string', minLength: 1, maxLength: 100 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['tripId'],
+              properties: { tripId: { type: 'string' } },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
+            502: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+
+        let resolved: { tripId: string } | null;
+        try {
+          resolved = await dependencies.resolveTripIdByClientId(
+            request.query.clientTripId,
+            user.id,
+          );
+        } catch (error) {
+          throw new HttpError('Trip resolve failed.', {
+            statusCode: 502,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+          });
+        }
+
+        if (!resolved) {
+          // No trip row for this clientTripId — trip_start genuinely never
+          // landed. The client treats this 404 as permanent and dead-letters
+          // the orphaned mutation so the ride-loss banner surfaces it.
+          throw new HttpError('No trip found for clientTripId.', {
+            statusCode: 404,
+            code: 'NOT_FOUND',
+          });
+        }
+
+        reply.header('cache-control', 'no-store');
+        return resolved;
+      },
+    );
+
     app.get(
       '/trips/history',
       {

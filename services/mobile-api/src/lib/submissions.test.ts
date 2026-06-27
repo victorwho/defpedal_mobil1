@@ -12,7 +12,8 @@ vi.mock('./supabaseAdmin', () => ({
   },
 }));
 
-const { getUserStats, getTripStatsDashboard, deleteTripTrack } = await import('./submissions');
+const { getUserStats, getTripStatsDashboard, deleteTripTrack, resolveTripIdByClientId } =
+  await import('./submissions');
 
 afterEach(() => {
   mockRpc.mockReset();
@@ -76,6 +77,39 @@ describe('getUserStats', () => {
     });
 
     await expect(getUserStats('user-5')).rejects.toThrow('connection refused');
+  });
+});
+
+describe('resolveTripIdByClientId', () => {
+  // Builds a chainable mock for .from('trips').select(...).eq(...).eq(...).maybeSingle()
+  const tripsSelectChain = (result: { data: unknown; error: unknown }) => {
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    chain.select = vi.fn(() => chain);
+    chain.eq = vi.fn(() => chain);
+    chain.maybeSingle = vi.fn(() => Promise.resolve(result));
+    return chain;
+  };
+
+  it('returns the server tripId for a matching (user, clientTripId)', async () => {
+    const chain = tripsSelectChain({ data: { id: 'srv-trip-1' }, error: null });
+    mockFrom.mockReturnValue(chain);
+
+    const result = await resolveTripIdByClientId('cli-1', 'user-1');
+
+    expect(mockFrom).toHaveBeenCalledWith('trips');
+    expect(chain.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(chain.eq).toHaveBeenCalledWith('client_trip_id', 'cli-1');
+    expect(result).toEqual({ tripId: 'srv-trip-1' });
+  });
+
+  it('returns null when no trip row matches (trip_start never landed)', async () => {
+    mockFrom.mockReturnValue(tripsSelectChain({ data: null, error: null }));
+    expect(await resolveTripIdByClientId('cli-missing', 'user-1')).toBeNull();
+  });
+
+  it('throws when the lookup errors so the caller retries instead of dropping', async () => {
+    mockFrom.mockReturnValue(tripsSelectChain({ data: null, error: { message: 'db down' } }));
+    await expect(resolveTripIdByClientId('cli-1', 'user-1')).rejects.toThrow('db down');
   });
 });
 

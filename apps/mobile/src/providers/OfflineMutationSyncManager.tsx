@@ -18,9 +18,42 @@ import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
 import { useConnectivity } from './ConnectivityMonitor';
 
+/**
+ * Resolve the server trip id for a trip_end / trip_track payload. Prefers the
+ * local clientTripId→serverId map; if that's missing (the mapping was lost to
+ * an app kill, the persist debounce, or a resetFlow prune) it self-heals by
+ * asking the server for the trip keyed on the durable trips.client_trip_id and
+ * caches the result via `onResolved` so a sibling mutation reuses it.
+ *
+ * Returns null only for the degenerate case of a mutation that carries neither
+ * a tripId nor a clientTripId (nothing to send). A 404 from the resolve
+ * endpoint (trip_start genuinely never landed) propagates as a permanent
+ * ApiClientError so the caller dead-letters the mutation instead of dropping
+ * it silently.
+ */
+const resolveServerTripId = async (
+  payload: { clientTripId?: string; tripId?: string },
+  tripServerIds: Record<string, string>,
+  onResolved: (clientTripId: string, tripId: string) => void,
+): Promise<string | null> => {
+  const local = getResolvedTripId(payload, tripServerIds);
+  if (local) {
+    return local;
+  }
+
+  if (!payload.clientTripId) {
+    return null;
+  }
+
+  const { tripId } = await mobileApi.resolveTrip(payload.clientTripId);
+  onResolved(payload.clientTripId, tripId);
+  return tripId;
+};
+
 const submitQueuedMutation = async (
   mutation: QueuedMutation,
   tripServerIds: Record<string, string>,
+  onResolved: (clientTripId: string, tripId: string) => void,
 ) => {
   switch (mutation.type) {
     case 'hazard':
@@ -33,7 +66,7 @@ const submitQueuedMutation = async (
       );
     case 'trip_end': {
       const payload = mutation.payload as QueuedTripEndPayload;
-      const tripId = getResolvedTripId(payload, tripServerIds);
+      const tripId = await resolveServerTripId(payload, tripServerIds, onResolved);
 
       if (!tripId) {
         return null;
@@ -46,7 +79,7 @@ const submitQueuedMutation = async (
     }
     case 'trip_track': {
       const payload = mutation.payload as QueuedTripTrackPayload;
-      const tripId = getResolvedTripId(payload, tripServerIds);
+      const tripId = await resolveServerTripId(payload, tripServerIds, onResolved);
 
       if (!tripId) {
         return null;
@@ -165,9 +198,18 @@ export const OfflineMutationSyncManager = () => {
         while (!cancelled && processedCount < maxPerFlush) {
           const state = useAppStore.getState();
 
-          // Find the next mutation eligible for sync.
+          // Find the next mutation eligible for sync. The queue is passed so
+          // an orphaned trip_end/trip_track (mapping lost) is processed — and
+          // self-healed via a server-side resolve — rather than skipped, while
+          // one whose trip_start is still pending keeps waiting.
           const mutation = state.queuedMutations.find(
-            (current) => !shouldSkipMutation(current, state.tripServerIds),
+            (current) =>
+              !shouldSkipMutation(
+                current,
+                state.tripServerIds,
+                Date.now(),
+                state.queuedMutations,
+              ),
           );
 
           if (!mutation) {
@@ -183,7 +225,15 @@ export const OfflineMutationSyncManager = () => {
             // that mutates the map between the snapshot and the await).
             const preSubmitState = useAppStore.getState();
             const response = await withMutationTimeout(
-              submitQueuedMutation(mutation, preSubmitState.tripServerIds),
+              submitQueuedMutation(
+                mutation,
+                preSubmitState.tripServerIds,
+                // Cache a self-healed clientTripId→serverId resolution so a
+                // sibling mutation (e.g. trip_track after trip_end) reuses it
+                // without a second resolve round-trip.
+                (clientTripId, tripId) =>
+                  useAppStore.getState().setTripServerId(clientTripId, tripId),
+              ),
               mutation.type,
             );
 

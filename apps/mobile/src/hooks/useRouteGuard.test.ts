@@ -15,6 +15,7 @@ vi.mock('../lib/storage', () => ({
     setItem: vi.fn(),
     removeItem: vi.fn(),
   },
+  flushPersistedWrites: vi.fn(),
 }));
 
 import { useAppStore } from '../store/appStore';
