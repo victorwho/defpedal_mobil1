@@ -309,15 +309,17 @@ export const ImpactSummaryCard = ({
           color={brandColors.accent}
           delayMs={staggerDelayMs * 2}
         />
-        <StaggeredCounter
-          targetValue={rideImpact.caloriesBurned}
-          decimals={0}
-          suffix=" kcal"
-          label={t('impact.caloriesBurned')}
-          equivalentText={calorieEquivalent(rideImpact.caloriesBurned)}
-          color="#F97316"
-          delayMs={staggerDelayMs * 3}
-        />
+        {(rideImpact.caloriesBurned ?? 0) > 0 && (
+          <StaggeredCounter
+            targetValue={rideImpact.caloriesBurned ?? 0}
+            decimals={0}
+            suffix=" kcal"
+            label={t('impact.caloriesBurned')}
+            equivalentText={calorieEquivalent(rideImpact.caloriesBurned ?? 0)}
+            color="#F97316"
+            delayMs={staggerDelayMs * 3}
+          />
+        )}
       </View>
     </View>
   );
