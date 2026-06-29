@@ -18,7 +18,7 @@ import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { useTheme, type ThemeColors } from '../src/design-system';
-import { gray, safetyColors } from '../src/design-system/tokens/colors';
+import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -64,8 +64,6 @@ export default function ProfileScreen() {
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [weightInput, setWeightInput] = useState('');
-  const [weightSaved, setWeightSaved] = useState(false);
-  const weightSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleAvatarPick = async () => {
     if (!user || !supabaseClient) return;
@@ -242,22 +240,11 @@ export default function ProfileScreen() {
     }
   }, [weightKg]);
 
-  // Clear the saved-flash timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (weightSavedTimer.current) clearTimeout(weightSavedTimer.current);
-    };
-  }, []);
-
-  const confirmWeight = useCallback(() => {
-    const parsed = parseInt(weightInput, 10);
-    const clamped = isNaN(parsed) ? weightKg : Math.round(Math.max(30, Math.min(300, parsed)));
-    setWeightKg(clamped);
-    setWeightInput(String(clamped));
-    setWeightSaved(true);
-    if (weightSavedTimer.current) clearTimeout(weightSavedTimer.current);
-    weightSavedTimer.current = setTimeout(() => setWeightSaved(false), 1500);
-  }, [weightInput, weightKg, setWeightKg]);
+  const stepWeight = useCallback((delta: number) => {
+    const next = Math.round(Math.max(30, Math.min(300, weightKg + delta)));
+    setWeightKg(next);
+    setWeightInput(String(next));
+  }, [weightKg, setWeightKg]);
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
@@ -583,11 +570,20 @@ export default function ProfileScreen() {
                 <Text style={styles.settingLabel}>{t('profile.bodyWeight')}</Text>
                 <Text style={styles.settingDescription}>{t('profile.bodyWeightDesc')}</Text>
               </View>
-              <View style={styles.weightInputWrap}>
+              <View style={styles.weightStepper}>
+                <Pressable
+                  style={styles.weightStepBtn}
+                  onPress={() => stepWeight(-1)}
+                  hitSlop={6}
+                  accessibilityLabel="Decrease weight"
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="remove" size={18} color={colors.textPrimary} />
+                </Pressable>
                 <TextInput
                   style={styles.weightInput}
                   value={weightInput}
-                  onChangeText={(v) => { setWeightInput(v); setWeightSaved(false); }}
+                  onChangeText={setWeightInput}
                   onBlur={() => {
                     const parsed = parseInt(weightInput, 10);
                     if (!isNaN(parsed)) {
@@ -604,16 +600,13 @@ export default function ProfileScreen() {
                 />
                 <Text style={styles.weightUnit}>{t('profile.bodyWeightUnit')}</Text>
                 <Pressable
-                  onPress={confirmWeight}
-                  hitSlop={8}
-                  accessibilityLabel="Save weight"
+                  style={styles.weightStepBtn}
+                  onPress={() => stepWeight(+1)}
+                  hitSlop={6}
+                  accessibilityLabel="Increase weight"
                   accessibilityRole="button"
                 >
-                  <Ionicons
-                    name={weightSaved ? 'checkmark-circle' : 'checkmark-circle-outline'}
-                    size={22}
-                    color={weightSaved ? safetyColors.safe : colors.textSecondary}
-                  />
+                  <Ionicons name="add" size={18} color={colors.textPrimary} />
                 </Pressable>
               </View>
             </View>
@@ -1327,10 +1320,20 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderBottomColor: colors.borderDefault,
     },
     weightLabelCol: { flex: 1, gap: space[1], marginRight: space[3] },
-    weightInputWrap: {
+    weightStepper: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: space[2],
+    },
+    weightStepBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: radii.full,
+      backgroundColor: colors.bgSecondary,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     weightInput: {
       ...textBase,
@@ -1341,7 +1344,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.md,
       paddingHorizontal: space[3],
       paddingVertical: space[2],
-      minWidth: 56,
+      minWidth: 52,
       textAlign: 'center',
     },
     weightUnit: {
