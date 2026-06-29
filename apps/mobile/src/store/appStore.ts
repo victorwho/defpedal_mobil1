@@ -95,6 +95,7 @@ type AppStore = QueueSlice & {
   shareConversionFeedOptin: boolean;
   bikeType: string | null;
   cyclingFrequency: string | null;
+  weightKg: number;
   avoidUnpaved: boolean;
   avoidHills: boolean;
   showBicycleLanes: boolean;
@@ -267,6 +268,7 @@ type AppStore = QueueSlice & {
   setShareConversionFeedOptin: (enabled: boolean) => void;
   setBikeType: (type: string | null) => void;
   setCyclingFrequency: (frequency: string | null) => void;
+  setWeightKg: (kg: number) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
   setAvoidHills: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
@@ -358,6 +360,7 @@ export const useAppStore = create<AppStore>()(
       shareConversionFeedOptin: true,
       bikeType: null,
       cyclingFrequency: null,
+      weightKg: 70,
       avoidUnpaved: false,
       avoidHills: false,
       notifyWeather: true,
@@ -635,6 +638,8 @@ export const useAppStore = create<AppStore>()(
       },
       setCyclingFrequency: (frequency) =>
         set(() => ({ cyclingFrequency: frequency })),
+      setWeightKg: (kg) =>
+        set(() => ({ weightKg: Math.round(Math.max(30, Math.min(300, kg))) })),
       setAvoidUnpaved: (enabled) =>
         set(() => ({ avoidUnpaved: enabled })),
       setAvoidHills: (enabled) =>
@@ -992,7 +997,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 4,
+      version: 5,
       migrate: (persistedState, version) => {
         let next = persistedState as Record<string, unknown> | undefined;
 
@@ -1079,6 +1084,14 @@ export const useAppStore = create<AppStore>()(
           }
         }
 
+        // v4 → v5: add weightKg with the 70 kg default for existing installs.
+        if (version < 5) {
+          const state = next as { weightKg?: number } | undefined;
+          if (state && (state.weightKg === undefined || state.weightKg === null)) {
+            next = { ...(state as object), weightKg: 70 };
+          }
+        }
+
         return next;
       },
       partialize: (state) => ({
@@ -1112,6 +1125,7 @@ export const useAppStore = create<AppStore>()(
         hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
+        weightKg: state.weightKg,
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
         onboardingCompleted: state.onboardingCompleted,

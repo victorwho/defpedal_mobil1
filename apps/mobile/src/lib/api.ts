@@ -366,6 +366,7 @@ export const mobileApi = {
       durationMinutes?: number;
       routeType?: 'safe' | 'fast';
       hadDestination?: boolean;
+      weightKg?: number;
     },
   ) =>
     mobileApiFetch<RideImpact>(`/v1/rides/${tripId}/impact`, {

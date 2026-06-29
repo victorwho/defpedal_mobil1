@@ -285,7 +285,7 @@ export const fetchWeather = async (
   }
 };
 
-const RAIN_THRESHOLD = 50;
+const RAIN_THRESHOLD = 30;
 // Temperature comfort zone — when min/max stay within these bounds we issue
 // no temperature warning at all. Cold/heat/swing rules below only fire when
 // the day exits this zone.

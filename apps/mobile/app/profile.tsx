@@ -63,6 +63,7 @@ export default function ProfileScreen() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [weightInput, setWeightInput] = useState('');
 
   const handleAvatarPick = async () => {
     if (!user || !supabaseClient) return;
@@ -136,7 +137,7 @@ export default function ProfileScreen() {
     shareTripsPublicly, themePreference, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
-    pedalVoiceSassy, notifyStreak,
+    pedalVoiceSassy, notifyStreak, weightKg,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -160,6 +161,7 @@ export default function ProfileScreen() {
     reviewPromptOptedOut: state.reviewPromptState.optedOut,
     pedalVoiceSassy: state.pedalVoiceSassy,
     notifyStreak: state.notifyStreak,
+    weightKg: state.weightKg,
   })));
 
   // Actions - stable references, single selector with shallow comparison
@@ -169,7 +171,7 @@ export default function ProfileScreen() {
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
-    setPedalVoiceSassy, setNotifyStreak,
+    setPedalVoiceSassy, setNotifyStreak, setWeightKg,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -192,6 +194,7 @@ export default function ProfileScreen() {
     setReviewOptOut: state.setReviewOptOut,
     setPedalVoiceSassy: state.setPedalVoiceSassy,
     setNotifyStreak: state.setNotifyStreak,
+    setWeightKg: state.setWeightKg,
   })));
 
   // Sync a single notification preference to the backend (fire-and-forget).
@@ -227,6 +230,15 @@ export default function ProfileScreen() {
       })
       .catch(() => {/* best-effort */});
   }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd, shareConversionFeedOptin]);
+
+  // Sync local text state with the persisted weightKg once on mount.
+  const weightSynced = useRef(false);
+  useEffect(() => {
+    if (!weightSynced.current) {
+      setWeightInput(String(weightKg));
+      weightSynced.current = true;
+    }
+  }, [weightKg]);
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
@@ -546,6 +558,34 @@ export default function ProfileScreen() {
               onSelect={setCyclingFrequency}
               placeholder={t('profile.howOften')}
             />
+
+            <View style={styles.weightRow}>
+              <View style={styles.weightLabelCol}>
+                <Text style={styles.settingLabel}>{t('profile.bodyWeight')}</Text>
+                <Text style={styles.settingDescription}>{t('profile.bodyWeightDesc')}</Text>
+              </View>
+              <View style={styles.weightInputWrap}>
+                <TextInput
+                  style={styles.weightInput}
+                  value={weightInput}
+                  onChangeText={setWeightInput}
+                  onBlur={() => {
+                    const parsed = parseInt(weightInput, 10);
+                    if (!isNaN(parsed)) {
+                      setWeightKg(parsed);
+                      setWeightInput(String(Math.round(Math.max(30, Math.min(300, parsed)))));
+                    } else {
+                      setWeightInput(String(weightKg));
+                    }
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  accessibilityLabel={t('profile.bodyWeight')}
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Text style={styles.weightUnit}>{t('profile.bodyWeightUnit')}</Text>
+              </View>
+            </View>
 
             <SettingRow
               label={t('profile.avoidUnpaved')}
@@ -1244,6 +1284,36 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textPrimary,
     },
     settingDescription: {
+      ...textSm,
+      color: colors.textSecondary,
+    },
+    weightRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: space[3],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderDefault,
+    },
+    weightLabelCol: { flex: 1, gap: space[1], marginRight: space[3] },
+    weightInputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+    },
+    weightInput: {
+      ...textBase,
+      color: colors.textPrimary,
+      backgroundColor: colors.bgSecondary,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+      borderRadius: radii.md,
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      minWidth: 56,
+      textAlign: 'center',
+    },
+    weightUnit: {
       ...textSm,
       color: colors.textSecondary,
     },

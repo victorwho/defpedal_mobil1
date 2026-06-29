@@ -2082,6 +2082,7 @@ export const buildV1Routes = (
         rideStartHour?: number;
         durationMinutes?: number;
         hadDestination?: boolean;
+        weightKg?: number;
       };
       Reply: RideImpact | ErrorResponse;
     }>(
@@ -2113,6 +2114,7 @@ export const buildV1Routes = (
               durationMinutes:  { type: 'number', minimum: 0, maximum: 1_440 },
               routeType:        { type: 'string', enum: ['safe', 'fast'] },
               hadDestination:   { type: 'boolean' },
+              weightKg:         { type: 'number', minimum: 10, maximum: 300 },
             },
           },
           response: {
@@ -2177,6 +2179,7 @@ export const buildV1Routes = (
           aqiLevel,
           rideStartHour,
           durationMinutes,
+          weightKg,
         } = request.body;
 
         // Compute calories — fetch bike_type from trip_tracks (non-fatal, defaults to acoustic)
@@ -2197,6 +2200,7 @@ export const buildV1Routes = (
           distanceMeters,
           (durationMinutes ?? 0) * 60,
           vehicleType,
+          weightKg,
         );
 
         // Call record_ride_impact RPC with full ride metadata

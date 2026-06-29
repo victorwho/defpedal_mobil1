@@ -399,6 +399,7 @@ export default function FeedbackScreen() {
     const co2 = distKm * 0.12;
     const money = distKm * 0.35;
     const vehicle = mapBikeTypeToVehicle(store.bikeType);
+    const weightKg = store.weightKg;
     const durationSeconds = session?.startedAt
       ? Math.max(0, Math.round((Date.now() - new Date(session.startedAt).getTime()) / 1000))
       : 0;
@@ -413,7 +414,7 @@ export default function FeedbackScreen() {
         : null,
       personalMicrolives: calculatePersonalMicrolives(distKm, vehicle, null),
       communitySeconds: calculateCommunitySeconds(distKm, vehicle),
-      caloriesBurned: calculateCaloriesBurned(distMeters, durationSeconds, vehicle),
+      caloriesBurned: calculateCaloriesBurned(distMeters, durationSeconds, vehicle, weightKg),
       newBadges: [],
       xpBreakdown: [],
       totalXpEarned: 0,
@@ -508,7 +509,7 @@ export default function FeedbackScreen() {
             result = await mobileApi.recordRideImpact(
               tripServerId,
               initialImpact.distanceMeters,
-              { hadDestination },
+              { hadDestination, weightKg: useAppStore.getState().weightKg },
             );
           } catch {
             // POST may 409 (already recorded) — fall back to GET
