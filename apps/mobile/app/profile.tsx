@@ -18,7 +18,7 @@ import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { useTheme, type ThemeColors } from '../src/design-system';
-import { gray } from '../src/design-system/tokens/colors';
+import { gray, safetyColors } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
@@ -64,6 +64,8 @@ export default function ProfileScreen() {
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [weightInput, setWeightInput] = useState('');
+  const [weightSaved, setWeightSaved] = useState(false);
+  const weightSavedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleAvatarPick = async () => {
     if (!user || !supabaseClient) return;
@@ -239,6 +241,23 @@ export default function ProfileScreen() {
       weightSynced.current = true;
     }
   }, [weightKg]);
+
+  // Clear the saved-flash timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (weightSavedTimer.current) clearTimeout(weightSavedTimer.current);
+    };
+  }, []);
+
+  const confirmWeight = useCallback(() => {
+    const parsed = parseInt(weightInput, 10);
+    const clamped = isNaN(parsed) ? weightKg : Math.round(Math.max(30, Math.min(300, parsed)));
+    setWeightKg(clamped);
+    setWeightInput(String(clamped));
+    setWeightSaved(true);
+    if (weightSavedTimer.current) clearTimeout(weightSavedTimer.current);
+    weightSavedTimer.current = setTimeout(() => setWeightSaved(false), 1500);
+  }, [weightInput, weightKg, setWeightKg]);
 
   const poiCategories = [
     { key: 'hydration' as const, label: t('profile.poiWater'), description: t('profile.poiWaterDesc') },
@@ -568,7 +587,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.weightInput}
                   value={weightInput}
-                  onChangeText={setWeightInput}
+                  onChangeText={(v) => { setWeightInput(v); setWeightSaved(false); }}
                   onBlur={() => {
                     const parsed = parseInt(weightInput, 10);
                     if (!isNaN(parsed)) {
@@ -584,6 +603,18 @@ export default function ProfileScreen() {
                   placeholderTextColor={colors.textSecondary}
                 />
                 <Text style={styles.weightUnit}>{t('profile.bodyWeightUnit')}</Text>
+                <Pressable
+                  onPress={confirmWeight}
+                  hitSlop={8}
+                  accessibilityLabel="Save weight"
+                  accessibilityRole="button"
+                >
+                  <Ionicons
+                    name={weightSaved ? 'checkmark-circle' : 'checkmark-circle-outline'}
+                    size={22}
+                    color={weightSaved ? safetyColors.safe : colors.textSecondary}
+                  />
+                </Pressable>
               </View>
             </View>
 
