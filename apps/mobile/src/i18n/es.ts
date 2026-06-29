@@ -942,6 +942,7 @@ export const es: TranslationKeys = {
     streakDayA11y: 'Día {{count}} de racha',
     lifeEarnedFmt: '+{{time}} de vida ganada',
     donatedSecondsFmt: '+{{seconds}}s donados a la ciudad',
+    caloriesBurned: 'Calorías quemadas',
   },
 
   // ── FAQ ──
@@ -1247,6 +1248,8 @@ export const es: TranslationKeys = {
     weekCo2Saved: 'CO2 ahorrado',
     weekSaved: 'Ahorrado',
     weekHazards: 'Peligros reportados',
+    weekCalories: 'Calorías quemadas',
+    totalCaloriesBurned: 'Calorías quemadas',
     quizTitle: 'Cuestionario diario de seguridad',
     quizSubtext: 'Responde para mantener tu racha',
     quizA11y: 'Haz el cuestionario diario',

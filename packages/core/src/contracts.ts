@@ -391,6 +391,7 @@ export interface TripHistoryItem {
   readonly startedAt: string;
   readonly endedAt: string | null;
   readonly distanceMeters?: number;
+  readonly caloriesBurned?: number;
 }
 
 export interface TripEndResponse {
@@ -887,6 +888,7 @@ export interface RideImpact {
   readonly equivalentText: string | null;
   readonly personalMicrolives: number;
   readonly communitySeconds: number;
+  readonly caloriesBurned: number;
   readonly newBadges: readonly BadgeUnlockEvent[];
   readonly xpBreakdown: readonly XpBreakdownItem[];
   readonly totalXpEarned: number;
@@ -920,11 +922,13 @@ export interface ImpactDashboard {
     readonly co2SavedKg: number;
     readonly moneySavedEur: number;
     readonly hazardsReported: number;
+    readonly caloriesBurned: number;
   };
   readonly totalMicrolives: number;
   readonly totalCommunitySeconds: number;
   readonly totalXp: number;
   readonly riderTier: RiderTierName;
+  readonly totalCaloriesBurned: number;
 }
 
 export interface QuizQuestion {

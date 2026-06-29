@@ -377,7 +377,7 @@ export const getTripHistory = async (
 
   const { data, error } = await supabaseAdmin
     .from('trip_tracks')
-    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at, ride_impacts(calories_burned)')
     .eq('user_id', userId)
     .order('started_at', { ascending: false })
     .limit(50);
@@ -386,20 +386,25 @@ export const getTripHistory = async (
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    tripId: row.trip_id as string,
-    routingMode: row.routing_mode as 'safe' | 'fast',
-    plannedRoutePolyline6: (row.planned_route_polyline6 as string) ?? undefined,
-    plannedRouteDistanceMeters: (row.planned_route_distance_meters as number) ?? undefined,
-    gpsBreadcrumbs: ((row.gps_trail as Array<{ lat: number; lon: number }>) ?? []).map(
-      (pt) => ({ lat: pt.lat, lon: pt.lon }),
-    ),
-    endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
-    startedAt: row.started_at as string,
-    endedAt: (row.ended_at as string) ?? null,
-    distanceMeters: (row.actual_distance_meters as number) ?? undefined,
-  }));
+  return (data ?? []).map((row: Record<string, unknown>) => {
+    const impactRows = row.ride_impacts as Array<{ calories_burned: number }> | null;
+    const calories = impactRows && impactRows.length > 0 ? Number(impactRows[0].calories_burned ?? 0) : undefined;
+    return {
+      id: row.id as string,
+      tripId: row.trip_id as string,
+      routingMode: row.routing_mode as 'safe' | 'fast',
+      plannedRoutePolyline6: (row.planned_route_polyline6 as string) ?? undefined,
+      plannedRouteDistanceMeters: (row.planned_route_distance_meters as number) ?? undefined,
+      gpsBreadcrumbs: ((row.gps_trail as Array<{ lat: number; lon: number }>) ?? []).map(
+        (pt) => ({ lat: pt.lat, lon: pt.lon }),
+      ),
+      endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
+      startedAt: row.started_at as string,
+      endedAt: (row.ended_at as string) ?? null,
+      distanceMeters: (row.actual_distance_meters as number) ?? undefined,
+      caloriesBurned: calories,
+    };
+  });
 };
 
 export type DeleteTripResult =

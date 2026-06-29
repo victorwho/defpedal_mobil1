@@ -951,6 +951,7 @@ export const en = {
     streakDayA11y: 'Streak day {{count}}',
     lifeEarnedFmt: '+{{time}} of life earned',
     donatedSecondsFmt: '+{{seconds}}s donated to city',
+    caloriesBurned: 'Calories burned',
   },
 
   // ── FAQ ──
@@ -1259,6 +1260,8 @@ export const en = {
     weekCo2Saved: 'CO2 saved',
     weekSaved: 'Saved',
     weekHazards: 'Hazards reported',
+    weekCalories: 'Calories burned',
+    totalCaloriesBurned: 'Calories burned',
     quizTitle: 'Daily Safety Quiz',
     quizSubtext: 'Answer to maintain your streak',
     quizA11y: "Take today's daily quiz",

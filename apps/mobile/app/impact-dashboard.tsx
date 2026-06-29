@@ -24,6 +24,7 @@ import { useBadges } from '../src/hooks/useBadges';
 import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
+import { safetyColors } from '../src/design-system/tokens/colors';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { space } from '../src/design-system/tokens/spacing';
 import {
@@ -277,6 +278,19 @@ export default function ImpactDashboardScreen() {
                 {t('impactDashboard.ridersProtectedSub')}
               </Text>
             </View>
+
+            {data.totalCaloriesBurned > 0 && (
+              <View style={styles.counterBlock}>
+                <AnimatedCounter
+                  targetValue={data.totalCaloriesBurned}
+                  suffix=" kcal"
+                  decimals={0}
+                  duration={1500}
+                  style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: safetyColors.caution }}
+                />
+                <Text style={styles.counterLabel}>{t('impactDashboard.totalCaloriesBurned')}</Text>
+              </View>
+            )}
           </View>
 
           {/* 3. This Week */}
@@ -307,6 +321,14 @@ export default function ImpactDashboardScreen() {
                 label={t('impactDashboard.weekHazards')}
                 styles={styles}
               />
+              {data.thisWeek.caloriesBurned > 0 && (
+                <StatTile
+                  value={String(Math.round(data.thisWeek.caloriesBurned))}
+                  unit="kcal"
+                  label={t('impactDashboard.weekCalories')}
+                  styles={styles}
+                />
+              )}
             </View>
           </View>
 

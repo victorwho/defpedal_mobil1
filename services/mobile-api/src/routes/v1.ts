@@ -29,7 +29,7 @@ import type {
   TiersResponse,
 } from '@defensivepedal/core';
 import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS, normalizeXpAwardResult } from '../lib/xp';
-import { getPreviewOrigin } from '@defensivepedal/core';
+import { getPreviewOrigin, calculateCaloriesBurned } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
@@ -648,6 +648,7 @@ export const buildV1Routes = (
                   plannedRoutePolyline6: { type: ['string', 'null'] },
                   plannedRouteDistanceMeters: { type: ['number', 'null'] },
                   distanceMeters: { type: ['number', 'null'] },
+                  caloriesBurned: { type: ['number', 'null'] },
                   gpsBreadcrumbs: {
                     type: 'array',
                     items: {
@@ -2118,7 +2119,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'caloriesBurned', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -2128,6 +2129,7 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
+                caloriesBurned: { type: 'number' },
                 newBadges: { type: 'array', items: rideImpactNewBadgeItemSchema },
                 xpBreakdown: { type: 'array', items: rideImpactXpBreakdownItemSchema },
                 totalXpEarned: { type: 'integer' },
@@ -2177,6 +2179,26 @@ export const buildV1Routes = (
           durationMinutes,
         } = request.body;
 
+        // Compute calories — fetch bike_type from trip_tracks (non-fatal, defaults to acoustic)
+        let vehicleType: 'acoustic' | 'ebike' = 'acoustic';
+        try {
+          const { data: trackMeta } = await supabaseAdmin
+            .from('trip_tracks')
+            .select('bike_type')
+            .eq('trip_id', tripId)
+            .single();
+          const bt = String(trackMeta?.bike_type ?? '').toLowerCase();
+          if (bt === 'ebike' || bt === 'electric' || bt.includes('e-bike')) {
+            vehicleType = 'ebike';
+          }
+        } catch { /* non-fatal */ }
+
+        const caloriesBurned = calculateCaloriesBurned(
+          distanceMeters,
+          (durationMinutes ?? 0) * 60,
+          vehicleType,
+        );
+
         // Call record_ride_impact RPC with full ride metadata
         const { data, error } = await supabaseAdmin.rpc('record_ride_impact', {
           p_trip_id: tripId,
@@ -2189,6 +2211,7 @@ export const buildV1Routes = (
           p_aqi_level:         aqiLevel        ?? null,
           p_ride_start_hour:   rideStartHour   ?? null,
           p_duration_minutes:  durationMinutes  ?? 0,
+          p_calories_burned:   caloriesBurned,
         });
 
         if (error) {
@@ -2522,6 +2545,7 @@ export const buildV1Routes = (
           equivalentText,
           personalMicrolives,
           communitySeconds,
+          caloriesBurned,
           newBadges,
           xpBreakdown,
           totalXpEarned,
@@ -2549,7 +2573,7 @@ export const buildV1Routes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
+              required: ['tripId', 'co2SavedKg', 'moneySavedEur', 'hazardsWarnedCount', 'distanceMeters', 'equivalentText', 'personalMicrolives', 'communitySeconds', 'caloriesBurned', 'newBadges', 'xpBreakdown', 'totalXpEarned', 'currentTotalXp', 'riderTier', 'tierPromotion'],
               properties: {
                 tripId: { type: 'string' },
                 co2SavedKg: { type: 'number' },
@@ -2559,6 +2583,7 @@ export const buildV1Routes = (
                 equivalentText: { type: ['string', 'null'] },
                 personalMicrolives: { type: 'number' },
                 communitySeconds: { type: 'number' },
+                caloriesBurned: { type: 'number' },
                 newBadges: { type: 'array', items: rideImpactNewBadgeItemSchema },
                 xpBreakdown: { type: 'array', items: rideImpactXpBreakdownItemSchema },
                 totalXpEarned: { type: 'integer' },
@@ -2597,7 +2622,7 @@ export const buildV1Routes = (
 
         const { data, error } = await supabaseAdmin
           .from('ride_impacts')
-          .select('trip_id, co2_saved_kg, money_saved_eur, hazards_warned_count, distance_meters')
+          .select('trip_id, co2_saved_kg, money_saved_eur, hazards_warned_count, distance_meters, calories_burned')
           .eq('trip_id', request.params.tripId)
           .eq('user_id', user.id)
           .single();
@@ -2620,12 +2645,17 @@ export const buildV1Routes = (
           }
 
           const distMeters = Number(track.actual_distance_meters ?? track.planned_route_distance_meters ?? 0);
+          const autoBt = String(track.bike_type ?? '').toLowerCase();
+          const autoVehicle: 'acoustic' | 'ebike' =
+            (autoBt === 'ebike' || autoBt === 'electric' || autoBt.includes('e-bike')) ? 'ebike' : 'acoustic';
+          const autoCalories = calculateCaloriesBurned(distMeters, 0, autoVehicle);
 
           // Auto-record the impact
           const { data: created } = await supabaseAdmin.rpc('record_ride_impact', {
             p_trip_id: request.params.tripId,
             p_user_id: user.id,
             p_distance_meters: distMeters,
+            p_calories_burned: autoCalories,
           });
 
           const createdRow = Array.isArray(created) ? created[0] : created;
@@ -2639,6 +2669,7 @@ export const buildV1Routes = (
               money_saved_eur: distMeters / 1000 * 0.35,
               hazards_warned_count: 0,
               distance_meters: distMeters,
+              calories_burned: autoCalories,
             };
           }
 
@@ -2755,6 +2786,7 @@ export const buildV1Routes = (
           equivalentText,
           personalMicrolives,
           communitySeconds,
+          caloriesBurned: Number((impactRow as Record<string, unknown>).calories_burned ?? 0),
           newBadges: newBadgesFromCheck,
           xpBreakdown,
           totalXpEarned,
@@ -2787,7 +2819,7 @@ export const buildV1Routes = (
                 'streak', 'totalCo2SavedKg', 'totalMoneySavedEur',
                 'totalHazardsReported', 'totalRidersProtected',
                 'thisWeek', 'totalMicrolives', 'totalCommunitySeconds',
-                'totalXp', 'riderTier',
+                'totalXp', 'riderTier', 'totalCaloriesBurned',
               ],
               properties: {
                 streak: {
@@ -2810,15 +2842,17 @@ export const buildV1Routes = (
                 totalCommunitySeconds: { type: 'number' },
                 totalXp: { type: 'integer' },
                 riderTier: { type: 'string' },
+                totalCaloriesBurned: { type: 'number' },
                 thisWeek: {
                   type: 'object',
                   additionalProperties: false,
-                  required: ['rides', 'co2SavedKg', 'moneySavedEur', 'hazardsReported'],
+                  required: ['rides', 'co2SavedKg', 'moneySavedEur', 'hazardsReported', 'caloriesBurned'],
                   properties: {
                     rides: { type: 'integer' },
                     co2SavedKg: { type: 'number' },
                     moneySavedEur: { type: 'number' },
                     hazardsReported: { type: 'integer' },
+                    caloriesBurned: { type: 'number' },
                   },
                 },
               },
@@ -2888,6 +2922,7 @@ export const buildV1Routes = (
         let weekCo2 = Number(thisWeek?.co2SavedKg ?? 0);
         let weekMoney = Number(thisWeek?.moneySavedEur ?? 0);
         const weekHazards = Number(thisWeek?.hazardsReported ?? 0);
+        const weekCalories = Number(thisWeek?.caloriesBurned ?? 0);
 
         // Fallback: if thisWeek from ride_impacts is empty, compute from trips table
         if (weekRides === 0 && totalCo2 > 0) {
@@ -2920,6 +2955,7 @@ export const buildV1Routes = (
             co2SavedKg: weekCo2,
             moneySavedEur: weekMoney,
             hazardsReported: weekHazards,
+            caloriesBurned: weekCalories,
           },
           totalMicrolives: Number(totals?.totalMicrolives ?? 0) > 0
             ? Number(totals?.totalMicrolives ?? 0)
@@ -2929,6 +2965,7 @@ export const buildV1Routes = (
             : totalCo2 > 0 ? (totalCo2 / 0.12) * 4.5 : 0,  // 4.5 sec/km
           totalXp: Number(d.totalXp ?? 0),
           riderTier: String(d.riderTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
+          totalCaloriesBurned: Number(d.totalCaloriesBurned ?? 0),
         };
       },
     );

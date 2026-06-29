@@ -1,5 +1,5 @@
 import type { BadgeUnlockEvent, RideImpact } from '@defensivepedal/core';
-import { formatMicrolivesAsTime } from '@defensivepedal/core';
+import { calorieEquivalent, formatMicrolivesAsTime } from '@defensivepedal/core';
 import { riderTiers, getTierProgress, getNextTier, type RiderTierKey } from '../design-system/tokens/tierColors';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
@@ -308,6 +308,15 @@ export const ImpactSummaryCard = ({
           equivalentText={null}
           color={brandColors.accent}
           delayMs={staggerDelayMs * 2}
+        />
+        <StaggeredCounter
+          targetValue={rideImpact.caloriesBurned}
+          decimals={0}
+          suffix=" kcal"
+          label={t('impact.caloriesBurned')}
+          equivalentText={calorieEquivalent(rideImpact.caloriesBurned)}
+          color="#F97316"
+          delayMs={staggerDelayMs * 3}
         />
       </View>
     </View>

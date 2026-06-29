@@ -942,6 +942,7 @@ export const ro: TranslationKeys = {
     streakDayA11y: 'Streak ziua {{count}}',
     lifeEarnedFmt: '+{{time}} de viață câștigată',
     donatedSecondsFmt: '+{{seconds}}s donate orașului',
+    caloriesBurned: 'Calorii arse',
   },
 
   // ── FAQ ──
@@ -1247,6 +1248,8 @@ export const ro: TranslationKeys = {
     weekCo2Saved: 'CO2 economisit',
     weekSaved: 'Economisit',
     weekHazards: 'Pericole raportate',
+    weekCalories: 'Calorii arse',
+    totalCaloriesBurned: 'Calorii arse',
     quizTitle: 'Quiz zilnic de siguranță',
     quizSubtext: 'Răspunde ca să-ți menții seria',
     quizA11y: 'Începe quizul zilnic',

@@ -1,5 +1,5 @@
 import type { TripHistoryItem } from '@defensivepedal/core';
-import { calculateCo2SavedKg, calculateTrailDistanceMeters, decodePolyline } from '@defensivepedal/core';
+import { calculateCo2SavedKg, calculateTrailDistanceMeters, decodePolyline, formatCaloriesBurned } from '@defensivepedal/core';
 import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -131,6 +131,12 @@ export const TripCard = memo(({
               ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
               : trip.plannedRouteDistanceMeters ?? 0
           )} size="sm" />
+          {(trip.caloriesBurned ?? 0) > 0 && (
+            <View style={styles.metric}>
+              <Ionicons name="flame-outline" size={14} color={gray[400]} />
+              <Text style={styles.metricText}>{formatCaloriesBurned(trip.caloriesBurned!)}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.badgeCol}>
