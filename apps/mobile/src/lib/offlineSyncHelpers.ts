@@ -30,7 +30,7 @@ export const BACKOFF_JITTER_RATIO = 0.25;
 export const MUTATION_SYNC_TIMEOUT_MS_BY_TYPE: Record<QueuedMutation['type'], number> = {
   trip_start: 30_000,
   trip_end: 30_000,
-  trip_track: 30_000,
+  trip_track: 60_000,
   trip_share: 15_000,
   hazard: 10_000,
   hazard_vote: 10_000,

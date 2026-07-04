@@ -96,11 +96,11 @@ function NavigationScreen() {
     });
     return () => {
       if (!active) return;
-      try {
-        deactivateKeepAwake(KEEP_AWAKE_TAG);
-      } catch {
-        // Already deactivated or native module gone — nothing to do.
-      }
+      // deactivateKeepAwake is typed void but the underlying native call
+      // resolves asynchronously — wrapping in Promise.resolve catches any
+      // rejection (e.g. "activity no longer available") that a try/catch
+      // misses on a non-awaited call (MOBILE-4).
+      void Promise.resolve(deactivateKeepAwake(KEEP_AWAKE_TAG)).catch(() => {});
     };
   }, []);
 
