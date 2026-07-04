@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ import {
 } from '../../src/design-system/tokens/typography';
 import { useAppStore } from '../../src/store/appStore';
 import { useSkipOnboarding } from '../../src/hooks/useSkipOnboarding';
+import { navigateAfterOnboarding } from '../../src/lib/post-onboarding-nav';
 import { useT } from '../../src/hooks/useTranslation';
 import {
   posthogConfigured,
@@ -46,6 +46,9 @@ export default function OnboardingConsentScreen() {
   const t = useT();
 
   const setAnalyticsConsent = useAppStore((s) => s.setAnalyticsConsent);
+  const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
+  const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
   const skipOnboarding = useSkipOnboarding();
   const persistedSentry = useAppStore((s) => s.analyticsConsent.sentry);
   const persistedPosthog = useAppStore((s) => s.analyticsConsent.posthog);
@@ -74,7 +77,12 @@ export default function OnboardingConsentScreen() {
       sentry: sentryConfigured ? crashReports : false,
       posthog: posthogConfigured ? productAnalytics : false,
     });
-    router.push('/onboarding/safety-score');
+    const wasInitialOnboarding = !onboardingCompleted;
+    setOnboardingCompleted(true);
+    if (wasInitialOnboarding) {
+      resetAnonymousOpenCount();
+    }
+    navigateAfterOnboarding();
   };
 
   return (
