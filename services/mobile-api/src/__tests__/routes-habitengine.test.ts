@@ -406,6 +406,8 @@ describe('POST /v1/rides/:tripId/impact', () => {
       error: null,
     });
 
+    // Mock trip_tracks bike_type lookup (for calorie calculation — non-fatal)
+    mockFrom.mockReturnValueOnce(chainResult(null));
     // Mock reward_equivalents query
     mockFrom.mockReturnValueOnce(chainResult([
       { equivalent_text: 'Equivalent to planting 1 tree' },
@@ -433,6 +435,8 @@ describe('POST /v1/rides/:tripId/impact', () => {
       data: [{ co2_saved_kg: 0.6, money_saved_eur: 1.75, hazards_warned_count: 0, distance_meters: 5000 }],
       error: null,
     });
+    // Mock trip_tracks bike_type lookup (for calorie calculation — non-fatal)
+    mockFrom.mockReturnValueOnce(chainResult(null));
     mockFrom.mockReturnValueOnce(chainResult([]));
 
     await app.inject({
@@ -453,6 +457,7 @@ describe('POST /v1/rides/:tripId/impact', () => {
       p_aqi_level: null,
       p_ride_start_hour: null,
       p_duration_minutes: 0,
+      p_calories_burned: 0,
     });
   });
 
