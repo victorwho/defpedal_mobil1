@@ -377,7 +377,7 @@ export const getTripHistory = async (
 
   const { data, error } = await supabaseAdmin
     .from('trip_tracks')
-    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at, ride_impacts(calories_burned)')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at')
     .eq('user_id', userId)
     .order('started_at', { ascending: false })
     .limit(50);
@@ -386,25 +386,37 @@ export const getTripHistory = async (
     throw new Error(error.message);
   }
 
-  return (data ?? []).map((row: Record<string, unknown>) => {
-    const impactRows = row.ride_impacts as Array<{ calories_burned: number }> | null;
-    const calories = impactRows && impactRows.length > 0 ? Number(impactRows[0].calories_burned ?? 0) : undefined;
-    return {
-      id: row.id as string,
-      tripId: row.trip_id as string,
-      routingMode: row.routing_mode as 'safe' | 'fast',
-      plannedRoutePolyline6: (row.planned_route_polyline6 as string) ?? undefined,
-      plannedRouteDistanceMeters: (row.planned_route_distance_meters as number) ?? undefined,
-      gpsBreadcrumbs: ((row.gps_trail as Array<{ lat: number; lon: number }>) ?? []).map(
-        (pt) => ({ lat: pt.lat, lon: pt.lon }),
-      ),
-      endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
-      startedAt: row.started_at as string,
-      endedAt: (row.ended_at as string) ?? null,
-      distanceMeters: (row.actual_distance_meters as number) ?? undefined,
-      caloriesBurned: calories,
-    };
-  });
+  const rows = data ?? [];
+
+  // ride_impacts.trip_id → trips.id, not → trip_tracks.id, so PostgREST cannot
+  // do an embedded resource join from trip_tracks. Fetch calories separately.
+  const caloriesMap = new Map<string, number>();
+  const tripIds = rows.map((r) => r.trip_id as string).filter(Boolean);
+  if (tripIds.length > 0) {
+    const { data: impactData } = await supabaseAdmin
+      .from('ride_impacts')
+      .select('trip_id, calories_burned')
+      .in('trip_id', tripIds);
+    for (const impact of impactData ?? []) {
+      caloriesMap.set(impact.trip_id as string, Number(impact.calories_burned ?? 0));
+    }
+  }
+
+  return rows.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    tripId: row.trip_id as string,
+    routingMode: row.routing_mode as 'safe' | 'fast',
+    plannedRoutePolyline6: (row.planned_route_polyline6 as string) ?? undefined,
+    plannedRouteDistanceMeters: (row.planned_route_distance_meters as number) ?? undefined,
+    gpsBreadcrumbs: ((row.gps_trail as Array<{ lat: number; lon: number }>) ?? []).map(
+      (pt) => ({ lat: pt.lat, lon: pt.lon }),
+    ),
+    endReason: row.end_reason as 'completed' | 'stopped' | 'app_killed' | 'in_progress',
+    startedAt: row.started_at as string,
+    endedAt: (row.ended_at as string) ?? null,
+    distanceMeters: (row.actual_distance_meters as number) ?? undefined,
+    caloriesBurned: caloriesMap.get(row.trip_id as string),
+  }));
 };
 
 export type DeleteTripResult =
