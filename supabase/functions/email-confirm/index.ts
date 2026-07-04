@@ -6,7 +6,7 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 // schemes (defensivepedal://) cannot be opened directly from email clients.
 // This function receives the HTTPS redirect from /auth/v1/verify, then:
 //   - Android browser → intent:// URI (Chrome handles natively, no JS)
-//   - iOS browser → custom-scheme 302 redirect (OS opens the app)
+//   - iOS browser → HTML intermediate page; JS opens the app or shows App Store link
 //   - Desktop/other → branded "email confirmed" HTML page telling the
 //     user to open the app on their phone
 //
@@ -83,13 +83,69 @@ Deno.serve((req: Request): Response => {
     });
   }
 
-  // iOS
+  // iOS: serve an HTML intermediate page instead of a bare custom-scheme 302.
+  // A bare 302 to defensivepedal:// causes SFSafariViewController (used by
+  // Gmail and other iOS apps) to show "Safari cannot open the page because the
+  // address is invalid" when the Defensive Pedal app is not installed, because
+  // iOS treats an unrecognised URL scheme as a navigation error. The HTML page
+  // triggers the same window.location redirect via JavaScript so the app opens
+  // if it is installed, while showing a helpful download button otherwise.
   const customSchemeUrl = `${scheme}://${targetPath}`;
+  const appStoreUrl = 'https://apps.apple.com/app/id6778694757';
+  // Two separate escape contexts:
+  // - HTML attributes (href): & → &amp;  " → &quot;
+  // - JS string literal inside <script>: \ → \\  " → \"  < → <
+  //   (HTML entities are NOT decoded inside <script> raw-text elements)
+  const htmlAttrUrl = customSchemeUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const jsStringUrl = customSchemeUrl
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/</g, '\\u003c');
 
-  return new Response(null, {
-    status: 302,
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Opening Defensive Pedal…</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0b0d10;
+     color:#f9fafb;display:flex;align-items:center;justify-content:center;
+     min-height:100vh;margin:0;padding:20px;box-sizing:border-box}
+.card{text-align:center;max-width:320px}
+h1{font-size:18px;font-weight:700;margin:0 0 8px}
+p{font-size:14px;color:#9ca3af;margin:0 0 24px;line-height:1.5}
+.btn{display:inline-block;padding:14px 28px;background:#d4a843;color:#0b0d10;
+     border-radius:12px;font-weight:700;text-decoration:none;font-size:15px}
+#store{margin-top:20px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Opening Defensive Pedal…</h1>
+  <p>Tap the button below if the app does not open automatically.</p>
+  <a class="btn" href="${htmlAttrUrl}">Open in app</a>
+  <div id="store" style="display:none">
+    <p style="margin-top:20px">App not installed? Download it first, then tap the link in your email again.</p>
+    <a class="btn" href="${appStoreUrl}">Download on the App Store</a>
+  </div>
+</div>
+<script>
+(function(){
+  try { window.location = "${jsStringUrl}"; } catch(e) {}
+  setTimeout(function(){
+    var s = document.getElementById('store');
+    if (s) s.style.display = 'block';
+  }, 2000);
+})();
+</script>
+</body>
+</html>`;
+
+  return new Response(html, {
+    status: 200,
     headers: {
-      location: customSchemeUrl,
+      'content-type': 'text/html; charset=utf-8',
       'cache-control': 'no-store',
     },
   });
