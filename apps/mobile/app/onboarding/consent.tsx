@@ -112,22 +112,18 @@ export default function OnboardingConsentScreen() {
         </View>
 
         <View style={styles.card}>
-          {sentryConfigured ? (
-            <SettingRow
-              label={t('onboardingConsent.crashLabel')}
-              description={t('onboardingConsent.crashDescription')}
-              checked={crashReports}
-              onChange={setCrashReports}
-            />
-          ) : null}
-          {posthogConfigured ? (
-            <SettingRow
-              label={t('onboardingConsent.analyticsLabel')}
-              description={t('onboardingConsent.analyticsDescription')}
-              checked={productAnalytics}
-              onChange={setProductAnalytics}
-            />
-          ) : null}
+          <SettingRow
+            label={t('onboardingConsent.crashLabel')}
+            description={t('onboardingConsent.crashDescription')}
+            checked={crashReports}
+            onChange={setCrashReports}
+          />
+          <SettingRow
+            label={t('onboardingConsent.analyticsLabel')}
+            description={t('onboardingConsent.analyticsDescription')}
+            checked={productAnalytics}
+            onChange={setProductAnalytics}
+          />
           <View style={styles.assuranceRow}>
             <Ionicons
               name="lock-closed-outline"
