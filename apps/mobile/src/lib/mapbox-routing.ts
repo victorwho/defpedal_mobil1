@@ -17,7 +17,7 @@ import type {
   RoutePreviewResponse,
   SupportedCountry,
 } from '@defensivepedal/core';
-import { encodePolyline, extractRouteFeatures, isRouteSupported } from '@defensivepedal/core';
+import { encodePolyline, extractRouteFeatures, haversineDistance, isRouteSupported } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -52,6 +52,12 @@ const OSRM_BASES: Record<SupportedCountry, { safe: string; flat: string }> = {
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
 const REQUEST_TIMEOUT_MS = 15_000;
+
+// Mapbox Directions API rejects cycling routes whose straight-line origin→
+// destination distance exceeds ~400km with HTTP 422 "Route exceeds maximum
+// distance limitation". Guard both the main fast/flat fetch and the
+// safe-vs-fast comparison fetch to suppress MOBILE-2 / MOBILE-C Sentry noise.
+const MAPBOX_MAX_STRAIGHT_LINE_M = 400_000;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -403,6 +409,14 @@ export const directPreviewRoute = async (
   const source: 'custom_osrm' | 'mapbox' =
     effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
 
+  // Fast/flat mode uses Mapbox Directions, which rejects routes > ~400km
+  // straight-line distance (MOBILE-C). Fail fast with a clear message.
+  if (effectiveMode !== 'safe' && haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
+    throw new Error(
+      'Route is too long for fast routing. Please switch to Safe routing.',
+    );
+  }
+
   const rawRoutes =
     effectiveMode === 'safe' && support.supported
       ? await fetchOsrmRoutes(
@@ -461,12 +475,17 @@ export const directPreviewRoute = async (
       let comparisonSegments: readonly RiskSegment[] = [];
 
       if (effectiveMode === 'safe') {
+        // Skip comparison for very long routes — Mapbox 422s at > ~400km (MOBILE-2)
+        if (haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
+          // Leave comparisonLabel undefined; no label for extreme-distance routes.
+        } else {
         // Fetch fast route for comparison
         const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
         if (fastRawRoutes.length > 0) {
           const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0, locale);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
           comparisonSegments = fastEnriched.riskSegments;
+        }
         }
       } else {
         // Fetch safe route for comparison — guarded by support.supported above
