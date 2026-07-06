@@ -50,7 +50,7 @@
     "expo-sqlite": "~55.0.10",
     "expo-status-bar": "~55.0.4",
     "expo-store-review": "~55.0.14",
-    "expo-task-manager": "~55.0.9",
+    "expo-task-manager": "~57.0.2",
     "expo-updates": "~55.0.21",
     "expo-web-browser": "~55.0.9",
     "posthog-react-native": "^4.37.3",
