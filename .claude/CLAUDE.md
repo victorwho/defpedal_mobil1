@@ -37,9 +37,10 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - Production URL: `https://defpedal-api-1081412761678.europe-central2.run.app`
 - GCP Project: `gen-lang-client-0895796477`
 - Region: `europe-central2`
-- Build image: `gcloud builds submit --config cloudbuild.yaml --timeout=600`
-- Deploy new revision: `gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated`
+- Build image: `gcloud builds submit --config cloudbuild.yaml --timeout=600 --project gen-lang-client-0895796477`
+- Deploy new revision: `gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated --project gen-lang-client-0895796477`
 - **Important:** `gcloud builds submit` only pushes the image. You MUST also run `gcloud run deploy` to create a new revision, otherwise Cloud Run keeps serving the old code.
+- **ALWAYS pass `--project gen-lang-client-0895796477` explicitly** — the machine's gcloud global default is `osrmro1` (the OSRM VMs project; don't change it). Without the flag, the build runs in osrmro1, compiles for ~4 min, then fails at image-push with `artifactregistry.repositories.uploadArtifacts` denied (error-log #61).
 - **Security:** `DEV_AUTH_BYPASS_ENABLED=false` on Cloud Run (disabled 2026-04-11, revision 00044). Do NOT re-enable in production. Defense-in-depth: as of revision 00074-dzg (2026-05-06), `services/mobile-api/src/lib/auth.ts` also refuses bypass when `process.env.NODE_ENV === 'production'`, and the Dockerfile bakes `ENV NODE_ENV=production` so the gate fires regardless of Cloud Run env config.
 - **Startup validation:** Server boots through `validateConfig()` in `config.ts`. Required env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `MAPBOX_ACCESS_TOKEN`. In production, missing vars → `process.exit(1)` before `app.listen()`. Avoids the "boots with null clients, fails per-request as confusing 401s" failure mode.
 
