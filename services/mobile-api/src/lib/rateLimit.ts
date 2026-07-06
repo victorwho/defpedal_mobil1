@@ -19,6 +19,10 @@ export type RateLimitPolicies = {
   // Free-text suggestion submissions — tight bucket because each row is a
   // human-review cost and the surface is abuse-prone.
   citySuggestion: RateLimitPolicy;
+  // Follow-graph writes (follow/unfollow/approve/decline) — bounded so one
+  // account cannot mass-follow to spam push notifications or churn
+  // follower counts (audit 2026-07-05 SEC-2).
+  follow: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {

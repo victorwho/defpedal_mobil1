@@ -470,9 +470,9 @@ function RoutePreviewScreen() {
       next: RoutingDisplay;
     }
   > = {
-    safe: { label: 'Safe', variant: 'risk-safe', next: 'fast' },
-    fast: { label: 'Fast', variant: 'info', next: 'flat' },
-    flat: { label: 'Flat', variant: 'accent', next: 'safe' },
+    safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
+    fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
+    flat: { label: t('planning.flat'), variant: 'accent', next: 'safe' },
   };
 
   const cycleRoutingMode = useCallback(() => {
@@ -505,8 +505,8 @@ function RoutePreviewScreen() {
     <PressableScale
       onPress={cycleRoutingMode}
       accessibilityRole="button"
-      accessibilityLabel={`Routing: ${currentMode.label}. Tap to switch to ${nextMode.label}.`}
-      accessibilityHint="Recomputes the route with the new profile"
+      accessibilityLabel={t('preview.modeCycleA11y', { current: currentMode.label, next: nextMode.label })}
+      accessibilityHint={t('preview.modeCycleHint')}
       hapticOnPress="snap"
       hitSlop={8}
       disabled={modeCycleDisabled}
@@ -516,7 +516,7 @@ function RoutePreviewScreen() {
         size="md"
         icon={
           isCyclingMode ? (
-            <Spinner size={16} accessibilityLabel="Recomputing route" />
+            <Spinner size={16} accessibilityLabel={t('preview.recomputingA11y')} />
           ) : (
             <Ionicons
               name="swap-horizontal"
@@ -526,7 +526,7 @@ function RoutePreviewScreen() {
           )
         }
       >
-        {longLabel ? `${currentMode.label} routing` : currentMode.label}
+        {longLabel ? t('preview.modeRoutingLong', { mode: currentMode.label }) : currentMode.label}
       </Badge>
     </PressableScale>
   );

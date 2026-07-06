@@ -49,6 +49,14 @@ export const es: TranslationKeys = {
     safe: 'Seguro',
     fast: 'Rápido',
     flat: 'Llano',
+    searchPlaceholder: '¿A dónde vamos?',
+    searchPlaceholderOffline: 'Conéctate a internet para buscar',
+    searchStartPlaceholder: 'Busca otro punto de partida',
+    searchStopPlaceholder: 'Busca una parada',
+    customStartLabel: 'Salida personalizada',
+    hazardDescribeTitle: 'Describe el peligro',
+    hazardDescribeSubtitle: 'Opcional — una nota breve ayuda a otros ciclistas.',
+    hazardDescribePlaceholder: 'p. ej. perro suelto, cristales, puerta cerrada…',
     savedRoutes: 'Rutas guardadas',
     reportHazard: 'Reportar peligro',
     centerLocation: 'Centrar en mi ubicación',
@@ -62,6 +70,10 @@ export const es: TranslationKeys = {
 
   // ── Route Preview ──
   preview: {
+    modeCycleA11y: 'Ruta: {{current}}. Toca para cambiar a {{next}}.',
+    modeCycleHint: 'Recalcula la ruta con el nuevo perfil',
+    recomputingA11y: 'Recalculando la ruta',
+    modeRoutingLong: 'Ruta {{mode}}',
     startNavigation: 'Iniciar navegación',
     returnToNavigation: 'Volver a la navegación',
     switchToSafe: 'Cambiar a ruta segura',
@@ -98,6 +110,9 @@ export const es: TranslationKeys = {
 
   // ── Navigation ──
   nav: {
+    noActiveTitle: 'Sin navegación activa',
+    noActiveBody: 'Elige un destino y previsualiza una ruta para empezar a navegar.',
+    returnToPreview: 'Volver a la vista previa',
     arrived: 'Has llegado a tu destino.',
     inMeters: 'En {{distance}} metros, {{instruction}}',
     thenInMeters: ', después en {{distance}} metros, {{instruction}}',
@@ -584,6 +599,7 @@ export const es: TranslationKeys = {
   // ── City Heartbeat ──
   cityHeartbeat: {
     title: 'Pulso de la ciudad',
+    loadFailed: 'No pudimos cargar el pulso de tu ciudad',
     cardTitle: 'Pulso de la ciudad',
     cardSub: 'Actividad en directo, tendencias, peligros y mejores ciclistas',
     todayPulse: 'PULSO DE HOY',
@@ -693,6 +709,8 @@ export const es: TranslationKeys = {
     saveAsHome: 'Establecer como Casa',
     saveAsWork: 'Establecer como Trabajo',
     savedPlaces: 'Lugares guardados',
+    selectA11y: 'Seleccionar {{name}}',
+    saveHintA11y: 'Mantén pulsado para guardar como Casa o Trabajo',
   },
 
   // ── Weather ──
@@ -747,6 +765,19 @@ export const es: TranslationKeys = {
     keepItUp: '¡Sigue así!',
     startChain: '¡Empieza tu racha hoy!',
     longest: 'Más larga:',
+    a11yLabel: 'Racha de {{days}} días, {{tier}}',
+    dormant: 'Inactiva',
+  },
+
+  // ── Streak tier names ──
+  streakTier: {
+    kindling: 'Yesca',
+    spark: 'Chispa',
+    commute: 'Hábito de trayecto',
+    endurance: 'Medio maratón sobre ruedas',
+    binary: 'Año binario',
+    century: 'Centenario',
+    legend: 'Leyenda',
   },
 
   // ── Guardian Tiers ──
@@ -925,8 +956,8 @@ export const es: TranslationKeys = {
     usernameHint: 'Mínimo 3 caracteres. Solo letras, números y guion bajo.',
     almostThere: 'Ya casi',
     createYourAccount: 'Crea tu cuenta',
-    signupSubMandatory: 'Crea una cuenta para seguir usando Defensive Pedal y sincronizar tus rutas a partir de ahora.',
-    signupSub: 'Sincroniza tus rutas, gana rachas y únete a la comunidad. Siempre puedes hacerlo más tarde.',
+    signupSubMandatory: 'Crea una cuenta para continuar — tus rutas, rachas e insignias se transfieren a ella.',
+    signupSub: 'Tus rutas, rachas e insignias se conservan. Sincronízalas y únete a la comunidad. Siempre puedes hacerlo más tarde.',
     percentComplete: '{{percent}}% completado',
     continueWithGoogle: 'Continuar con Google',
     or: 'o',
@@ -977,6 +1008,9 @@ export const es: TranslationKeys = {
   // ── Achievements / Trophy Case ──
   achievements: {
     screenTitle: 'Logros',
+    loadFailed: 'No pudimos cargar tus insignias',
+    loadFailedSub: 'Revisa tu conexión e inténtalo de nuevo',
+    holoA11y: 'Insignia holográfica',
     yourAchievements: 'TUS LOGROS',
     moreToUnlock: '+ {{count}} por desbloquear',
     emptyAllTitle: 'Aún ninguna insignia — vamos a por la primera.',

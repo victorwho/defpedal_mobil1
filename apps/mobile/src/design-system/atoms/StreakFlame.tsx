@@ -36,6 +36,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useT } from '../../hooks/useTranslation';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { Mascot } from './Mascot';
 import type { MascotPose } from '../tokens/mascotPoses';
@@ -176,9 +177,13 @@ export function StreakFlame({
   style,
   testID,
 }: StreakFlameProps): React.ReactElement {
+  const t = useT();
   const tier = getTierForStreak(streakDays);
   const dormant = streakDays <= 0;
   const dims = SIZE_MAP[size];
+  // Audit 2026-07-05 UX-7/UX-9: localized tier name — core's `label` is
+  // English-only, so RO/ES riders (and their screen readers) got English.
+  const tierName = t(`streakTier.${tier.tier}`);
 
   const flameColor = dormant ? DORMANT_HEX : FLAME_HEX[tier.flameColor];
   const numberColor = dormant ? DORMANT_HEX : flameColor;
@@ -195,7 +200,7 @@ export function StreakFlame({
     <View
       style={[styles.row, style]}
       testID={testID}
-      accessibilityLabel={`Streak ${displayNumber} days, ${tier.label}`}
+      accessibilityLabel={t('streak.a11yLabel', { days: displayNumber, tier: tierName })}
     >
       <FlameIcon
         size={dims.iconPx}
@@ -213,7 +218,7 @@ export function StreakFlame({
       </Text>
       {showPose ? <Mascot pose={pose} width={dims.mascotWidth} /> : null}
       {showLabel ? (
-        <Text style={styles.label}>{dormant ? 'Dormant' : tier.label}</Text>
+        <Text style={styles.label}>{dormant ? t('streak.dormant') : tierName}</Text>
       ) : null}
     </View>
   );

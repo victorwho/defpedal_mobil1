@@ -63,13 +63,20 @@ vi.mock('../../atoms/Spinner', () => {
 });
 
 vi.mock('../../../hooks/useTranslation', () => ({
-  useT: () => (key: string) => {
+  useT: () => (key: string, vars?: Record<string, string | number>) => {
     const translations: Record<string, string> = {
       'search.recent': 'Recent',
       'search.searching': 'Searching...',
       'search.noMatches': 'No results found',
+      'search.selectA11y': 'Select {{name}}',
+      'search.saveHintA11y': 'Long-press to save as Home or Work',
+      'common.cancel': 'Cancel',
     };
-    return translations[key] ?? key;
+    const raw = translations[key] ?? key;
+    if (!vars) return raw;
+    return raw.replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
+      vars[name] !== undefined ? String(vars[name]) : `{{${name}}}`,
+    );
   },
 }));
 

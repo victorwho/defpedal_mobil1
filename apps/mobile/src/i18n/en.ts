@@ -47,6 +47,14 @@ export const en = {
     safe: 'Safe',
     fast: 'Fast',
     flat: 'Flat',
+    searchPlaceholder: 'Where to?',
+    searchPlaceholderOffline: 'Connect to internet to search',
+    searchStartPlaceholder: 'Search a different start point',
+    searchStopPlaceholder: 'Search for a stop',
+    customStartLabel: 'Custom start',
+    hazardDescribeTitle: 'Describe the hazard',
+    hazardDescribeSubtitle: 'Optional — a short note helps other cyclists.',
+    hazardDescribePlaceholder: 'e.g. loose dog, glass shards, closed gate…',
     savedRoutes: 'Saved routes',
     reportHazard: 'Report hazard',
     centerLocation: 'Center on current location',
@@ -60,6 +68,10 @@ export const en = {
 
   // ── Route Preview ──
   preview: {
+    modeCycleA11y: 'Routing: {{current}}. Tap to switch to {{next}}.',
+    modeCycleHint: 'Recomputes the route with the new profile',
+    recomputingA11y: 'Recomputing route',
+    modeRoutingLong: '{{mode}} routing',
     startNavigation: 'Start navigation',
     returnToNavigation: 'Return to navigation',
     switchToSafe: 'Switch to safe route',
@@ -96,6 +108,9 @@ export const en = {
 
   // ── Navigation ──
   nav: {
+    noActiveTitle: 'No active navigation',
+    noActiveBody: 'Pick a destination and preview a route to start navigating.',
+    returnToPreview: 'Return to preview',
     arrived: 'You have arrived at your destination.',
     inMeters: 'In {{distance}} meters, {{instruction}}',
     thenInMeters: ', then in {{distance}} meters, {{instruction}}',
@@ -592,6 +607,7 @@ export const en = {
   // ── City Heartbeat ──
   cityHeartbeat: {
     title: 'City Heartbeat',
+    loadFailed: "Couldn't load your city's pulse",
     cardTitle: 'City Heartbeat',
     cardSub: 'Live activity, trends, hazards & top riders',
     todayPulse: "TODAY'S PULSE",
@@ -701,6 +717,8 @@ export const en = {
     saveAsHome: 'Set as Home',
     saveAsWork: 'Set as Work',
     savedPlaces: 'Saved places',
+    selectA11y: 'Select {{name}}',
+    saveHintA11y: 'Long-press to save as Home or Work',
   },
 
   // ── Weather ──
@@ -756,6 +774,19 @@ export const en = {
     keepItUp: 'Keep it up!',
     startChain: 'Start your chain today!',
     longest: 'Longest:',
+    a11yLabel: 'Streak {{days}} days, {{tier}}',
+    dormant: 'Dormant',
+  },
+
+  // ── Streak tier names (mirror packages/core/src/streakTiers.ts labels) ──
+  streakTier: {
+    kindling: 'Kindling',
+    spark: 'Spark',
+    commute: 'Commute Habit',
+    endurance: 'Half-Marathon Riding',
+    binary: 'Binary Year',
+    century: 'Century',
+    legend: 'Legend',
   },
 
   // ── Guardian Tiers ──
@@ -934,8 +965,8 @@ export const en = {
     usernameHint: 'Min 3 characters. Letters, numbers, underscore only.',
     almostThere: 'Almost there',
     createYourAccount: 'Create your account',
-    signupSubMandatory: 'Create an account to continue using Defensive Pedal and start syncing your rides from here on.',
-    signupSub: 'Sync your rides, earn streaks, and join the community. You can always do this later.',
+    signupSubMandatory: 'Create an account to continue — your rides, streaks, and badges carry over to it.',
+    signupSub: 'Your rides, streaks, and badges carry over. Sync them, and join the community. You can always do this later.',
     percentComplete: '{{percent}}% complete',
     continueWithGoogle: 'Continue with Google',
     or: 'or',
@@ -986,6 +1017,9 @@ export const en = {
   // ── Achievements / Trophy Case ──
   achievements: {
     screenTitle: 'Achievements',
+    loadFailed: "Couldn't load your badges",
+    loadFailedSub: 'Check your connection and try again',
+    holoA11y: 'Holographic badge',
     yourAchievements: 'YOUR ACHIEVEMENTS',
     moreToUnlock: '+ {{count}} more to unlock',
     emptyAllTitle: 'No badges yet — let’s spot your first one.',

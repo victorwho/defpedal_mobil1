@@ -12,7 +12,9 @@ let mockRpcResult: { data: unknown; error: { message: string } | null } = {
   data: { merged: true },
   error: null,
 };
+let mockDeleteUserResult: { error: { message: string } | null } = { error: null };
 const rpcSpy = vi.fn();
+const deleteUserSpy = vi.fn(async () => mockDeleteUserResult);
 const getUserSpy = vi.fn(async () => ({ data: { user: mockAnonUser }, error: mockAnonError }));
 
 vi.mock('../lib/supabaseAuth', () => ({
@@ -24,6 +26,11 @@ vi.mock('../lib/supabaseAdmin', () => ({
     rpc: (...args: unknown[]) => {
       rpcSpy(...args);
       return Promise.resolve(mockRpcResult);
+    },
+    auth: {
+      admin: {
+        deleteUser: (id: string) => deleteUserSpy(id),
+      },
     },
   },
 }));
@@ -52,9 +59,11 @@ describe('POST /v1/account/merge-anonymous', () => {
   beforeEach(() => {
     rpcSpy.mockClear();
     getUserSpy.mockClear();
+    deleteUserSpy.mockClear();
     mockAnonUser = { id: ANON_ID, is_anonymous: true, email: null };
     mockAnonError = null;
     mockRpcResult = { data: { merged: true }, error: null };
+    mockDeleteUserResult = { error: null };
   });
 
   it('401 when unauthenticated', async () => {
@@ -162,6 +171,72 @@ describe('POST /v1/account/merge-anonymous', () => {
       p_target_id: TARGET_ID,
     });
     expect(res.json()).toEqual({ merged: false, reason: 'target_not_empty' });
+    await app.close();
+  });
+
+  // ── Replay guard, token layer (audit 2026-07-05 SEC-1) ──
+
+  it('deletes the anonymous auth user after a successful merge', async () => {
+    mockRpcResult = { data: { merged: true }, error: null };
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/account/merge-anonymous',
+      headers: fullUserHeaders,
+      payload: { anonymousAccessToken: 'anon-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ merged: true });
+    expect(deleteUserSpy).toHaveBeenCalledWith(ANON_ID);
+    await app.close();
+  });
+
+  it('does NOT delete the anonymous auth user when the merge is refused', async () => {
+    mockRpcResult = { data: { merged: false, reason: 'target_not_empty' }, error: null };
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/account/merge-anonymous',
+      headers: fullUserHeaders,
+      payload: { anonymousAccessToken: 'anon-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(deleteUserSpy).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('still returns merged:true when the anon-user delete fails (SQL merged_at guard covers replay)', async () => {
+    mockRpcResult = { data: { merged: true }, error: null };
+    mockDeleteUserResult = { error: { message: 'admin API unavailable' } };
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/account/merge-anonymous',
+      headers: fullUserHeaders,
+      payload: { anonymousAccessToken: 'anon-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ merged: true });
+    expect(deleteUserSpy).toHaveBeenCalledWith(ANON_ID);
+    await app.close();
+  });
+
+  it('refusal reason source_already_merged passes through to the client', async () => {
+    mockRpcResult = { data: { merged: false, reason: 'source_already_merged' }, error: null };
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/account/merge-anonymous',
+      headers: fullUserHeaders,
+      payload: { anonymousAccessToken: 'anon-token' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ merged: false, reason: 'source_already_merged' });
+    expect(deleteUserSpy).not.toHaveBeenCalled();
     await app.close();
   });
 });

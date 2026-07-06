@@ -139,12 +139,35 @@ export const buildActivityFeedRoutes = (
               properties: { acceptedAt: { type: 'string', format: 'date-time' } },
             },
             401: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        // Reactions intentionally stay open to anonymous sessions (matches the
+        // v1 sibling in feed-reactions.ts — likes are low-stakes and the app is
+        // anonymous-first), but they must not be an unbounded write path
+        // (audit 2026-07-05 SEC-4): throttle per caller on the 'write' bucket.
         const user = await requireUser(request, dependencies);
+
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: 'write',
+          key: buildRateLimitIdentity({ ip: request.ip, userId: user.id }),
+          limit: dependencies.rateLimitPolicies.write.limit,
+          windowMs: dependencies.rateLimitPolicies.write.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rl.limit);
+        reply.header('x-ratelimit-remaining', rl.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rl.resetAt / 1000));
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for reactions.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
         const db = ensureSupabase();
 
         // Reactions consolidated to a single "like" (review P3): coerce 'love'
@@ -206,12 +229,32 @@ export const buildActivityFeedRoutes = (
               properties: { acceptedAt: { type: 'string', format: 'date-time' } },
             },
             401: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
+        // Same throttling rationale as POST react above (audit SEC-4).
         const user = await requireUser(request, dependencies);
+
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: 'write',
+          key: buildRateLimitIdentity({ ip: request.ip, userId: user.id }),
+          limit: dependencies.rateLimitPolicies.write.limit,
+          windowMs: dependencies.rateLimitPolicies.write.windowMs,
+        });
+        reply.header('x-ratelimit-limit', rl.limit);
+        reply.header('x-ratelimit-remaining', rl.remaining);
+        reply.header('x-ratelimit-reset', Math.ceil(rl.resetAt / 1000));
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for reactions.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
         const db = ensureSupabase();
 
         // Coerce 'love' → 'like' (reactions consolidated — see POST react above).

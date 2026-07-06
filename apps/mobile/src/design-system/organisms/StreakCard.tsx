@@ -54,7 +54,9 @@ export const StreakCard = ({ streakState }: StreakCardProps) => {
             {t('streak.dayStreak', { count: streakState.currentStreak })}
           </Text>
           {hasStreak ? (
-            <Text style={styles.tierLabel}>{tier.label}</Text>
+            // Audit 2026-07-05 UX-7: localized tier name — core's `label` is
+            // English-only; the streakTier.* namespace covers en/ro/es.
+            <Text style={styles.tierLabel}>{t(`streakTier.${tier.tier}`)}</Text>
           ) : null}
         </View>
       </View>

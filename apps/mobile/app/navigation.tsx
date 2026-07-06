@@ -992,10 +992,10 @@ function NavigationScreen() {
           }}
         >
           <Text style={[textXs, { color: colors.cautionText, textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: fontFamily.body.bold }]}>
-            No active navigation
+            {t('nav.noActiveTitle')}
           </Text>
           <Text style={[textBase, { color: colors.textSecondary }]}>
-            Start a route preview first so the navigation session has a selected route and steps.
+            {t('nav.noActiveBody')}
           </Text>
         </View>
         <Button
@@ -1006,7 +1006,7 @@ function NavigationScreen() {
             router.replace('/route-preview');
           }}
         >
-          Return to preview
+          {t('nav.returnToPreview')}
         </Button>
       </Screen>
     );

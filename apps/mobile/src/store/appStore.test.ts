@@ -1157,6 +1157,26 @@ describe('useAppStore', () => {
       useAppStore.getState().resetUserScopedState();
       expect(useAppStore.getState().userHazardVotes).toEqual({});
     });
+
+    // Audit 2026-07-05 STATE-3: Home/Work addresses are the most sensitive
+    // persisted locations — they must not survive a sign-out/account switch.
+    it('resetUserScopedState wipes savedPlaces and cachedCityHeartbeat', () => {
+      const place = {
+        id: 'sp-1',
+        primaryText: 'Strada Exemplu 1',
+        secondaryText: 'București',
+        lat: 44.4268,
+        lon: 26.1025,
+      } as never;
+      useAppStore.getState().setSavedPlace('home', place);
+      useAppStore.getState().setSavedPlace('work', place);
+      expect(useAppStore.getState().savedPlaces.home).not.toBeNull();
+      expect(useAppStore.getState().savedPlaces.work).not.toBeNull();
+
+      useAppStore.getState().resetUserScopedState();
+      expect(useAppStore.getState().savedPlaces).toEqual({ home: null, work: null });
+      expect(useAppStore.getState().cachedCityHeartbeat).toBeNull();
+    });
   });
 
   describe('weather warning session flag', () => {

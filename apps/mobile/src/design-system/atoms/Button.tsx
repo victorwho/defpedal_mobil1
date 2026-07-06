@@ -19,6 +19,7 @@ import { space } from '../tokens/spacing';
 import { fontFamily } from '../tokens/typography';
 import { brandColors, darkTheme, safetyColors } from '../tokens/colors';
 import { useTheme } from '../ThemeContext';
+import { useT } from '../../hooks/useTranslation';
 import { PressableScale } from './PressableScale';
 
 // Pressed-state variants (darker shades of safety colors, not in main token set)
@@ -118,6 +119,7 @@ export const Button: React.FC<ButtonProps> = ({
   const s = sizeStyles[size];
   const v = variantStyles[variant];
   const { colors, mode } = useTheme();
+  const t = useT();
 
   // Ghost has no background, so its text must contrast with the live screen.
   // Dark theme keeps the bright accent (#FACC15, AA-pass on the dark deep bg).
@@ -163,12 +165,16 @@ export const Button: React.FC<ButtonProps> = ({
       accessibilityState={{ disabled, busy: loading }}
       style={containerStyle}
       pressedStyle={{ backgroundColor: effectivePressedBg }}
+      // Audit 2026-07-05 UX-11: `sm` renders 36dp tall — below the 44dp touch
+      // minimum. hitSlop extends the touchable area (~48dp effective) without
+      // changing the visual height.
+      hitSlop={size === 'sm' ? { top: 6, bottom: 6, left: 4, right: 4 } : undefined}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
           color={effectiveText}
-          accessibilityLabel="Loading"
+          accessibilityLabel={t('common.loading')}
         />
       ) : (
         <>

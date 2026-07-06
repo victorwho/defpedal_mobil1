@@ -78,6 +78,16 @@ export const UserCacheResetBridge = () => {
     // queries refetch the real account's data, while leaving Zustand route state
     // intact.
     if (previousIsAnonymous && !isAnonymous) {
+      // Audit 2026-07-05 STATE-1: pendingBadgeUnlocks / pendingTierPromotion
+      // drive GLOBALLY mounted celebration overlays (BadgeUnlockOverlayManager,
+      // RankUpOverlayManager in _layout.tsx). If the anonymous session queued a
+      // celebration that hadn't fired yet and the user signs into an ESTABLISHED
+      // account (merge skipped: target_not_empty), that account would see a
+      // full-screen celebration for an achievement that isn't theirs. Clear the
+      // queues while still preserving routePreview/routeRequest (the reason this
+      // branch skips resetUserScopedState in the first place).
+      useAppStore.getState().clearBadgeUnlocks();
+      useAppStore.getState().clearTierPromotion();
       void queryClient.invalidateQueries();
       return;
     }

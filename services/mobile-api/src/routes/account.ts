@@ -112,6 +112,32 @@ export const buildAccountRoutes = (
         }
 
         const result = (data ?? {}) as { merged?: boolean; reason?: string };
+
+        // Token-layer replay guard (audit 2026-07-05 SEC-1): after a successful
+        // merge every valuable row has been re-parented to the target, so the
+        // anonymous auth user is an empty husk whose refresh token could
+        // otherwise mint new access tokens and replay the merge against more
+        // fresh accounts. Delete it. Best-effort: the SQL-side merged_at guard
+        // (migration 202607060001) still blocks replay if this delete fails.
+        if (result.merged === true) {
+          try {
+            const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(anonUser.id);
+            if (deleteError) {
+              request.log.warn(
+                { event: 'merge_anon_delete_failed', anonId: anonUser.id, error: deleteError.message },
+                'failed to delete merged anonymous auth user',
+              );
+              captureServerException(deleteError, { route: 'merge-anonymous', phase: 'delete_anon_user' });
+            }
+          } catch (deleteError) {
+            request.log.warn(
+              { event: 'merge_anon_delete_failed', anonId: anonUser.id },
+              'failed to delete merged anonymous auth user',
+            );
+            captureServerException(deleteError, { route: 'merge-anonymous', phase: 'delete_anon_user' });
+          }
+        }
+
         return {
           merged: result.merged === true,
           ...(result.reason ? { reason: result.reason } : {}),

@@ -18,12 +18,28 @@ import { buildRetentionRoutes } from './routes/retention';
 import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
 import { buildV1Routes } from './routes/v1';
 
+// Path-only URL for error context — querystrings can carry rider GPS
+// (audit 2026-07-05 SEC-5); never forward them to Sentry.
+const pathOnly = (url: string): string => url.split('?')[0] ?? url;
+
 export const buildApp = (options: {
   dependencies?: Partial<MobileApiDependencies>;
 } = {}) => {
   const app = Fastify({
     logger: {
       level: config.logLevel,
+      // Safety net (audit 2026-07-05 SEC-7): no current call site logs full
+      // header objects, but if one ever does, bearer tokens and cookies must
+      // not reach Cloud Run logs.
+      redact: {
+        paths: [
+          'req.headers.authorization',
+          'req.headers.cookie',
+          'headers.authorization',
+          '*.headers.authorization',
+        ],
+        censor: '[REDACTED]',
+      },
     },
   });
   const dependencies = createMobileApiDependencies(options.dependencies);
@@ -170,7 +186,7 @@ export const buildApp = (options: {
           statusCode: error.statusCode,
           code: error.code,
           method: request.method,
-          url: request.raw.url ?? request.url,
+          url: pathOnly(request.raw.url ?? request.url),
         });
       }
       return reply
@@ -187,7 +203,7 @@ export const buildApp = (options: {
     app.log.error(error);
     captureServerException(error, {
       method: request.method,
-      url: request.raw.url ?? request.url,
+      url: pathOnly(request.raw.url ?? request.url),
     });
     return reply
       .status(500)

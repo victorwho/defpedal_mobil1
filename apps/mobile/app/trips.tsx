@@ -215,6 +215,14 @@ function TripsScreen() {
         ) : error ? (
           <View style={styles.center}>
             <Text style={styles.errorText}>{t('tripsScreen.loadFailed')}</Text>
+            <Pressable
+              style={styles.retryButton}
+              onPress={() => void refetch()}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+            </Pressable>
           </View>
         ) : !trips?.length ? (
           <View style={styles.center}>
@@ -315,6 +323,21 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textBase,
       color: colors.danger,
       textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: space[3],
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: space[6],
+      paddingVertical: space[2],
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    retryButtonText: {
+      ...textBase,
+      color: colors.accent,
+      fontFamily: fontFamily.body.semiBold,
     },
     emptyTitle: {
       ...textBase,

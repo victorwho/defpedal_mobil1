@@ -9,6 +9,8 @@
  * on the paths above yields Fastify's default 404 (no route exposed).
  */
 
+import { randomInt } from 'node:crypto';
+
 import type { ErrorResponse } from '@defensivepedal/core';
 import { buildShareDeepLinks } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
@@ -58,6 +60,16 @@ const PUBLIC_VIEW_BUCKET = 'publicShareView';
 const PUBLIC_VIEW_LIMIT = 60; // 60 beacons/min/ip is generous
 const PUBLIC_VIEW_WINDOW_MS = 60_000;
 
+// Audit 2026-07-05 SEC-6: IP-keyed limits on public code lookup + claim so
+// the 62^8 keyspace can't be probed at wire speed. A human opening a share
+// link does exactly one lookup; 30/min/ip leaves ample headroom.
+const PUBLIC_LOOKUP_BUCKET = 'publicShareLookup';
+const PUBLIC_LOOKUP_LIMIT = 30;
+const PUBLIC_LOOKUP_WINDOW_MS = 60_000;
+const CLAIM_BUCKET = 'shareClaim';
+const CLAIM_LIMIT = 10;
+const CLAIM_WINDOW_MS = 60_000;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -95,6 +107,10 @@ export const buildRouteShareRoutes = (
         supabase: supabase as unknown as Parameters<
           typeof createRouteShareService
         >[0]['supabase'],
+        // Audit 2026-07-05 SEC-6: CSPRNG for share-code generation. The core
+        // default stays Math.random (browser-shared module); the server
+        // injects crypto so codes aren't predictable from V8 PRNG state.
+        randomSource: () => randomInt(0, 2 ** 48) / 2 ** 48,
       });
     };
 
@@ -173,11 +189,26 @@ export const buildRouteShareRoutes = (
             200: routeSharePublicResponseSchema,
             404: errorResponseSchema,
             410: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
       async (request) => {
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: PUBLIC_LOOKUP_BUCKET,
+          key: buildRateLimitIdentity({ ip: request.ip }),
+          limit: PUBLIC_LOOKUP_LIMIT,
+          windowMs: PUBLIC_LOOKUP_WINDOW_MS,
+        });
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for this endpoint.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
+
         const service = buildService();
 
         const result = await service.getPublicShare(request.params.code);
@@ -235,6 +266,7 @@ export const buildRouteShareRoutes = (
             404: errorResponseSchema,
             410: errorResponseSchema,
             422: errorResponseSchema,
+            429: errorResponseSchema,
             500: errorResponseSchema,
             502: errorResponseSchema,
           },
@@ -245,6 +277,20 @@ export const buildRouteShareRoutes = (
           request,
           dependencies.authenticateUser,
         );
+
+        const rl = await dependencies.rateLimiter.consume({
+          bucket: CLAIM_BUCKET,
+          key: buildRateLimitIdentity({ ip: request.ip, userId: user.id }),
+          limit: CLAIM_LIMIT,
+          windowMs: CLAIM_WINDOW_MS,
+        });
+        if (!rl.allowed) {
+          throw new HttpError('Rate limit exceeded for this endpoint.', {
+            statusCode: 429,
+            code: 'RATE_LIMITED',
+            details: [`Retry after ${Math.max(1, Math.ceil(rl.retryAfterMs / 1000))} seconds.`],
+          });
+        }
 
         const service = buildService();
 

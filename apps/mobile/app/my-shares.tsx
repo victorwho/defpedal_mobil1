@@ -244,6 +244,14 @@ export default function MySharesScreen() {
       ) : query.isError && !data ? (
         <View style={styles.centerBox}>
           <Text style={styles.errorText}>{t('myShares.loadError')}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => void query.refetch()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -438,6 +446,22 @@ const createThemedStyles = (colors: ThemeColors) =>
     errorText: {
       ...textSm,
       color: colors.danger,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: space[3],
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: space[6],
+      paddingVertical: space[2],
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    retryButtonText: {
+      ...textSm,
+      color: colors.accent,
+      fontFamily: fontFamily.body.semiBold,
       textAlign: 'center',
     },
   });

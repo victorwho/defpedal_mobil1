@@ -1,7 +1,8 @@
 import type { ErrorResponse, FollowRequest, RiderTierName, SuggestedUser } from '@defensivepedal/core';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import type { MobileApiDependencies } from '../lib/dependencies';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import {
   approveDeclineResponseSchema,
   errorResponseSchema,
@@ -16,6 +17,46 @@ import {
 } from '../lib/followSchemas';
 import { HttpError } from '../lib/http';
 import { ensureSupabase, requireFullUser, requireUser } from './feed-helpers';
+
+// ---------------------------------------------------------------------------
+// Rate limiting — follow-graph writes share the dedicated `follow` bucket so
+// one account cannot mass-follow to spam notifications (audit 2026-07-05
+// SEC-2). Mirrors the applyRateLimit helper in leaderboard.ts.
+// ---------------------------------------------------------------------------
+
+const applyFollowRateLimit = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: MobileApiDependencies,
+  userId: string,
+) => {
+  const policy = dependencies.rateLimitPolicies.follow;
+  const decision = await dependencies.rateLimiter.consume({
+    bucket: 'follow',
+    key: buildRateLimitIdentity({ ip: request.ip, userId }),
+    limit: policy.limit,
+    windowMs: policy.windowMs,
+  });
+
+  reply.header('x-ratelimit-limit', decision.limit);
+  reply.header('x-ratelimit-remaining', decision.remaining);
+  reply.header('x-ratelimit-reset', Math.ceil(decision.resetAt / 1000));
+  if (decision.retryAfterMs > 0) {
+    reply.header('retry-after', Math.max(1, Math.ceil(decision.retryAfterMs / 1000)));
+  }
+
+  if (!decision.allowed) {
+    request.log.warn(
+      { event: 'mobile_api_rate_limited', policy: 'follow', ip: request.ip, userId },
+      'request rate limited',
+    );
+    throw new HttpError('Rate limit exceeded for this endpoint.', {
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+      details: [`Retry after ${Math.max(1, Math.ceil(decision.retryAfterMs / 1000))} seconds.`],
+    });
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Plugin
@@ -39,14 +80,16 @@ export const buildFollowRoutes = (
             400: errorResponseSchema,
             401: errorResponseSchema,
             403: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         // Anonymous sessions cannot create follows — they'd appear in target
         // users' follow_requests / followers without an attributable identity.
         const user = await requireFullUser(request, dependencies);
+        await applyFollowRateLimit(request, reply, dependencies, user.id);
         const db = ensureSupabase();
         const targetId = request.params.id;
 
@@ -145,11 +188,13 @@ export const buildFollowRoutes = (
             200: unfollowResponseSchema,
             401: errorResponseSchema,
             403: errorResponseSchema,
+            429: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireFullUser(request, dependencies);
+        await applyFollowRateLimit(request, reply, dependencies, user.id);
         const db = ensureSupabase();
 
         await db
@@ -175,12 +220,14 @@ export const buildFollowRoutes = (
             401: errorResponseSchema,
             403: errorResponseSchema,
             404: errorResponseSchema,
+            429: errorResponseSchema,
             502: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireFullUser(request, dependencies);
+        await applyFollowRateLimit(request, reply, dependencies, user.id);
         const db = ensureSupabase();
         const requesterId = request.params.id;
 
@@ -218,11 +265,13 @@ export const buildFollowRoutes = (
             401: errorResponseSchema,
             403: errorResponseSchema,
             404: errorResponseSchema,
+            429: errorResponseSchema,
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireFullUser(request, dependencies);
+        await applyFollowRateLimit(request, reply, dependencies, user.id);
         const db = ensureSupabase();
         const requesterId = request.params.id;
 

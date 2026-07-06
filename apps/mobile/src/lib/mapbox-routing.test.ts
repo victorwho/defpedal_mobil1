@@ -553,7 +553,13 @@ describe('country-aware OSRM dispatch', () => {
     expect(result.coverage.status).toBe('unsupported');
   });
 
-  it('falls back to Mapbox on a cross-border RO -> ES request', async () => {
+  // Commit 055e89a added a 400km straight-line guard on every Mapbox
+  // Directions call (the API 422s beyond that), so the cross-border fallback
+  // is only reachable for pairs under 400km. Bucharest → Sofia (~294km,
+  // destination outside both bboxes) exercises the fallback; the old
+  // Bucharest → Madrid (~2,470km) pair now correctly fails fast instead —
+  // covered by the rejection test below.
+  it('falls back to Mapbox on a cross-border ride to an unsupported neighbor (RO -> BG)', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
@@ -562,7 +568,7 @@ describe('country-aware OSRM dispatch', () => {
 
     const result = await directPreviewRoute({
       origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
-      destination: { lat: 40.4168, lon: -3.7038 }, // Madrid
+      destination: { lat: 42.6977, lon: 23.3219 }, // Sofia (~294km, unsupported)
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,
@@ -571,6 +577,23 @@ describe('country-aware OSRM dispatch', () => {
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(firstCallUrl).toContain('api.mapbox.com');
     expect(result.coverage.safeRouting).toBe(false);
+  });
+
+  it('fails fast with a clear message when a Mapbox-bound route exceeds the 400km guard (RO -> ES)', async () => {
+    setupFetchMock([]);
+
+    await expect(
+      directPreviewRoute({
+        origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
+        destination: { lat: 40.4168, lon: -3.7038 }, // Madrid (~2,470km)
+        mode: 'safe',
+        avoidUnpaved: false,
+        avoidHills: false,
+      }),
+    ).rejects.toThrow('Route is too long for fast routing');
+
+    // Fails BEFORE any network call — that's the point of the guard.
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(0);
   });
 
   it('attempts safe-vs-fast comparison for ES once the country gate allows it', async () => {
@@ -592,8 +615,11 @@ describe('country-aware OSRM dispatch', () => {
     ]);
 
     const result = await directPreviewRoute({
+      // Madrid → Zaragoza (~273km): stays under the 400km Mapbox guard from
+      // commit 055e89a so the comparison fetch still fires (the old Madrid →
+      // Barcelona pair was ~505km and the comparison is now skipped there).
       origin: { lat: 40.4168, lon: -3.7038 },
-      destination: { lat: 41.3851, lon: 2.1734 },
+      destination: { lat: 41.6488, lon: -0.8891 },
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,

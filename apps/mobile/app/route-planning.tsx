@@ -1028,9 +1028,9 @@ export default function RoutePlanningScreen() {
             /* Start override search (expanded) */
             <View style={styles.originCard}>
               <SearchBar
-                label="Custom start"
+                label={t('planning.customStartLabel')}
                 value={startOverrideQuery}
-                placeholder="Search a different start point"
+                placeholder={t('planning.searchStartPlaceholder')}
                 active
                 isLoading={startOverrideAutocompleteQuery.isFetching}
                 errorMessage={
@@ -1093,7 +1093,7 @@ export default function RoutePlanningScreen() {
               <SearchBar
                 label="Destination"
                 value={destinationQuery}
-                placeholder={isOnline ? 'Where to?' : 'Connect to internet to search'}
+                placeholder={t(isOnline ? 'planning.searchPlaceholder' : 'planning.searchPlaceholderOffline')}
                 active={isOnline && activeField === 'destination'}
                 isLoading={destinationAutocompleteQuery.isFetching}
                 errorMessage={
@@ -1144,7 +1144,7 @@ export default function RoutePlanningScreen() {
                   <SearchBar
                     label={`Stop ${index + 1}`}
                     value={waypointQueries[index] ?? ''}
-                    placeholder="Search for a stop"
+                    placeholder={t('planning.searchStopPlaceholder')}
                     active
                     isLoading={waypointAutocompleteQuery.isFetching}
                     errorMessage={
@@ -1257,7 +1257,7 @@ export default function RoutePlanningScreen() {
                 <SearchBar
                   label={`Stop ${waypoints.length + 1}`}
                   value={waypointQueries[waypoints.length] ?? ''}
-                  placeholder="Search for a stop"
+                  placeholder={t('planning.searchStopPlaceholder')}
                   active
                   isLoading={waypointAutocompleteQuery.isPending}
                   errorMessage={
@@ -1517,13 +1517,13 @@ export default function RoutePlanningScreen() {
         >
           {hazardDescribeMode ? (
             <>
-              <Text style={styles.hazardGridTitle}>Describe the hazard</Text>
-              <Text style={styles.hazardGridSubtitle}>Optional — a short note helps other cyclists.</Text>
+              <Text style={styles.hazardGridTitle}>{t('planning.hazardDescribeTitle')}</Text>
+              <Text style={styles.hazardGridSubtitle}>{t('planning.hazardDescribeSubtitle')}</Text>
               <TextInput
                 style={styles.hazardDescribeInput}
                 value={hazardDescription}
                 onChangeText={setHazardDescription}
-                placeholder="e.g. loose dog, glass shards, closed gate…"
+                placeholder={t('planning.hazardDescribePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 maxLength={280}

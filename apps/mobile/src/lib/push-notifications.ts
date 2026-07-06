@@ -129,6 +129,16 @@ export const handleNotificationResponse = (
   response: any,
 ): void => {
   const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+
+  // Audit 2026-07-05 UX-5: honor an explicit deep link generically so senders
+  // that ship `deepLink` (e.g. ambassador referral pushes → '/my-shares')
+  // land somewhere useful even without a dedicated case below. Must run
+  // BEFORE the `type` bail — the referral payloads carry no `type`.
+  if (data && typeof data.deepLink === 'string' && data.deepLink.startsWith('/')) {
+    router.push(data.deepLink as never);
+    return;
+  }
+
   if (!data?.type) return;
 
   switch (data.type) {
@@ -136,6 +146,19 @@ export const handleNotificationResponse = (
       if (data.tripShareId) {
         router.push('/community-feed');
       }
+      break;
+    // Audit 2026-07-05 UX-5: previously-unhandled high-intent taps.
+    case 'follow_request':
+      // Follow requests are managed from the profile surface.
+      router.push('/profile');
+      break;
+    case 'weekly_summary':
+      router.push(
+        typeof data.screen === 'string' ? (`/${data.screen.replace(/^\//, '')}` as never) : '/impact-dashboard',
+      );
+      break;
+    case 'first_ride':
+      router.push('/route-planning');
       break;
     case 'hazard':
       router.push('/route-planning');

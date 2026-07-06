@@ -136,6 +136,9 @@ export const checkFirstRideNudge = async (
   await dispatchNotification(profile.id, LOG_CATEGORY, {
     title: 'Your First Ride Awaits',
     body: 'Your first route is ready — just 5 minutes on quiet streets near home. This weekend could be the start of something great.',
+    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
+    // routes to the planner instead of dead-ending (payloads had no data).
+    data: { type: 'first_ride', screen: 'route-planning' },
   });
 
   return { template, sent: true };
@@ -172,6 +175,9 @@ export const checkPostFirstRide = async (
   await dispatchNotification(profile.id, LOG_CATEGORY, {
     title: 'You Did It!',
     body: 'Yesterday you rode for the first time. Remember how good that felt? Another short ride is waiting for you.',
+    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
+    // routes to the planner instead of dead-ending (payloads had no data).
+    data: { type: 'first_ride', screen: 'route-planning' },
   });
 
   return { template, sent: true };
@@ -198,6 +204,9 @@ export const checkWeatherInvitation = async (
   await dispatchNotification(profile.id, LOG_CATEGORY, {
     title: 'Perfect Weekend Ride',
     body: 'Perfect cycling weather this weekend. A short ride through quiet streets?',
+    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
+    // routes to the planner instead of dead-ending (payloads had no data).
+    data: { type: 'first_ride', screen: 'route-planning' },
   });
 
   return { template, sent: true };
@@ -232,6 +241,9 @@ export const checkLapsedReengagement = async (
   await dispatchNotification(profile.id, LOG_CATEGORY, {
     title: 'We Miss You',
     body: "It's been a while — that's okay. Your route is still here whenever you're ready. No pressure.",
+    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
+    // routes to the planner instead of dead-ending (payloads had no data).
+    data: { type: 'first_ride', screen: 'route-planning' },
   });
 
   return { template, sent: true };

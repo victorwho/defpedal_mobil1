@@ -49,6 +49,14 @@ export const ro: TranslationKeys = {
     safe: 'Sigur',
     fast: 'Rapid',
     flat: 'Plat',
+    searchPlaceholder: 'Unde mergem?',
+    searchPlaceholderOffline: 'Conectează-te la internet pentru a căuta',
+    searchStartPlaceholder: 'Caută alt punct de plecare',
+    searchStopPlaceholder: 'Caută o oprire',
+    customStartLabel: 'Plecare personalizată',
+    hazardDescribeTitle: 'Descrie pericolul',
+    hazardDescribeSubtitle: 'Opțional — o notă scurtă îi ajută pe ceilalți bicicliști.',
+    hazardDescribePlaceholder: 'ex. câine agresiv, cioburi de sticlă, poartă închisă…',
     savedRoutes: 'Trasee salvate',
     reportHazard: 'Raportează pericol',
     centerLocation: 'Centrează pe locația curentă',
@@ -62,6 +70,10 @@ export const ro: TranslationKeys = {
 
   // ── Route Preview ──
   preview: {
+    modeCycleA11y: 'Rutare: {{current}}. Atinge pentru a comuta la {{next}}.',
+    modeCycleHint: 'Recalculează ruta cu noul profil',
+    recomputingA11y: 'Se recalculează ruta',
+    modeRoutingLong: 'Rutare {{mode}}',
     startNavigation: 'Începe navigarea',
     returnToNavigation: 'Înapoi la navigare',
     switchToSafe: 'Schimbă pe traseu sigur',
@@ -98,6 +110,9 @@ export const ro: TranslationKeys = {
 
   // ── Navigation ──
   nav: {
+    noActiveTitle: 'Nicio navigare activă',
+    noActiveBody: 'Alege o destinație și previzualizează o rută pentru a începe navigarea.',
+    returnToPreview: 'Înapoi la previzualizare',
     arrived: 'Ați ajuns la destinație.',
     inMeters: 'Peste {{distance}} metri, {{instruction}}',
     thenInMeters: ', apoi peste {{distance}} metri, {{instruction}}',
@@ -584,6 +599,7 @@ export const ro: TranslationKeys = {
   // ── City Heartbeat ──
   cityHeartbeat: {
     title: 'Pulsul orașului',
+    loadFailed: 'Nu am putut încărca pulsul orașului',
     cardTitle: 'Pulsul orașului',
     cardSub: 'Activitate live, tendințe, pericole și top cicliști',
     todayPulse: 'PULSUL DE AZI',
@@ -693,6 +709,8 @@ export const ro: TranslationKeys = {
     saveAsHome: 'Setează ca Acasă',
     saveAsWork: 'Setează ca Serviciu',
     savedPlaces: 'Locuri salvate',
+    selectA11y: 'Selectează {{name}}',
+    saveHintA11y: 'Ține apăsat pentru a salva ca Acasă sau Serviciu',
   },
 
   // ── Weather ──
@@ -747,6 +765,19 @@ export const ro: TranslationKeys = {
     keepItUp: 'Continuă tot așa!',
     startChain: 'Începe seria ta azi!',
     longest: 'Cea mai lungă:',
+    a11yLabel: 'Serie de {{days}} zile, {{tier}}',
+    dormant: 'Inactivă',
+  },
+
+  // ── Streak tier names ──
+  streakTier: {
+    kindling: 'Aprindere',
+    spark: 'Scânteie',
+    commute: 'Obicei de navetă',
+    endurance: 'Semimaraton pe două roți',
+    binary: 'An binar',
+    century: 'Centenar',
+    legend: 'Legendă',
   },
 
   // ── Guardian Tiers ──
@@ -925,8 +956,8 @@ export const ro: TranslationKeys = {
     usernameHint: 'Minim 3 caractere. Doar litere, cifre și underscore.',
     almostThere: 'Aproape gata',
     createYourAccount: 'Creează-ți contul',
-    signupSubMandatory: 'Creează un cont pentru a continua să folosești Defensive Pedal și a-ți sincroniza cursele de acum înainte.',
-    signupSub: 'Sincronizează-ți cursele, câștigă serii și alătură-te comunității. Poți face asta oricând mai târziu.',
+    signupSubMandatory: 'Creează un cont pentru a continua — cursele, seriile și insignele tale se transferă pe el.',
+    signupSub: 'Cursele, seriile și insignele tale se păstrează. Sincronizează-le și alătură-te comunității. Poți face asta oricând mai târziu.',
     percentComplete: '{{percent}}% finalizat',
     continueWithGoogle: 'Continuă cu Google',
     or: 'sau',
@@ -977,6 +1008,9 @@ export const ro: TranslationKeys = {
   // ── Achievements / Trophy Case ──
   achievements: {
     screenTitle: 'Realizări',
+    loadFailed: 'Nu am putut încărca insignele',
+    loadFailedSub: 'Verifică conexiunea și încearcă din nou',
+    holoA11y: 'Insignă holografică',
     yourAchievements: 'REALIZĂRILE TALE',
     moreToUnlock: '+ {{count}} de deblocat',
     emptyAllTitle: 'Nicio insignă încă — să o găsim pe prima.',

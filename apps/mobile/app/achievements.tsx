@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import type {
   BadgeDefinition,
@@ -36,6 +37,7 @@ import { Mascot } from '../src/design-system/atoms/Mascot';
 import { stagger } from '../src/design-system/tokens/motion';
 import { type BadgeTier, type BadgeCategory, badgeSpace } from '../src/design-system/tokens/badgeColors';
 import { useTheme, type ThemeColors } from '../src/design-system';
+import { radii } from '../src/design-system/tokens/radii';
 import { space, layout } from '../src/design-system/tokens/spacing';
 import { fontFamily, textSm } from '../src/design-system/tokens/typography';
 import { useBadges } from '../src/hooks/useBadges';
@@ -159,7 +161,7 @@ export default function AchievementsScreen() {
   const cellWidth =
     (screenWidth - 2 * layout.screenHorizontalPadding - (numColumns - 1) * badgeSpace.gridGap) /
     numColumns;
-  const { data, isLoading } = useBadges();
+  const { data, isLoading, isError, refetch } = useBadges();
 
   const [selectedTab, setSelectedTab] = useState<BadgeCategory | 'all'>('all');
   const [selectedBadge, setSelectedBadge] = useState<SortedBadge | null>(null);
@@ -296,6 +298,23 @@ export default function AchievementsScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={colors.accent} size="large" />
         </View>
+      ) : isError && !data ? (
+        // Audit 2026-07-05 UX-1: a failed badge load must not render the
+        // "no badges yet" empty state — a rider with a full trophy case would
+        // read it as data loss. Mirror community-feed's error + retry pattern.
+        <View style={styles.loadingContainer}>
+          <Ionicons name="cloud-offline-outline" size={48} color={colors.accent} />
+          <Text style={styles.errorTitle}>{t('achievements.loadFailed')}</Text>
+          <Text style={styles.errorSubtitle}>{t('achievements.loadFailedSub')}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => void refetch()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+          </Pressable>
+        </View>
       ) : (
         <FlatList
           // FlatList rejects mid-life numColumns changes — remount on rotation.
@@ -385,6 +404,36 @@ const createThemedStyles = (colors: ThemeColors) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
+      gap: space[3],
+      paddingHorizontal: space[8],
+    },
+    errorTitle: {
+      ...textSm,
+      fontFamily: fontFamily.heading.bold,
+      fontSize: 18,
+      color: colors.textPrimary,
+      textAlign: 'center',
+    },
+    errorSubtitle: {
+      ...textSm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: space[2],
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: space[6],
+      paddingVertical: space[2],
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    retryButtonText: {
+      ...textSm,
+      color: colors.accent,
+      fontFamily: fontFamily.body.semiBold,
+      textAlign: 'center',
     },
     headerSection: {
       gap: space[4],

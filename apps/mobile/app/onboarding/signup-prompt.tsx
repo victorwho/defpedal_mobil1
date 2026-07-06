@@ -147,11 +147,13 @@ export default function OnboardingSignupPromptScreen() {
           <Text style={styles.eyebrow}>{t('onboarding.almostThere')}</Text>
           <Text style={styles.title}>{t('onboarding.createYourAccount')}</Text>
           <Text style={styles.subtitle}>
-            {/* Review 2026-06-12 P1: this used to promise "Your data will be
-                preserved", but no anonymous→account merge exists — sign-in
-                switches to a fresh user id and anonymous rides/XP/badges are
-                left behind. Don't promise what we don't do. A real merge
-                endpoint is tracked as future work (review Phase 1 item 17). */}
+            {/* Audit 2026-07-05 UX-13: the anonymous→account merge is live
+                (merge_anonymous_account + AnonMergeManager), so the copy now
+                promises continuity — a fresh signup carries the anonymous
+                session's rides/streaks/badges over. Phrased as "carry over"
+                (not an absolute guarantee) because the merge only fires into
+                a FRESH account; signing into an established account keeps
+                that account's data instead. */}
             {isMandatory
               ? t('onboarding.signupSubMandatory')
               : t('onboarding.signupSub')}

@@ -45,7 +45,9 @@ import {
 import Svg, { Defs, Ellipse, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAppStore } from '../../store/appStore';
+import { useT } from '../../hooks/useTranslation';
 import { useHoloTilt } from '../hooks/useHoloTilt';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import { tierColors, type BadgeTier } from '../tokens/badgeColors';
 import { getHoloBadgeAsset } from '../tokens/holoBadges';
 
@@ -102,8 +104,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   forceMotion = false,
   focused = false,
   onTap,
-  accessibilityLabel = 'Holographic badge',
+  accessibilityLabel,
 }) => {
+  const t = useT();
+  // Audit 2026-07-05 UX-9: localized default a11y label.
+  const resolvedA11yLabel = accessibilityLabel ?? t('achievements.holoA11y');
   // Resolve the PNG source: explicit `source` wins; otherwise look up by key.
   const resolvedSource = useMemo(
     () => source ?? (badgeKey ? getHoloBadgeAsset(badgeKey, tierFamily) : undefined),
@@ -112,6 +117,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
 
   const appState = useAppStore((s) => s.appState);
   const motionAllowed = forceMotion || appState !== 'NAVIGATING';
+  // Audit 2026-07-05 UX-10 (WCAG 2.3.3): the gyro shimmer already respects
+  // Reduce Motion inside useHoloTilt, but the tap-glare sweep and drag-tilt
+  // are user-triggered animations that must be suppressed too. Tap
+  // FORWARDING stays live — only the visual motion is gated.
+  const reducedMotion = useReducedMotion();
 
   const tiltX = useRef(new Animated.Value(0)).current;
   const tiltY = useRef(new Animated.Value(0)).current;
@@ -141,7 +151,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   onTapRef.current = onTap;
 
   const fireGlare = () => {
-    if (!motionAllowed) return;
+    if (!motionAllowed || reducedMotion) return;
     glareProgress.setValue(0);
     Animated.timing(glareProgress, {
       toValue: 1,
@@ -187,9 +197,11 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
           _e: GestureResponderEvent,
           gesture: PanResponderGestureState,
         ) => {
-          const half = size / 2;
-          tiltX.setValue(Math.max(-1, Math.min(1, gesture.dx / half)));
-          tiltY.setValue(Math.max(-1, Math.min(1, gesture.dy / half)));
+          if (!reducedMotion) {
+            const half = size / 2;
+            tiltX.setValue(Math.max(-1, Math.min(1, gesture.dx / half)));
+            tiltY.setValue(Math.max(-1, Math.min(1, gesture.dy / half)));
+          }
           if (
             Math.abs(gesture.dx) > TAP_MAX_DISTANCE ||
             Math.abs(gesture.dy) > TAP_MAX_DISTANCE
@@ -211,7 +223,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
         },
         onPanResponderTerminate: releaseTilt,
       }),
-    [interactive, motionAllowed, size],
+    [interactive, motionAllowed, size, reducedMotion],
   );
 
   useEffect(() => {
@@ -348,7 +360,7 @@ export const HoloSticker: React.FC<HoloStickerProps> = ({
   return (
     <View
       accessibilityRole="image"
-      accessibilityLabel={accessibilityLabel}
+      accessibilityLabel={resolvedA11yLabel}
       style={containerStyle}
       {...panResponder.panHandlers}
     >

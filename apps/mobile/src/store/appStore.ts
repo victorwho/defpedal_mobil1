@@ -996,6 +996,11 @@ export const useAppStore = create<AppStore>()(
           pendingTierPromotion: null,
           weatherNotice: null,
           homeLocation: null,
+          // Audit 2026-07-05 STATE-3: Home/Work full addresses are the most
+          // sensitive locations we hold — they must never survive a sign-out /
+          // account switch and greet the next account on this device.
+          savedPlaces: { home: null, work: null },
+          cachedCityHeartbeat: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,
         })),

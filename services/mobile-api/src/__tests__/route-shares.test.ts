@@ -51,11 +51,27 @@ const fakeAuthenticateUser = vi
   .fn<(token: string) => Promise<{ id: string; email: string | null } | null>>()
   .mockResolvedValue({ id: USER_ID, email: 'rider@test.local' });
 
+// Open-by-default limiter: the public lookup + claim endpoints consume a
+// rate-limit decision (audit 2026-07-05 SEC-6); tests that exercise 429s
+// override via `deps`.
+const noopRateLimiter = {
+  backend: 'memory' as const,
+  consume: vi.fn().mockResolvedValue({
+    allowed: true,
+    limit: 100,
+    remaining: 99,
+    resetAt: Date.now() + 60_000,
+    retryAfterMs: 0,
+  }),
+  clear: vi.fn(),
+};
+
 const makeDependencies = (
   overrides: Partial<MobileApiDependencies> = {},
 ): MobileApiDependencies =>
   ({
     authenticateUser: fakeAuthenticateUser,
+    rateLimiter: noopRateLimiter,
     ...overrides,
   }) as MobileApiDependencies;
 

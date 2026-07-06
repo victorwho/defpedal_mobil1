@@ -83,6 +83,9 @@ const rateLimitPolicies: RateLimitPolicies = {
   routeReroute: { limit: 100, windowMs: 60_000 },
   write: { limit: 100, windowMs: 60_000 },
   hazardVote: { limit: 100, windowMs: 600_000 },
+  // Follow-graph bucket (audit 2026-07-05 SEC-2) — open limit so functional
+  // tests don't trip it; the dedicated 429 test overrides with limit: 1.
+  follow: { limit: 100, windowMs: 600_000 },
 };
 
 const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) =>
@@ -594,6 +597,48 @@ describe('GET /v1/profile/follow-requests', () => {
     });
     expect(response.statusCode).toBe(502);
     expect(response.json().code).toBe('UPSTREAM_ERROR');
+
+    await app.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rate limiting — follow bucket (audit 2026-07-05 SEC-2)
+// ---------------------------------------------------------------------------
+
+describe('follow-graph rate limiting', () => {
+  beforeEach(() => {
+    supabaseResultQueue.length = 0;
+    vi.clearAllMocks();
+  });
+
+  it('returns 429 once the follow bucket is exhausted', async () => {
+    const app = buildTestApp({
+      rateLimiter: createMemoryRateLimiter(),
+      rateLimitPolicies: {
+        ...rateLimitPolicies,
+        follow: { limit: 1, windowMs: 600_000 },
+      },
+    });
+    await app.ready();
+
+    // First unfollow consumes the single slot (delete chain dequeues a
+    // default { data: null, error: null } result).
+    const first = await app.inject({
+      method: 'DELETE',
+      url: `/v1/users/${TARGET_USER_ID}/follow`,
+      headers: authHeaders,
+    });
+    expect(first.statusCode).toBe(200);
+
+    const second = await app.inject({
+      method: 'DELETE',
+      url: `/v1/users/${TARGET_USER_ID}/follow`,
+      headers: authHeaders,
+    });
+    expect(second.statusCode).toBe(429);
+    expect(second.json().code).toBe('RATE_LIMITED');
+    expect(second.headers['retry-after']).toBeDefined();
 
     await app.close();
   });

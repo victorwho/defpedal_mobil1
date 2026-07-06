@@ -176,6 +176,16 @@ export const config = {
         3600000,
       ),
     },
+    // Follow-graph writes — 20 actions / 10 min per account. Generous for a
+    // human working through suggested users, tight enough to stop
+    // mass-follow notification spam (audit 2026-07-05 SEC-2).
+    follow: {
+      limit: parsePositiveNumber(resolveConfigValue(['RATE_LIMIT_FOLLOW_MAX'], '20'), 20),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_FOLLOW_WINDOW_MS'], '600000'),
+        600000,
+      ),
+    },
   },
   // Sentry error tracking (review 2026-06-12 P2 observability). Entirely
   // inert until SENTRY_DSN is set — without it, init is skipped and every

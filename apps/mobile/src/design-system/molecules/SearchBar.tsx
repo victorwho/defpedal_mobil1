@@ -190,7 +190,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         Alert.alert(t('search.saveAs'), suggestion.primaryText, [
           { text: t('search.saveAsHome'), onPress: () => onSavePlace(suggestion, 'home') },
           { text: t('search.saveAsWork'), onPress: () => onSavePlace(suggestion, 'work') },
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
         ]);
       }
     : undefined;
@@ -572,7 +572,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   onLongPress={handleLongPress ? () => handleLongPress(suggestion) : undefined}
                   delayLongPress={500}
                   accessibilityRole="button"
-                  accessibilityLabel={`Select ${suggestion.primaryText}`}
+                  accessibilityLabel={t('search.selectA11y', { name: suggestion.primaryText })}
+                  accessibilityHint={handleLongPress ? t('search.saveHintA11y') : undefined}
                 >
                   <Ionicons
                     name={iconName}

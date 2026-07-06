@@ -23,6 +23,36 @@ import { config } from '../config';
 
 let initialized = false;
 
+/** Strips the querystring from a URL-ish string. */
+const stripQuery = (url: string): string => url.split('?')[0] ?? url;
+
+/**
+ * PII scrub (audit 2026-07-05 SEC-5): several GET endpoints carry rider GPS
+ * in the querystring (`/hazards/nearby?lat=..&lon=..`, `/risk-map`,
+ * `/neighborhood-safety-score`). A 5xx on one of those must not ship raw
+ * coordinates into Sentry, so every outgoing event has querystrings removed
+ * from its request URL and any `extra.url` context. Exported for unit tests.
+ */
+export const scrubEventPii = <
+  T extends {
+    request?: { url?: string; query_string?: unknown };
+    extra?: Record<string, unknown>;
+  },
+>(
+  event: T,
+): T => {
+  if (event.request?.url) {
+    event.request.url = stripQuery(event.request.url);
+  }
+  if (event.request && 'query_string' in event.request) {
+    delete event.request.query_string;
+  }
+  if (event.extra && typeof event.extra.url === 'string') {
+    event.extra.url = stripQuery(event.extra.url);
+  }
+  return event;
+};
+
 /** Initializes Sentry if a DSN is configured. Idempotent. */
 export const initSentry = (): boolean => {
   if (initialized) return true;
@@ -33,6 +63,9 @@ export const initSentry = (): boolean => {
     environment: config.sentry.environment,
     release: config.sentry.release || undefined,
     tracesSampleRate: config.sentry.tracesSampleRate,
+    // Explicit, not just the SDK default — never attach ip/user headers.
+    sendDefaultPii: false,
+    beforeSend: (event) => scrubEventPii(event),
   });
 
   initialized = true;

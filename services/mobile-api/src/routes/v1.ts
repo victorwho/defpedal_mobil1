@@ -1497,6 +1497,9 @@ export const buildV1Routes = (
     },
     async (request, reply) => {
       const user = await requireWriteUser(request, dependencies);
+      await applyRateLimit(request, reply, dependencies, 'write', {
+        userId: user.id,
+      });
 
       const { expoPushToken, deviceId, platform } = request.body as {
         expoPushToken: string;
@@ -1554,6 +1557,9 @@ export const buildV1Routes = (
     },
     async (request, reply) => {
       const user = await requireWriteUser(request, dependencies);
+      await applyRateLimit(request, reply, dependencies, 'write', {
+        userId: user.id,
+      });
 
       const { deviceId } = request.body as { deviceId: string };
       if (!deviceId) {
@@ -3327,6 +3333,9 @@ export const buildV1Routes = (
       { schema: { body: savedRouteCreateRequestSchema } },
       async (request, reply) => {
         const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
         if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
 
         const payload = normalizeSavedRouteCreateRequest(request.body);
@@ -3369,8 +3378,11 @@ export const buildV1Routes = (
 
     app.delete<{ Params: { id: string } }>(
       '/saved-routes/:id',
-      async (request) => {
+      async (request, reply) => {
         const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
         if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
 
         const { error } = await supabaseAdmin
@@ -3390,8 +3402,11 @@ export const buildV1Routes = (
 
     app.patch<{ Params: { id: string } }>(
       '/saved-routes/:id/use',
-      async (request) => {
+      async (request, reply) => {
         const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
         if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
 
         const { error } = await supabaseAdmin

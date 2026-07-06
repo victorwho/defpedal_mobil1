@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -72,10 +73,21 @@ export default function CityHeartbeatScreen() {
   }
 
   if (error && !heartbeat) {
+    // Audit 2026-07-05 UX-3: never print the raw error string (leaks internal
+    // endpoint/RPC detail and reads as a crash) and never dead-end — offer a
+    // retry. The raw message still reaches Sentry via the query layer.
     return (
       <Screen title={screenTitle} headerVariant="back">
         <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{t('cityHeartbeat.loadFailed')}</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => refetch()}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text style={styles.retryButtonText}>{t('common.retry')}</Text>
+          </Pressable>
         </View>
       </Screen>
     );
@@ -314,6 +326,23 @@ const createThemedStyles = (colors: ThemeColors) =>
     errorText: {
       ...textSm,
       color: colors.danger,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: space[3],
+      minHeight: 44,
+      justifyContent: 'center',
+      alignSelf: 'center',
+      paddingHorizontal: space[6],
+      paddingVertical: space[2],
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    retryButtonText: {
+      ...textSm,
+      color: colors.accent,
+      fontFamily: fontFamily.body.semiBold,
       textAlign: 'center',
     },
 
