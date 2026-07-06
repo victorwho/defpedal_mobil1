@@ -99,6 +99,21 @@ export const enableSentry = () => {
         }
       }
 
+      const errorMsg = event.exception?.values?.[0]?.value ?? '';
+
+      // Distance validation guard — purely user-facing, not an app error.
+      if (errorMsg.startsWith('Route is too long for fast routing')) {
+        return null;
+      }
+
+      // NoSegment: expected condition when origin/destination isn't snappable
+      // to Mapbox's road network (pedestrian zones, private roads, cross-border
+      // fallback destinations). Not actionable — downgrade to warning so it
+      // doesn't pollute the error feed but remains visible for trend monitoring.
+      if (errorMsg.includes('NoSegment')) {
+        event.level = 'warning';
+      }
+
       return event;
     },
   });

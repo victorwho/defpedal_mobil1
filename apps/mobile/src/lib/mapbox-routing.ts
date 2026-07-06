@@ -248,6 +248,9 @@ const fetchMapboxRoutes = async (
   const data = (await response.json()) as RouteResponse;
 
   if (data.code !== 'Ok' || !data.routes?.length) {
+    if (data.code === 'NoSegment') {
+      throw new Error(`No cycling route found near this location. Try moving your pin closer to a road. (NoSegment)`);
+    }
     throw new Error(`Mapbox returned no routes (code: ${data.code})`);
   }
 
