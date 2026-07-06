@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
@@ -35,6 +35,15 @@ export interface SearchBarProps {
   suggestions?: AutocompleteSuggestion[];
   /** Recent destinations to show when field is focused but empty */
   recentDestinations?: readonly AutocompleteSuggestion[];
+  /** When provided, shows a "Current location" row at top of dropdown so user can reset to GPS */
+  onSelectCurrentLocation?: () => void;
+  /** Saved Home and Work places — shown as quick-pick rows in the empty dropdown */
+  savedPlaces?: {
+    home: AutocompleteSuggestion | null;
+    work: AutocompleteSuggestion | null;
+  };
+  /** Called when user long-presses a suggestion and picks "Save as Home/Work" */
+  onSavePlace?: (suggestion: AutocompleteSuggestion, type: 'home' | 'work') => void;
   onChangeText: (value: string) => void;
   onFocus: () => void;
   onClear: () => void;
@@ -139,6 +148,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   statusText,
   suggestions = [],
   recentDestinations = [],
+  onSelectCurrentLocation,
+  savedPlaces,
+  onSavePlace,
   onChangeText,
   onFocus,
   onClear,
@@ -154,6 +166,34 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const hasSearchedWithNoResults = !isLoading && !errorMessage && value.length >= 2 && suggestions.length === 0;
   const showSuggestions =
     active && (isLoading || Boolean(errorMessage) || suggestions.length > 0 || hasSearchedWithNoResults);
+
+  // Show "Current location" row at top of whichever dropdown is visible, or standalone if none
+  const showCurrentLocation = active && !!onSelectCurrentLocation;
+  const showStandaloneCurrentLocation = showCurrentLocation && !showRecents && !showSuggestions;
+
+  // Saved places — Home/Work quick-pick rows
+  const hasSavedPlaces = !!(savedPlaces?.home || savedPlaces?.work);
+  const valueLower = value.trim().toLowerCase();
+  // Keyword override: when user types 'home'/'work', inject saved place as the only suggestion
+  const keywordPlace =
+    valueLower === 'home' && savedPlaces?.home
+      ? savedPlaces.home
+      : valueLower === 'work' && savedPlaces?.work
+        ? savedPlaces.work
+        : null;
+  const showSavedPlacesSection = active && hasSavedPlaces && value.length === 0;
+  const showSavedPlacesStandalone = showSavedPlacesSection && !showRecents && !showStandaloneCurrentLocation;
+
+  // Helper: show save-as alert for a suggestion
+  const handleLongPress = onSavePlace
+    ? (suggestion: AutocompleteSuggestion) => {
+        Alert.alert(t('search.saveAs'), suggestion.primaryText, [
+          { text: t('search.saveAsHome'), onPress: () => onSavePlace(suggestion, 'home') },
+          { text: t('search.saveAsWork'), onPress: () => onSavePlace(suggestion, 'work') },
+          { text: 'Cancel', style: 'cancel' },
+        ]);
+      }
+    : undefined;
 
   return (
     <View style={styles.wrap}>
@@ -211,9 +251,83 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         </Text>
       ) : null}
 
+      {/* Standalone mini-dropdown: Current location + Saved places (no recents, no suggestions) */}
+      {(showStandaloneCurrentLocation || showSavedPlacesStandalone) ? (
+        <View
+          style={[
+            styles.suggestionSheet,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.borderDefault,
+            },
+            shadows.md,
+          ]}
+        >
+          {showCurrentLocation ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.suggestionButton,
+                { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+              ]}
+              onPress={onSelectCurrentLocation}
+              accessibilityRole="button"
+              accessibilityLabel={t('search.currentLocation')}
+            >
+              <Ionicons name="locate-outline" size={20} color={colors.accent} style={styles.suggestionIcon} />
+              <Text style={[textBase, { color: colors.accent, fontFamily: fontFamily.body.semiBold }]}>
+                {t('search.currentLocation')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {hasSavedPlaces ? (
+            <Text style={[textXs, { color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: space[2], paddingTop: space[1], paddingBottom: space[1] }]}>
+              {t('search.savedPlaces')}
+            </Text>
+          ) : null}
+          {(['home', 'work'] as const).map((type) => {
+            const place = savedPlaces?.[type];
+            const isHome = type === 'home';
+            return (
+              <Pressable
+                key={type}
+                style={({ pressed }) => [
+                  styles.suggestionButton,
+                  { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+                ]}
+                onPress={place ? () => onSelectSuggestion(place) : undefined}
+                accessibilityRole="button"
+                accessibilityLabel={isHome ? t('search.home') : t('search.work')}
+              >
+                <Ionicons
+                  name={isHome ? 'home-outline' : 'briefcase-outline'}
+                  size={20}
+                  color={place ? colors.accent : colors.textMuted}
+                  style={styles.suggestionIcon}
+                />
+                <View style={styles.suggestionText}>
+                  <Text style={[textBase, { color: place ? colors.textPrimary : colors.textMuted, fontFamily: fontFamily.body.semiBold }]}>
+                    {isHome ? t('search.home') : t('search.work')}
+                  </Text>
+                  {place ? (
+                    <Text style={[textSm, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {place.primaryText}
+                    </Text>
+                  ) : (
+                    <Text style={[textSm, { color: colors.textMuted }]}>
+                      {isHome ? t('search.setHome') : t('search.setWork')}
+                    </Text>
+                  )}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+
       {/* Recent destinations (shown when field is focused but empty) */}
       {showRecents ? (
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           style={[
             styles.suggestionSheet,
             {
@@ -224,6 +338,59 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             shadows.md,
           ]}
         >
+          {showCurrentLocation ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.suggestionButton,
+                { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+              ]}
+              onPress={onSelectCurrentLocation}
+              accessibilityRole="button"
+              accessibilityLabel={t('search.currentLocation')}
+            >
+              <Ionicons name="locate-outline" size={20} color={colors.accent} style={styles.suggestionIcon} />
+              <Text style={[textBase, { color: colors.accent, fontFamily: fontFamily.body.semiBold }]}>
+                {t('search.currentLocation')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {hasSavedPlaces ? (
+            <Text style={[textXs, { color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: space[2], paddingTop: space[1], paddingBottom: space[1] }]}>
+              {t('search.savedPlaces')}
+            </Text>
+          ) : null}
+          {(['home', 'work'] as const).map((type) => {
+            const place = savedPlaces?.[type];
+            const isHome = type === 'home';
+            if (!place) return null;
+            return (
+              <Pressable
+                key={type}
+                style={({ pressed }) => [
+                  styles.suggestionButton,
+                  { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+                ]}
+                onPress={() => onSelectSuggestion(place)}
+                accessibilityRole="button"
+                accessibilityLabel={isHome ? t('search.home') : t('search.work')}
+              >
+                <Ionicons
+                  name={isHome ? 'home-outline' : 'briefcase-outline'}
+                  size={20}
+                  color={colors.accent}
+                  style={styles.suggestionIcon}
+                />
+                <View style={styles.suggestionText}>
+                  <Text style={[textBase, { color: colors.textPrimary, fontFamily: fontFamily.body.semiBold }]}>
+                    {isHome ? t('search.home') : t('search.work')}
+                  </Text>
+                  <Text style={[textSm, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {place.primaryText}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
           <Text
             style={[
               textXs,
@@ -300,6 +467,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       {/* Suggestions dropdown */}
       {showSuggestions ? (
         <ScrollView
+          keyboardShouldPersistTaps="handled"
           style={[
             styles.suggestionSheet,
             {
@@ -310,6 +478,30 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             shadows.md,
           ]}
         >
+          {showCurrentLocation ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.suggestionButton,
+                { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+              ]}
+              onPress={onSelectCurrentLocation}
+              accessibilityRole="button"
+              accessibilityLabel={t('search.currentLocation')}
+            >
+              <Ionicons
+                name="locate-outline"
+                size={20}
+                color={colors.accent}
+                style={styles.suggestionIcon}
+              />
+              <Text
+                style={[textBase, { color: colors.accent, fontFamily: fontFamily.body.semiBold }]}
+              >
+                {t('search.currentLocation')}
+              </Text>
+            </Pressable>
+          ) : null}
+
           {isLoading ? (
             <View style={styles.helperRow}>
               <Spinner size={16} />
@@ -325,7 +517,35 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             </Text>
           ) : null}
 
-          {!isLoading && !errorMessage && suggestions.length === 0 ? (
+          {/* Keyword place: user typed 'home'/'work' and the place is saved */}
+          {keywordPlace && !isLoading ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.suggestionButton,
+                { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
+              ]}
+              onPress={() => onSelectSuggestion(keywordPlace)}
+              accessibilityRole="button"
+              accessibilityLabel={valueLower === 'home' ? t('search.home') : t('search.work')}
+            >
+              <Ionicons
+                name={valueLower === 'home' ? 'home-outline' : 'briefcase-outline'}
+                size={20}
+                color={colors.accent}
+                style={styles.suggestionIcon}
+              />
+              <View style={styles.suggestionText}>
+                <Text style={[textBase, { color: colors.accent, fontFamily: fontFamily.body.semiBold }]}>
+                  {valueLower === 'home' ? t('search.home') : t('search.work')}
+                </Text>
+                <Text style={[textSm, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {keywordPlace.primaryText}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+
+          {!isLoading && !errorMessage && suggestions.length === 0 && !keywordPlace ? (
             <Text style={[textSm, { color: colors.textSecondary }]}>
               {t('search.noMatches')}
             </Text>
@@ -333,6 +553,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
           {!isLoading &&
             !errorMessage &&
+            !keywordPlace &&
             suggestions.map((suggestion) => {
               const iconName = getSuggestionIcon(
                 suggestion.featureType,
@@ -348,6 +569,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
                   ]}
                   onPress={() => onSelectSuggestion(suggestion)}
+                  onLongPress={handleLongPress ? () => handleLongPress(suggestion) : undefined}
+                  delayLongPress={500}
                   accessibilityRole="button"
                   accessibilityLabel={`Select ${suggestion.primaryText}`}
                 >

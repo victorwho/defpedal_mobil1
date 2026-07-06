@@ -684,6 +684,15 @@ export const ro: TranslationKeys = {
     searching: 'Se caută locuri\u2026',
     noMatches: 'Niciun rezultat încă. Continuă să tastezi sau încearcă un reper din apropiere.',
     recent: 'Recente',
+    currentLocation: 'Locație curentă',
+    home: 'Acasă',
+    work: 'Serviciu',
+    setHome: 'Setează adresa de acasă',
+    setWork: 'Setează adresa de serviciu',
+    saveAs: 'Salvează locul ca…',
+    saveAsHome: 'Setează ca Acasă',
+    saveAsWork: 'Setează ca Serviciu',
+    savedPlaces: 'Locuri salvate',
   },
 
   // ── Weather ──

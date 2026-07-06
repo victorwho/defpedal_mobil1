@@ -101,6 +101,14 @@ const splitDisplayLabel = (label: string): LocationDisplay => {
   };
 };
 
+const isSavedPlaceKeyword = (
+  query: string,
+  places: { home: AutocompleteSuggestion | null; work: AutocompleteSuggestion | null },
+) => {
+  const q = query.trim().toLowerCase();
+  return (q === 'home' && !!places.home) || (q === 'work' && !!places.work);
+};
+
 export default function RoutePlanningScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -223,6 +231,8 @@ export default function RoutePlanningScreen() {
   // Set homeLocation on first GPS fix if not already set (used by telemetry)
   const homeLocation = useAppStore((state) => state.homeLocation);
   const setHomeLocation = useAppStore((state) => state.setHomeLocation);
+  const savedPlaces = useAppStore((state) => state.savedPlaces);
+  const setSavedPlace = useAppStore((state) => state.setSavedPlace);
   useEffect(() => {
     if (!homeLocation && currentLocation) {
       setHomeLocation({ lat: currentLocation.lat, lon: currentLocation.lon });
@@ -649,7 +659,8 @@ export default function RoutePlanningScreen() {
     enabled:
       Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'startOverride' &&
-      deferredStartOverrideQuery.length >= 2,
+      deferredStartOverrideQuery.length >= 2 &&
+      !isSavedPlaceKeyword(deferredStartOverrideQuery, savedPlaces),
   });
 
   const destinationAutocompleteQuery = useQuery({
@@ -668,7 +679,8 @@ export default function RoutePlanningScreen() {
     enabled:
       Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'destination' &&
-      deferredDestinationQuery.length >= 2,
+      deferredDestinationQuery.length >= 2 &&
+      !isSavedPlaceKeyword(deferredDestinationQuery, savedPlaces),
   });
 
   // Merge matching recent ride destinations into autocomplete results.
@@ -1020,7 +1032,7 @@ export default function RoutePlanningScreen() {
                 value={startOverrideQuery}
                 placeholder="Search a different start point"
                 active
-                isLoading={startOverrideAutocompleteQuery.isPending}
+                isLoading={startOverrideAutocompleteQuery.isFetching}
                 errorMessage={
                   startOverrideAutocompleteQuery.isError
                     ? startOverrideAutocompleteQuery.error.message
@@ -1040,6 +1052,9 @@ export default function RoutePlanningScreen() {
                   handleStartOverrideSelect(suggestion);
                   setActiveField(null);
                 }}
+                onSelectCurrentLocation={clearStartOverride}
+                savedPlaces={savedPlaces}
+                onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
               />
               <Pressable
                 style={styles.cancelButton}
@@ -1080,7 +1095,7 @@ export default function RoutePlanningScreen() {
                 value={destinationQuery}
                 placeholder={isOnline ? 'Where to?' : 'Connect to internet to search'}
                 active={isOnline && activeField === 'destination'}
-                isLoading={destinationAutocompleteQuery.isPending}
+                isLoading={destinationAutocompleteQuery.isFetching}
                 errorMessage={
                   destinationAutocompleteQuery.isError
                     ? destinationAutocompleteQuery.error.message
@@ -1102,6 +1117,8 @@ export default function RoutePlanningScreen() {
                   setActiveField('destination');
                 }}
                 onSelectSuggestion={handleDestinationSelect}
+                savedPlaces={savedPlaces}
+                onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
               />
               {hasValidDestination ? (
                 <Pressable
@@ -1129,7 +1146,7 @@ export default function RoutePlanningScreen() {
                     value={waypointQueries[index] ?? ''}
                     placeholder="Search for a stop"
                     active
-                    isLoading={waypointAutocompleteQuery.isPending}
+                    isLoading={waypointAutocompleteQuery.isFetching}
                     errorMessage={
                       waypointAutocompleteQuery.isError
                         ? waypointAutocompleteQuery.error.message
@@ -1147,6 +1164,8 @@ export default function RoutePlanningScreen() {
                     }}
                     onClear={() => handleRemoveWaypoint(index)}
                     onSelectSuggestion={(s) => handleWaypointSelect(index, s)}
+                    savedPlaces={savedPlaces}
+                    onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
                   />
                 </View>
               ) : (
@@ -1261,6 +1280,8 @@ export default function RoutePlanningScreen() {
                     setActiveField(null);
                   }}
                   onSelectSuggestion={(s) => handleWaypointSelect(waypoints.length, s)}
+                  savedPlaces={savedPlaces}
+                  onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
                 />
               </View>
             </View>

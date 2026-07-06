@@ -692,6 +692,15 @@ export const en = {
     searching: 'Searching places\u2026',
     noMatches: 'No matches yet. Keep typing or try a nearby landmark.',
     recent: 'Recent',
+    currentLocation: 'Current location',
+    home: 'Home',
+    work: 'Work',
+    setHome: 'Set home address',
+    setWork: 'Set work address',
+    saveAs: 'Save this place as\u2026',
+    saveAsHome: 'Set as Home',
+    saveAsWork: 'Set as Work',
+    savedPlaces: 'Saved places',
   },
 
   // ── Weather ──

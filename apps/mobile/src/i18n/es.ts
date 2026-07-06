@@ -684,6 +684,15 @@ export const es: TranslationKeys = {
     searching: 'Buscando lugares…',
     noMatches: 'Aún no hay resultados. Sigue escribiendo o prueba un punto de referencia cercano.',
     recent: 'Recientes',
+    currentLocation: 'Ubicación actual',
+    home: 'Casa',
+    work: 'Trabajo',
+    setHome: 'Guardar dirección de casa',
+    setWork: 'Guardar dirección de trabajo',
+    saveAs: 'Guardar este lugar como…',
+    saveAsHome: 'Establecer como Casa',
+    saveAsWork: 'Establecer como Trabajo',
+    savedPlaces: 'Lugares guardados',
   },
 
   // ── Weather ──

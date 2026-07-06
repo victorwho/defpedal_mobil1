@@ -1,4 +1,5 @@
 import type {
+  CityHeartbeat,
   Coordinate,
   CyclingGoal,
   HazardVoteDirection,
@@ -131,6 +132,7 @@ type AppStore = QueueSlice & {
     totalMoneyEur: number;
     totalHazardsWarned: number;
   } | null;
+  cachedCityHeartbeat: CityHeartbeat | null;
   locale: Locale;
   // True once the rider has explicitly picked a language in Profile. Until
   // then the app follows the device locale (auto-detected on first run +
@@ -179,9 +181,15 @@ type AppStore = QueueSlice & {
   userHazardVotes: Record<string, HazardVoteDirection>;
   setUserHazardVote: (hazardId: string, direction: HazardVoteDirection) => void;
   clearUserHazardVote: (hazardId: string) => void;
-  // ── Home Location ──
+  // ── Home Location (telemetry only — lat/lon approximation) ──
   homeLocation: { lat: number; lon: number } | null;
   setHomeLocation: (loc: { lat: number; lon: number }) => void;
+  // ── Saved Places (Home / Work) — rich location with label for navigation ──
+  savedPlaces: {
+    home: import('@defensivepedal/core').AutocompleteSuggestion | null;
+    work: import('@defensivepedal/core').AutocompleteSuggestion | null;
+  };
+  setSavedPlace: (type: 'home' | 'work', place: import('@defensivepedal/core').AutocompleteSuggestion | null) => void;
   pendingBadgeUnlocks: readonly import('@defensivepedal/core').BadgeUnlockEvent[];
   enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;
@@ -233,6 +241,7 @@ type AppStore = QueueSlice & {
   incrementAnonymousOpenCount: () => void;
   resetAnonymousOpenCount: () => void;
   setCyclingGoal: (goal: CyclingGoal | null) => void;
+  setCachedCityHeartbeat: (heartbeat: CityHeartbeat) => void;
   setCachedStreak: (streak: StreakState | null) => void;
   setCachedImpact: (impact: {
     totalCo2Kg: number;
@@ -389,6 +398,7 @@ export const useAppStore = create<AppStore>()(
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
+      cachedCityHeartbeat: null,
       // Fresh installs follow the device language; overridden by persisted
       // value on hydration, and by an explicit pick via `setLocale`.
       locale: getDeviceLocale(),
@@ -456,6 +466,10 @@ export const useAppStore = create<AppStore>()(
       homeLocation: null,
       setHomeLocation: (loc: { lat: number; lon: number }) =>
         set(() => ({ homeLocation: loc })),
+      // ── Saved Places ──
+      savedPlaces: { home: null, work: null },
+      setSavedPlace: (type, place) =>
+        set((state) => ({ savedPlaces: { ...state.savedPlaces, [type]: place } })),
       addRecentDestination: (destination) =>
         set((state) => {
           // Remove existing entry with same coordinates (de-duplicate)
@@ -580,6 +594,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ anonymousOpenCount: 0 })),
       setCyclingGoal: (goal) =>
         set(() => ({ cyclingGoal: goal })),
+      setCachedCityHeartbeat: (heartbeat) =>
+        set(() => ({ cachedCityHeartbeat: heartbeat })),
       setCachedStreak: (streak) =>
         set(() => ({ cachedStreak: streak })),
       setCachedImpact: (impact) =>
@@ -1133,6 +1149,7 @@ export const useAppStore = create<AppStore>()(
         cyclingGoal: state.cyclingGoal,
         cachedStreak: state.cachedStreak,
         cachedImpact: state.cachedImpact,
+        cachedCityHeartbeat: state.cachedCityHeartbeat,
         notificationPermissionAsked: state.notificationPermissionAsked,
         ratingSkipCount: state.ratingSkipCount,
         reviewPromptState: state.reviewPromptState,
@@ -1151,6 +1168,7 @@ export const useAppStore = create<AppStore>()(
         locale: state.locale,
         localeExplicitlySet: state.localeExplicitlySet,
         homeLocation: state.homeLocation,
+        savedPlaces: state.savedPlaces,
         // pendingShareClaim persisted — survives redirect-to-onboarding
         // that can drop in-memory state before auth finishes. Attempts
         // are intentionally NOT persisted (reset on cold start).

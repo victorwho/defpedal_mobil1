@@ -56,7 +56,7 @@ const hazardLabel = (type: HazardType | string): string =>
 export default function CityHeartbeatScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const { heartbeat, isLoading, error, refetch } = useCityHeartbeat();
+  const { heartbeat, isLoading, isRefreshing, error, refetch } = useCityHeartbeat();
   const t = useT();
   const screenTitle = t('cityHeartbeat.title');
 
@@ -98,7 +98,7 @@ export default function CityHeartbeatScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
+            refreshing={isLoading || isRefreshing}
             onRefresh={refetch}
             tintColor={colors.accent}
           />
