@@ -3,6 +3,12 @@
 import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+// Explicit module import instead of the global `GeoJSON` namespace: the
+// namespace only exists while @types/mapbox-gl (a deprecated stub since
+// mapbox-gl ships its own types) transitively pulls @types/geojson — a
+// mapbox-gl bump removes it and breaks the build (Dependabot PR #41,
+// 2026-07-06). @types/geojson is now a direct devDependency.
+import type { Feature } from 'geojson';
 import { decodePolyline, type RouteShareRiskCategory } from '@defensivepedal/core';
 import type { RouteSharePublicView } from '../lib/routeShareTypes';
 
@@ -32,7 +38,7 @@ function computeBounds(coords: Array<[number, number]>): mapboxgl.LngLatBounds {
 function buildSegmentFeatures(
   coords: Array<[number, number]>,
   riskSegments: RouteSharePublicView['route']['riskSegments'],
-): GeoJSON.Feature[] {
+): Feature[] {
   if (riskSegments.length === 0) {
     return [
       {
@@ -42,7 +48,7 @@ function buildSegmentFeatures(
       },
     ];
   }
-  const features: GeoJSON.Feature[] = [];
+  const features: Feature[] = [];
   for (const seg of riskSegments) {
     const slice = coords.slice(
       Math.max(0, seg.startIndex),

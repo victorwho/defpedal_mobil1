@@ -18,6 +18,25 @@ updates:
         update-types:
           - minor
           - patch
+    # Native-coupled packages move ONLY during a deliberate Expo SDK / RN
+    # upgrade project — this repo pins Expo SDK 55 / RN 0.83, and even a
+    # semver-minor react-native bump is a native migration. Dependabot's
+    # first sweep (2026-07-06) proposed expo-* SDK 57 majors and RN 0.86
+    # inside the grouped PR; all would break the native builds.
+    ignore:
+      - dependency-name: 'expo'
+      - dependency-name: 'expo-*'
+      - dependency-name: '@expo/*'
+      - dependency-name: 'react-native'
+      - dependency-name: 'react-native-*'
+      - dependency-name: '@react-native/*'
+      - dependency-name: '@react-native-community/*'
+      - dependency-name: '@react-native-google-signin/*'
+      - dependency-name: '@rnmapbox/*'
+      - dependency-name: '@sentry/react-native'
+      - dependency-name: 'posthog-react-native'
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
   - package-ecosystem: docker
     directory: /services/mobile-api
     schedule:
