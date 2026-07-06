@@ -23,8 +23,8 @@
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@rnmapbox/maps": "^10.1.41",
     "@sentry/react-native": "^8.4.0",
-    "@supabase/supabase-js": "^2.56.1",
-    "@tanstack/react-query": "^5.83.1",
+    "@supabase/supabase-js": "^2.110.0",
+    "@tanstack/react-query": "^5.101.2",
     "expo": "~55.0.6",
     "expo-apple-authentication": "~55.0.13",
     "expo-application": "~55.0.9",
@@ -61,20 +61,20 @@
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
     "react-native-view-shot": "4.0.3",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/react-native": "^13.3.3",
     "@types/react": "^19.2.2",
-    "@typescript-eslint/parser": "^8.15.0",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@typescript-eslint/parser": "^8.63.0",
+    "@vitejs/plugin-react": "^6.0.3",
     "eslint": "^8.57.1",
-    "happy-dom": "^20.8.9",
+    "happy-dom": "^20.10.6",
     "jsdom": "^25.0.1",
     "react-native-web": "^0.21.2",
-    "react-test-renderer": "^19.2.1",
+    "react-test-renderer": "^19.2.7",
     "typescript": "~5.8.2"
   }
 }
