@@ -36,7 +36,7 @@
     "expo-font": "~55.0.4",
     "expo-haptics": "~55.0.8",
     "expo-image-picker": "~55.0.16",
-    "expo-keep-awake": "~55.0.4",
+    "expo-keep-awake": "~57.0.0",
     "expo-location": "~55.1.2",
     "expo-media-library": "~55.0.14",
     "expo-notifications": "~55.0.16",
