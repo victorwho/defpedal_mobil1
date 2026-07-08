@@ -263,6 +263,10 @@ type AppStore = QueueSlice & {
    * nudges. Mirrors profiles.notify_streak. */
   notifyStreak: boolean;
   setNotifyStreak: (enabled: boolean) => void;
+  /** Master switch for ALL Pedal nudges (audit 2026-07-05 UX-14). Mirrors
+   * profiles.notify_pedal_nudges; false silences every trigger server-side. */
+  notifyPedalNudges: boolean;
+  setNotifyPedalNudges: (enabled: boolean) => void;
   /** One-time onboarding card explaining Pedal's voice. Persisted so the
    * card only ever appears once per device. */
   hasSeenMeetPedalCard: boolean;
@@ -618,6 +622,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ quietHoursStart: start, quietHoursEnd: end })),
       setPedalVoiceSassy: (enabled) => set(() => ({ pedalVoiceSassy: enabled })),
       setNotifyStreak: (enabled) => set(() => ({ notifyStreak: enabled })),
+      notifyPedalNudges: true,
+      setNotifyPedalNudges: (enabled) => set(() => ({ notifyPedalNudges: enabled })),
       setHasSeenMeetPedalCard: (seen) => set(() => ({ hasSeenMeetPedalCard: seen })),
       showBicycleLanes: true,
       poiVisibility: {
@@ -1143,6 +1149,7 @@ export const useAppStore = create<AppStore>()(
         quietHoursEnd: state.quietHoursEnd,
         pedalVoiceSassy: state.pedalVoiceSassy,
         notifyStreak: state.notifyStreak,
+        notifyPedalNudges: state.notifyPedalNudges,
         hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,

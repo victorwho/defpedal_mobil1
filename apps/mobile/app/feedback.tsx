@@ -35,6 +35,7 @@ import { Button, Surface } from '../src/design-system/atoms';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { ReviewPromptCard } from '../src/design-system/organisms/ReviewPromptCard';
+import { useCelebrationStage } from '../src/design-system/hooks/useCelebrationStage';
 import { mascotPoses } from '../src/design-system/tokens/mascotPoses';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -564,6 +565,11 @@ export default function FeedbackScreen() {
 
   // Milestone detection
   const [pendingMilestone, setPendingMilestone] = useState<MilestoneKey | null>(null);
+  // Audit 2026-07-05 UX-12: register the milestone modal with the celebration
+  // coordinator so it can't render its backdrop UNDER the root-level badge /
+  // rank-up overlays. It's lowest priority, so those pop first; this modal
+  // only shows once it holds the stage.
+  const canShowMilestone = useCelebrationStage('milestone', pendingMilestone != null);
 
   useEffect(() => {
     if (!dashboard) return;
@@ -722,7 +728,7 @@ export default function FeedbackScreen() {
       ) : null}
 
       {/* Milestone share modal */}
-      {pendingMilestone ? (
+      {pendingMilestone && canShowMilestone ? (
         <Modal
           visible
           onClose={handleDismissMilestone}

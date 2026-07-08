@@ -361,6 +361,14 @@ const routeOptionSchema = {
     totalClimbMeters: {
       type: ['number', 'null'],
     },
+    // Audit 2026-07-05 API-1: normalizeRoutePreviewResponse sets this on every
+    // route option but the schema omitted it, so Fastify silently stripped it
+    // (Gotcha #9). Optional — the normalizer emits undefined when elevation
+    // wasn't computed, so it stays out of `required`.
+    elevationProfile: {
+      type: 'array',
+      items: { type: 'number' },
+    },
     steps: {
       type: 'array',
       items: navigationStepSchema,

@@ -640,7 +640,10 @@ function RoutePreviewScreen() {
       {previewQuery.isError ? (
         <View style={styles.warningPanel}>
           <Text style={styles.warningTitle}>{t('preview.previewFailed')}</Text>
-          <Text style={styles.warningBody}>{previewQuery.error.message}</Text>
+          {/* Audit 2026-07-05 UX-4: localized copy, not the raw
+              Mapbox/OSRM error string. Raw message already goes to Sentry via
+              the query layer. */}
+          <Text style={styles.warningBody}>{t('preview.previewFailedBody')}</Text>
           <Button
             variant="ghost"
             size="sm"

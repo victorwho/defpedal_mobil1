@@ -33,7 +33,7 @@ const TIER_FROM_LEVEL: Record<number, BadgeTier> = {
   5: 'diamond',
 };
 
-export const BadgeCard: React.FC<BadgeCardProps> = ({
+const BadgeCardComponent: React.FC<BadgeCardProps> = ({
   badge,
   earned,
   earnedTier,
@@ -126,3 +126,8 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
     </Pressable>
   );
 };
+
+// Audit 2026-07-05 QUAL-5: the one Trophy Case list-item component that wasn't
+// memoized (siblings TripCard / FeedCard / ActivityFeedCard / LeaderboardRow
+// all are). Wraps the relatively heavy BadgeVisual/HoloSticker per cell.
+export const BadgeCard = React.memo(BadgeCardComponent);

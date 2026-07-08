@@ -17,6 +17,7 @@ export * from './routeAnalysis';
 export * from './reviewEligibility';
 export * from './ridePattern';
 export * from './riskDistribution';
+export * from './savedPlaceKeywords';
 export * from './shareCaption';
 export * from './shareCodeGenerator';
 export * from './shareDeepLinkBuilder';

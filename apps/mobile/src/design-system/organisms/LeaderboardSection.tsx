@@ -140,10 +140,11 @@ export function LeaderboardSection() {
         </View>
       )}
 
-      {/* Error state */}
+      {/* Error state — audit 2026-07-05 UX-4: localized copy, not the raw
+          Supabase/API error string. */}
       {error && !isLoading && (
         <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{t('leaderboard.loadFailed')}</Text>
           <Button onPress={refetch} variant="secondary" size="sm">{t('common.retry')}</Button>
         </View>
       )}

@@ -844,6 +844,8 @@ export interface ProfileUpdateRequest {
   notifyHazard?: boolean;
   notifyCommunity?: boolean;
   notifyStreak?: boolean;
+  /** Master switch for the Pedal nudge system — audit 2026-07-05 UX-14. */
+  notifyPedalNudges?: boolean;
   notifyImpactSummary?: boolean;
   quietHoursStart?: string | null;
   quietHoursEnd?: string | null;

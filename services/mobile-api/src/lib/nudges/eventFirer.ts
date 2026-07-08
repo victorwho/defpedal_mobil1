@@ -23,6 +23,7 @@ import { supabaseAdmin } from '../supabaseAdmin';
 interface ProfileRow {
   id: string;
   display_name: string | null;
+  notify_pedal_nudges: boolean | null;
   notify_streak: boolean | null;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
@@ -31,7 +32,7 @@ interface ProfileRow {
 }
 
 const PROFILE_COLUMNS =
-  'id, display_name, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
+  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
 
 const toProfile = (row: ProfileRow): UserNudgeProfile => ({
   userId: row.id,
@@ -39,6 +40,7 @@ const toProfile = (row: ProfileRow): UserNudgeProfile => ({
   // here it's a full user. Setting `true` keeps eligibility from short-
   // circuiting on a column that doesn't exist on profiles.
   hasEmail: true,
+  notifyPedalNudges: row.notify_pedal_nudges ?? true,
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',
   quietHoursEnd: row.quiet_hours_end ?? '07:00',

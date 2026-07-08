@@ -1,6 +1,34 @@
 # Defensive Pedal — Full Codebase Audit
 
-**Generated:** 2026-07-05 · **Revised:** 2026-07-06 (rev 1) · **Fixes applied:** 2026-07-06 (rev 2)
+**Generated:** 2026-07-05 · **Revised:** 2026-07-06 (rev 1) · **Fixes applied:** 2026-07-06 (rev 2), 2026-07-08 (rev 3)
+
+> **Revision 3 (2026-07-08) — second fix pass ("best next bite").** Cleared the highest-leverage remaining backlog. Verified end-to-end: typecheck 0; core 762/762, mobile-api 535/535, mobile 1179/1179; lint 0; bundle 200.
+>
+> | Finding | Status | Notes |
+> |---|---|---|
+> | SCALE-7 (P1) | **FIXED + LIVE** | Migration `202607070001`: GiST on `trips.start_location` + btree `started_at`. `EXPLAIN` confirms `get_neighborhood_leaderboard` now index-scans (was seq-scan/view). |
+> | SCALE-8 (P1) | **FIXED + LIVE** | Same migration: **expression** GiST on the hazards JSONB point. Both live RPCs (`get_nearby_hazards`, leaderboard hazards branch) share the exact expression, so ZERO RPC rewrites — `EXPLAIN` confirms `Index Scan using idx_hazards_location_geo`. Simpler than the audit's generated-column plan. |
+> | SCALE-11 (P1) | **FIXED + LIVE** | Migration `202607070002`: retention batch 200→5000 + partial index; backlog already drained (0 rows) so pure future-proofing. |
+> | INFRA-2 (P2) | **FIXED + LIVE** | Found **3** live `record_ride_impact` overloads (worse drift than suspected). Migration `202607070003` drops the 2 stale ones, re-creates the 11-param with a trip-ownership guard (`TRIP_NOT_OWNED`→403 in `v1.ts`); repo now matches live. |
+> | PERF-4 (P2) | **FIXED** | Weekly-impact cron: 1+2N sequential queries → constant grouped queries (`loadWeekImpactByUser`/`loadSentCountsByUser`, 500-id chunks). New test file (2 tests). |
+> | API-1 (P3) | **FIXED** | `elevationProfile` added to `routeOptionSchema` (was silently stripped). |
+> | UX-14 (P3) | **FIXED + LIVE** | Master "Pedal nudges" opt-out full-stack: migration `202607070004` (`notify_pedal_nudges`), eligibility master gate (suppresses **every** trigger incl. P0s, +2 tests), profile PATCH/schema/contracts, mobile store + toggle row + en/ro/es. |
+> | PERF-1 (P2) | **FIXED** | Mascot PNGs downscaled 1024-2194px → 360px master via `scripts/process-mascot-images.py`: **15MB → 1MB (92% smaller)**, filenames unchanged. |
+> | PERF-5 (P3) | **FIXED** | `daily-weather-notification.ts` fetch now has AbortController + 10s timeout. |
+> | QUAL-2 (P2) | **FIXED** | Overpass client trio → shared `createOverpassPointClient` factory (`overpassClient.ts`); the 3 files are thin wrappers, exports/signatures unchanged, existing 45 tests pass untouched. |
+> | QUAL-5 (P3) | **FIXED** | `BadgeCard` wrapped in `React.memo` (last un-memoized list item). |
+> | UX-4 (P3) | **FIXED** | Raw `error.message` replaced with localized copy on route-preview / navigation reroute / leaderboard (en/ro/es); raw still to Sentry. |
+> | UX-12 (P3) | **FIXED** | Milestone share modal joined the celebration coordinator (`CelebrationKind` += `milestone`, lowest priority) so it no longer double-backdrops under root badge/rank-up overlays. |
+> | UX-17 (P3) | **FIXED** | Shared `matchSavedPlaceKeyword` in core (en/ro/es synonyms, diacritic-insensitive, +5 tests) wired into both the route-planning fetch-suppression and the SearchBar row-injection so they can't drift. |
+> | INFRA-3 (P3) | **FIXED** | Dockerfile pinned to `node:22-alpine@sha256:16e2…c3e2` (both stages). |
+>
+> **Assessed, deferred with reason:**
+> - **INFRA-4 (P3, CI coverage gate):** dry-ran coverage — **core passes (92.96%)** but the **mobile-api coverage provider is broken** (`@vitest/coverage-istanbul@4.x` errors: missing `BaseCoverageProvider` export). Flipping a repo-wide `--coverage` CI gate now would RED the build, so per the audit's own "dry-run first" caution the gate is NOT wired. Fixing the provider version mismatch is a separate dependency-reconciliation task.
+> - **UX-16 (P3, saved-places discoverability):** deferred — adding hint toasts, a clear-affordance, and long-press-to-remove is speculative gesture/UX redesign, not a mechanical fix; out of scope for a quick-win bite.
+>
+> **Still open (unchanged from rev 2):** ops items (Memorystore SCALE-1, Cloud Run flags SCALE-3, OSRM instance group SCALE-4 ops half, third-party plans SCALE-15/16/17, Supabase tier SCALE-20), L reworks (nudge cron SCALE-5/6, v1.ts split QUAL-1, RouteMap thumbnailMode PERF-2/3 mobile side), pre-100k checklist scalability P2s (SCALE-2/9/10/12/13/18/19), QUAL-3 (`as any`), QUAL-4 (dispatcher/HoloSticker tests), API-2, UX-6 (quiet-hours editor).
+>
+> **Deploy status (rev 3):** DB migrations `202607070001-04` all applied live; API code fixes (INFRA-2 403 map, PERF-4, API-1 schema, UX-14 gate) need a Cloud Run deploy to go live; mobile fixes need a new preview build. The DB-layer guards (ownership check, indexes, master-nudge column) are already live.
 
 > **Revision 2 (2026-07-06) — fix application pass.** The following findings were FIXED in code, each verified by running the relevant test suite (final gate: typecheck 0 errors; core 757/757, mobile-api 531/531, mobile 1178/1178 tests green; lint ratchet clean; bundle check HTTP 200):
 >

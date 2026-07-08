@@ -88,6 +88,7 @@ export const ro: TranslationKeys = {
     routeComparison: 'Comparație trasee',
     previewLoading: 'Se încarcă previzualizarea',
     previewFailed: 'Previzualizare eșuată',
+    previewFailedBody: 'Nu am putut calcula acest traseu. Verifică conexiunea și încearcă din nou.',
     noRoutes: 'Niciun traseu disponibil',
     noRoutesBody: 'Serverul nu a returnat alternative pentru această cerere. Încearcă modul rapid sau o destinație diferită.',
     noRouteSelected: 'Niciun traseu selectat',
@@ -143,6 +144,7 @@ export const ro: TranslationKeys = {
     offRouteCountdown: 'În afara traseului. Redirecționare automată în {{seconds}}s.',
     offRouteReady: 'În afara traseului. Redirecționare manuală disponibilă.',
     rerouting: 'Se solicită un traseu nou de la poziția GPS.',
+    rerouteFailed: 'Nu am putut recalcula traseul. Atinge pentru a reîncerca.',
     rerouteNow: 'Redirecționează acum',
     retryGps: 'Reîncearcă GPS',
     gpsLive: 'GPS activ',
@@ -391,6 +393,9 @@ export const ro: TranslationKeys = {
     keepFullGpsHistoryOff: 'Rezumatele curselor sunt păstrate pentru totdeauna; urmele GPS brute sunt eliminate automat după 90 de zile. Distanța, CO2 și insignele nu sunt afectate.',
     // ── Pedal Nudges section ──
     sectionPedalNudges: 'Notificări Pedal',
+    nudgeMaster: 'Notificări Pedal',
+    nudgeMasterOn: 'Pedal îți poate trimite mementouri și felicitări',
+    nudgeMasterOff: 'Toate notificările Pedal sunt oprite',
     pedalVoice: 'Vocea lui Pedal',
     pedalVoiceSassy: 'Cu umor',
     pedalVoiceNeutral: 'Neutră',
@@ -1075,6 +1080,7 @@ export const ro: TranslationKeys = {
   // ── Leaderboard ──
   leaderboard: {
     title: 'Clasament de cartier',
+    loadFailed: 'Nu am putut încărca clasamentul. Trage pentru reîmprospătare sau încearcă din nou.',
     tabs: {
       co2: 'CO2 economisit',
       hazards: 'Pericole raportate',

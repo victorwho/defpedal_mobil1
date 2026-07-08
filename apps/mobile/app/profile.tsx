@@ -137,7 +137,7 @@ export default function ProfileScreen() {
     shareTripsPublicly, themePreference, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
-    pedalVoiceSassy, notifyStreak, weightKg,
+    pedalVoiceSassy, notifyStreak, notifyPedalNudges, weightKg,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -161,6 +161,7 @@ export default function ProfileScreen() {
     reviewPromptOptedOut: state.reviewPromptState.optedOut,
     pedalVoiceSassy: state.pedalVoiceSassy,
     notifyStreak: state.notifyStreak,
+    notifyPedalNudges: state.notifyPedalNudges,
     weightKg: state.weightKg,
   })));
 
@@ -171,7 +172,7 @@ export default function ProfileScreen() {
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
-    setPedalVoiceSassy, setNotifyStreak, setWeightKg,
+    setPedalVoiceSassy, setNotifyStreak, setNotifyPedalNudges, setWeightKg,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -194,6 +195,7 @@ export default function ProfileScreen() {
     setReviewOptOut: state.setReviewOptOut,
     setPedalVoiceSassy: state.setPedalVoiceSassy,
     setNotifyStreak: state.setNotifyStreak,
+    setNotifyPedalNudges: state.setNotifyPedalNudges,
     setWeightKg: state.setWeightKg,
   })));
 
@@ -755,6 +757,23 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <SectionTitle variant="accent">{t('profile.sectionPedalNudges')}</SectionTitle>
 
+            {/* Audit 2026-07-05 UX-14: master switch. When off, every nudge
+                trigger is suppressed server-side (profiles.notify_pedal_nudges),
+                so the per-category rows below are disabled to make that clear. */}
+            <SettingRow
+              label={t('profile.nudgeMaster')}
+              description={
+                notifyPedalNudges
+                  ? t('profile.nudgeMasterOn')
+                  : t('profile.nudgeMasterOff')
+              }
+              checked={notifyPedalNudges}
+              onChange={(checked) => {
+                setNotifyPedalNudges(checked);
+                syncNotifPref({ notifyPedalNudges: checked });
+              }}
+            />
+
             <SettingRow
               label={t('profile.pedalVoice')}
               description={
@@ -763,6 +782,7 @@ export default function ProfileScreen() {
                   : t('profile.pedalVoiceNeutralDesc')
               }
               checked={pedalVoiceSassy}
+              disabled={!notifyPedalNudges}
               onChange={(checked) => {
                 setPedalVoiceSassy(checked);
                 if (user) {
@@ -783,6 +803,7 @@ export default function ProfileScreen() {
                   : t('profile.nudgeCategoryStreakOff')
               }
               checked={notifyStreak}
+              disabled={!notifyPedalNudges}
               onChange={(checked) => {
                 setNotifyStreak(checked);
                 syncNotifPref({ notifyStreak: checked });

@@ -89,6 +89,7 @@ const fetchPushTokens = async (userId: string): Promise<string[]> => {
 interface ProfileRow {
   id: string;
   display_name: string | null;
+  notify_pedal_nudges: boolean | null;
   notify_streak: boolean | null;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
@@ -103,6 +104,7 @@ const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
   // sees only users who already opted into `notify_streak`, so it treats
   // them as full users for eligibility purposes.
   hasEmail: true,
+  notifyPedalNudges: row.notify_pedal_nudges ?? true,
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',
   quietHoursEnd: row.quiet_hours_end ?? '07:00',
@@ -110,7 +112,7 @@ const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
 });
 
 const PROFILE_COLUMNS =
-  'id, display_name, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
+  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
 
 /**
  * Triggers whose intended follow-up action is "complete a ride / qualify

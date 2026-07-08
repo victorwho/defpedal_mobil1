@@ -86,11 +86,16 @@ describe("LeaderboardSection", () => {
     expect(screen.getByText("Neighborhood Leaderboard")).toBeTruthy();
   });
 
-  it("shows error message and retry button on error", () => {
+  it("shows localized error message and retry button on error", () => {
+    // Audit 2026-07-05 UX-4: the raw error string is no longer rendered — a
+    // localized message is shown instead (useT is unmocked → real en.ts copy).
     const refetch = vi.fn();
     mockUseLeaderboard.mockReturnValue({ data: undefined, isLoading: false, error: "Network error", refetch });
     render(React.createElement(LeaderboardSection, null));
-    expect(screen.getByText("Network error")).toBeTruthy();
+    expect(screen.queryByText("Network error")).toBeNull();
+    expect(
+      screen.getByText("Couldn't load the leaderboard. Pull to refresh or try again."),
+    ).toBeTruthy();
     expect(screen.getByText("Retry")).toBeTruthy();
   });
 

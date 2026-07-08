@@ -21,13 +21,20 @@
  * without the store or React.
  */
 
-export type CelebrationKind = 'badge' | 'rankup' | 'meetpedal';
+export type CelebrationKind = 'badge' | 'rankup' | 'meetpedal' | 'milestone';
 
-/** Highest priority first. */
+/**
+ * Highest priority first. `milestone` (audit 2026-07-05 UX-12) is the
+ * post-ride share modal on the feedback screen — it's a screen-local Modal,
+ * not a root overlay, so before joining the stage it rendered UNDER the
+ * root-level badge/rank-up overlays (double backdrop). It sits lowest: the
+ * root celebrations pop first, then the milestone modal takes the stage.
+ */
 export const CELEBRATION_PRIORITY: readonly CelebrationKind[] = [
   'badge',
   'rankup',
   'meetpedal',
+  'milestone',
 ];
 
 export type CelebrationWants = Record<CelebrationKind, boolean>;
@@ -36,6 +43,7 @@ export const INITIAL_CELEBRATION_WANTS: CelebrationWants = {
   badge: false,
   rankup: false,
   meetpedal: false,
+  milestone: false,
 };
 
 /**

@@ -10,6 +10,7 @@ import {
 const baseProfile: UserNudgeProfile = {
   userId: 'user-1',
   hasEmail: true,
+  notifyPedalNudges: true,
   notifyStreak: true,
   quietHoursStart: '22:00',
   quietHoursEnd: '07:00',
@@ -80,6 +81,40 @@ describe('evaluateEligibility — anonymous gate', () => {
       now: NOON_BUCHAREST,
     });
     expect(result.eligible).toBe(false);
+    expect(result.outcome).toBe('suppressed_anonymous');
+  });
+});
+
+describe('evaluateEligibility — master opt-out (audit 2026-07-05 UX-14)', () => {
+  it('rejects EVERY trigger when notifyPedalNudges is false — including P0 celebrations', () => {
+    for (const [trigger, priority] of [
+      ['post_ride_celebration', 0],
+      ['post_hazard_thanks', 0],
+      ['milestone_celebration', 0],
+      ['streak_at_risk_dramatic', 1],
+      ['daily_ride_reminder', 2],
+      ['lapsed_reengagement', 3],
+      ['community_signal', 3],
+    ] as const) {
+      const result = evaluateEligibility({
+        trigger,
+        priority,
+        profile: { ...baseProfile, notifyPedalNudges: false },
+        window: baseWindow,
+        now: NOON_BUCHAREST,
+      });
+      expect(result.eligible).toBe(false);
+      expect(result.outcome).toBe('suppressed_category_pref');
+    }
+  });
+  it('anonymous suppression still wins over the master switch (ordering)', () => {
+    const result = evaluateEligibility({
+      trigger: 'post_ride_celebration',
+      priority: 0,
+      profile: { ...baseProfile, hasEmail: false, notifyPedalNudges: false },
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
     expect(result.outcome).toBe('suppressed_anonymous');
   });
 });

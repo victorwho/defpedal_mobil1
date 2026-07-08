@@ -66,6 +66,8 @@ export const buildFeedProfileRoutes = (
         if (request.body.notifyHazard !== undefined) updates.notify_hazard = request.body.notifyHazard;
         if (request.body.notifyCommunity !== undefined) updates.notify_community = request.body.notifyCommunity;
         if (request.body.notifyStreak !== undefined) updates.notify_streak = request.body.notifyStreak;
+        if (request.body.notifyPedalNudges !== undefined)
+          updates.notify_pedal_nudges = request.body.notifyPedalNudges;
         if (request.body.notifyImpactSummary !== undefined) updates.notify_impact_summary = request.body.notifyImpactSummary;
         if (request.body.quietHoursStart !== undefined) updates.quiet_hours_start = request.body.quietHoursStart;
         if (request.body.quietHoursEnd !== undefined) updates.quiet_hours_end = request.body.quietHoursEnd;

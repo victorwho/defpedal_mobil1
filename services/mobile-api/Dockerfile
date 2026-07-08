@@ -1,4 +1,10 @@
-FROM node:22-alpine AS builder
+# Pinned to a digest for reproducibility (audit 2026-07-05 INFRA-3): a floating
+# `node:22-alpine` tag can silently change the Node/Alpine patch shipped to
+# Cloud Run between builds with no commit. Digest resolved 2026-07-08 for
+# node:22-alpine. Bump deliberately (paired with Dependabot's docker ecosystem
+# entry) — do NOT jump to node:26 without a Cloud Run deploy test (Dependabot
+# PR #39 left open for that reason).
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
 WORKDIR /app
 
 COPY package.json package.json
@@ -17,7 +23,7 @@ COPY services/mobile-api services/mobile-api
 
 RUN npm run build --workspace @defensivepedal/mobile-api
 
-FROM node:22-alpine AS runtime
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS runtime
 WORKDIR /app
 
 # Set NODE_ENV so the dev-auth-bypass gate (lib/auth.ts) refuses to honour

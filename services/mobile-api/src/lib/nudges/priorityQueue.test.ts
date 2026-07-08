@@ -5,6 +5,7 @@ import { pickHighestPriorityTrigger } from './priorityQueue';
 const baseProfile: UserNudgeProfile = {
   userId: 'user-1',
   hasEmail: true,
+  notifyPedalNudges: true,
   notifyStreak: true,
   quietHoursStart: '22:00',
   quietHoursEnd: '07:00',

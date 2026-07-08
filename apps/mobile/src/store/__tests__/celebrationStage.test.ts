@@ -53,7 +53,21 @@ describe('resolveActiveCelebration', () => {
     ).toBe('rankup');
   });
 
-  it('orders priority badge > rankup > meetpedal', () => {
-    expect(CELEBRATION_PRIORITY).toEqual(['badge', 'rankup', 'meetpedal']);
+  it('orders priority badge > rankup > meetpedal > milestone', () => {
+    // milestone added lowest (audit 2026-07-05 UX-12): root overlays pop
+    // before the screen-local milestone share modal takes the stage.
+    expect(CELEBRATION_PRIORITY).toEqual(['badge', 'rankup', 'meetpedal', 'milestone']);
+  });
+
+  it('milestone yields to every root overlay but wins when alone', () => {
+    expect(
+      resolveActiveCelebration(null, wants({ badge: true, milestone: true })),
+    ).toBe('badge');
+    expect(
+      resolveActiveCelebration(null, wants({ meetpedal: true, milestone: true })),
+    ).toBe('meetpedal');
+    expect(
+      resolveActiveCelebration(null, wants({ milestone: true })),
+    ).toBe('milestone');
   });
 });

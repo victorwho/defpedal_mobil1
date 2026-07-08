@@ -25,6 +25,12 @@ export interface UserNudgeProfile {
   readonly userId: string;
   /** Anonymous Supabase users have a null/empty email. */
   readonly hasEmail: boolean;
+  /**
+   * Master switch for the whole nudge system (profiles.notify_pedal_nudges,
+   * audit 2026-07-05 UX-14). false = no nudges of ANY kind, including P0
+   * celebrations — "off" must mean off.
+   */
+  readonly notifyPedalNudges: boolean;
   /** Per-category opt-out (existing profiles.notify_streak boolean). */
   readonly notifyStreak: boolean;
   /** Quiet hours start in 24-h "HH:MM" form, e.g. "22:00". */
@@ -165,6 +171,13 @@ export const evaluateEligibility = (req: EligibilityRequest): EligibilityResult 
   // 1. Anonymous users get no nudges, ever. The signup gate is intentional.
   if (!req.profile.hasEmail) {
     return { eligible: false, outcome: 'suppressed_anonymous' };
+  }
+
+  // 1b. Master opt-out (audit 2026-07-05 UX-14): Profile > Pedal Nudges >
+  // "Pedal nudges" off silences EVERY trigger — including P0 celebrations,
+  // which otherwise bypass every other gate below.
+  if (!req.profile.notifyPedalNudges) {
+    return { eligible: false, outcome: 'suppressed_category_pref' };
   }
 
   // 2. Streak-category opt-out covers streak-at-risk + milestone + apology.

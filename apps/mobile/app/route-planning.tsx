@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, PLAY_STORE_URL } from '@defensivepedal/core';
+import { hasStartOverride, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -105,8 +105,11 @@ const isSavedPlaceKeyword = (
   query: string,
   places: { home: AutocompleteSuggestion | null; work: AutocompleteSuggestion | null },
 ) => {
-  const q = query.trim().toLowerCase();
-  return (q === 'home' && !!places.home) || (q === 'work' && !!places.work);
+  // Audit 2026-07-05 UX-17: shared, locale-aware keyword matcher — must stay
+  // in sync with SearchBar's row injection or typing a keyword suppresses
+  // autocomplete without showing the saved place.
+  const type = matchSavedPlaceKeyword(query);
+  return type !== null && !!places[type];
 };
 
 export default function RoutePlanningScreen() {

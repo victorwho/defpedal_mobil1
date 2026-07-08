@@ -92,6 +92,7 @@ export const profileUpdateRequestSchema = {
     notifyHazard: { type: 'boolean' },
     notifyCommunity: { type: 'boolean' },
     notifyStreak: { type: 'boolean' },
+    notifyPedalNudges: { type: 'boolean' },
     notifyImpactSummary: { type: 'boolean' },
     quietHoursStart: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },
     quietHoursEnd: { type: ['string', 'null'], pattern: '^\\d{2}:\\d{2}$' },

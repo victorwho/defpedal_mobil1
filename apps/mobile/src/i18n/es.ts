@@ -88,6 +88,7 @@ export const es: TranslationKeys = {
     routeComparison: 'Comparativa de rutas',
     previewLoading: 'Cargando vista previa',
     previewFailed: 'Error en la vista previa',
+    previewFailedBody: 'No pudimos calcular esta ruta. Revisa tu conexión e inténtalo de nuevo.',
     noRoutes: 'No hay rutas disponibles',
     noRoutesBody: 'El servidor no ha devuelto alternativas para esta solicitud. Prueba el modo rápido o un destino diferente.',
     noRouteSelected: 'Ninguna ruta seleccionada',
@@ -143,6 +144,7 @@ export const es: TranslationKeys = {
     offRouteCountdown: 'Fuera de ruta. Recálculo automático en {{seconds}}s.',
     offRouteReady: 'Fuera de ruta. Recálculo manual disponible.',
     rerouting: 'Solicitando una ruta nueva desde tu posición GPS.',
+    rerouteFailed: 'No pudimos recalcular la ruta. Toca para reintentar.',
     rerouteNow: 'Recalcular ahora',
     retryGps: 'Reintentar GPS',
     gpsLive: 'GPS activo',
@@ -391,6 +393,9 @@ export const es: TranslationKeys = {
     keepFullGpsHistoryOff: 'Los resúmenes de las rutas se conservan para siempre; las trazas GPS sin procesar se eliminan automáticamente tras 90 días. La distancia, CO2 e insignias no se ven afectados.',
     // ── Pedal Nudges section ──
     sectionPedalNudges: 'Avisos de Pedal',
+    nudgeMaster: 'Avisos de Pedal',
+    nudgeMasterOn: 'Pedal puede enviarte recordatorios y celebraciones',
+    nudgeMasterOff: 'Todos los avisos de Pedal están desactivados',
     pedalVoice: 'Voz de Pedal',
     pedalVoiceSassy: 'Con descaro',
     pedalVoiceNeutral: 'Neutra',
@@ -1075,6 +1080,7 @@ export const es: TranslationKeys = {
   // ── Leaderboard ──
   leaderboard: {
     title: 'Clasificación del barrio',
+    loadFailed: 'No pudimos cargar la clasificación. Desliza para actualizar o inténtalo de nuevo.',
     tabs: {
       co2: 'CO2 ahorrado',
       hazards: 'Peligros reportados',

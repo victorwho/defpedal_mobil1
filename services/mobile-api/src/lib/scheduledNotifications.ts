@@ -5,6 +5,10 @@ import { dispatchNotification } from './notifications';
 
 const MAX_NOTIFICATIONS_PER_WEEK = 3;
 
+// PostgREST `IN (...)` filters are sent in the URL — chunk id lists so a
+// large opted-in user base can't overflow the request line.
+const IN_CHUNK_SIZE = 500;
+
 interface UserRow {
   id: string;
   quiet_hours_start: string | null;
@@ -12,23 +16,71 @@ interface UserRow {
   quiet_hours_timezone: string | null;
 }
 
+const chunk = <T>(items: readonly T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+};
+
+interface WeekImpact {
+  rideCount: number;
+  co2Kg: number;
+  moneyEur: number;
+}
+
 /**
- * Count notifications sent to a user in the current 7-day window.
- * Returns true if under the weekly cap.
+ * Audit 2026-07-05 PERF-4: the weekly cron ran 1 + 2N sequential queries
+ * (per-user ride-count + per-user notification-cap count). These two helpers
+ * replace the per-user probes with one grouped query per 500 users each —
+ * query volume is now constant in the number of opted-in users.
  */
-const isUnderWeeklyCap = async (userId: string): Promise<boolean> => {
-  if (!supabaseAdmin) return false;
+const loadWeekImpactByUser = async (
+  userIds: readonly string[],
+  weekAgoIso: string,
+): Promise<Map<string, WeekImpact>> => {
+  const byUser = new Map<string, WeekImpact>();
+  if (!supabaseAdmin) return byUser;
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { count, error } = await supabaseAdmin
-    .from('notification_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('status', 'sent')
-    .gte('created_at', sevenDaysAgo);
+  for (const ids of chunk(userIds, IN_CHUNK_SIZE)) {
+    const { data } = await supabaseAdmin
+      .from('ride_impacts')
+      .select('user_id, co2_saved_kg, money_saved_eur')
+      .in('user_id', ids as string[])
+      .gte('created_at', weekAgoIso);
 
-  if (error) return false;
-  return (count ?? 0) < MAX_NOTIFICATIONS_PER_WEEK;
+    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      const userId = row.user_id as string;
+      const entry = byUser.get(userId) ?? { rideCount: 0, co2Kg: 0, moneyEur: 0 };
+      entry.rideCount += 1;
+      entry.co2Kg += Number(row.co2_saved_kg ?? 0);
+      entry.moneyEur += Number(row.money_saved_eur ?? 0);
+      byUser.set(userId, entry);
+    }
+  }
+  return byUser;
+};
+
+const loadSentCountsByUser = async (
+  userIds: readonly string[],
+  sinceIso: string,
+): Promise<Map<string, number>> => {
+  const counts = new Map<string, number>();
+  if (!supabaseAdmin) return counts;
+
+  for (const ids of chunk(userIds, IN_CHUNK_SIZE)) {
+    const { data } = await supabaseAdmin
+      .from('notification_log')
+      .select('user_id')
+      .eq('status', 'sent')
+      .in('user_id', ids as string[])
+      .gte('created_at', sinceIso);
+
+    for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      const userId = row.user_id as string;
+      counts.set(userId, (counts.get(userId) ?? 0) + 1);
+    }
+  }
+  return counts;
 };
 
 /**
@@ -60,34 +112,30 @@ export const sendWeeklyImpactSummary = async (
   let sent = 0;
   let skipped = 0;
 
-  for (const user of users as Array<UserRow & { total_co2_saved_kg: number; total_money_saved_eur: number }>) {
+  // Audit 2026-07-05 PERF-4: batch the two per-user gate probes into grouped
+  // queries so the cron scales with rides-this-week, not opted-in users.
+  const candidates = users as Array<UserRow & { total_co2_saved_kg: number; total_money_saved_eur: number }>;
+  const candidateIds = candidates.map((u) => u.id);
+  const weekImpactByUser = await loadWeekImpactByUser(candidateIds, weekAgo);
+  const sentCountsByUser = await loadSentCountsByUser(candidateIds, weekAgo);
+
+  for (const user of candidates) {
     try {
-      // Check if user had rides this week
-      const { count } = await supabaseAdmin
-        .from('ride_impacts')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('created_at', weekAgo);
+      const week = weekImpactByUser.get(user.id);
+      const count = week?.rideCount ?? 0;
 
-      if (!count || count === 0) {
+      if (count === 0) {
         skipped++;
         continue;
       }
 
-      if (!(await isUnderWeeklyCap(user.id))) {
+      if ((sentCountsByUser.get(user.id) ?? 0) >= MAX_NOTIFICATIONS_PER_WEEK) {
         skipped++;
         continue;
       }
 
-      // Aggregate this week's impact
-      const { data: weekData } = await supabaseAdmin
-        .from('ride_impacts')
-        .select('co2_saved_kg, money_saved_eur, distance_meters')
-        .eq('user_id', user.id)
-        .gte('created_at', weekAgo);
-
-      const weekCo2 = (weekData ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + Number(r.co2_saved_kg ?? 0), 0);
-      const weekMoney = (weekData ?? []).reduce((sum: number, r: Record<string, unknown>) => sum + Number(r.money_saved_eur ?? 0), 0);
+      const weekCo2 = week?.co2Kg ?? 0;
+      const weekMoney = week?.moneyEur ?? 0;
 
       // Merge social interaction data (validations + likes from past 7 days)
       let socialSuffix = '';

@@ -1017,7 +1017,7 @@ function NavigationScreen() {
   const warningMessage = locationState.error
     ? locationState.error
     : rerouteMutation.isError
-      ? rerouteMutation.error.message
+      ? t('nav.rerouteFailed')
       : navigationSession.rerouteEligible
         ? rerouteMutation.isPending
           ? t('nav.rerouting')

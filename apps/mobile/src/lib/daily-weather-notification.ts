@@ -27,14 +27,21 @@ const fetchTomorrowForecast = async (
   lat: number,
   lon: number,
 ): Promise<GoodWeatherForecast | null> => {
+  // Audit 2026-07-05 PERF-5: bound the request like every other fetch site —
+  // a hung Open-Meteo call would otherwise leave this promise pending on the
+  // notification-scheduling path. 10s mirrors weather.ts.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,weather_code&timezone=auto&forecast_days=2`;
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: controller.signal });
     if (!response.ok) return null;
     const data: unknown = await response.json();
     return parseForecastResponse(data, pickForecastIndex(new Date()));
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 };
 

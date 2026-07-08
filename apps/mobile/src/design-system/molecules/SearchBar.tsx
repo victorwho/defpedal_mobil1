@@ -9,6 +9,7 @@ import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Alert, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { AutocompleteSuggestion, SuggestionFeatureType } from '@defensivepedal/core';
+import { matchSavedPlaceKeyword } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
 import { TextInput } from '../atoms/TextInput';
@@ -173,14 +174,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({
 
   // Saved places — Home/Work quick-pick rows
   const hasSavedPlaces = !!(savedPlaces?.home || savedPlaces?.work);
-  const valueLower = value.trim().toLowerCase();
-  // Keyword override: when user types 'home'/'work', inject saved place as the only suggestion
-  const keywordPlace =
-    valueLower === 'home' && savedPlaces?.home
-      ? savedPlaces.home
-      : valueLower === 'work' && savedPlaces?.work
-        ? savedPlaces.work
-        : null;
+  // Keyword override: when user types 'home'/'work' (or a localized synonym —
+  // audit 2026-07-05 UX-17), inject the saved place as the only suggestion.
+  // Shared matcher keeps this in sync with route-planning's fetch-suppression.
+  const keywordType = matchSavedPlaceKeyword(value);
+  const keywordPlace = keywordType ? savedPlaces?.[keywordType] ?? null : null;
   const showSavedPlacesSection = active && hasSavedPlaces && value.length === 0;
   const showSavedPlacesStandalone = showSavedPlacesSection && !showRecents && !showStandaloneCurrentLocation;
 
@@ -526,17 +524,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
               ]}
               onPress={() => onSelectSuggestion(keywordPlace)}
               accessibilityRole="button"
-              accessibilityLabel={valueLower === 'home' ? t('search.home') : t('search.work')}
+              accessibilityLabel={keywordType === 'home' ? t('search.home') : t('search.work')}
             >
               <Ionicons
-                name={valueLower === 'home' ? 'home-outline' : 'briefcase-outline'}
+                name={keywordType === 'home' ? 'home-outline' : 'briefcase-outline'}
                 size={20}
                 color={colors.accent}
                 style={styles.suggestionIcon}
               />
               <View style={styles.suggestionText}>
                 <Text style={[textBase, { color: colors.accent, fontFamily: fontFamily.body.semiBold }]}>
-                  {valueLower === 'home' ? t('search.home') : t('search.work')}
+                  {keywordType === 'home' ? t('search.home') : t('search.work')}
                 </Text>
                 <Text style={[textSm, { color: colors.textSecondary }]} numberOfLines={1}>
                   {keywordPlace.primaryText}

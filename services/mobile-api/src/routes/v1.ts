@@ -2233,6 +2233,18 @@ export const buildV1Routes = (
               details: [error.message],
             });
           }
+          // Ownership guard inside record_ride_impact (audit 2026-07-05
+          // INFRA-2, migration 202607070003): the trip must belong to the
+          // caller — writing impact rows against someone else's trip pollutes
+          // ride_impacts analytics.
+          if (error.message.includes('TRIP_NOT_OWNED')) {
+            // 'UNAUTHORIZED' (not FORBIDDEN) — the only 403-compatible value
+            // in the ErrorResponse code enum; matches auth.ts's convention.
+            throw new HttpError('Trip does not belong to this user.', {
+              statusCode: 403,
+              code: 'UNAUTHORIZED',
+            });
+          }
           request.log.error({ event: 'ride_impact_error', error: error.message }, 'ride impact recording failed');
           throw new HttpError('Failed to record ride impact.', {
             statusCode: 502,

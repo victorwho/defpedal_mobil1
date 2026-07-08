@@ -86,6 +86,7 @@ export const en = {
     routeComparison: 'Route comparison',
     previewLoading: 'Preview loading',
     previewFailed: 'Preview failed',
+    previewFailedBody: "We couldn't calculate this route. Check your connection and try again.",
     noRoutes: 'No routes available',
     noRoutesBody: 'The backend returned no alternatives for this request. Try fast mode or a different destination.',
     noRouteSelected: 'No route selected',
@@ -141,6 +142,7 @@ export const en = {
     offRouteCountdown: 'Off route. Automatic reroute will fire in {{seconds}}s.',
     offRouteReady: 'Off route. Manual reroute is ready.',
     rerouting: 'Requesting a new route from the rider\u2019s live GPS position.',
+    rerouteFailed: "Couldn't recalculate the route. Tap to try again.",
     rerouteNow: 'Reroute now',
     retryGps: 'Retry GPS',
     gpsLive: 'GPS live',
@@ -399,6 +401,9 @@ export const en = {
     keepFullGpsHistoryOff: 'Trip summaries are kept forever; raw GPS breadcrumbs are auto-truncated after 90 days. Distance, CO2 and badges are unaffected.',
     // ── Pedal Nudges section ──
     sectionPedalNudges: 'Pedal Nudges',
+    nudgeMaster: 'Pedal nudges',
+    nudgeMasterOn: 'Pedal can send you reminders and celebrations',
+    nudgeMasterOff: 'All Pedal nudges are off',
     pedalVoice: 'Pedal voice',
     pedalVoiceSassy: 'Sassy',
     pedalVoiceNeutral: 'Neutral',
@@ -1087,6 +1092,7 @@ export const en = {
   // ── Leaderboard ──
   leaderboard: {
     title: 'Neighborhood Leaderboard',
+    loadFailed: "Couldn't load the leaderboard. Pull to refresh or try again.",
     tabs: {
       co2: 'CO2 Saved',
       hazards: 'Hazards Reported',
