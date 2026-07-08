@@ -4,7 +4,7 @@
 # node:22-alpine. Bump deliberately (paired with Dependabot's docker ecosystem
 # entry) — do NOT jump to node:26 without a Cloud Run deploy test (Dependabot
 # PR #39 left open for that reason).
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
+FROM node:26-alpine@sha256:725aeba2364a9b16beae49e180d83bd597dbd0b15c47f1f28875c290bfd255b9 AS builder
 WORKDIR /app
 
 COPY package.json package.json
@@ -23,7 +23,7 @@ COPY services/mobile-api services/mobile-api
 
 RUN npm run build --workspace @defensivepedal/mobile-api
 
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS runtime
+FROM node:26-alpine@sha256:725aeba2364a9b16beae49e180d83bd597dbd0b15c47f1f28875c290bfd255b9 AS runtime
 WORKDIR /app
 
 # Set NODE_ENV so the dev-auth-bypass gate (lib/auth.ts) refuses to honour
