@@ -245,3 +245,28 @@ review device's clock is set automatically and re-test."*
 - Rebuild via the iOS profile (EAS auto-increments the build number), resubmit, reply with the note
   above. Manual pre-submit check: set a real device's clock +15 min → expect the friendly message +
   banner (no raw `appauth` string); set clock automatic → Google sign-in succeeds.
+
+---
+
+## Log: 2026-07-11 — build 18 (v0.2.97), clean run to TestFlight
+
+Store-submission build for v0.2.97 (Android AAB built the same session). No new blockers —
+every documented fix held; fully non-interactive.
+
+- **Build 18** — id `b4c21ae9-abde-48da-8e8b-4275b622f77f`, version 0.2.97, buildNumber auto
+  17 → 18. ✅ (`eas build -p ios --profile production --non-interactive`).
+- **Submit** — submission `89877998-3e47-44d0-96bb-6e47e44d0211` (`eas submit … --id b4c21ae9…`).
+  The temporary `ascApiKey*` triplet was added to `eas.json` `submit.production.ios`, then reverted
+  (`git diff -- apps/mobile/eas.json` empty). "Submitted to App Store Connect."
+- **Apple processing → build 18 `VALID`** on TestFlight (verified via the ASC `/v1/builds`
+  ES256-JWT poll: 18 VALID, uploaded 2026-07-11T02:34:14-07:00, not expired). No ITMS rejection.
+- **App Review notes** prepared at `apkreleases/ios-app-review-notes-v0.2.97.txt`: demo login
+  `testuser@example.com` / `test`; **simulate Braşov 45.60, 25.47** (the 2.1(a) geo-gating —
+  maps/Community are empty from a US location); Google clock-skew (auto date & time) + 5.1.1(iv)
+  location notes.
+- **NOT yet promoted to App Store review.** Submit-for-Review remains the manual ASC step (attach
+  build 18 to the version record → Resolution Center reply if an open rejection → Submit for Review).
+  This is the **first iOS binary carrying v0.2.93 → 0.2.97** (calories, weight personalization,
+  onboarding changes, audit fixes) — none of it has run on real iOS hardware; smoke-test on
+  TestFlight before submitting, and confirm the App Privacy answers cover the new user-entered
+  weight (fitness data).
