@@ -2657,7 +2657,7 @@ export const buildV1Routes = (
         if (error || !impactRow) {
           const { data: track } = await supabaseAdmin
             .from('trip_tracks')
-            .select('actual_distance_meters, planned_route_distance_meters, bike_type, aqi_at_start')
+            .select('actual_distance_meters, planned_route_distance_meters, bike_type, aqi_at_start, started_at, ended_at')
             .eq('trip_id', request.params.tripId)
             .eq('user_id', user.id)
             .single();
@@ -2670,13 +2670,25 @@ export const buildV1Routes = (
           const autoBt = String(track.bike_type ?? '').toLowerCase();
           const autoVehicle: 'acoustic' | 'ebike' =
             (autoBt === 'ebike' || autoBt === 'electric' || autoBt.includes('e-bike')) ? 'ebike' : 'acoustic';
-          const autoCalories = calculateCaloriesBurned(distMeters, 0, autoVehicle);
+          // Derive real ride duration from the track timestamps. calories =
+          // MET x weight x hours, so a 0 duration always yields 0 kcal and the
+          // client hides the calorie block — auto-computed impacts therefore
+          // never showed calories. ended_at is null for in-progress trips -> 0.
+          const startMs = track.started_at ? new Date(track.started_at as string).getTime() : NaN;
+          const endMs = track.ended_at ? new Date(track.ended_at as string).getTime() : NaN;
+          const autoDurationSeconds =
+            Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+              ? Math.round((endMs - startMs) / 1000)
+              : 0;
+          const autoDurationMinutes = autoDurationSeconds > 0 ? Math.round(autoDurationSeconds / 60) : 0;
+          const autoCalories = calculateCaloriesBurned(distMeters, autoDurationSeconds, autoVehicle);
 
           // Auto-record the impact
           const { data: created } = await supabaseAdmin.rpc('record_ride_impact', {
             p_trip_id: request.params.tripId,
             p_user_id: user.id,
             p_distance_meters: distMeters,
+            p_duration_minutes: autoDurationMinutes,
             p_calories_burned: autoCalories,
           });
 
