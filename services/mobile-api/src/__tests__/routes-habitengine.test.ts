@@ -106,6 +106,7 @@ const chainResult = (data: unknown, error: unknown = null) => {
   addMethod('upsert');
   addMethod('delete');
   chain.single = vi.fn(resolve);
+  chain.maybeSingle = vi.fn(resolve);
   chain.then = resolve().then.bind(resolve());
   // Make the chain itself thenable for queries that don't end with .single()
   (chain as Record<string, unknown>)[Symbol.toStringTag] = 'Promise';
@@ -520,6 +521,81 @@ describe('POST /v1/rides/:tripId/impact', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().equivalentText).toBeNull();
+  });
+});
+
+// ===========================================================================
+// GET /v1/rides/:tripId/impact  (auto-compute fallback)
+// ===========================================================================
+
+describe('GET /v1/rides/:tripId/impact (auto-compute)', () => {
+  // Regression guard for the "calories permanently 0" bug: the auto-compute
+  // fallback (fired when no ride_impacts row exists yet) used to pass 0 for
+  // duration to calculateCaloriesBurned, so it always stored 0 kcal and the
+  // client hid the calorie block forever. It must derive the real duration
+  // from the track's started_at/ended_at.
+  const trackFor = (endedAt: string | null) => ({
+    actual_distance_meters: 9000, // 9 km
+    planned_route_distance_meters: null,
+    bike_type: 'acoustic',
+    aqi_at_start: null,
+    started_at: '2026-07-01T10:00:00.000Z',
+    ended_at: endedAt, // 30 min later -> 18 km/h -> MET 6.8
+  });
+
+  it('derives calories from the track duration when no impact row exists', async () => {
+    const tripId = '11111111-1111-4111-8111-111111111111';
+    mockFrom
+      .mockReturnValueOnce(chainResult(null))                                   // ride_impacts: not found
+      .mockReturnValueOnce(chainResult(trackFor('2026-07-01T10:30:00.000Z'))); // trip_tracks: 30-min ride
+    mockRpc
+      .mockResolvedValueOnce({ data: {
+        trip_id: tripId, co2_saved_kg: 1.08, money_saved_eur: 3.15,
+        hazards_warned_count: 0, distance_meters: 9000, calories_burned: 238,
+      }, error: null })                                                          // record_ride_impact
+      .mockResolvedValueOnce({ data: { personalMicrolives: 5, communitySeconds: 100 }, error: null }) // record_ride_microlives
+      .mockResolvedValueOnce({ data: [], error: null });                        // check_and_award_badges
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const recordCall = mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact');
+    expect(recordCall).toBeDefined();
+    const args = (recordCall?.[1] ?? {}) as { p_duration_minutes?: number; p_calories_burned?: number };
+    expect(args.p_duration_minutes).toBe(30);
+    // MET 6.8 (18 km/h) x 70 kg (default weight) x 0.5 h = 238 kcal
+    expect(args.p_calories_burned).toBe(238);
+    expect(response.json().caloriesBurned).toBe(238);
+  });
+
+  it('records 0 calories for an in-progress trip with no ended_at', async () => {
+    const tripId = '22222222-2222-4222-8222-222222222222';
+    mockFrom
+      .mockReturnValueOnce(chainResult(null))              // ride_impacts: not found
+      .mockReturnValueOnce(chainResult(trackFor(null)));   // trip_tracks: still in progress
+    mockRpc
+      .mockResolvedValueOnce({ data: {
+        trip_id: tripId, co2_saved_kg: 1.08, money_saved_eur: 3.15,
+        hazards_warned_count: 0, distance_meters: 9000, calories_burned: 0,
+      }, error: null })
+      .mockResolvedValueOnce({ data: { personalMicrolives: 1, communitySeconds: 1 }, error: null })
+      .mockResolvedValueOnce({ data: [], error: null });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const recordCall = mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact');
+    const args = (recordCall?.[1] ?? {}) as { p_duration_minutes?: number; p_calories_burned?: number };
+    expect(args.p_duration_minutes).toBe(0);
+    expect(args.p_calories_burned).toBe(0);
   });
 });
 
