@@ -267,6 +267,27 @@ describe('mapboxAutocomplete', () => {
     expect(fetchCall).toContain('limit=3');
   });
 
+  it('expands a supported-country hint to the full supported list (EU-27 + EEA + CH)', async () => {
+    mockFetchResponse({ suggestions: [] });
+
+    await mapboxAutocomplete({
+      query: 'vienna',
+      countryHint: 'ro',
+      limit: 3,
+    });
+
+    const fetchCall = vi.mocked(fetch).mock.calls[0][0] as string;
+    const countries = (new URL(fetchCall).searchParams.get('country') ?? '').split(',');
+    // A rider physically in RO must be able to search destinations in every
+    // supported country — not just RO+ES (pre-gate behavior).
+    expect(countries).toHaveLength(31);
+    expect(countries).toEqual(
+      expect.arrayContaining(['RO', 'ES', 'DE', 'FR', 'AT', 'CH', 'NO', 'IS', 'LI']),
+    );
+    // UK is deliberately outside the supported set (2026-07-12).
+    expect(countries).not.toContain('GB');
+  });
+
   it('throws on non-OK response', async () => {
     mockFetchResponse({ message: 'Unauthorized' }, false, 401);
 

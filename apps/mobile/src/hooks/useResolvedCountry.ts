@@ -95,9 +95,11 @@ export const useResolvedCountry = (): ResolvedCountry => {
 
   // Mirror the PHYSICAL origin country onto `routeRequest.countryHint`. Search
   // biasing follows where the rider actually IS (proximity / Mapbox country
-  // filter), not the custom map origin they may be planning from. With the
-  // v0.2.81 RO+ES expansion in `mapbox-search.ts`, this only changes which
-  // single ISO code is stored — autocomplete restricts to both regardless.
+  // filter), not the custom map origin they may be planning from. Since the
+  // supported-country expansion in `mapbox-search.ts` (RO+ES in v0.2.81, all
+  // EU-27+EEA+CH after the global-availability gate), this only changes which
+  // single ISO code is stored — autocomplete expands a supported hint to the
+  // full supported list regardless.
   //
   // - Physical origin in RO or ES → write that ISO code.
   // - Outside, or GPS pending → clear so search falls back to global

@@ -17,6 +17,7 @@ import type {
   ReverseGeocodeResponse,
   SuggestionFeatureType,
 } from '@defensivepedal/core';
+import { SUPPORTED_APP_COUNTRIES } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
 
@@ -36,29 +37,28 @@ const MIN_QUERY_LENGTH = 2;
 const SUPPORTED_COUNTRIES: ReadonlySet<string> = new Set(['BR', 'RO', 'ES']);
 
 /**
- * Countries we ship dedicated OSRM safety profiles for. When the rider is
- * physically inside ANY of these (their `countryHint` resolves to RO or ES),
- * we expand the Mapbox `country` filter to ALL of them — so a Romanian
- * rider can autocomplete "Madrid" and a Spanish rider can autocomplete
- * "Bucharest" without us having to expose a separate country picker.
+ * Search-filter expansion for supported app countries (EU-27 + EEA + CH —
+ * `SUPPORTED_APP_COUNTRIES` from core, single source of truth with the
+ * onboarding region gate). When the rider is physically inside ANY of these
+ * (their `countryHint` resolves via the RO/ES routing bboxes today), we
+ * expand the Mapbox `country` filter to ALL of them — so a Romanian rider
+ * can autocomplete "Madrid" or "Vienna" without a separate country picker.
  * Proximity bias keeps local results on top, so the noise tradeoff is
- * negligible. Riders outside these countries (e.g. France, UK) keep
- * unrestricted global search, biased by GPS proximity.
+ * negligible. Riders outside the supported countries keep unrestricted
+ * global search, biased by GPS proximity (their hint is never set).
  */
-const ROUTING_COUNTRIES = ['RO', 'ES'] as const;
-const ROUTING_COUNTRY_SET: ReadonlySet<string> = new Set(ROUTING_COUNTRIES);
-const ROUTING_COUNTRY_LIST = ROUTING_COUNTRIES.join(',');
+const SEARCH_COUNTRY_LIST = [...SUPPORTED_APP_COUNTRIES].join(',');
 
 /**
  * Convert a `countryHint` into the Mapbox `country` query value. When the
- * hint matches a routing country (RO or ES), return the full RO,ES list so
+ * hint matches a supported app country, return the full supported list so
  * cross-country search works. Otherwise pass the hint through verbatim
  * (legacy / future single-country use cases).
  */
 const expandSearchCountries = (hint: string | undefined): string | undefined => {
   if (!hint) return undefined;
   const upper = hint.toUpperCase();
-  return ROUTING_COUNTRY_SET.has(upper) ? ROUTING_COUNTRY_LIST : upper;
+  return SUPPORTED_APP_COUNTRIES.has(upper) ? SEARCH_COUNTRY_LIST : upper;
 };
 
 // ---------------------------------------------------------------------------
