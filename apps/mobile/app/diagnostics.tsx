@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -21,6 +21,10 @@ import {
   textXs,
 } from '../src/design-system/tokens/typography';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
+import {
+  getDevMockLocation,
+  setDevMockLocation,
+} from '../src/lib/devMockLocation';
 import { mobileEnv } from '../src/lib/env';
 import { listOfflineRegions } from '../src/lib/offlinePacks';
 import { storageEngineKind } from '../src/lib/storage';
@@ -36,6 +40,21 @@ import {
 } from '../src/lib/validationSummary';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
+
+// Dev/preview-only fake GPS presets (Diagnostics card below). Chosen to
+// cover every location-dependent surface: RO/ES (country content + risk
+// data), a newly covered EU country, EEA/CH edges, the UK exclusion, and a
+// non-European waitlist country.
+const DEV_LOCATION_PRESETS: readonly { label: string; lat: number; lon: number }[] = [
+  { label: 'Bucharest 🇷🇴', lat: 44.4268, lon: 26.1025 },
+  { label: 'Madrid 🇪🇸', lat: 40.4168, lon: -3.7038 },
+  { label: 'Berlin 🇩🇪', lat: 52.52, lon: 13.405 },
+  { label: 'Vienna 🇦🇹', lat: 48.2082, lon: 16.3738 },
+  { label: 'Zurich 🇨🇭', lat: 47.3769, lon: 8.5417 },
+  { label: 'Reykjavik 🇮🇸', lat: 64.1466, lon: -21.9426 },
+  { label: 'London 🇬🇧', lat: 51.5074, lon: -0.1278 },
+  { label: 'New York 🇺🇸', lat: 40.7128, lon: -74.006 },
+];
 
 type ApiHealthResponse = {
   ok: boolean;
@@ -296,6 +315,8 @@ function DiagnosticsContent() {
   );
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Dev fake-GPS card state — mirrors lib/devMockLocation (null in production).
+  const [devMockCoord, setDevMockCoord] = useState(() => getDevMockLocation());
   const [screenError, setScreenError] = useState<string | null>(null);
   const [devStatusMessage, setDevStatusMessage] = useState<string | null>(null);
   const [holoTier, setHoloTier] = useState<BadgeTier>('gold');
@@ -896,6 +917,84 @@ function DiagnosticsContent() {
       </DiagnosticCard>
       ) : null}
 
+      {mobileEnv.appEnv !== 'production' ? (
+      <DiagnosticCard title="Fake GPS location (dev)">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Overrides the app's GPS for the planning origin, onboarding region
+          gate, quiz country, and search filter. The real reverse-geocoder
+          runs on the fake coordinates, so everything downstream behaves as
+          if you were there. Live-navigation GPS stays real. Inert on
+          production builds.
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          Active:{' '}
+          <Text style={styles.monoValue}>
+            {devMockCoord
+              ? `${devMockCoord.lat.toFixed(4)}, ${devMockCoord.lon.toFixed(4)}`
+              : 'off (real GPS)'}
+          </Text>
+        </Text>
+        <View style={styles.badgeRow}>
+          {DEV_LOCATION_PRESETS.map((preset) => {
+            const active =
+              devMockCoord?.lat === preset.lat && devMockCoord?.lon === preset.lon;
+            return (
+              <Pressable
+                key={preset.label}
+                onPress={() => {
+                  const coord = { lat: preset.lat, lon: preset.lon };
+                  void setDevMockLocation(coord);
+                  setDevMockCoord(coord);
+                }}
+                style={[
+                  styles.mockLocationPill,
+                  {
+                    borderColor: active ? colors.accent : colors.borderDefault,
+                    backgroundColor: active ? brandTints.accentLight : colors.bgPrimary,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Fake location: ${preset.label}`}
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.bodyText, { color: colors.textPrimary }]}>
+                  {preset.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={styles.buttonRow}>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              void setDevMockLocation(null);
+              setDevMockCoord(null);
+            }}
+          >
+            Use real GPS
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              // Reset the once-per-install gate answer and re-enter the
+              // onboarding gate screen so the fake location is re-detected.
+              useAppStore.setState({
+                regionGate: { status: 'unchecked', countryCode: null },
+              });
+              router.push('/onboarding/region-check' as never);
+            }}
+          >
+            Re-run region gate
+          </Button>
+        </View>
+      </DiagnosticCard>
+      ) : null}
+
       <View style={styles.buttonRow}>
         <Button
           variant="primary"
@@ -974,5 +1073,11 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     gap: space[3],
+  },
+  mockLocationPill: {
+    borderWidth: 1,
+    borderRadius: radii.full,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
   },
 });

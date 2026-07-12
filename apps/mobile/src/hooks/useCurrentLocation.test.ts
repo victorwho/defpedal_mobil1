@@ -18,10 +18,17 @@ vi.mock('expo-location', () => ({
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
 }));
 
+// Dev fake-GPS module — off by default; individual tests can arm it.
+const mockGetDevMockLocation = vi.fn();
+vi.mock('../lib/devMockLocation', () => ({
+  getDevMockLocation: (...args: unknown[]) => mockGetDevMockLocation(...args),
+}));
+
 import { useCurrentLocation } from './useCurrentLocation';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetDevMockLocation.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -40,6 +47,21 @@ describe('useCurrentLocation', () => {
     expect(result.current.accuracyMeters).toBeNull();
     expect(result.current.permissionStatus).toBe('undetermined');
     expect(result.current.error).toBeNull();
+  });
+
+  it('returns the dev fake GPS location without touching permissions or the OS fix', async () => {
+    mockGetDevMockLocation.mockReturnValue({ lat: 52.52, lon: 13.405 }); // Berlin
+
+    const { result } = renderHook(() => useCurrentLocation());
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.location).toEqual({ lat: 52.52, lon: 13.405 });
+    expect(result.current.permissionStatus).toBe('granted');
+    expect(mockGetForegroundPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockGetCurrentPositionAsync).not.toHaveBeenCalled();
   });
 
   it('fetches location when permission is already granted', async () => {

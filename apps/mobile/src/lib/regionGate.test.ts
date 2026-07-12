@@ -1,14 +1,18 @@
 // @vitest-environment node
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { mockGetPermissions, mockLastKnown, mockCurrent, mockReverseGeocode } = vi.hoisted(
-  () => ({
+const { mockGetPermissions, mockLastKnown, mockCurrent, mockReverseGeocode, mockGetDevMockLocation } =
+  vi.hoisted(() => ({
     mockGetPermissions: vi.fn(),
     mockLastKnown: vi.fn(),
     mockCurrent: vi.fn(),
     mockReverseGeocode: vi.fn(),
-  }),
-);
+    mockGetDevMockLocation: vi.fn(),
+  }));
+
+vi.mock('./devMockLocation', () => ({
+  getDevMockLocation: mockGetDevMockLocation,
+}));
 
 vi.mock('expo-location', () => ({
   getForegroundPermissionsAsync: mockGetPermissions,
@@ -29,6 +33,7 @@ const bucharestFix = { coords: { latitude: 44.4268, longitude: 26.1025 } };
 beforeEach(() => {
   vi.clearAllMocks();
   clearCountryCodeCacheForTests();
+  mockGetDevMockLocation.mockReturnValue(null);
   mockGetPermissions.mockResolvedValue({ status: 'granted' });
   mockLastKnown.mockResolvedValue(bucharestFix);
   mockCurrent.mockResolvedValue(bucharestFix);
@@ -66,6 +71,17 @@ describe('detectCountryCode', () => {
   it('normalizes geocoder output (lowercase, UK alias)', async () => {
     mockReverseGeocode.mockResolvedValue([{ isoCountryCode: 'uk' }]);
     await expect(detectCountryCode()).resolves.toBe('GB');
+  });
+
+  it('uses the dev fake GPS location when set — no permission check, no real fix', async () => {
+    mockGetDevMockLocation.mockReturnValue({ lat: 52.52, lon: 13.405 }); // Berlin
+    mockReverseGeocode.mockResolvedValue([{ isoCountryCode: 'DE' }]);
+
+    await expect(detectCountryCode()).resolves.toBe('DE');
+    expect(mockGetPermissions).not.toHaveBeenCalled();
+    expect(mockLastKnown).not.toHaveBeenCalled();
+    // The real reverse-geocoder still runs — on the mocked coordinates.
+    expect(mockReverseGeocode).toHaveBeenCalledWith({ latitude: 52.52, longitude: 13.405 });
   });
 
   it('gives up after the overall timeout instead of hanging the spinner', async () => {

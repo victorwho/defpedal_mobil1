@@ -2,6 +2,8 @@ import type { Coordinate } from '@defensivepedal/core';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 
+import { getDevMockLocation } from '../lib/devMockLocation';
+
 type PermissionStatus = Location.PermissionStatus | 'undetermined';
 
 type CurrentLocationState = {
@@ -26,6 +28,17 @@ export const useCurrentLocation = (): CurrentLocationState => {
   const refreshLocation = async () => {
     setIsLoading(true);
     setError(null);
+
+    // Dev/preview-only fake GPS (Diagnostics > Fake GPS location). Returns
+    // null on production builds — see lib/devMockLocation.ts.
+    const mock = getDevMockLocation();
+    if (mock) {
+      setLocation(mock);
+      setAccuracyMeters(5);
+      setPermissionStatus('granted' as Location.PermissionStatus);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const currentPermission = await Location.getForegroundPermissionsAsync();

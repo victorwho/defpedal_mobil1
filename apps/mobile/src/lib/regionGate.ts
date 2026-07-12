@@ -1,6 +1,8 @@
 import { normalizeCountryCode } from '@defensivepedal/core';
 import * as Location from 'expo-location';
 
+import { getDevMockLocation } from './devMockLocation';
+
 /**
  * Best-effort country detection for the onboarding region gate.
  *
@@ -72,6 +74,15 @@ export const detectCountryCode = (): Promise<string | null> =>
 
 const detectCountryCodeUnbounded = async (): Promise<string | null> => {
   try {
+    // Dev/preview-only fake GPS (Diagnostics > Fake GPS location; null on
+    // production builds). Bypasses the permission gate and position fix but
+    // still runs the real reverse-geocoder on the mocked coordinates, so the
+    // rest of the pipeline behaves exactly as if the rider were there.
+    const mock = getDevMockLocation();
+    if (mock) {
+      return await reverseGeocodeCountryCode(mock.lat, mock.lon);
+    }
+
     const permission = await Location.getForegroundPermissionsAsync();
     if (permission.status !== 'granted') {
       return null;
