@@ -711,3 +711,57 @@ describe('quantizeRiskScore bucket mapping', () => {
     expect(allowedMidpoints.has(110)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 6. Oversized geometry handling — EU-wide routes (Sentry
+//    FST_ERR_CTP_BODY_TOO_LARGE, 2026-07-12). Long cross-country routes can
+//    POST multi-MB geometry: the route-scoped bodyLimit must accept it and
+//    the handler must downsample before the PostGIS RPC.
+// ---------------------------------------------------------------------------
+
+describe('POST /v1/risk-segments oversized geometry', () => {
+  const bigCoordinates = Array.from({ length: 60_000 }, (_, i) => [
+    26.1 + i * 0.00001,
+    44.4 + i * 0.00001,
+  ]);
+
+  it('accepts a body above the 1 MiB Fastify default (route-scoped 8 MiB limit)', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    // ~60k float pairs ≈ 2+ MB of JSON — 413 before the bodyLimit raise.
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/risk-segments',
+      headers: authHeaders,
+      payload: { geometry: { type: 'LineString', coordinates: bigCoordinates } },
+    });
+
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('downsamples oversized geometry before the risk RPC, keeping the endpoints', async () => {
+    const fetchRiskSegments = vi.fn().mockResolvedValue([]);
+    const app = buildTestApp({ fetchRiskSegments });
+    await app.ready();
+
+    await app.inject({
+      method: 'POST',
+      url: '/v1/risk-segments',
+      headers: authHeaders,
+      payload: { geometry: { type: 'LineString', coordinates: bigCoordinates } },
+    });
+
+    expect(fetchRiskSegments).toHaveBeenCalledTimes(1);
+    const passedGeometry = fetchRiskSegments.mock.calls[0][0] as {
+      coordinates: number[][];
+    };
+    expect(passedGeometry.coordinates.length).toBeLessThanOrEqual(15_000);
+    expect(passedGeometry.coordinates[0]).toEqual(bigCoordinates[0]);
+    expect(passedGeometry.coordinates[passedGeometry.coordinates.length - 1]).toEqual(
+      bigCoordinates[bigCoordinates.length - 1],
+    );
+    await app.close();
+  });
+});

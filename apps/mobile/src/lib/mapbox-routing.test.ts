@@ -605,6 +605,41 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
     expect(result.coverage.status).toBe('unsupported');
   });
 
+  it('downsamples oversized route geometry before POSTing to /v1/risk-segments', async () => {
+    // EU-wide routes can carry huge geometries; the raw body used to blow
+    // past the server's limit (Sentry FST_ERR_CTP_BODY_TOO_LARGE 2026-07-12).
+    const bigCoords: [number, number][] = Array.from({ length: 20_000 }, (_, i) => [
+      26.1 + i * 0.0001,
+      44.43 + i * 0.0001,
+    ]);
+    setupFetchMock([
+      { data: createRouteResponse([createOsrmRoute({ coords: bigCoords })]) },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const riskCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).includes('/v1/risk-segments'));
+    expect(riskCall).toBeDefined();
+    const body = JSON.parse((riskCall![1] as RequestInit).body as string) as {
+      geometry: { coordinates: [number, number][] };
+    };
+    expect(body.geometry.coordinates.length).toBeLessThanOrEqual(12_000);
+    expect(body.geometry.coordinates[0]).toEqual(bigCoords[0]);
+    expect(body.geometry.coordinates[body.geometry.coordinates.length - 1]).toEqual(
+      bigCoords[bigCoords.length - 1],
+    );
+  });
+
   it('fails fast with a clear message when a Mapbox-bound route exceeds the 400km guard', async () => {
     setupFetchMock([]);
 

@@ -31,7 +31,7 @@ import type {
   TiersResponse,
 } from '@defensivepedal/core';
 import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS, normalizeXpAwardResult } from '../lib/xp';
-import { getPreviewOrigin, calculateCaloriesBurned } from '@defensivepedal/core';
+import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
@@ -1465,12 +1465,27 @@ export const buildV1Routes = (
       },
     );
 
+    // EU-wide routing (2026-07-12) means long cross-country routes can carry
+    // hundreds of thousands of geometry points. Two defenses (Sentry
+    // FST_ERR_CTP_BODY_TOO_LARGE the same day):
+    //   1. Route-scoped bodyLimit raise (8 MiB vs the 1 MiB default) so
+    //      clients already in the field that POST full-resolution geometry
+    //      don't 413. The endpoint is OAuth-gated + rate-limited, so the
+    //      bigger ceiling is bounded abuse surface.
+    //   2. Server-side downsample before the PostGIS RPC so a monster
+    //      geometry can't turn the risk match into a cost bomb regardless
+    //      of what the client sent. Newer clients (v0.2.99+) downsample to
+    //      12k points before POSTing anyway.
+    const RISK_SEGMENTS_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
+    const MAX_RISK_GEOMETRY_POINTS = 15_000;
+
     app.post<{
       Body: { geometry: { type: string; coordinates: number[][] } };
       Reply: { riskSegments: RiskSegment[] } | ErrorResponse;
     }>(
       '/risk-segments',
       {
+        bodyLimit: RISK_SEGMENTS_BODY_LIMIT_BYTES,
         schema: {
           response: {
             200: { type: 'object' as const, properties: { riskSegments: { type: 'array' as const } } },
@@ -1495,10 +1510,16 @@ export const buildV1Routes = (
           });
         }
 
+        const boundedGeometry: GeoJsonLineString = {
+          type: 'LineString',
+          coordinates: downsampleCoordinates(
+            geometry.coordinates,
+            MAX_RISK_GEOMETRY_POINTS,
+          ) as [number, number][],
+        };
+
         try {
-          const riskSegments = await dependencies.fetchRiskSegments(
-            geometry as GeoJsonLineString,
-          );
+          const riskSegments = await dependencies.fetchRiskSegments(boundedGeometry);
           return { riskSegments };
         } catch (error) {
           throw new HttpError('Risk segment fetch failed.', {

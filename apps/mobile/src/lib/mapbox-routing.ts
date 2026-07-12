@@ -17,7 +17,7 @@ import type {
   RoutePreviewResponse,
   SupportedCountry,
 } from '@defensivepedal/core';
-import { encodePolyline, extractRouteFeatures, haversineDistance, isRouteSupported } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isRouteSupported } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -388,13 +388,24 @@ const fetchRouteRiskSegments = async (
   }
 };
 
+// Cap the geometry POSTed to /v1/risk-segments. EU-wide routing means a
+// long cross-country route can carry hundreds of thousands of points — the
+// raw body blows past the server's limit (Sentry FST_ERR_CTP_BODY_TOO_LARGE,
+// 2026-07-12) and inflates the PostGIS matching cost. 12k points ≈ ~300 KB
+// JSON and ≈ 8 m spacing on a 100 km ride — far finer than the risk overlay
+// needs.
+const MAX_RISK_GEOMETRY_POINTS = 12_000;
+
 const enrichRouteWithRisk = async (
   route: RouteOption,
   coordinates: [number, number][],
 ): Promise<RouteOption> => {
   const geometry: GeoJsonLineString = {
     type: 'LineString',
-    coordinates,
+    coordinates: downsampleCoordinates(
+      coordinates,
+      MAX_RISK_GEOMETRY_POINTS,
+    ) as [number, number][],
   };
 
   const riskSegments = await fetchRouteRiskSegments(geometry);

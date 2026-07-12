@@ -9,6 +9,7 @@ export * from './contrast';
 export * from './countryCoverage';
 export * from './distance';
 export * from './formatters';
+export * from './geometrySampling';
 export * from './mapboxStaticImageUrl';
 export * from './navigation';
 export * from './polyline';
