@@ -203,6 +203,26 @@ export const FlatList = React.forwardRef(
   },
 );
 
+export const KeyboardAvoidingView = React.forwardRef(
+  (
+    {
+      children,
+      behavior: _behavior,
+      keyboardVerticalOffset: _kvo,
+      style: _style,
+      testID,
+      ...props
+    }: {
+      children?: React.ReactNode;
+      behavior?: string;
+      keyboardVerticalOffset?: number;
+      style?: unknown;
+      testID?: string;
+    },
+    ref,
+  ) => React.createElement('div', { ref, 'data-testid': testID, ...props }, children),
+);
+
 export const ActivityIndicator = ({
   accessibilityLabel,
   ...props

@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -233,11 +235,15 @@ export default function OnboardingRegionCheckScreen() {
   }
 
   return (
-    <View
+    // iOS does not pan the window when the keyboard opens (Android does), so
+    // without this the email field + Notify-me button sink under the
+    // keyboard on small iPhones. Same platform-split as feedback.tsx.
+    <KeyboardAvoidingView
       style={[
         styles.root,
         { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] },
       ]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.glowTop} importantForAccessibility="no" accessibilityElementsHidden />
       <View style={styles.topSection}>
@@ -313,7 +319,7 @@ export default function OnboardingRegionCheckScreen() {
           <Text style={styles.changeCountryLink}>{t('onboarding.regionChangeCountry')}</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
