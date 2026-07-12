@@ -317,6 +317,7 @@ export const ro: TranslationKeys = {
     quizRegionSubtitleOverride: 'Fixat pe {{country}}',
     quizRegionRomania: 'România',
     quizRegionSpain: 'Spania',
+    quizRegionGeneric: 'General (Europa)',
     pointsOfInterest: 'Puncte de interes',
     notifications: 'Notificări',
     dailyWeather: 'Meteo zilnic',

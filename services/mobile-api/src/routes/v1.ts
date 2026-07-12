@@ -3103,7 +3103,7 @@ export const buildV1Routes = (
             type: 'object',
             additionalProperties: false,
             properties: {
-              country: { type: 'string', enum: ['RO', 'ES'] },
+              country: { type: 'string', enum: ['RO', 'ES', 'GENERIC'] },
               locale: { type: 'string', enum: ['en', 'ro', 'es'] },
             },
           },
@@ -3193,7 +3193,7 @@ export const buildV1Routes = (
             properties: {
               questionId: { type: 'string', format: 'uuid' },
               selectedIndex: { type: 'integer', minimum: 0, maximum: 3 },
-              country: { type: 'string', enum: ['RO', 'ES'] },
+              country: { type: 'string', enum: ['RO', 'ES', 'GENERIC'] },
               locale: { type: 'string', enum: ['en', 'ro', 'es'] },
             },
           },

@@ -317,6 +317,7 @@ export const es: TranslationKeys = {
     quizRegionSubtitleOverride: 'Fijado en {{country}}',
     quizRegionRomania: 'Rumanía',
     quizRegionSpain: 'España',
+    quizRegionGeneric: 'General (Europa)',
     pointsOfInterest: 'Puntos de interés',
     notifications: 'Notificaciones',
     dailyWeather: 'Tiempo diario',

@@ -1,15 +1,17 @@
 /**
  * Quiz pool dispatcher.
  *
- * The /v1/quiz routes ship one of two static question catalogues — RO or ES —
- * selected by a `country` query/body param. Both pools share the same
- * `StaticQuizQuestion` shape (declared in each pool file), and IDs are FRESH
- * UUIDs that don't collide across pools, so a question is always uniquely
- * associated with the pool it came from.
+ * The /v1/quiz routes ship one of three static question catalogues — RO, ES,
+ * or GENERIC (country-agnostic, generally-true content for riders outside
+ * the two country pools; global availability gate, 2026-07-12) — selected by
+ * a `country` query/body param. All pools share the same
+ * `StaticQuizQuestion` shape (declared in the RO pool file), and IDs are
+ * FRESH UUIDs that don't collide across pools, so a question is always
+ * uniquely associated with the pool it came from.
  *
- * This module is the single switch point: routes never import either pool
- * directly, so swapping pools or adding a third country only touches this
- * file and the route signature.
+ * This module is the single switch point: routes never import a pool
+ * directly, so swapping pools or adding a country only touches this file
+ * and the route signature.
  */
 
 import type { QuizCountry } from '@defensivepedal/core';
@@ -19,6 +21,7 @@ import {
   type StaticQuizQuestion,
 } from './quiz-questions';
 import { QUIZ_QUESTIONS_ES } from './quiz-questions-es';
+import { QUIZ_QUESTIONS_GENERIC } from './quiz-questions-generic';
 
 export type { StaticQuizQuestion } from './quiz-questions';
 
@@ -27,6 +30,8 @@ export const getQuizPool = (country: QuizCountry): readonly StaticQuizQuestion[]
   switch (country) {
     case 'ES':
       return QUIZ_QUESTIONS_ES;
+    case 'GENERIC':
+      return QUIZ_QUESTIONS_GENERIC;
     case 'RO':
     default:
       return QUIZ_QUESTIONS;

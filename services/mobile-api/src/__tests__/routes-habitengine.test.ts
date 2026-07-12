@@ -1015,6 +1015,96 @@ describe('Quiz country dispatch', () => {
 
     expect(response.statusCode).toBe(400);
   });
+
+  it('GET /v1/quiz/daily?country=GENERIC serves a question from the generic pool', async () => {
+    mockFrom.mockReturnValueOnce(chainResult([]));
+
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const genericIds = new Set(QUIZ_QUESTIONS_GENERIC.map((q) => q.id));
+    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily?country=GENERIC',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(genericIds.has(body.id)).toBe(true);
+    expect(roIds.has(body.id)).toBe(false);
+  });
+
+  it('POST /v1/quiz/answer with a GENERIC question id + country=GENERIC grades correctly', async () => {
+    mockFrom.mockReturnValueOnce(chainResult(null));
+
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const genericQuestion = QUIZ_QUESTIONS_GENERIC[0];
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/quiz/answer',
+      headers: authHeaders,
+      payload: {
+        questionId: genericQuestion.id,
+        selectedIndex: genericQuestion.correctIndex,
+        country: 'GENERIC',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().isCorrect).toBe(true);
+  });
+});
+
+// ===========================================================================
+// GENERIC pool curation rule — "if a sentence is only true in SOME
+// countries, it does not belong here." Guards future question additions.
+// ===========================================================================
+
+describe('GENERIC quiz pool integrity', () => {
+  it('contains no country-specific references in any locale', async () => {
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+
+    // Country names, cities, and law references across all three locales.
+    const forbidden =
+      /Romania|România|Rumanía|Romanian|Spain|Spania|España|Spanish|Bucharest|București|Bucarest|Cluj|Timișoara|Iași|Madrid|Barcelona|Sevilla|Codul Rutier|Reglamento General/i;
+
+    for (const q of QUIZ_QUESTIONS_GENERIC) {
+      for (const locale of ['en', 'ro', 'es'] as const) {
+        const blob = [q.questionText[locale], q.explanation[locale], ...q.options[locale]].join(' ');
+        expect(blob, `question ${q.id} (${locale}) references a country`).not.toMatch(forbidden);
+      }
+    }
+  });
+
+  it('has unique ids that do not collide with the RO or ES pools', async () => {
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
+    const { QUIZ_QUESTIONS_ES } = await import('../data/quiz-questions-es');
+
+    const genericIds = QUIZ_QUESTIONS_GENERIC.map((q) => q.id);
+    expect(new Set(genericIds).size).toBe(genericIds.length);
+
+    const otherIds = new Set([...QUIZ_QUESTIONS, ...QUIZ_QUESTIONS_ES].map((q) => q.id));
+    for (const id of genericIds) {
+      expect(otherIds.has(id)).toBe(false);
+    }
+  });
+
+  it('has a sane pool size and valid correctIndex on every question', async () => {
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+
+    expect(QUIZ_QUESTIONS_GENERIC.length).toBeGreaterThanOrEqual(25);
+    for (const q of QUIZ_QUESTIONS_GENERIC) {
+      for (const locale of ['en', 'ro', 'es'] as const) {
+        expect(q.options[locale]).toHaveLength(4);
+      }
+      expect(q.correctIndex).toBeGreaterThanOrEqual(0);
+      expect(q.correctIndex).toBeLessThan(4);
+    }
+  });
 });
 
 // ===========================================================================

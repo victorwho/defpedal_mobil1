@@ -1,21 +1,28 @@
 /**
  * Quiz country detection.
  *
- * The daily safety quiz serves one of two static question pools (RO or ES).
- * Picking the right pool for each rider is a small composite policy:
+ * The daily safety quiz serves one of three static question pools: RO
+ * (Romanian law + local context), ES (Spanish law + local context), or
+ * GENERIC (country-agnostic questions that are generally true everywhere —
+ * added with the global availability gate, 2026-07-12, so a rider in Berlin
+ * or Boston never gets asked about the Codul Rutier). Picking the right pool
+ * is a small composite policy:
  *
  *   1. **User override wins.** A `'RO'` / `'ES'` preference from the Profile
  *      picker short-circuits everything — expats, tourists, and testers can
  *      pin their region.
  *   2. **GPS bbox lookup.** When the preference is `'auto'`, classify the
- *      caller's coords against axis-aligned bounding boxes for the supported
- *      countries (mainland Romania, mainland Spain + Balearic Islands, Canary
- *      Islands).
+ *      caller's coords against axis-aligned bounding boxes for RO and ES
+ *      (mainland Romania; mainland Spain + Balearics + Canary Islands). A
+ *      valid GPS fix OUTSIDE both is a *reliable* "not RO/ES" answer — that
+ *      rider gets `'GENERIC'`, because serving them RO law would be wrong,
+ *      not merely imprecise.
  *   3. **Device-locale region.** When GPS is unavailable (permission denied,
- *      pre-first-fix), use the device locale's region code as a hint.
- *   4. **Default to `'RO'`.** Romania is the launched country with deeper
- *      content coverage, so it's the safer fallback when nothing else can
- *      narrow it down.
+ *      pre-first-fix), an RO/ES device region still selects the matching
+ *      country content.
+ *   4. **Default to `'GENERIC'`.** When nothing can place the rider, serve
+ *      the questions that are true everywhere rather than gambling on a
+ *      country's law. (Pre-gate this defaulted to `'RO'`.)
  *
  * Bbox note vs `countryCoverage.ts`
  * --------------------------------
@@ -35,11 +42,15 @@
  * All helpers are pure, deterministic, and sync — safe to call on every render.
  */
 
-/** Supported quiz pools. */
-export type QuizCountry = 'RO' | 'ES';
+/** Supported quiz pools. GENERIC = country-agnostic, generally-true content. */
+export type QuizCountry = 'RO' | 'ES' | 'GENERIC';
 
-/** User preference from Profile > Display > Quiz region. */
-export type QuizCountryPreference = 'auto' | QuizCountry;
+/**
+ * User preference from Profile > Display > Quiz region. Only the two
+ * country pools are pinnable — 'auto' already resolves to GENERIC whenever
+ * the rider isn't placeable in RO/ES, so a GENERIC pin adds nothing.
+ */
+export type QuizCountryPreference = 'auto' | 'RO' | 'ES';
 
 /** What signal produced the resolved country (telemetry / debug surface). */
 export type QuizCountrySource = 'override' | 'gps' | 'locale' | 'default';
@@ -133,20 +144,22 @@ export const resolveQuizCountry = (
     return { country: input.preference, source: 'override' };
   }
 
-  // 2. GPS bbox lookup.
-  if (input.coords) {
+  // 2. GPS bbox lookup. A valid fix INSIDE an RO/ES box selects that
+  //    country's content; a valid fix OUTSIDE both is a reliable "the rider
+  //    is somewhere else" — serve the generally-true pool rather than a
+  //    country's law that doesn't apply where they ride.
+  if (input.coords && Number.isFinite(input.coords.lat) && Number.isFinite(input.coords.lon)) {
     const fromGps = resolveQuizCountryFromCoords(input.coords.lat, input.coords.lon);
-    if (fromGps !== null) {
-      return { country: fromGps, source: 'gps' };
-    }
+    return { country: fromGps ?? 'GENERIC', source: 'gps' };
   }
 
-  // 3. Device-locale region hint.
+  // 3. Device-locale region hint (no GPS available).
   const region = input.deviceLocaleRegion?.trim().toUpperCase() ?? null;
   if (region === 'RO' || region === 'ES') {
     return { country: region, source: 'locale' };
   }
 
-  // 4. Launch-country fallback.
-  return { country: 'RO', source: 'default' };
+  // 4. Nothing can place the rider — serve the questions that are true
+  //    everywhere.
+  return { country: 'GENERIC', source: 'default' };
 };

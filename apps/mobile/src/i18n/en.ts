@@ -325,6 +325,7 @@ export const en = {
     quizRegionSubtitleOverride: 'Pinned to {{country}}',
     quizRegionRomania: 'Romania',
     quizRegionSpain: 'Spain',
+    quizRegionGeneric: 'General (Europe)',
     pointsOfInterest: 'Points of Interest',
     notifications: 'Notifications',
     dailyWeather: 'Daily Weather Brief',

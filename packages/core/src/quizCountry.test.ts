@@ -142,6 +142,29 @@ describe('resolveQuizCountry — GPS branch (preference=auto)', () => {
       }),
     ).toEqual({ country: 'ES', source: 'gps' });
   });
+
+  it('a reliable GPS fix OUTSIDE RO/ES resolves to GENERIC — even over an RO/ES locale', () => {
+    // Romanian expat riding in Berlin: Romanian law does not apply where
+    // they ride, so the generally-true pool wins over the locale hint.
+    // (They can still pin RO via the Profile override.)
+    expect(
+      resolveQuizCountry({
+        preference: 'auto',
+        coords: { lat: 52.52, lon: 13.405 }, // Berlin
+        deviceLocaleRegion: 'RO',
+      }),
+    ).toEqual({ country: 'GENERIC', source: 'gps' });
+  });
+
+  it('non-finite coords are NOT treated as a reliable fix — falls through to locale', () => {
+    expect(
+      resolveQuizCountry({
+        preference: 'auto',
+        coords: { lat: Number.NaN, lon: Number.NaN },
+        deviceLocaleRegion: 'ES',
+      }),
+    ).toEqual({ country: 'ES', source: 'locale' });
+  });
 });
 
 describe('resolveQuizCountry — locale branch', () => {
@@ -150,17 +173,6 @@ describe('resolveQuizCountry — locale branch', () => {
       resolveQuizCountry({
         preference: 'auto',
         coords: null,
-        deviceLocaleRegion: 'ES',
-      }),
-    ).toEqual({ country: 'ES', source: 'locale' });
-  });
-
-  it('falls back to device locale when coords are outside every bbox', () => {
-    // Rider testing in Berlin: GPS unsupported, but the OS locale is Spanish.
-    expect(
-      resolveQuizCountry({
-        preference: 'auto',
-        coords: { lat: 52.5200, lon: 13.4050 },
         deviceLocaleRegion: 'ES',
       }),
     ).toEqual({ country: 'ES', source: 'locale' });
@@ -177,35 +189,34 @@ describe('resolveQuizCountry — locale branch', () => {
   });
 });
 
-describe('resolveQuizCountry — default branch', () => {
-  it('defaults to RO when nothing else narrows it', () => {
+describe('resolveQuizCountry — GENERIC fallback', () => {
+  it('defaults to GENERIC when nothing can place the rider', () => {
     expect(
       resolveQuizCountry({
         preference: 'auto',
         coords: null,
         deviceLocaleRegion: null,
       }),
-    ).toEqual({ country: 'RO', source: 'default' });
+    ).toEqual({ country: 'GENERIC', source: 'default' });
   });
 
-  it('defaults to RO when locale region is unsupported (e.g. US)', () => {
+  it('defaults to GENERIC when locale region is not RO/ES (e.g. US)', () => {
     expect(
       resolveQuizCountry({
         preference: 'auto',
         coords: null,
         deviceLocaleRegion: 'US',
       }),
-    ).toEqual({ country: 'RO', source: 'default' });
+    ).toEqual({ country: 'GENERIC', source: 'default' });
   });
 
-  it('defaults to RO when coords are outside bboxes and no locale region', () => {
-    // Rider testing in Berlin with a non-RO/ES OS locale.
+  it('GPS outside bboxes with a non-RO/ES locale resolves to GENERIC via the gps branch', () => {
     expect(
       resolveQuizCountry({
         preference: 'auto',
         coords: { lat: 48.8566, lon: 2.3522 }, // Paris
         deviceLocaleRegion: 'FR',
       }),
-    ).toEqual({ country: 'RO', source: 'default' });
+    ).toEqual({ country: 'GENERIC', source: 'gps' });
   });
 });

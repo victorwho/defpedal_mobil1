@@ -1132,9 +1132,19 @@ const formatQuizRegionLabel = (
 };
 
 const formatQuizCountryName = (
-  country: 'RO' | 'ES',
+  country: 'RO' | 'ES' | 'GENERIC',
   t: QuizRegionPickerProps['t'],
-): string => (country === 'ES' ? t('profile.quizRegionSpain') : t('profile.quizRegionRomania'));
+): string => {
+  switch (country) {
+    case 'ES':
+      return t('profile.quizRegionSpain');
+    case 'GENERIC':
+      return t('profile.quizRegionGeneric');
+    case 'RO':
+    default:
+      return t('profile.quizRegionRomania');
+  }
+};
 
 function QuizRegionPicker({ preference, setPreference, t, styles }: QuizRegionPickerProps) {
   // Resolve the LOCALE-ONLY hint for the subtitle. No GPS — see component
