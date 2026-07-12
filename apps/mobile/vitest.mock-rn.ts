@@ -157,6 +157,52 @@ export const ScrollView = React.forwardRef(
   ) => React.createElement('div', { ref, 'data-testid': testID, role: 'scrollview', ...props }, children),
 );
 
+export const FlatList = React.forwardRef(
+  (
+    {
+      data,
+      renderItem,
+      keyExtractor,
+      ListEmptyComponent,
+      ListHeaderComponent,
+      keyboardShouldPersistTaps: _ksp,
+      style: _style,
+      contentContainerStyle: _ccs,
+      testID,
+      ...props
+    }: {
+      data?: readonly unknown[];
+      renderItem?: (info: { item: unknown; index: number }) => React.ReactNode;
+      keyExtractor?: (item: unknown, index: number) => string;
+      ListEmptyComponent?: React.ComponentType | React.ReactElement | null;
+      ListHeaderComponent?: React.ComponentType | React.ReactElement | null;
+      keyboardShouldPersistTaps?: string;
+      style?: unknown;
+      contentContainerStyle?: unknown;
+      testID?: string;
+    },
+    ref,
+  ) => {
+    const items = data ?? [];
+    const renderMaybeComponent = (c: React.ComponentType | React.ReactElement | null | undefined) =>
+      c == null ? null : React.isValidElement(c) ? c : React.createElement(c);
+    return React.createElement(
+      'div',
+      { ref, role: 'list', 'data-testid': testID, ...props },
+      renderMaybeComponent(ListHeaderComponent),
+      items.length === 0
+        ? renderMaybeComponent(ListEmptyComponent)
+        : items.map((item, index) =>
+            React.createElement(
+              'div',
+              { key: keyExtractor ? keyExtractor(item, index) : index },
+              renderItem?.({ item, index }),
+            ),
+          ),
+    );
+  },
+);
+
 export const ActivityIndicator = ({
   accessibilityLabel,
   ...props

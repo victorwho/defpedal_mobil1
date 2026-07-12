@@ -1,3 +1,4 @@
+export * from './appAvailability';
 export * from './breadcrumbs';
 export * from './calories';
 export * from './co2';

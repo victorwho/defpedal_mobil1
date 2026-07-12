@@ -517,6 +517,23 @@ export interface NearbyCitySuggestion {
   submittedAt: string;
 }
 
+// ── Country Waitlist (region gate) ──
+
+export interface CountryWaitlistRequest {
+  email: string;
+  /** ISO 3166-1 alpha-2 the user selected in the picker. */
+  countryCode: string;
+  /** ISO 3166-1 alpha-2 resolved from GPS reverse-geocode, when available. */
+  detectedCountryCode?: string | null;
+  locale?: string | null;
+  source: 'onboarding';
+}
+
+export interface CountryWaitlistResponse {
+  /** Duplicate submissions are deduped server-side and still report joined. */
+  status: 'joined';
+}
+
 // ── Community Feed ──
 
 export const SAFETY_TAG_OPTIONS = [

@@ -99,8 +99,8 @@ describe('Onboarding location priming — Guideline 5.1.1(iv)', () => {
     fireEvent.click(screen.getByText('onboarding.enableLocation'));
 
     await waitFor(() => expect(mockRequest).toHaveBeenCalledTimes(1));
-    // Granted → advance to the consent step.
-    expect(router.push).toHaveBeenCalledWith('/onboarding/consent');
+    // Granted → advance to the region gate (which passes through to consent).
+    expect(router.push).toHaveBeenCalledWith('/onboarding/region-check');
   });
 
   it('after a denial, offers continue-without-location and an Open Settings link', async () => {
@@ -120,6 +120,7 @@ describe('Onboarding location priming — Guideline 5.1.1(iv)', () => {
     expect(openSettingsSpy).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByText('onboarding.continueWithoutLocation'));
-    expect(router.push).toHaveBeenCalledWith('/onboarding/consent');
+    // No GPS → the region gate falls back to its manual country picker.
+    expect(router.push).toHaveBeenCalledWith('/onboarding/region-check');
   });
 });

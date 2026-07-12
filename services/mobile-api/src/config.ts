@@ -176,6 +176,18 @@ export const config = {
         3600000,
       ),
     },
+    // Region-gate waitlist signups — 3/hour per (usually anonymous) user.
+    // A rider legitimately submits once, maybe twice after a typo.
+    countryWaitlist: {
+      limit: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_COUNTRY_WAITLIST_MAX'], '3'),
+        3,
+      ),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_COUNTRY_WAITLIST_WINDOW_MS'], '3600000'),
+        3600000,
+      ),
+    },
     // Follow-graph writes — 20 actions / 10 min per account. Generous for a
     // human working through suggested users, tight enough to stop
     // mass-follow notification spam (audit 2026-07-05 SEC-2).

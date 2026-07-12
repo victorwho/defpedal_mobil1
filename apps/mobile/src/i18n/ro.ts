@@ -970,6 +970,26 @@ export const ro: TranslationKeys = {
     maybeLater: 'Poate mai târziu',
     a11yGoogle: 'Autentificare cu Google',
     a11ySkipAccount: 'Omite crearea contului deocamdată',
+    // -- Region gate (disponibilitate globală, 2026-07-12) --
+    regionChecking: 'Verificăm disponibilitatea în zona ta…',
+    regionPickerTitle: 'Unde pedalezi?',
+    regionPickerSubtitle:
+      'Nu am putut detecta automat țara ta. Alege-o mai jos ca să îți arătăm ce este disponibil.',
+    regionSearchPlaceholder: 'Caută țări',
+    regionNoResults: 'Nicio țară nu corespunde căutării',
+    regionUnavailableTitle: 'Încă nu suntem în {{country}}',
+    regionUnavailableSubtitle:
+      'Rutarea sigură Defensive Pedal acoperă momentan Europa. Lasă-ne emailul tău și te anunțăm imediat ce lansăm în {{country}}.',
+    regionEmailPlaceholder: 'tu@exemplu.com',
+    regionEmailConsent: 'Îți vom scrie doar despre disponibilitatea în țara ta — nimic altceva.',
+    regionNotifyMe: 'Anunță-mă',
+    regionEmailInvalid: 'Te rugăm să introduci o adresă de email validă.',
+    regionSubmitFailed: 'Nu am putut salva emailul. Verifică conexiunea și încearcă din nou.',
+    regionSubmitted: 'Ești pe listă! Îți scriem când lansăm în {{country}}.',
+    regionContinueAnyway: 'Continuă oricum',
+    regionContinueAnywayHint:
+      'Poți planifica rute în continuare, dar scorurile de siguranță și datele despre pericole sunt limitate în afara Europei.',
+    regionChangeCountry: 'Schimbă țara',
   },
 
   // ── Impact ──

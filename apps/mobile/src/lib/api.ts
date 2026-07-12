@@ -8,6 +8,8 @@ import type {
   CitySuggestionResponse,
   CommunityStats,
   Coordinate,
+  CountryWaitlistRequest,
+  CountryWaitlistResponse,
   CoverageResponse,
   ErrorResponse,
   FeedComment,
@@ -199,6 +201,14 @@ export const mobileApi = {
     mobileApiFetch<NearbyCitySuggestion[]>(
       `/v1/city-suggestions/nearby?lat=${lat}&lon=${lon}&radius=${radiusMeters}`,
     ),
+
+  // ── Country Waitlist (region gate) ──
+
+  joinCountryWaitlist: (payload: CountryWaitlistRequest) =>
+    mobileApiFetch<CountryWaitlistResponse>('/v1/country-waitlist', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // ── Community Feed ──
 

@@ -114,6 +114,21 @@ type AppStore = QueueSlice & {
   quietHoursStart: string;
   quietHoursEnd: string;
   onboardingCompleted: boolean;
+  // Global availability region gate (onboarding/region-check). Device-scoped
+  // like analyticsConsent — the answer is about where this install physically
+  // is, not which account is signed in, so it is NOT reset by
+  // resetUserScopedState. `unchecked` = gate not yet run (new install);
+  // `passed` = detected/picked country is supported (EU+EEA+CH+UK);
+  // `waitlisted` = unsupported country acknowledged (soft gate — the user may
+  // still use the app with Mapbox fallback routing).
+  regionGate: {
+    status: 'unchecked' | 'passed' | 'waitlisted';
+    countryCode: string | null;
+  };
+  setRegionGate: (gate: {
+    status: 'passed' | 'waitlisted';
+    countryCode: string | null;
+  }) => void;
   // Analytics consent — captured during onboarding, surfaceable post-onboarding
   // via Profile → Privacy & Analytics. Device-scoped (not reset on signOut)
   // because the consent decision is about this install, not this account.
@@ -386,6 +401,7 @@ export const useAppStore = create<AppStore>()(
       notifyStreak: true,
       hasSeenMeetPedalCard: false,
       onboardingCompleted: false,
+      regionGate: { status: 'unchecked', countryCode: null },
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
       //   Art 6(1)(f) / ANSPDCP Law 506/2004 equivalent for service-stability
@@ -584,6 +600,10 @@ export const useAppStore = create<AppStore>()(
       setShowHistoryOverlay: (show) => set(() => ({ showHistoryOverlay: show })),
       setOnboardingCompleted: (completed) =>
         set(() => ({ onboardingCompleted: completed })),
+      setRegionGate: (gate) =>
+        set(() => ({
+          regionGate: { status: gate.status, countryCode: gate.countryCode },
+        })),
       setAnalyticsConsent: (consent) =>
         set(() => ({
           analyticsConsent: {
@@ -1157,6 +1177,7 @@ export const useAppStore = create<AppStore>()(
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
         onboardingCompleted: state.onboardingCompleted,
+        regionGate: state.regionGate,
         analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,
         cachedStreak: state.cachedStreak,

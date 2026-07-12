@@ -23,6 +23,9 @@ export type RateLimitPolicies = {
   // account cannot mass-follow to spam push notifications or churn
   // follower counts (audit 2026-07-05 SEC-2).
   follow: RateLimitPolicy;
+  // Region-gate waitlist signups — tight because the caller is usually an
+  // anonymous session and each row is a stored email address.
+  countryWaitlist: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {

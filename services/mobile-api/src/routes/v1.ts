@@ -2,6 +2,8 @@ import type {
   BadgeResponse,
   CitySuggestionRequest,
   CitySuggestionResponse,
+  CountryWaitlistRequest,
+  CountryWaitlistResponse,
   CoverageResponse,
   EarlyEndReason,
   ErrorResponse,
@@ -90,6 +92,10 @@ import {
   nearbyCitySuggestionsQuerySchema,
   nearbyCitySuggestionsResponseSchema,
 } from '../lib/citySuggestionSchemas';
+import {
+  countryWaitlistRequestSchema,
+  countryWaitlistResponseSchema,
+} from '../lib/countryWaitlistSchemas';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
@@ -1208,6 +1214,60 @@ export const buildV1Routes = (
       await applyRateLimit(request, reply, dependencies, 'routePreview');
       const stub: NearbyCitySuggestion[] = [];
       return stub;
+    });
+
+    // ── Country waitlist (region gate) ──
+    // "Notify me when Defensive Pedal reaches my country" signups from the
+    // onboarding region gate. The caller is usually an ANONYMOUS Supabase
+    // session (pre-signup audience), so this uses requireAuthenticatedUser,
+    // not requireFullUser. Dedicated tight bucket (3/hour) because each row
+    // stores an email address supplied by an unverified user.
+
+    app.post<{ Body: CountryWaitlistRequest }>('/country-waitlist', {
+      schema: {
+        body: countryWaitlistRequestSchema,
+        response: {
+          200: countryWaitlistResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
+      const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+      await applyRateLimit(request, reply, dependencies, 'countryWaitlist', {
+        userId: user.id,
+      });
+
+      // Normalize before the write so the plain-column unique constraint
+      // (email, country_code) dedupes case-insensitively.
+      const email = request.body.email.trim().toLowerCase();
+      const countryCode = request.body.countryCode.trim().toUpperCase();
+      const detectedCountryCode =
+        request.body.detectedCountryCode?.trim().toUpperCase() ?? null;
+
+      try {
+        const response: CountryWaitlistResponse = await dependencies.submitCountryWaitlist(
+          {
+            email,
+            countryCode,
+            detectedCountryCode,
+            locale: request.body.locale ?? null,
+            source: request.body.source,
+          },
+          user.id,
+        );
+        return response;
+      } catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError('Country waitlist signup failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+        });
+      }
     });
 
     // ── Hazard expiry cron ──

@@ -31,16 +31,18 @@ export default function OnboardingPermissionScreen() {
   const [isRequesting, setIsRequesting] = useState(false);
 
   // If location is already granted (returning user / cleared data but kept permission),
-  // auto-advance to the analytics consent step (compliance plan item 8 — consent
-  // must be captured before any telemetry fires, regardless of how the user
-  // entered the flow).
+  // auto-advance through the region gate to the analytics consent step
+  // (compliance plan item 8 — consent must be captured before any telemetry
+  // fires, regardless of how the user entered the flow). region-check passes
+  // straight through to consent when the gate was already answered on this
+  // device.
   useEffect(() => {
     let cancelled = false;
     const checkExisting = async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
         if (!cancelled && status === 'granted') {
-          router.replace('/onboarding/consent' as any);
+          router.replace('/onboarding/region-check' as any);
         }
       } catch {
         // Ignore — user will tap the button
@@ -57,7 +59,7 @@ export default function OnboardingPermissionScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status === 'granted') {
-        router.push('/onboarding/consent' as any);
+        router.push('/onboarding/region-check' as any);
       } else {
         setDenied(true);
       }
@@ -71,10 +73,12 @@ export default function OnboardingPermissionScreen() {
   // Reachable ONLY after the OS permission request has been shown and denied.
   // App Store Guideline 5.1.1(iv): the priming screen has no skip/exit — the
   // single "Continue" CTA always proceeds to the system prompt first. After a
-  // denial the user may continue without location; we still route through
-  // consent so analytics gating is captured before goal-selection / first-route.
+  // denial the user may continue without location; we still route through the
+  // region gate (which falls back to its manual country picker without GPS)
+  // and consent so analytics gating is captured before goal-selection /
+  // first-route.
   const handleContinueWithoutLocation = () => {
-    router.push('/onboarding/consent' as any);
+    router.push('/onboarding/region-check' as any);
   };
 
   const handleOpenSettings = () => {

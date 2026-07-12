@@ -1,6 +1,8 @@
 import type {
   CitySuggestionRequest,
   CitySuggestionResponse,
+  CountryWaitlistRequest,
+  CountryWaitlistResponse,
   HazardReportRequest,
   HazardReportResponse,
   NavigationFeedbackRequest,
@@ -646,4 +648,43 @@ export const submitCitySuggestion = async (
     createdAt: new Date().toISOString(),
     status: 'open',
   };
+};
+
+const memoryCountryWaitlist = new Map<string, CountryWaitlistRequest & { userId: string }>();
+
+/**
+ * Region-gate waitlist signup. The route handler has already normalized
+ * `email` (trim + lowercase) and country codes (uppercase); the plain-column
+ * unique constraint (email, country_code) plus `ignoreDuplicates` makes the
+ * write idempotent — a repeat signup is a silent no-op that still reports
+ * `joined`, so the client never has to special-case "already on the list".
+ */
+export const submitCountryWaitlist = async (
+  request: CountryWaitlistRequest,
+  userId: string,
+): Promise<CountryWaitlistResponse> => {
+  if (supabaseAdmin) {
+    const { error } = await supabaseAdmin
+      .from('country_waitlist')
+      .upsert(
+        {
+          user_id: userId,
+          email: request.email,
+          country_code: request.countryCode,
+          detected_country_code: request.detectedCountryCode ?? null,
+          locale: request.locale ?? null,
+          source: request.source,
+        },
+        { onConflict: 'email,country_code', ignoreDuplicates: true },
+      );
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return { status: 'joined' };
+  }
+
+  memoryCountryWaitlist.set(`${request.email}:${request.countryCode}`, { ...request, userId });
+  return { status: 'joined' };
 };

@@ -979,6 +979,26 @@ export const en = {
     maybeLater: 'Maybe later',
     a11yGoogle: 'Sign in with Google',
     a11ySkipAccount: 'Skip account creation for now',
+    // -- Region gate (global availability, 2026-07-12) --
+    regionChecking: 'Checking availability in your area…',
+    regionPickerTitle: 'Where do you ride?',
+    regionPickerSubtitle:
+      'We couldn’t detect your country automatically. Pick it below so we can show you what’s available.',
+    regionSearchPlaceholder: 'Search countries',
+    regionNoResults: 'No countries match your search',
+    regionUnavailableTitle: 'Not in {{country}} yet',
+    regionUnavailableSubtitle:
+      'Defensive Pedal’s safety routing currently covers Europe. Leave your email and we’ll let you know the moment we launch in {{country}}.',
+    regionEmailPlaceholder: 'you@example.com',
+    regionEmailConsent: 'We’ll only email you about availability in your country — nothing else.',
+    regionNotifyMe: 'Notify me',
+    regionEmailInvalid: 'Please enter a valid email address.',
+    regionSubmitFailed: 'Couldn’t save your email. Check your connection and try again.',
+    regionSubmitted: 'You’re on the list! We’ll email you when we launch in {{country}}.',
+    regionContinueAnyway: 'Continue anyway',
+    regionContinueAnywayHint:
+      'You can still plan routes, but safety scores and hazard data are limited outside Europe.',
+    regionChangeCountry: 'Change country',
   },
 
   // ── Impact ──

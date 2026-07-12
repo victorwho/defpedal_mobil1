@@ -970,6 +970,26 @@ export const es: TranslationKeys = {
     maybeLater: 'Quizás más tarde',
     a11yGoogle: 'Iniciar sesión con Google',
     a11ySkipAccount: 'Omitir la creación de cuenta por ahora',
+    // -- Region gate (disponibilidad global, 2026-07-12) --
+    regionChecking: 'Comprobando la disponibilidad en tu zona…',
+    regionPickerTitle: '¿Dónde pedaleas?',
+    regionPickerSubtitle:
+      'No pudimos detectar tu país automáticamente. Elígelo abajo para mostrarte qué está disponible.',
+    regionSearchPlaceholder: 'Buscar países',
+    regionNoResults: 'Ningún país coincide con tu búsqueda',
+    regionUnavailableTitle: 'Aún no estamos en {{country}}',
+    regionUnavailableSubtitle:
+      'El enrutamiento seguro de Defensive Pedal cubre actualmente Europa. Déjanos tu email y te avisaremos en cuanto lancemos en {{country}}.',
+    regionEmailPlaceholder: 'tu@ejemplo.com',
+    regionEmailConsent: 'Solo te escribiremos sobre la disponibilidad en tu país — nada más.',
+    regionNotifyMe: 'Avisadme',
+    regionEmailInvalid: 'Introduce una dirección de email válida.',
+    regionSubmitFailed: 'No pudimos guardar tu email. Comprueba tu conexión e inténtalo de nuevo.',
+    regionSubmitted: '¡Estás en la lista! Te escribiremos cuando lancemos en {{country}}.',
+    regionContinueAnyway: 'Continuar de todos modos',
+    regionContinueAnywayHint:
+      'Puedes seguir planificando rutas, pero las puntuaciones de seguridad y los datos de peligros son limitados fuera de Europa.',
+    regionChangeCountry: 'Cambiar país',
   },
 
   // ── Impact ──
