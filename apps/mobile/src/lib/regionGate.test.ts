@@ -18,12 +18,17 @@ vi.mock('expo-location', () => ({
   Accuracy: { Low: 3 },
 }));
 
-import { detectCountryCode } from './regionGate';
+import {
+  clearCountryCodeCacheForTests,
+  detectCountryCode,
+  reverseGeocodeCountryCode,
+} from './regionGate';
 
 const bucharestFix = { coords: { latitude: 44.4268, longitude: 26.1025 } };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearCountryCodeCacheForTests();
   mockGetPermissions.mockResolvedValue({ status: 'granted' });
   mockLastKnown.mockResolvedValue(bucharestFix);
   mockCurrent.mockResolvedValue(bucharestFix);
@@ -74,5 +79,27 @@ describe('detectCountryCode', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('reverseGeocodeCountryCode', () => {
+  it('caches by coarse coordinates so nearby repeat calls skip the geocoder', async () => {
+    mockReverseGeocode.mockResolvedValue([{ isoCountryCode: 'DE' }]);
+
+    await expect(reverseGeocodeCountryCode(52.52, 13.405)).resolves.toBe('DE');
+    // ~1 km away — same 0.1° bucket, must be served from cache.
+    await expect(reverseGeocodeCountryCode(52.525, 13.41)).resolves.toBe('DE');
+
+    expect(mockReverseGeocode).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches a null resolution but not a thrown failure', async () => {
+    // Thrown failure (offline geocoder): NOT cached — retry can succeed.
+    mockReverseGeocode.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(reverseGeocodeCountryCode(48.85, 2.35)).resolves.toBeNull();
+
+    mockReverseGeocode.mockResolvedValue([{ isoCountryCode: 'FR' }]);
+    await expect(reverseGeocodeCountryCode(48.85, 2.35)).resolves.toBe('FR');
+    expect(mockReverseGeocode).toHaveBeenCalledTimes(2);
   });
 });

@@ -28,6 +28,45 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
     }),
   ]);
 
+// Country resolution needs no precision — 0.1° (~11 km) rounding lets GPS
+// jitter and repeated callers (region gate, search-hint resolution in
+// useResolvedCountry) share one device-geocoder hit per area.
+const countryCodeCache = new Map<string, string | null>();
+
+const countryCacheKey = (lat: number, lon: number): string =>
+  `${lat.toFixed(1)},${lon.toFixed(1)}`;
+
+/** Test hook — the module-level cache would otherwise leak between tests. */
+export const clearCountryCodeCacheForTests = (): void => {
+  countryCodeCache.clear();
+};
+
+/**
+ * Coordinate → ISO 3166-1 alpha-2 via the platform reverse-geocoder,
+ * normalized (uppercase, UK→GB) and cached by coarse coordinates.
+ * Failures resolve to `null` and are deliberately NOT cached, so a later
+ * attempt (e.g. back online) can still succeed.
+ */
+export const reverseGeocodeCountryCode = async (
+  lat: number,
+  lon: number,
+): Promise<string | null> => {
+  const key = countryCacheKey(lat, lon);
+  const cached = countryCodeCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+    const code = normalizeCountryCode(results[0]?.isoCountryCode ?? null);
+    countryCodeCache.set(key, code);
+    return code;
+  } catch {
+    return null;
+  }
+};
+
 export const detectCountryCode = (): Promise<string | null> =>
   withTimeout(detectCountryCodeUnbounded(), OVERALL_TIMEOUT_MS);
 
@@ -49,12 +88,10 @@ const detectCountryCodeUnbounded = async (): Promise<string | null> => {
       return null;
     }
 
-    const results = await Location.reverseGeocodeAsync({
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    });
-
-    return normalizeCountryCode(results[0]?.isoCountryCode ?? null);
+    return await reverseGeocodeCountryCode(
+      position.coords.latitude,
+      position.coords.longitude,
+    );
   } catch {
     return null;
   }

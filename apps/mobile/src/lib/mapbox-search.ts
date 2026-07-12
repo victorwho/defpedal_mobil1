@@ -40,12 +40,13 @@ const SUPPORTED_COUNTRIES: ReadonlySet<string> = new Set(['BR', 'RO', 'ES']);
  * Search-filter expansion for supported app countries (EU-27 + EEA + CH —
  * `SUPPORTED_APP_COUNTRIES` from core, single source of truth with the
  * onboarding region gate). When the rider is physically inside ANY of these
- * (their `countryHint` resolves via the RO/ES routing bboxes today), we
- * expand the Mapbox `country` filter to ALL of them — so a Romanian rider
- * can autocomplete "Madrid" or "Vienna" without a separate country picker.
+ * (`countryHint` is resolved by `useResolvedCountry` — RO/ES routing bboxes
+ * synchronously, the on-device reverse geocoder elsewhere), we expand the
+ * Mapbox `country` filter to ALL of them — so a Romanian rider can
+ * autocomplete "Madrid" or "Vienna" without a separate country picker.
  * Proximity bias keeps local results on top, so the noise tradeoff is
  * negligible. Riders outside the supported countries keep unrestricted
- * global search, biased by GPS proximity (their hint is never set).
+ * global search, biased by GPS proximity (their hint is cleared).
  */
 const SEARCH_COUNTRY_LIST = [...SUPPORTED_APP_COUNTRIES].join(',');
 

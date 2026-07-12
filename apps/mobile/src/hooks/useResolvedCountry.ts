@@ -1,11 +1,13 @@
 import { useEffect, useMemo } from 'react';
 import type { Coordinate, SupportedCountry } from '@defensivepedal/core';
 import {
+  SUPPORTED_APP_COUNTRIES,
   getPreviewOrigin,
   isRouteSupported,
   resolveCountryFromCoord,
 } from '@defensivepedal/core';
 
+import { reverseGeocodeCountryCode } from '../lib/regionGate';
 import { useAppStore } from '../store/appStore';
 
 export type UnsupportedReason =
@@ -95,30 +97,52 @@ export const useResolvedCountry = (): ResolvedCountry => {
 
   // Mirror the PHYSICAL origin country onto `routeRequest.countryHint`. Search
   // biasing follows where the rider actually IS (proximity / Mapbox country
-  // filter), not the custom map origin they may be planning from. Since the
-  // supported-country expansion in `mapbox-search.ts` (RO+ES in v0.2.81, all
-  // EU-27+EEA+CH after the global-availability gate), this only changes which
-  // single ISO code is stored — autocomplete expands a supported hint to the
-  // full supported list regardless.
+  // filter), not the custom map origin they may be planning from.
+  // `mapbox-search.ts` expands any supported-country hint to the full
+  // EU-27+EEA+CH list, so the hint's job is just "is the rider inside a
+  // supported country, and which one".
   //
-  // - Physical origin in RO or ES → write that ISO code.
-  // - Outside, or GPS pending → clear so search falls back to global
-  //   proximity-biased results. Without the explicit clear, a persisted RO
-  //   from a previous session would lock a Spanish rider's search until
-  //   the hook's first write.
+  // - Physical origin in RO or ES → the routing bboxes answer synchronously.
+  // - Elsewhere with a real fix → resolve via the (cached, on-device)
+  //   reverse geocoder so riders in the other supported countries also get
+  //   the supported-list search filter (global-availability gate follow-up).
+  // - Unsupported country / unresolvable / GPS pending → clear, so search
+  //   falls back to global proximity-biased results — a waitlisted rider who
+  //   continued anyway must still be able to search at home. The explicit
+  //   clear also stops a persisted hint from a previous session locking a
+  //   traveler's search to the wrong region.
   const physicalOriginCountry = useMemo(
     () => (!ZERO_COORD(physicalOrigin) ? resolveCountryFromCoord(physicalOrigin) : null),
     [physicalOrigin],
   );
   useEffect(() => {
-    if (physicalOriginCountry === null) {
+    if (physicalOriginCountry !== null) {
+      if (countryHint?.toUpperCase() === physicalOriginCountry) return;
+      setRouteRequest({ countryHint: physicalOriginCountry });
+      return;
+    }
+
+    if (ZERO_COORD(physicalOrigin)) {
       if (countryHint === undefined) return;
       setRouteRequest({ countryHint: undefined });
       return;
     }
-    if (countryHint?.toUpperCase() === physicalOriginCountry) return;
-    setRouteRequest({ countryHint: physicalOriginCountry });
-  }, [physicalOriginCountry, countryHint, setRouteRequest]);
+
+    let cancelled = false;
+    void reverseGeocodeCountryCode(physicalOrigin.lat, physicalOrigin.lon).then((code) => {
+      if (cancelled) return;
+      const next =
+        code !== null && SUPPORTED_APP_COUNTRIES.has(code) ? code : undefined;
+      const current = useAppStore.getState().routeRequest.countryHint;
+      if (next === undefined ? current === undefined : current?.toUpperCase() === next) {
+        return;
+      }
+      setRouteRequest({ countryHint: next });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [physicalOriginCountry, physicalOrigin, countryHint, setRouteRequest]);
 
   return resolved;
 };
