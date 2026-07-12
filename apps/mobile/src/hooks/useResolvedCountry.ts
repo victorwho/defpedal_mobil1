@@ -12,11 +12,10 @@ import { useAppStore } from '../store/appStore';
 
 export type UnsupportedReason =
   | 'origin_unsupported'
-  | 'destination_unsupported'
-  | 'cross_border';
+  | 'destination_unsupported';
 
 export interface ResolvedCountry {
-  /** Country resolved from the current planning origin. `null` outside RO/ES. */
+  /** Country resolved from the current planning origin. `null` outside the 31 covered countries. */
   readonly originCountry: SupportedCountry | null;
   /** Country resolved from the planning destination. `null` if unset/unsupported. */
   readonly destinationCountry: SupportedCountry | null;
@@ -49,10 +48,9 @@ export const useResolvedCountry = (): ResolvedCountry => {
 
   // Effective origin = what the router will actually use. When the rider has
   // tapped "Change start" and entered a custom address, `startOverride` wins;
-  // otherwise the physical GPS origin. This matters for the cross_border
-  // check: a Romanian rider testing intra-Spain routes via Change-Start
-  // would otherwise see origin=Bucharest + destination=Madrid and trip the
-  // cross_border banner, even though the routed ride is Madrid → Barcelona.
+  // otherwise the physical GPS origin. This matters for coverage gating: a
+  // rider outside coverage planning a route between two covered points via
+  // Change-Start must be gated on the routed ride, not their GPS position.
   const routingOrigin = useMemo(
     () => getPreviewOrigin({ origin: physicalOrigin, startOverride }),
     [physicalOrigin, startOverride],

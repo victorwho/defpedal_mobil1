@@ -1308,9 +1308,11 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat routing toggle — gated by country support.
-              Outside RO/ES we hide Safe + Flat (no OSRM data) and surface a
-              banner so the rider understands why only Fast is on offer. */}
+          {/* Safe / Fast / Flat routing toggle — gated by coverage support.
+              Outside the 31 covered countries (EU-27 + EEA + CH) we hide
+              Safe + Flat (no OSRM data) and surface a banner so the rider
+              understands why only Fast is on offer. Cross-border rides
+              within coverage are supported (single EU graph). */}
           {hasValidDestination ? (
             resolvedCountry.routeSupported ? (
               <View>
@@ -1351,11 +1353,9 @@ export default function RoutePlanningScreen() {
               >
                 <Ionicons name="information-circle-outline" size={16} color={gray[600]} />
                 <Text style={styles.coverageNoticeText}>
-                  {resolvedCountry.unsupportedReason === 'cross_border'
-                    ? t('planning.coverageCrossBorder')
-                    : resolvedCountry.unsupportedReason === 'destination_unsupported'
-                      ? t('planning.coverageDestinationUnsupported')
-                      : t('planning.coverageOriginUnsupported')}
+                  {resolvedCountry.unsupportedReason === 'destination_unsupported'
+                    ? t('planning.coverageDestinationUnsupported')
+                    : t('planning.coverageOriginUnsupported')}
                 </Text>
               </View>
             )

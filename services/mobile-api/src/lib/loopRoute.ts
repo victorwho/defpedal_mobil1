@@ -1,5 +1,4 @@
 import type { Coordinate, RouteResponse } from '@defensivepedal/core';
-import { resolveCountryFromCoord } from '@defensivepedal/core';
 
 import { config } from '../config';
 
@@ -107,14 +106,9 @@ export const fetchLoopRoute = async (
   }
 
   const coordinates = buildLoopCoordinates(request.origin, waypoints);
-  // Loop routes start and end at the same origin, so country is determined
-  // by the origin alone. Fall back to RO if outside supported coverage —
-  // onboarding loop generation is an internal feature; the route may not be
-  // ideal for an unsupported region but the caller already gated on country.
-  const originCountry = resolveCountryFromCoord(request.origin);
-  const baseUrl =
-    originCountry === 'ES' ? config.safeOsrmEsBaseUrl : config.safeOsrmBaseUrl;
-  const url = `${baseUrl}/${coordinates}?${params.toString()}`;
+  // Single EU-wide OSRM graph (2026-07-12) — no per-country dispatch left;
+  // the caller already gated on coverage.
+  const url = `${config.safeOsrmBaseUrl}/${coordinates}?${params.toString()}`;
 
   const response = await fetch(url);
 

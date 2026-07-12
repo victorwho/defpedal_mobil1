@@ -64,15 +64,28 @@ describe('useResolvedCountry — search country hint', () => {
     expect(mockReverseGeocodeCountryCode).not.toHaveBeenCalled();
   });
 
-  it('resolves the hint via the geocoder for a rider in another supported country', async () => {
-    mockReverseGeocodeCountryCode.mockResolvedValue('DE');
-    setOrigin(52.52, 13.405); // Berlin — outside the RO/ES bboxes
+  it('sets the hint from the routing bbox for a rider in a newly covered country (no geocoder call)', async () => {
+    setOrigin(52.52, 13.405); // Berlin — inside the DE coverage bbox
     renderHook(() => useResolvedCountry());
 
     await waitFor(() =>
       expect(useAppStore.getState().routeRequest.countryHint).toBe('DE'),
     );
-    expect(mockReverseGeocodeCountryCode).toHaveBeenCalledWith(52.52, 13.405);
+    expect(mockReverseGeocodeCountryCode).not.toHaveBeenCalled();
+  });
+
+  it('resolves the hint via the geocoder for supported territory outside the coverage boxes', async () => {
+    // Funchal, Madeira: Portuguese (supported country) but outside the PT
+    // mainland coverage bbox — the geocoder fallback carries the search
+    // filter for exactly these off-box territories.
+    mockReverseGeocodeCountryCode.mockResolvedValue('PT');
+    setOrigin(32.6669, -16.9241);
+    renderHook(() => useResolvedCountry());
+
+    await waitFor(() =>
+      expect(useAppStore.getState().routeRequest.countryHint).toBe('PT'),
+    );
+    expect(mockReverseGeocodeCountryCode).toHaveBeenCalledWith(32.6669, -16.9241);
   });
 
   it('clears the hint for a rider in an unsupported country (global search stays open)', async () => {

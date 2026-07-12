@@ -580,16 +580,14 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 - Key tables: `road_risk_data`, `hazards`, `trips`, `trip_tracks`, `navigation_feedback`, `trip_shares`, `feed_likes`, `trip_loves`, `feed_comments`, `profiles`, `push_tokens`, `leaderboard_snapshots`
 - Key RPC: `get_segmented_risk_route`, `get_nearby_feed`, `get_user_trip_stats`, `get_neighborhood_leaderboard`, `check_champion_repeat_badges`
 
-### OSRM Servers (per country)
-- **Romania safe**: `https://osrm.defensivepedal.com/route/v1/bicycle` (Caddy + Let's Encrypt TLS in front of port 5000)
-- **Romania flat**: `https://osrm-flat.defensivepedal.com/route/v1/bicycle` (Caddy in front of port 5001 — same path; the subdomain alone selects the container)
-- **Spain safe**: `https://osrm-es.defensivepedal.com/route/v1/bicycle`
-- **Spain flat**: `https://osrm-es-flat.defensivepedal.com/route/v1/bicycle`
-- Direct IP (RO, debugging only, plaintext): `http://34.116.139.172:5000` and `:5001` — not used by the app, exceptions removed from manifests
-- Hosted on GCP project `osrmro1` in `europe-central2-c`
-- Custom safety profile using OSM road attributes
-- Supports `&exclude=unpaved` parameter
-- **Country dispatch**: both client (`apps/mobile/src/lib/mapbox-routing.ts` `OSRM_BASES`) and server (`services/mobile-api/src/lib/clients/customOsrm.ts`) resolve country from the ride's origin+destination via `isRouteSupported` in `@defensivepedal/core` (`packages/core/src/countryCoverage.ts`). Both endpoints must resolve to the same country — cross-border rides fall back to Mapbox cycling with a banner notice on `route-planning`. Bbox coverage = RO mainland + ES mainland + Balearics. **Canary Islands excluded** for v1 (no OSRM data shipped). Adding a new country = one entry in `OSRM_BASES` + one bbox in `COUNTRY_BBOXES`. `road_risk_data` is RO-only today; Spain routes render without colored risk segments and the safe-vs-fast comparison label is suppressed until ES risk data ships.
+### OSRM Servers (EU-wide single graph, 2026-07-12)
+- **Safe**: `https://osrm.defensivepedal.com/route/v1/bicycle` (Caddy + Let's Encrypt TLS in front of port 5000)
+- **Flat**: `https://osrm-flat.defensivepedal.com/route/v1/bicycle` (Caddy in front of port 5001 — same path; the subdomain alone selects the container)
+- **One graph covers all 31 supported countries** (EU-27 + EEA + CH — see `packages/core/src/appAvailability.ts`); verified 2026-07-12 by probing Berlin/Paris/Madrid/Stockholm/Reykjavik/Nicosia + a Vienna→Bratislava cross-border route. The former `osrm-es.*` / `osrm-es-flat.*` per-country pair is retired (config keys + dispatch removed).
+- **Out-of-coverage failure shape**: OSRM does NOT error for points outside its data (UK, Serbia, Canaries…) — it returns `Ok` with a degenerate distance-0 route. Both the client (`fetchOsrmRoutes` → `OsrmOutOfCoverageError` → silent degrade to Mapbox fast + coverage `unsupported`) and the server (`customOsrm.ts`) carry a **zero-distance guard**; do not remove it — the loose coverage bboxes deliberately over-include neighbors (Bosnia inside the HR box, Belgrade/Chișinău inside the RO box) and rely on the guard as the backstop.
+- Direct IP (debugging only, plaintext): `http://34.116.139.172:5000` and `:5001` — not used by the app, exceptions removed from manifests
+- Hosted on GCP project `osrmro1` in `europe-central2-c`; custom safety profile using OSM road attributes; supports `&exclude=unpaved`
+- **Coverage dispatch**: `isRouteSupported` in `packages/core/src/countryCoverage.ts` — 31 per-country bbox sets (`COUNTRY_BBOXES`), **cross-border pairs within coverage are SUPPORTED** (`cross_border` reason removed). RO + ES are listed FIRST in the record: attribution is first-match and only those two have `road_risk_data`-dependent features (safe-vs-fast comparison gates on the attributed country); Iberia note — Portugal attributes as 'ES' (inseparable by bbox, harmless). Canary Islands / Madeira / Azores / Samos remain outside the boxes (no graph data → Mapbox fallback). `road_risk_data` is RO+ES-only; routes elsewhere render without colored risk segments and without the comparison label.
 
 ### GitHub
 - Repo: `victorwho/defpedal_mobil1`

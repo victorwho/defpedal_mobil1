@@ -30,24 +30,21 @@ import { getAccessToken } from './supabase';
 // ---------------------------------------------------------------------------
 
 /**
- * Per-country OSRM endpoints. Both endpoints of a ride must resolve to the
- * same country (OSRM data is partitioned per server) — see `isRouteSupported`
- * in `@defensivepedal/core`. Adding a new country = one entry here + one
- * bbox in `countryCoverage.ts`.
+ * Single EU-wide OSRM deployment (2026-07-12): one graph covering all 31
+ * supported countries (EU-27 + EEA + CH), so there is no per-country server
+ * split anymore and cross-border rides route natively. The former
+ * osrm-es.* pair is retired. Coverage gating lives in `isRouteSupported`
+ * (`countryCoverage.ts`); adding coverage = extend the bboxes there, not
+ * this constant.
  *
- * Risk segments are currently RO-only; ES routes still render but without
- * colored risk overlays until `road_risk_data` is populated for Spain.
+ * Risk segments (colored overlays + safe-vs-fast comparison) remain
+ * RO+ES-only until `road_risk_data` ships for more countries — routes
+ * elsewhere render without them.
  */
-const OSRM_BASES: Record<SupportedCountry, { safe: string; flat: string }> = {
-  RO: {
-    safe: 'https://osrm.defensivepedal.com/route/v1/bicycle',
-    flat: 'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
-  },
-  ES: {
-    safe: 'https://osrm-es.defensivepedal.com/route/v1/bicycle',
-    flat: 'https://osrm-es-flat.defensivepedal.com/route/v1/bicycle',
-  },
-};
+const OSRM_BASE = {
+  safe: 'https://osrm.defensivepedal.com/route/v1/bicycle',
+  flat: 'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
+} as const;
 
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
@@ -161,8 +158,15 @@ const buildCoordString = (
   return points.map((p) => `${p.lon},${p.lat}`).join(';');
 };
 
+/**
+ * OSRM answered `Ok` but every route was distance-0 — the loose coverage
+ * bbox admitted a point the graph has no data for. Distinguished from
+ * network/server errors so the caller can degrade to Mapbox (coverage miss)
+ * instead of surfacing a retryable error (transient failure).
+ */
+class OsrmOutOfCoverageError extends Error {}
+
 const fetchOsrmRoutes = async (
-  country: SupportedCountry,
   origin: Coordinate,
   destination: Coordinate,
   avoidUnpaved: boolean,
@@ -173,7 +177,7 @@ const fetchOsrmRoutes = async (
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
   // Use flat-profile endpoint when avoidHills is set (separate OSRM instance)
-  const base = avoidHills ? OSRM_BASES[country].flat : OSRM_BASES[country].safe;
+  const base = avoidHills ? OSRM_BASE.flat : OSRM_BASE.safe;
   let url = `${base}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
@@ -195,7 +199,20 @@ const fetchOsrmRoutes = async (
     throw new Error(`OSRM returned no routes (code: ${data.code})`);
   }
 
-  return data.routes;
+  // Zero-distance guard: for points OUTSIDE its data (e.g. Belgrade inside
+  // the loose RO bbox, Bosnia inside the HR bbox, the Canaries), OSRM does
+  // NOT error — it snaps both endpoints to the same far-away edge and
+  // returns `Ok` with a distance-0 route (probed 2026-07-12). Throw the
+  // typed error so `directPreviewRoute` degrades to Mapbox fast routing
+  // instead of rendering a garbage route or surfacing a hard error.
+  const routable = data.routes.filter((route) => route.distance > 0);
+  if (routable.length === 0) {
+    throw new OsrmOutOfCoverageError(
+      'OSRM returned only zero-distance routes (outside data coverage).',
+    );
+  }
+
+  return routable;
 };
 
 // ---------------------------------------------------------------------------
@@ -408,29 +425,47 @@ export const directPreviewRoute = async (
   // here too as defense-in-depth: silent fall-back to Mapbox fast routing.
   const support = isRouteSupported(origin, destination);
   const canUseOsrm = support.supported;
-  const effectiveMode = requestedMode === 'safe' && !canUseOsrm ? 'fast' : requestedMode;
-  const source: 'custom_osrm' | 'mapbox' =
-    effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
+  let effectiveMode = requestedMode === 'safe' && !canUseOsrm ? 'fast' : requestedMode;
+  // Flipped when OSRM answers a supported-bbox pair with only degenerate
+  // zero-distance routes — a loose-bbox mis-hit (e.g. Chișinău sits inside
+  // the RO box but outside the graph). Treated exactly like unsupported
+  // coverage from that point on.
+  let osrmCoverageMiss = false;
 
   // Fast/flat mode uses Mapbox Directions, which rejects routes > ~400km
   // straight-line distance (MOBILE-C). Fail fast with a clear message.
-  if (effectiveMode !== 'safe' && haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
-    throw new Error(
-      'Route is too long for fast routing. Please switch to Safe routing.',
-    );
+  const assertWithinMapboxDistance = () => {
+    if (haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
+      throw new Error(
+        'Route is too long for fast routing. Please switch to Safe routing.',
+      );
+    }
+  };
+
+  let rawRoutes: Route[];
+  if (effectiveMode === 'safe' && support.supported) {
+    try {
+      rawRoutes = await fetchOsrmRoutes(
+        origin,
+        destination,
+        request.avoidUnpaved,
+        request.avoidHills,
+        waypoints,
+      );
+    } catch (error) {
+      if (!(error instanceof OsrmOutOfCoverageError)) throw error;
+      effectiveMode = 'fast';
+      osrmCoverageMiss = true;
+      assertWithinMapboxDistance();
+      rawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
+    }
+  } else {
+    assertWithinMapboxDistance();
+    rawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
   }
 
-  const rawRoutes =
-    effectiveMode === 'safe' && support.supported
-      ? await fetchOsrmRoutes(
-          support.country,
-          origin,
-          destination,
-          request.avoidUnpaved,
-          request.avoidHills,
-          waypoints,
-        )
-      : await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
+  const source: 'custom_osrm' | 'mapbox' =
+    effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
 
   const routes: RouteOption[] = rawRoutes.map((route, index) =>
     mapRoute(route, source, index, locale),
@@ -463,6 +498,7 @@ export const directPreviewRoute = async (
   const comparisonEligible =
     request.showRouteComparison &&
     support.supported &&
+    !osrmCoverageMiss &&
     COMPARISON_ELIGIBLE_COUNTRIES.includes(support.country);
 
   let comparisonLabel: string | undefined;
@@ -493,7 +529,6 @@ export const directPreviewRoute = async (
       } else {
         // Fetch safe route for comparison — guarded by support.supported above
         const safeRawRoutes = await fetchOsrmRoutes(
-          support.country,
           origin,
           destination,
           request.avoidUnpaved,
@@ -551,10 +586,13 @@ export const directPreviewRoute = async (
       ? support.country
       : support.originCountry ?? request.countryHint?.toUpperCase() ?? 'UNKNOWN';
 
+  // A coverage miss reports as unsupported — the bbox said yes but the graph
+  // said no, and the rider got the same Mapbox fallback either way.
+  const effectivelyCovered = support.supported && !osrmCoverageMiss;
   const coverage: CoverageRegion = {
     countryCode: resolvedCountryCode,
-    status: support.supported ? 'supported' : 'unsupported',
-    safeRouting: support.supported,
+    status: effectivelyCovered ? 'supported' : 'unsupported',
+    safeRouting: effectivelyCovered,
     fastRouting: true,
   };
 

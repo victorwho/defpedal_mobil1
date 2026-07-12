@@ -467,8 +467,8 @@ describe('directPreviewRoute', () => {
   });
 });
 
-describe('country-aware OSRM dispatch', () => {
-  it('routes Spanish safe requests to osrm-es', async () => {
+describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
+  it('routes Spanish safe requests to the EU OSRM server', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
@@ -485,11 +485,11 @@ describe('country-aware OSRM dispatch', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('://osrm-es.defensivepedal.com');
-    expect(firstCallUrl).not.toContain('osrm-es-flat');
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-es');
   });
 
-  it('routes Spanish flat requests to osrm-es-flat', async () => {
+  it('routes Spanish flat requests to the EU flat server', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
@@ -505,19 +505,20 @@ describe('country-aware OSRM dispatch', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('://osrm-es-flat.defensivepedal.com');
+    expect(firstCallUrl).toContain('://osrm-flat.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-es');
   });
 
-  it('keeps RO requests on osrm.defensivepedal.com (not osrm-es)', async () => {
+  it('routes safe requests in a newly covered country (Berlin) to the EU server', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
       { data: createRiskResponse() },
     ]);
 
-    await directPreviewRoute({
-      origin: { lat: 44.43, lon: 26.1 },
-      destination: { lat: 44.44, lon: 26.12 },
+    const result = await directPreviewRoute({
+      origin: { lat: 52.52, lon: 13.405 },
+      destination: { lat: 52.53, lon: 13.42 },
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,
@@ -525,7 +526,29 @@ describe('country-aware OSRM dispatch', () => {
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
-    expect(firstCallUrl).not.toContain('osrm-es');
+    expect(result.selectedMode).toBe('safe');
+    expect(result.coverage.safeRouting).toBe(true);
+  });
+
+  it('routes cross-border rides within coverage via OSRM (RO -> BG)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
+      destination: { lat: 42.6977, lon: 23.3219 }, // Sofia — same EU graph now
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(result.selectedMode).toBe('safe');
+    expect(result.coverage.safeRouting).toBe(true);
   });
 
   it('falls back to Mapbox when safe is requested in an unsupported country', async () => {
@@ -535,10 +558,10 @@ describe('country-aware OSRM dispatch', () => {
       { data: createRiskResponse() },
     ]);
 
-    // Paris → Paris (both unsupported)
+    // London → London (UK outside coverage)
     const result = await directPreviewRoute({
-      origin: { lat: 48.8566, lon: 2.3522 },
-      destination: { lat: 48.86, lon: 2.36 },
+      origin: { lat: 51.5074, lon: -0.1278 },
+      destination: { lat: 51.51, lon: -0.1 },
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,
@@ -553,39 +576,42 @@ describe('country-aware OSRM dispatch', () => {
     expect(result.coverage.status).toBe('unsupported');
   });
 
-  // Commit 055e89a added a 400km straight-line guard on every Mapbox
-  // Directions call (the API 422s beyond that), so the cross-border fallback
-  // is only reachable for pairs under 400km. Bucharest → Sofia (~294km,
-  // destination outside both bboxes) exercises the fallback; the old
-  // Bucharest → Madrid (~2,470km) pair now correctly fails fast instead —
-  // covered by the rejection test below.
-  it('falls back to Mapbox on a cross-border ride to an unsupported neighbor (RO -> BG)', async () => {
+  it('degrades to Mapbox when OSRM answers a bbox mis-hit with zero-distance routes', async () => {
+    // Chișinău sits inside the loose RO bbox but outside the graph — OSRM
+    // answers Ok + distance-0 (probed 2026-07-12). The guard must flip the
+    // ride to Mapbox fast routing and report coverage as unsupported.
+    const zeroDistanceRoute = { ...createOsrmRoute(), distance: 0 };
     setupFetchMock([
-      { data: createRouteResponse() },
+      { data: { code: 'Ok', routes: [zeroDistanceRoute] } }, // OSRM garbage
+      { data: createRouteResponse() },                       // Mapbox fallback
       { data: createElevationResponse() },
       { data: createRiskResponse() },
     ]);
 
     const result = await directPreviewRoute({
-      origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
-      destination: { lat: 42.6977, lon: 23.3219 }, // Sofia (~294km, unsupported)
+      origin: { lat: 47.0105, lon: 28.8638 },
+      destination: { lat: 47.02, lon: 28.88 },
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,
     });
 
-    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('api.mapbox.com');
+    const calls = vi.mocked(fetch).mock.calls.map((c) => c[0] as string);
+    expect(calls[0]).toContain('://osrm.defensivepedal.com');
+    expect(calls[1]).toContain('api.mapbox.com');
+    expect(result.selectedMode).toBe('fast');
+    expect(result.routes[0].source).toBe('mapbox');
     expect(result.coverage.safeRouting).toBe(false);
+    expect(result.coverage.status).toBe('unsupported');
   });
 
-  it('fails fast with a clear message when a Mapbox-bound route exceeds the 400km guard (RO -> ES)', async () => {
+  it('fails fast with a clear message when a Mapbox-bound route exceeds the 400km guard', async () => {
     setupFetchMock([]);
 
     await expect(
       directPreviewRoute({
-        origin: { lat: 44.4268, lon: 26.1025 },   // Bucharest
-        destination: { lat: 40.4168, lon: -3.7038 }, // Madrid (~2,470km)
+        origin: { lat: 51.5074, lon: -0.1278 },  // London (unsupported → Mapbox)
+        destination: { lat: 55.9533, lon: -3.1883 }, // Edinburgh (~530km)
         mode: 'safe',
         avoidUnpaved: false,
         avoidHills: false,

@@ -48,16 +48,8 @@ export const config = {
       ['SAFE_OSRM_FLAT_BASE_URL'],
       'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
     ),
-  safeOsrmEsBaseUrl:
-    resolveConfigValue(
-      ['SAFE_OSRM_ES_BASE_URL'],
-      'https://osrm-es.defensivepedal.com/route/v1/bicycle',
-    ),
-  safeOsrmEsFlatBaseUrl:
-    resolveConfigValue(
-      ['SAFE_OSRM_ES_FLAT_BASE_URL'],
-      'https://osrm-es-flat.defensivepedal.com/route/v1/bicycle',
-    ),
+  // safeOsrmEs(Flat)BaseUrl removed 2026-07-12 — the EU-wide graph on the
+  // main pair covers Spain; the osrm-es.* servers are retired.
   mapboxAccessToken: resolveConfigValue(
     ['MAPBOX_ACCESS_TOKEN', 'VITE_MAPBOX_ACCESS_TOKEN', 'EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN'],
     '',

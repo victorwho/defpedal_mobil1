@@ -2,7 +2,6 @@ import type {
   Coordinate,
   RoutePreviewRequest,
   RouteResponse,
-  SupportedCountry,
 } from '@defensivepedal/core';
 import { isRouteSupported } from '@defensivepedal/core';
 
@@ -47,19 +46,13 @@ const fetchOsrmWithRetry = async (url: string): Promise<Response> => {
 };
 
 /**
- * Resolve the OSRM base URL for an origin/destination pair. Mirrors the
- * mobile-side dispatch in `apps/mobile/src/lib/mapbox-routing.ts` so server
- * and client land on the same server for the same ride.
+ * Resolve the OSRM base URL. Single EU-wide deployment (2026-07-12): one
+ * graph covers all 31 supported countries, so the only split left is the
+ * safe vs flat profile. Mirrors the mobile-side dispatch in
+ * `apps/mobile/src/lib/mapbox-routing.ts`.
  */
-const resolveBaseUrl = (
-  country: SupportedCountry,
-  avoidHills: boolean,
-): string => {
-  if (country === 'ES') {
-    return avoidHills ? config.safeOsrmEsFlatBaseUrl : config.safeOsrmEsBaseUrl;
-  }
-  return avoidHills ? config.safeOsrmFlatBaseUrl : config.safeOsrmBaseUrl;
-};
+const resolveBaseUrl = (avoidHills: boolean): string =>
+  avoidHills ? config.safeOsrmFlatBaseUrl : config.safeOsrmBaseUrl;
 
 export const fetchSafeRoutes = async (
   request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills'> & {
@@ -86,7 +79,7 @@ export const fetchSafeRoutes = async (
     params.set('exclude', 'unpaved');
   }
 
-  const baseUrl = resolveBaseUrl(support.country, request.avoidHills);
+  const baseUrl = resolveBaseUrl(request.avoidHills);
   const url = `${baseUrl}/${buildCoordinates(
     request.origin,
     request.destination,
@@ -98,5 +91,20 @@ export const fetchSafeRoutes = async (
     throw new Error(`Safe routing request failed with ${response.status}`);
   }
 
-  return (await response.json()) as RouteResponse;
+  const data = (await response.json()) as RouteResponse;
+
+  // Zero-distance guard: for points outside its data (loose-bbox mis-hits
+  // like Belgrade inside the RO box), OSRM answers `Ok` with a degenerate
+  // distance-0 route instead of erroring (probed 2026-07-12). Reject it here
+  // so the preview falls back to Mapbox instead of returning garbage.
+  if (
+    data.code === 'Ok' &&
+    Array.isArray(data.routes) &&
+    data.routes.length > 0 &&
+    data.routes.every((route) => !(route.distance > 0))
+  ) {
+    throw new Error('Safe routing returned only zero-distance routes (outside data coverage).');
+  }
+
+  return data;
 };
