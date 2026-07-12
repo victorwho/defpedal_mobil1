@@ -199,6 +199,25 @@ describe('POST /v1/country-waitlist', () => {
     await app.close();
   });
 
+  it('accepts a null detectedCountryCode (GPS detection failed, picker-only path)', async () => {
+    const submit = vi.fn().mockResolvedValue({ status: 'joined' });
+    const app = buildTestApp({ submitCountryWaitlist: submit });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/country-waitlist',
+      headers: authHeaders,
+      payload: { ...validPayload, detectedCountryCode: null },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({ detectedCountryCode: null }),
+      ANON_USER_ID,
+    );
+    await app.close();
+  });
+
   it('rejects a malformed email with 400', async () => {
     const app = buildTestApp();
     const response = await app.inject({

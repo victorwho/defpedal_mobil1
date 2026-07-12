@@ -15,6 +15,10 @@ import * as Location from 'expo-location';
  */
 
 const FRESH_FIX_TIMEOUT_MS = 8_000;
+// Hard ceiling on the whole detection — the platform geocoder has no
+// timeout of its own and a hang here would strand the rider on the
+// "Checking availability…" spinner with no way forward.
+const OVERALL_TIMEOUT_MS = 12_000;
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
   Promise.race([
@@ -24,7 +28,10 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T | null> =>
     }),
   ]);
 
-export const detectCountryCode = async (): Promise<string | null> => {
+export const detectCountryCode = (): Promise<string | null> =>
+  withTimeout(detectCountryCodeUnbounded(), OVERALL_TIMEOUT_MS);
+
+const detectCountryCodeUnbounded = async (): Promise<string | null> => {
   try {
     const permission = await Location.getForegroundPermissionsAsync();
     if (permission.status !== 'granted') {
