@@ -18,18 +18,19 @@ describe('SUPPORTED_APP_COUNTRIES', () => {
     }
   });
 
-  it('contains EEA members, Switzerland, and the UK', () => {
-    for (const code of ['IS', 'LI', 'NO', 'CH', 'GB']) {
+  it('contains EEA members and Switzerland', () => {
+    for (const code of ['IS', 'LI', 'NO', 'CH']) {
       expect(SUPPORTED_APP_COUNTRIES.has(code)).toBe(true);
     }
   });
 
-  it('has exactly 32 entries (EU-27 + IS/LI/NO + CH + GB)', () => {
-    expect(SUPPORTED_APP_COUNTRIES.size).toBe(32);
+  it('has exactly 31 entries (EU-27 + IS/LI/NO + CH)', () => {
+    expect(SUPPORTED_APP_COUNTRIES.size).toBe(31);
   });
 
-  it('does not contain non-European or unsupported countries', () => {
-    for (const code of ['US', 'RS', 'UA', 'TR', 'MD', 'AL', 'BA', 'MK', 'ME', 'XK']) {
+  it('does not contain the UK or other unsupported countries', () => {
+    // GB is deliberately outside the OSRM routing coverage (2026-07-12).
+    for (const code of ['GB', 'US', 'RS', 'UA', 'TR', 'MD', 'AL', 'BA', 'MK', 'ME', 'XK']) {
       expect(SUPPORTED_APP_COUNTRIES.has(code)).toBe(false);
     }
   });
@@ -63,9 +64,11 @@ describe('isAppCountrySupported', () => {
     expect(isAppCountrySupported('fr')).toBe(true);
   });
 
-  it('accepts the UK via both GB and the UK alias', () => {
-    expect(isAppCountrySupported('GB')).toBe(true);
-    expect(isAppCountrySupported('UK')).toBe(true);
+  it('rejects the UK consistently via both GB and the UK alias', () => {
+    // The alias still matters: a UK rider must resolve to GB and land on
+    // the waitlist, not fall through as "unknown country" to the picker.
+    expect(isAppCountrySupported('GB')).toBe(false);
+    expect(isAppCountrySupported('UK')).toBe(false);
   });
 
   it('rejects unsupported countries', () => {

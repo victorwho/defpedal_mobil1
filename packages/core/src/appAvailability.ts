@@ -5,16 +5,16 @@
  * available in the rider's country at all?".
  *
  * The Play/App Store listings are open worldwide; new installs outside this
- * list see the onboarding region gate (country picker + email waitlist) and
- * may still continue with Mapbox fallback routing (soft gate, product
- * decision 2026-07-12).
+ * list (including the UK) see the onboarding region gate (country picker +
+ * email waitlist) and may still continue with Mapbox fallback routing (soft
+ * gate, product decision 2026-07-12).
  */
 
 /**
  * ISO 3166-1 alpha-2 codes where the app is considered available: the 27 EU
- * member states plus the EEA (Iceland, Liechtenstein, Norway), Switzerland,
- * and the United Kingdom — the countries a Europe OSM extract actually
- * covers with routable data.
+ * member states plus the EEA (Iceland, Liechtenstein, Norway) and
+ * Switzerland — the countries the EU-wide OSRM routing deployment covers
+ * (confirmed list, 2026-07-12). The UK is deliberately NOT included.
  */
 export const SUPPORTED_APP_COUNTRIES: ReadonlySet<string> = new Set([
   // EU-27
@@ -23,8 +23,8 @@ export const SUPPORTED_APP_COUNTRIES: ReadonlySet<string> = new Set([
   'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
   // EEA
   'IS', 'LI', 'NO',
-  // Bilateral / post-Brexit
-  'CH', 'GB',
+  // Bilateral
+  'CH',
 ]);
 
 /**

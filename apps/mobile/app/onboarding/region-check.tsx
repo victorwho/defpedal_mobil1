@@ -42,7 +42,7 @@ type Phase = 'detecting' | 'picker' | 'waitlist';
  * Onboarding region gate (global availability, 2026-07-12).
  *
  * Sits between the location-permission screen and consent. GPS reverse-
- * geocode resolves the rider's country: supported (EU + EEA + CH + UK, see
+ * geocode resolves the rider's country: supported (EU-27 + EEA + CH, see
  * core `appAvailability.ts`) passes straight through — the rider only ever
  * sees a brief spinner. Unknown → manual country picker. Unsupported →
  * waitlist panel that collects an email for the launch announcement, with a
