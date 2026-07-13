@@ -64,8 +64,6 @@ export const ro: TranslationKeys = {
       'Rutarea sigură nu este încă disponibilă în zona ta — folosim rute standard de ciclism.',
     coverageDestinationUnsupported:
       'Destinația ta este în afara zonei cu rutare sigură — folosim rute standard de ciclism.',
-    coverageCrossBorder:
-      'Rutarea sigură funcționează într-o singură țară — folosim rute standard pentru această cursă transfrontalieră.',
   },
 
   // ── Route Preview ──

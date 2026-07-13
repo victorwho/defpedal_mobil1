@@ -31,6 +31,13 @@ describe('resolveCountryFromCoord', () => {
     expect(resolveCountryFromCoord({ lat: 39.5696, lon: 2.6502 })).toBe('ES');
   });
 
+  it('resolves the Spanish North-African exclaves to ES (gate/routing consistency)', () => {
+    // Ceuta and Melilla are ISO-ES, so they pass the availability gate —
+    // the routing bboxes must agree or the app contradicts itself.
+    expect(resolveCountryFromCoord({ lat: 35.8894, lon: -5.3213 })).toBe('ES'); // Ceuta
+    expect(resolveCountryFromCoord({ lat: 35.2923, lon: -2.9381 })).toBe('ES'); // Melilla
+  });
+
   it('resolves the newly covered EU capitals', () => {
     expect(resolveCountryFromCoord({ lat: 48.8566, lon: 2.3522 })).toBe('FR'); // Paris
     expect(resolveCountryFromCoord({ lat: 52.52, lon: 13.405 })).toBe('DE'); // Berlin

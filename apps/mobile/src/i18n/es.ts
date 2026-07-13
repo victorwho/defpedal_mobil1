@@ -64,8 +64,6 @@ export const es: TranslationKeys = {
       'La ruta segura aún no está disponible en tu zona — usamos rutas ciclistas estándar.',
     coverageDestinationUnsupported:
       'Tu destino está fuera de la cobertura de rutas seguras — usamos rutas ciclistas estándar.',
-    coverageCrossBorder:
-      'La ruta segura funciona dentro de un solo país — usamos rutas ciclistas estándar para este trayecto transfronterizo.',
   },
 
   // ── Route Preview ──

@@ -491,9 +491,10 @@ function RoutePreviewScreen() {
   }, [currentDisplayMode, setAvoidHills, setRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
-  // Outside RO/ES we only have Mapbox fast routing — the cycle pill becomes
-  // a passive label so taps don't kick the request through unavailable
-  // Safe/Flat profiles. The route-planning gate already forced mode to fast.
+  // Outside the covered countries (EU-27 + EEA + CH) we only have Mapbox
+  // fast routing — the cycle pill becomes a passive label so taps don't kick
+  // the request through unavailable Safe/Flat profiles. The route-planning
+  // gate already forced mode to fast.
   const modeCycleDisabled = isCyclingMode || !resolvedCountry.routeSupported;
   const currentMode = modeDisplay[currentDisplayMode];
   const nextMode = modeDisplay[currentMode.next];

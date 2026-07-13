@@ -449,12 +449,12 @@ describe('mapboxReverseGeocode', () => {
 });
 
 describe('mapboxGetCoverage', () => {
-  it('returns supported for known country hint', async () => {
-    const result = await mapboxGetCoverage(-23.55, -46.63, 'BR');
+  it('returns supported for a newly covered country hint (DE)', async () => {
+    const result = await mapboxGetCoverage(52.52, 13.405, 'DE');
 
     expect(result.matched?.status).toBe('supported');
     expect(result.matched?.safeRouting).toBe(true);
-    expect(result.matched?.countryCode).toBe('BR');
+    expect(result.matched?.countryCode).toBe('DE');
     expect(result.regions).toHaveLength(1);
   });
 
@@ -465,21 +465,25 @@ describe('mapboxGetCoverage', () => {
     expect(result.matched?.countryCode).toBe('RO');
   });
 
-  it('returns unsupported for unknown country', async () => {
-    const result = await mapboxGetCoverage(51.5, -0.12, 'GB');
+  it('returns unsupported for countries outside the supported set (GB, BR)', async () => {
+    // BR was in the legacy hardcoded set (Pedala Defensiva origins) — the
+    // set now derives from SUPPORTED_APP_COUNTRIES, which excludes it.
+    const gb = await mapboxGetCoverage(51.5, -0.12, 'GB');
+    expect(gb.matched?.status).toBe('unsupported');
+    expect(gb.matched?.safeRouting).toBe(false);
 
-    expect(result.matched?.status).toBe('unsupported');
-    expect(result.matched?.safeRouting).toBe(false);
+    const br = await mapboxGetCoverage(-23.55, -46.63, 'BR');
+    expect(br.matched?.status).toBe('unsupported');
   });
 
   it('falls back to reverse geocode when no hint provided', async () => {
-    const feature = createGeocodeFeature({ countryCode: 'BR' });
+    const feature = createGeocodeFeature({ countryCode: 'FR' });
     mockFetchResponse({ type: 'FeatureCollection', features: [feature] });
 
-    const result = await mapboxGetCoverage(-23.55, -46.63);
+    const result = await mapboxGetCoverage(48.85, 2.35);
 
     expect(result.matched?.status).toBe('supported');
-    expect(result.matched?.countryCode).toBe('BR');
+    expect(result.matched?.countryCode).toBe('FR');
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -493,7 +497,7 @@ describe('mapboxGetCoverage', () => {
   });
 
   it('has generatedAt timestamp', async () => {
-    const result = await mapboxGetCoverage(-23.55, -46.63, 'BR');
+    const result = await mapboxGetCoverage(44.43, 26.10, 'RO');
 
     expect(result.generatedAt).toBeDefined();
     expect(() => new Date(result.generatedAt)).not.toThrow();

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockEnv, mockGetItem, mockSetItem, mockRemoveItem } = vi.hoisted(() => ({
   // Mutable so individual tests can flip the environment.
-  mockEnv: { appEnv: 'preview' as string },
+  mockEnv: { appEnv: 'preview' as string, appVariant: 'preview' as string },
   mockGetItem: vi.fn().mockResolvedValue(null),
   mockSetItem: vi.fn().mockResolvedValue(undefined),
   mockRemoveItem: vi.fn().mockResolvedValue(undefined),
@@ -30,6 +30,7 @@ const berlin = { lat: 52.52, lon: 13.405 };
 beforeEach(() => {
   vi.clearAllMocks();
   mockEnv.appEnv = 'preview';
+  mockEnv.appVariant = 'preview';
   resetDevMockLocationForTests();
 });
 
@@ -76,6 +77,19 @@ describe('devMockLocation — PRODUCTION guarantee', () => {
     // Even flipping back (impossible at runtime, but proves nothing leaked
     // into the cache during the production write attempt):
     mockEnv.appEnv = 'preview';
+    expect(getDevMockLocation()).toBeNull();
+  });
+
+  it('EITHER production signal disables the tool (appVariant alone, appEnv alone)', async () => {
+    // The two flags come from two separate build systems (build-preview.sh
+    // vs eas.json). A build path that forgets one must still fail closed.
+    await setDevMockLocation(berlin);
+
+    mockEnv.appVariant = 'production'; // appEnv still 'preview'
+    expect(getDevMockLocation()).toBeNull();
+
+    mockEnv.appVariant = 'preview';
+    mockEnv.appEnv = 'production'; // appVariant back to 'preview'
     expect(getDevMockLocation()).toBeNull();
   });
 });

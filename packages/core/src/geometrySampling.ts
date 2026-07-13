@@ -21,6 +21,13 @@ export const downsampleCoordinates = <T>(
   coords: readonly T[],
   maxPoints: number,
 ): readonly T[] => {
+  // Non-finite cap = caller bug; degrade to "no downsampling" rather than
+  // silently returning a corrupt 1-point array (NaN poisons the stride
+  // loop condition so only the final push would execute).
+  if (!Number.isFinite(maxPoints)) {
+    return coords;
+  }
+
   if (coords.length <= maxPoints || coords.length <= 2) {
     return coords;
   }

@@ -62,8 +62,6 @@ export const en = {
       "Safe routing isn't available in your area yet — using standard cycling routes.",
     coverageDestinationUnsupported:
       "Your destination is outside our safe-routing coverage — using standard cycling routes.",
-    coverageCrossBorder:
-      'Safe routing works within a single country — using standard cycling routes for this cross-border ride.',
   },
 
   // ── Route Preview ──

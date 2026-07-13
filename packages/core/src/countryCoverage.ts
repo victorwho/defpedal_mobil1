@@ -43,8 +43,17 @@ const COUNTRY_BBOXES: Record<SupportedCountry, readonly Bbox[]> = {
   // boxes must win the overlap against loose neighbor boxes (HU/BG clip
   // western/southern Romania) or riders there silently lose the comparison.
   RO: [[20.26, 43.62, 29.74, 48.27]],
-  // Mainland + Balearics. Canary Islands intentionally excluded (no data).
-  ES: [[-9.40, 35.95, 4.33, 43.79]],
+  // Mainland + Balearics, plus tight boxes for the North-African exclaves
+  // Ceuta and Melilla — legally Spanish/EU, so they pass the ISO-based
+  // availability gate and must not then fail the bbox routing gate ("app
+  // says yes, routing says no"). Kept tight to minimize bleed into Morocco;
+  // any data gap degrades via the zero-distance guard. Canary Islands
+  // intentionally excluded (no graph data).
+  ES: [
+    [-9.40, 35.95, 4.33, 43.79],
+    [-5.42, 35.85, -5.26, 35.95], // Ceuta
+    [-3.00, 35.25, -2.90, 35.36], // Melilla
+  ],
   AT: [[9.4, 46.3, 17.2, 49.1]],
   BE: [[2.5, 49.4, 6.5, 51.6]],
   BG: [[22.3, 41.2, 28.7, 44.3]],

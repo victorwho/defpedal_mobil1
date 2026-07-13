@@ -16,13 +16,14 @@ export interface ResolvedQuizCountry {
 }
 
 /**
- * Resolve which quiz pool (RO or ES) to serve the current rider.
+ * Resolve which quiz pool (RO, ES, or GENERIC) to serve the current rider.
  *
  * Composite policy (delegated to `resolveQuizCountry` in core):
  *   1. Profile override (`'RO'` / `'ES'`) wins.
- *   2. GPS bbox lookup (covers RO mainland, ES mainland + Balearics + Canary).
- *   3. Device-locale region (`'RO'` / `'ES'`).
- *   4. Default to `'RO'`.
+ *   2. GPS bbox lookup (RO mainland, ES mainland + Balearics + Canary);
+ *      a reliable fix OUTSIDE both resolves `'GENERIC'`.
+ *   3. Device-locale region (`'RO'` / `'ES'`) when no GPS.
+ *   4. Default to `'GENERIC'` — generally-true content, never wrong-country law.
  *
  * The `source` field is purely informational — useful for surfacing
  * "Auto · detected: Spain" in the Profile picker subtitle and for telemetry.

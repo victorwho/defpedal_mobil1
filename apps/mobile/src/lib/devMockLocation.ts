@@ -28,7 +28,13 @@ import { mobileEnv } from './env';
 
 const STORAGE_KEY = 'devMockLocation.v1';
 
-const isProduction = (): boolean => mobileEnv.appEnv === 'production';
+// Fail closed on EITHER production signal. `appVariant` (APP_VARIANT) and
+// `appEnv` (EXPO_PUBLIC_APP_ENV) are both flipped per flavor by
+// scripts/build-preview.sh Step 1b and by eas.json profiles — but they are
+// two separate variables set by two separate build systems, so a future
+// build path that forgets one must not silently enable this tool.
+const isProduction = (): boolean =>
+  mobileEnv.appVariant === 'production' || mobileEnv.appEnv === 'production';
 
 let cached: Coordinate | null = null;
 

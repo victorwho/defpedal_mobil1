@@ -31,10 +31,12 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const MIN_QUERY_LENGTH = 2;
 
 /**
- * Countries where Pedala Defensiva provides safe-routing coverage.
- * Extend this set as new regions are added.
+ * Countries where safe-routing coverage exists — used only by the (currently
+ * unconsumed) `mapboxGetCoverage` status helper. Derived from the core
+ * supported set so it can't drift from reality again (it lingered at
+ * BR/RO/ES long after the EU-wide expansion).
  */
-const SUPPORTED_COUNTRIES: ReadonlySet<string> = new Set(['BR', 'RO', 'ES']);
+const SUPPORTED_COUNTRIES: ReadonlySet<string> = SUPPORTED_APP_COUNTRIES;
 
 /**
  * Search-filter expansion for supported app countries (EU-27 + EEA + CH —
