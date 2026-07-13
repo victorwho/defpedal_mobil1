@@ -638,6 +638,17 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
     expect(body.geometry.coordinates[body.geometry.coordinates.length - 1]).toEqual(
       bigCoords[bigCoords.length - 1],
     );
+
+    // The elevation POST carries the same cap — it hit the identical
+    // body-too-large error on EU-length routes (Sentry MOBILE-R).
+    const elevationCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([url]) => String(url).includes('/v1/elevation-profile'));
+    expect(elevationCall).toBeDefined();
+    const elevationBody = JSON.parse(
+      (elevationCall![1] as RequestInit).body as string,
+    ) as { coordinates: [number, number][] };
+    expect(elevationBody.coordinates.length).toBeLessThanOrEqual(12_000);
   });
 
   it('fails fast with a clear message when a Mapbox-bound route exceeds the 400km guard', async () => {

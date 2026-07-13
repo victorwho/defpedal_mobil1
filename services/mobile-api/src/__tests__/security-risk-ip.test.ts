@@ -771,6 +771,31 @@ describe('POST /v1/risk-segments oversized geometry', () => {
     await app.close();
   });
 
+  it('POST /v1/elevation-profile accepts an oversized body and downsamples before the tile math', async () => {
+    // Same EU-length-route failure as /risk-segments (Sentry MOBILE-R hit
+    // /elevation-profile with FST_ERR_CTP_BODY_TOO_LARGE the same day).
+    const getElevationProfile = vi.fn().mockResolvedValue([10, 12, 15]);
+    const getElevationGain = vi.fn().mockResolvedValue({ elevationGain: 5, elevationLoss: 0 });
+    const app = buildTestApp({ getElevationProfile, getElevationGain });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/elevation-profile',
+      headers: authHeaders,
+      payload: { coordinates: bigCoordinates },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const passedCoords = getElevationProfile.mock.calls[0][0] as number[][];
+    expect(passedCoords.length).toBeLessThanOrEqual(15_000);
+    expect(passedCoords[0]).toEqual(bigCoordinates[0]);
+    expect(passedCoords[passedCoords.length - 1]).toEqual(
+      bigCoordinates[bigCoordinates.length - 1],
+    );
+    await app.close();
+  });
+
   it('downsamples oversized geometry before the risk RPC, keeping the endpoints', async () => {
     const fetchRiskSegments = vi.fn().mockResolvedValue([]);
     const app = buildTestApp({ fetchRiskSegments });

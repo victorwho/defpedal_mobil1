@@ -11,6 +11,17 @@ export default defineConfig({
       // P0 paths from feedback/hazard handlers don't consume mocked
       // Supabase chains and pollute other tests in the same file.
       NUDGES_ENABLED: 'false',
+      // Point Supabase at NOTHING during tests. Several suites do not mock
+      // lib/supabaseAdmin; without this override vitest inherits the real
+      // .env, and fixture queries (user_id='test-user-001', 'user-123')
+      // land on the PRODUCTION database — observed in prod postgres logs
+      // 2026-07-13 while running this suite locally. Empty values make
+      // supabaseAdmin null, sending those code paths to their in-memory
+      // fallbacks. vitest env is applied before dotenv, and dotenv does not
+      // override existing vars, so these win.
+      SUPABASE_URL: '',
+      SUPABASE_SERVICE_ROLE_KEY: '',
+      SUPABASE_ANON_KEY: '',
     },
     coverage: {
       provider: 'istanbul',

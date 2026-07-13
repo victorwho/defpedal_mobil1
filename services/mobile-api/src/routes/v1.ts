@@ -1403,6 +1403,23 @@ export const buildV1Routes = (
       },
     );
 
+    // EU-wide routing (2026-07-12) means long cross-country routes can carry
+    // hundreds of thousands of geometry points, and Sentry
+    // FST_ERR_CTP_BODY_TOO_LARGE hit BOTH geometry-accepting endpoints
+    // (/elevation-profile and /risk-segments) during the first EU-length
+    // route testing. Shared defenses:
+    //   1. Route-scoped bodyLimit raise (8 MiB vs the 1 MiB default) so
+    //      clients already in the field that POST full-resolution geometry
+    //      don't 413. Both endpoints are rate-limited.
+    //   2. Server-side downsample before the expensive work (PostGIS risk
+    //      match / Terrain-RGB tile decoding) so a monster geometry can't
+    //      become a cost bomb regardless of client version. Newer clients
+    //      (v0.2.99+) downsample to 12k points before POSTing anyway.
+    const ROUTE_GEOMETRY_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
+    const MAX_ROUTE_GEOMETRY_POINTS = 15_000;
+
+    // The elevation profile is consumed as a standalone chart array +
+    // gain/loss numbers, so a uniform resample is lossless for the UI.
     app.post<{
       Body: { coordinates: number[][] };
       Reply: {
@@ -1413,6 +1430,7 @@ export const buildV1Routes = (
     }>(
       '/elevation-profile',
       {
+        bodyLimit: ROUTE_GEOMETRY_BODY_LIMIT_BYTES,
         schema: {
           response: {
             200: {
@@ -1442,7 +1460,10 @@ export const buildV1Routes = (
         }
 
         try {
-          const typedCoords = coordinates as [number, number][];
+          const typedCoords = downsampleCoordinates(
+            coordinates as [number, number][],
+            MAX_ROUTE_GEOMETRY_POINTS,
+          ) as [number, number][];
 
           // Fetch profile and gain/loss in parallel
           const [elevationProfile, gainLoss] = await Promise.all([
@@ -1465,27 +1486,13 @@ export const buildV1Routes = (
       },
     );
 
-    // EU-wide routing (2026-07-12) means long cross-country routes can carry
-    // hundreds of thousands of geometry points. Two defenses (Sentry
-    // FST_ERR_CTP_BODY_TOO_LARGE the same day):
-    //   1. Route-scoped bodyLimit raise (8 MiB vs the 1 MiB default) so
-    //      clients already in the field that POST full-resolution geometry
-    //      don't 413. The endpoint is OAuth-gated + rate-limited, so the
-    //      bigger ceiling is bounded abuse surface.
-    //   2. Server-side downsample before the PostGIS RPC so a monster
-    //      geometry can't turn the risk match into a cost bomb regardless
-    //      of what the client sent. Newer clients (v0.2.99+) downsample to
-    //      12k points before POSTing anyway.
-    const RISK_SEGMENTS_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
-    const MAX_RISK_GEOMETRY_POINTS = 15_000;
-
     app.post<{
       Body: { geometry: { type: string; coordinates: number[][] } };
       Reply: { riskSegments: RiskSegment[] } | ErrorResponse;
     }>(
       '/risk-segments',
       {
-        bodyLimit: RISK_SEGMENTS_BODY_LIMIT_BYTES,
+        bodyLimit: ROUTE_GEOMETRY_BODY_LIMIT_BYTES,
         schema: {
           response: {
             200: { type: 'object' as const, properties: { riskSegments: { type: 'array' as const } } },
@@ -1531,7 +1538,7 @@ export const buildV1Routes = (
           type: 'LineString',
           coordinates: downsampleCoordinates(
             geometry.coordinates,
-            MAX_RISK_GEOMETRY_POINTS,
+            MAX_ROUTE_GEOMETRY_POINTS,
           ) as [number, number][],
         };
 

@@ -325,10 +325,14 @@ const enrichRouteWithElevation = async (
   if (!mobileEnv.mobileApiUrl) return route;
 
   try {
+    // Same 12k-point cap as the risk-segments POST below — EU-length routes
+    // otherwise blow the server body limit (Sentry, 2026-07-12), and the
+    // elevation chart is a uniform resample anyway.
+    const bounded = downsampleCoordinates(coordinates, MAX_RISK_GEOMETRY_POINTS);
     const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/elevation-profile`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coordinates }),
+      body: JSON.stringify({ coordinates: bounded }),
     });
 
     if (!response.ok) return route;
@@ -388,12 +392,13 @@ const fetchRouteRiskSegments = async (
   }
 };
 
-// Cap the geometry POSTed to /v1/risk-segments. EU-wide routing means a
-// long cross-country route can carry hundreds of thousands of points — the
-// raw body blows past the server's limit (Sentry FST_ERR_CTP_BODY_TOO_LARGE,
-// 2026-07-12) and inflates the PostGIS matching cost. 12k points ≈ ~300 KB
-// JSON and ≈ 8 m spacing on a 100 km ride — far finer than the risk overlay
-// needs.
+// Cap the geometry POSTed to /v1/risk-segments AND /v1/elevation-profile.
+// EU-wide routing means a long cross-country route can carry hundreds of
+// thousands of points — the raw body blows past the server's limit (Sentry
+// FST_ERR_CTP_BODY_TOO_LARGE on both endpoints, 2026-07-12) and inflates
+// the PostGIS / Terrain-RGB cost. 12k points ≈ ~300 KB JSON and ≈ 8 m
+// spacing on a 100 km ride — far finer than the risk overlay or elevation
+// chart needs.
 const MAX_RISK_GEOMETRY_POINTS = 12_000;
 
 const enrichRouteWithRisk = async (
