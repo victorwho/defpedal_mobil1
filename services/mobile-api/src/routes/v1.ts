@@ -1498,7 +1498,24 @@ export const buildV1Routes = (
         },
       },
       async (request, reply) => {
-        const user = await requireOAuthUser(request, dependencies);
+        // PRODUCT REQUIREMENT (2026-07-13): anonymous riders must see the
+        // per-segment risk overlay and total route risk EXACTLY like
+        // registered users — risk scoring is the product's core value and
+        // anonymous-first onboarding is the conversion funnel. This relaxes
+        // the 2026-04-13 full-OAuth hardening for this endpoint, mirroring
+        // the /risk-map onboarding exception below.
+        //
+        // Defences in depth that REMAIN for anonymous reads:
+        //   1. Auth still required — an anonymous Supabase session is a real
+        //      JWT, not an open endpoint.
+        //   2. Scores stay quantized to bucket midpoints with server-side
+        //      thresholds (lib/risk.ts) — raw model output never leaves.
+        //   3. Per-user rate limiting (user-keyed incl. anonymous ids) —
+        //      bounded scrape rate per minted session.
+        // /routes/preview + /routes/reroute stay full-OAuth: the mobile app
+        // routes client-side, so relaxing those dormant, bundled-response
+        // endpoints would widen the IP surface with zero user benefit.
+        const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'routePreview', { userId: user.id });
 
         const geometry = request.body?.geometry;

@@ -241,11 +241,14 @@ describe('Unauthenticated access blocked on risk endpoints', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 1b. Anonymous Supabase users may read /v1/risk-map (onboarding exception)
-//     The other 3 risk endpoints still require a full OAuth user.
+// 1b. Anonymous Supabase users may read /v1/risk-map (onboarding exception,
+//     2026-04) AND /v1/risk-segments (risk-parity product decision,
+//     2026-07-13 — anonymous riders see per-segment risk + total route risk
+//     exactly like registered users). /routes/preview + /routes/reroute
+//     still require a full OAuth user (dormant server-side routing paths).
 // ---------------------------------------------------------------------------
 
-describe('Anonymous user access on /v1/risk-map (onboarding preview)', () => {
+describe('Anonymous user access on risk read endpoints', () => {
   const anonAuthHeaders = { authorization: `Bearer ${TEST_TOKEN}` };
 
   it('GET /v1/risk-map: anonymous Supabase user passes the auth gate', async () => {
@@ -273,8 +276,35 @@ describe('Anonymous user access on /v1/risk-map (onboarding preview)', () => {
     await app.close();
   });
 
+  it('POST /v1/risk-segments: anonymous Supabase user gets risk segments like a full user', async () => {
+    // Product decision 2026-07-13: risk scoring per segment + total route
+    // risk must render identically for anonymous riders. A 403 here is the
+    // exact bug this guards against (client silently drops to no-overlay).
+    const fetchRiskSegments = vi.fn().mockResolvedValue([]);
+    const app = buildTestApp({
+      authenticateUser: vi.fn().mockResolvedValue({ id: 'anon-user-1', email: null }),
+      fetchRiskSegments,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/risk-segments',
+      headers: anonAuthHeaders,
+      payload: {
+        geometry: { type: 'LineString', coordinates: [[26.1, 44.4], [26.2, 44.5]] },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fetchRiskSegments).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
   it('POST /v1/routes/preview: anonymous user is still rejected (403)', async () => {
-    // Read-only risk-map relaxation MUST NOT leak to the other risk endpoints.
+    // The risk-read relaxations MUST NOT leak to the server-side routing
+    // endpoints (dormant for the app — it routes client-side).
     const app = buildTestApp({
       authenticateUser: vi.fn().mockResolvedValue({ id: 'anon-user-1', email: null }),
     });
