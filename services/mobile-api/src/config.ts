@@ -1,3 +1,5 @@
+import { ROUTING_COVERED_COUNTRIES } from '@defensivepedal/core';
+
 import { resolveConfigValue } from './env';
 
 const splitCsv = (value: string | undefined, fallback: string[]): string[] =>
@@ -79,7 +81,16 @@ export const config = {
     userId: resolveConfigValue(['DEV_AUTH_BYPASS_USER_ID'], 'dev-auth-user'),
     email: resolveConfigValue(['DEV_AUTH_BYPASS_EMAIL'], ''),
   },
-  supportedSafeCountries: splitCsv(resolveConfigValue(['SUPPORTED_SAFE_COUNTRIES']), ['RO', 'ES']),
+  // Default derives from the core routing-coverage list (EU-27 + EEA + CH,
+  // 2026-07-13) so /v1/coverage can't drift from what the OSRM graph
+  // actually serves — it lied "safeRouting: false" for the 29 new countries
+  // while the RO,ES default lingered. Note splitCsv MERGES the env var into
+  // the default (additive), so the legacy SUPPORTED_SAFE_COUNTRIES=RO,ES on
+  // Cloud Run is harmless.
+  supportedSafeCountries: splitCsv(
+    resolveConfigValue(['SUPPORTED_SAFE_COUNTRIES']),
+    [...ROUTING_COVERED_COUNTRIES],
+  ),
   routeResponseCache: {
     previewTtlMs: parsePositiveNumber(
       resolveConfigValue(['ROUTE_PREVIEW_CACHE_TTL_MS'], '45000'),
