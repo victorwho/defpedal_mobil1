@@ -270,3 +270,28 @@ every documented fix held; fully non-interactive.
   onboarding changes, audit fixes) — none of it has run on real iOS hardware; smoke-test on
   TestFlight before submitting, and confirm the App Privacy answers cover the new user-entered
   weight (fitness data).
+
+## Log: 2026-07-13 — build 19 (v0.2.101), clean run to TestFlight
+
+Store-submission build for v0.2.101 — the global-availability release (31-country region gate +
+EU-wide OSRM + country waitlist; Android AAB vc 104 built the same session). Fully non-interactive;
+no new blockers.
+
+- **Build 19** — id `ea0aa3f9-9c03-46aa-852e-edd8199539cc`, version 0.2.101, buildNumber auto
+  18 → 19. ✅ (`eas build -p ios --profile production --non-interactive`).
+- **Submit** — submission `5cdc768f-e186-4a32-b852-0c906ba3715f`. Temporary `ascApiKey*` triplet
+  added to `eas.json` `submit.production.ios`, submit ran, triplet reverted (`git diff` empty).
+  "Submitted to App Store Connect."
+- **Apple processing → build 19 `VALID`** (ASC `/v1/builds` ES256-JWT poll: 19 VALID, uploaded
+  2026-07-13T02:38:12-07:00). Ingest-lag note: the freshly-uploaded build is INVISIBLE in
+  `/v1/builds` for the first ~1–2 min — the newest row is still the previous build. Filter for
+  `buildNumber > lastKnown` instead of trusting `sort=-uploadedDate` position 0.
+- **App Review notes** prepared at `apkreleases/ios-app-review-notes-v0.2.101.txt`: demo login
+  `testuser@example.com` / `test`; simulate Braşov 45.60, 25.47; NEW section explaining the
+  one-time region-gate screen a US-located reviewer will see (country picker → "Continue anyway"
+  proceeds into the full app — nothing is blocked).
+- **NOT yet promoted to App Store review.** Manual ASC steps remain: TestFlight smoke test
+  (first iOS binary with the region gate — verify the gate renders and "Continue anyway" works
+  under a US location sim), App Privacy check (body weight fitness data + waitlist email
+  collection), expand App Store availability to worldwide alongside this version, attach build 19
+  to the version record, paste the review notes, Submit for Review.
