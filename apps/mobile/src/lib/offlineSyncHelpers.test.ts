@@ -22,6 +22,7 @@ import {
   BACKOFF_BASE_MS,
   BACKOFF_JITTER_RATIO,
   getBackoffDelay,
+  getMutationBackstopTimeoutMs,
   getMutationTimeoutMs,
   getResolvedTripId,
   hasPendingTripStart,
@@ -63,6 +64,34 @@ describe('getMutationTimeoutMs', () => {
     // before the API came back from cold. Guard the regression.
     for (const type of ['trip_start', 'trip_end', 'trip_track'] as const) {
       expect(MUTATION_SYNC_TIMEOUT_MS_BY_TYPE[type]).toBeGreaterThanOrEqual(25_000);
+    }
+  });
+});
+
+describe('getMutationBackstopTimeoutMs', () => {
+  it('covers BOTH sequential legs (resolve + main request) for trip-dependent types', () => {
+    // MOBILE-7 regression (2026-07-15, v0.2.101): trip_end's submission can
+    // legitimately spend a full resolve-call timeout before its own request.
+    // The old `inner + 5s` backstop (35s) sat INSIDE that ~60s worst case,
+    // fired mid-flight on every retry, and guaranteed a dead-letter.
+    expect(getMutationBackstopTimeoutMs('trip_end')).toBe(30_000 + 30_000 + 5_000);
+    expect(getMutationBackstopTimeoutMs('trip_track')).toBe(60_000 + 30_000 + 5_000);
+  });
+
+  it('stays at inner + 5s for single-leg types', () => {
+    expect(getMutationBackstopTimeoutMs('trip_start')).toBe(30_000 + 5_000);
+    expect(getMutationBackstopTimeoutMs('hazard')).toBe(10_000 + 5_000);
+    expect(getMutationBackstopTimeoutMs('trip_share')).toBe(15_000 + 5_000);
+  });
+
+  it('backstop is strictly above the worst-case sum of inner timeouts', () => {
+    // The invariant that keeps the outer race from ever beating a healthy
+    // inner abort: whatever the per-type budgets are tuned to, the backstop
+    // must exceed resolve + main for the two-legged types.
+    for (const type of ['trip_end', 'trip_track'] as const) {
+      const worstCaseInner =
+        getMutationTimeoutMs(type) + getMutationTimeoutMs('trip_end');
+      expect(getMutationBackstopTimeoutMs(type)).toBeGreaterThan(worstCaseInner);
     }
   });
 });

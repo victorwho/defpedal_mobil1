@@ -6,7 +6,7 @@ import { mobileApi } from '../lib/api';
 import { mobileEnv } from '../lib/env';
 import {
   getBackoffDelay,
-  getMutationTimeoutMs,
+  getMutationBackstopTimeoutMs,
   getResolvedTripId,
   isPermanentError,
   MAX_RETRY_COUNT,
@@ -128,12 +128,17 @@ const withMutationTimeout = async <TResponse,>(
   promise: Promise<TResponse>,
   mutationType: QueuedMutation['type'],
 ) => {
-  // Backstop only: the per-type timeout is threaded into the request itself
+  // Backstop only: the per-type timeout is threaded into each request itself
   // (api.ts passes timeoutMs to apiFetch's AbortController for trip_*), so
-  // this outer race should never win against a healthy abort. The +5s buffer
-  // guarantees the inner abort fires first and surfaces as ApiClientError
+  // this outer race should never win against a healthy abort. The budget
+  // must cover ALL sequential legs of the submission — trip_end/trip_track
+  // can spend a full resolve-call timeout BEFORE their main request, which
+  // the old `inner + 5s` budget didn't account for: it fired mid-flight on
+  // slow links, on every retry, guaranteeing a dead-letter (MOBILE-7
+  // regression, 2026-07-15). getMutationBackstopTimeoutMs sizes the race so
+  // a healthy inner abort always fires first and surfaces as ApiClientError
   // (kind 'timeout', retryable) rather than this generic Error.
-  const timeoutMs = getMutationTimeoutMs(mutationType) + 5_000;
+  const timeoutMs = getMutationBackstopTimeoutMs(mutationType);
   return new Promise<TResponse>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
       reject(

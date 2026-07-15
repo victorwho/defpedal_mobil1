@@ -44,6 +44,27 @@ export const getMutationTimeoutMs = (type: QueuedMutation['type']): number =>
   MUTATION_SYNC_TIMEOUT_MS_BY_TYPE[type] ?? DEFAULT_MUTATION_SYNC_TIMEOUT_MS;
 
 /**
+ * Outer backstop budget for one whole `submitQueuedMutation` call.
+ *
+ * The backstop must cover EVERY awaited leg of the submission, not just the
+ * main request. trip_end/trip_track can legitimately spend two full inner
+ * timeouts back-to-back: the self-heal `GET /trips/resolve` (its own 30s
+ * AbortController budget) and then the actual request. The old backstop of
+ * `inner + 5s` (35s for trip_end) sat INSIDE that worst case, so on a slow
+ * link the backstop fired while both inner calls were still healthy — and
+ * because it fired on every retry, the mutation could never succeed and was
+ * guaranteed to dead-letter (MOBILE-7 regression on v0.2.101; the original
+ * 2026-05-24 MOBILE-7 fix sized the inner timeouts but not this outer race).
+ * The +5s tail keeps the backstop as the true last-resort guard for the legs
+ * without their own abort (e.g. the token refresh in mobileApiFetch, which
+ * runs before the abortable fetch).
+ */
+export const getMutationBackstopTimeoutMs = (type: QueuedMutation['type']): number =>
+  getMutationTimeoutMs(type) +
+  (TRIP_DEPENDENT_TYPES.has(type) ? getMutationTimeoutMs('trip_end') : 0) +
+  5_000;
+
+/**
  * Exponential backoff with ±25% jitter, capped at the retry-count cap.
  * Jitter spreads simultaneous reconnects across a small window so many
  * devices coming online together don't stampede the API.
