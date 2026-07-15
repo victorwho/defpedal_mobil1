@@ -91,8 +91,9 @@ const getSessionAgeMs = (session: {
  *                      semantics (trip closed server-side, nothing in
  *                      History, no impact/XP).
  *
- * Anonymous rides (no activeTripClientId) have no server trip to close —
- * only the local reset runs.
+ * A missing activeTripClientId (defensive — since the GPS-audit P0-1 fix
+ * every ride enqueues trip_start and sets the id, session or not) means
+ * there is no server trip to close; only the local reset runs.
  */
 const closeInterruptedRide = async (saveTrack: boolean): Promise<void> => {
   // Drain any background-recorded samples (the screen-off / process-dead

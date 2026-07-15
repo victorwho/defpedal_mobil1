@@ -387,28 +387,32 @@ function RoutePreviewScreen() {
         : `session-${Date.now()}`;
     const previewOriginCoordinate = getPreviewOrigin(routeRequest);
 
-    if (user) {
-      const clientTripId = createClientTripId();
+    // Enqueued UNCONDITIONALLY — even when no auth session exists yet (GPS
+    // audit 2026-07-15 P0-1). The old `if (user)` gate meant a failed
+    // cold-start anonymous sign-in (first open in a dead zone) started the
+    // ride with activeTripClientId=null, and queueTripEnd then silently
+    // dropped the entire recorded ride at the end. The offline queue is the
+    // right buffer: OfflineMutationSyncManager holds the drain until a
+    // session exists, and AuthSessionProvider keeps retrying anonymous
+    // sign-in until one lands.
+    const clientTripId = createClientTripId();
 
-      enqueueMutation('trip_start', {
-        clientTripId,
-        sessionId,
-        startLocationText: usingCustomStart
-          ? `Custom start (${formatCoordinateLabel(previewOriginCoordinate.lat, previewOriginCoordinate.lon)})`
-          : `Current rider location (${formatCoordinateLabel(previewOriginCoordinate.lat, previewOriginCoordinate.lon)})`,
-        startCoordinate: previewOriginCoordinate,
-        destinationText: formatCoordinateLabel(
-          routeRequest.destination.lat,
-          routeRequest.destination.lon,
-        ),
-        destinationCoordinate: routeRequest.destination,
-        distanceMeters: selectedRoute.distanceMeters,
-        startedAt: new Date().toISOString(),
-      });
-      setActiveTripClientId(clientTripId);
-    } else {
-      setActiveTripClientId(null);
-    }
+    enqueueMutation('trip_start', {
+      clientTripId,
+      sessionId,
+      startLocationText: usingCustomStart
+        ? `Custom start (${formatCoordinateLabel(previewOriginCoordinate.lat, previewOriginCoordinate.lon)})`
+        : `Current rider location (${formatCoordinateLabel(previewOriginCoordinate.lat, previewOriginCoordinate.lon)})`,
+      startCoordinate: previewOriginCoordinate,
+      destinationText: formatCoordinateLabel(
+        routeRequest.destination.lat,
+        routeRequest.destination.lon,
+      ),
+      destinationCoordinate: routeRequest.destination,
+      distanceMeters: selectedRoute.distanceMeters,
+      startedAt: new Date().toISOString(),
+    });
+    setActiveTripClientId(clientTripId);
 
     telemetry.capture('navigation_started', {
       mode: routePreview?.selectedMode ?? routeRequest.mode,

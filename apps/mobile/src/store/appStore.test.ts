@@ -1177,6 +1177,39 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().savedPlaces).toEqual({ home: null, work: null });
       expect(useAppStore.getState().cachedCityHeartbeat).toBeNull();
     });
+
+    // GPS audit 2026-07-15 P0-2: a userId transition (sign-out / account
+    // switch / stale-refresh-token auto-recovery) must not delete unsynced
+    // ride data — the old unconditional queue wipe silently lost whole rides
+    // with no dead-letter and no RideLossBanner.
+    it('resetUserScopedState preserves queued ride mutations but drops user-scoped ones', () => {
+      const store = useAppStore.getState();
+      store.enqueueMutation('trip_start', { clientTripId: 'ct-1' } as never);
+      store.enqueueMutation('trip_track', { clientTripId: 'ct-1' } as never);
+      store.enqueueMutation('trip_end', { clientTripId: 'ct-1' } as never);
+      store.enqueueMutation('hazard_vote', { hazardId: 'h-1', direction: 'up' } as never);
+      store.enqueueMutation('feedback', { rating: 5 } as never);
+      store.enqueueMutation('trip_share', { tripId: 't-1' } as never);
+
+      useAppStore.getState().resetUserScopedState();
+
+      const types = useAppStore.getState().queuedMutations.map((m) => m.type).sort();
+      expect(types).toEqual(['trip_end', 'trip_start', 'trip_track']);
+    });
+
+    it('resetUserScopedState clears tripServerIds even though ride mutations survive', () => {
+      // A stale old-user server id would make trip_end's owner-scoped UPDATE
+      // match zero rows under the new token and report silent success; the
+      // resolve path 404s instead → dead-letter → visible banner.
+      const store = useAppStore.getState();
+      store.enqueueMutation('trip_end', { clientTripId: 'ct-2' } as never);
+      store.setTripServerId('ct-2', 'server-trip-old-user');
+
+      useAppStore.getState().resetUserScopedState();
+
+      expect(useAppStore.getState().tripServerIds).toEqual({});
+      expect(useAppStore.getState().queuedMutations).toHaveLength(1);
+    });
   });
 
   describe('weather warning session flag', () => {

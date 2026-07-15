@@ -44,7 +44,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 
 import { getDeviceLocale, type Locale } from '../i18n';
-import { zustandStorage } from '../lib/storage';
+import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
   INITIAL_CELEBRATION_WANTS,
   resolveActiveCelebration,
@@ -53,6 +53,13 @@ import { createQueueSlice, type QueueSlice } from './queueSlice';
 
 const MAX_RECENT_DESTINATIONS = 3;
 const MAX_RECENT_CITY_SUGGESTIONS = 5;
+
+// Queued mutation types that survive resetUserScopedState (GPS audit
+// 2026-07-15 P0-2). Narrower than queueSlice's TRIP_CRITICAL_TYPES on
+// purpose: `feedback` is a user-scoped opinion and must not be re-sent as
+// the next account, but the ride itself (start/end/GPS trail) belongs to
+// the human holding the device.
+const RIDE_DATA_MUTATION_TYPES = new Set<string>(['trip_start', 'trip_end', 'trip_track']);
 
 const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   origin: {
@@ -997,14 +1004,33 @@ export const useAppStore = create<AppStore>()(
       // 5-screen onboarding flow you already completed. The signup-prompt
       // gate (see computeOnboardingGateTarget) still surfaces the
       // sign-up CTA on subsequent anonymous opens.
-      resetUserScopedState: () =>
-        set(() => ({
+      resetUserScopedState: () => {
+        set((state) => ({
           appState: 'IDLE',
           routePreview: null,
           selectedRouteId: null,
           navigationSession: resetNavigationSession(),
           routeRequest: DEFAULT_ROUTE_REQUEST,
-          queuedMutations: [],
+          // GPS audit 2026-07-15 P0-2: a userId transition (sign-out, account
+          // switch, stale-refresh-token auto-recovery) must NOT delete
+          // unsynced ride data. A whole-chain queued ride (trip_start still
+          // pending) simply uploads under the next session — same human, the
+          // ride lands in the History they're now using. A partially-synced
+          // chain can't be re-owned: its trip_end/trip_track resolve against
+          // the new user, 404, and dead-letter into RideLossBanner — visible,
+          // not silent (the old unconditional wipe was invisible: mutations
+          // were deleted, not dead-lettered, so the banner never fired).
+          // User-scoped opinions (hazard votes, shares, feedback, city
+          // suggestions) are still dropped — sending them as the next user
+          // would misattribute them.
+          queuedMutations: state.queuedMutations.filter((mutation) =>
+            RIDE_DATA_MUTATION_TYPES.has(mutation.type),
+          ),
+          // Old-user server trip ids MUST be cleared even though the ride
+          // mutations are kept: under the new token a stale id would make
+          // trip_end's owner-scoped UPDATE match zero rows and report silent
+          // success. Forcing the resolve path 404s instead → dead-letter →
+          // banner.
           tripServerIds: {},
           activeTripClientId: null,
           // onboardingCompleted intentionally NOT reset — see comment above.
@@ -1029,7 +1055,12 @@ export const useAppStore = create<AppStore>()(
           cachedCityHeartbeat: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,
-        })),
+        }));
+        // Ride mutations surviving a userId transition are recovery-critical
+        // state — flush the debounced persist immediately (same rule as
+        // queueSlice's enqueue/resolve/kill).
+        flushPersistedWrites();
+      },
     }),
     {
       name: 'defensivepedal-app-store',

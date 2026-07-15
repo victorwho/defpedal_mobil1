@@ -16,6 +16,7 @@ import {
 } from '../lib/offlineSyncHelpers';
 import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
+import { useAuthSessionOptional } from './AuthSessionProvider';
 import { useConnectivity } from './ConnectivityMonitor';
 
 /**
@@ -156,6 +157,12 @@ const withMutationTimeout = async <TResponse,>(
 
 export const OfflineMutationSyncManager = () => {
   const { isOnline } = useConnectivity();
+  // Session gate (GPS audit 2026-07-15 P0-1): with no auth session every
+  // request would 401 — a permanent 4xx that dead-letters ride data a later
+  // sign-in could have delivered. `null` context (provider absent, e.g. in
+  // isolated tests) deliberately does NOT gate.
+  const auth = useAuthSessionOptional();
+  const hasSession = auth === null ? true : Boolean(auth.session);
   const flushingRef = useRef(false);
   const prevOnlineRef = useRef(isOnline);
 
@@ -340,6 +347,14 @@ export const OfflineMutationSyncManager = () => {
       return () => { cancelled = true; };
     }
 
+    // Online but session-less (failed anonymous sign-in, stale-token local
+    // sign-out): hold the queue instead of sending requests doomed to 401.
+    // The effect re-runs the moment AuthSessionProvider lands a session —
+    // its anonymous retry loop guarantees one eventually arrives.
+    if (!hasSession) {
+      return () => { cancelled = true; };
+    }
+
     // If we just transitioned from offline to online, trigger immediate flush.
     // Otherwise, flush on mount as usual.
     const wasOffline = !prevOnlineRef.current;
@@ -363,7 +378,7 @@ export const OfflineMutationSyncManager = () => {
       cancelled = true;
       clearInterval(intervalHandle);
     };
-  }, [isOnline]);
+  }, [isOnline, hasSession]);
 
   return null;
 };

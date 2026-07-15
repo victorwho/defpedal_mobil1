@@ -130,6 +130,59 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     };
   }, []);
 
+  // ── Anonymous sign-in retry (GPS audit 2026-07-15 P0-1) ──
+  // The mount effect above attempts anonymous sign-in exactly once. If that
+  // attempt fails (cold start in a dead zone, transient Supabase outage) the
+  // app used to stay session-less for the whole process lifetime — and a
+  // session-less ride was silently dropped at queueTripEnd. Keep retrying
+  // with backoff until a session exists; rides queued in the meantime drain
+  // the moment one lands (OfflineMutationSyncManager gates on the session).
+  // The loop also covers a mid-session stale-refresh-token sign-out, where
+  // the mount effect's one-shot anon sign-in is long gone.
+  useEffect(() => {
+    if (isLoading || session || !isSupabaseConfigured()) return undefined;
+
+    let cancelled = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const RETRY_DELAYS_MS = [10_000, 30_000, 90_000, 180_000, 300_000];
+
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
+      timer = setTimeout(() => void run(), delay);
+    };
+
+    const run = async () => {
+      if (cancelled) return;
+      attempt += 1;
+      // An explicit sign-in (or a slow first attempt) may have landed since
+      // this retry was scheduled — never stack a second anonymous user on
+      // top of an existing session.
+      const current = await getCurrentSession().catch(() => null);
+      if (cancelled) return;
+      if (current) {
+        setSession(current);
+        return;
+      }
+      const next = await signInAnonymously();
+      if (cancelled) return;
+      if (next) {
+        setSession(next);
+        setAuthError(null);
+      } else {
+        scheduleNext();
+      }
+    };
+
+    scheduleNext();
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [isLoading, session]);
+
   // ── Handle email-confirmation deep link callback ──
   // Email confirmation / magic links redirect back to the app via the custom
   // scheme (through the email-confirm edge function). Google sign-in no longer
