@@ -208,6 +208,21 @@ export const buildApp = (options: {
     // audit 2026-07-15 P0-3). Preserve the status; 5xx and status-less
     // errors stay on the generic path below so they still reach Sentry.
     if (typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 500) {
+      // Log the occurrence (re-audit 2026-07-15): before this branch existed
+      // these errors were force-500'd AND logged — a client-side regression
+      // spraying oversized/malformed bodies must not become invisible just
+      // because the status is now honest. Warn-level, no Sentry (4xx are
+      // client conditions, matching the HttpError policy above).
+      request.log.warn(
+        {
+          event: 'native_4xx_error',
+          statusCode: error.statusCode,
+          code: error.code,
+          method: request.method,
+          url: pathOnly(request.raw.url ?? request.url),
+        },
+        error.message,
+      );
       // The contract's code union is closed; the native Fastify code (e.g.
       // FST_ERR_CTP_BODY_TOO_LARGE) travels in details — 4xx details are
       // client-visible per the policy above.

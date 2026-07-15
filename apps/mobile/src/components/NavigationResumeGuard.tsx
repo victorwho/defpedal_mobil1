@@ -108,37 +108,42 @@ const closeInterruptedRide = async (saveTrack: boolean): Promise<void> => {
   const clientTripId = state.activeTripClientId;
 
   if (session && clientTripId) {
-    // Dedup against an already-queued trip_end for this trip (same guard as
-    // navigation.tsx queueTripEnd) so recovery after a kill that happened
-    // mid-End-Ride doesn't double-close the trip.
-    const alreadyQueuedTripEnd = state.queuedMutations.some(
-      (mutation) =>
-        mutation.type === 'trip_end' &&
-        (mutation.payload as { clientTripId?: string }).clientTripId === clientTripId,
-    );
+    // Dedup EACH mutation independently (re-audit 2026-07-15 P1). The old
+    // guard wrapped BOTH enqueues in a single already-queued-trip_end check,
+    // so a stale prompt for a ride whose in-ride Discard had already queued
+    // a trip_end (app killed inside resetFlow's persist window) made
+    // "Save ride" enqueue NOTHING — the trail was silently lost while the
+    // 'save' telemetry reported success. A trip_end dedup must never
+    // suppress the trip_track the user explicitly asked to save.
+    const hasQueued = (type: 'trip_end' | 'trip_track') =>
+      state.queuedMutations.some(
+        (mutation) =>
+          mutation.type === type &&
+          (mutation.payload as { clientTripId?: string }).clientTripId === clientTripId,
+      );
 
-    if (!alreadyQueuedTripEnd) {
-      const endedAt = new Date().toISOString();
+    const endedAt = new Date().toISOString();
 
+    if (!hasQueued('trip_end')) {
       state.enqueueMutation('trip_end', {
         clientTripId,
         endedAt,
         reason: 'stopped',
       });
+    }
 
-      if (saveTrack && session.gpsBreadcrumbs.length > 0) {
-        // routeRequest.mode is in the persist whitelist so the mode survives
-        // the kill — read it from the rehydrated store rather than
-        // defaulting to 'fast' (which mislabeled kill-recovered safe rides).
-        state.enqueueMutation('trip_track', {
-          clientTripId,
-          routingMode: state.routeRequest?.mode ?? 'fast',
-          gpsBreadcrumbs: session.gpsBreadcrumbs,
-          endReason: 'app_killed',
-          startedAt: session.startedAt,
-          endedAt,
-        });
-      }
+    if (saveTrack && session.gpsBreadcrumbs.length > 0 && !hasQueued('trip_track')) {
+      // routeRequest.mode is in the persist whitelist so the mode survives
+      // the kill — read it from the rehydrated store rather than
+      // defaulting to 'fast' (which mislabeled kill-recovered safe rides).
+      state.enqueueMutation('trip_track', {
+        clientTripId,
+        routingMode: state.routeRequest?.mode ?? 'fast',
+        gpsBreadcrumbs: session.gpsBreadcrumbs,
+        endReason: 'app_killed',
+        startedAt: session.startedAt,
+        endedAt,
+      });
     }
   }
 

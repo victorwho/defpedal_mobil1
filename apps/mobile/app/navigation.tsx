@@ -169,9 +169,18 @@ function NavigationScreen() {
   // snapshot only reads once on mount, which races the async start attempt,
   // so re-read shortly after mount and then on a slow poll.
   const [bgWarningDismissed, setBgWarningDismissed] = useState(false);
+  // Don't trust the hook's mount-time read: it can race the async start
+  // attempt and surface a STALE 'error' persisted by the PREVIOUS ride
+  // (re-audit 2026-07-15 P2 — a healthy ride flashed the scare banner for
+  // up to 5s). Only render the banner from reads taken after the start
+  // attempt has had time to overwrite the status.
+  const [bgSnapshotSettled, setBgSnapshotSettled] = useState(false);
   const refreshBackgroundSnapshot = backgroundSnapshot.refresh;
   useEffect(() => {
-    const settle = setTimeout(refreshBackgroundSnapshot, 5_000);
+    const settle = setTimeout(() => {
+      refreshBackgroundSnapshot();
+      setBgSnapshotSettled(true);
+    }, 5_000);
     const poll = setInterval(refreshBackgroundSnapshot, 30_000);
     return () => {
       clearTimeout(settle);
@@ -179,7 +188,7 @@ function NavigationScreen() {
     };
   }, [refreshBackgroundSnapshot]);
   const showBgRecordingWarning =
-    backgroundSnapshot.status.status === 'error' && !bgWarningDismissed;
+    bgSnapshotSettled && backgroundSnapshot.status.status === 'error' && !bgWarningDismissed;
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,

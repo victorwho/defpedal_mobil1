@@ -1207,6 +1207,27 @@ describe('useAppStore', () => {
       expect(types).toEqual(['trip_end', 'trip_start', 'trip_track']);
     });
 
+    it("resetUserScopedState with rideDataDisposition 'dead' dead-letters ride mutations instead of leaving them live", () => {
+      // Re-audit finding (2026-07-15 P1): a departing REAL account must not
+      // let its unsynced ride drain under the fresh anonymous user — that
+      // silently misattributes the ride away from the account, forever
+      // (anon merge is fresh-target-only). Dead-letter → RideLossBanner →
+      // post-sign-in retry attributes correctly.
+      const store = useAppStore.getState();
+      store.enqueueMutation('trip_start', { clientTripId: 'ct-3' } as never);
+      store.enqueueMutation('trip_track', { clientTripId: 'ct-3' } as never);
+      store.enqueueMutation('hazard_vote', { hazardId: 'h-2', direction: 'up' } as never);
+
+      useAppStore.getState().resetUserScopedState({ rideDataDisposition: 'dead' });
+
+      const queued = useAppStore.getState().queuedMutations;
+      expect(queued.map((m) => m.type).sort()).toEqual(['trip_start', 'trip_track']);
+      for (const mutation of queued) {
+        expect(mutation.status).toBe('dead');
+        expect(mutation.lastError).toContain('Sign back in');
+      }
+    });
+
     it('resetUserScopedState clears tripServerIds even though ride mutations survive', () => {
       // A stale old-user server id would make trip_end's owner-scoped UPDATE
       // match zero rows under the new token and report silent success; the

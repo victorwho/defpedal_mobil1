@@ -159,29 +159,46 @@ let lastAnonSignInError: string | null = null;
 
 export const getLastAnonSignInError = (): string | null => lastAnonSignInError;
 
-export const signInAnonymously = async (): Promise<MobileAuthSession | null> => {
-  const client = requireSupabaseClient();
+// In-flight dedupe: two concurrent callers (e.g. profile.tsx's explicit
+// post-sign-out signInAnonymously racing AuthSessionProvider's background
+// retry loop) must share ONE Supabase call — each un-deduped call mints a
+// separate anonymous user, wasting an auth row and double-firing the
+// userId-change reset bridge (GPS audit 2026-07-15 re-audit, P3).
+let inFlightAnonSignIn: Promise<MobileAuthSession | null> | null = null;
 
-  try {
-    const { data, error } = await client.auth.signInAnonymously();
+export const signInAnonymously = (): Promise<MobileAuthSession | null> => {
+  if (inFlightAnonSignIn) return inFlightAnonSignIn;
 
-    if (error) {
-      lastAnonSignInError = error.message || 'Anonymous sign-in failed.';
+  const attempt = (async (): Promise<MobileAuthSession | null> => {
+    try {
+      // Inside the try so an unconfigured-Supabase throw resolves to null
+      // (callers fire-and-forget from timers; a rejection would be unhandled).
+      const client = requireSupabaseClient();
+      const { data, error } = await client.auth.signInAnonymously();
+
+      if (error) {
+        lastAnonSignInError = error.message || 'Anonymous sign-in failed.';
+        return null;
+      }
+
+      if (!data.session) {
+        lastAnonSignInError = 'Anonymous sign-in returned no session.';
+        return null;
+      }
+
+      lastAnonSignInError = null;
+      emitAuthSessionChange();
+      return toMobileAuthSession(data.session.access_token, data.session.user);
+    } catch (err) {
+      lastAnonSignInError = err instanceof Error ? err.message : String(err);
       return null;
+    } finally {
+      inFlightAnonSignIn = null;
     }
+  })();
 
-    if (!data.session) {
-      lastAnonSignInError = 'Anonymous sign-in returned no session.';
-      return null;
-    }
-
-    lastAnonSignInError = null;
-    emitAuthSessionChange();
-    return toMobileAuthSession(data.session.access_token, data.session.user);
-  } catch (err) {
-    lastAnonSignInError = err instanceof Error ? err.message : String(err);
-    return null;
-  }
+  inFlightAnonSignIn = attempt;
+  return attempt;
 };
 
 export const signInWithEmail = async (email: string, password: string) => {

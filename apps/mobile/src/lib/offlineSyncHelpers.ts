@@ -58,6 +58,15 @@ export const getMutationTimeoutMs = (type: QueuedMutation['type']): number =>
  * The +5s tail keeps the backstop as the true last-resort guard for the legs
  * without their own abort (e.g. the token refresh in mobileApiFetch, which
  * runs before the abortable fetch).
+ *
+ * Known imprecision (accepted): apiFetch retries retryable statuses
+ * internally (up to 3 attempts, each with a fresh AbortController budget)
+ * and mobileApiFetch re-issues once after a 401 refresh — so under a
+ * sustained 5xx storm a single leg can exceed one nominal timeout and the
+ * backstop can still fire on a technically-alive attempt. That costs one
+ * extra queue retry cycle (the error is non-permanent), never data loss;
+ * sizing the backstop for the full internal-retry worst case (~3x) would
+ * make it useless as a hang guard.
  */
 export const getMutationBackstopTimeoutMs = (type: QueuedMutation['type']): number =>
   getMutationTimeoutMs(type) +

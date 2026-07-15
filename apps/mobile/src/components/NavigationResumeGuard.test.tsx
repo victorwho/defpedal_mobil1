@@ -397,6 +397,51 @@ describe('NavigationResumeGuard', () => {
     expect(screen.queryByTestId('resume-modal')).toBeNull();
   });
 
+  it("Save ride still enqueues the trip_track when a trip_end is already queued (re-audit P1: the trip_end dedup must not suppress the trail)", async () => {
+    // Scenario: in-ride Discard queued a trip_end, then the app was killed
+    // inside resetFlow's persist window — the stale NAVIGATING session
+    // resurrects the prompt. Tapping "Save ride" must save the trail even
+    // though a trip_end for this clientTripId already exists.
+    const session = {
+      ...makeNavigationSession(FIFTEEN_MINUTES_MS + 60_000),
+      gpsBreadcrumbs: [
+        { lat: 44.43, lon: 26.1, ts: Date.now() - FIFTEEN_MINUTES_MS - 30_000, acc: null, spd: null, hdg: null },
+        { lat: 44.44, lon: 26.11, ts: Date.now() - FIFTEEN_MINUTES_MS, acc: null, spd: null, hdg: null },
+      ],
+    };
+    useAppStore.setState({
+      appState: 'NAVIGATING',
+      navigationSession: session as any,
+      activeTripClientId: 'client-trip-stale',
+      queuedMutations: [],
+      onboardingCompleted: true,
+    });
+    useAppStore.getState().enqueueMutation('trip_end', {
+      clientTripId: 'client-trip-stale',
+      endedAt: new Date().toISOString(),
+      reason: 'stopped',
+    } as any);
+    mockLoadCachedRoute.mockResolvedValue(makeCachedRoute());
+
+    render(<NavigationResumeGuard />);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('btn-secondary'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const queued = useAppStore.getState().queuedMutations;
+    // No duplicate trip_end...
+    expect(queued.filter((m) => m.type === 'trip_end')).toHaveLength(1);
+    // ...but the trail the user asked to save IS queued.
+    const track = queued.find((m) => m.type === 'trip_track');
+    expect(track).toBeTruthy();
+    expect((track!.payload as { gpsBreadcrumbs: unknown[] }).gpsBreadcrumbs).toHaveLength(2);
+  });
+
   it('does not double-queue trip_end when one is already queued for the same trip', async () => {
     const session = {
       ...makeNavigationSession(5 * 60 * 1000),

@@ -93,7 +93,18 @@ export const UserCacheResetBridge = () => {
     }
 
     queryClient.clear();
-    resetUserScopedState();
+    // Ride-data disposition (GPS audit 2026-07-15 re-audit): queued
+    // trip mutations survive the reset, but WHERE they may flow depends on
+    // who is leaving. A departing ANONYMOUS session → 'preserve' (the next
+    // anonymous session is the same human; the ride follows them). A
+    // departing REAL account → 'dead' (draining under the fresh anonymous
+    // user would silently misattribute the ride away from the account —
+    // unrecoverable, since the anon merge is fresh-target-only; dead-letter
+    // surfaces it in RideLossBanner and a post-sign-in retry attributes it
+    // correctly).
+    resetUserScopedState({
+      rideDataDisposition: previousIsAnonymous ? 'preserve' : 'dead',
+    });
   }, [userId, isAnonymous, isLoading, queryClient, resetUserScopedState]);
 
   // Whenever the user holds a real (non-anonymous) account, mark onboarding

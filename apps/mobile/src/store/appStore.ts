@@ -339,7 +339,18 @@ type AppStore = QueueSlice & {
   upsertOfflineRegion: (region: OfflineRegion) => void;
   removeOfflineRegion: (regionId: string) => void;
   resetFlow: () => void;
-  resetUserScopedState: () => void;
+  resetUserScopedState: (options?: {
+    /**
+     * What happens to queued trip_start/trip_end/trip_track (GPS audit
+     * 2026-07-15 P0-2 + re-audit): 'preserve' (default — previous identity
+     * was anonymous; the ride flows to the next anonymous session held by
+     * the same human) or 'dead' (previous identity was a REAL account;
+     * dead-letter so RideLossBanner surfaces the ride and a post-sign-in
+     * retry attributes it correctly instead of silently gifting it to a
+     * throwaway anonymous user).
+     */
+    rideDataDisposition?: 'preserve' | 'dead';
+  }) => void;
   // Slice 5a: transient flag set by handleLoadSavedRoute in route-planning
   // and read by useShareRoute when composing the POST /v1/route-shares
   // payload. When present, the share is created with source='saved' and the
@@ -962,7 +973,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           offlineRegions: state.offlineRegions.filter((region) => region.id !== regionId),
         })),
-      resetFlow: () =>
+      resetFlow: () => {
         set((state) => {
           // Prune tripServerIds: keep only entries for mutations still in the queue
           const activeClientIds = new Set(
@@ -989,7 +1000,15 @@ export const useAppStore = create<AppStore>()(
             activeTripClientId: null,
             tripServerIds: prunedIds,
           };
-        }),
+        });
+        // Recovery-critical (re-audit 2026-07-15): a debounced-but-unflushed
+        // resetFlow after End Ride → Discard leaves a stale NAVIGATING
+        // session on disk; a kill in that window resurrects the resume
+        // prompt for a ride the user already discarded. resetFlow was the
+        // one flow-state writer NOT force-flushing (queueSlice's actions all
+        // do — the June-22-cliff rule).
+        flushPersistedWrites();
+      },
       // Resets every user-scoped field to the initial default while preserving
       // device-level preferences (theme, locale, voice guidance, offline map
       // packs, POI visibility, bike/routing defaults). Invoked on sign-out and
@@ -1010,28 +1029,50 @@ export const useAppStore = create<AppStore>()(
       // 5-screen onboarding flow you already completed. The signup-prompt
       // gate (see computeOnboardingGateTarget) still surfaces the
       // sign-up CTA on subsequent anonymous opens.
-      resetUserScopedState: () => {
+      resetUserScopedState: (options) => {
+        const rideDataDisposition = options?.rideDataDisposition ?? 'preserve';
         set((state) => ({
           appState: 'IDLE',
           routePreview: null,
           selectedRouteId: null,
           navigationSession: resetNavigationSession(),
           routeRequest: DEFAULT_ROUTE_REQUEST,
-          // GPS audit 2026-07-15 P0-2: a userId transition (sign-out, account
-          // switch, stale-refresh-token auto-recovery) must NOT delete
-          // unsynced ride data. A whole-chain queued ride (trip_start still
-          // pending) simply uploads under the next session — same human, the
-          // ride lands in the History they're now using. A partially-synced
-          // chain can't be re-owned: its trip_end/trip_track resolve against
-          // the new user, 404, and dead-letter into RideLossBanner — visible,
-          // not silent (the old unconditional wipe was invisible: mutations
-          // were deleted, not dead-lettered, so the banner never fired).
+          // GPS audit 2026-07-15 P0-2 (+ same-day adversarial re-audit): a
+          // userId transition must NOT delete unsynced ride data — the old
+          // unconditional wipe was invisible (mutations deleted, never
+          // dead-lettered, RideLossBanner never fired). But WHERE the data
+          // may flow depends on who the previous identity was:
+          //
+          //   'preserve' (previous session was ANONYMOUS): keep the ride
+          //   mutations live. The next session is another throwaway
+          //   anonymous identity held by the same human — uploading under it
+          //   keeps the ride in the History they're actually using.
+          //
+          //   'dead' (previous session was a REAL account): letting the
+          //   queue drain would silently attribute the ride to the fresh
+          //   anonymous user — permanently lost to the real account (the
+          //   anon-merge RPC is fresh-target-only). Mark the mutations dead
+          //   instead: RideLossBanner surfaces the loss, and a user-initiated
+          //   retry AFTER signing back in uploads the ride to the correct
+          //   account.
+          //
+          // Partially-synced chains are safe either way: trip_end/trip_track
+          // resolve against the new user, 404, and dead-letter visibly.
           // User-scoped opinions (hazard votes, shares, feedback, city
           // suggestions) are still dropped — sending them as the next user
           // would misattribute them.
-          queuedMutations: state.queuedMutations.filter((mutation) =>
-            RIDE_DATA_MUTATION_TYPES.has(mutation.type),
-          ),
+          queuedMutations: state.queuedMutations
+            .filter((mutation) => RIDE_DATA_MUTATION_TYPES.has(mutation.type))
+            .map((mutation) =>
+              rideDataDisposition === 'dead' && mutation.status !== 'dead'
+                ? {
+                    ...mutation,
+                    status: 'dead' as const,
+                    lastError:
+                      'Signed out before this ride finished syncing. Sign back in and retry to save it to your account.',
+                  }
+                : mutation,
+            ),
           // Old-user server trip ids MUST be cleared even though the ride
           // mutations are kept: under the new token a stale id would make
           // trip_end's owner-scoped UPDATE match zero rows and report silent

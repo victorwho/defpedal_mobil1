@@ -5,6 +5,10 @@ const trackedOperationByPath: Record<string, string> = {
   '/v1/routes/reroute': 'route_reroute',
   '/v1/trips/start': 'trip_start',
   '/v1/trips/end': 'trip_end',
+  // Re-audit 2026-07-15: the GPS-trail upload is the single most
+  // loss-sensitive request in the app — its 4xx/5xx outcomes must appear in
+  // request telemetry (a rejected track upload dead-letters ride data).
+  '/v1/trips/track': 'trip_track',
   '/v1/hazards': 'hazard_report',
   '/v1/feedback': 'navigation_feedback',
 };
