@@ -526,3 +526,18 @@ try {
 **Fix (both ends, both shipped):** route-scoped `bodyLimit: 8 MiB` on `/risk-segments` (unblocks clients already in the field; endpoint is OAuth-gated + rate-limited so the ceiling is bounded) + server-side `downsampleCoordinates(coords, 15_000)` before the PostGIS RPC (a monster geometry is also a query cost bomb); client downsamples to 12k points (~300 KB) before POSTing from v0.2.99+. Helper in `packages/core/src/geometrySampling.ts` — uniform stride, exact endpoints preserved, pass-through (same reference) when under the cap.
 **General rule:** when a feature multiplies the size/length/count of an existing input (longer routes, bigger regions, more countries), sweep every endpoint and query that input flows through for fixed-size assumptions BEFORE shipping — body limits, schema maxItems, DB statement costs, timeouts. Cap unbounded client-generated payloads on BOTH sides: client-side for the steady state, server-side because old clients live in the field for months.
 **Occurrences:** 2026-07-12 — Sentry `4bff25295b834de1828411847b4b6d50`, minutes into EU-preview testing; fixed in `f1935c0`, deployed same day.
+
+---
+
+## Error #65 (2026-07-15): Geometry-accepting endpoint missed the #64 sweep — and the error handler hid the 413 as a retryable 500
+
+**What happened:** The #64 fix (route-scoped 8 MiB bodyLimit + server-side downsample for full-resolution route geometry) was applied to the two endpoints that had *visibly* failed in Sentry (`/elevation-profile`, `/risk-segments`) — but `/trips/track` accepts the same `overview=full` geometry (`plannedRoutePolyline6`) and got neither defense. Worse, its failure mode was silent and unrecoverable: a 400/413 on the track upload is classified permanent by the offline queue → the ride's GPS trail dead-letters. Found by the GPS-tracking audit (docs/reviews/gps-tracking-audit-2026-07-15.md P0-3), not by Sentry — no field failure yet because EU-length routes only became possible on 2026-07-12 and v0.2.101 hadn't rolled out.
+
+**Compounding bug:** the global error handler (`app.ts`) only special-cased AJV validation errors and `HttpError`; every other native Fastify error — including `FST_ERR_CTP_BODY_TOO_LARGE`, which carries `statusCode: 413` — was force-mapped to 500. The client treats 5xx as retryable, so an over-limit payload burned all 5 retries (~31 s + 5 slots of the shared `write` rate bucket) before dead-lettering, and the Sentry alert was mislabeled as a generic 500.
+
+**Fixes (commit `06cb647`):** `/trips/track` got the shared `ROUTE_GEOMETRY_BODY_LIMIT_BYTES`/`MAX_ROUTE_GEOMETRY_POINTS` defenses (decode → downsample → re-encode; under-cap passes byte-identical; malformed polylines drop the overlay, never the trail); error handler now preserves any native 4xx `statusCode` (code travels in `details`).
+
+**Rules:**
+1. When a payload-class bug is found on one endpoint, grep for EVERY endpoint accepting the same payload class before closing it — the fix sweep is by *input shape*, not by *which endpoints alerted*. `grep -l 'polyline6\|coordinates' src/routes/` would have caught `/trips/track` on 2026-07-12.
+2. An error-handler that force-maps unknown errors to 500 converts permanent client errors into retryable server errors — check `error.statusCode` before defaulting.
+3. Endpoints whose rejection dead-letters client data (offline-queue uploads) deserve the most defensive limits, not the defaults — a 4xx there is data loss, not a client bug report.
