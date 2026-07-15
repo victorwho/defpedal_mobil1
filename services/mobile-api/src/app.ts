@@ -200,6 +200,22 @@ export const buildApp = (options: {
         );
     }
 
+    // Native Fastify errors (FST_ERR_CTP_BODY_TOO_LARGE → 413, unsupported
+    // media type → 415, bad content parsing → 400) carry a meaningful 4xx
+    // statusCode. Force-mapping them to 500 made permanent client-payload
+    // conditions look retryable — the offline queue burned all 5 retries on
+    // an over-bodyLimit /trips/track upload before dead-lettering it (GPS
+    // audit 2026-07-15 P0-3). Preserve the status; 5xx and status-less
+    // errors stay on the generic path below so they still reach Sentry.
+    if (typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 500) {
+      // The contract's code union is closed; the native Fastify code (e.g.
+      // FST_ERR_CTP_BODY_TOO_LARGE) travels in details — 4xx details are
+      // client-visible per the policy above.
+      return reply
+        .status(error.statusCode)
+        .send(toErrorResponse(error.message, 'BAD_REQUEST', error.code ? [error.code] : undefined));
+    }
+
     app.log.error(error);
     captureServerException(error, {
       method: request.method,

@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { encodePolyline, decodePolyline } from '@defensivepedal/core';
 
 import { buildApp } from '../app';
 import {
@@ -570,6 +571,116 @@ describe('POST /v1/trips/track', () => {
       payload: validTrackBody,
     });
     expect(response.statusCode).toBe(502);
+
+    await app.close();
+  });
+
+  // ---------------------------------------------------------------------
+  // Oversized-geometry defenses (GPS audit 2026-07-15 P0-3 — the same
+  // error-log #64 class that hit /elevation-profile and /risk-segments).
+  // A rejected track upload dead-letters in the offline queue, so this
+  // endpoint must accept any legitimate ride.
+  // ---------------------------------------------------------------------
+
+  it('downsamples an over-cap plannedRoutePolyline6 before saving (endpoints preserved)', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    // 20k points along a line — over the 15k server cap.
+    const points: [number, number][] = Array.from({ length: 20000 }, (_, i) => [
+      26.1 + i * 0.0001,
+      44.4 + i * 0.00005,
+    ]);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, plannedRoutePolyline6: encodePolyline(points) },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const saved = saveTripTrack.mock.calls[0][0] as { plannedRoutePolyline6?: string };
+    const savedPoints = decodePolyline(saved.plannedRoutePolyline6 ?? '');
+    expect(savedPoints.length).toBeLessThanOrEqual(15000);
+    expect(savedPoints.length).toBeGreaterThan(2);
+    // Uniform downsample keeps exact endpoints (polyline6 rounds to 1e-6).
+    expect(savedPoints[0][0]).toBeCloseTo(points[0][0], 6);
+    expect(savedPoints[savedPoints.length - 1][0]).toBeCloseTo(points[points.length - 1][0], 6);
+
+    await app.close();
+  });
+
+  it('passes an under-cap plannedRoutePolyline6 through byte-identical', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    const points: [number, number][] = Array.from({ length: 100 }, (_, i) => [
+      26.1 + i * 0.001,
+      44.4 + i * 0.0005,
+    ]);
+    const encoded = encodePolyline(points);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, plannedRoutePolyline6: encoded },
+    });
+    expect(response.statusCode).toBe(200);
+    expect((saveTripTrack.mock.calls[0][0] as { plannedRoutePolyline6?: string }).plannedRoutePolyline6).toBe(encoded);
+
+    await app.close();
+  });
+
+  it('accepts a >1 MiB body (raised route-scoped bodyLimit) and still downsamples', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    // Random-walk polyline with coarse deltas → long encoding per point.
+    // ~300k points ≈ 1.5-2 MB encoded: over the old 1 MiB default limit
+    // (which 413'd → force-500'd), under the new 8 MiB route limit.
+    let lon = 26.1;
+    let lat = 44.4;
+    const points: [number, number][] = [];
+    for (let i = 0; i < 300000; i += 1) {
+      lon += (i % 2 === 0 ? 1 : -1) * 0.001;
+      lat += (i % 3 === 0 ? 1 : -1) * 0.0005;
+      points.push([lon, lat]);
+    }
+    const encoded = encodePolyline(points);
+    expect(encoded.length).toBeGreaterThan(1024 * 1024);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, plannedRoutePolyline6: encoded },
+    });
+    expect(response.statusCode).toBe(200);
+    const saved = saveTripTrack.mock.calls[0][0] as { plannedRoutePolyline6?: string };
+    expect(decodePolyline(saved.plannedRoutePolyline6 ?? '').length).toBeLessThanOrEqual(15000);
+
+    await app.close();
+  });
+
+  it('returns 413 (not 500) for a body beyond the 8 MiB route limit', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, plannedRoutePolyline6: 'x'.repeat(9 * 1024 * 1024) },
+    });
+    // Native Fastify FST_ERR_CTP_BODY_TOO_LARGE must surface as 413 so the
+    // offline queue dead-letters immediately instead of burning 5 retries
+    // on a retryable-looking 500.
+    expect(response.statusCode).toBe(413);
+    expect(response.json().code).toBe('BAD_REQUEST');
+    expect(response.json().details).toContain('FST_ERR_CTP_BODY_TOO_LARGE');
 
     await app.close();
   });

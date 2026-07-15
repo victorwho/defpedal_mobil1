@@ -31,7 +31,7 @@ import type {
   TiersResponse,
 } from '@defensivepedal/core';
 import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS, normalizeXpAwardResult } from '../lib/xp';
-import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned } from '@defensivepedal/core';
+import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned, decodePolyline, encodePolyline } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
@@ -462,9 +462,44 @@ export const buildV1Routes = (
       },
     );
 
+    // EU-wide routing (2026-07-12) means long cross-country routes can carry
+    // hundreds of thousands of geometry points, and Sentry
+    // FST_ERR_CTP_BODY_TOO_LARGE hit the geometry-accepting endpoints
+    // (/elevation-profile and /risk-segments) during the first EU-length
+    // route testing. Shared defenses for every geometry-accepting route
+    // (/trips/track joined 2026-07-15 — GPS audit P0-3: a rejected track
+    // upload dead-letters in the offline queue and the ride's GPS trail is
+    // unrecoverable, so this endpoint must never bounce a legitimate ride):
+    //   1. Route-scoped bodyLimit raise (8 MiB vs the 1 MiB default) so
+    //      clients already in the field that POST full-resolution geometry
+    //      don't 413. All these endpoints are rate-limited.
+    //   2. Server-side downsample before the expensive work (PostGIS risk
+    //      match / Terrain-RGB decoding / jsonb storage) so a monster
+    //      geometry can't become a cost bomb regardless of client version.
+    //      Newer clients (v0.2.99+) downsample to 12k points before POSTing.
+    const ROUTE_GEOMETRY_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
+    const MAX_ROUTE_GEOMETRY_POINTS = 15_000;
+
+    // Planned-route polylines arrive encoded, so the downsample is a
+    // decode → uniform resample → re-encode round-trip; geometries already
+    // under the cap pass through byte-identical. A malformed polyline must
+    // never fail the save — the GPS trail is the data that matters — so any
+    // decode/encode surprise just drops the planned-route overlay.
+    const boundPlannedRoutePolyline = (encoded: string | undefined): string | undefined => {
+      if (!encoded) return encoded;
+      try {
+        const points = decodePolyline(encoded);
+        if (points.length <= MAX_ROUTE_GEOMETRY_POINTS) return encoded;
+        return encodePolyline(downsampleCoordinates(points, MAX_ROUTE_GEOMETRY_POINTS) as [number, number][]);
+      } catch {
+        return undefined;
+      }
+    };
+
     app.post(
       '/trips/track',
       {
+        bodyLimit: ROUTE_GEOMETRY_BODY_LIMIT_BYTES,
         schema: {
           body: {
             type: 'object',
@@ -474,7 +509,10 @@ export const buildV1Routes = (
               tripId: { type: 'string', minLength: 1, maxLength: 100 },
               clientTripId: { type: 'string', minLength: 1, maxLength: 100 },
               routingMode: { type: 'string', enum: ['safe', 'fast'] },
-              plannedRoutePolyline6: { type: 'string', maxLength: 500000 },
+              // ~4 chars/point at road-following deltas → 6M chars comfortably
+              // covers any real EU route while staying under the 8 MiB body
+              // limit alongside the breadcrumb array.
+              plannedRoutePolyline6: { type: 'string', maxLength: 6000000 },
               plannedRouteDistanceMeters: { type: 'number', minimum: 0, maximum: 1000000 },
               gpsBreadcrumbs: {
                 type: 'array',
@@ -542,7 +580,7 @@ export const buildV1Routes = (
               tripId: body.tripId,
               clientTripId: body.clientTripId,
               routingMode: body.routingMode,
-              plannedRoutePolyline6: body.plannedRoutePolyline6,
+              plannedRoutePolyline6: boundPlannedRoutePolyline(body.plannedRoutePolyline6),
               plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
               gpsBreadcrumbs: body.gpsBreadcrumbs,
               endReason: body.endReason,
@@ -1403,20 +1441,9 @@ export const buildV1Routes = (
       },
     );
 
-    // EU-wide routing (2026-07-12) means long cross-country routes can carry
-    // hundreds of thousands of geometry points, and Sentry
-    // FST_ERR_CTP_BODY_TOO_LARGE hit BOTH geometry-accepting endpoints
-    // (/elevation-profile and /risk-segments) during the first EU-length
-    // route testing. Shared defenses:
-    //   1. Route-scoped bodyLimit raise (8 MiB vs the 1 MiB default) so
-    //      clients already in the field that POST full-resolution geometry
-    //      don't 413. Both endpoints are rate-limited.
-    //   2. Server-side downsample before the expensive work (PostGIS risk
-    //      match / Terrain-RGB tile decoding) so a monster geometry can't
-    //      become a cost bomb regardless of client version. Newer clients
-    //      (v0.2.99+) downsample to 12k points before POSTing anyway.
-    const ROUTE_GEOMETRY_BODY_LIMIT_BYTES = 8 * 1024 * 1024;
-    const MAX_ROUTE_GEOMETRY_POINTS = 15_000;
+    // ROUTE_GEOMETRY_BODY_LIMIT_BYTES / MAX_ROUTE_GEOMETRY_POINTS are
+    // declared above /trips/track (the first geometry-accepting route);
+    // /elevation-profile and /risk-segments below share the same defenses.
 
     // The elevation profile is consumed as a standalone chart array +
     // gain/loss numbers, so a uniform resample is lossless for the UI.
