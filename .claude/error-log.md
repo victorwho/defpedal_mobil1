@@ -541,3 +541,19 @@ try {
 1. When a payload-class bug is found on one endpoint, grep for EVERY endpoint accepting the same payload class before closing it — the fix sweep is by *input shape*, not by *which endpoints alerted*. `grep -l 'polyline6\|coordinates' src/routes/` would have caught `/trips/track` on 2026-07-12.
 2. An error-handler that force-maps unknown errors to 500 converts permanent client errors into retryable server errors — check `error.statusCode` before defaulting.
 3. Endpoints whose rejection dead-letters client data (offline-queue uploads) deserve the most defensive limits, not the defaults — a 4xx there is data loss, not a client bug report.
+
+---
+
+## Error #66 (2026-07-15): `crypto.randomInt(0, 2 ** 48)` — range cap is 2^48 − 1, so the CSPRNG hardening itself broke route sharing for nine days
+
+**What happened:** The audit fix "CSPRNG share codes" (2026-07-05 SEC-6, live in `defpedal-api-00103` ~07-06) injected `randomSource: () => randomInt(0, 2 ** 48) / 2 ** 48` into the share-code generator. Node's `crypto.randomInt` requires `max - min <= 281474976710655` (2^48 **− 1**); the call asked for exactly 2^48 — one over — and threw `ERR_OUT_OF_RANGE` on **every** invocation. The route handler wrapped it as `HttpError 502 "Failed to create route share."`, so **POST /v1/route-shares failed 100% of the time from 2026-07-06 to 2026-07-15** (15 Sentry events = every user attempt). Found when Victor reported the share button showing HTTP 502; root cause was one `gcloud logging read jsonPayload.event="http_error_details"` away.
+
+**Why tests missed it:** every route-share test injects its own `service` or deterministic `randomSource` — the ONE line that only runs in production (the seam wiring) had zero coverage. The 5xx-details policy also kept the real message out of Sentry (it's only in Cloud Run logs), so the alert title was just the generic wrapper text.
+
+**Fix (commit this session):** `randomBytes(6).readUIntBE(0, 6) / 2 ** 48` — 48 uniform bits, no range API to misuse — extracted as exported `cryptoShareCodeRandomSource` and covered by a regression test that exercises the REAL production source (10k draws in [0,1) + valid codes through the real generator).
+
+**Rules:**
+1. A "hardening" change that swaps an implementation detail (Math.random → crypto) MUST be executed at least once against its real bounds before shipping — bounds-checked crypto APIs (`randomInt`, `randomFillSync` offsets) throw at call time, not import time.
+2. When a factory wires a dependency that every test overrides, add one test that pins the PRODUCTION wiring (export the default, test it directly). The injected seam is exactly where dead-on-arrival code hides.
+3. `crypto.randomInt` range is ≤ 2^48 − 1. For a uniform [0,1) source, prefer `randomBytes(6).readUIntBE(0, 6) / 2 ** 48`.
+4. When Sentry shows a generic wrapped 5xx, the real cause is in Cloud Run logs under `jsonPayload.event="http_error_details"` (the 2026-06-12 policy logs 5xx details server-side only).

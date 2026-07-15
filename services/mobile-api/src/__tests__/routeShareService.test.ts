@@ -754,3 +754,39 @@ describe('routeShareService.claimShare', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Production random source (error-log #66 regression)
+// ---------------------------------------------------------------------------
+//
+// Every other test in this file injects its own service or random source —
+// which is exactly how `randomInt(0, 2 ** 48)` (range cap is 2^48 - 1)
+// shipped and threw ERR_OUT_OF_RANGE on every real request, 502-ing all of
+// POST /v1/route-shares for nine days. These tests exercise the REAL
+// production source.
+
+import { generateShareCode, SHARE_CODE_REGEX } from '@defensivepedal/core';
+import { cryptoShareCodeRandomSource } from '../routes/route-shares';
+
+describe('cryptoShareCodeRandomSource (production source)', () => {
+  it('never throws and stays in [0, 1) across many draws', () => {
+    for (let i = 0; i < 10_000; i += 1) {
+      const value = cryptoShareCodeRandomSource();
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThan(1);
+    }
+  });
+
+  it('produces valid share codes through the real generator', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i += 1) {
+      const code = generateShareCode(cryptoShareCodeRandomSource);
+      expect(code).toMatch(SHARE_CODE_REGEX);
+      seen.add(code);
+    }
+    // 200 draws from a 62^8 keyspace colliding would mean the source is
+    // degenerate (e.g. constant output).
+    expect(seen.size).toBe(200);
+  });
+});

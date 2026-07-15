@@ -9,7 +9,7 @@
  * on the paths above yields Fastify's default 404 (no route exposed).
  */
 
-import { randomInt } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 import type { ErrorResponse } from '@defensivepedal/core';
 import { buildShareDeepLinks } from '@defensivepedal/core';
@@ -84,6 +84,21 @@ const ensureSupabase = () => {
   return supabaseAdmin;
 };
 
+/**
+ * CSPRNG-backed [0, 1) source for share-code generation (audit 2026-07-05
+ * SEC-6: the core default stays Math.random for the browser-shared module;
+ * the server injects crypto so codes aren't predictable from V8 PRNG state).
+ *
+ * Uses 6 random bytes = 48 bits, uniform over [0, 2^48) → [0, 1). Do NOT
+ * "simplify" to `randomInt(0, 2 ** 48)`: randomInt's range cap is 2^48 - 1,
+ * so that call threw ERR_OUT_OF_RANGE on EVERY invocation and 502'd all of
+ * POST /v1/route-shares from 2026-07-06 to 2026-07-15 (error-log #66) —
+ * unnoticed by tests because every test injects its own service/source.
+ * Exported so the regression test exercises the REAL production source.
+ */
+export const cryptoShareCodeRandomSource = (): number =>
+  randomBytes(6).readUIntBE(0, 6) / 2 ** 48;
+
 // ---------------------------------------------------------------------------
 // Plugin factory
 // ---------------------------------------------------------------------------
@@ -107,10 +122,7 @@ export const buildRouteShareRoutes = (
         supabase: supabase as unknown as Parameters<
           typeof createRouteShareService
         >[0]['supabase'],
-        // Audit 2026-07-05 SEC-6: CSPRNG for share-code generation. The core
-        // default stays Math.random (browser-shared module); the server
-        // injects crypto so codes aren't predictable from V8 PRNG state.
-        randomSource: () => randomInt(0, 2 ** 48) / 2 ** 48,
+        randomSource: cryptoShareCodeRandomSource,
       });
     };
 
