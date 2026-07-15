@@ -131,6 +131,9 @@ export const en = {
     resumeGuardDestinationFallback: 'your destination',
     bgServiceTitle: 'Defensive Pedal navigation active',
     bgServiceBody: 'Tracking your ride so navigation keeps working with the screen off.',
+    bgRecordingUnavailable:
+      'Screen-off recording is unavailable — allow location "All the time" in Settings, or keep the screen on to record your whole ride.',
+    dismiss: 'Dismiss',
     earlyEndTitle: 'Why did you end your route early?',
     earlyEndReachedDestination: 'I reached my destination',
     earlyEndFoundBetterRoute: 'I found a better route on my own',

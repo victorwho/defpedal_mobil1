@@ -23,6 +23,7 @@ import {
   type RouteShareCreateResult,
   type RouteShareRiskSegment,
 } from '../lib/api';
+import { boundRoutePolyline6 } from '../lib/routeGeometry';
 import { useConnectivity } from '../providers/ConnectivityMonitor';
 import { useAppStore } from '../store/appStore';
 
@@ -134,7 +135,9 @@ export function useShareRoute(): UseShareRouteReturn {
             lat: input.destination.lat,
             lon: input.destination.lon,
           },
-          geometryPolyline6: input.route.geometryPolyline6,
+          // Bounded to 12k points — the share endpoint sits behind the same
+          // 1 MiB default body limit that bit /trips/track (GPS audit P0-3).
+          geometryPolyline6: boundRoutePolyline6(input.route.geometryPolyline6),
           distanceMeters: input.route.distanceMeters,
           durationSeconds: input.route.durationSeconds,
           routingMode: input.routingMode,

@@ -468,9 +468,9 @@ describe('useAppStore', () => {
       expect(breadcrumbs?.[0].lat).toBe(40.4168);
     });
 
-    it('caps GPS breadcrumbs at 2000', () => {
+    it('thins the trail past 2000 crumbs instead of evicting the ride opening (GPS audit P1-1)', () => {
       useAppStore.getState().startNavigation(createRoute('safe-1'));
-      // Manually set near cap, with a session start before the crumb timestamps
+      // Manually set at cap, with a session start before the crumb timestamps
       // so the new (plausible) crumb passes the stale-fix guard.
       const session = useAppStore.getState().navigationSession!;
       const baseTs = 1710400000000;
@@ -497,8 +497,18 @@ describe('useAppStore', () => {
         timestamp: baseTs + 2000 * 1000,
       });
 
-      // Should still be 2000, not 2001
-      expect(useAppStore.getState().navigationSession?.gpsBreadcrumbs).toHaveLength(2000);
+      const trail = useAppStore.getState().navigationSession!.gpsBreadcrumbs;
+      // Bounded — thinning halves resolution rather than growing past the cap.
+      expect(trail.length).toBeLessThanOrEqual(2000);
+      // The ride's FIRST crumb survives (the old ring buffer evicted it —
+      // rides longer than the buffer lost their opening kilometres).
+      expect(trail[0].ts).toBe(baseTs);
+      // The just-appended newest crumb survives too.
+      expect(trail[trail.length - 1].ts).toBe(baseTs + 2000 * 1000);
+      // Timestamps stay strictly increasing after thinning.
+      for (let i = 1; i < trail.length; i += 1) {
+        expect(trail[i].ts).toBeGreaterThan(trail[i - 1].ts);
+      }
     });
 
     it('sets muted state on navigation session', () => {

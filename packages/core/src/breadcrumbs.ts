@@ -95,3 +95,25 @@ export const sanitizeBreadcrumbs = <T extends SanitisableCrumb>(
 
   return out;
 };
+
+/**
+ * Halve a breadcrumb trail's resolution: keep every 2nd sample plus the final
+ * one (index 0 — the ride's origin — is always even, so it survives).
+ *
+ * Used by the mobile trail buffers when they hit their memory cap (GPS audit
+ * 2026-07-15 P1-1). The old ring-buffer eviction dropped the OLDEST samples,
+ * so any ride longer than the buffer's time span (~66 min at 1 sample/2 s)
+ * silently lost its opening kilometres — and with them distance/CO2/XP.
+ * Thinning keeps the whole ride at progressively coarser resolution instead:
+ * each pass doubles the time span the buffer can hold (66 min → 2.2 h → 4.4 h
+ * → …) at the same memory cost, and a few extra seconds between samples
+ * changes a road-following distance sum by well under 1%.
+ *
+ * The implied-speed sanitiser gates stay valid on thinned trails because
+ * `isPlausibleStep` self-calibrates to the timestamp gap.
+ */
+export const thinBreadcrumbTrail = <T>(trail: readonly T[]): T[] => {
+  if (trail.length < 3) return [...trail];
+  const lastIndex = trail.length - 1;
+  return trail.filter((_, index) => index % 2 === 0 || index === lastIndex);
+};

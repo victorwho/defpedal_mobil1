@@ -133,6 +133,9 @@ export const ro: TranslationKeys = {
     resumeGuardDestinationFallback: 'destinația ta',
     bgServiceTitle: 'Navigare Defensive Pedal activă',
     bgServiceBody: 'Îți urmărim cursa ca navigarea să funcționeze și cu ecranul stins.',
+    bgRecordingUnavailable:
+      'Înregistrarea cu ecranul stins nu e disponibilă — permite localizarea „Tot timpul” din Setări sau ține ecranul aprins ca să-ți înregistrezi toată cursa.',
+    dismiss: 'Închide',
     earlyEndTitle: 'De ce ai încheiat traseul mai devreme?',
     earlyEndReachedDestination: 'Am ajuns la destinație',
     earlyEndFoundBetterRoute: 'Am găsit singur un traseu mai bun',

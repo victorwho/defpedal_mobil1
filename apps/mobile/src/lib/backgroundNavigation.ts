@@ -1,4 +1,5 @@
 import type { NavigationLocationSample } from '@defensivepedal/core';
+import { thinBreadcrumbTrail } from '@defensivepedal/core';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 
@@ -87,9 +88,14 @@ export const persistNavigationLocationSamples = async (
     merged.push(sample);
   }
 
+  // At capacity, thin (halve resolution, keep endpoints) instead of evicting
+  // the oldest samples — same rationale as the main trail buffer (GPS audit
+  // 2026-07-15 P1-1): a continuous screen-off stretch longer than the buffer
+  // (~33 min at 1 sample/2 s) used to lose its earliest kilometres before the
+  // foreground merge could drain them.
   await writeJson(
     BACKGROUND_LOCATION_HISTORY_KEY,
-    merged.slice(-MAX_BACKGROUND_LOCATION_HISTORY),
+    merged.length > MAX_BACKGROUND_LOCATION_HISTORY ? thinBreadcrumbTrail(merged) : merged,
   );
 };
 

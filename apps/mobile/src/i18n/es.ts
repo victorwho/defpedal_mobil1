@@ -133,6 +133,9 @@ export const es: TranslationKeys = {
     resumeGuardDestinationFallback: 'tu destino',
     bgServiceTitle: 'Navegación de Defensive Pedal activa',
     bgServiceBody: 'Registramos tu ruta para que la navegación siga funcionando con la pantalla apagada.',
+    bgRecordingUnavailable:
+      'La grabación con la pantalla apagada no está disponible: permite la ubicación «Todo el tiempo» en Ajustes o mantén la pantalla encendida para registrar toda tu ruta.',
+    dismiss: 'Cerrar',
     earlyEndTitle: '¿Por qué has terminado la ruta antes de tiempo?',
     earlyEndReachedDestination: 'He llegado a mi destino',
     earlyEndFoundBetterRoute: 'He encontrado una ruta mejor por mi cuenta',

@@ -22,6 +22,7 @@ import {
   DEFAULT_REVIEW_PROMPT_STATE,
   ensureInstalledAt,
   isPlausibleStep,
+  thinBreadcrumbTrail,
   resetNavigationSession,
   recordError as reviewRecordError,
   recordPromptShown as reviewRecordPromptShown,
@@ -891,12 +892,17 @@ export const useAppStore = create<AppStore>()(
           if (lastCrumb && !isPlausibleStep(lastCrumb, newCrumb)) {
             return state; // implausible jump → cached/outlier fix
           }
-          // Ring-buffer: drop oldest when at capacity so long rides keep recording
+          // At capacity, THIN the trail (halve resolution, keep endpoints)
+          // instead of evicting the oldest samples (GPS audit 2026-07-15
+          // P1-1): eviction silently deleted the opening kilometres of any
+          // ride longer than ~66 min — production's longest stored trail was
+          // exactly this cap. Each thinning pass doubles the ride duration
+          // the buffer can hold at the same memory cost.
           const MAX_BREADCRUMBS = 2000;
-          const updatedCrumbs =
-            crumbs.length >= MAX_BREADCRUMBS
-              ? [...crumbs.slice(1), newCrumb]
-              : [...crumbs, newCrumb];
+          let updatedCrumbs = [...crumbs, newCrumb];
+          if (updatedCrumbs.length > MAX_BREADCRUMBS) {
+            updatedCrumbs = thinBreadcrumbTrail(updatedCrumbs);
+          }
           return {
             navigationSession: {
               ...session,

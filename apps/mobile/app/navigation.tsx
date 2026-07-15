@@ -40,6 +40,7 @@ import { useForegroundNavigationLocation } from '../src/hooks/useForegroundNavig
 import { mobileApi } from '../src/lib/api';
 import { mobileEnv } from '../src/lib/env';
 import { cacheActiveRoute, clearCachedRoute, type CachedRouteData } from '../src/lib/offlineRouteCache';
+import { boundRoutePolyline6 } from '../src/lib/routeGeometry';
 import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -161,6 +162,24 @@ function NavigationScreen() {
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
+  // Surface "screen-off recording unavailable" (GPS audit 2026-07-15 P1-2):
+  // when the rider granted only "While using the app", the background task
+  // fails to start and every locked-screen stretch records nothing — the
+  // status was persisted but nothing in the ride UI ever read it. The
+  // snapshot only reads once on mount, which races the async start attempt,
+  // so re-read shortly after mount and then on a slow poll.
+  const [bgWarningDismissed, setBgWarningDismissed] = useState(false);
+  const refreshBackgroundSnapshot = backgroundSnapshot.refresh;
+  useEffect(() => {
+    const settle = setTimeout(refreshBackgroundSnapshot, 5_000);
+    const poll = setInterval(refreshBackgroundSnapshot, 30_000);
+    return () => {
+      clearTimeout(settle);
+      clearInterval(poll);
+    };
+  }, [refreshBackgroundSnapshot]);
+  const showBgRecordingWarning =
+    backgroundSnapshot.status.status === 'error' && !bgWarningDismissed;
   const { parkingLocations } = useBicycleParking(
     routeRequest ? { lat: routeRequest.origin.lat, lon: routeRequest.origin.lon } : null,
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
@@ -449,7 +468,10 @@ function NavigationScreen() {
       enqueueMutation('trip_track', {
         clientTripId: currentActiveTripClientId,
         routingMode: (currentRoutePreview?.selectedMode as 'safe' | 'fast') ?? 'fast',
-        plannedRoutePolyline6: selectedRoute.geometryPolyline6,
+        // Bounded to 12k points before upload — an EU-length full-resolution
+        // polyline would trip the server's body/schema limits and dead-letter
+        // the GPS trail riding in the same request (GPS audit P0-3).
+        plannedRoutePolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
         plannedRouteDistanceMeters: selectedRoute.distanceMeters,
         gpsBreadcrumbs: currentSession.gpsBreadcrumbs,
         endReason: reason,
@@ -476,7 +498,7 @@ function NavigationScreen() {
         distanceMeters: actualDistance,
         durationSeconds,
         elevationGainMeters: selectedRoute.totalClimbMeters,
-        geometryPolyline6: selectedRoute.geometryPolyline6,
+        geometryPolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
         safetyTags: [],
         startCoordinate: { lat: currentRouteRequest.origin.lat, lon: currentRouteRequest.origin.lon },
       });
@@ -1138,6 +1160,25 @@ function NavigationScreen() {
                 onPress={() => setOfflineBannerDismissed(true)}
               >
                 Dismiss
+              </Button>
+            </View>
+          ) : null}
+
+          {/* Screen-off recording unavailable (background permission denied) */}
+          {showBgRecordingWarning ? (
+            <View
+              style={[styles.warningBanner, shadows.md]}
+              accessibilityLiveRegion="polite"
+            >
+              <Text style={[textSm, styles.warningBannerText]}>
+                {t('nav.bgRecordingUnavailable')}
+              </Text>
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => setBgWarningDismissed(true)}
+              >
+                {t('nav.dismiss')}
               </Button>
             </View>
           ) : null}

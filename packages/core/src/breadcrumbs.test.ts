@@ -5,6 +5,7 @@ import {
   MAX_CYCLING_SPEED_MPS,
   MAX_SEGMENT_METERS,
   sanitizeBreadcrumbs,
+  thinBreadcrumbTrail,
 } from './breadcrumbs';
 
 // Reference points used across the suite.
@@ -83,5 +84,35 @@ describe('sanitizeBreadcrumbs', () => {
   it('preserves a legitimately empty or single-point trail', () => {
     expect(sanitizeBreadcrumbs([])).toEqual([]);
     expect(sanitizeBreadcrumbs([MADRID])).toEqual([MADRID]);
+  });
+});
+
+describe('thinBreadcrumbTrail', () => {
+  const trail = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i }));
+
+  it('passes short trails (< 3) through as a copy', () => {
+    const two = trail(2);
+    const result = thinBreadcrumbTrail(two);
+    expect(result).toEqual(two);
+    expect(result).not.toBe(two);
+  });
+
+  it('keeps the first and last samples and roughly halves the count', () => {
+    const result = thinBreadcrumbTrail(trail(2001));
+    expect(result[0].id).toBe(0);
+    expect(result[result.length - 1].id).toBe(2000);
+    expect(result.length).toBeLessThanOrEqual(1001);
+  });
+
+  it('keeps the final sample even when its index is odd', () => {
+    const result = thinBreadcrumbTrail(trail(10)); // last index 9 (odd)
+    expect(result.map((c) => c.id)).toEqual([0, 2, 4, 6, 8, 9]);
+  });
+
+  it('preserves relative order', () => {
+    const result = thinBreadcrumbTrail(trail(101));
+    for (let i = 1; i < result.length; i += 1) {
+      expect(result[i].id).toBeGreaterThan(result[i - 1].id);
+    }
   });
 });
