@@ -58,13 +58,21 @@ describe('persistNavigationLocationSamples', () => {
     expect(history.map((s) => s.timestamp)).toEqual([1000, 2000, 3000]);
   });
 
-  it('ring-buffers at the cap, keeping the most recent samples', async () => {
+  it('thins at the cap instead of evicting — first and last samples survive (GPS audit P1-1)', async () => {
     const batch = Array.from({ length: 1100 }, (_, i) => sample(i + 1));
     await persistNavigationLocationSamples(batch);
     const history = await getPersistedNavigationLocationHistory();
-    expect(history.length).toBe(1000);
-    expect(history[0].timestamp).toBe(101); // oldest 100 dropped
+    // Bounded, at half resolution — not grown past the cap.
+    expect(history.length).toBeLessThanOrEqual(1000);
+    // The stretch's OPENING sample survives (the old ring buffer evicted it,
+    // so a >33-min locked-screen stretch lost its earliest kilometres).
+    expect(history[0].timestamp).toBe(1);
+    // The newest sample survives too.
     expect(history[history.length - 1].timestamp).toBe(1100);
+    // Order stays strictly increasing after thinning.
+    for (let i = 1; i < history.length; i += 1) {
+      expect(history[i].timestamp).toBeGreaterThan(history[i - 1].timestamp);
+    }
   });
 
   it('clearPersistedNavigationHistory empties the trail', async () => {

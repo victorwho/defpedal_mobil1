@@ -557,3 +557,13 @@ try {
 2. When a factory wires a dependency that every test overrides, add one test that pins the PRODUCTION wiring (export the default, test it directly). The injected seam is exactly where dead-on-arrival code hides.
 3. `crypto.randomInt` range is ≤ 2^48 − 1. For a uniform [0,1) source, prefer `randomBytes(6).readUIntBE(0, 6) / 2 ** 48`.
 4. When Sentry shows a generic wrapped 5xx, the real cause is in Cloud Run logs under `jsonPayload.event="http_error_details"` (the 2026-06-12 policy logs 5xx details server-side only).
+
+---
+
+## Error #67 (2026-07-15): `vitest run | tail -N` masks test failures — red CI shipped on a "green" local run
+
+**What happened:** The trail-thinning change (GPS audit P1-1) broke an existing test (`src/lib/__tests__/backgroundNavigation.test.ts` asserted the old ring-buffer eviction). The pre-commit verification ran the full suite as `npx vitest run 2>&1 | tail -3` — a pipeline's exit status is the LAST command's (`tail`, always 0), so the failure was invisible and three consecutive CI runs on main went red. The pre-push hook didn't catch it either (it runs typecheck + lint, not tests).
+
+**Rules:**
+1. Never gate on a test command piped through `tail`/`grep`/`head` without `set -o pipefail` in the same shell invocation.
+2. When a behavior change is made, grep for tests of the OLD behavior in `__tests__/` directories too — this repo keeps tests both next to files AND in `__tests__/` subdirs (`backgroundNavigation.test.ts` lives in `src/lib/__tests__/`, not next to `src/lib/backgroundNavigation.ts`).
