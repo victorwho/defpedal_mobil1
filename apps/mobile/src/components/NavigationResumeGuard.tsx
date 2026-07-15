@@ -13,18 +13,28 @@
  * (OfflineRouteCache). Based on session age:
  *
  *   < 15 min  → auto-resume (navigate to /navigation silently)
- *   >= 15 min → show modal prompt "Resume or Discard?"
+ *   >= 15 min → show modal prompt "Resume / Save ride / Discard ride"
+ *
+ * The prompt is THREE-way (GPS audit 2026-07-15 P1-0): the two-button
+ * "Resume or Discard?" version deleted the fully-recorded GPS trail of every
+ * interrupted ride — a rider reopening the app hours after an interrupted
+ * ride has no reason to "resume navigating" somewhere they already went, so
+ * they tapped Discard and the ride vanished (zero `app_killed` recovery
+ * tracks reached production in July 2026 vs 67 in May under the old
+ * auto-save recovery; 127 trackless "zombie" trips in a month). "Save ride"
+ * runs the same close-out as the automatic kill-recovery path, so the ride
+ * lands in History with its trail.
  *
  * If state is inconsistent (NAVIGATING session without a resumable cached
  * route), the interrupted ride is closed out server-side (trip_end +
  * trip_track with end_reason 'app_killed' — the old kill-recovery behavior,
  * so the ride still lands in History) and the flow resets to IDLE.
  *
- * Discard semantics: an explicit user "Discard" queues trip_end only (no
- * trip_track — matching the in-ride End Ride → Discard path: no History row,
- * no impact/XP/badges) and resets to IDLE via resetFlow. It must NEVER call
- * finishNavigation(): that transitions to AWAITING_FEEDBACK (stranding the
- * app — route-preview's guard excludes that state) and increments
+ * Discard semantics: an explicit user "Discard ride" queues trip_end only
+ * (no trip_track — matching the in-ride End Ride → Discard path: no History
+ * row, no impact/XP/badges) and resets to IDLE via resetFlow. It must NEVER
+ * call finishNavigation(): that transitions to AWAITING_FEEDBACK (stranding
+ * the app — route-preview's guard excludes that state) and increments
  * completedRideCount (review-prompt / MeetPedal gates) for a ride the user
  * just threw away (review 2026-06-12, P1 #5).
  */
@@ -34,8 +44,10 @@ import { router } from 'expo-router';
 
 import { loadCachedRoute, clearCachedRoute } from '../lib/offlineRouteCache';
 import { mergeBackgroundBreadcrumbsIntoSession } from '../lib/mergeBackgroundBreadcrumbs';
+import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
 import { useStoreHydrated } from '../hooks/useStoreHydrated';
+import { useT } from '../hooks/useTranslation';
 import { useAuthSessionOptional } from '../providers/AuthSessionProvider';
 import { Modal } from '../design-system/organisms/Modal';
 import { Button } from '../design-system/atoms/Button';
@@ -184,6 +196,7 @@ export const NavigationResumeGuard: React.FC = () => {
       // for a resume. Close the interrupted ride out (keeps the GPS trail so
       // the ride still lands in History, like the old kill recovery).
       if (cachedRoute == null) {
+        telemetry.capture('resume_guard_outcome', { choice: 'auto_close_save' });
         await closeInterruptedRide(true);
         return;
       }
@@ -192,10 +205,11 @@ export const NavigationResumeGuard: React.FC = () => {
 
       if (ageMs < AUTO_RESUME_THRESHOLD_MS) {
         // Fresh session — auto-resume
+        telemetry.capture('resume_guard_outcome', { choice: 'auto_resume' });
         router.replace('/navigation');
       } else {
         // Stale session — ask the user
-        setDestinationLabel(cachedRoute.destinationLabel || 'your destination');
+        setDestinationLabel(cachedRoute.destinationLabel);
         setShowPrompt(true);
       }
     };
@@ -205,30 +219,47 @@ export const NavigationResumeGuard: React.FC = () => {
 
   const handleResume = useCallback(() => {
     setShowPrompt(false);
+    telemetry.capture('resume_guard_outcome', { choice: 'resume' });
     router.replace('/navigation');
+  }, []);
+
+  const handleSave = useCallback(() => {
+    setShowPrompt(false);
+    // Same close-out as the automatic kill-recovery path: trip_end +
+    // trip_track ('app_killed') → the ride lands in History with its trail.
+    telemetry.capture('resume_guard_outcome', { choice: 'save' });
+    void closeInterruptedRide(true);
   }, []);
 
   const handleDiscard = useCallback(() => {
     setShowPrompt(false);
     // Explicit discard: close the server trip, skip the History trail.
+    telemetry.capture('resume_guard_outcome', { choice: 'discard' });
     void closeInterruptedRide(false);
   }, []);
+
+  const t = useT();
 
   if (!showPrompt) return null;
 
   return (
     <Modal
       visible={showPrompt}
-      title="Resume navigation?"
-      description={`You were navigating to ${destinationLabel}. Would you like to pick up where you left off?`}
+      title={t('nav.resumeGuardTitle')}
+      description={t('nav.resumeGuardMessage', {
+        destination: destinationLabel || t('nav.resumeGuardDestinationFallback'),
+      })}
       variant="default"
       footer={
         <View style={styles.footer}>
-          <Button variant="ghost" size="md" onPress={handleDiscard}>
-            Discard
-          </Button>
           <Button variant="primary" size="md" onPress={handleResume}>
-            Resume
+            {t('nav.resumeGuardResume')}
+          </Button>
+          <Button variant="secondary" size="md" onPress={handleSave}>
+            {t('nav.resumeGuardSave')}
+          </Button>
+          <Button variant="ghost" size="md" onPress={handleDiscard}>
+            {t('nav.resumeGuardDiscard')}
           </Button>
         </View>
       }
@@ -241,9 +272,11 @@ export const NavigationResumeGuard: React.FC = () => {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  // Column stack: three actions with localized labels (ro/es run long)
+  // don't fit a row on narrow screens.
   footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: space[3],
   },
 });

@@ -43,6 +43,11 @@ vi.mock('../providers/AuthSessionProvider', () => ({
   useAuthSessionOptional: vi.fn(),
 }));
 
+const mockTelemetryCapture = vi.fn();
+vi.mock('../lib/telemetry', () => ({
+  telemetry: { capture: (...args: unknown[]) => mockTelemetryCapture(...args) },
+}));
+
 // Mock the design system organisms and atoms to avoid rendering heavy UI
 vi.mock('../design-system/organisms/Modal', () => ({
   Modal: ({
@@ -212,7 +217,11 @@ describe('NavigationResumeGuard', () => {
     });
 
     expect(screen.getByTestId('resume-modal')).toBeTruthy();
-    expect(screen.getByTestId('modal-title').textContent).toBe('Resume navigation?');
+    expect(screen.getByTestId('modal-title').textContent).toBe('Finish your last ride?');
+    // Three-way prompt (GPS audit 2026-07-15 P1-0): Resume / Save ride / Discard.
+    expect(screen.getByTestId('btn-primary')).toBeTruthy();
+    expect(screen.getByTestId('btn-secondary')).toBeTruthy();
+    expect(screen.getByTestId('btn-ghost')).toBeTruthy();
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
@@ -288,6 +297,61 @@ describe('NavigationResumeGuard', () => {
     fireEvent.click(resumeBtn);
 
     expect(mockRouter.replace).toHaveBeenCalledWith('/navigation');
+  });
+
+  it('Save ride queues trip_end + trip_track (app_killed) with the recorded trail, resets to IDLE, never calls finishNavigation', async () => {
+    const breadcrumbs = [
+      { lat: 44.43, lon: 26.1, ts: Date.now() - FIFTEEN_MINUTES_MS - 30_000, acc: null, spd: null, hdg: null },
+      { lat: 44.44, lon: 26.11, ts: Date.now() - FIFTEEN_MINUTES_MS, acc: null, spd: null, hdg: null },
+    ];
+    const session = {
+      ...makeNavigationSession(FIFTEEN_MINUTES_MS + 60_000),
+      gpsBreadcrumbs: breadcrumbs,
+    };
+    useAppStore.setState({
+      appState: 'NAVIGATING',
+      navigationSession: session as any,
+      activeTripClientId: 'client-trip-save',
+      queuedMutations: [],
+      completedRideCount: 3,
+      onboardingCompleted: true,
+    });
+    mockLoadCachedRoute.mockResolvedValue(makeCachedRoute());
+
+    const finishSpy = vi.spyOn(useAppStore.getState(), 'finishNavigation');
+
+    render(<NavigationResumeGuard />);
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const saveBtn = screen.getByTestId('btn-secondary');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(finishSpy).not.toHaveBeenCalled();
+    const state = useAppStore.getState();
+    const queued = state.queuedMutations;
+    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    // The whole point of Save ride: the recorded trail survives into a
+    // trip_track (end_reason app_killed → lands in History like the
+    // automatic kill-recovery path).
+    const track = queued.find((m) => m.type === 'trip_track');
+    expect(track).toBeTruthy();
+    const payload = track!.payload as { endReason: string; gpsBreadcrumbs: unknown[] };
+    expect(payload.endReason).toBe('app_killed');
+    expect(payload.gpsBreadcrumbs).toHaveLength(2);
+    // Background-recorded samples are drained into the trail before the
+    // trip_track is built.
+    expect(mockMergeBackground).toHaveBeenCalled();
+    // resetFlow semantics: IDLE, no completed-ride inflation.
+    expect(state.appState).toBe('IDLE');
+    expect(state.completedRideCount).toBe(3);
+    expect(mockClearCachedRoute).toHaveBeenCalled();
+    expect(screen.queryByTestId('resume-modal')).toBeNull();
   });
 
   it('Discard queues trip_end only (no trip_track), resets to IDLE, and never calls finishNavigation', async () => {
