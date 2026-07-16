@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Linking,
@@ -13,6 +13,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { AppleSignInButton } from '../src/components/AppleSignInButton';
 import { BrandLogo } from '../src/components/BrandLogo';
+import { GoogleSignInButton } from '../src/components/GoogleSignInButton';
 import { Button, Mascot, Surface, TextInput, ScreenHeader } from '../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -56,6 +57,10 @@ export default function AuthScreen() {
   const contextAuthError = authCtx?.authError ?? null;
 
   const t = useT();
+  // `?email=1` (e.g. from the signup prompt's "Use email instead" link, or the
+  // post-password-reset redirect) pre-opens the otherwise collapsed email form.
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [showEmailForm, setShowEmailForm] = useState(params.email === '1');
   const [mode, setMode] = useState<AuthMode>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -286,54 +291,6 @@ export default function AuthScreen() {
         ) : (
           /* ── Sign-in / Sign-up form ── */
           <Surface radius="2xl" elevation="lg" style={styles.card}>
-            {/* Mode toggle */}
-            <View style={styles.segmentedRow}>
-              <Pressable
-                style={[
-                  styles.segmentButton,
-                  mode === 'sign-in' && styles.segmentButtonActive,
-                ]}
-                onPress={() => {
-                  setMode('sign-in');
-                  setErrorMessage(null);
-                  setStatusMessage(null);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: mode === 'sign-in' }}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    mode === 'sign-in' && styles.segmentLabelActive,
-                  ]}
-                >
-                  {t('auth.signIn')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.segmentButton,
-                  mode === 'sign-up' && styles.segmentButtonActive,
-                ]}
-                onPress={() => {
-                  setMode('sign-up');
-                  setErrorMessage(null);
-                  setStatusMessage(null);
-                }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: mode === 'sign-up' }}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    mode === 'sign-up' && styles.segmentLabelActive,
-                  ]}
-                >
-                  {t('auth.signUp')}
-                </Text>
-              </Pressable>
-            </View>
-
             {/* Supabase not configured notice */}
             {!isSupabaseConfigured ? (
               <View style={styles.warningBanner}>
@@ -372,72 +329,18 @@ export default function AuthScreen() {
               />
             ) : null}
 
-            {/* Google Sign-in */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.googleButton,
-                pressed && { opacity: 0.8 },
-                (!isSupabaseConfigured || isSubmitting) && { opacity: 0.4 },
-              ]}
+            {/* Google Sign-in — the single dominant action. Apple (above, iOS
+                only) keeps equal prominence per App Store Guideline 4.8. */}
+            <GoogleSignInButton
+              label={t('onboarding.continueWithGoogle')}
               onPress={() => void handleGoogleSignIn()}
               disabled={!isSupabaseConfigured || isSubmitting}
-              accessibilityRole="button"
-              accessibilityLabel="Sign in with Google"
-            >
-              <View style={styles.googleIconWrap}>
-                <Text style={styles.googleG}>G</Text>
-              </View>
-              <Text style={styles.googleLabel}>{t('feedback.continueGoogle')}</Text>
-            </Pressable>
+              accessibilityLabel={t('onboarding.a11yGoogle')}
+            />
+            <Text style={styles.trustLine}>{t('onboarding.trustMicroline')}</Text>
 
-            {/* Divider */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or continue with email</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Email field */}
-            <View style={styles.fieldStack}>
-              <TextInput
-                label={t('auth.email')}
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                placeholder="you@example.com"
-                disabled={!isSupabaseConfigured}
-                leftIcon={
-                  <Ionicons name="mail-outline" size={18} color={gray[400]} />
-                }
-              />
-              <TextInput
-                label={t('auth.password')}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="Minimum 6 characters"
-                disabled={!isSupabaseConfigured}
-                leftIcon={
-                  <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
-                }
-              />
-              {mode === 'sign-in' ? (
-                <Pressable
-                  onPress={() => void handleForgotPassword()}
-                  disabled={isSubmitting || !isSupabaseConfigured}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('auth.forgotPassword')}
-                  style={styles.forgotRow}
-                >
-                  <Text style={styles.toggleLink}>{t('auth.forgotPassword')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Status / error messages */}
+            {/* Status / error messages — outside the collapsed email form so
+                Google/Apple failures stay visible. */}
             {statusMessage ? (
               <Text style={styles.successText}>{statusMessage}</Text>
             ) : null}
@@ -445,35 +348,138 @@ export default function AuthScreen() {
               <Text style={styles.errorText}>{displayError}</Text>
             ) : null}
 
-            {/* Submit button */}
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              disabled={isSubmitting || !isSupabaseConfigured}
-              loading={isSubmitting}
-              onPress={() => void submit()}
-            >
-              {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
-            </Button>
-
-            {/* Mode toggle text */}
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleQuestion}>
-                {mode === 'sign-in' ? "Don't have an account?" : 'Already have an account?'}
-              </Text>
+            {!showEmailForm ? (
+              /* Email path demoted: quiet text link that reveals the form. */
               <Pressable
-                onPress={() => {
-                  setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
-                  setErrorMessage(null);
-                  setStatusMessage(null);
-                }}
+                onPress={() => setShowEmailForm(true)}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('onboarding.useEmailInstead')}
+                style={styles.emailLinkRow}
               >
-                <Text style={styles.toggleLink}>
-                  {mode === 'sign-in' ? t('auth.signUp') : t('auth.signIn')}
-                </Text>
+                <Text style={styles.emailLink}>{t('onboarding.useEmailInstead')}</Text>
               </Pressable>
-            </View>
+            ) : (
+              <>
+                {/* Mode toggle */}
+                <View style={styles.segmentedRow}>
+                  <Pressable
+                    style={[
+                      styles.segmentButton,
+                      mode === 'sign-in' && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => {
+                      setMode('sign-in');
+                      setErrorMessage(null);
+                      setStatusMessage(null);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: mode === 'sign-in' }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentLabel,
+                        mode === 'sign-in' && styles.segmentLabelActive,
+                      ]}
+                    >
+                      {t('auth.signIn')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.segmentButton,
+                      mode === 'sign-up' && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => {
+                      setMode('sign-up');
+                      setErrorMessage(null);
+                      setStatusMessage(null);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: mode === 'sign-up' }}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentLabel,
+                        mode === 'sign-up' && styles.segmentLabelActive,
+                      ]}
+                    >
+                      {t('auth.signUp')}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Email field */}
+                <View style={styles.fieldStack}>
+                  <TextInput
+                    label={t('auth.email')}
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="email-address"
+                    placeholder="you@example.com"
+                    disabled={!isSupabaseConfigured}
+                    leftIcon={
+                      <Ionicons name="mail-outline" size={18} color={gray[400]} />
+                    }
+                  />
+                  <TextInput
+                    label={t('auth.password')}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    placeholder="Minimum 6 characters"
+                    disabled={!isSupabaseConfigured}
+                    leftIcon={
+                      <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
+                    }
+                  />
+                  {mode === 'sign-in' ? (
+                    <Pressable
+                      onPress={() => void handleForgotPassword()}
+                      disabled={isSubmitting || !isSupabaseConfigured}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('auth.forgotPassword')}
+                      style={styles.forgotRow}
+                    >
+                      <Text style={styles.toggleLink}>{t('auth.forgotPassword')}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+
+                {/* Submit button */}
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  disabled={isSubmitting || !isSupabaseConfigured}
+                  loading={isSubmitting}
+                  onPress={() => void submit()}
+                >
+                  {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
+                </Button>
+
+                {/* Mode toggle text */}
+                <View style={styles.toggleRow}>
+                  <Text style={styles.toggleQuestion}>
+                    {mode === 'sign-in' ? "Don't have an account?" : 'Already have an account?'}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in');
+                      setErrorMessage(null);
+                      setStatusMessage(null);
+                    }}
+                  >
+                    <Text style={styles.toggleLink}>
+                      {mode === 'sign-in' ? t('auth.signUp') : t('auth.signIn')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </>
+            )}
           </Surface>
         )}
 
@@ -652,54 +658,22 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textPrimary,
       lineHeight: 18,
     },
-    // Google button
-    googleButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: 52,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      backgroundColor: colors.bgSecondary,
-      gap: space[3],
-    },
-    googleIconWrap: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: gray[50],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    googleG: {
-      fontFamily: fontFamily.body.bold,
-      fontSize: 14,
-      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
-      color: '#4285F4',
-      marginTop: -1,
-    },
-    googleLabel: {
-      ...textSm,
-      fontFamily: fontFamily.body.bold,
-      color: colors.textPrimary,
-    },
-    // Divider
-    dividerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: space[3],
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.borderDefault,
-    },
-    dividerText: {
+    // Trust microline under the Google button
+    trustLine: {
       ...textXs,
-      color: gray[500],
-      textTransform: 'uppercase' as const,
-      letterSpacing: 0.5,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    // Demoted email path
+    emailLinkRow: {
+      alignSelf: 'center',
+      paddingVertical: space[1],
+    },
+    emailLink: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
     // Fields
     fieldStack: {

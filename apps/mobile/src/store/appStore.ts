@@ -185,6 +185,13 @@ type AppStore = QueueSlice & {
   // out and back in on the same handset should not reopen the prompt window.
   reviewPromptState: ReviewPromptState;
   completedRideCount: number;
+  // ── Save-ride signup prompt (post-ride impact screen, anonymous only) ──
+  // USER-scoped (unlike reviewPromptState): cleared by resetUserScopedState —
+  // a new account on this device is a new relationship and may be asked again.
+  // Gating logic in src/lib/save-ride-prompt.ts.
+  saveRidePrompt: { lastShownRide: number; dismissCount: number };
+  markSaveRidePromptShown: (rideCount: number) => void;
+  recordSaveRidePromptDismiss: () => void;
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
@@ -277,6 +284,11 @@ type AppStore = QueueSlice & {
   setNotifyHazard: (enabled: boolean) => void;
   setNotifyCommunity: (enabled: boolean) => void;
   setQuietHours: (start: string, end: string) => void;
+  /** "Riding tips & reminders" — the anonymous-push consent opt-in
+   * (2026-07-16). Default OFF (ePrivacy opt-in). Mirrors
+   * profiles.notify_riding_tips via PATCH /v1/profile/notification-consent. */
+  notifyRidingTips: boolean;
+  setNotifyRidingTips: (enabled: boolean) => void;
   // ── Pedal Nudge System (Phase 4) ──
   /** Pedal's witty/sassy voice. Default ON; toggle to neutral for the
    * functional first-variant copy. Mirrors profiles.pedal_voice_sassy. */
@@ -294,6 +306,22 @@ type AppStore = QueueSlice & {
    * card only ever appears once per device. */
   hasSeenMeetPedalCard: boolean;
   setHasSeenMeetPedalCard: (seen: boolean) => void;
+  // ── Anonymous Activation Ladder (spec: docs/plans/anonymous-activation-ladder.md) ──
+  /** Device-scoped like regionGate — NOT reset by resetUserScopedState
+   * (sign-out must not restart the ladder). Max 3 local notifications ever;
+   * `completed` is terminal. */
+  activationLadder: import('../lib/activation-ladder-messages').ActivationLadderState;
+  /** Sets firstOpenAt once (no-op when already set). */
+  initActivationLadderFirstOpen: (iso?: string) => void;
+  markActivationLadderRungFired: (rung: number) => void;
+  setActivationLadderScheduled: (
+    scheduled: import('../lib/activation-ladder-messages').ActivationLadderState['scheduledRung'],
+  ) => void;
+  completeActivationLadder: () => void;
+  /** Profile > Pedal Nudges > "Getting-started reminders". Local-only pref —
+   * anonymous users have no profiles row to mirror it to. */
+  notifyActivationLadder: boolean;
+  setNotifyActivationLadder: (enabled: boolean) => void;
   setShowBicycleLanes: (enabled: boolean) => void;
   showRouteFeatures: boolean;
   setShowRouteFeatures: (enabled: boolean) => void;
@@ -391,6 +419,120 @@ type AppStore = QueueSlice & {
   markInstallReferrerChecked: () => void;
 };
 
+/**
+ * Persist migration chain (v0 → v5). Extracted from the persist config and
+ * exported so upgrade-path behavior is unit-testable — preserving existing
+ * users' explicit telemetry choices is a hard requirement (2026-07-16, the
+ * consent screen was removed from onboarding; the migration + rehydration
+ * path is what guarantees a user who turned Sentry OFF stays OFF and one who
+ * opted PostHog ON stays ON).
+ */
+export const migratePersistedAppState = (
+  persistedState: unknown,
+  version: number,
+): unknown => {
+  let next = persistedState as Record<string, unknown> | undefined;
+
+  // v0 → v1: analytics consent default flip (P0.1 split, 2026-05-25).
+  //   - Users who never made a choice (`capturedAt === null` AND
+  //     `sentry === false`) get `sentry: true` — the old `false` was a
+  //     bundled default they never saw; the new default is legitimate
+  //     interest.
+  //   - Users who explicitly chose (`capturedAt !== null`) keep their saved
+  //     choice. We never silently flip an explicit decision.
+  if (version < 1) {
+    const state = next as
+      | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
+      | undefined;
+    const consent = state?.analyticsConsent;
+    if (
+      consent &&
+      (consent.capturedAt ?? null) === null &&
+      consent.sentry === false
+    ) {
+      next = {
+        ...(state as object),
+        analyticsConsent: { ...consent, sentry: true },
+      };
+    }
+  }
+
+  // v1 → v2: routing-mode default reset. Existing installs had
+  // `routeRequest.mode` persisted as whatever the rider last picked
+  // (often 'fast'); we now want every cold start to land on 'safe'.
+  if (version < 2) {
+    const state = next as
+      | { routeRequest?: { mode?: string } & Record<string, unknown> }
+      | undefined;
+    if (state?.routeRequest) {
+      next = {
+        ...(state as object),
+        routeRequest: { ...state.routeRequest, mode: 'safe' },
+      };
+    }
+  }
+
+  // v2 → v3: device-locale auto-detection. Older installs defaulted to
+  // 'en' and only changed on an explicit Profile pick, so a rider on a
+  // Romanian/Spanish phone saw English until they changed it by hand. A
+  // *non-English* persisted locale could only have come from an explicit
+  // pick (default was 'en', nothing else wrote it), so we respect it and
+  // mark `localeExplicitlySet`. For the untouched 'en' default we adopt
+  // the device locale once. Also reconciles `routeRequest.locale` (it
+  // mirrors `locale` but the mirror only ran on `setLocale`, so it could
+  // have drifted) — this heals the turn-by-turn instruction language.
+  if (version < 3) {
+    const state = next as
+      | {
+          locale?: string;
+          routeRequest?: Record<string, unknown>;
+        }
+      | undefined;
+    const persistedLocale = state?.locale;
+    const explicit = !!persistedLocale && persistedLocale !== 'en';
+    const resolved: Locale = explicit
+      ? (persistedLocale as Locale)
+      : getDeviceLocale();
+    next = {
+      ...(state as object),
+      locale: resolved,
+      localeExplicitlySet: explicit,
+      routeRequest: { ...(state?.routeRequest ?? {}), locale: resolved },
+    };
+  }
+
+  // v3 → v4: re-apply the 'safe' routing default. The v1 → v2 reset above
+  // was silently undone for most installs by a bug in route-planning.tsx
+  // that force-set `mode: 'fast'` on the empty planning screen (before a
+  // destination was picked, `routeSupported` is false), so the persisted
+  // value drifted back to 'fast'. That screen bug is now fixed (the
+  // force-fast gates on a destination being set). This heals the already-
+  // corrupted persisted value so every rider lands on 'safe' as intended.
+  // 'flat' riders (mode 'safe' + avoidHills) are untouched; only 'fast'
+  // is reset. Riders who want Fast re-select it once and it now sticks.
+  if (version < 4) {
+    const state = next as
+      | { routeRequest?: { mode?: string } & Record<string, unknown> }
+      | undefined;
+    if (state?.routeRequest) {
+      next = {
+        ...(state as object),
+        routeRequest: { ...state.routeRequest, mode: 'safe' },
+      };
+    }
+  }
+
+  // v4 → v5: add weightKg with the 70 kg default for existing installs.
+  if (version < 5) {
+    const state = next as { weightKg?: number } | undefined;
+    if (state && (state.weightKg === undefined || state.weightKg === null)) {
+      next = { ...(state as object), weightKg: 70 };
+    }
+  }
+
+  return next;
+};
+
 export const useAppStore = create<AppStore>()(
   persist(
     (set, get) => ({
@@ -413,12 +555,58 @@ export const useAppStore = create<AppStore>()(
       notifyWeather: true,
       notifyHazard: true,
       notifyCommunity: true,
+      // Consent opt-in — default OFF, unlike every other notify pref.
+      notifyRidingTips: false,
+      setNotifyRidingTips: (enabled) => set(() => ({ notifyRidingTips: enabled })),
       quietHoursStart: '22:00',
       quietHoursEnd: '07:00',
       // Pedal Nudge System defaults
       pedalVoiceSassy: true,
       notifyStreak: true,
       hasSeenMeetPedalCard: false,
+      // Anonymous Activation Ladder defaults (device-scoped)
+      notifyActivationLadder: true,
+      activationLadder: {
+        firstOpenAt: null,
+        rungsFired: [],
+        completed: false,
+        scheduledRung: null,
+      },
+      initActivationLadderFirstOpen: (iso) =>
+        set((state) =>
+          state.activationLadder.firstOpenAt
+            ? {}
+            : {
+                activationLadder: {
+                  ...state.activationLadder,
+                  firstOpenAt: iso ?? new Date().toISOString(),
+                },
+              },
+        ),
+      markActivationLadderRungFired: (rung) =>
+        set((state) => ({
+          activationLadder: {
+            ...state.activationLadder,
+            rungsFired: state.activationLadder.rungsFired.includes(rung)
+              ? state.activationLadder.rungsFired
+              : [...state.activationLadder.rungsFired, rung],
+            scheduledRung: null,
+          },
+        })),
+      setActivationLadderScheduled: (scheduled) =>
+        set((state) => ({
+          activationLadder: { ...state.activationLadder, scheduledRung: scheduled },
+        })),
+      completeActivationLadder: () =>
+        set((state) => ({
+          activationLadder: {
+            ...state.activationLadder,
+            completed: true,
+            scheduledRung: null,
+          },
+        })),
+      setNotifyActivationLadder: (enabled) =>
+        set(() => ({ notifyActivationLadder: enabled })),
       onboardingCompleted: false,
       regionGate: { status: 'unchecked', countryCode: null },
       // P0.1 (2026-05-25) split crash reporting from product analytics.
@@ -448,6 +636,21 @@ export const useAppStore = create<AppStore>()(
       ratingSkipCount: 0,
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
       completedRideCount: 0,
+      saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
+      markSaveRidePromptShown: (rideCount) =>
+        set((state) => ({
+          saveRidePrompt: {
+            ...state.saveRidePrompt,
+            lastShownRide: Math.max(state.saveRidePrompt.lastShownRide, rideCount),
+          },
+        })),
+      recordSaveRidePromptDismiss: () =>
+        set((state) => ({
+          saveRidePrompt: {
+            ...state.saveRidePrompt,
+            dismissCount: state.saveRidePrompt.dismissCount + 1,
+          },
+        })),
       showHistoryOverlay: false,
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
@@ -1084,6 +1287,9 @@ export const useAppStore = create<AppStore>()(
           cyclingGoal: null,
           cachedStreak: null,
           cachedImpact: null,
+          // Save-ride prompt is user-scoped: a new account = new relationship,
+          // so the ask schedule and dismissal cap start over.
+          saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
           ratingSkipCount: 0,
           notificationPermissionAsked: false,
           anonymousOpenCount: 0,
@@ -1123,102 +1329,7 @@ export const useAppStore = create<AppStore>()(
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
       version: 5,
-      migrate: (persistedState, version) => {
-        let next = persistedState as Record<string, unknown> | undefined;
-
-        // v0 → v1: analytics consent default flip.
-        if (version < 1) {
-          const state = next as
-            | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
-            | undefined;
-          const consent = state?.analyticsConsent;
-          if (
-            consent &&
-            (consent.capturedAt ?? null) === null &&
-            consent.sentry === false
-          ) {
-            next = {
-              ...(state as object),
-              analyticsConsent: { ...consent, sentry: true },
-            };
-          }
-        }
-
-        // v1 → v2: routing-mode default reset. Existing installs had
-        // `routeRequest.mode` persisted as whatever the rider last picked
-        // (often 'fast'); we now want every cold start to land on 'safe'.
-        if (version < 2) {
-          const state = next as
-            | { routeRequest?: { mode?: string } & Record<string, unknown> }
-            | undefined;
-          if (state?.routeRequest) {
-            next = {
-              ...(state as object),
-              routeRequest: { ...state.routeRequest, mode: 'safe' },
-            };
-          }
-        }
-
-        // v2 → v3: device-locale auto-detection. Older installs defaulted to
-        // 'en' and only changed on an explicit Profile pick, so a rider on a
-        // Romanian/Spanish phone saw English until they changed it by hand. A
-        // *non-English* persisted locale could only have come from an explicit
-        // pick (default was 'en', nothing else wrote it), so we respect it and
-        // mark `localeExplicitlySet`. For the untouched 'en' default we adopt
-        // the device locale once. Also reconciles `routeRequest.locale` (it
-        // mirrors `locale` but the mirror only ran on `setLocale`, so it could
-        // have drifted) — this heals the turn-by-turn instruction language.
-        if (version < 3) {
-          const state = next as
-            | {
-                locale?: string;
-                routeRequest?: Record<string, unknown>;
-              }
-            | undefined;
-          const persistedLocale = state?.locale;
-          const explicit = !!persistedLocale && persistedLocale !== 'en';
-          const resolved: Locale = explicit
-            ? (persistedLocale as Locale)
-            : getDeviceLocale();
-          next = {
-            ...(state as object),
-            locale: resolved,
-            localeExplicitlySet: explicit,
-            routeRequest: { ...(state?.routeRequest ?? {}), locale: resolved },
-          };
-        }
-
-        // v3 → v4: re-apply the 'safe' routing default. The v1 → v2 reset above
-        // was silently undone for most installs by a bug in route-planning.tsx
-        // that force-set `mode: 'fast'` on the empty planning screen (before a
-        // destination was picked, `routeSupported` is false), so the persisted
-        // value drifted back to 'fast'. That screen bug is now fixed (the
-        // force-fast gates on a destination being set). This heals the already-
-        // corrupted persisted value so every rider lands on 'safe' as intended.
-        // 'flat' riders (mode 'safe' + avoidHills) are untouched; only 'fast'
-        // is reset. Riders who want Fast re-select it once and it now sticks.
-        if (version < 4) {
-          const state = next as
-            | { routeRequest?: { mode?: string } & Record<string, unknown> }
-            | undefined;
-          if (state?.routeRequest) {
-            next = {
-              ...(state as object),
-              routeRequest: { ...state.routeRequest, mode: 'safe' },
-            };
-          }
-        }
-
-        // v4 → v5: add weightKg with the 70 kg default for existing installs.
-        if (version < 5) {
-          const state = next as { weightKg?: number } | undefined;
-          if (state && (state.weightKg === undefined || state.weightKg === null)) {
-            next = { ...(state as object), weightKg: 70 };
-          }
-        }
-
-        return next;
-      },
+      migrate: (persistedState, version) => migratePersistedAppState(persistedState, version),
       partialize: (state) => ({
         appState: state.appState,
         voiceGuidanceEnabled: state.voiceGuidanceEnabled,
@@ -1243,12 +1354,17 @@ export const useAppStore = create<AppStore>()(
         notifyWeather: state.notifyWeather,
         notifyHazard: state.notifyHazard,
         notifyCommunity: state.notifyCommunity,
+        notifyRidingTips: state.notifyRidingTips,
         quietHoursStart: state.quietHoursStart,
         quietHoursEnd: state.quietHoursEnd,
         pedalVoiceSassy: state.pedalVoiceSassy,
         notifyStreak: state.notifyStreak,
         notifyPedalNudges: state.notifyPedalNudges,
         hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
+        // Anonymous activation ladder — device-scoped; intentionally NOT in
+        // resetUserScopedState (sign-out must not restart the ladder).
+        activationLadder: state.activationLadder,
+        notifyActivationLadder: state.notifyActivationLadder,
         bikeType: state.bikeType,
         cyclingFrequency: state.cyclingFrequency,
         weightKg: state.weightKg,
@@ -1265,6 +1381,7 @@ export const useAppStore = create<AppStore>()(
         ratingSkipCount: state.ratingSkipCount,
         reviewPromptState: state.reviewPromptState,
         completedRideCount: state.completedRideCount,
+        saveRidePrompt: state.saveRidePrompt,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
         quizCountryPreference: state.quizCountryPreference,

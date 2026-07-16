@@ -10,7 +10,7 @@ import {
 } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -35,6 +35,7 @@ import { Button, Surface } from '../src/design-system/atoms';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
 import { ReviewPromptCard } from '../src/design-system/organisms/ReviewPromptCard';
+import { SaveRideCard } from '../src/design-system/organisms/SaveRideCard';
 import { useCelebrationStage } from '../src/design-system/hooks/useCelebrationStage';
 import { mascotPoses } from '../src/design-system/tokens/mascotPoses';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -45,6 +46,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
+import { shouldShowSaveRidePrompt } from '../src/lib/save-ride-prompt';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useShareCard } from '../src/hooks/useShareCard';
 import { useShareRide } from '../src/hooks/useShareRide';
@@ -113,9 +115,15 @@ type ImpactStepProps = {
   readonly colors: ThemeColors;
   /** Current streak count post-save. Drives the +1 celebration animation. */
   readonly streakCount?: number;
+  /**
+   * Save-ride signup card slot (anonymous users, gated by
+   * shouldShowSaveRidePrompt in the parent) — rendered after the XP/badges
+   * summary, before the action buttons.
+   */
+  readonly saveRideSlot?: ReactNode;
 };
 
-const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors, streakCount }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors, streakCount, saveRideSlot }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -132,6 +140,8 @@ const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors
         newBadges={rideImpact.newBadges}
         streakCount={streakCount}
       />
+
+      {saveRideSlot}
 
       <View style={styles.impactActions}>
         <Button
@@ -613,9 +623,37 @@ export default function FeedbackScreen() {
     setPendingMilestone(null);
   };
 
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
-  const [signupSubmitting, setSignupSubmitting] = useState(false);
-  const signupPromptShownRef = useRef(false);
+  // ── Save-ride signup card (anonymous users, impact step) ──
+  // Replaces the old end-of-flow signup Modal: one ask surface, inline at the
+  // natural pause point right under the XP/badge results, on the capped ride
+  // schedule (1, 3, +5 — see src/lib/save-ride-prompt.ts). Never a blocking
+  // modal, never a second ask in the same session.
+  const saveRidePromptState = useAppStore((s) => s.saveRidePrompt);
+  const completedRideCountForPrompt = useAppStore((s) => s.completedRideCount);
+  const appStateForPrompt = useAppStore((s) => s.appState);
+  const [saveRideVisible, setSaveRideVisible] = useState(false);
+  const [saveRideToast, setSaveRideToast] = useState<string | null>(null);
+  const saveRideEvaluatedRef = useRef(false);
+
+  // Evaluate eligibility ONCE per screen visit, after auth settles. The card
+  // records "shown" on mount, which would immediately re-fail a live-computed
+  // check — so the verdict is latched into state (same pattern as
+  // showReviewCard on the rating step).
+  useEffect(() => {
+    if (saveRideEvaluatedRef.current) return;
+    if (!authCtx || authCtx.isLoading) return;
+    saveRideEvaluatedRef.current = true;
+    if (
+      shouldShowSaveRidePrompt({
+        isAnonymous: authCtx.isAnonymous,
+        completedRideCount: completedRideCountForPrompt,
+        state: saveRidePromptState,
+        isNavigating: appStateForPrompt === 'NAVIGATING',
+      })
+    ) {
+      setSaveRideVisible(true);
+    }
+  }, [authCtx, completedRideCountForPrompt, saveRidePromptState, appStateForPrompt]);
 
   const navigateAway = () => {
     resetFlow();
@@ -623,34 +661,10 @@ export default function FeedbackScreen() {
   };
 
   const handleDone = () => {
-    // Show signup prompt for anonymous users (once per session)
-    if (authCtx?.isAnonymous && !signupPromptShownRef.current) {
-      signupPromptShownRef.current = true;
-      setShowSignupPrompt(true);
-      return;
-    }
     navigateAway();
   };
 
   const handleCancel = () => {
-    navigateAway();
-  };
-
-  const handleSignupGoogle = async () => {
-    if (!authCtx) return;
-    setSignupSubmitting(true);
-    try {
-      await authCtx.signInWithGoogle();
-    } catch {
-      // Ignore — user cancelled or error
-    } finally {
-      setSignupSubmitting(false);
-      navigateAway();
-    }
-  };
-
-  const handleSignupDismiss = () => {
-    setShowSignupPrompt(false);
     navigateAway();
   };
 
@@ -694,6 +708,19 @@ export default function FeedbackScreen() {
             styles={styles}
             colors={colors}
             streakCount={dashboard?.streak.currentStreak}
+            saveRideSlot={
+              saveRideVisible ? (
+                <View style={styles.saveRideSlot}>
+                  <SaveRideCard
+                    onSuccess={() => {
+                      setSaveRideVisible(false);
+                      setSaveRideToast(t('saveRide.successToast'));
+                    }}
+                    onDismiss={() => setSaveRideVisible(false)}
+                  />
+                </View>
+              ) : null
+            }
           />
         ) : (
           <RatingStep
@@ -723,6 +750,17 @@ export default function FeedbackScreen() {
             message={shareRide.toastMessage}
             variant="warning"
             onDismiss={shareRide.consumeToast}
+          />
+        </View>
+      ) : null}
+
+      {/* Save-ride sign-in success toast */}
+      {saveRideToast ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={saveRideToast}
+            variant="success"
+            onDismiss={() => setSaveRideToast(null)}
           />
         </View>
       ) : null}
@@ -760,38 +798,6 @@ export default function FeedbackScreen() {
         </Modal>
       ) : null}
 
-      {/* Anonymous signup prompt after ride */}
-      {showSignupPrompt ? (
-        <Modal
-          visible
-          onClose={handleSignupDismiss}
-          title={t('feedback.saveProgress')}
-          description={t('feedback.signUpKeepStreak')}
-          footer={
-            <View style={styles.signupPromptFooter}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.signupGoogleButton,
-                  pressed && { opacity: 0.8 },
-                  signupSubmitting && { opacity: 0.4 },
-                ]}
-                onPress={() => void handleSignupGoogle()}
-                disabled={signupSubmitting}
-                accessibilityRole="button"
-                accessibilityLabel="Sign in with Google"
-              >
-                <View style={styles.signupGoogleIcon}>
-                  <Text style={styles.signupGoogleG}>G</Text>
-                </View>
-                <Text style={styles.signupGoogleLabel}>{t('feedback.continueGoogle')}</Text>
-              </Pressable>
-              <Button variant="ghost" size="md" onPress={handleSignupDismiss}>
-                {t('feedback.maybeLater')}
-              </Button>
-            </View>
-          }
-        />
-      ) : null}
     </View>
   );
 }
@@ -942,10 +948,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[2],
       alignItems: 'center',
     },
-    signupPromptFooter: {
-      gap: space[3],
-      alignItems: 'center',
-    },
     shareToastContainer: {
       position: 'absolute',
       left: 0,
@@ -953,36 +955,10 @@ const createThemedStyles = (colors: ThemeColors) =>
       bottom: space[6],
       alignItems: 'center',
     },
-    signupGoogleButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: '100%',
-      height: 52,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      backgroundColor: colors.bgSecondary,
-      gap: space[3],
-    },
-    signupGoogleIcon: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: gray[50],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    signupGoogleG: {
-      fontFamily: fontFamily.body.bold,
-      fontSize: 14,
-      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
-      color: '#4285F4',
-      marginTop: -1,
-    },
-    signupGoogleLabel: {
-      ...textSm,
-      fontFamily: fontFamily.body.bold,
-      color: colors.textPrimary,
+    // Save-ride card slot — the scroll content's own gap handles top spacing;
+    // no extra chrome, the card owns its surface.
+    saveRideSlot: {
+      // Placeholder for future spacing tweaks; kept so the slot has a stable
+      // style hook in the JSX.
     },
   });

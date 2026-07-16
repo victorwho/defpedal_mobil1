@@ -43,16 +43,25 @@ type Phase = 'detecting' | 'picker' | 'waitlist';
 /**
  * Onboarding region gate (global availability, 2026-07-12).
  *
- * Sits between the location-permission screen and consent. GPS reverse-
- * geocode resolves the rider's country: supported (EU-27 + EEA + CH, see
- * core `appAvailability.ts`) passes straight through — the rider only ever
- * sees a brief spinner. Unknown → manual country picker. Unsupported →
- * waitlist panel that collects an email for the launch announcement, with a
- * "Continue anyway" soft gate (Mapbox fallback routing still works
- * worldwide; only safety scores / hazard data are Europe-bound).
+ * Sits between the location-permission screen and the signup prompt (the
+ * consent screen was removed from the flow 2026-07-16 — telemetry controls
+ * live in Profile › Privacy & analytics, with a transparency notice on the
+ * first onboarding screen). GPS reverse-geocode resolves the rider's
+ * country: supported (EU-27 + EEA + CH, see core `appAvailability.ts`)
+ * passes straight through — the rider only ever sees a brief spinner.
+ * Unknown → manual country picker. Unsupported → waitlist panel that
+ * collects an email for the launch announcement, with a "Continue anyway"
+ * soft gate (Mapbox fallback routing still works worldwide; only safety
+ * scores / hazard data are Europe-bound).
  *
  * The decision persists device-scoped in `regionGate` — the gate runs once
- * per install, never again (returning here replaces straight to consent).
+ * per install, never again (returning here passes straight through).
+ *
+ * This screen is now also where onboarding is marked COMPLETE (the logic
+ * the consent screen used to own): completion is recorded BEFORE showing
+ * the signup prompt so a hard-close on the prompt doesn't re-run the flow,
+ * and every prompt path (Google / email / guest) lands in the app on its
+ * own.
  */
 export default function OnboardingRegionCheckScreen() {
   const insets = useSafeAreaInsets();
@@ -74,15 +83,21 @@ export default function OnboardingRegionCheckScreen() {
     null,
   );
 
-  const proceedToConsent = () => {
-    router.replace('/onboarding/consent' as any);
+  const proceedToSignupPrompt = () => {
+    const store = useAppStore.getState();
+    const wasInitialOnboarding = !store.onboardingCompleted;
+    store.setOnboardingCompleted(true);
+    if (wasInitialOnboarding) {
+      store.resetAnonymousOpenCount();
+    }
+    router.replace('/onboarding/signup-prompt' as any);
   };
 
   useEffect(() => {
     // Gate already answered on this device (returning user / re-entered
     // onboarding) — pass through without re-running detection.
     if (useAppStore.getState().regionGate.status !== 'unchecked') {
-      proceedToConsent();
+      proceedToSignupPrompt();
       return;
     }
 
@@ -93,7 +108,7 @@ export default function OnboardingRegionCheckScreen() {
 
       if (code && isAppCountrySupported(code)) {
         useAppStore.getState().setRegionGate({ status: 'passed', countryCode: code });
-        proceedToConsent();
+        proceedToSignupPrompt();
         return;
       }
 
@@ -126,7 +141,7 @@ export default function OnboardingRegionCheckScreen() {
   const handleSelectCountry = (code: string) => {
     if (isAppCountrySupported(code)) {
       setRegionGate({ status: 'passed', countryCode: code });
-      proceedToConsent();
+      proceedToSignupPrompt();
       return;
     }
     setSelectedCode(code);
@@ -163,7 +178,7 @@ export default function OnboardingRegionCheckScreen() {
 
   const handleContinueAnyway = () => {
     setRegionGate({ status: 'waitlisted', countryCode: selectedCode });
-    proceedToConsent();
+    proceedToSignupPrompt();
   };
 
   const countryName = findCountryName(selectedCode) ?? selectedCode ?? '';

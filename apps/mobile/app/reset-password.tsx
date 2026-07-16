@@ -119,7 +119,9 @@ export default function ResetPasswordScreen() {
             <>
               <Text style={styles.title}>{t('auth.resetPasswordExpiredTitle')}</Text>
               <Text style={styles.subtitle}>{t('auth.resetPasswordExpiredBody')}</Text>
-              <Button variant="primary" size="lg" fullWidth onPress={() => router.replace('/auth')}>
+              {/* `email=1` pre-opens /auth's collapsed email form — the user is
+                  here to sign in with email + their (reset) password. */}
+              <Button variant="primary" size="lg" fullWidth onPress={() => router.replace('/auth?email=1')}>
                 {t('auth.resetPasswordBackToSignIn')}
               </Button>
             </>

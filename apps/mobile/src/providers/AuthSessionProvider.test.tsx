@@ -21,6 +21,7 @@ vi.mock('expo-web-browser', () => ({
 
 vi.mock('../lib/push-notifications', () => ({
   registerForPushNotifications: vi.fn(),
+  registerForPushNotificationsIfEligible: vi.fn(),
 }));
 
 vi.mock('../lib/supabase', () => ({

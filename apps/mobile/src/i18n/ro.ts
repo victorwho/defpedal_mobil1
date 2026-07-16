@@ -283,6 +283,16 @@ export const ro: TranslationKeys = {
     dismissA11y: 'Închide solicitarea de recenzie',
   },
 
+  // ── Save-ride signup card (post-ride impact, doar utilizatori anonimi) ──
+  saveRide: {
+    title: 'Salvează această tură până nu dispare',
+    body: 'Tura, XP-ul și insignele tale există doar pe acest telefon. O atingere le păstrează pentru totdeauna.',
+    keepGuest: 'Pedalez în continuare ca invitat',
+    dismissA11y: 'Închide sugestia de salvare a turei',
+    successToast: 'Autentificat — turele tale se sincronizează acum în contul tău.',
+    error: 'Autentificarea nu s-a finalizat — tura ta e tot aici. Încearcă oricând.',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profil',
@@ -412,6 +422,10 @@ export const ro: TranslationKeys = {
     nudgeCategoryStreak: 'Reamintiri streak',
     nudgeCategoryStreakDesc: 'Streak în pericol + scuze post-pierdere + etape',
     nudgeCategoryStreakOff: 'Fără notificări legate de streak',
+    // Anonymous activation ladder (getting-started reminders)
+    activationLadder: 'Memento-uri de început',
+    activationLadderDesc: 'Cel mult trei memento-uri de la Pedal până la prima ta tură',
+    activationLadderOff: 'Fără memento-uri de început',
     // ── Meet Pedal one-time onboarding card ──
     meetPedalTitle: 'Salut, sunt Pedal',
     meetPedalBody: 'Țin lucrurile relaxate — un mic ghiont când streak-ul tău e în pericol, un strigăt de bucurie când finalizezi o cursă. Mă poți potoli oricând din Profil dacă devin enervant.',
@@ -472,6 +486,8 @@ export const ro: TranslationKeys = {
     crashDescription: 'Activă implicit. Urme ale stivei și informații despre dispozitiv când aplicația se blochează — fără locație, fără date personale. Ne ajută să remediem erorile mai rapid. Poți dezactiva oricând.',
     analyticsLabel: 'Trimite analize de produs',
     analyticsDescription: 'Dezactivată implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație. Activează dacă vrei să ne ajuți să prioritizăm.',
+    ridingTipsLabel: 'Sfaturi de pedalat & memento-uri',
+    ridingTipsDescription: 'Notificări ocazionale care te ajută să pedalezi în siguranță. Le poți opri oricând.',
     assurance: 'Tu deții controlul.',
     continue: 'Continuă',
     changeLater: 'Poți schimba oricând din Profil → Confidențialitate & analiză.',
@@ -483,9 +499,9 @@ export const ro: TranslationKeys = {
     profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
     intro: 'Rapoartele de eroare sunt active implicit pentru a ne ajuta să remediem bug-urile (interes legitim conform GDPR). Analiza produsului este dezactivată implicit și opt-in. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
     crashLabel: 'Trimite rapoarte de eroare',
-    crashDescription: 'Implicit: activă. Urme ale stivei și informații despre dispozitiv când aplicația se blochează. Fără date de locație.',
+    crashDescription: 'Activă implicit pentru a menține aplicația stabilă. Anonim. Poți dezactiva oricând.',
     analyticsLabel: 'Trimite analize de produs',
-    analyticsDescription: 'Implicit: dezactivată (opt-in). Evenimente de utilizare anonime pentru a livra ce contează. Fără trasee GPS.',
+    analyticsDescription: 'Dezactivată implicit. Evenimente de utilizare anonime care ne ajută să decidem ce construim. Fără trasee GPS.',
     crashUnavailable: 'Raportarea erorilor nu este configurată în acest build.',
     analyticsUnavailable: 'Analiza produsului nu este configurată în acest build.',
     assurance: 'Când un comutator este oprit, nu se trimit evenimente pe acel canal. Nu vindem niciodată datele tale.',
@@ -923,6 +939,8 @@ export const ro: TranslationKeys = {
     safetyScoreViewed: 'Scor siguranță vizualizat',
     goalSelected: 'Obiectiv selectat',
     firstRouteExplored: 'Primul traseu explorat',
+    regionConfirmed: 'Țară confirmată',
+    privacySaved: 'Preferințe de confidențialitate salvate',
     accountCreated: 'Cont creat',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Omite',
@@ -978,6 +996,15 @@ export const ro: TranslationKeys = {
     maybeLater: 'Poate mai târziu',
     a11yGoogle: 'Autentificare cu Google',
     a11ySkipAccount: 'Omite crearea contului deocamdată',
+    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
+    signupPromptTitle: 'Vezi turele tale. Urmărește-ți progresul',
+    signupPromptSub:
+      'Istoricul turelor, XP-ul și insignele tale se păstrează în contul tău gratuit — pe orice telefon.',
+    useEmailInstead: 'Folosește emailul în schimb',
+    trustMicroline: 'Gratuit pentru totdeauna. Traseele tale sunt private implicit.',
+    rideAsGuest: 'Mai târziu — pedalez ca invitat',
+    telemetryNotice:
+      'Colectăm rapoarte anonime de erori pentru a menține aplicația stabilă. Gestionează asta și analizele oricând din Profil › Confidențialitate.',
     // -- Region gate (disponibilitate globală, 2026-07-12) --
     regionChecking: 'Verificăm disponibilitatea în zona ta…',
     regionPickerTitle: 'Unde pedalezi?',

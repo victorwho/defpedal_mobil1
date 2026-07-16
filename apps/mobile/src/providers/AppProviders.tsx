@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '../design-system';
+import { ActivationLadderScheduler } from './ActivationLadderScheduler';
 import { AnonMergeManager } from './AnonMergeManager';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { ConnectivityProvider } from './ConnectivityMonitor';
@@ -38,6 +39,12 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
               <OfflineMutationSyncManager />
               <NotificationProvider />
               <DailyWeatherScheduler />
+              {/*
+                ActivationLadderScheduler mounted AFTER DailyWeatherScheduler:
+                the weather scheduler owns the one-and-only notification
+                permission prompt; the ladder only reads permission state.
+              */}
+              <ActivationLadderScheduler />
               {/*
                 ShareClaimProcessor mounted above OffScreenCaptureHostProvider
                 (which wraps `children`) so it sits at a stable layer in the

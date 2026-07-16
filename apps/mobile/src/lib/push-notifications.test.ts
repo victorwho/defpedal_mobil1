@@ -45,6 +45,7 @@ import {
   configureNotificationHandler,
   registerForPushNotifications,
   ensureNotificationPermissionAsync,
+  shouldRegisterPushToken,
 } from './push-notifications';
 import { router } from 'expo-router';
 import { mobileApi } from './api';
@@ -213,5 +214,34 @@ describe('push-notifications', () => {
 
       await expect(unregisterPushToken()).resolves.toBeUndefined();
     });
+  });
+});
+
+describe('shouldRegisterPushToken (consent-gated anonymous push, 2026-07-16)', () => {
+  it('never registers without a session', () => {
+    expect(
+      shouldRegisterPushToken({ hasSession: false, isAnonymous: false, notifyRidingTips: true }),
+    ).toBe(false);
+    expect(
+      shouldRegisterPushToken({ hasSession: false, isAnonymous: true, notifyRidingTips: true }),
+    ).toBe(false);
+  });
+
+  it('full accounts register regardless of the riding-tips opt-in (zero regression)', () => {
+    expect(
+      shouldRegisterPushToken({ hasSession: true, isAnonymous: false, notifyRidingTips: false }),
+    ).toBe(true);
+    expect(
+      shouldRegisterPushToken({ hasSession: true, isAnonymous: false, notifyRidingTips: true }),
+    ).toBe(true);
+  });
+
+  it('anonymous sessions register ONLY with the riding-tips opt-in ON', () => {
+    expect(
+      shouldRegisterPushToken({ hasSession: true, isAnonymous: true, notifyRidingTips: false }),
+    ).toBe(false);
+    expect(
+      shouldRegisterPushToken({ hasSession: true, isAnonymous: true, notifyRidingTips: true }),
+    ).toBe(true);
   });
 });

@@ -283,6 +283,16 @@ export const es: TranslationKeys = {
     dismissA11y: 'Cerrar petición de reseña',
   },
 
+  // ── Save-ride signup card (impacto post-ruta, solo usuarios anónimos) ──
+  saveRide: {
+    title: 'Guarda esta ruta antes de que desaparezca',
+    body: 'Tu ruta, XP e insignias solo viven en este teléfono. Un toque las guarda para siempre.',
+    keepGuest: 'Sigo pedaleando como invitado',
+    dismissA11y: 'Cerrar el aviso de guardar la ruta',
+    successToast: 'Sesión iniciada — tus rutas ahora se sincronizan con tu cuenta.',
+    error: 'El inicio de sesión no terminó — tu ruta sigue aquí. Inténtalo cuando quieras.',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Perfil',
@@ -412,6 +422,10 @@ export const es: TranslationKeys = {
     nudgeCategoryStreak: 'Recordatorios de racha',
     nudgeCategoryStreakDesc: 'Racha en riesgo + disculpa tras perderla + hitos',
     nudgeCategoryStreakOff: 'Sin avisos relacionados con la racha',
+    // Anonymous activation ladder (getting-started reminders)
+    activationLadder: 'Recordatorios para empezar',
+    activationLadderDesc: 'Hasta tres recordatorios de Pedal hasta tu primera ruta',
+    activationLadderOff: 'Sin recordatorios para empezar',
     // ── Meet Pedal one-time onboarding card ──
     meetPedalTitle: 'Hola, soy Pedal',
     meetPedalBody: 'Lo llevo con ligereza — un empujoncito cuando tu racha está en riesgo, un grito de ánimo cuando terminas una ruta. Puedes bajarme el volumen desde Perfil si me pongo pesado.',
@@ -472,6 +486,8 @@ export const es: TranslationKeys = {
     crashDescription: 'Activo por defecto. Trazas de pila e información del dispositivo cuando la app falla — sin ubicación, sin datos personales. Nos ayuda a corregir errores más rápido. Puedes desactivarlo en cualquier momento.',
     analyticsLabel: 'Enviar analíticas de producto',
     analyticsDescription: 'Desactivado por defecto. Eventos de uso anónimos para entregar lo que importa. Sin seguimiento de ubicación. Actívalo si quieres ayudarnos a priorizar.',
+    ridingTipsLabel: 'Consejos y recordatorios para pedalear',
+    ridingTipsDescription: 'Notificaciones ocasionales que te ayudan a empezar a pedalear con seguridad. Puedes desactivarlas cuando quieras.',
     assurance: 'Tú tienes el control.',
     continue: 'Continuar',
     changeLater: 'Puedes cambiarlo en cualquier momento desde Perfil → Privacidad y analítica.',
@@ -483,9 +499,9 @@ export const es: TranslationKeys = {
     profileRowSub: 'Preferencias para reportes de fallos y analítica de producto',
     intro: 'Los reportes de fallos están activos por defecto para ayudarnos a corregir bugs (base de interés legítimo según RGPD). La analítica de producto está desactivada por defecto y es opcional. Cambia cualquiera de los dos de forma independiente — desactivar un interruptor detiene los nuevos eventos para ese canal inmediatamente.',
     crashLabel: 'Enviar reportes de fallos',
-    crashDescription: 'Por defecto: activado. Trazas de pila e información del dispositivo cuando la app falla. Sin datos de ubicación.',
+    crashDescription: 'Activado por defecto para mantener la app estable. Anónimo. Desactívalo cuando quieras.',
     analyticsLabel: 'Enviar analíticas de producto',
-    analyticsDescription: 'Por defecto: desactivado (opcional). Eventos de uso anónimos para entregar lo correcto. Sin trazas GPS.',
+    analyticsDescription: 'Desactivado por defecto. Eventos de uso anónimos que nos ayudan a decidir qué construir. Sin trazas GPS.',
     crashUnavailable: 'Los reportes de fallos no están configurados en esta versión.',
     analyticsUnavailable: 'La analítica de producto no está configurada en esta versión.',
     assurance: 'Cuando un interruptor está apagado, no se envían eventos en ese canal. Nunca vendemos tus datos.',
@@ -923,6 +939,8 @@ export const es: TranslationKeys = {
     safetyScoreViewed: 'Puntuación de seguridad vista',
     goalSelected: 'Objetivo seleccionado',
     firstRouteExplored: 'Primera ruta explorada',
+    regionConfirmed: 'País confirmado',
+    privacySaved: 'Preferencias de privacidad guardadas',
     accountCreated: 'Cuenta creada',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Omitir',
@@ -978,6 +996,15 @@ export const es: TranslationKeys = {
     maybeLater: 'Quizás más tarde',
     a11yGoogle: 'Iniciar sesión con Google',
     a11ySkipAccount: 'Omitir la creación de cuenta por ahora',
+    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
+    signupPromptTitle: 'Mira tus rutas. Sigue tu progreso',
+    signupPromptSub:
+      'Tu historial de rutas, XP e insignias se guardan en tu cuenta gratuita — en cualquier teléfono.',
+    useEmailInstead: 'Prefiero usar el correo',
+    trustMicroline: 'Gratis para siempre. Tus rutas son privadas por defecto.',
+    rideAsGuest: 'Ahora no — pedaleo como invitado',
+    telemetryNotice:
+      'Recopilamos informes anónimos de fallos para mantener la app estable. Gestiona esto y las analíticas cuando quieras en Perfil › Privacidad.',
     // -- Region gate (disponibilidad global, 2026-07-12) --
     regionChecking: 'Comprobando la disponibilidad en tu zona…',
     regionPickerTitle: '¿Dónde pedaleas?',

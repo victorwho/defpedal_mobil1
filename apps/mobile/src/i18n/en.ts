@@ -287,6 +287,16 @@ export const en = {
     dismissA11y: 'Dismiss review prompt',
   },
 
+  // ── Save-ride signup card (post-ride impact, anonymous only) ──
+  saveRide: {
+    title: 'Save this ride before it’s gone',
+    body: 'Your ride, XP, and badges live only on this phone. One tap keeps them forever.',
+    keepGuest: 'Keep riding as guest',
+    dismissA11y: 'Dismiss save-ride prompt',
+    successToast: 'Signed in — your rides now sync to your account.',
+    error: 'Sign-in didn’t finish — your ride is still here. Try again anytime.',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profile',
@@ -420,6 +430,10 @@ export const en = {
     nudgeCategoryStreak: 'Streak reminders',
     nudgeCategoryStreakDesc: 'Streak-at-risk + post-loss apology + milestones',
     nudgeCategoryStreakOff: 'No streak-related pushes',
+    // Anonymous activation ladder (getting-started reminders)
+    activationLadder: 'Getting-started reminders',
+    activationLadderDesc: 'Up to three reminders from Pedal until your first ride',
+    activationLadderOff: 'No getting-started reminders',
     // ── Meet Pedal one-time onboarding card ──
     meetPedalTitle: 'Meet Pedal',
     meetPedalBody: 'I keep things light — a friendly nudge when your streak is at risk, a cheer when you finish a ride. Turn me down in Profile anytime if I get on your nerves.',
@@ -480,6 +494,8 @@ export const en = {
     crashDescription: 'On by default. Stack traces and device info when the app crashes — no location, no personal data. Helps us fix bugs faster. You can turn this off anytime.',
     analyticsLabel: 'Share product analytics',
     analyticsDescription: 'Off by default. Anonymous usage events so we can ship the right features. No location tracking. Turn on if you\'d like to help shape the roadmap.',
+    ridingTipsLabel: 'Riding tips & reminders',
+    ridingTipsDescription: 'Occasional notifications to help you start riding safely. You can turn this off anytime.',
     assurance: 'You\'re in control.',
     continue: 'Continue',
     changeLater: 'You can change these anytime in Profile → Privacy & analytics.',
@@ -491,9 +507,9 @@ export const en = {
     profileRowSub: 'Crash reports and product analytics preferences',
     intro: 'Crash reports are on by default to help us fix bugs (legitimate-interest basis under GDPR). Product analytics is off by default and opt-in. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
     crashLabel: 'Share crash reports',
-    crashDescription: 'Default: on. Stack traces and device info when the app crashes. No location data.',
+    crashDescription: 'On by default to keep the app stable. Anonymous. Turn off anytime.',
     analyticsLabel: 'Share product analytics',
-    analyticsDescription: 'Default: off (opt-in). Anonymised usage events so we can ship the right things. No GPS tracks.',
+    analyticsDescription: 'Off by default. Anonymous usage events that help us decide what to build. No GPS tracks.',
     crashUnavailable: 'Crash reporting is not configured in this build.',
     analyticsUnavailable: 'Product analytics is not configured in this build.',
     assurance: 'When a switch is off, no events are sent for that channel. We never sell your data.',
@@ -932,6 +948,8 @@ export const en = {
     safetyScoreViewed: 'Safety score viewed',
     goalSelected: 'Goal selected',
     firstRouteExplored: 'First route explored',
+    regionConfirmed: 'Country confirmed',
+    privacySaved: 'Privacy choices saved',
     accountCreated: 'Account created',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Skip',
@@ -987,6 +1005,17 @@ export const en = {
     maybeLater: 'Maybe later',
     a11yGoogle: 'Sign in with Google',
     a11ySkipAccount: 'Skip account creation for now',
+    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
+    signupPromptTitle: 'See your rides. Track your progress',
+    signupPromptSub:
+      'Your ride history, XP, and badges live in your free account — on any phone.',
+    useEmailInstead: 'Use email instead',
+    trustMicroline: 'Free forever. Rides private by default. No spam.',
+    rideAsGuest: 'Not now — ride as guest',
+    // Transparency notice on the first onboarding screen (2026-07-16 — the
+    // legal condition for removing the consent screen from the flow).
+    telemetryNotice:
+      'We collect anonymous crash reports to keep the app stable. Manage this and analytics anytime in Profile › Privacy.',
     // -- Region gate (global availability, 2026-07-12) --
     regionChecking: 'Checking availability in your area…',
     regionPickerTitle: 'Where do you ride?',

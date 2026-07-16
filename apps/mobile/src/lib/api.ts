@@ -304,6 +304,16 @@ export const mobileApi = {
       method: 'DELETE',
       body: JSON.stringify({ deviceId }),
     }),
+  // Riding-tips consent (anonymous push opt-in, 2026-07-16). Anonymous-allowed
+  // server-side — this call IS the GDPR consent record.
+  updateNotificationConsent: (ridingTips: boolean) =>
+    mobileApiFetch<{ ridingTips: boolean; consentedAt: string | null; acceptedAt: string }>(
+      '/v1/profile/notification-consent',
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ ridingTips }),
+      },
+    ),
 
   // ── Recent Destinations (from rides) ──
 

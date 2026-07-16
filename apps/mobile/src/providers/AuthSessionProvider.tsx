@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 
 import type { MobileAuthSession, MobileAuthUser } from '../lib/devAuth';
 import { consumePendingPasswordReset } from '../lib/passwordReset';
-import { registerForPushNotifications } from '../lib/push-notifications';
+import { registerForPushNotificationsIfEligible } from '../lib/push-notifications';
 import {
   activateDeveloperBypassSession,
   getCurrentSession,
@@ -281,12 +281,20 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
     };
   }, []);
 
-  // Register for push notifications when user session is available
+  // Register for push notifications when a session is available (2026-07-16,
+  // consent-gated anonymous push). Full accounts register exactly as before;
+  // anonymous sessions register ONLY with the riding-tips opt-in ON (the
+  // wrapper reads the store flag at call time — see shouldRegisterPushToken).
+  // Previously this registered for EVERY session including anonymous, which
+  // is how 323 anonymous tokens reached production without consent.
   useEffect(() => {
     if (session?.user && !isLoading) {
-      void registerForPushNotifications();
+      void registerForPushNotificationsIfEligible({
+        hasSession: true,
+        isAnonymous: session.isAnonymous === true,
+      });
     }
-  }, [session?.user?.id, isLoading]);
+  }, [session?.user?.id, session?.isAnonymous, isLoading]);
 
   const clearAuthError = () => setAuthError(null);
 

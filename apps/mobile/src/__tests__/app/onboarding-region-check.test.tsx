@@ -2,17 +2,20 @@
 /**
  * Onboarding region gate — behavior tests (global availability, 2026-07-12).
  *
- * Contract under test:
+ * Contract under test (consent screen removed from the flow 2026-07-16 —
+ * the gate now routes straight to the signup prompt AND owns marking
+ * onboarding complete before it):
  *   1. Supported country detected via GPS → gate passes silently (store
- *      records `passed`, user is replaced to consent, no picker rendered).
+ *      records `passed`, onboarding marked complete, user is replaced to
+ *      the signup prompt, no picker rendered).
  *   2. Unsupported country detected → waitlist panel with the country name,
  *      email submit through mobileApi.joinCountryWaitlist, and a
  *      "Continue anyway" soft gate that records `waitlisted`.
  *   3. No detection (permission denied / geocode failure) → manual country
  *      picker; picking a supported country passes, an unsupported one goes
  *      to the waitlist.
- *   4. A device that already answered the gate is replaced straight to
- *      consent without re-running detection.
+ *   4. A device that already answered the gate is replaced straight to the
+ *      signup prompt without re-running detection.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -79,6 +82,10 @@ beforeEach(() => {
   useAppStore.setState({
     regionGate: { status: 'unchecked', countryCode: null },
     locale: 'en',
+    // The gate now owns onboarding completion (consent screen removed
+    // 2026-07-16) — start each test from a fresh install's state.
+    onboardingCompleted: false,
+    anonymousOpenCount: 1,
   });
   mockJoinCountryWaitlist.mockResolvedValue({ status: 'joined' });
 });
@@ -89,12 +96,17 @@ describe('Region gate — GPS detection', () => {
     render(<OnboardingRegionCheckScreen />);
 
     await waitFor(() =>
-      expect(router.replace).toHaveBeenCalledWith('/onboarding/consent'),
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
     );
     expect(useAppStore.getState().regionGate).toEqual({
       status: 'passed',
       countryCode: 'FR',
     });
+    // The gate marks onboarding complete BEFORE the signup prompt (the
+    // completion logic the deleted consent screen used to own) and resets
+    // the anonymous open count exactly once, on initial completion.
+    expect(useAppStore.getState().onboardingCompleted).toBe(true);
+    expect(useAppStore.getState().anonymousOpenCount).toBe(0);
     expect(screen.queryByText('onboarding.regionPickerTitle')).toBeNull();
   });
 
@@ -120,9 +132,29 @@ describe('Region gate — GPS detection', () => {
     render(<OnboardingRegionCheckScreen />);
 
     await waitFor(() =>
-      expect(router.replace).toHaveBeenCalledWith('/onboarding/consent'),
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
     );
     expect(mockDetectCountryCode).not.toHaveBeenCalled();
+  });
+
+  it('does NOT reset the anonymous open count when onboarding was already completed (re-prompt gate safety)', async () => {
+    // A returning anonymous user re-entering the flow (e.g. via profile
+    // sign-out → /onboarding) must not have their open count zeroed —
+    // otherwise the count-based signup re-prompt (>=2 dismissible, >=3
+    // mandatory in computeOnboardingGateTarget) could loop forever.
+    useAppStore.setState({
+      regionGate: { status: 'passed', countryCode: 'RO' },
+      onboardingCompleted: true,
+      anonymousOpenCount: 2,
+    });
+    mockDetectCountryCode.mockResolvedValue(null);
+    render(<OnboardingRegionCheckScreen />);
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
+    );
+    expect(useAppStore.getState().anonymousOpenCount).toBe(2);
+    expect(useAppStore.getState().onboardingCompleted).toBe(true);
   });
 });
 
@@ -141,7 +173,7 @@ describe('Region gate — country picker', () => {
       status: 'passed',
       countryCode: 'RO',
     });
-    expect(router.replace).toHaveBeenCalledWith('/onboarding/consent');
+    expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt');
   });
 
   it('moves to the waitlist when an unsupported country is picked', async () => {
@@ -215,7 +247,7 @@ describe('Region gate — waitlist', () => {
       status: 'waitlisted',
       countryCode: 'US',
     });
-    expect(router.replace).toHaveBeenCalledWith('/onboarding/consent');
+    expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt');
   });
 
   it('Change country returns to the picker', async () => {

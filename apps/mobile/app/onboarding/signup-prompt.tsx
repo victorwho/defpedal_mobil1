@@ -4,16 +4,15 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import { Button, Mascot } from '../../src/design-system/atoms';
+import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
+import { Mascot } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
-import { gray } from '../../src/design-system/tokens/colors';
-import { radii } from '../../src/design-system/tokens/radii';
-import { shadows } from '../../src/design-system/tokens/shadows';
 import { space } from '../../src/design-system/tokens/spacing';
 import { brandTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
+  text2xs,
   textBase,
   textSm,
   textXs,
@@ -29,11 +28,14 @@ import { useAppStore } from '../../src/store/appStore';
 // Progress steps
 // ---------------------------------------------------------------------------
 
+// Mirrors the REAL onboarding flow since 592b751 (2026-07-04): location
+// permission (index) → country check (region-check) → privacy choices
+// (consent) → account (this screen). The old safety-score / goal / first-route
+// steps were removed from the flow then; listing them here lied to the user.
 const PROGRESS_STEPS = [
   { labelKey: 'onboarding.locationEnabled', completed: true },
-  { labelKey: 'onboarding.safetyScoreViewed', completed: true },
-  { labelKey: 'onboarding.goalSelected', completed: true },
-  { labelKey: 'onboarding.firstRouteExplored', completed: false },
+  { labelKey: 'onboarding.regionConfirmed', completed: true },
+  { labelKey: 'onboarding.privacySaved', completed: true },
   { labelKey: 'onboarding.accountCreated', completed: false },
 ] as const;
 
@@ -122,7 +124,9 @@ export default function OnboardingSignupPromptScreen() {
   };
 
   const handleEmailSignUp = () => {
-    router.replace('/auth');
+    // `email=1` pre-opens the (now collapsed-by-default) email form on /auth,
+    // so the demoted link still lands the user directly on the form.
+    router.replace('/auth?email=1');
   };
 
   return (
@@ -145,22 +149,46 @@ export default function OnboardingSignupPromptScreen() {
             <Mascot pose="point" size="md" />
           </View>
           <Text style={styles.eyebrow}>{t('onboarding.almostThere')}</Text>
-          <Text style={styles.title}>{t('onboarding.createYourAccount')}</Text>
+          {/* Benefit-framed headline (2026-07-16): "See your rides. Track your
+              progress" — the account as the key to history + progression.
+              Endowed-progress step list stays below. */}
+          <Text style={styles.title}>{t('onboarding.signupPromptTitle')}</Text>
           <Text style={styles.subtitle}>
-            {/* Audit 2026-07-05 UX-13: the anonymous→account merge is live
-                (merge_anonymous_account + AnonMergeManager), so the copy now
-                promises continuity — a fresh signup carries the anonymous
-                session's rides/streaks/badges over. Phrased as "carry over"
-                (not an absolute guarantee) because the merge only fires into
-                a FRESH account; signing into an established account keeps
-                that account's data instead. */}
+            {/* Mandatory gate keeps its "create an account to continue" copy —
+                it must explain why the user can't dismiss. The anonymous→account
+                merge is live (merge_anonymous_account + AnonMergeManager), so
+                both variants can promise continuity. */}
             {isMandatory
               ? t('onboarding.signupSubMandatory')
-              : t('onboarding.signupSub')}
+              : t('onboarding.signupPromptSub')}
           </Text>
         </View>
 
-        {/* Progress bar */}
+        {/* Primary action — single dominant button, directly under the benefit
+            copy so it sits above the fold on a 6.1" screen. */}
+        <View style={styles.ctaSection}>
+          <GoogleSignInButton
+            label={t('onboarding.continueWithGoogle')}
+            onPress={() => void handleGoogleSignIn()}
+            disabled={isSubmitting}
+            accessibilityLabel={t('onboarding.a11yGoogle')}
+          />
+          <Text style={styles.trustLine}>{t('onboarding.trustMicroline')}</Text>
+          <Pressable
+            onPress={handleEmailSignUp}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('onboarding.useEmailInstead')}
+            style={styles.emailLinkRow}
+          >
+            <Text style={styles.emailLink}>{t('onboarding.useEmailInstead')}</Text>
+          </Pressable>
+          {errorMessage ? (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          ) : null}
+        </View>
+
+        {/* Endowed progress — kept per research; now below the CTA. */}
         <View style={styles.progressSection}>
           <View style={styles.progressBarBg}>
             <View style={[styles.progressBarFill, { width: `${PROGRESS_PERCENT}%` }]} />
@@ -188,43 +216,6 @@ export default function OnboardingSignupPromptScreen() {
           </View>
         </View>
 
-        {/* Sign-up card */}
-        <View style={styles.card}>
-          {/* Google */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.googleButton,
-              pressed && { opacity: 0.8 },
-              isSubmitting && { opacity: 0.4 },
-            ]}
-            onPress={() => void handleGoogleSignIn()}
-            disabled={isSubmitting}
-            accessibilityRole="button"
-            accessibilityLabel={t('onboarding.a11yGoogle')}
-          >
-            <View style={styles.googleIconWrap}>
-              <Text style={styles.googleG}>G</Text>
-            </View>
-            <Text style={styles.googleLabel}>{t('onboarding.continueWithGoogle')}</Text>
-          </Pressable>
-
-          {/* Divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('onboarding.or')}</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Email */}
-          <Button variant="secondary" size="lg" fullWidth onPress={handleEmailSignUp}>
-            {t('onboarding.signUpWithEmail')}
-          </Button>
-
-          {errorMessage ? (
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          ) : null}
-        </View>
-
         {/* Legal footer — quietly discloses ToS + Privacy acceptance. */}
         <View style={styles.legalFooter}>
           <Text style={styles.legalText}>
@@ -249,7 +240,10 @@ export default function OnboardingSignupPromptScreen() {
         </View>
       </ScrollView>
 
-      {/* Dismiss — pinned outside the scroll so it stays clear of the system nav bar. */}
+      {/* Guest path — tertiary plain-text link, pinned outside the scroll so it
+          stays clear of the system nav bar. hitSlop 16 keeps the small text at
+          a ≥44pt touch target. Completion logic unchanged (finishOnboarding →
+          setOnboardingCompleted + navigateAfterOnboarding). */}
       {!isMandatory ? (
         <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
           <Pressable
@@ -258,7 +252,7 @@ export default function OnboardingSignupPromptScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('onboarding.a11ySkipAccount')}
           >
-            <Text style={styles.dismissText}>{t('onboarding.maybeLater')}</Text>
+            <Text style={styles.dismissText}>{t('onboarding.rideAsGuest')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -356,62 +350,24 @@ const createThemedStyles = (colors: ThemeColors) =>
     stepLabelCompleted: {
       color: colors.textPrimary,
     },
-    card: {
-      backgroundColor: colors.bgPrimary,
-      borderRadius: radii['2xl'],
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      padding: space[5],
-      gap: space[4],
-      marginTop: space[4],
-      ...shadows.lg,
-    },
-    googleButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: 52,
-      borderRadius: radii.xl,
-      borderWidth: 1,
-      borderColor: colors.borderDefault,
-      backgroundColor: colors.bgSecondary,
+    ctaSection: {
+      paddingTop: space[5],
       gap: space[3],
     },
-    googleIconWrap: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: gray[50],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    googleG: {
-      fontFamily: fontFamily.body.bold,
-      fontSize: 14,
-      // eslint-disable-next-line no-restricted-syntax -- Google brand identity colour; required by Google sign-in branding guidelines.
-      color: '#4285F4',
-      marginTop: -1,
-    },
-    googleLabel: {
-      ...textSm,
-      fontFamily: fontFamily.body.bold,
-      color: colors.textPrimary,
-    },
-    dividerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: space[3],
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.borderDefault,
-    },
-    dividerText: {
+    trustLine: {
       ...textXs,
-      color: gray[500],
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    emailLinkRow: {
+      alignSelf: 'center',
+      paddingVertical: space[1],
+    },
+    emailLink: {
+      ...textSm,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
     errorText: {
       ...textSm,
@@ -428,9 +384,12 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderTopColor: colors.borderDefault,
     },
     dismissText: {
-      ...textSm,
+      // Deliberately tiny (10px) — the guest path is the most-demoted action
+      // on the screen. hitSlop 16 on the Pressable keeps the touch target
+      // ≥44pt despite the small glyphs.
+      ...text2xs,
       fontFamily: fontFamily.body.medium,
-      color: colors.textMuted,
+      color: colors.textSecondary,
     },
     legalFooter: {
       paddingHorizontal: space[4],

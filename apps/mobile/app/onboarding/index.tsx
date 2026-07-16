@@ -20,6 +20,7 @@ import {
   textXs,
 } from '../../src/design-system/tokens/typography';
 import { safetyColors } from '../../src/design-system/tokens/colors';
+import { PRIVACY_URL } from '../../src/lib/legal-urls';
 import { useT } from '../../src/hooks/useTranslation';
 
 export default function OnboardingPermissionScreen() {
@@ -30,12 +31,13 @@ export default function OnboardingPermissionScreen() {
   const [denied, setDenied] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
 
-  // If location is already granted (returning user / cleared data but kept permission),
-  // auto-advance through the region gate to the analytics consent step
-  // (compliance plan item 8 — consent must be captured before any telemetry
-  // fires, regardless of how the user entered the flow). region-check passes
-  // straight through to consent when the gate was already answered on this
-  // device.
+  // If location is already granted (returning user / cleared data but kept
+  // permission), auto-advance through the region gate. The consent screen
+  // was removed from the flow 2026-07-16: crash reporting runs under
+  // legitimate interest (transparency notice in this screen's footer),
+  // product analytics stays OFF until opted in via Profile › Privacy &
+  // analytics. region-check passes straight through to the signup prompt
+  // when the gate was already answered on this device.
   useEffect(() => {
     let cancelled = false;
     const checkExisting = async () => {
@@ -75,8 +77,7 @@ export default function OnboardingPermissionScreen() {
   // single "Continue" CTA always proceeds to the system prompt first. After a
   // denial the user may continue without location; we still route through the
   // region gate (which falls back to its manual country picker without GPS)
-  // and consent so analytics gating is captured before goal-selection /
-  // first-route.
+  // before the signup prompt.
   const handleContinueWithoutLocation = () => {
     router.push('/onboarding/region-check' as any);
   };
@@ -165,6 +166,20 @@ export default function OnboardingPermissionScreen() {
             {t('onboarding.enableLocation')}
           </Button>
         )}
+        {/* Transparency notice (2026-07-16) — the legal condition for
+            removing the consent screen from onboarding: crash reporting runs
+            under legitimate interest (GDPR Art 6(1)(f)) with clear notice +
+            an always-available objection in Profile › Privacy & analytics. */}
+        <Text style={styles.telemetryNotice}>
+          {t('onboarding.telemetryNotice')}{' '}
+          <Text
+            style={styles.telemetryNoticeLink}
+            onPress={() => void Linking.openURL(PRIVACY_URL)}
+            accessibilityRole="link"
+          >
+            {t('legal.privacyPolicy')}
+          </Text>
+        </Text>
       </View>
     </View>
   );
@@ -269,6 +284,18 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textSecondary,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    telemetryNotice: {
+      ...textXs,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 16,
+      paddingTop: space[2],
+    },
+    telemetryNoticeLink: {
+      ...textXs,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
     statRow: {
       paddingBottom: space[1],

@@ -59,6 +59,44 @@ export const ensureNotificationPermissionAsync = async (): Promise<boolean> => {
 };
 
 /**
+ * Pure gate for push-token registration (2026-07-16, consent-gated anonymous
+ * push). Register when a session exists (anonymous OR full) AND the user is
+ * either a full account (today's behavior, zero regression) or an anonymous
+ * user who explicitly opted into "Riding tips & reminders". The OS-permission
+ * condition is enforced inside `registerForPushNotifications` itself
+ * (ensureNotificationPermissionAsync — unchanged).
+ *
+ * Historical note: there was never an anonymous gate here — 323 of 439
+ * production tokens belonged to anonymous users when this shipped. This gate
+ * makes anonymous registration lawful (consent) rather than enabling it.
+ */
+export const shouldRegisterPushToken = (input: {
+  hasSession: boolean;
+  isAnonymous: boolean;
+  notifyRidingTips: boolean;
+}): boolean => {
+  if (!input.hasSession) return false;
+  if (!input.isAnonymous) return true;
+  return input.notifyRidingTips;
+};
+
+/**
+ * Consent-aware registration entry point. Reads the riding-tips opt-in from
+ * the store at call time; the caller supplies the session facts.
+ */
+export const registerForPushNotificationsIfEligible = async (input: {
+  hasSession: boolean;
+  isAnonymous: boolean;
+}): Promise<string | null> => {
+  const eligible = shouldRegisterPushToken({
+    ...input,
+    notifyRidingTips: useAppStore.getState().notifyRidingTips,
+  });
+  if (!eligible) return null;
+  return registerForPushNotifications();
+};
+
+/**
  * Register for push notifications, request permission, get Expo push token,
  * and send it to the server.
  */
@@ -158,6 +196,13 @@ export const handleNotificationResponse = (
       );
       break;
     case 'first_ride':
+      router.push('/route-planning');
+      break;
+    case 'activation_ladder':
+      // Anonymous activation ladder (docs/plans/anonymous-activation-ladder.md):
+      // all rungs land on route planning — the plan-framed copy promises a
+      // route/score, and this is where both live. Cold-start taps arrive via
+      // NotificationProvider's getLastNotificationResponseAsync path.
       router.push('/route-planning');
       break;
     case 'hazard':

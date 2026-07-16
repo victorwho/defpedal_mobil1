@@ -17,12 +17,17 @@ import {
 } from '../src/lib/telemetry';
 
 /**
- * Post-onboarding screen for changing the analytics consent decision captured
- * during onboarding. Mirrors the toggles and copy from /onboarding/consent.
+ * The SINGLE control surface for telemetry (since 2026-07-16 — the onboarding
+ * consent screen was removed from the flow; a transparency notice on the
+ * first onboarding screen plus these always-available toggles satisfy the
+ * legitimate-interest/opt-in split without a blocking step).
  *
  * Reachable from Profile → Account → Privacy & analytics. Telemetry stops
  * within the same render cycle when a user toggles off — TelemetryProvider
  * subscribes to the store slice and tears down the affected client.
+ * `setAnalyticsConsent` stamps `capturedAt` on every change here: that
+ * timestamp is now the record of the user's affirmative act (opt-in for
+ * PostHog / objection for Sentry).
  */
 export default function PrivacyAnalyticsScreen() {
   const { colors } = useTheme();

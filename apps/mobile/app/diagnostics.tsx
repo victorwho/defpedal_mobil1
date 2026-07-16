@@ -310,6 +310,8 @@ function DiagnosticsContent() {
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
   const reviewPromptState = useAppStore((state) => state.reviewPromptState);
   const completedRideCount = useAppStore((state) => state.completedRideCount);
+  const activationLadder = useAppStore((state) => state.activationLadder);
+  const notifyActivationLadder = useAppStore((state) => state.notifyActivationLadder);
   const queueDeveloperValidationWrites = useAppStore(
     (state) => state.queueDeveloperValidationWrites,
   );
@@ -319,6 +321,7 @@ function DiagnosticsContent() {
   const [devMockCoord, setDevMockCoord] = useState(() => getDevMockLocation());
   const [screenError, setScreenError] = useState<string | null>(null);
   const [devStatusMessage, setDevStatusMessage] = useState<string | null>(null);
+  const [ladderDevMessage, setLadderDevMessage] = useState<string | null>(null);
   const [holoTier, setHoloTier] = useState<BadgeTier>('gold');
   const [foregroundPermission, setForegroundPermission] = useState<string>('unknown');
   const [backgroundPermission, setBackgroundPermission] = useState<string>('unknown');
@@ -799,6 +802,74 @@ function DiagnosticsContent() {
               }}
             >
               Force dead trip mutation (banner test)
+            </Button>
+          </View>
+        </DiagnosticCard>
+      ) : null}
+
+      {/* Activation ladder dev tool — dual production gate like the fake-GPS
+          tool (appVariant AND appEnv, two build systems set them separately;
+          a build path that forgets one must not enable this). */}
+      {mobileEnv.appVariant !== 'production' && mobileEnv.appEnv !== 'production' ? (
+        <DiagnosticCard title="Activation ladder (dev)">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+            Anonymous first-ride reminder ladder (max 3, 18:45 local). The dev
+            fire delivers the next rung in ~2s with its real payload AND
+            advances the ladder (records it fired, schedules the next rung) —
+            tap the button three times to walk the full sequence.
+          </Text>
+          <View style={styles.metricGrid}>
+            <MetricBlock
+              label="First open"
+              value={
+                activationLadder.firstOpenAt
+                  ? new Date(activationLadder.firstOpenAt).toLocaleString()
+                  : 'not set'
+              }
+            />
+            <MetricBlock
+              label="Rungs fired"
+              value={
+                activationLadder.rungsFired.length > 0
+                  ? activationLadder.rungsFired.join(', ')
+                  : 'none'
+              }
+            />
+            <MetricBlock
+              label="Completed"
+              value={activationLadder.completed ? 'Yes' : 'No'}
+            />
+            <MetricBlock
+              label="Scheduled"
+              value={
+                activationLadder.scheduledRung
+                  ? `rung ${activationLadder.scheduledRung.rung} @ ${new Date(activationLadder.scheduledRung.fireAt).toLocaleString()}`
+                  : 'none'
+              }
+            />
+            <MetricBlock label="Toggle" value={notifyActivationLadder ? 'On' : 'Off'} />
+            <MetricBlock label="Anonymous" value={isAnonymous ? 'Yes' : 'No'} />
+          </View>
+          {ladderDevMessage ? (
+            <Text style={[styles.helperText, { color: colors.textMuted }]}>{ladderDevMessage}</Text>
+          ) : null}
+          <View style={styles.buttonRow}>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              accessibilityLabel="Fire next activation ladder rung now"
+              onPress={() => {
+                const { fireNextLadderRungNowForDev } =
+                  require('../src/lib/activation-ladder') as typeof import('../src/lib/activation-ladder');
+                fireNextLadderRungNowForDev(isAnonymous)
+                  .then((result) => setLadderDevMessage(result))
+                  .catch((err: unknown) =>
+                    setLadderDevMessage(err instanceof Error ? err.message : 'failed'),
+                  );
+              }}
+            >
+              Fire next ladder rung now
             </Button>
           </View>
         </DiagnosticCard>

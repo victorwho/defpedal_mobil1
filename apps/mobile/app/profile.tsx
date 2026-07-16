@@ -138,6 +138,7 @@ export default function ProfileScreen() {
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
     pedalVoiceSassy, notifyStreak, notifyPedalNudges, weightKg,
+    notifyActivationLadder, notifyRidingTips,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
     bikeType: state.bikeType,
@@ -163,6 +164,8 @@ export default function ProfileScreen() {
     notifyStreak: state.notifyStreak,
     notifyPedalNudges: state.notifyPedalNudges,
     weightKg: state.weightKg,
+    notifyActivationLadder: state.notifyActivationLadder,
+    notifyRidingTips: state.notifyRidingTips,
   })));
 
   // Actions - stable references, single selector with shallow comparison
@@ -173,6 +176,7 @@ export default function ProfileScreen() {
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
     setPedalVoiceSassy, setNotifyStreak, setNotifyPedalNudges, setWeightKg,
+    setNotifyActivationLadder, setNotifyRidingTips,
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
@@ -197,6 +201,8 @@ export default function ProfileScreen() {
     setNotifyStreak: state.setNotifyStreak,
     setNotifyPedalNudges: state.setNotifyPedalNudges,
     setWeightKg: state.setWeightKg,
+    setNotifyActivationLadder: state.setNotifyActivationLadder,
+    setNotifyRidingTips: state.setNotifyRidingTips,
   })));
 
   // Sync a single notification preference to the backend (fire-and-forget).
@@ -807,6 +813,69 @@ export default function ProfileScreen() {
               onChange={(checked) => {
                 setNotifyStreak(checked);
                 syncNotifPref({ notifyStreak: checked });
+              }}
+            />
+
+            {/* Anonymous activation ladder (docs/plans/anonymous-activation-
+                ladder.md §7). Local-only pref — no profiles column, no
+                syncNotifPref. Deliberately NOT disabled by the master switch:
+                the master mirrors the SERVER-side pedal-nudge suppression,
+                while these are local notifications for anonymous users who
+                have no server profile to suppress. Toggling off is permanent
+                (spec §4 stop conditions): cancels the pending rung and marks
+                the ladder completed. */}
+            <SettingRow
+              label={t('profile.activationLadder')}
+              description={
+                notifyActivationLadder
+                  ? t('profile.activationLadderDesc')
+                  : t('profile.activationLadderOff')
+              }
+              checked={notifyActivationLadder}
+              onChange={(checked) => {
+                setNotifyActivationLadder(checked);
+                if (!checked) {
+                  const { stopActivationLadder } =
+                    require('../src/lib/activation-ladder') as typeof import('../src/lib/activation-ladder');
+                  void stopActivationLadder().catch(() => {
+                    // Cancellation is best-effort here; the next schedule
+                    // pass re-runs the stop conditions as the backstop.
+                  });
+                }
+              }}
+            />
+
+            {/* Riding tips & reminders — anonymous-push consent mirror
+                (2026-07-16). Same toggle as onboarding consent so consent is
+                revocable in two taps. ON records consent server-side then
+                registers the push token; OFF withdraws (server nulls the
+                consent record and, for anonymous users, deletes their push
+                tokens) and unregisters this device. Independent of the
+                master switch — this is a consent gate, not a nudge category. */}
+            <SettingRow
+              label={t('onboardingConsent.ridingTipsLabel')}
+              description={t('onboardingConsent.ridingTipsDescription')}
+              checked={notifyRidingTips}
+              onChange={(checked) => {
+                setNotifyRidingTips(checked);
+                const {
+                  registerForPushNotificationsIfEligible,
+                  unregisterPushToken,
+                } = require('../src/lib/push-notifications') as typeof import('../src/lib/push-notifications');
+                if (checked) {
+                  void mobileApi
+                    .updateNotificationConsent(true)
+                    .then(() =>
+                      registerForPushNotificationsIfEligible({
+                        hasSession: user != null,
+                        isAnonymous,
+                      }),
+                    )
+                    .catch(() => {/* best-effort */});
+                } else {
+                  void mobileApi.updateNotificationConsent(false).catch(() => {/* best-effort */});
+                  void unregisterPushToken();
+                }
               }}
             />
           </View>
