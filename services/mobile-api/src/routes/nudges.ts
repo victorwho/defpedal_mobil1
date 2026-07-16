@@ -95,15 +95,22 @@ interface ProfileRow {
   quiet_hours_end: string | null;
   quiet_hours_timezone: string | null;
   pedal_voice_sassy: boolean | null;
+  is_anonymous: boolean | null;
+  notify_riding_tips: boolean | null;
 }
 
 const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
   userId: row.id,
-  // Per Phase 1 design: anonymous gating happens upstream (mobile API's
-  // requireFullUser for P0 events, signup flow for cron loop). The cron
-  // sees only users who already opted into `notify_streak`, so it treats
-  // them as full users for eligibility purposes.
-  hasEmail: true,
+  // 2026-07-16 (consent-gated anonymous push): the old code hardcoded
+  // `hasEmail: true` on the claim that "anonymous gating happens upstream" —
+  // it did NOT (anonymous users have streaks/trips, so they enter the
+  // candidate buckets, and 323 of 439 production push tokens belonged to
+  // anonymous users). `profiles.is_anonymous` is trigger-maintained and
+  // verified in sync with auth.users (984/984, 2026-07-16), so eligibility
+  // now sees the real signal and enforces the anonymous whitelist + the
+  // notify_riding_tips consent gate itself.
+  hasEmail: !(row.is_anonymous ?? false),
+  notifyRidingTips: row.notify_riding_tips ?? false,
   notifyPedalNudges: row.notify_pedal_nudges ?? true,
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',
@@ -112,7 +119,7 @@ const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
 });
 
 const PROFILE_COLUMNS =
-  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
+  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy, is_anonymous, notify_riding_tips';
 
 /**
  * Triggers whose intended follow-up action is "complete a ride / qualify

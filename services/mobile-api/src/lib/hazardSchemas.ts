@@ -42,6 +42,10 @@ export const hazardExpireResponseSchema = {
   properties: {
     deletedCount: { type: 'integer' },  // expires_at < now - 7d
     purgedCount: { type: 'integer' },   // score <= -3 for >= 24h
+    // Anonymous push-token hygiene (2026-07-16): stale anon tokens pruned by
+    // delete_stale_anonymous_push_tokens(90). -1 = the RPC call failed
+    // (best-effort — never fails the hazard cron).
+    prunedAnonPushTokens: { type: 'integer' },
     runAt: { type: 'string', format: 'date-time' },
   },
 } as const;

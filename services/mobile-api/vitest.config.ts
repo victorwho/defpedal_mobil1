@@ -11,6 +11,10 @@ export default defineConfig({
       // P0 paths from feedback/hazard handlers don't consume mocked
       // Supabase chains and pollute other tests in the same file.
       NUDGES_ENABLED: 'false',
+      // Anonymous push stays OFF in tests (its production default). Suites
+      // that exercise the anonymous whitelist flip it per-test via
+      // process.env and restore in afterEach (same pattern as killSwitch).
+      ANON_PUSH_ENABLED: 'false',
       // Point Supabase at NOTHING during tests. Several suites do not mock
       // lib/supabaseAdmin; without this override vitest inherits the real
       // .env, and fixture queries (user_id='test-user-001', 'user-123')

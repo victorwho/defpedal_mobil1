@@ -19,3 +19,20 @@ export const areNudgesEnabled = (): boolean => {
   // (unset, "true", typos) leaves the system live.
   return !(raw === 'false' || raw === '0' || raw === 'off');
 };
+
+/**
+ * Anonymous-push kill switch (`ANON_PUSH_ENABLED`, 2026-07-16).
+ *
+ * Gates every server push to ANONYMOUS users (nudge eligibility + the
+ * firstride cron). Unlike NUDGES_ENABLED this defaults to OFF — anonymous
+ * push is a consent-sensitive rollout, so it must be enabled explicitly:
+ *   gcloud run services update defpedal-api --region europe-central2 \
+ *     --update-env-vars ANON_PUSH_ENABLED=true
+ * Rollback is the same command with =false.
+ */
+export const isAnonPushEnabled = (): boolean => {
+  const raw = (process.env.ANON_PUSH_ENABLED ?? '').trim().toLowerCase();
+  // Only explicit "true" / "1" / "on" enables. Everything else (unset,
+  // "false", typos) keeps anonymous push OFF — fail closed.
+  return raw === 'true' || raw === '1' || raw === 'on';
+};

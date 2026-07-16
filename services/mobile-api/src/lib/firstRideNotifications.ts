@@ -19,6 +19,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { dispatchNotification } from './notifications';
+import { ANONYMOUS_ALLOWED_TRIGGERS } from './nudges/eligibility';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +37,13 @@ export interface FirstRideProfile {
   readonly notify_mia: boolean;
   readonly created_at: string;
   readonly last_ride_at: string | null;
+  /**
+   * profiles.is_anonymous (2026-07-16, consent-gated anonymous push).
+   * Anonymous users only receive the ANONYMOUS_ALLOWED_TRIGGERS templates —
+   * post_first_ride stays registered-only. The caller (cron route) is
+   * responsible for the notify_riding_tips + ANON_PUSH_ENABLED gates.
+   */
+  readonly is_anonymous: boolean;
 }
 
 interface TemplateResult {
@@ -267,12 +275,23 @@ export const evaluateFirstRideNotifications = async (
     return [{ template: 'first_ride_nudge', sent: false, reason: 'weekly_budget_exceeded' }];
   }
 
-  const checks = [
-    checkFirstRideNudge,
-    checkPostFirstRide,
-    checkWeatherInvitation,
-    checkLapsedReengagement,
+  const allChecks: ReadonlyArray<{
+    template: FirstRideTemplate;
+    check: (db: SupabaseClient, profile: FirstRideProfile) => Promise<TemplateResult>;
+  }> = [
+    { template: 'first_ride_nudge', check: checkFirstRideNudge },
+    { template: 'post_first_ride', check: checkPostFirstRide },
+    { template: 'weather_invitation', check: checkWeatherInvitation },
+    { template: 'lapsed_reengagement', check: checkLapsedReengagement },
   ];
+
+  // Anonymous users only receive the whitelisted templates (2026-07-16) —
+  // shared constant with the nudge system so both engines agree.
+  const checks = (
+    profile.is_anonymous
+      ? allChecks.filter((c) => ANONYMOUS_ALLOWED_TRIGGERS.includes(c.template))
+      : allChecks
+  ).map((c) => c.check);
 
   for (const check of checks) {
     const result = await check(db, profile);

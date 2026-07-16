@@ -9,6 +9,7 @@ import {
   evaluateFirstRideNotifications,
   type FirstRideProfile,
 } from '../lib/firstRideNotifications';
+import { isAnonPushEnabled } from '../lib/nudges/killSwitch';
 
 interface NotificationEvaluateResponse {
   evaluated: number;
@@ -71,11 +72,33 @@ export const buildFirstRideNotificationRoutes = (
 
         const db = ensureSupabase();
 
-        const { data: profileRows, error: queryError } = await db
+        // Consent-gated anonymous push (2026-07-16): registered users keep the
+        // notify_mia gate exactly as before. Anonymous users are included ONLY
+        // when the ANON_PUSH_ENABLED kill switch is on AND they explicitly
+        // opted into riding tips (notify_riding_tips=true — the GDPR consent).
+        // Before this gate the query's notify_mia=true default (TRUE for every
+        // profile) silently included all anonymous users — 285 consent-less
+        // sends had gone out by 2026-07-16.
+        const CANDIDATE_LIMIT = 1000;
+        let candidateQuery = db
           .from('profiles')
-          .select('id, notify_mia, created_at')
-          .eq('notify_mia', true)
-          .limit(1000);
+          .select('id, notify_mia, created_at, is_anonymous, notify_riding_tips')
+          .eq('notify_mia', true);
+        candidateQuery = isAnonPushEnabled()
+          ? candidateQuery.or('is_anonymous.eq.false,notify_riding_tips.eq.true')
+          : candidateQuery.eq('is_anonymous', false);
+        const { data: profileRows, error: queryError } = await candidateQuery.limit(
+          CANDIDATE_LIMIT,
+        );
+
+        if ((profileRows?.length ?? 0) >= CANDIDATE_LIMIT) {
+          // PostgREST caps unpaginated reads — hitting the limit means users
+          // beyond row 1000 silently never get evaluated. Surface it loudly.
+          request.log.warn(
+            { event: 'firstride_candidate_limit_hit', limit: CANDIDATE_LIMIT },
+            'first-ride candidate query hit its row limit — tail users skipped',
+          );
+        }
 
         if (queryError) {
           request.log.error(
@@ -93,6 +116,8 @@ export const buildFirstRideNotificationRoutes = (
           id: string;
           notify_mia: boolean;
           created_at: string;
+          is_anonymous: boolean | null;
+          notify_riding_tips: boolean | null;
         }>;
 
         let evaluated = 0;
@@ -126,6 +151,7 @@ export const buildFirstRideNotificationRoutes = (
               notify_mia: row.notify_mia,
               created_at: row.created_at,
               last_ride_at: (lastTrip?.ended_at as string | null | undefined) ?? null,
+              is_anonymous: row.is_anonymous ?? false,
             };
 
             const results = await evaluateFirstRideNotifications(db, profile);

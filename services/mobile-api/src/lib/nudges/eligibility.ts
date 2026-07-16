@@ -16,6 +16,8 @@
 
 import type { NudgePriority, NudgeTrigger } from '@defensivepedal/core';
 
+import { isAnonPushEnabled } from './killSwitch';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -25,6 +27,12 @@ export interface UserNudgeProfile {
   readonly userId: string;
   /** Anonymous Supabase users have a null/empty email. */
   readonly hasEmail: boolean;
+  /**
+   * Explicit "Riding tips & reminders" opt-in (profiles.notify_riding_tips,
+   * 2026-07-16). The consent gate for anonymous push — without it anonymous
+   * users are suppressed for every trigger. Irrelevant for registered users.
+   */
+  readonly notifyRidingTips: boolean;
   /**
    * Master switch for the whole nudge system (profiles.notify_pedal_nudges,
    * audit 2026-07-05 UX-14). false = no nudges of ANY kind, including P0
@@ -167,10 +175,35 @@ export interface EligibilityRequest {
 
 const DEFAULT_DAILY_CAP = 2;
 
+/**
+ * The ONLY sends anonymous users may ever receive (2026-07-16, consent-gated
+ * anonymous push). Union of the firstride-engine templates and the one nudge
+ * trigger allowed for anonymous users — typed as strings because
+ * 'first_ride_nudge' / 'weather_invitation' live in the firstride engine, not
+ * the NudgeTrigger union; both engines check against this same list.
+ */
+export const ANONYMOUS_ALLOWED_TRIGGERS: readonly string[] = [
+  'first_ride_nudge',
+  'weather_invitation',
+  'lapsed_reengagement',
+];
+
 export const evaluateEligibility = (req: EligibilityRequest): EligibilityResult => {
-  // 1. Anonymous users get no nudges, ever. The signup gate is intentional.
+  // 1. Anonymous users: eligible ONLY when (a) the ANON_PUSH_ENABLED kill
+  // switch is on, (b) the trigger is on the anonymous whitelist, and (c) the
+  // user explicitly opted into "Riding tips & reminders"
+  // (profiles.notify_riding_tips — the GDPR consent gate). Everything else
+  // keeps the historical suppressed_anonymous outcome. Whitelisted anonymous
+  // sends still run through every gate below (quiet hours, cap, safety
+  // floor, category prefs) — consent unlocks the gates, it doesn't skip them.
   if (!req.profile.hasEmail) {
-    return { eligible: false, outcome: 'suppressed_anonymous' };
+    if (
+      !isAnonPushEnabled() ||
+      !ANONYMOUS_ALLOWED_TRIGGERS.includes(req.trigger) ||
+      !req.profile.notifyRidingTips
+    ) {
+      return { eligible: false, outcome: 'suppressed_anonymous' };
+    }
   }
 
   // 1b. Master opt-out (audit 2026-07-05 UX-14): Profile > Pedal Nudges >

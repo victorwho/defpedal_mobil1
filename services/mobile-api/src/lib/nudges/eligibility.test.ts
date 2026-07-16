@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANONYMOUS_ALLOWED_TRIGGERS,
   currentHHMMInTimezone,
   evaluateEligibility,
   isInQuietHours,
@@ -10,6 +11,7 @@ import {
 const baseProfile: UserNudgeProfile = {
   userId: 'user-1',
   hasEmail: true,
+  notifyRidingTips: false,
   notifyPedalNudges: true,
   notifyStreak: true,
   quietHoursStart: '22:00',
@@ -82,6 +84,118 @@ describe('evaluateEligibility — anonymous gate', () => {
     });
     expect(result.eligible).toBe(false);
     expect(result.outcome).toBe('suppressed_anonymous');
+  });
+});
+
+describe('evaluateEligibility — anonymous whitelist (consent-gated push, 2026-07-16)', () => {
+  // vitest env pins ANON_PUSH_ENABLED='false' (production default); flip it
+  // per-test and always restore.
+  const withAnonPushEnabled = (value: string, fn: () => void) => {
+    const prev = process.env.ANON_PUSH_ENABLED;
+    process.env.ANON_PUSH_ENABLED = value;
+    try {
+      fn();
+    } finally {
+      process.env.ANON_PUSH_ENABLED = prev;
+    }
+  };
+
+  const anonOptedIn: UserNudgeProfile = {
+    ...baseProfile,
+    hasEmail: false,
+    notifyRidingTips: true,
+  };
+
+  it('exports the agreed whitelist', () => {
+    expect(ANONYMOUS_ALLOWED_TRIGGERS).toEqual([
+      'first_ride_nudge',
+      'weather_invitation',
+      'lapsed_reengagement',
+    ]);
+  });
+
+  it('anonymous + opted-in + whitelisted trigger + switch ON → eligible', () => {
+    withAnonPushEnabled('true', () => {
+      const result = evaluateEligibility({
+        trigger: 'lapsed_reengagement',
+        priority: 3,
+        profile: anonOptedIn,
+        window: baseWindow,
+        now: NOON_BUCHAREST,
+      });
+      expect(result.eligible).toBe(true);
+      expect(result.outcome).toBe('eligible');
+    });
+  });
+
+  it('anonymous + opted-in + NON-whitelisted triggers stay suppressed', () => {
+    withAnonPushEnabled('true', () => {
+      for (const [trigger, priority] of [
+        ['post_ride_celebration', 0],
+        ['milestone_celebration', 0],
+        ['streak_at_risk_dramatic', 1],
+        ['daily_ride_reminder', 2],
+        ['community_signal', 3],
+      ] as const) {
+        const result = evaluateEligibility({
+          trigger,
+          priority,
+          profile: anonOptedIn,
+          window: baseWindow,
+          now: NOON_BUCHAREST,
+        });
+        expect(result.outcome, trigger).toBe('suppressed_anonymous');
+      }
+    });
+  });
+
+  it('anonymous WITHOUT the riding-tips opt-in stays suppressed even for whitelisted triggers', () => {
+    withAnonPushEnabled('true', () => {
+      const result = evaluateEligibility({
+        trigger: 'lapsed_reengagement',
+        priority: 3,
+        profile: { ...baseProfile, hasEmail: false, notifyRidingTips: false },
+        window: baseWindow,
+        now: NOON_BUCHAREST,
+      });
+      expect(result.outcome).toBe('suppressed_anonymous');
+    });
+  });
+
+  it('kill switch OFF (default) short-circuits everything anonymous', () => {
+    // ANON_PUSH_ENABLED='false' from vitest env — no flip needed.
+    const result = evaluateEligibility({
+      trigger: 'lapsed_reengagement',
+      priority: 3,
+      profile: anonOptedIn,
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.outcome).toBe('suppressed_anonymous');
+  });
+
+  it('whitelisted anonymous sends still respect quiet hours — consent unlocks, never skips, the gates', () => {
+    withAnonPushEnabled('true', () => {
+      const result = evaluateEligibility({
+        trigger: 'lapsed_reengagement',
+        priority: 3,
+        profile: anonOptedIn,
+        window: baseWindow,
+        now: MIDNIGHT_BUCHAREST,
+      });
+      expect(result.outcome).toBe('suppressed_quiet_hours');
+    });
+  });
+
+  it('registered users are untouched by the opt-in flag (zero regression)', () => {
+    const result = evaluateEligibility({
+      trigger: 'lapsed_reengagement',
+      priority: 3,
+      profile: { ...baseProfile, notifyRidingTips: false },
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.eligible).toBe(true);
   });
 });
 

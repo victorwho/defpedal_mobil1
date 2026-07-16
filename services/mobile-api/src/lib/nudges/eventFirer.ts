@@ -40,6 +40,9 @@ const toProfile = (row: ProfileRow): UserNudgeProfile => ({
   // here it's a full user. Setting `true` keeps eligibility from short-
   // circuiting on a column that doesn't exist on profiles.
   hasEmail: true,
+  // Irrelevant for full users (the riding-tips opt-in only gates anonymous
+  // sends) — false keeps the P0 fast path honest if this ever changes.
+  notifyRidingTips: false,
   notifyPedalNudges: row.notify_pedal_nudges ?? true,
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',

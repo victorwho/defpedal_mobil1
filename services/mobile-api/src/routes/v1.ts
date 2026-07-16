@@ -1318,7 +1318,12 @@ export const buildV1Routes = (
 
     app.post<{
       Reply:
-        | { deletedCount: number; purgedCount: number; runAt: string }
+        | {
+            deletedCount: number;
+            purgedCount: number;
+            prunedAnonPushTokens: number;
+            runAt: string;
+          }
         | ErrorResponse;
     }>('/hazards/expire', {
       schema: {
@@ -1397,12 +1402,47 @@ export const buildV1Routes = (
       const purgedCount = purgedRows?.length ?? 0;
       const deletedCount = deletedRows?.length ?? 0;
 
+      // Anonymous push-token hygiene (2026-07-16): piggybacks on this daily
+      // cron (per plan — no new Scheduler job). Deletes push_tokens of
+      // anonymous users with no token refresh, no trip, and no sign-in in 90
+      // days (SECURITY DEFINER RPC — it consults auth.users.last_sign_in_at).
+      // Best-effort: a failure here must never break hazard expiry.
+      let prunedAnonPushTokens = -1;
+      try {
+        const { data: pruned, error: pruneError } = await supabaseAdmin.rpc(
+          'delete_stale_anonymous_push_tokens',
+          { retention_days: 90 },
+        );
+        if (pruneError) {
+          request.log.warn(
+            { event: 'anon_push_token_prune_failed', error: pruneError.message },
+            'anonymous push-token hygiene failed',
+          );
+        } else {
+          prunedAnonPushTokens = typeof pruned === 'number' ? pruned : 0;
+        }
+      } catch (pruneErr) {
+        request.log.warn(
+          {
+            event: 'anon_push_token_prune_failed',
+            error: pruneErr instanceof Error ? pruneErr.message : 'unknown',
+          },
+          'anonymous push-token hygiene failed',
+        );
+      }
+
       request.log.info(
-        { event: 'hazards_expire_run', purgedCount, deletedCount, runAt: nowIso },
+        {
+          event: 'hazards_expire_run',
+          purgedCount,
+          deletedCount,
+          prunedAnonPushTokens,
+          runAt: nowIso,
+        },
         'Hazard expire cron completed.',
       );
 
-      return { deletedCount, purgedCount, runAt: nowIso };
+      return { deletedCount, purgedCount, prunedAnonPushTokens, runAt: nowIso };
     });
 
     app.post<{ Body: NavigationFeedbackBody; Reply: WriteAckResponse | ErrorResponse }>(
@@ -1709,6 +1749,132 @@ export const buildV1Routes = (
         .eq('device_id', deviceId);
 
       return reply.send({ acceptedAt: new Date().toISOString() });
+    },
+  );
+
+  // ── Notification consent (riding tips — anonymous push opt-in) ──
+  // Anonymous-allowed (requireWriteUser): this IS the consent mechanism that
+  // makes anonymous push lawful, so anonymous sessions must be able to call
+  // it. `notify_riding_tips_consented_at` is the GDPR consent record — set on
+  // the false→true flip, NEVER moved by repeat ONs, nulled on withdrawal.
+  app.patch(
+    '/profile/notification-consent',
+    {
+      schema: {
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ridingTips'],
+          properties: {
+            ridingTips: { type: 'boolean' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            required: ['ridingTips', 'consentedAt', 'acceptedAt'],
+            properties: {
+              ridingTips: { type: 'boolean' },
+              consentedAt: { type: ['string', 'null'] },
+              acceptedAt: { type: 'string' },
+            },
+          },
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const user = await requireWriteUser(request, dependencies);
+      await applyRateLimit(request, reply, dependencies, 'write', {
+        userId: user.id,
+      });
+
+      const { ridingTips } = request.body as { ridingTips: boolean };
+
+      if (!supabaseAdmin) {
+        throw new HttpError('Database unavailable.', { statusCode: 502, code: 'UPSTREAM_ERROR' });
+      }
+
+      if (ridingTips) {
+        // Preserve the original consent timestamp on repeat ONs — it's a
+        // GDPR record of when consent was GIVEN, not of the latest toggle.
+        const { data: current } = await supabaseAdmin
+          .from('profiles')
+          .select('notify_riding_tips, notify_riding_tips_consented_at')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const keepExisting =
+          current?.notify_riding_tips === true &&
+          current?.notify_riding_tips_consented_at != null;
+        const consentedAt = keepExisting
+          ? (current.notify_riding_tips_consented_at as string)
+          : new Date().toISOString();
+
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            notify_riding_tips: true,
+            notify_riding_tips_consented_at: consentedAt,
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          request.log.error({ error }, 'notification consent update failed');
+          captureServerException(error, {
+            route: 'notification-consent',
+            userId: user.id,
+          });
+          return reply
+            .status(500)
+            .send({ error: 'Failed to record consent.', code: 'UPSTREAM_ERROR' });
+        }
+
+        return reply.send({
+          ridingTips: true,
+          consentedAt,
+          acceptedAt: new Date().toISOString(),
+        });
+      }
+
+      // Withdrawal: clear flag + consent record.
+      const { error } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          notify_riding_tips: false,
+          notify_riding_tips_consented_at: null,
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        request.log.error({ error }, 'notification consent withdrawal failed');
+        captureServerException(error, {
+          route: 'notification-consent',
+          userId: user.id,
+        });
+        return reply
+          .status(500)
+          .send({ error: 'Failed to withdraw consent.', code: 'UPSTREAM_ERROR' });
+      }
+
+      // Revoke push tokens on withdrawal — ANONYMOUS users only (delete: the
+      // table has no revoked flag). Riding tips is the sole lawful basis for
+      // an anonymous token, so withdrawal removes it entirely. Registered
+      // users KEEP their tokens: hazard/weather/community pushes are separate
+      // preferences and must not regress (task: zero full-account regression).
+      if (!user.email) {
+        await supabaseAdmin.from('push_tokens').delete().eq('user_id', user.id);
+      }
+
+      return reply.send({
+        ridingTips: false,
+        consentedAt: null,
+        acceptedAt: new Date().toISOString(),
+      });
     },
   );
 
