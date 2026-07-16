@@ -567,3 +567,12 @@ try {
 **Rules:**
 1. Never gate on a test command piped through `tail`/`grep`/`head` without `set -o pipefail` in the same shell invocation.
 2. When a behavior change is made, grep for tests of the OLD behavior in `__tests__/` directories too — this repo keeps tests both next to files AND in `__tests__/` subdirs (`backgroundNavigation.test.ts` lives in `src/lib/__tests__/`, not next to `src/lib/backgroundNavigation.ts`).
+
+## Error #68 (2026-07-16): "Anonymous users are unreachable by design" was false — a consent-less anonymous push channel had been live for months
+
+**What happened:** The anonymous-activation spec (and CLAUDE.md) claimed push-token registration was "gated behind a logged-in session" and the nudge docs said "anonymous users excluded". A pre-implementation production audit disproved every layer of that claim: (1) `PUT /v1/push-token` uses `requireWriteUser`, which accepts anonymous sessions; (2) the mobile registration effect in `AuthSessionProvider` fired for ANY session — 323 of 439 production push tokens belonged to anonymous users; (3) the firstride cron gated only on `notify_mia = true`, whose column DEFAULT is true, so all 984 anonymous profiles were candidates; (4) `routes/nudges.ts` hardcoded `hasEmail: true` ("anonymous gating happens upstream" — it didn't). Net effect: 285 'mia'-category pushes had been SENT to anonymous users without any consent, the most recent the same morning the audit ran.
+
+**Rules:**
+1. Before building on a "this can't happen server-side" claim from docs/specs, run the disproving production query first (here: one JOIN of push_tokens × auth.users). Docs describe intent; only the database describes behavior.
+2. A `hasEmail: true` / `isAnonymous: false` HARDCODE in a batch pipeline is a suppression gate that doesn't exist. If eligibility logic takes an anonymity flag, the cron mapping must read the real column (`profiles.is_anonymous` — trigger-maintained, verified in sync with auth.users) — never a constant.
+3. Boolean profile columns with `DEFAULT true` (notify_mia, notify_*) silently include every user class created after the column shipped — including classes (anonymous) that didn't exist or weren't considered when the default was chosen. When adding a user class, audit every `eq('<flag>', true)` cron query.
