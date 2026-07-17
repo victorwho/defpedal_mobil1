@@ -287,7 +287,7 @@ Any handler that "removes a ride" (user-initiated delete, GDPR purge, retention 
 
 ### Map Stage Layout (MapStageScreen.tsx)
 - Full-bleed map behind a `SafeAreaView` overlay
-- `CollapsibleSheet` with PanResponder for swipeable bottom panel
+- `CollapsibleSheet` with PanResponder for swipeable bottom panel — **starts collapsed by default** (map-first, peek strip visible; changed session 92). A companion effect re-springs the collapsed height when `peekContent` arrives after the async route load — don't remove it, the sheet mounts before the route exists and the peek row would clip at handle-only height
 - Fixed footer buttons (Start Navigation, Back) stay visible when sheet collapses
 - Right overlay for floating control buttons
 
