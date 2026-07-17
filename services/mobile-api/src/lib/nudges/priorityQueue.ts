@@ -49,6 +49,12 @@ export interface PickRequest {
   readonly dailyCap?: number;
   /** Cron path: make P0 triggers respect quiet hours (review 2026-06-12). */
   readonly enforceQuietHours?: boolean;
+  /**
+   * Per-tick priority escalations, e.g. city_riders_pulse jumps P3 → P2 when
+   * its 5-day send guarantee is breached. Overrides the catalog priority for
+   * both eligibility and slot ordering.
+   */
+  readonly priorityOverrides?: Readonly<Partial<Record<NudgeTrigger, NudgePriority>>>;
   readonly now?: Date;
 }
 
@@ -68,7 +74,7 @@ export interface PickRequest {
  */
 export const pickHighestPriorityTrigger = (req: PickRequest): QueueDecision => {
   const considered = req.candidates.map((trigger) => {
-    const priority = getTriggerPriority(trigger);
+    const priority = req.priorityOverrides?.[trigger] ?? getTriggerPriority(trigger);
     const result = evaluateEligibility({
       trigger,
       priority,

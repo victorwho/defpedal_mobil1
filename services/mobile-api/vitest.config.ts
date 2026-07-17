@@ -11,6 +11,9 @@ export default defineConfig({
       // P0 paths from feedback/hazard handlers don't consume mocked
       // Supabase chains and pollute other tests in the same file.
       NUDGES_ENABLED: 'false',
+      // City Riders Pulse off in tests for the same reason; suites that
+      // exercise it override process.env per-test and restore in afterEach.
+      CITY_PULSE_ENABLED: 'false',
       // Anonymous push stays OFF in tests (its production default). Suites
       // that exercise the anonymous whitelist flip it per-test via
       // process.env and restore in afterEach (same pattern as killSwitch).

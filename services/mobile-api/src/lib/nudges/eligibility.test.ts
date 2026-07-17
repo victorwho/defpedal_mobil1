@@ -495,3 +495,83 @@ describe('evaluateEligibility — happy path', () => {
     expect(result.outcome).toBe('eligible');
   });
 });
+
+describe('evaluateEligibility — city_riders_pulse', () => {
+  const tipsOnProfile: UserNudgeProfile = { ...baseProfile, notifyRidingTips: true };
+
+  it('rejects anonymous users (not on the anonymous whitelist)', () => {
+    expect(ANONYMOUS_ALLOWED_TRIGGERS).not.toContain('city_riders_pulse');
+    const result = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 3,
+      profile: { ...tipsOnProfile, hasEmail: false },
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.outcome).toBe('suppressed_anonymous');
+  });
+
+  it('suppresses registered users without the riding-tips consent', () => {
+    const result = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 3,
+      profile: baseProfile, // notifyRidingTips: false
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.outcome).toBe('suppressed_category_pref');
+  });
+
+  it('is eligible for a consented registered user in good conditions', () => {
+    const result = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 3,
+      profile: tipsOnProfile,
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    expect(result.eligible).toBe(true);
+  });
+
+  it('is safety-gated: bad weather and after-sunset suppress it', () => {
+    const weather = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 3,
+      profile: tipsOnProfile,
+      window: { ...baseWindow, badWeatherNow: true },
+      now: NOON_BUCHAREST,
+    });
+    expect(weather.outcome).toBe('suppressed_weather');
+
+    const sunset = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 3,
+      profile: tipsOnProfile,
+      window: { ...baseWindow, afterSunset: true },
+      now: NOON_BUCHAREST,
+    });
+    expect(sunset.outcome).toBe('suppressed_sunset');
+  });
+
+  it('respects quiet hours and the daily cap even when escalated to P2', () => {
+    const quiet = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 2,
+      profile: tipsOnProfile,
+      window: baseWindow,
+      now: MIDNIGHT_BUCHAREST,
+    });
+    expect(quiet.outcome).toBe('suppressed_quiet_hours');
+
+    const capped = evaluateEligibility({
+      trigger: 'city_riders_pulse',
+      priority: 2,
+      profile: tipsOnProfile,
+      window: { ...baseWindow, pushesLast24h: 2 },
+      now: NOON_BUCHAREST,
+    });
+    expect(capped.outcome).toBe('suppressed_cap');
+  });
+});

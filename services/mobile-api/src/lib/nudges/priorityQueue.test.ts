@@ -127,3 +127,45 @@ describe('pickHighestPriorityTrigger', () => {
     expect(a.trigger).toBe(b.trigger);
   });
 });
+
+describe('pickHighestPriorityTrigger — city_riders_pulse escalation', () => {
+  const pulseProfile: UserNudgeProfile = {
+    ...baseProfile,
+    notifyRidingTips: true,
+  };
+
+  it('loses a P3 tie without an override (ambient trigger yields)', () => {
+    const result = pickHighestPriorityTrigger({
+      candidates: ['city_riders_pulse', 'lapsed_reengagement'],
+      profile: pulseProfile,
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+    });
+    // Both P3 — TRIGGERS_BY_PRIORITY order breaks the tie; city pulse is last.
+    expect(result.trigger).toBe('lapsed_reengagement');
+  });
+
+  it('wins the slot when escalated to P2 on guarantee breach', () => {
+    const result = pickHighestPriorityTrigger({
+      candidates: ['city_riders_pulse', 'lapsed_reengagement'],
+      profile: pulseProfile,
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+      priorityOverrides: { city_riders_pulse: 2 },
+    });
+    expect(result.trigger).toBe('city_riders_pulse');
+    const pulse = result.considered.find((c) => c.trigger === 'city_riders_pulse');
+    expect(pulse?.priority).toBe(2);
+  });
+
+  it('still loses to P1 even when escalated', () => {
+    const result = pickHighestPriorityTrigger({
+      candidates: ['city_riders_pulse', 'streak_at_risk_dramatic'],
+      profile: pulseProfile,
+      window: baseWindow,
+      now: NOON_BUCHAREST,
+      priorityOverrides: { city_riders_pulse: 2 },
+    });
+    expect(result.trigger).toBe('streak_at_risk_dramatic');
+  });
+});

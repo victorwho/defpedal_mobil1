@@ -13,6 +13,7 @@ import {
   pickMessage,
   type NudgeContext,
   type NudgeLocale,
+  type NudgePriority,
   type NudgeTrigger,
 } from '@defensivepedal/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -27,6 +28,15 @@ export interface DispatchRequest {
   readonly sassy: boolean;
   /** Push tokens for the user's devices. Caller resolves from `push_tokens`. */
   readonly pushTokens: ReadonlyArray<string>;
+  /**
+   * Escalated priority to record on nudge_log (e.g. city_riders_pulse P3→P2
+   * on guarantee breach). Falls back to the catalog priority when absent.
+   */
+  readonly priorityOverride?: NudgePriority;
+  /** city_riders_pulse rotation input — forwarded to pickMessage. */
+  readonly sendDateISO?: string;
+  /** city_riders_pulse rotation input — forwarded to pickMessage. */
+  readonly recentVariantIds?: readonly string[];
   /** Outcome captured by the eligibility/queue layer. */
   readonly outcome:
     | 'scheduled'
@@ -71,7 +81,10 @@ export const dispatchNudge = async (
     context: req.context,
     sassy: req.sassy,
     userId: req.userId,
+    sendDateISO: req.sendDateISO,
+    recentVariantIds: req.recentVariantIds,
   });
+  const logPriority = req.priorityOverride ?? message.priority;
 
   // Suppression paths: write a nudge_log row + return without sending.
   if (req.outcome !== 'scheduled' && req.outcome !== 'sent') {
@@ -81,7 +94,7 @@ export const dispatchNudge = async (
         user_id: req.userId,
         trigger_id: req.trigger,
         variant_id: message.variantId,
-        priority: message.priority,
+        priority: logPriority,
         outcome: req.outcome,
         context: req.context,
       })
@@ -105,7 +118,7 @@ export const dispatchNudge = async (
         user_id: req.userId,
         trigger_id: req.trigger,
         variant_id: message.variantId,
-        priority: message.priority,
+        priority: logPriority,
         outcome: 'suppressed_no_token',
         context: req.context,
       })
@@ -131,7 +144,7 @@ export const dispatchNudge = async (
       user_id: req.userId,
       trigger_id: req.trigger,
       variant_id: message.variantId,
-      priority: message.priority,
+      priority: logPriority,
       outcome: 'scheduled',
       context: req.context,
     })

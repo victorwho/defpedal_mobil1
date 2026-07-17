@@ -227,6 +227,14 @@ export const handleNotificationResponse = (
       router.push('/route-planning');
       break;
     }
+    // City Riders Pulse (docs/plans/city-riders-pulse-notification.md): the
+    // ask is "join them?" — land on route planning. Today's dispatcher sends
+    // these as type 'nudge' (handled below, ride-asking else-branch → route
+    // planning); this explicit case covers the plan's declared payload type
+    // if the dispatcher ever sets per-trigger types.
+    case 'city_riders_pulse':
+      router.push('/route-planning');
+      break;
     case 'nudge': {
       // Pedal Nudge tap (review 2026-06-12 item 23): report the tap so the
       // attribution sweep can close the funnel, then route by trigger —

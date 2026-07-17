@@ -21,6 +21,19 @@ export const areNudgesEnabled = (): boolean => {
 };
 
 /**
+ * City Riders Pulse kill switch (`CITY_PULSE_ENABLED`).
+ *
+ * Per-trigger flag checked ALONGSIDE `NUDGES_ENABLED` — the global switch
+ * still silences everything. Defaults to ON like NUDGES_ENABLED; rollback:
+ *   gcloud run services update defpedal-api --region europe-central2 \
+ *     --update-env-vars CITY_PULSE_ENABLED=false
+ */
+export const isCityPulseEnabled = (): boolean => {
+  const raw = (process.env.CITY_PULSE_ENABLED ?? '').trim().toLowerCase();
+  return !(raw === 'false' || raw === '0' || raw === 'off');
+};
+
+/**
  * Anonymous-push kill switch (`ANON_PUSH_ENABLED`, 2026-07-16).
  *
  * Gates every server push to ANONYMOUS users (nudge eligibility + the

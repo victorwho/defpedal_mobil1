@@ -138,6 +138,9 @@ const SAFETY_GATED_TRIGGERS = new Set<NudgeTrigger>([
   'streak_at_risk_mild',
   'streak_at_risk_dramatic',
   'daily_ride_reminder',
+  // Asks for a ride — never during bad weather or after sunset. The plan doc
+  // explicitly lets these suppressions override the 5-day send guarantee.
+  'city_riders_pulse',
 ]);
 
 /**
@@ -215,6 +218,13 @@ export const evaluateEligibility = (req: EligibilityRequest): EligibilityResult 
 
   // 2. Streak-category opt-out covers streak-at-risk + milestone + apology.
   if (STREAK_CATEGORY_TRIGGERS.has(req.trigger) && !req.profile.notifyStreak) {
+    return { eligible: false, outcome: 'suppressed_category_pref' };
+  }
+
+  // 2b. city_riders_pulse is consent-gated on "Riding tips & reminders" for
+  // EVERYONE (not just anonymous users) — semantically it is a riding tip,
+  // and reusing the toggle avoids a new column + consent surface.
+  if (req.trigger === 'city_riders_pulse' && !req.profile.notifyRidingTips) {
     return { eligible: false, outcome: 'suppressed_category_pref' };
   }
 

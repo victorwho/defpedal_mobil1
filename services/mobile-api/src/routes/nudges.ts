@@ -22,13 +22,23 @@
 
 import type { ErrorResponse, NudgeTrigger } from '@defensivepedal/core';
 import {
+  CITY_PULSE_FALLBACK_POPULATION,
+  CITY_PULSE_ROTATION_MEMORY,
+  computeCityRiderCount,
   computeRidePattern,
+  drawInitialFireAt,
+  drawNextFireAt,
+  getCityPulseWeatherFactor,
   getTriggerPriority,
   isAfterSunset,
   isBadCyclingWeather,
+  isGuaranteeBreached,
   isMilestoneDay,
+  localDateISO,
+  pickMessage,
   type NudgeContext,
   type NudgeLocale,
+  type NudgePriority,
 } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -36,11 +46,12 @@ import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
 import { verifyBearerSecret } from '../lib/cronAuth';
 import { fetchCyclingForecast } from '../lib/clients/openMeteo';
+import { cityKey, findNearestCity } from '../lib/nudges/cities';
 import { dispatchNudge } from '../lib/nudges/dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from '../lib/nudges/eligibility';
-import { areNudgesEnabled } from '../lib/nudges/killSwitch';
+import { areNudgesEnabled, isCityPulseEnabled } from '../lib/nudges/killSwitch';
 import { pickHighestPriorityTrigger } from '../lib/nudges/priorityQueue';
-import { resolveUserLocation } from '../lib/nudges/userLocation';
+import { resolveUserLocation, type UserLocation } from '../lib/nudges/userLocation';
 import {
   errorResponseSchema,
   nudgesAttributeRequestSchema,
@@ -137,6 +148,9 @@ const ACTIONABLE_TRIGGERS: readonly NudgeTrigger[] = [
   'daily_ride_reminder',
   'lapsed_reengagement',
   'streak_lost_apology',
+  // Social-proof ride ask — "join them?" means a completed ride counts as
+  // the attributed action (plan doc §Telemetry).
+  'city_riders_pulse',
 ];
 
 // ---------------------------------------------------------------------------
@@ -272,6 +286,14 @@ export const buildNudgeRoutes = (
         }
 
         const db = ensureSupabase();
+
+        // City Riders Pulse: seed nudge_schedule rows for riders who became
+        // eligible (first completed trip) since the last tick. Organic-only —
+        // dormant riders get seeded when they next ride.
+        if (isCityPulseEnabled()) {
+          await seedCityPulseSchedules(db, request.log);
+        }
+
         const userCandidates = await buildUserCandidateMap(db, request.log);
 
         let evaluated = 0;
@@ -346,6 +368,14 @@ export const buildNudgeRoutes = (
             const forecast = await fetchCyclingForecast(location.lat, location.lon);
             const badWeatherNow = forecast ? isBadCyclingWeather(forecast) : true;
 
+            // City Riders Pulse guarantee: past 5 days unsent → escalate the
+            // candidate to P2 so it wins the next allowed slot.
+            const hasCityPulse = liveCandidates.includes('city_riders_pulse');
+            const priorityOverrides =
+              hasCityPulse && isGuaranteeBreached(ctx.cityPulseLastSentAt ?? null)
+                ? ({ city_riders_pulse: 2 as NudgePriority } as const)
+                : undefined;
+
             const decision = pickHighestPriorityTrigger({
               candidates: liveCandidates,
               profile,
@@ -358,6 +388,7 @@ export const buildNudgeRoutes = (
               // Cron path: cron-sourced P0 (milestone backstop) must respect
               // quiet hours so it never buzzes overnight (review 2026-06-12).
               enforceQuietHours: true,
+              priorityOverrides,
             });
 
             const baseContext: NudgeContext = {
@@ -383,19 +414,91 @@ export const buildNudgeRoutes = (
               suppressed++;
             }
 
+            // City pulse lost the slot or was suppressed this tick: transient
+            // outcomes (weather/sunset/quiet-hours/cap/slot) leave the schedule
+            // due so it retries next tick; permanent-ish gates (consent off,
+            // anonymous, no device) redraw 1–5 days out to avoid tick-spam.
+            if (hasCityPulse && decision.trigger !== 'city_riders_pulse') {
+              const pulseConsidered = decision.considered.find(
+                (c) => c.trigger === 'city_riders_pulse',
+              );
+              const pulseOutcome =
+                pulseConsidered && !pulseConsidered.result.eligible
+                  ? pulseConsidered.result.outcome
+                  : 'lost_slot';
+              await updateCityPulseSchedule(db, userId, pulseOutcome, location);
+            }
+
             if (!decision.trigger) continue;
 
             const tokens = await fetchPushTokens(userId);
 
+            // City pulse dispatch extras: the synthetic N (deterministic per
+            // city+date), the rotation inputs, and the escalated priority.
+            let dispatchContext = baseContext;
+            let sendDateISO: string | undefined;
+            let recentVariantIds: readonly string[] | undefined;
+            let priorityOverride: NudgePriority | undefined;
+            if (decision.trigger === 'city_riders_pulse') {
+              const city = findNearestCity(location.lat, location.lon);
+              const utcOffsetHours = city?.utcOffsetHours ?? 2;
+              const dateISO = localDateISO(new Date(), utcOffsetHours);
+              // Bad weather is suppressed upstream by the safety floor, so the
+              // factor here is 1.0 (good) or 0.6 (mediocre); the ?? is defensive.
+              const weatherFactor = getCityPulseWeatherFactor(forecast) ?? 0.6;
+              const key = city
+                ? cityKey(city)
+                : `fallback|${location.lat.toFixed(1)},${location.lon.toFixed(1)}`;
+              const count = computeCityRiderCount(
+                key,
+                city?.population ?? CITY_PULSE_FALLBACK_POPULATION,
+                city?.countryCode ?? '',
+                dateISO,
+                weatherFactor,
+              );
+              recentVariantIds = await fetchRecentCityPulseVariants(db, userId);
+              sendDateISO = dateISO;
+              priorityOverride = priorityOverrides?.city_riders_pulse;
+              dispatchContext = {
+                ...baseContext,
+                // city undefined → pedalVoice renders its localized
+                // "your city" fallback instead of a wrong name.
+                city: city?.name,
+                n: count.n,
+                rate: Math.round(count.rate * 10000) / 10000,
+                weatherFactor,
+              };
+              // Mirror the deterministic variant id into nudge_log.context —
+              // dispatchNudge re-derives the identical pick from the same
+              // rotation inputs.
+              const preview = pickMessage({
+                trigger: 'city_riders_pulse',
+                locale: 'en',
+                context: dispatchContext,
+                sassy,
+                userId,
+                sendDateISO,
+                recentVariantIds,
+              });
+              dispatchContext = { ...dispatchContext, variantId: preview.variantId };
+            }
+
             const dispatchResult = await dispatchNudge(db, {
               userId,
               trigger: decision.trigger,
-              context: baseContext,
+              context: dispatchContext,
               locale: 'en',
               sassy,
               pushTokens: tokens,
               outcome: 'scheduled',
+              priorityOverride,
+              sendDateISO,
+              recentVariantIds,
             });
+
+            if (decision.trigger === 'city_riders_pulse') {
+              await updateCityPulseSchedule(db, userId, dispatchResult.outcome, location);
+            }
 
             if (dispatchResult.outcome === 'sent') sent++;
             else suppressed++;
@@ -718,6 +821,8 @@ interface UserCandidateContext {
   readonly streakCount: number;
   readonly lastQualifyingDate: string | null;
   readonly lapsedDays?: number;
+  /** nudge_schedule.last_sent_at for city_riders_pulse (Bucket D users). */
+  readonly cityPulseLastSentAt?: string | null;
   readonly candidates: NudgeTrigger[];
 }
 
@@ -891,6 +996,40 @@ const buildUserCandidateMap = async (
     });
   }
 
+  // ─── Bucket D: City Riders Pulse — due schedule rows ───
+  if (isCityPulseEnabled()) {
+    const { data: dueRows, error: dueErr } = await db
+      .from('nudge_schedule')
+      .select('user_id, next_fire_at, last_sent_at')
+      .eq('trigger_id', 'city_riders_pulse')
+      .lte('next_fire_at', new Date().toISOString())
+      .limit(1000);
+
+    if (dueErr) {
+      log.warn(
+        { event: 'nudges_city_pulse_due_query_error', error: dueErr.message },
+        'city-pulse due-schedule query failed',
+      );
+    }
+
+    for (const row of (dueRows ?? []) as Array<{
+      user_id: string;
+      next_fire_at: string;
+      last_sent_at: string | null;
+    }>) {
+      const existing = map.get(row.user_id);
+      const candidates = existing ? [...existing.candidates] : [];
+      candidates.push('city_riders_pulse');
+      map.set(row.user_id, {
+        streakCount: existing?.streakCount ?? 0,
+        lastQualifyingDate: existing?.lastQualifyingDate ?? null,
+        lapsedDays: existing?.lapsedDays,
+        cityPulseLastSentAt: row.last_sent_at,
+        candidates,
+      });
+    }
+  }
+
   return map;
 };
 
@@ -995,6 +1134,135 @@ const isCommunitySignalEligible = async (
   const priorRank = rows[1]!.rank;
   // Higher rank number = worse position. Dropping = rank increases.
   return currentRank - priorRank >= COMMUNITY_RANK_DROP_THRESHOLD;
+};
+
+// ---------------------------------------------------------------------------
+// City Riders Pulse schedule management
+// ---------------------------------------------------------------------------
+
+/**
+ * Seed `nudge_schedule` rows for riders with a trip in the last 7 days who
+ * don't have one yet: next_fire_at = now + U(0…5 days) at a random minute in
+ * the 07:00–21:30 local window. Runs every evaluate tick; the 7-day trips
+ * window bounds the scan while guaranteeing every newly-active rider is
+ * caught (their first trip is by definition recent). Dormant riders seed on
+ * their next ride — no backfill needed.
+ */
+const seedCityPulseSchedules = async (
+  db: ReturnType<typeof ensureSupabase>,
+  log: import('fastify').FastifyBaseLogger,
+): Promise<void> => {
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: tripRows, error: tripsErr } = await db
+      .from('trips')
+      .select('user_id')
+      .gte('started_at', since)
+      .not('started_at', 'is', null)
+      .limit(2000);
+    if (tripsErr || !tripRows?.length) return;
+
+    const userIds = [...new Set((tripRows as Array<{ user_id: string }>).map((r) => r.user_id))];
+
+    const { data: existingRows } = await db
+      .from('nudge_schedule')
+      .select('user_id')
+      .eq('trigger_id', 'city_riders_pulse')
+      .in('user_id', userIds);
+    const seeded = new Set(
+      ((existingRows ?? []) as Array<{ user_id: string }>).map((r) => r.user_id),
+    );
+
+    for (const userId of userIds) {
+      if (seeded.has(userId)) continue;
+      const location = await resolveUserLocation(db, userId);
+      const city = findNearestCity(location.lat, location.lon);
+      const fireAt = drawInitialFireAt(new Date(), Math.random, city?.utcOffsetHours ?? 2);
+      await db.from('nudge_schedule').upsert(
+        {
+          user_id: userId,
+          trigger_id: 'city_riders_pulse',
+          next_fire_at: fireAt.toISOString(),
+          last_sent_at: null,
+        },
+        { onConflict: 'user_id,trigger_id', ignoreDuplicates: true },
+      );
+    }
+  } catch (err) {
+    log.warn(
+      { event: 'nudges_city_pulse_seed_error', error: (err as Error).message },
+      'city-pulse seeding failed',
+    );
+  }
+};
+
+/**
+ * Outcomes that keep the schedule row due so the pulse retries next tick:
+ * lost the priority slot, daily cap, quiet hours, and the safety floor
+ * (weather/sunset — these deliberately override the 5-day guarantee).
+ */
+const CITY_PULSE_TRANSIENT_OUTCOMES = new Set([
+  'lost_slot',
+  'suppressed_cap',
+  'suppressed_quiet_hours',
+  'suppressed_weather',
+  'suppressed_sunset',
+  'suppressed_qualified_already',
+]);
+
+/**
+ * Advance the schedule after a tick in which the pulse resolved:
+ *   - 'sent' → stamp last_sent_at and draw the next fire 1–5 days out.
+ *   - permanent-ish gates (consent off, anonymous, no token, expo error) →
+ *     redraw next_fire_at WITHOUT stamping last_sent_at, so the row doesn't
+ *     re-log a suppression every 30-min tick.
+ *   - transient gates → leave the row due (retry next tick).
+ */
+const updateCityPulseSchedule = async (
+  db: ReturnType<typeof ensureSupabase>,
+  userId: string,
+  outcome: string,
+  location: UserLocation,
+): Promise<void> => {
+  if (CITY_PULSE_TRANSIENT_OUTCOMES.has(outcome)) return;
+
+  const utcOffsetHours = findNearestCity(location.lat, location.lon)?.utcOffsetHours ?? 2;
+  const now = new Date();
+  const nextFireAt = drawNextFireAt(now, Math.random, utcOffsetHours);
+  const patch =
+    outcome === 'sent'
+      ? {
+          next_fire_at: nextFireAt.toISOString(),
+          last_sent_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        }
+      : { next_fire_at: nextFireAt.toISOString(), updated_at: now.toISOString() };
+
+  await db
+    .from('nudge_schedule')
+    .update(patch)
+    .eq('user_id', userId)
+    .eq('trigger_id', 'city_riders_pulse');
+};
+
+/**
+ * Last variant ids actually sent to this user for the pulse (most recent
+ * first) — the per-send rotation skips them so no line repeats within four
+ * sends.
+ */
+const fetchRecentCityPulseVariants = async (
+  db: ReturnType<typeof ensureSupabase>,
+  userId: string,
+): Promise<readonly string[]> => {
+  const { data } = await db
+    .from('nudge_log')
+    .select('variant_id')
+    .eq('user_id', userId)
+    .eq('trigger_id', 'city_riders_pulse')
+    .eq('outcome', 'sent')
+    .order('created_at', { ascending: false })
+    .limit(CITY_PULSE_ROTATION_MEMORY);
+  return ((data ?? []) as Array<{ variant_id: string }>).map((r) => r.variant_id);
 };
 
 /**

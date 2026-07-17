@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { areNudgesEnabled, isAnonPushEnabled } from './killSwitch';
+import { areNudgesEnabled, isAnonPushEnabled, isCityPulseEnabled } from './killSwitch';
 
 describe('areNudgesEnabled', () => {
   const original = process.env.NUDGES_ENABLED;
@@ -106,5 +106,36 @@ describe('isAnonPushEnabled', () => {
   it('trims surrounding whitespace before comparing', () => {
     process.env.ANON_PUSH_ENABLED = '  true  ';
     expect(isAnonPushEnabled()).toBe(true);
+  });
+});
+
+describe('isCityPulseEnabled', () => {
+  const original = process.env.CITY_PULSE_ENABLED;
+
+  beforeEach(() => {
+    delete process.env.CITY_PULSE_ENABLED;
+  });
+
+  afterEach(() => {
+    if (original === undefined) delete process.env.CITY_PULSE_ENABLED;
+    else process.env.CITY_PULSE_ENABLED = original;
+  });
+
+  it('defaults to enabled when unset', () => {
+    expect(isCityPulseEnabled()).toBe(true);
+  });
+
+  it('disables on explicit false / 0 / off (case-insensitive)', () => {
+    for (const value of ['false', 'FALSE', '0', 'off', ' Off ']) {
+      process.env.CITY_PULSE_ENABLED = value;
+      expect(isCityPulseEnabled()).toBe(false);
+    }
+  });
+
+  it('stays enabled for true and unrecognized values (fail open like NUDGES_ENABLED)', () => {
+    for (const value of ['true', '1', 'on', 'garbage']) {
+      process.env.CITY_PULSE_ENABLED = value;
+      expect(isCityPulseEnabled()).toBe(true);
+    }
   });
 });

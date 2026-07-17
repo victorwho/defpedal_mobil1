@@ -251,7 +251,10 @@ describe('Catalog completeness', () => {
   });
 
   it('TRIGGERS_BY_PRIORITY lists all triggers, ordered ascending by priority', () => {
-    expect(new Set(TRIGGERS_BY_PRIORITY).size).toBe(TRIGGER_LIST.length);
+    // TRIGGER_LIST covers the sticky-catalog triggers; city_riders_pulse is
+    // catalogued separately (per-send rotation) but still counts here.
+    expect(new Set(TRIGGERS_BY_PRIORITY).size).toBe(TRIGGER_LIST.length + 1);
+    expect(TRIGGERS_BY_PRIORITY).toContain('city_riders_pulse');
     for (let i = 1; i < TRIGGERS_BY_PRIORITY.length; i++) {
       const prev = getTriggerPriority(TRIGGERS_BY_PRIORITY[i - 1]!);
       const curr = getTriggerPriority(TRIGGERS_BY_PRIORITY[i]!);
