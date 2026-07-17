@@ -220,8 +220,6 @@ export const ro: TranslationKeys = {
     reportHazard: 'Raportează hazard',
     showElevation: 'Arată altitudinea',
     hideElevation: 'Ascunde altitudinea',
-    showMenu: 'Arată meniul',
-    hideMenu: 'Ascunde meniul',
     maneuverA11y: '{{description}}, în {{distance}}',
     tapReplay: 'Atinge pentru a auzi din nou indicația',
     offlineNoInternet: 'Offline — fără conexiune la internet',

@@ -223,8 +223,6 @@ export const en = {
     reportHazard: 'Report hazard',
     showElevation: 'Show elevation',
     hideElevation: 'Hide elevation',
-    showMenu: 'Show menu',
-    hideMenu: 'Hide menu',
     // Accessibility (screen-reader) labels for the HUD
     maneuverA11y: '{{description}}, in {{distance}}',
     tapReplay: 'Tap to hear instruction again',

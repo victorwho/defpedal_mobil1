@@ -62,14 +62,31 @@ const CollapsibleSheet = ({
 }) => {
   const reducedMotion = useReducedMotion();
   const t = useT();
-  const [expanded, setExpanded] = useState(true);
+  // Collapsed by default — map-first: the peek strip carries the one-line
+  // summary and the rider drags/taps up for full details.
+  const [expanded, setExpanded] = useState(false);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
   // Use a ref so panResponder closures always read the current collapsed height,
   // even if peekContent changes after the first render (e.g. route loads async).
   const effectiveCollapsedRef = useRef(HANDLE_HEIGHT);
   effectiveCollapsedRef.current = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
-  const sheetHeight = useRef(new Animated.Value(effectiveExpanded)).current;
-  const expandedRef = useRef(true);
+  const sheetHeight = useRef(new Animated.Value(effectiveCollapsedRef.current)).current;
+  const expandedRef = useRef(false);
+
+  // The sheet now starts collapsed, so the collapsed height can change after
+  // mount: the peek row only exists once the route has loaded. Re-snap the
+  // animated height when peek content appears/disappears while collapsed,
+  // otherwise the peek row would be clipped at the handle-only height.
+  const hasPeekContent = Boolean(peekContent);
+  useEffect(() => {
+    if (expandedRef.current) return;
+    Animated.spring(sheetHeight, {
+      toValue: hasPeekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT,
+      useNativeDriver: false,
+      tension: 50,
+      friction: 10,
+    }).start();
+  }, [hasPeekContent, sheetHeight]);
 
   // One-shot drag-handle teaching pulse on first idle. Suppressed by reduced
   // motion. Doesn't replay on remount because handle visibility is the same

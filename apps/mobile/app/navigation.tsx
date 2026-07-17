@@ -381,7 +381,6 @@ function NavigationScreen() {
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
   const [hazardDescription, setHazardDescription] = useState('');
-  const [showMenu, setShowMenu] = useState(false);
   const [showElevationProgress, setShowElevationProgress] = useState(false);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   // Open when the rider chose "Save" from the End Ride dialog while ending the
@@ -658,7 +657,7 @@ function NavigationScreen() {
     setHazardPickerOpen(true);
   };
 
-  const speak = useCallback((message: string) => {
+  const speak = useCallback((message: string, options?: { allowWhenOffRoute?: boolean }) => {
     const currentState = useAppStore.getState();
     const session = currentState.navigationSession;
     if (
@@ -667,6 +666,14 @@ function NavigationScreen() {
       session.isMuted ||
       currentState.appState !== 'NAVIGATING'
     ) {
+      return;
+    }
+
+    // While off-route the step index recalculates every GPS tick, which would
+    // otherwise re-announce the next instruction over and over. Keep voice
+    // quiet until the rider is back on the route; only the one-time off-route
+    // notice and explicit user taps pass allowWhenOffRoute.
+    if (session.offRouteSince != null && !options?.allowWhenOffRoute) {
       return;
     }
 
@@ -685,7 +692,10 @@ function NavigationScreen() {
       return;
     }
 
-    if (currentStep) {
+    // Don't immediately read the current step while off-route — voice resumes
+    // once the rider is back on the route.
+    const session = useAppStore.getState().navigationSession;
+    if (currentStep && session?.offRouteSince == null) {
       Speech.speak(currentStep.instruction, {
         language: routeRequest.locale,
       });
@@ -887,13 +897,15 @@ function NavigationScreen() {
 
     const activeStep = selectedRoute.steps[progress.currentStepIndex] ?? null;
 
-    if (progress.shouldPreAnnounce && activeStep) {
+    // Suppress instruction announcements while off-route — don't mark them
+    // either, so the instruction still fires once the rider rejoins the route.
+    if (!progress.isOffRoute && progress.shouldPreAnnounce && activeStep) {
       markPreAnnouncement(activeStep.id);
       const dist = Math.round(progress.distanceToManeuverMeters ?? 200);
       speak(t('nav.inMeters', { distance: dist, instruction: activeStep.instruction }));
     }
 
-    if (progress.shouldAnnounceApproach && activeStep) {
+    if (!progress.isOffRoute && progress.shouldAnnounceApproach && activeStep) {
       markApproachAnnouncement(activeStep.id);
       speak(t('nav.inMeters', { distance: 50, instruction: activeStep.instruction }));
     }
@@ -903,10 +915,13 @@ function NavigationScreen() {
       advanceNavigation(selectedRoute.steps.length);
     }
 
-    // Announce off-route once when transitioning from on-route to off-route
+    // Announce off-route once when transitioning from on-route to off-route,
+    // cutting any instruction that is mid-utterance. Voice then stays silent
+    // (speak() guard) until the rider is back on the route.
     if (progress.isOffRoute && !offRouteAnnouncedRef.current) {
       offRouteAnnouncedRef.current = true;
-      speak(t('nav.offRoute'));
+      void Speech.stop();
+      speak(t('nav.offRoute'), { allowWhenOffRoute: true });
     } else if (!progress.isOffRoute) {
       offRouteAnnouncedRef.current = false;
     }
@@ -1139,7 +1154,10 @@ function NavigationScreen() {
             onPress={() => {
               if (currentStep) {
                 const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);
-                speak(t('nav.inMeters', { distance: dist, instruction: currentStep.instruction }));
+                // Explicit tap — repeat the instruction even while off-route.
+                speak(t('nav.inMeters', { distance: dist, instruction: currentStep.instruction }), {
+                  allowWhenOffRoute: true,
+                });
               }
             }}
           />
@@ -1248,44 +1266,6 @@ function NavigationScreen() {
               />
             </View>
           ) : null}
-
-          {/* Menu toggle + expanded nav icons */}
-          {showMenu ? (
-            <>
-              <View style={styles.roundButton}>
-                <IconButton
-                  icon={<Ionicons name="time-outline" size={22} color={gray[300]} />}
-                  onPress={() => { setShowMenu(false); router.push('/history'); }}
-                  accessibilityLabel={t('tabs.history')}
-                  variant="secondary"
-                />
-              </View>
-              <View style={styles.roundButton}>
-                <IconButton
-                  icon={<Ionicons name="people-outline" size={22} color={gray[300]} />}
-                  onPress={() => { setShowMenu(false); router.push('/community'); }}
-                  accessibilityLabel={t('tabs.community')}
-                  variant="secondary"
-                />
-              </View>
-              <View style={styles.roundButton}>
-                <IconButton
-                  icon={<Ionicons name="person-outline" size={22} color={gray[300]} />}
-                  onPress={() => { setShowMenu(false); router.push('/profile'); }}
-                  accessibilityLabel={t('tabs.profile')}
-                  variant="secondary"
-                />
-              </View>
-            </>
-          ) : null}
-          <View style={styles.roundButton}>
-            <IconButton
-              icon={<Ionicons name={showMenu ? 'close' : 'menu'} size={22} color={gray[300]} />}
-              onPress={() => setShowMenu((prev) => !prev)}
-              accessibilityLabel={showMenu ? t('nav.hideMenu') : t('nav.showMenu')}
-              variant="secondary"
-            />
-          </View>
 
           {/* End ride — distinct danger-styled stop button */}
           <View style={styles.endRideButton}>

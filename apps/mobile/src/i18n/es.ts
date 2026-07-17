@@ -220,8 +220,6 @@ export const es: TranslationKeys = {
     reportHazard: 'Reportar peligro',
     showElevation: 'Mostrar altitud',
     hideElevation: 'Ocultar altitud',
-    showMenu: 'Mostrar menú',
-    hideMenu: 'Ocultar menú',
     maneuverA11y: '{{description}}, en {{distance}}',
     tapReplay: 'Toca para escuchar la indicación de nuevo',
     offlineNoInternet: 'Sin conexión — sin internet',
