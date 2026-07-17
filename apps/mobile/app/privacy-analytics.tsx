@@ -48,6 +48,12 @@ export default function PrivacyAnalyticsScreen() {
   const handlePosthogToggle = useCallback(
     (next: boolean) => {
       setAnalyticsConsent({ sentry: sentryConsent, posthog: next });
+      if (next) {
+        // Opt-in prompt measurement (docs/plans/analytics-optin-prompts.md):
+        // record Settings as the conversion source — this also permanently
+        // retires all three contextual opt-in prompts.
+        useAppStore.getState().markAnalyticsPromptConverted('settings');
+      }
     },
     [setAnalyticsConsent, sentryConsent],
   );

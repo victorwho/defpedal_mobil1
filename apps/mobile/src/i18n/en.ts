@@ -297,6 +297,23 @@ export const en = {
     error: 'Sign-in didn’t finish — your ride is still here. Try again anytime.',
   },
 
+  // ── Product-analytics opt-in prompts (docs/plans/analytics-optin-prompts.md) ──
+  analyticsOptIn: {
+    successToast: 'Thanks — you’re shaping the roadmap now.',
+    noThanks: 'No thanks',
+    dismissA11y: 'Dismiss analytics prompt',
+    footer: 'Anonymous. No GPS tracks. Off anytime in Profile › Privacy.',
+    p1Title: 'Help decide what Pedal builds next',
+    p1Body: 'Two rides in — you clearly get it. Share anonymous usage stats and the features you use most get built first.',
+    p1Cta: 'Count me in',
+    p2Title: 'You just made the map safer',
+    p2Body: 'That report helps riders nearby. Want to help us the same way? Anonymous usage stats show us what’s working.',
+    p2Cta: 'Share anonymous stats',
+    p3Title: 'You track your stats. Let us track ours?',
+    p3Body: 'Anonymous usage events tell us which safety features actually get used — so we double down on the right ones.',
+    p3Cta: 'Turn on analytics',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profile',

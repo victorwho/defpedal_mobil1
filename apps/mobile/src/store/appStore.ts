@@ -45,6 +45,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 
 import { getDeviceLocale, type Locale } from '../i18n';
+import { DEFAULT_ANALYTICS_PROMPT_STATE } from '../lib/analytics-optin';
 import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
   INITIAL_CELEBRATION_WANTS,
@@ -192,6 +193,17 @@ type AppStore = QueueSlice & {
   saveRidePrompt: { lastShownRide: number; dismissCount: number };
   markSaveRidePromptShown: (rideCount: number) => void;
   recordSaveRidePromptDismiss: () => void;
+  // ── Product-analytics opt-in prompts (docs/plans/analytics-optin-prompts.md) ──
+  // USER-scoped — cleared by resetUserScopedState (a new account is a new
+  // consent relationship). Gating in src/lib/analytics-optin.ts; session
+  // arbitration vs SaveRideCard/ReviewPromptCard in src/lib/prompt-arbitration.ts.
+  analyticsPrompt: import('../lib/analytics-optin').AnalyticsPromptState;
+  markAnalyticsPromptShown: (promptId: string) => void;
+  recordAnalyticsPromptDismiss: () => void;
+  /** Records what flipped PostHog on (prompt id or 'settings'). First source wins. */
+  markAnalyticsPromptConverted: (source: string) => void;
+  recordImpactDashboardVisit: () => void;
+  markHazardReported: () => void;
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
@@ -637,6 +649,43 @@ export const useAppStore = create<AppStore>()(
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
       completedRideCount: 0,
       saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
+      analyticsPrompt: DEFAULT_ANALYTICS_PROMPT_STATE,
+      markAnalyticsPromptShown: (promptId) =>
+        set((state) => ({
+          analyticsPrompt: {
+            ...state.analyticsPrompt,
+            asksShown: state.analyticsPrompt.asksShown.includes(promptId)
+              ? state.analyticsPrompt.asksShown
+              : [...state.analyticsPrompt.asksShown, promptId],
+            lastAskAt: new Date().toISOString(),
+          },
+        })),
+      recordAnalyticsPromptDismiss: () =>
+        set((state) => ({
+          analyticsPrompt: {
+            ...state.analyticsPrompt,
+            dismissCount: state.analyticsPrompt.dismissCount + 1,
+          },
+        })),
+      markAnalyticsPromptConverted: (source) =>
+        set((state) =>
+          state.analyticsPrompt.convertedBy !== null
+            ? {}
+            : { analyticsPrompt: { ...state.analyticsPrompt, convertedBy: source } },
+        ),
+      recordImpactDashboardVisit: () =>
+        set((state) => ({
+          analyticsPrompt: {
+            ...state.analyticsPrompt,
+            impactDashboardVisits: state.analyticsPrompt.impactDashboardVisits + 1,
+          },
+        })),
+      markHazardReported: () =>
+        set((state) =>
+          state.analyticsPrompt.hasReportedHazard
+            ? {}
+            : { analyticsPrompt: { ...state.analyticsPrompt, hasReportedHazard: true } },
+        ),
       markSaveRidePromptShown: (rideCount) =>
         set((state) => ({
           saveRidePrompt: {
@@ -1290,6 +1339,8 @@ export const useAppStore = create<AppStore>()(
           // Save-ride prompt is user-scoped: a new account = new relationship,
           // so the ask schedule and dismissal cap start over.
           saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
+          // Analytics opt-in prompts are user-scoped for the same reason.
+          analyticsPrompt: DEFAULT_ANALYTICS_PROMPT_STATE,
           ratingSkipCount: 0,
           notificationPermissionAsked: false,
           anonymousOpenCount: 0,
@@ -1382,6 +1433,7 @@ export const useAppStore = create<AppStore>()(
         reviewPromptState: state.reviewPromptState,
         completedRideCount: state.completedRideCount,
         saveRidePrompt: state.saveRidePrompt,
+        analyticsPrompt: state.analyticsPrompt,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
         quizCountryPreference: state.quizCountryPreference,

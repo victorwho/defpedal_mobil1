@@ -1,7 +1,7 @@
 import type { ImpactDashboard } from '@defensivepedal/core';
 import { formatMicrolivesAsTime, formatCommunitySeconds } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -35,8 +35,15 @@ import {
   textSm,
   textXs,
 } from '../src/design-system/tokens/typography';
+import { AnalyticsOptInCard } from '../src/design-system/organisms/AnalyticsOptInCard';
 import { StreakCard } from '../src/design-system/organisms/StreakCard';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { riderTiers, getTierProgress, getNextTier, getXpToNextTier, type RiderTierKey } from '../src/design-system/tokens/tierColors';
+import {
+  isImpactDashboardTriggered,
+  shouldShowAnalyticsPrompt,
+} from '../src/lib/analytics-optin';
+import { claimPromptSlot } from '../src/lib/prompt-arbitration';
 import { mobileApi } from '../src/lib/api';
 import { brandTints } from '../src/design-system/tokens/tints';
 import { useAppStore } from '../src/store/appStore';
@@ -130,6 +137,33 @@ export default function ImpactDashboardScreen() {
     queryFn: () => mobileApi.fetchImpactDashboard(tz),
     staleTime: 5 * 60_000,
   });
+
+  // Analytics opt-in prompt 3 ("you like data, we like data"): record the
+  // visit, then latch eligibility ONCE per mount — the card records "shown"
+  // on mount, which would re-fail a live check. Someone on their 3rd+ stats
+  // visit has revealed they value measurement (spec rationale).
+  const [showAnalyticsPrompt, setShowAnalyticsPrompt] = useState(false);
+  const [analyticsToast, setAnalyticsToast] = useState<string | null>(null);
+  const analyticsEvaluatedRef = useRef(false);
+  useEffect(() => {
+    if (analyticsEvaluatedRef.current) return;
+    analyticsEvaluatedRef.current = true;
+    const store = useAppStore.getState();
+    store.recordImpactDashboardVisit();
+    const fresh = useAppStore.getState();
+    if (
+      fresh.appState !== 'NAVIGATING' &&
+      isImpactDashboardTriggered(fresh.analyticsPrompt.impactDashboardVisits) &&
+      shouldShowAnalyticsPrompt('impact_dashboard', {
+        posthogEnabled: fresh.analyticsConsent.posthog,
+        state: fresh.analyticsPrompt,
+        now: new Date(),
+      }) &&
+      claimPromptSlot('analytics')
+    ) {
+      setShowAnalyticsPrompt(true);
+    }
+  }, []);
 
   const treeEquivalent = data ? (data.totalCo2SavedKg / 21).toFixed(1) : '0';
 
@@ -348,7 +382,30 @@ export default function ImpactDashboardScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </Surface>
+
+          {/* Analytics opt-in prompt 3 — bottom of the scroll, after Recent
+              Badges (spec placement). */}
+          {showAnalyticsPrompt ? (
+            <AnalyticsOptInCard
+              promptId="impact_dashboard"
+              onConverted={() => {
+                setShowAnalyticsPrompt(false);
+                setAnalyticsToast(t('analyticsOptIn.successToast'));
+              }}
+              onDismiss={() => setShowAnalyticsPrompt(false)}
+            />
+          ) : null}
         </ScrollView>
+      ) : null}
+
+      {analyticsToast ? (
+        <View style={styles.toastContainer} pointerEvents="box-none">
+          <Toast
+            message={analyticsToast}
+            variant="success"
+            onDismiss={() => setAnalyticsToast(null)}
+          />
+        </View>
       ) : null}
     </SafeAreaView>
   );
@@ -385,6 +442,13 @@ const createThemedStyles = (colors: ThemeColors) =>
       paddingHorizontal: space[5],
       gap: space[4],
       paddingTop: space[2],
+    },
+    toastContainer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: space[6],
+      alignItems: 'center',
     },
     // Cards
     card: {

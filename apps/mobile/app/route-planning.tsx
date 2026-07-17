@@ -425,6 +425,8 @@ export default function RoutePlanningScreen() {
       hazardType: 'other',
       ...(trimmed.length > 0 ? { description: trimmed } : {}),
     });
+    // Analytics opt-in prompt 2 trigger evidence (first hazard report).
+    useAppStore.getState().markHazardReported();
     setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate, hazardType: 'other' });
     if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
     hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
@@ -445,6 +447,8 @@ export default function RoutePlanningScreen() {
         source: 'armchair',
         hazardType,
       });
+      // Analytics opt-in prompt 2 trigger evidence (first hazard report).
+      useAppStore.getState().markHazardReported();
       setPendingHazardCoordinate(null);
       setHazardPickerOpen(false);
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: pendingHazardCoordinate, hazardType });
@@ -491,6 +495,8 @@ export default function RoutePlanningScreen() {
         source: 'manual',
         hazardType: selectedHazardType,
       });
+      // Analytics opt-in prompt 2 trigger evidence (first hazard report).
+      useAppStore.getState().markHazardReported();
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
       if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
       hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);

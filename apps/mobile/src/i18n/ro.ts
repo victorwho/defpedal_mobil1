@@ -293,6 +293,23 @@ export const ro: TranslationKeys = {
     error: 'Autentificarea nu s-a finalizat — tura ta e tot aici. Încearcă oricând.',
   },
 
+  // ── Product-analytics opt-in prompts (docs/plans/analytics-optin-prompts.md) ──
+  analyticsOptIn: {
+    successToast: 'Mulțumim — de acum contribui la planurile noastre.',
+    noThanks: 'Nu, mulțumesc',
+    dismissA11y: 'Închide sugestia de analiză',
+    footer: 'Anonim. Fără trasee GPS. Se poate opri oricând din Profil › Confidențialitate.',
+    p1Title: 'Ajută-l pe Pedal să aleagă ce construim',
+    p1Body: 'Două ture deja — clar te-ai prins. Trimite statistici anonime de utilizare și funcțiile pe care le folosești ajung primele pe listă.',
+    p1Cta: 'Mă bag',
+    p2Title: 'Tocmai ai făcut harta mai sigură',
+    p2Body: 'Raportul tău ajută bicicliștii din zonă. Vrei să ne ajuți și pe noi la fel? Statisticile anonime ne arată ce funcționează.',
+    p2Cta: 'Trimite statistici anonime',
+    p3Title: 'Tu îți urmărești statisticile. Ne lași și pe noi?',
+    p3Body: 'Evenimentele anonime de utilizare ne spun ce funcții de siguranță se folosesc cu adevărat — ca să investim în cele care contează.',
+    p3Cta: 'Activează analizele',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Profil',

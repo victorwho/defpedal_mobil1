@@ -312,6 +312,9 @@ function DiagnosticsContent() {
   const completedRideCount = useAppStore((state) => state.completedRideCount);
   const activationLadder = useAppStore((state) => state.activationLadder);
   const notifyActivationLadder = useAppStore((state) => state.notifyActivationLadder);
+  const saveRidePrompt = useAppStore((state) => state.saveRidePrompt);
+  const analyticsPrompt = useAppStore((state) => state.analyticsPrompt);
+  const posthogConsent = useAppStore((state) => state.analyticsConsent.posthog);
   const queueDeveloperValidationWrites = useAppStore(
     (state) => state.queueDeveloperValidationWrites,
   );
@@ -322,6 +325,7 @@ function DiagnosticsContent() {
   const [screenError, setScreenError] = useState<string | null>(null);
   const [devStatusMessage, setDevStatusMessage] = useState<string | null>(null);
   const [ladderDevMessage, setLadderDevMessage] = useState<string | null>(null);
+  const [growthDevMessage, setGrowthDevMessage] = useState<string | null>(null);
   const [holoTier, setHoloTier] = useState<BadgeTier>('gold');
   const [foregroundPermission, setForegroundPermission] = useState<string>('unknown');
   const [backgroundPermission, setBackgroundPermission] = useState<string>('unknown');
@@ -703,6 +707,78 @@ function DiagnosticsContent() {
       {screenError ? (
         <DiagnosticCard title="Diagnostics issue" tone="warning">
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>{screenError}</Text>
+        </DiagnosticCard>
+      ) : null}
+
+      {/* Growth-prompt dev tool — same dual production gate as fake-GPS. */}
+      {mobileEnv.appVariant !== 'production' && mobileEnv.appEnv !== 'production' ? (
+        <DiagnosticCard title="Growth prompts (dev)">
+          <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+            Save-ride card (rides 1/3/8+5, anonymous only, 2 dismissals = off)
+            and analytics opt-in prompts (once each, 3 lifetime, 14-day
+            spacing, 2 dismissals = off, retired when analytics is ON). Reset
+            buttons let you retest without clearing app data. Restart the app
+            between prompt tests — session arbitration allows only one ask
+            surface per session.
+          </Text>
+          <View style={styles.metricGrid}>
+            <MetricBlock label="Ride count" value={String(completedRideCount)} />
+            <MetricBlock label="Anonymous" value={isAnonymous ? 'Yes' : 'No'} />
+            <MetricBlock label="Analytics consent" value={posthogConsent ? 'ON (prompts retired)' : 'off'} />
+            <MetricBlock
+              label="Save-ride"
+              value={`shown@${saveRidePrompt.lastShownRide} / ${saveRidePrompt.dismissCount} dismissals`}
+            />
+            <MetricBlock
+              label="Analytics asks"
+              value={
+                analyticsPrompt.asksShown.length > 0
+                  ? `${analyticsPrompt.asksShown.join(', ')} / ${analyticsPrompt.dismissCount} dismissals`
+                  : `none / ${analyticsPrompt.dismissCount} dismissals`
+              }
+            />
+            <MetricBlock
+              label="Last ask"
+              value={
+                analyticsPrompt.lastAskAt
+                  ? new Date(analyticsPrompt.lastAskAt).toLocaleString()
+                  : 'never'
+              }
+            />
+            <MetricBlock label="Converted by" value={analyticsPrompt.convertedBy ?? 'none'} />
+            <MetricBlock label="Dashboard visits" value={String(analyticsPrompt.impactDashboardVisits)} />
+            <MetricBlock label="Hazard reported" value={analyticsPrompt.hasReportedHazard ? 'Yes' : 'No'} />
+          </View>
+          {growthDevMessage ? (
+            <Text style={[styles.helperText, { color: colors.textMuted }]}>{growthDevMessage}</Text>
+          ) : null}
+          <View style={styles.buttonRow}>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              accessibilityLabel="Reset growth prompt state and ride counter"
+              onPress={() => {
+                useAppStore.setState({
+                  saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
+                  analyticsPrompt: {
+                    asksShown: [],
+                    dismissCount: 0,
+                    lastAskAt: null,
+                    convertedBy: null,
+                    impactDashboardVisits: 0,
+                    hasReportedHazard: false,
+                  },
+                  completedRideCount: 0,
+                });
+                setGrowthDevMessage(
+                  'Prompt state + ride counter reset. Next completed ride is ride #1 (save-ride card if anonymous); ride #2 fires analytics prompt 1. Restart the app first if another prompt card already showed this session.',
+                );
+              }}
+            >
+              Reset prompts + ride counter
+            </Button>
+          </View>
         </DiagnosticCard>
       ) : null}
 

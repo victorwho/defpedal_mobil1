@@ -293,6 +293,23 @@ export const es: TranslationKeys = {
     error: 'El inicio de sesión no terminó — tu ruta sigue aquí. Inténtalo cuando quieras.',
   },
 
+  // ── Product-analytics opt-in prompts (docs/plans/analytics-optin-prompts.md) ──
+  analyticsOptIn: {
+    successToast: 'Gracias — ahora ayudas a definir el rumbo.',
+    noThanks: 'No, gracias',
+    dismissA11y: 'Cerrar el aviso de analíticas',
+    footer: 'Anónimo. Sin rutas GPS. Desactívalo cuando quieras en Perfil › Privacidad.',
+    p1Title: 'Ayuda a decidir qué construimos',
+    p1Body: 'Dos rutas ya — está claro que le pillas el punto. Comparte estadísticas anónimas y las funciones que más usas se construyen primero.',
+    p1Cta: 'Cuenta conmigo',
+    p2Title: 'Acabas de hacer el mapa más seguro',
+    p2Body: 'Ese aviso ayuda a ciclistas cercanos. ¿Nos ayudas igual? Las estadísticas anónimas nos muestran qué funciona.',
+    p2Cta: 'Compartir estadísticas anónimas',
+    p3Title: 'Tú sigues tus estadísticas. ¿Nos dejas seguir las nuestras?',
+    p3Body: 'Los eventos anónimos de uso nos dicen qué funciones de seguridad se usan de verdad — para apostar por las correctas.',
+    p3Cta: 'Activar analíticas',
+  },
+
   // ── Profile ──
   profile: {
     title: 'Perfil',

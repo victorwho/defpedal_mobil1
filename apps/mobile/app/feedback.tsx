@@ -34,6 +34,7 @@ import {
 import { Button, Surface } from '../src/design-system/atoms';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
+import { AnalyticsOptInCard } from '../src/design-system/organisms/AnalyticsOptInCard';
 import { ReviewPromptCard } from '../src/design-system/organisms/ReviewPromptCard';
 import { SaveRideCard } from '../src/design-system/organisms/SaveRideCard';
 import { useCelebrationStage } from '../src/design-system/hooks/useCelebrationStage';
@@ -46,6 +47,12 @@ import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
 import { fontFamily, text2xl, textBase, textSm } from '../src/design-system/tokens/typography';
 import { mobileApi } from '../src/lib/api';
+import {
+  isPostSecondRideTriggered,
+  shouldShowAnalyticsPrompt,
+  type AnalyticsPromptId,
+} from '../src/lib/analytics-optin';
+import { claimPromptSlot } from '../src/lib/prompt-arbitration';
 import { shouldShowSaveRidePrompt } from '../src/lib/save-ride-prompt';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useShareCard } from '../src/hooks/useShareCard';
@@ -121,9 +128,15 @@ type ImpactStepProps = {
    * summary, before the action buttons.
    */
   readonly saveRideSlot?: ReactNode;
+  /**
+   * Analytics opt-in card slot (prompts 1/2, gated + arbitrated in the
+   * parent — mutually exclusive with saveRideSlot by arbitration). Same
+   * slot family, same position.
+   */
+  readonly analyticsOptInSlot?: ReactNode;
 };
 
-const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors, streakCount, saveRideSlot }: ImpactStepProps) => {
+const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors, streakCount, saveRideSlot, analyticsOptInSlot }: ImpactStepProps) => {
   const t = useT();
   return (
     <ScrollView
@@ -142,6 +155,7 @@ const ImpactStep = ({ rideImpact, onContinue, onShare, isSharing, styles, colors
       />
 
       {saveRideSlot}
+      {analyticsOptInSlot}
 
       <View style={styles.impactActions}>
         <Button
@@ -272,7 +286,10 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
         lastFeedbackNegative: rating < 4,
       },
     });
-    if (decision !== null) {
+    // Session arbitration (analytics-optin plan): the review card yields if
+    // an analytics opt-in card already showed this session — never two asks
+    // in one session. SaveRide + review coexisting is unchanged behavior.
+    if (decision !== null && claimPromptSlot('review')) {
       setShowReviewCard(true);
     }
   };
@@ -633,25 +650,59 @@ export default function FeedbackScreen() {
   const appStateForPrompt = useAppStore((s) => s.appState);
   const [saveRideVisible, setSaveRideVisible] = useState(false);
   const [saveRideToast, setSaveRideToast] = useState<string | null>(null);
+  // Analytics opt-in prompts 1 (post-second-ride) + 2 (post-first-hazard,
+  // deferred here from route-planning — see the plan's implementer's-choice
+  // note). At most one can latch per visit.
+  const [analyticsPromptId, setAnalyticsPromptId] = useState<AnalyticsPromptId | null>(null);
+  const [analyticsToast, setAnalyticsToast] = useState<string | null>(null);
   const saveRideEvaluatedRef = useRef(false);
 
-  // Evaluate eligibility ONCE per screen visit, after auth settles. The card
-  // records "shown" on mount, which would immediately re-fail a live-computed
+  // Evaluate eligibility ONCE per screen visit, after auth settles. The cards
+  // record "shown" on mount, which would immediately re-fail a live-computed
   // check — so the verdict is latched into state (same pattern as
-  // showReviewCard on the rating step).
+  // showReviewCard on the rating step). Order encodes the arbitration
+  // priority: SaveRideCard claims its session slot FIRST; the analytics
+  // prompts only claim when the save-ride card didn't (claimPromptSlot also
+  // blocks analytics when a review/save-ride card showed earlier this
+  // session, and vice versa — spec: never in the same session).
   useEffect(() => {
     if (saveRideEvaluatedRef.current) return;
     if (!authCtx || authCtx.isLoading) return;
     saveRideEvaluatedRef.current = true;
+
     if (
       shouldShowSaveRidePrompt({
         isAnonymous: authCtx.isAnonymous,
         completedRideCount: completedRideCountForPrompt,
         state: saveRidePromptState,
         isNavigating: appStateForPrompt === 'NAVIGATING',
-      })
+      }) &&
+      claimPromptSlot('save_ride')
     ) {
       setSaveRideVisible(true);
+      return;
+    }
+
+    const store = useAppStore.getState();
+    const analyticsGate = {
+      posthogEnabled: store.analyticsConsent.posthog,
+      state: store.analyticsPrompt,
+      now: new Date(),
+    };
+    const candidate: AnalyticsPromptId | null = isPostSecondRideTriggered(
+      completedRideCountForPrompt,
+    )
+      ? 'post_second_ride'
+      : store.analyticsPrompt.hasReportedHazard
+        ? 'post_first_hazard'
+        : null;
+    if (
+      candidate !== null &&
+      appStateForPrompt !== 'NAVIGATING' &&
+      shouldShowAnalyticsPrompt(candidate, analyticsGate) &&
+      claimPromptSlot('analytics')
+    ) {
+      setAnalyticsPromptId(candidate);
     }
   }, [authCtx, completedRideCountForPrompt, saveRidePromptState, appStateForPrompt]);
 
@@ -721,6 +772,18 @@ export default function FeedbackScreen() {
                 </View>
               ) : null
             }
+            analyticsOptInSlot={
+              analyticsPromptId !== null ? (
+                <AnalyticsOptInCard
+                  promptId={analyticsPromptId}
+                  onConverted={() => {
+                    setAnalyticsPromptId(null);
+                    setAnalyticsToast(t('analyticsOptIn.successToast'));
+                  }}
+                  onDismiss={() => setAnalyticsPromptId(null)}
+                />
+              ) : null
+            }
           />
         ) : (
           <RatingStep
@@ -761,6 +824,17 @@ export default function FeedbackScreen() {
             message={saveRideToast}
             variant="success"
             onDismiss={() => setSaveRideToast(null)}
+          />
+        </View>
+      ) : null}
+
+      {/* Analytics opt-in success toast */}
+      {analyticsToast ? (
+        <View style={styles.shareToastContainer} pointerEvents="box-none">
+          <Toast
+            message={analyticsToast}
+            variant="success"
+            onDismiss={() => setAnalyticsToast(null)}
           />
         </View>
       ) : null}

@@ -624,6 +624,8 @@ function NavigationScreen() {
       hazardType,
       ...(trimmed && trimmed.length > 0 ? { description: trimmed } : {}),
     });
+    // Analytics opt-in prompt 2 trigger evidence (first hazard report).
+    useAppStore.getState().markHazardReported();
     telemetry.capture('hazard_report_queued', {
       source: 'manual',
       hazard_type: hazardType,
