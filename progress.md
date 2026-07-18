@@ -1,6 +1,6 @@
 # Implementation Progress
 
-Last updated: 2026-07-18 (session 93b — City Riders Pulse DEPLOYED to production: migration applied, Cloud Run `defpedal-api-00115-dfv`, single-user test send verified on the consented test account; reach stays consent-gated on notify_riding_tips — 0 other registered users opted in at deploy time)
+Last updated: 2026-07-18 (session 93c — preview-package FCM credentials fixed (error-log #69): Expo had no FCM V1 key for com.defensivepedal.mobile.preview, so ALL server pushes to preview installs failed silently; key uploaded via expo.dev, delivery verified on device; Victor's pulse re-armed for 2026-07-19 ~07:30 EEST. Earlier: session 93b — City Riders Pulse DEPLOYED to production: migration applied, Cloud Run `defpedal-api-00115-dfv`, single-user test send verified on the consented test account; reach stays consent-gated on notify_riding_tips — 0 other registered users opted in at deploy time)
 
 This file tracks the mobile app implementation progress against `mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
