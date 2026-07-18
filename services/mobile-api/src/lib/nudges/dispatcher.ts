@@ -65,6 +65,13 @@ export interface DispatchResult {
 }
 
 /**
+ * Mask a push token for telemetry: keep the last 6 characters of the inner
+ * id — enough to correlate against push_tokens rows, without writing full
+ * send-capable tokens into analytics contexts.
+ */
+const maskPushToken = (token: string): string => `…${token.replace(/\]$/, '').slice(-6)}`;
+
+/**
  * Persist a nudge_log row and (if outcome is 'sent') fire the push.
  *
  * Returns a record describing what landed. Throws only on truly unexpected
@@ -154,9 +161,13 @@ export const dispatchNudge = async (
 
   // Send to every registered device for the user; succeed if at least one
   // ticket lands. Collect dead tokens from the in-ticket DeviceNotRegistered
-  // signal so we can prune them (item 22).
+  // signal so we can prune them (item 22). Track every per-token failure —
+  // "sent" only means ONE token got a ticket, which is exactly how the
+  // months-long InvalidCredentials outage stayed invisible (error-log #69).
   let firstTicketId: string | null = null;
+  let ticketCount = 0;
   const deadTokens: string[] = [];
+  const tokenErrors: Array<{ token: string; code: string }> = [];
   for (const token of req.pushTokens) {
     const result = await sendPushNotification({
       to: token,
@@ -171,7 +182,15 @@ export const dispatchNudge = async (
       },
       categoryId: 'nudge',
     });
-    if (result.ticketId && !firstTicketId) firstTicketId = result.ticketId;
+    if (result.ticketId) {
+      ticketCount++;
+      if (!firstTicketId) firstTicketId = result.ticketId;
+    } else {
+      tokenErrors.push({
+        token: maskPushToken(result.token),
+        code: result.errorCode ?? 'unknown',
+      });
+    }
     if (isDeadTokenError(result.errorCode)) deadTokens.push(result.token);
   }
 
@@ -188,7 +207,9 @@ export const dispatchNudge = async (
   const finalOutcome: DispatchRequest['outcome'] = firstTicketId ? 'sent' : 'expo_error';
   const now = new Date().toISOString();
 
-  // Update the scheduled row to its final post-send state.
+  // Update the scheduled row to its final post-send state, folding the
+  // per-token fan-out summary into context so a partially-failing send
+  // (e.g. 1 of 4 tokens deliverable) is visible in telemetry.
   if (nudgeLogId) {
     await db
       .from('nudge_log')
@@ -196,6 +217,14 @@ export const dispatchNudge = async (
         outcome: finalOutcome,
         sent_at: finalOutcome === 'sent' ? now : null,
         expo_ticket_id: firstTicketId,
+        context: {
+          ...req.context,
+          delivery: {
+            tokens: req.pushTokens.length,
+            tickets: ticketCount,
+            ...(tokenErrors.length > 0 ? { errors: tokenErrors } : {}),
+          },
+        },
       })
       .eq('id', nudgeLogId);
   }
