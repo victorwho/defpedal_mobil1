@@ -1,6 +1,6 @@
 # City Riders Pulse — social-proof ride nudge
 
-**Status:** IMPLEMENTED on main 2026-07-17 (session 93) — NOT deployed; see "Deployment steps" at the bottom
+**Status:** LIVE in production since 2026-07-18 (Cloud Run `defpedal-api-00115-dfv`, migration applied). Effective reach is consent-gated: only users with "Riding tips & reminders" ON can receive it — at deploy time that was a single test account (victorrotariu@gmail.com), which received a verified send (sassy-v6, Bucharest, n=136,867, weatherFactor 0.6) at 07:17 EEST on 2026-07-18. Broader reach happens as users opt into the toggle; kill switch `CITY_PULSE_ENABLED=false` remains the rollback.
 **One-liner:** a push notification — "1,240 people are cycling in Bucharest today. Join them?" — where N is a synthetic number proportional to city size, fired at a random time on random days, never between 22:00–07:00, and guaranteed at least once every 5 days.
 
 ## Where it lives
@@ -168,7 +168,9 @@ Core: `cityPulse.ts` (seeded N, next-fire draw, deadline boost — pure, vitest-
 
 Whether Râșnov-sized towns (N ≈ 100–200) feel motivating or sad — could raise the floor or switch small towns to county-level numbers. Whether to A/B fact-wording vs estimate-wording via the existing variant buckets before committing to fact-wording fleet-wide.
 
-## Deployment steps (manual — none of these have been executed)
+## Deployment steps (EXECUTED 2026-07-18 — steps 1–3 done: migration applied, image built, revision `defpedal-api-00115-dfv` live; kept for re-deploys)
+
+Post-deploy observations from the first live send (2026-07-18): (a) 76 schedule rows seeded on the first tick (riders with a trip in the last 7 days); only the consented test account received a push, zero suppression spam (others' draws land over the coming days). (b) `{n}` renders without thousands separators ("136867" not "136,867") — cosmetic polish TODO in `renderTemplate` before wide adoption. (c) The standard-time (winter) utcOffset makes summer evening draws land up to 1h later in true local time — an evening draw near the 21:30 ceiling can land ~21:57 EEST or after sunset, where the DST-correct quiet-hours/sunset gates catch it and roll the send to the next morning. Within spec (safety floor overrides), but storing the IANA tz instead of a fixed offset would tighten it.
 
 Implemented 2026-07-17. Code lives in: `packages/core/src/cityPulse.ts` (formula + schedule draws), `packages/core/src/pedalVoice.ts` (80-variant catalog, per-send rotation), `services/mobile-api/src/lib/nudges/cities.ts` + `citiesData.ts` (GeoNames dataset, 5,516 cities — regenerate with `scripts/generate-cities-dataset.mjs`), eligibility/queue/dispatcher wiring in `services/mobile-api/src/lib/nudges/` + `src/routes/nudges.ts`, migration `supabase/migrations/202607170001_nudge_schedule.sql`, mobile tap case in `apps/mobile/src/lib/push-notifications.ts`.
 
