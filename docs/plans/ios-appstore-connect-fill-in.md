@@ -80,7 +80,7 @@ COMMUNITY
 Share rides, react and comment, and follow the City Heartbeat dashboard to feel your city's cycling pulse.
 
 PRIVACY
-Crash diagnostics are minimal and you can opt out. Product analytics are off by default. We never sell your data and we don't use it for advertising. Full policy at routes.defensivepedal.com/privacy.
+Crash diagnostics and product analytics are anonymous, and you can turn either off anytime in Profile › Privacy. We never sell your data and we don't use it for advertising. Full policy at routes.defensivepedal.com/privacy.
 
 Ride safer. Pedal defensively.
 ```
@@ -120,7 +120,7 @@ Declare these data types — each is **Linked to user = Yes**, **Used for tracki
 | Diagnostics → **Crash Data** (Sentry) | App Functionality, Analytics — *mark **Not** linked* |
 | Diagnostics → **Performance Data** | App Functionality, Analytics — *mark **Not** linked* |
 
-> **Photos — CONFIRMED collected (2026-06-10):** the profile avatar uploads to Supabase Storage (`profile.tsx:100` `.from('avatars').upload(...)`), so **Photos or Videos must be declared** (Linked to user = Yes, tracking = No, App Functionality). The Diagnostics rows reflect the consent split: Sentry crash/perf is on by default (opt-out) and anonymised → mark **Not Linked**; PostHog product analytics is opt-in (off by default) but still declared since it *can* collect Product Interaction.
+> **Photos — CONFIRMED collected (2026-06-10):** the profile avatar uploads to Supabase Storage (`profile.tsx:100` `.from('avatars').upload(...)`), so **Photos or Videos must be declared** (Linked to user = Yes, tracking = No, App Functionality). The Diagnostics rows reflect the consent split: Sentry crash/perf is on by default (opt-out) and anonymised → mark **Not Linked**; PostHog product analytics is **on by default since 2026-07-19 (opt-out in Settings)** and declared since it collects Product Interaction — still anonymous, so Not Linked, tracking = No.
 
 ---
 

@@ -75,7 +75,7 @@ This is where most of our affirmative answers land.
 | Question | Answer | Source of truth |
 |---|---|---|
 | Does the app share personal information with other users? | **Yes — limited** | Username and display name on hazard reports, comments, and shared trips. No email, phone, or contact info shown. Avatar photo if set. See `apps/mobile/app/community-feed.tsx`. |
-| Does the app share personal information with third parties? | **Yes — disclosed** | Supabase (DB + auth), Mapbox (maps), Sentry (crash reports — opt-in), PostHog (analytics — opt-in). Full list in privacy policy at `routes.defensivepedal.com/privacy`. |
+| Does the app share personal information with third parties? | **Yes — disclosed** | Supabase (DB + auth), Mapbox (maps), Sentry (crash reports — on by default, opt-out in Settings), PostHog (analytics — on by default since 2026-07-19, opt-out in Settings). Full list in privacy policy at `routes.defensivepedal.com/privacy`. |
 | Can users edit / remove their personal info? | **Yes** | Profile editing in app. Full account deletion at Profile → Account → Delete account, or via web at `routes.defensivepedal.com/account-deletion`. |
 
 ## Category 8 — Location

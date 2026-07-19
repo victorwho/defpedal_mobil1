@@ -7,7 +7,7 @@
 > as the final filed version** until counsel has reviewed and signed the
 > back-page certification block.
 
-- **Document version:** 0.1
+- **Document version:** 0.1 (+ amendment log below)
 - **Date drafted:** 2026-04-27
 - **Author:** Victor Rotariu (data controller)
 - **Reviewers required before sign-off:** Romanian legal counsel; ANSPDCP
@@ -15,6 +15,14 @@
 - **Next review trigger:** any of the following — adding paid features, adding
   ad SDKs, expanding beyond Romania, migrating Supabase out of US region,
   introducing new processors, or after 12 months elapsed.
+
+### Amendment log
+
+| Date | Change | Impact on this DPIA |
+|---|---|---|
+| 2026-05-25 | Consent split (see `consent-split-2026-05-25.md`): Sentry → default ON under legitimate interest; PostHog → default OFF, consent basis. | Resolved risk **R6** in the "default OFF for PostHog" direction the risk entry anticipated. |
+| 2026-07-16 | Onboarding consent screen removed; Settings (Profile › Privacy & analytics) became the single control surface, with a transparency notice on the first onboarding screen. | The "consent screen" mitigations cited under R6 no longer exist in that form. |
+| 2026-07-19 | **PostHog default flipped back to ON** (controller decision, commit `a01aadb`, session 95b) — **without the counsel review that R6 and §4.1 call for**. Opt-out in Settings; explicit user choices preserved across upgrades; disclosure via onboarding notice + Privacy Policy. App now ships EU-wide (31 countries), not Romania-only. | **R6 is LIVE AGAIN in amplified form**: the body of this draft still describes product analytics under Art 6(1)(a) consent (§ purposes table), but shipped behavior is default-ON/opt-out, which is a legitimate-interest-style posture ePrivacy does not clearly permit for analytics. This conflict is deliberately left visible for counsel. The §4.1 item "Romanian counsel decision on default-ON PostHog consent" is the review gate — still open. |
 
 ---
 
@@ -52,7 +60,7 @@ mitigations in section 4 explicitly address this re-identification risk.
 | Maintain trip history, achievements, leaderboard, badges | (b) Performance of contract |
 | Detect and warn about hazards reported by other riders | (b) Performance of contract; (f) Legitimate interest in rider safety |
 | Capture crash reports for diagnostics | (f) Legitimate interest with `sendDefaultPii: false` ; **opt-out available** |
-| Capture product analytics for usage measurement | (a) **Explicit consent** required (PostHog anonymous-event posture is partial mitigation; full consent at first launch and re-consent screen in Profile) |
+| Capture product analytics for usage measurement | (a) **Explicit consent** required (PostHog anonymous-event posture is partial mitigation; full consent at first launch and re-consent screen in Profile). ⚠️ **Shipped behavior diverges since 2026-07-19: default-ON with Settings opt-out — see amendment log + R6.** |
 | Send push notifications (daily weather, weekly impact, social digest) | (b) Performance of contract for transactional notifications; per-channel toggles available in Profile for marketing-style channels |
 | Comply with legal obligations (DSA UGC moderation, GDPR rights, OUG 34) | (c) Compliance with legal obligation |
 
@@ -66,7 +74,7 @@ mitigations in section 4 explicitly address this re-identification risk.
 | **Open-Meteo** | Weather + AQI lookups | EU (Germany) | Approximate location (rounded for weather lookup) |
 | **OSRM** (self-hosted on GCP) | Safety-scored routing engine | EU (`europe-central2-c`, IP `34.116.139.172`) | Route start / end coordinates **(plaintext HTTP, see R5)** |
 | **Sentry** | Crash reports (opt-in) | EU (`de.sentry.io`) | Stack traces, device model, OS version. **No PII** (`sendDefaultPii: false`) |
-| **PostHog** | Product analytics (opt-in) | EU | Event names, anonymous ID, screen names. **No GPS, no PII** |
+| **PostHog** | Product analytics (**on by default since 2026-07-19, opt-out in Settings** — see amendment log) | EU | Event names, anonymous ID, screen names. **No GPS, no PII** |
 | **Expo Push** | Push notification delivery | US (Expo / Cloudflare) | Push token + notification payload (no GPS in payload) |
 | **Resend** (planned, see retention runbook) | Inactive-warning email mailer | EU | Email address only |
 
@@ -92,7 +100,7 @@ mitigations in section 4 explicitly address this re-identification risk.
 | User-generated content | Hazard descriptions, ride-share captions, comments | Standard, post-moderation |
 | Device / technical | Device model, OS version, app version, push token | Standard |
 | Crash diagnostics (opt-in) | Stack traces, breadcrumbs | Standard |
-| Product analytics events (opt-in) | Anonymous event names, screen names | Standard |
+| Product analytics events (on by default since 2026-07-19, opt-out) | Anonymous event names, screen names | Standard |
 | Server access logs | IP address, request timestamp | Standard, 12-month retention |
 
 No special-category data (Art. 9) is processed: no health data, no political
@@ -269,6 +277,13 @@ significant / maximum), and the resulting risk level.
   flagged in compliance plan item 8.**
 - **Residual risk:** Pending counsel review. May escalate to "default OFF
   for PostHog" depending on counsel's read.
+- **2026-07-19 note (see amendment log):** this risk was resolved on
+  2026-05-25 (PostHog default OFF) and then knowingly re-opened on
+  2026-07-19 by controller decision, now WITHOUT a consent screen at all —
+  mitigations are the first-screen transparency notice, the Settings
+  opt-out with immediate effect, the anonymous/no-GPS event posture, and
+  preservation of explicit user choices. The counsel question above is
+  unchanged and now applies EU-wide, not just Romania.
 
 ### R7 — Supabase data residency in US region
 

@@ -1,5 +1,16 @@
 # Consent split decision — 2026-05-25
 
+> ⚠️ **Partially superseded 2026-07-19.** The **PostHog row** of this decision
+> (default OFF, Art 6(1)(a) consent basis) was overridden by the controller:
+> PostHog now defaults **ON** with a Settings opt-out (commit `a01aadb`,
+> session 95b), without the ANSPDCP/ePrivacy review this memo's framework
+> anticipated. Explicit user choices (`capturedAt !== null`) still survive
+> every upgrade, and `capturedAt` is still never stamped by defaults. The
+> **Sentry row is unchanged** (default ON, legitimate interest). Current
+> policy source of truth: `.claude/CLAUDE.md` telemetry section +
+> `docs/legal/dpia.md` amendment log. This memo remains the unedited record
+> of the 2026-05-25 decision.
+
 **Status:** decided and implemented in v0.2.77 (TBD release).
 **Authoriser:** Victor Rotariu (sole controller, Defensive Pedal).
 **Related work:** sentryfix.md item P0.1 (was blocking P3f fatal tagging).
