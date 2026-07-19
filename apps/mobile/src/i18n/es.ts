@@ -625,6 +625,9 @@ export const es: TranslationKeys = {
     tryAgainLater: 'Comprueba tu conexión e inténtalo de nuevo.',
     noRidesNearby: 'Aún no hay rutas compartidas cerca',
     beFirst: 'Completa una ruta y sé el primero en compartirla.',
+    // Etiqueta de alcance ampliado del feed
+    scopeRegion: 'Mostrando rutas de tu región',
+    scopeCommunity: 'Mostrando rutas de toda la comunidad Defensive Pedal',
   },
 
   // ── Community Stats ──

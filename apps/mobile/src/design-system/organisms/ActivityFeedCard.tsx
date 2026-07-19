@@ -79,15 +79,18 @@ const REPORT_TARGET_BY_ITEM_TYPE: Record<ActivityFeedItem['type'], ReportTargetT
 // Helpers
 // ---------------------------------------------------------------------------
 
-const formatRelativeTime = (isoDate: string): string => {
+type TranslateFn = (key: string, vars?: Record<string, string | number>) => string;
+
+const formatRelativeTime = (isoDate: string, t: TranslateFn): string => {
   const diff = Date.now() - new Date(isoDate).getTime();
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('feedCard.now');
+  if (minutes < 60) return t('feedCard.minsAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('feedCard.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
+  if (days < 7) return t('feedCard.daysAgo', { count: days });
+  // Older items (the feed now surfaces them — Change 3) show a locale date.
   return new Date(isoDate).toLocaleDateString();
 };
 
@@ -393,6 +396,7 @@ const CardHeader = React.memo(function CardHeader({
   onUserPress,
   styles,
 }: CardHeaderProps) {
+  const t = useT();
   return (
     <View style={styles.header}>
       <View style={styles.avatar}>
@@ -414,7 +418,7 @@ const CardHeader = React.memo(function CardHeader({
             )}
           </Pressable>
         </View>
-        <Text style={styles.timestamp}>{formatRelativeTime(timestamp)}</Text>
+        <Text style={styles.timestamp}>{formatRelativeTime(timestamp, t)}</Text>
       </View>
     </View>
   );

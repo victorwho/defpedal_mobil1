@@ -625,6 +625,9 @@ export const ro: TranslationKeys = {
     tryAgainLater: 'Verifică conexiunea și încearcă din nou.',
     noRidesNearby: 'Nicio cursă distribuită în apropiere',
     beFirst: 'Completează o cursă și fii primul care o distribuie!',
+    // Etichetă pentru aria lărgită a fluxului
+    scopeRegion: 'Îți arătăm curse din regiunea ta',
+    scopeCommunity: 'Îți arătăm curse din toată comunitatea Defensive Pedal',
   },
 
   // ── Community Stats ──

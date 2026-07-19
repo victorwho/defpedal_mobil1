@@ -100,6 +100,18 @@ function CommunityFeedScreen() {
     [data?.pages],
   );
 
+  // Ladder scope the server resolved for this feed (Change 2/3). Only
+  // rendered as a chip when the feed was widened beyond 'nearby' — an
+  // honest "you're seeing the wider community" note, never for the
+  // default local view.
+  const scopeUsed = data?.pages[0]?.scopeUsed;
+  const scopeChipLabel =
+    scopeUsed === 'region'
+      ? t('communityScreen.scopeRegion')
+      : scopeUsed === 'community'
+        ? t('communityScreen.scopeCommunity')
+        : null;
+
   // Merge activity items with "suggested users" separators every 10 items
   const mergedItems: readonly MergedItem[] = useMemo(() => {
     const result: MergedItem[] = [];
@@ -266,6 +278,14 @@ function CommunityFeedScreen() {
         onEndReachedThreshold={0.5}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        ListHeaderComponent={
+          scopeChipLabel && activityItems.length > 0 ? (
+            <View style={styles.scopeChip}>
+              <Ionicons name="earth-outline" size={14} color={colors.textSecondary} />
+              <Text style={styles.scopeChipText}>{scopeChipLabel}</Text>
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
@@ -402,6 +422,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       left: 16,
       right: 16,
       bottom: 80,
+    },
+    scopeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      backgroundColor: colors.bgSecondary,
+      borderWidth: 1,
+      borderColor: colors.borderDefault,
+    },
+    scopeChipText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '600',
     },
   });
 

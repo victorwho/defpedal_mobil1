@@ -633,6 +633,9 @@ export const en = {
     tryAgainLater: 'Check your connection and try again.',
     noRidesNearby: 'No rides shared nearby yet',
     beFirst: 'Complete a ride and be the first to share!',
+    // Community-visibility ladder scope chip (only shown when widened)
+    scopeRegion: 'Showing rides from your region',
+    scopeCommunity: 'Showing rides from across the Defensive Pedal community',
   },
 
   // ── Community Stats ──
