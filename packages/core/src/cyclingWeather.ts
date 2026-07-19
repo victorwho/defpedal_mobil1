@@ -44,6 +44,22 @@ export const CYCLING_WIND_MAX_KMH = 25;
 export const STORM_WEATHER_CODE_THRESHOLD = 71;
 
 // ---------------------------------------------------------------------------
+// Thresholds — safety-suppression boundary (isBadCyclingWeather)
+// ---------------------------------------------------------------------------
+// Exported so consumers that grade the in-between band (e.g. the City Pulse
+// variable weather factor) interpolate against the SAME boundaries the safety
+// floor enforces — the two can never drift apart.
+
+/** Below this min temp, riders must not be pushed onto icy roads. */
+export const BAD_TEMP_MIN_C = 2;
+/** Above this max temp, heat is a safety issue, not just discomfort. */
+export const BAD_TEMP_MAX_C = 35;
+/** Above this rain probability, suppress ride-asking pushes. */
+export const BAD_PRECIP_MAX_PCT = 60;
+/** Above this wind speed, gusts are dangerous for urban cyclists. */
+export const BAD_WIND_MAX_KMH = 40;
+
+// ---------------------------------------------------------------------------
 // Predicates
 // ---------------------------------------------------------------------------
 
@@ -78,11 +94,11 @@ export const isBadCyclingWeather = (f: CyclingForecast): boolean => {
   }
   if (f.weatherCode >= STORM_WEATHER_CODE_THRESHOLD) return true;
   // Freezing risk — riders shouldn't be pushed onto icy / slippery roads.
-  if (f.tempMin < 2) return true;
-  if (f.tempMax > 35) return true;
+  if (f.tempMin < BAD_TEMP_MIN_C) return true;
+  if (f.tempMax > BAD_TEMP_MAX_C) return true;
   // Heavy rain probability (well above the "happy day" threshold).
-  if (f.precipitationProbability > 60) return true;
+  if (f.precipitationProbability > BAD_PRECIP_MAX_PCT) return true;
   // Strong wind — gusty conditions are dangerous for urban cyclists.
-  if (f.windSpeedMax > 40) return true;
+  if (f.windSpeedMax > BAD_WIND_MAX_KMH) return true;
   return false;
 };

@@ -444,7 +444,8 @@ export const buildNudgeRoutes = (
               const utcOffsetHours = city?.utcOffsetHours ?? 2;
               const dateISO = localDateISO(new Date(), utcOffsetHours);
               // Bad weather is suppressed upstream by the safety floor, so the
-              // factor here is 1.0 (good) or 0.6 (mediocre); the ?? is defensive.
+              // factor here grades 0.4 (borderline) to 1.0 (good) by the worst
+              // forecast dimension; the ?? is defensive (missing forecast).
               const weatherFactor = getCityPulseWeatherFactor(forecast) ?? 0.6;
               const key = city
                 ? cityKey(city)

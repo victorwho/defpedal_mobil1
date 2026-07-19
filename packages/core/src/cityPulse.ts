@@ -19,7 +19,17 @@
  */
 
 import type { CyclingForecast } from './cyclingWeather';
-import { isBadCyclingWeather, isGoodCyclingDay } from './cyclingWeather';
+import {
+  BAD_PRECIP_MAX_PCT,
+  BAD_TEMP_MAX_C,
+  BAD_TEMP_MIN_C,
+  BAD_WIND_MAX_KMH,
+  CYCLING_PRECIP_MAX_PCT,
+  CYCLING_TEMP_MAX_C,
+  CYCLING_TEMP_MIN_C,
+  CYCLING_WIND_MAX_KMH,
+  isBadCyclingWeather,
+} from './cyclingWeather';
 import { djb2Hash } from './pedalVoice';
 
 // ---------------------------------------------------------------------------
@@ -70,7 +80,10 @@ export const COUNTRY_CYCLING_SHARE: Readonly<Record<string, CountryCyclingShare>
   NL: MEASURED(0.41),
   PL: ESTIMATED,
   PT: ESTIMATED,
-  RO: ESTIMATED,
+  // Calibrated 2026-07-19: the 8% EU-average estimate read ~60% too high on
+  // the ground (Bucharest pulse showed ~137k riders). 0.032 × the estimate
+  // mult (×1.5) gives a 4.8% base rate — 40% of the old figure.
+  RO: { share: 0.032, measured: false },
   SK: ESTIMATED,
   SI: ESTIMATED,
   ES: ESTIMATED,
@@ -107,20 +120,45 @@ const MINUTE_MS = 60 * 1000;
 // Weather factor
 // ---------------------------------------------------------------------------
 
+/** Weather factor at the safety-suppression boundary (worst allowed day). */
+export const CITY_PULSE_WEATHER_FACTOR_FLOOR = 0.4;
+
+/**
+ * How far `value` sits between the good-day limit (0) and the bad/suppress
+ * limit (1). Higher = worse; clamped to [0, 1].
+ */
+const degradation = (value: number, goodLimit: number, badLimit: number): number =>
+  clamp((value - goodLimit) / (badLimit - goodLimit), 0, 1);
+
 /**
  * Map a forecast onto the pulse weather factor:
- *   good ×1.0, mediocre ×0.6, bad → null (suppress the notification).
+ *   good ×1.0 … bad → null (suppress the notification), with the in-between
+ *   band graded CONTINUOUSLY instead of a flat ×0.6 (changed 2026-07-19).
+ *
+ * Each dimension (rain probability, wind, cold, heat) is interpolated between
+ * its happy-commuter limit (`CYCLING_*`, factor 1.0) and its safety-floor
+ * limit (`BAD_*`, factor 0.4); the WORST dimension decides — riders bail on
+ * the single worst condition, they don't average a cold morning against a
+ * calm wind. So a 22°C day at 35% rain reads ~0.9 while a 3°C drizzle day
+ * reads ~0.47, where both were a flat 0.6 before. Rounded to 2 decimals for
+ * clean telemetry.
  *
  * "Bad" reuses the nudge safety floor (`isBadCyclingWeather` — storms,
- * freezing, heavy rain, strong wind); "good" is the happy-commuter window
- * (`isGoodCyclingDay`); anything between is mediocre. A missing forecast
- * fails closed to null, consistent with the safety floor.
+ * freezing, heavy rain, strong wind). A missing forecast fails closed to
+ * null, consistent with the safety floor.
  */
 export const getCityPulseWeatherFactor = (
   forecast: CyclingForecast | null | undefined,
 ): number | null => {
   if (!forecast || isBadCyclingWeather(forecast)) return null;
-  return isGoodCyclingDay(forecast) ? 1.0 : 0.6;
+  const worst = Math.max(
+    degradation(forecast.precipitationProbability, CYCLING_PRECIP_MAX_PCT, BAD_PRECIP_MAX_PCT),
+    degradation(forecast.windSpeedMax, CYCLING_WIND_MAX_KMH, BAD_WIND_MAX_KMH),
+    degradation(CYCLING_TEMP_MIN_C - forecast.tempMin, 0, CYCLING_TEMP_MIN_C - BAD_TEMP_MIN_C),
+    degradation(forecast.tempMax - CYCLING_TEMP_MAX_C, 0, BAD_TEMP_MAX_C - CYCLING_TEMP_MAX_C),
+  );
+  const factor = 1 - (1 - CITY_PULSE_WEATHER_FACTOR_FLOOR) * worst;
+  return Math.round(factor * 100) / 100;
 };
 
 // ---------------------------------------------------------------------------
@@ -151,7 +189,7 @@ export interface CityRiderCount {
  *                 Combined with `dateISO` it seeds jitter + the 0–9 offset, so
  *                 every user in the city sees the identical N that day.
  * @param dateISO  local calendar date "YYYY-MM-DD" in the CITY's timezone.
- * @param weatherFactor  1.0 or 0.6 from `getCityPulseWeatherFactor` — callers
+ * @param weatherFactor  0.4–1.0 from `getCityPulseWeatherFactor` — callers
  *                 must suppress entirely (never call this) when it is null.
  */
 export const computeCityRiderCount = (

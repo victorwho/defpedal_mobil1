@@ -24,11 +24,15 @@ N = round( population × rate × weekday × season × weather )
 | `rate` | **per-country:** `clamp(mult × countryCyclingShare × jitter, 0.5%, 40%)`, where `mult = 3` for measured Eurobarometer shares and `mult = 1.5` for estimated/defaulted shares; **additionally capped at 9% when city population < 50k** (small towns make inflated percentages visibly false). `jitter` is a seeded draw in [0.85, 1.15] |
 | `weekday` | Sat/Sun ×1.15, else ×1.0 |
 | `season` | Apr–Sep ×1.0, Mar/Oct ×0.8, Nov–Feb ×0.5 |
-| `weather` | good ×1.0, mediocre ×0.6, bad → notification suppressed entirely |
+| `weather` | good ×1.0 … bad → suppressed; the in-between band grades **continuously ×1.0→×0.4** by the worst forecast dimension (was a flat ×0.6 until 2026-07-19 — see calibration history) |
 
 **Country cycling share** (`COUNTRY_CYCLING_SHARE` constant table in `cityPulse.ts`, keyed by the same ISO codes as `appAvailability.ts`): the share of people whose main daily transport mode is a bicycle, from the Eurobarometer mobility survey, with a `measured: boolean` flag per entry. Known anchors (measured, mult ×3): NL 41%, SE 21%, DE 15%, HU 14%, FI 13%, DK 12%, BE 12%, FR 3% ([Euronews/Eurobarometer](https://www.euronews.com/next/2023/09/19/cycling-in-europe-which-countries-and-cities-are-the-most-and-least-bicycle-friendly)). Countries without a sourced figure (incl. RO, ES, NO as of this writing) default to the 8% EU average with `measured: false` → mult ×1.5. Upgrading a country from guess to measured (flipping the flag once the Eurobarometer figure is confirmed) is a data edit.
 
 The **40% cap is still required**: 3 × NL's 41% = 123% of the population — without the clamp the formula claims more cyclists than inhabitants (SE also caps: 3 × 21% = 63%). Low-cycling countries land in a plausible range: FR 3 × 3% = 9%, defaulted countries 1.5 × 8% = 12%. If a specific country still reads wrong, adjust its table entry rather than the formula.
+
+**Calibration history:**
+- **RO (2026-07-19):** cut 60% from the EU-average default — `share: 0.032` (base rate 1.5 × 3.2% = 4.8%, jittered 4.08%–5.52%). Trigger: the first live Bucharest pulse (2026-07-18, mediocre Saturday) showed ~137k riders, judged far too high on the ground. Bucharest now reads ~55k in the same conditions. Side effect: RO towns under 50k sit below the 9% small-town cap, so the cap no longer binds for RO (Râșnov ≈ 1,447 → ~630).
+- **Variable weather factor (2026-07-19):** the flat mediocre ×0.6 became a continuous grade. Each dimension (rain probability, wind, cold, heat) interpolates between its good-day limit (`CYCLING_*`, ×1.0) and its safety-suppression limit (`BAD_*` — now exported from `cyclingWeather.ts` so the taper and the safety floor share one source of truth), the **worst dimension decides**, floor ×0.4 at the suppression boundary, rounded to 2 decimals. A barely-not-good day (33% rain) reads ×0.94 instead of cliffing to ×0.6; a 3°C morning reads ×0.47. `nudge_log.context.weatherFactor` now carries the graded value — dashboards segmenting on `weatherFactor = 0.6` must switch to range buckets.
 
 Round to a non-round figure (e.g. nearest 10 plus a small seeded offset — "1,240" reads like a count, "1,200" reads like a guess). Floor at ~40 so small towns don't produce "3 people are cycling".
 

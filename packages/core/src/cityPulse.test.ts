@@ -5,6 +5,7 @@ import {
   CITY_PULSE_MIN_N,
   CITY_PULSE_RATE_MAX,
   CITY_PULSE_SMALL_TOWN_RATE_CAP,
+  CITY_PULSE_WEATHER_FACTOR_FLOOR,
   CITY_PULSE_WINDOW_END_MINUTES,
   CITY_PULSE_WINDOW_START_MINUTES,
   COUNTRY_CYCLING_SHARE,
@@ -57,9 +58,12 @@ describe('COUNTRY_CYCLING_SHARE', () => {
     expect(COUNTRY_CYCLING_SHARE.BE).toEqual({ share: 0.12, measured: true });
     expect(COUNTRY_CYCLING_SHARE.FR).toEqual({ share: 0.03, measured: true });
     // Estimated countries default to the 8% EU average.
-    for (const code of ['RO', 'ES', 'NO', 'IS', 'LI', 'CH', 'IT', 'PL'] as const) {
+    for (const code of ['ES', 'NO', 'IS', 'LI', 'CH', 'IT', 'PL'] as const) {
       expect(COUNTRY_CYCLING_SHARE[code]).toEqual({ share: 0.08, measured: false });
     }
+    // RO calibrated down 60% from the EU-average estimate (2026-07-19) — the
+    // Bucharest pulse read ~137k with the 8% default, judged far too high.
+    expect(COUNTRY_CYCLING_SHARE.RO).toEqual({ share: 0.032, measured: false });
   });
 });
 
@@ -94,14 +98,26 @@ describe('computeCityRiderCount — rate clamps', () => {
   });
 
   it('caps towns under 50k at 9% regardless of country', () => {
-    // Râșnov-sized RO town: 1.5 × 8% × jitter ∈ [10.2%, 13.8%] — always above
-    // the small-town cap, so the cap must bind.
-    const town = computeCityRiderCount('RO|Râşnov|45.58', 15_253, 'RO', '2026-07-17', 1.0);
+    // Zakopane-sized PL town: 1.5 × 8% × jitter ∈ [10.2%, 13.8%] — always
+    // above the small-town cap, so the cap must bind.
+    const town = computeCityRiderCount('PL|Zakopane|49.29', 27_000, 'PL', '2026-07-17', 1.0);
     expect(town.rate).toBe(CITY_PULSE_SMALL_TOWN_RATE_CAP);
 
     // NL small town: would be 40% without the small-town cap.
     const nlTown = computeCityRiderCount('NL|Sneek|53.03', 33_000, 'NL', '2026-07-17', 1.0);
     expect(nlTown.rate).toBe(CITY_PULSE_SMALL_TOWN_RATE_CAP);
+
+    // RO towns now sit BELOW the cap (4.08%–5.52% after the 2026-07-19
+    // calibration) — the cap must not bind, the calibrated rate flows through.
+    const roTown = computeCityRiderCount('RO|Râşnov|45.58', 15_253, 'RO', '2026-07-17', 1.0);
+    expect(roTown.rate).toBeLessThan(CITY_PULSE_SMALL_TOWN_RATE_CAP);
+  });
+
+  it('RO rate reflects the 60% calibration cut (4.08%–5.52% after jitter)', () => {
+    const r = computeCityRiderCount('RO|Bucharest|44.43', 1_877_155, 'RO', '2026-07-17', 1.0);
+    // 1.5 × 3.2% × jitter ∈ [0.85, 1.15]
+    expect(r.rate).toBeGreaterThanOrEqual(0.0408);
+    expect(r.rate).toBeLessThanOrEqual(0.0552);
   });
 
   it('leaves mid-range countries between the clamps (FR ≈ 9%)', () => {
@@ -157,12 +173,54 @@ describe('computeCityRiderCount — factors and presentation', () => {
 });
 
 describe('getCityPulseWeatherFactor', () => {
-  it('maps good / mediocre / bad / missing correctly', () => {
+  it('maps good / bad / missing correctly', () => {
     expect(getCityPulseWeatherFactor(GOOD_FORECAST)).toBe(1.0);
-    expect(getCityPulseWeatherFactor(MEDIOCRE_FORECAST)).toBe(0.6);
     expect(getCityPulseWeatherFactor(STORM_FORECAST)).toBeNull();
     expect(getCityPulseWeatherFactor(null)).toBeNull();
     expect(getCityPulseWeatherFactor(undefined)).toBeNull();
+  });
+
+  it('grades the mediocre band continuously by severity (2026-07-19)', () => {
+    // tempMin 5 → cold degradation (10−5)/(10−2) = 0.625 → 1 − 0.6×0.625 = 0.63.
+    expect(getCityPulseWeatherFactor(MEDIOCRE_FORECAST)).toBe(0.63);
+    // Rain halfway between the good limit (30%) and suppression (60%) → 0.7.
+    expect(
+      getCityPulseWeatherFactor({ ...GOOD_FORECAST, precipitationProbability: 45 }),
+    ).toBe(0.7);
+    // Barely over the good limit stays near 1.0 — no more 40% cliff.
+    expect(
+      getCityPulseWeatherFactor({ ...GOOD_FORECAST, precipitationProbability: 33 }),
+    ).toBe(0.94);
+    // At the suppression boundary the factor bottoms out at the 0.4 floor.
+    expect(
+      getCityPulseWeatherFactor({ ...GOOD_FORECAST, precipitationProbability: 60 }),
+    ).toBe(CITY_PULSE_WEATHER_FACTOR_FLOOR);
+    // Wind halfway between 25 and 40 → 0.7.
+    expect(getCityPulseWeatherFactor({ ...GOOD_FORECAST, windSpeedMax: 32.5 })).toBe(0.7);
+    // Heat: 31.5°C is halfway between 28 and 35 → 0.7.
+    expect(getCityPulseWeatherFactor({ ...GOOD_FORECAST, tempMax: 31.5 })).toBe(0.7);
+  });
+
+  it('the worst dimension decides — no averaging across dimensions', () => {
+    // Rain at 0.5 degradation + wind at 0.2 degradation → still 0.7 (rain wins).
+    expect(
+      getCityPulseWeatherFactor({
+        ...GOOD_FORECAST,
+        precipitationProbability: 45,
+        windSpeedMax: 28,
+      }),
+    ).toBe(0.7);
+  });
+
+  it('is monotonic: strictly worse weather never raises the factor', () => {
+    let prev = 1.0;
+    for (let precip = 30; precip <= 60; precip += 5) {
+      const f = getCityPulseWeatherFactor({ ...GOOD_FORECAST, precipitationProbability: precip });
+      expect(f).not.toBeNull();
+      expect(f!).toBeLessThanOrEqual(prev);
+      prev = f!;
+    }
+    expect(prev).toBe(CITY_PULSE_WEATHER_FACTOR_FLOOR);
   });
 });
 
