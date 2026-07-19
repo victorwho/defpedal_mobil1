@@ -250,6 +250,24 @@ describe('buildWeatherSchedule', () => {
     expect(fires.length).toBeLessThanOrEqual(MAX_SCHEDULED_FIRES);
   });
 
+  it('cap truncation drops baseline draws, never the escalation fires', () => {
+    // A dense persisted chain: 10 future entries 6h apart inside the 3-day
+    // baseline window. With 4 escalation fires that's 14 candidates > the
+    // cap of 12 — the 4 escalation fires must ALL survive.
+    const dense = Array.from(
+      { length: 10 },
+      (_, k) => new Date(now.getTime() + (12 + 6 * k) * HOUR_MS),
+    );
+    const { fires } = buildWeatherSchedule(dense, now, () => 0.5);
+    expect(fires.length).toBeLessThanOrEqual(MAX_SCHEDULED_FIRES);
+    const escalationStart = new Date(2026, 6, 23, 10, 0, 0).getTime();
+    const survivingEscalation = fires.filter((f) => f.getTime() >= escalationStart);
+    expect(survivingEscalation.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < fires.length; i += 1) {
+      expect(fires[i].getTime()).toBeGreaterThan(fires[i - 1].getTime());
+    }
+  });
+
   it('returns the horizon-extended chain for persistence (superset window of fires)', () => {
     const { chain } = buildWeatherSchedule([], now, () => 0.5);
     expect(chain[chain.length - 1].getTime()).toBeGreaterThanOrEqual(

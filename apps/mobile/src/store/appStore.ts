@@ -124,6 +124,11 @@ type AppStore = QueueSlice & {
   // losing it would just re-roll the cadence, never duplicate notifications.
   dailyWeatherChain: string[];
   setDailyWeatherChain: (times: string[]) => void;
+  // Generation tag of the currently scheduled notification set — lets the
+  // cancel path reconstruct the ids by index when the OS refuses to
+  // enumerate scheduled notifications (review 2026-07-19, LOW).
+  dailyWeatherGeneration: string | null;
+  setDailyWeatherGeneration: (generation: string | null) => void;
   notifyHazard: boolean;
   notifyCommunity: boolean;
   quietHoursStart: string;
@@ -572,6 +577,7 @@ export const useAppStore = create<AppStore>()(
       avoidHills: false,
       notifyWeather: true,
       dailyWeatherChain: [],
+      dailyWeatherGeneration: null,
       notifyHazard: true,
       notifyCommunity: true,
       // Consent opt-in — default OFF, unlike every other notify pref.
@@ -914,6 +920,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ notifyWeather: enabled })),
       setDailyWeatherChain: (times) =>
         set(() => ({ dailyWeatherChain: times })),
+      setDailyWeatherGeneration: (generation) =>
+        set(() => ({ dailyWeatherGeneration: generation })),
       setNotifyHazard: (enabled) =>
         set(() => ({ notifyHazard: enabled })),
       setNotifyCommunity: (enabled) =>
@@ -1413,6 +1421,7 @@ export const useAppStore = create<AppStore>()(
         poiVisibility: state.poiVisibility,
         notifyWeather: state.notifyWeather,
         dailyWeatherChain: state.dailyWeatherChain,
+        dailyWeatherGeneration: state.dailyWeatherGeneration,
         notifyHazard: state.notifyHazard,
         notifyCommunity: state.notifyCommunity,
         notifyRidingTips: state.notifyRidingTips,

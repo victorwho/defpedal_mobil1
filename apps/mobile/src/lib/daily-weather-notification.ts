@@ -8,6 +8,7 @@ import {
 } from './daily-weather-messages';
 import {
   CHAIN_HORIZON_DAYS,
+  MAX_SCHEDULED_FIRES,
   buildWeatherSchedule,
   forecastDayIndex,
 } from './daily-weather-schedule';
@@ -22,16 +23,35 @@ const NOTIFICATION_ID_PREFIX = 'daily-weather-cycling';
 // into calendar day 7.
 const FORECAST_DAYS = CHAIN_HORIZON_DAYS + 1;
 
+type NotificationsModule = typeof import('expo-notifications');
+type AppStoreHook = typeof import('../store/appStore').useAppStore;
+
+// Test seam: the lazy `require()` calls below bypass vitest's module-mock
+// registry (same constraint that gave activation-ladder.ts its injected
+// notifier), so behavioral tests inject fakes here instead.
+let testOverrides: {
+  notifications?: NotificationsModule;
+  store?: AppStoreHook;
+} = {};
+
+export const __setDailyWeatherTestOverrides = (
+  overrides: typeof testOverrides,
+): void => {
+  testOverrides = overrides;
+};
+
 const getNotifications = () => {
+  if (testOverrides.notifications) return testOverrides.notifications;
   if (!hasNotificationsNativeModule()) return null;
   try {
-    return require('expo-notifications') as typeof import('expo-notifications');
+    return require('expo-notifications') as NotificationsModule;
   } catch {
     return null;
   }
 };
 
 const getAppStore = () => {
+  if (testOverrides.store) return testOverrides.store;
   // Lazy so node tests of the early-return paths never touch zustand persist.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useAppStore } = require('../store/appStore') as typeof import('../store/appStore');
@@ -68,10 +88,13 @@ const fetchForecastRows = async (
  * Cancel every weather notification EXCEPT the given generation (pass null
  * to cancel everything, e.g. from the Profile toggle-off). Covers all older
  * generations plus the pre-2026-07-18 legacy single id via the shared prefix.
+ * `staleGeneration` is the last generation recorded BEFORE this pass — used
+ * to reconstruct cancellable ids when the OS refuses to enumerate.
  */
 const cancelWeatherNotificationsExcept = async (
   N: typeof import('expo-notifications'),
   keepGeneration: string | null,
+  staleGeneration: string | null,
 ): Promise<void> => {
   const keepPrefix = keepGeneration
     ? `${NOTIFICATION_ID_PREFIX}-${keepGeneration}-`
@@ -88,10 +111,19 @@ const cancelWeatherNotificationsExcept = async (
         .map((s) => N.cancelScheduledNotificationAsync(s.identifier).catch(() => {})),
     );
   } catch {
-    // Enumeration failed — cancel the legacy fixed id (the only one
-    // addressable without a list). Stale generations left behind get swept
-    // by the next successful pass; duplicates beat silence.
-    await N.cancelScheduledNotificationAsync(NOTIFICATION_ID_PREFIX).catch(() => {});
+    // Enumeration failed — cancel by CONSTRUCTED ids instead: the legacy
+    // fixed id plus every index of the stale generation (cancel by id needs
+    // no list). Anything still left gets swept by the next successful pass;
+    // duplicates beat silence.
+    const ids = [NOTIFICATION_ID_PREFIX];
+    if (staleGeneration && staleGeneration !== keepGeneration) {
+      for (let i = 0; i < MAX_SCHEDULED_FIRES; i += 1) {
+        ids.push(`${NOTIFICATION_ID_PREFIX}-${staleGeneration}-${i}`);
+      }
+    }
+    await Promise.all(
+      ids.map((id) => N.cancelScheduledNotificationAsync(id).catch(() => {})),
+    );
   }
 };
 
@@ -123,6 +155,7 @@ export const scheduleDailyWeatherNotifications = async (
 
   const now = new Date();
   const store = getAppStore();
+  const previousGeneration = store.getState().dailyWeatherGeneration;
   const persistedChain = store
     .getState()
     .dailyWeatherChain.map((iso) => new Date(iso))
@@ -155,7 +188,7 @@ export const scheduleDailyWeatherNotifications = async (
       const { title, body } = buildCyclingAdvice(forecast);
       const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
       const seconds = Math.max(60, Math.floor((fireAt.getTime() - now.getTime()) / 1000));
-      return N.scheduleNotificationAsync({
+      const input = {
         identifier: `${NOTIFICATION_ID_PREFIX}-${generation}-${index}`,
         content: {
           title,
@@ -170,11 +203,17 @@ export const scheduleDailyWeatherNotifications = async (
           seconds,
           repeats: false,
         },
-      }).catch(() => {});
+      };
+      // One retry per fire: a transient scheduling failure would otherwise
+      // silently drop that ping forever (review 2026-07-19, LOW).
+      return N.scheduleNotificationAsync(input)
+        .catch(() => N.scheduleNotificationAsync(input))
+        .catch(() => {});
     }),
   );
 
-  await cancelWeatherNotificationsExcept(N, generation);
+  store.getState().setDailyWeatherGeneration(generation);
+  await cancelWeatherNotificationsExcept(N, generation, previousGeneration);
 };
 
 /**
@@ -184,9 +223,16 @@ export const scheduleDailyWeatherNotifications = async (
 export const cancelDailyWeatherNotifications = async (): Promise<void> => {
   const N = getNotifications();
   if (!N) return;
-  await cancelWeatherNotificationsExcept(N, null);
+  let staleGeneration: string | null = null;
+  try {
+    staleGeneration = getAppStore().getState().dailyWeatherGeneration;
+  } catch {
+    // Store unavailable (e.g. node tests) — enumeration is the only path.
+  }
+  await cancelWeatherNotificationsExcept(N, null, staleGeneration);
   try {
     getAppStore().getState().setDailyWeatherChain([]);
+    getAppStore().getState().setDailyWeatherGeneration(null);
   } catch {
     // Store unavailable (e.g. node tests) — cancelling the OS side is enough.
   }

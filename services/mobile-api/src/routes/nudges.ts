@@ -24,6 +24,7 @@ import type { ErrorResponse, NudgeTrigger } from '@defensivepedal/core';
 import {
   CITY_PULSE_FALLBACK_POPULATION,
   CITY_PULSE_ROTATION_MEMORY,
+  CITY_PULSE_WEATHER_FACTOR_FLOOR,
   computeCityRiderCount,
   computeRidePattern,
   drawInitialFireAt,
@@ -443,10 +444,15 @@ export const buildNudgeRoutes = (
               const city = findNearestCity(location.lat, location.lon);
               const utcOffsetHours = city?.utcOffsetHours ?? 2;
               const dateISO = localDateISO(new Date(), utcOffsetHours);
-              // Bad weather is suppressed upstream by the safety floor, so the
-              // factor here grades 0.4 (borderline) to 1.0 (good) by the worst
-              // forecast dimension; the ?? is defensive (missing forecast).
-              const weatherFactor = getCityPulseWeatherFactor(forecast) ?? 0.6;
+              // Unreachable-null by construction: reaching this dispatch means
+              // the trigger passed the SAFETY_GATED_TRIGGERS eligibility gate,
+              // which requires a non-null, non-bad forecast — exactly the
+              // conditions under which the factor is non-null (review
+              // 2026-07-19). The ?? is pure defense; it uses the exported
+              // floor so a future gating refactor can never resurrect the
+              // retired flat 0.6.
+              const weatherFactor =
+                getCityPulseWeatherFactor(forecast) ?? CITY_PULSE_WEATHER_FACTOR_FLOOR;
               const key = city
                 ? cityKey(city)
                 : `fallback|${location.lat.toFixed(1)},${location.lon.toFixed(1)}`;

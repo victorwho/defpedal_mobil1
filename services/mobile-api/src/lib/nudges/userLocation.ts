@@ -127,7 +127,20 @@ const parseGeographyPoint = (
 const parseWkbHexPoint = (
   hex: string,
 ): { lat: number; lon: number } | null => {
-  if (hex.length < 42 || !/^[0-9A-Fa-f]+$/.test(hex)) return null;
+  // Bounds: 42 hex chars = minimal no-SRID Point; 128 comfortably covers the
+  // SRID form (50) with headroom — anything longer is not a Point and must
+  // not reach the regex/Buffer allocation (review 2026-07-19). Odd lengths
+  // are rejected explicitly because Buffer.from(hex) silently DROPS a
+  // trailing odd digit instead of throwing, which could make a corrupted
+  // value decode to plausible-but-wrong coordinates.
+  if (
+    hex.length < 42 ||
+    hex.length > 128 ||
+    hex.length % 2 !== 0 ||
+    !/^[0-9A-Fa-f]+$/.test(hex)
+  ) {
+    return null;
+  }
   const buf = Buffer.from(hex, 'hex');
   const littleEndian = buf[0] === 1;
   if (buf[0] !== 0 && buf[0] !== 1) return null;

@@ -85,9 +85,22 @@ describe('resolveUserLocation', () => {
     expect(loc.lon).toBeCloseTo(25.46);
   });
 
+  it('decodes big-endian EWKB (synthetic point 50.25N, 10.5E)', async () => {
+    // Hand-built: 0x00 byte order, BE type 0x20000001 (Point+SRID), SRID
+    // 4326, lon 10.5 (0x4025...), lat 50.25 (0x40492...). PostGIS on x86/ARM
+    // always emits LE, so this fixture guards the untraveled BE branch.
+    const bigEndian = '0020000001000010E640250000000000004049200000000000';
+    const loc = await resolveUserLocation(dbReturning({ start_location: bigEndian }), 'u-be');
+    expect(loc.fromFallback).toBe(false);
+    expect(loc.lat).toBeCloseTo(50.25);
+    expect(loc.lon).toBeCloseTo(10.5);
+  });
+
   it.each<[string, unknown]>([
     ['non-hex string', 'not-a-location'],
     ['truncated WKB', SAMPLE_WKB.slice(0, 20)],
+    ['odd-length hex (Buffer.from silently truncates a trailing digit)', `${SAMPLE_WKB}A`],
+    ['oversized hex (> 128 chars, not a Point)', SAMPLE_WKB.repeat(4)],
     ['WKB of a non-Point geometry', '0102000020E6100000' + SAMPLE_WKB.slice(18)],
     ['WKB with out-of-range coords', '0101000020E6100000' + '0000000000006940' + '0000000000006940'], // lon=lat=200
     ['empty object', {}],

@@ -170,10 +170,24 @@ export const buildWeatherSchedule = (
       t.getTime() >= minFireTime.getTime() &&
       t.getTime() < escalationStart.getTime(),
   );
-  const merged = [...baseline, ...buildEscalationFires(now)].sort(
-    (a, b) => a.getTime() - b.getTime(),
+  const merged = enforceMinGap(
+    [...baseline, ...buildEscalationFires(now)].sort(
+      (a, b) => a.getTime() - b.getTime(),
+    ),
   );
-  return { chain, fires: enforceMinGap(merged).slice(0, MAX_SCHEDULED_FIRES) };
+  if (merged.length <= MAX_SCHEDULED_FIRES) {
+    return { chain, fires: merged };
+  }
+  // Over the cap: a plain tail-slice would drop the LATEST fires first —
+  // which are exactly the escalation fires guaranteeing inactivity coverage.
+  // Instead keep every escalation fire and trim the newest baseline draws
+  // (review 2026-07-19, LOW). Escalation fires all sit at/after
+  // escalationStart (clamp is forward-only); baseline all before it.
+  const escalation = merged.filter((t) => t.getTime() >= escalationStart.getTime());
+  const keptBaseline = merged
+    .filter((t) => t.getTime() < escalationStart.getTime())
+    .slice(0, Math.max(0, MAX_SCHEDULED_FIRES - escalation.length));
+  return { chain, fires: [...keptBaseline, ...escalation] };
 };
 
 /**
