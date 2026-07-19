@@ -2766,9 +2766,15 @@ export const buildV1Routes = (
               .eq('trip_id', tripId)
               .single();
 
-            const startLocation = tripRow.start_location as Record<string, unknown> | null;
-            const startLat = Number(startLocation?.latitude ?? startLocation?.lat ?? 0);
-            const startLon = Number(startLocation?.longitude ?? startLocation?.lon ?? 0);
+            // PostgREST returns geography columns as WKB hex (error-log
+            // #70) — the old `.latitude ?? .lat ?? 0` read stamped
+            // POINT(0 0) on every published ride. Parse properly; 0/0
+            // sentinel makes autoPublish store NULL (follower-only)
+            // instead of a bogus Null Island location.
+            const { parseGeographyPoint } = await import('../lib/nudges/userLocation');
+            const startCoords = parseGeographyPoint(tripRow.start_location);
+            const startLat = startCoords?.lat ?? 0;
+            const startLon = startCoords?.lon ?? 0;
             const tripStartedAt = (trackRow?.started_at ?? tripRow.started_at) as string;
             const tripEndedAt = (trackRow?.ended_at ?? tripRow.ended_at ?? new Date().toISOString()) as string;
             const durationSeconds = (new Date(tripEndedAt).getTime() - new Date(tripStartedAt).getTime()) / 1000;

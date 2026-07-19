@@ -10,6 +10,7 @@
 
 import { trimPolylineEndpoints } from '@defensivepedal/core';
 
+import { parseGeographyPoint } from './nudges/userLocation';
 import { supabaseAdmin } from './supabaseAdmin';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,19 @@ interface AutoPublishTierUpParams {
 
 const toPointWkt = (lat: number, lon: number) => `POINT(${lon} ${lat})`;
 
+/**
+ * WKT for a real coordinate, or null for the 0/0 sentinel / non-finite
+ * input. POINT(0 0) ("Null Island") is never a real ride start — it was
+ * the artifact of reading a WKB-hex geography as an object (error-log
+ * #70) and polluted 112 ride + 165 badge rows before 2026-07-19. A NULL
+ * location keeps the item follower-only rather than mislocating it.
+ */
+const toPointWktOrNull = (lat: number, lon: number): string | null => {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat === 0 && lon === 0) return null;
+  return toPointWkt(lat, lon);
+};
+
 const getUserProfile = async (userId: string) => {
   if (!supabaseAdmin) return null;
   const { data } = await supabaseAdmin
@@ -125,7 +139,15 @@ const getShareableLocation = async (userId: string): Promise<string | null> => {
     .limit(1)
     .maybeSingle();
 
-  return (data as { location: string } | null)?.location ?? null;
+  const location = (data as { location: string } | null)?.location ?? null;
+  if (!location) return null;
+
+  // Belt-and-suspenders vs the Null Island artifact (see toPointWktOrNull):
+  // never propagate a 0/0 or unparseable location onto badge/tier rows.
+  const parsed = parseGeographyPoint(location);
+  if (!parsed || (parsed.lat === 0 && parsed.lon === 0)) return null;
+
+  return location;
 };
 
 // ---------------------------------------------------------------------------
@@ -179,7 +201,7 @@ export const autoPublishRide = async (params: AutoPublishRideParams): Promise<st
       user_id: params.userId,
       type: 'ride',
       payload,
-      location: toPointWkt(params.startLat, params.startLon),
+      location: toPointWktOrNull(params.startLat, params.startLon),
     })
     .select('id')
     .single();
@@ -215,7 +237,7 @@ export const autoPublishHazardBatch = async (params: AutoPublishHazardBatchParam
       user_id: params.userId,
       type: 'hazard_batch',
       payload,
-      location: toPointWkt(params.startLat, params.startLon),
+      location: toPointWktOrNull(params.startLat, params.startLon),
     })
     .select('id')
     .single();
@@ -243,7 +265,7 @@ export const autoPublishHazardStandalone = async (params: AutoPublishHazardStand
       user_id: params.userId,
       type: 'hazard_standalone',
       payload,
-      location: toPointWkt(params.lat, params.lon),
+      location: toPointWktOrNull(params.lat, params.lon),
     })
     .select('id')
     .single();

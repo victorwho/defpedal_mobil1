@@ -289,13 +289,17 @@ describe('autoPublishBadgeUnlock', () => {
     expect(result).toBe('activity-badge-1');
   });
 
+  // Real EWKB hex fixtures (little-endian, SRID 4326):
+  const BUCHAREST_EWKB = '0101000020E61000000AD7A3703D1A3A4066F7E461A1364640';
+  const NULL_ISLAND_EWKB = '0101000020E610000000000000000000000000000000000000';
+
   it('stamps the latest ride location when the sharing toggle is on', async () => {
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
       error: null,
     });
     // Latest located ride activity (WKB hex echoed verbatim)
-    enqueueResult({ data: { location: '0101000020E6100000AABBCCDD' }, error: null });
+    enqueueResult({ data: { location: BUCHAREST_EWKB }, error: null });
     enqueueResult({ data: { id: 'activity-badge-loc' }, error: null });
 
     const result = await autoPublishBadgeUnlock({
@@ -311,7 +315,32 @@ describe('autoPublishBadgeUnlock', () => {
     const { supabaseAdmin } = await import('../lib/supabaseAdmin');
     const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
     expect(insertCalls).toHaveLength(1);
-    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe('0101000020E6100000AABBCCDD');
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe(BUCHAREST_EWKB);
+  });
+
+  it('refuses to propagate a Null Island (0,0) ride location', async () => {
+    enqueueResult({
+      data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+    // Latest ride is a pre-repair POINT(0 0) artifact (error-log #70)
+    enqueueResult({ data: { location: NULL_ISLAND_EWKB }, error: null });
+    enqueueResult({ data: { id: 'activity-badge-noloc' }, error: null });
+
+    const result = await autoPublishBadgeUnlock({
+      userId: USER_ID,
+      badgeKey: 'first_ride',
+      badgeName: 'First Ride',
+      iconKey: 'bicycle',
+      category: 'milestones',
+      flavorText: 'You completed your first ride!',
+    });
+    expect(result).toBe('activity-badge-noloc');
+
+    const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+    const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
+    expect(insertCalls).toHaveLength(1);
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBeNull();
   });
 
   it('publishes without location when the sharing toggle is off', async () => {
@@ -383,11 +412,12 @@ describe('autoPublishTierUp', () => {
   });
 
   it('stamps the latest ride location when the sharing toggle is on', async () => {
+    const brasovEwkb = '0101000020E610000085EB51B81E85394048E17A14AEC74640'; // real EWKB Point
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
       error: null,
     });
-    enqueueResult({ data: { location: '0101000020E6100000EEFF0011' }, error: null });
+    enqueueResult({ data: { location: brasovEwkb }, error: null });
     enqueueResult({ data: { id: 'activity-tier-loc' }, error: null });
 
     const result = await autoPublishTierUp({
@@ -402,7 +432,7 @@ describe('autoPublishTierUp', () => {
     const { supabaseAdmin } = await import('../lib/supabaseAdmin');
     const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
     expect(insertCalls).toHaveLength(1);
-    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe('0101000020E6100000EEFF0011');
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe(brasovEwkb);
   });
 
   it('creates feed item with correct payload structure', async () => {

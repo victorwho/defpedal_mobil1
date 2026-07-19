@@ -95,8 +95,14 @@ export const __resetLocationCache = (): void => {
  *   - GeoJSON object: `{ type: 'Point', coordinates: [26.10, 44.43] }`
  *
  * Returns null on any malformed input.
+ *
+ * Exported (2026-07-19, activity-feed Null Island repair): the v1 ride-end
+ * auto-publish block had the same #70 bug — it read
+ * `start_location.latitude ?? .lat ?? 0` from the WKB hex string and
+ * stamped POINT(0 0) on 112 ride activities. Any code reading a geography
+ * column through PostgREST must go through this parser.
  */
-const parseGeographyPoint = (
+export const parseGeographyPoint = (
   raw: unknown,
 ): { lat: number; lon: number } | null => {
   if (typeof raw === 'string') {
