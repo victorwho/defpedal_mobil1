@@ -512,11 +512,11 @@ export const ro: TranslationKeys = {
   privacyAnalytics: {
     title: 'Confidențialitate & analiză',
     profileRowSub: 'Preferințe pentru rapoarte de eroare și analiză produs',
-    intro: 'Rapoartele de eroare sunt active implicit pentru a ne ajuta să remediem bug-urile (interes legitim conform GDPR). Analiza produsului este dezactivată implicit și opt-in. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
+    intro: 'Rapoartele de eroare și analiza produsului sunt active implicit — rapoartele mențin aplicația stabilă, analiza ne ajută să decidem ce construim. Comută independent — dezactivarea unui comutator oprește imediat evenimentele noi pentru acel canal.',
     crashLabel: 'Trimite rapoarte de eroare',
     crashDescription: 'Activă implicit pentru a menține aplicația stabilă. Anonim. Poți dezactiva oricând.',
     analyticsLabel: 'Trimite analize de produs',
-    analyticsDescription: 'Dezactivată implicit. Evenimente de utilizare anonime care ne ajută să decidem ce construim. Fără trasee GPS.',
+    analyticsDescription: 'Activă implicit. Evenimente de utilizare anonime care ne ajută să decidem ce construim. Fără trasee GPS. Poți dezactiva oricând.',
     crashUnavailable: 'Raportarea erorilor nu este configurată în acest build.',
     analyticsUnavailable: 'Analiza produsului nu este configurată în acest build.',
     assurance: 'Când un comutator este oprit, nu se trimit evenimente pe acel canal. Nu vindem niciodată datele tale.',
@@ -1052,7 +1052,7 @@ export const ro: TranslationKeys = {
     trustMicroline: 'Gratuit pentru totdeauna. Traseele tale sunt private implicit.',
     rideAsGuest: 'Mai târziu — pedalez ca invitat',
     telemetryNotice:
-      'Colectăm rapoarte anonime de erori pentru a menține aplicația stabilă. Gestionează asta și analizele oricând din Profil › Confidențialitate.',
+      'Colectăm rapoarte anonime de erori și analize anonime de produs (fără trasee GPS) pentru a menține aplicația stabilă și a o îmbunătăți. Le poți dezactiva oricând din Profil › Confidențialitate.',
     // -- Region gate (disponibilitate globală, 2026-07-12) --
     regionChecking: 'Verificăm disponibilitatea în zona ta…',
     regionPickerTitle: 'Unde pedalezi?',

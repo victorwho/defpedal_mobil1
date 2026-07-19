@@ -35,6 +35,18 @@ describe('shouldShowAnalyticsPrompt — retirement', () => {
     expect(gate(state(), true)).toBe(false);
   });
 
+  it('retired permanently for an explicit decliner (default-ON regime, 2026-07-19)', () => {
+    // posthog off + capturedAt set = the user turned it OFF in Settings.
+    expect(
+      shouldShowAnalyticsPrompt('post_second_ride', {
+        posthogEnabled: false,
+        hasExplicitChoice: true,
+        state: state(),
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+
   it('retired once a conversion is recorded, even if the flag were later off', () => {
     expect(gate(state({ convertedBy: 'settings' }))).toBe(false);
     expect(gate(state({ convertedBy: 'impact_dashboard' }))).toBe(false);

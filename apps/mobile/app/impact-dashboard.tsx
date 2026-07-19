@@ -156,6 +156,9 @@ export default function ImpactDashboardScreen() {
       isImpactDashboardTriggered(fresh.analyticsPrompt.impactDashboardVisits) &&
       shouldShowAnalyticsPrompt('impact_dashboard', {
         posthogEnabled: fresh.analyticsConsent.posthog,
+        // Explicit Settings choice (opt-out under the default-ON regime) —
+        // never re-ask a decliner.
+        hasExplicitChoice: fresh.analyticsConsent.capturedAt !== null,
         state: fresh.analyticsPrompt,
         now: new Date(),
       }) &&

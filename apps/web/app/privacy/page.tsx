@@ -142,9 +142,9 @@ export default function PrivacyPage() {
             version, anonymised stack traces. No location, no personal data.
           </li>
           <li>
-            Product analytics (opt-in only, off by default): anonymous usage
-            events when you explicitly enable it in Profile → Privacy &
-            analytics. Helps us prioritise the roadmap. No GPS tracking.
+            Product analytics (on by default; opt out anytime in Profile →
+            Privacy & analytics): anonymous usage events that help us
+            prioritise the roadmap. No GPS tracking, no location data.
           </li>
         </ul>
 
@@ -252,8 +252,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>PostHog</strong> — anonymised product analytics, EU host
-            (eu.i.posthog.com). <strong>Off by default</strong>; transmitted
-            only when you explicitly opt in.
+            (eu.i.posthog.com). <strong>On by default</strong>; disable
+            anytime in Profile → Privacy & analytics and transmission stops
+            immediately. An explicit off choice is never overridden.
           </li>
           <li>
             <strong>Firebase App Distribution</strong> — used for tester

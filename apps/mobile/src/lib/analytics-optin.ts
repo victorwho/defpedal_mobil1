@@ -52,6 +52,13 @@ const SPACING_MS = ANALYTICS_PROMPT_MIN_SPACING_DAYS * 24 * 60 * 60 * 1000;
 export interface AnalyticsPromptGateInput {
   /** Current PostHog consent flag — true retires every prompt permanently. */
   posthogEnabled: boolean;
+  /**
+   * True when the user has made an explicit Settings choice
+   * (`analyticsConsent.capturedAt !== null`). Since the 2026-07-19
+   * default-ON flip, PostHog-off + explicit choice = a deliberate opt-OUT —
+   * re-asking would be nagging a decliner, so every prompt is suppressed.
+   */
+  hasExplicitChoice?: boolean;
   state: AnalyticsPromptState;
   now: Date;
 }
@@ -60,6 +67,8 @@ export interface AnalyticsPromptGateInput {
  * Shared gates for every prompt. Per-prompt trigger conditions (ride count,
  * hazard flag, visit count) are the CALLER's job — this enforces the caps:
  *   - retired once PostHog is on (any source) or a conversion is recorded
+ *   - retired forever for explicit decliners (post-2026-07-19 default-ON,
+ *     posthog=false means the user turned it OFF in Settings)
  *   - 2 explicit dismissals anywhere → all prompts off forever
  *   - each prompt shows at most once, ever (asksShown)
  *   - lifetime cap of 3 asks total
@@ -69,8 +78,9 @@ export const shouldShowAnalyticsPrompt = (
   promptId: AnalyticsPromptId,
   input: AnalyticsPromptGateInput,
 ): boolean => {
-  const { posthogEnabled, state, now } = input;
+  const { posthogEnabled, hasExplicitChoice, state, now } = input;
   if (posthogEnabled) return false;
+  if (hasExplicitChoice) return false;
   if (state.convertedBy !== null) return false;
   if (state.dismissCount >= ANALYTICS_PROMPT_MAX_DISMISSALS) return false;
   if (state.asksShown.includes(promptId)) return false;

@@ -512,11 +512,11 @@ export const es: TranslationKeys = {
   privacyAnalytics: {
     title: 'Privacidad y analítica',
     profileRowSub: 'Preferencias para reportes de fallos y analítica de producto',
-    intro: 'Los reportes de fallos están activos por defecto para ayudarnos a corregir bugs (base de interés legítimo según RGPD). La analítica de producto está desactivada por defecto y es opcional. Cambia cualquiera de los dos de forma independiente — desactivar un interruptor detiene los nuevos eventos para ese canal inmediatamente.',
+    intro: 'Los reportes de fallos y la analítica de producto están activos por defecto — los reportes mantienen la app estable y la analítica nos ayuda a decidir qué construir. Cambia cualquiera de los dos de forma independiente — desactivar un interruptor detiene los nuevos eventos para ese canal inmediatamente.',
     crashLabel: 'Enviar reportes de fallos',
     crashDescription: 'Activado por defecto para mantener la app estable. Anónimo. Desactívalo cuando quieras.',
     analyticsLabel: 'Enviar analíticas de producto',
-    analyticsDescription: 'Desactivado por defecto. Eventos de uso anónimos que nos ayudan a decidir qué construir. Sin trazas GPS.',
+    analyticsDescription: 'Activado por defecto. Eventos de uso anónimos que nos ayudan a decidir qué construir. Sin trazas GPS. Desactívalo cuando quieras.',
     crashUnavailable: 'Los reportes de fallos no están configurados en esta versión.',
     analyticsUnavailable: 'La analítica de producto no está configurada en esta versión.',
     assurance: 'Cuando un interruptor está apagado, no se envían eventos en ese canal. Nunca vendemos tus datos.',
@@ -1052,7 +1052,7 @@ export const es: TranslationKeys = {
     trustMicroline: 'Gratis para siempre. Tus rutas son privadas por defecto.',
     rideAsGuest: 'Ahora no — pedaleo como invitado',
     telemetryNotice:
-      'Recopilamos informes anónimos de fallos para mantener la app estable. Gestiona esto y las analíticas cuando quieras en Perfil › Privacidad.',
+      'Recopilamos informes anónimos de fallos y analíticas anónimas de producto (sin trazas GPS) para mantener la app estable y mejorarla. Desactiva cualquiera cuando quieras en Perfil › Privacidad.',
     // -- Region gate (disponibilidad global, 2026-07-12) --
     regionChecking: 'Comprobando la disponibilidad en tu zona…',
     regionPickerTitle: '¿Dónde pedaleas?',

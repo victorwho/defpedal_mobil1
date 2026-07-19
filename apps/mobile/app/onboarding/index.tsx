@@ -34,10 +34,12 @@ export default function OnboardingPermissionScreen() {
   // If location is already granted (returning user / cleared data but kept
   // permission), auto-advance through the region gate. The consent screen
   // was removed from the flow 2026-07-16: crash reporting runs under
-  // legitimate interest (transparency notice in this screen's footer),
-  // product analytics stays OFF until opted in via Profile › Privacy &
-  // analytics. region-check passes straight through to the signup prompt
-  // when the gate was already answered on this device.
+  // legitimate interest, and since 2026-07-19 product analytics is ALSO on
+  // by default (product-owner override of the opt-in design) — both are
+  // disclosed by the transparency notice in this screen's footer, with
+  // opt-out in Profile › Privacy & analytics. region-check passes straight
+  // through to the signup prompt when the gate was already answered on
+  // this device.
   useEffect(() => {
     let cancelled = false;
     const checkExisting = async () => {

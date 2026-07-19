@@ -686,6 +686,9 @@ export default function FeedbackScreen() {
     const store = useAppStore.getState();
     const analyticsGate = {
       posthogEnabled: store.analyticsConsent.posthog,
+      // Explicit Settings choice (opt-out under the default-ON regime) —
+      // never re-ask a decliner.
+      hasExplicitChoice: store.analyticsConsent.capturedAt !== null,
       state: store.analyticsPrompt,
       now: new Date(),
     };

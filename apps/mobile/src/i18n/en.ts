@@ -520,11 +520,11 @@ export const en = {
   privacyAnalytics: {
     title: 'Privacy & analytics',
     profileRowSub: 'Crash reports and product analytics preferences',
-    intro: 'Crash reports are on by default to help us fix bugs (legitimate-interest basis under GDPR). Product analytics is off by default and opt-in. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
+    intro: 'Crash reports and product analytics are on by default — crash reports keep the app stable, analytics helps us decide what to build. Toggle either one independently — turning a switch off stops new events for that channel immediately.',
     crashLabel: 'Share crash reports',
     crashDescription: 'On by default to keep the app stable. Anonymous. Turn off anytime.',
     analyticsLabel: 'Share product analytics',
-    analyticsDescription: 'Off by default. Anonymous usage events that help us decide what to build. No GPS tracks.',
+    analyticsDescription: 'On by default. Anonymous usage events that help us decide what to build. No GPS tracks. Turn off anytime.',
     crashUnavailable: 'Crash reporting is not configured in this build.',
     analyticsUnavailable: 'Product analytics is not configured in this build.',
     assurance: 'When a switch is off, no events are sent for that channel. We never sell your data.',
@@ -1063,7 +1063,7 @@ export const en = {
     // Transparency notice on the first onboarding screen (2026-07-16 — the
     // legal condition for removing the consent screen from the flow).
     telemetryNotice:
-      'We collect anonymous crash reports to keep the app stable. Manage this and analytics anytime in Profile › Privacy.',
+      'We collect anonymous crash reports and anonymous product analytics (no GPS tracks) to keep the app stable and improve it. Turn either off anytime in Profile › Privacy.',
     // -- Region gate (global availability, 2026-07-12) --
     regionChecking: 'Checking availability in your area…',
     regionPickerTitle: 'Where do you ride?',

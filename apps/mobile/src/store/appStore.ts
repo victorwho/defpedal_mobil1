@@ -443,12 +443,13 @@ type AppStore = QueueSlice & {
 };
 
 /**
- * Persist migration chain (v0 → v5). Extracted from the persist config and
+ * Persist migration chain (v0 → v6). Extracted from the persist config and
  * exported so upgrade-path behavior is unit-testable — preserving existing
  * users' explicit telemetry choices is a hard requirement (2026-07-16, the
  * consent screen was removed from onboarding; the migration + rehydration
- * path is what guarantees a user who turned Sentry OFF stays OFF and one who
- * opted PostHog ON stays ON).
+ * path is what guarantees a user who turned Sentry OFF stays OFF, one who
+ * opted PostHog ON stays ON, and — since the 2026-07-19 default flip — one
+ * who explicitly turned PostHog OFF stays OFF).
  */
 export const migratePersistedAppState = (
   persistedState: unknown,
@@ -553,6 +554,33 @@ export const migratePersistedAppState = (
     }
   }
 
+  // v5 → v6: product-analytics default flip (2026-07-19, product-owner
+  // decision — overrides the 2026-05-25 opt-in design; see the default's
+  // comment block below). Mirrors the v0 → v1 sentry pattern:
+  //   - Users who never made a choice (`capturedAt === null` AND
+  //     `posthog === false`) get `posthog: true` — the old `false` was a
+  //     bundled default they never acted on.
+  //   - Users who explicitly chose (`capturedAt !== null`) keep their saved
+  //     choice — an explicit PostHog OFF stays OFF forever. We never
+  //     silently flip an explicit decision, and we never stamp capturedAt
+  //     here (it records a USER act only).
+  if (version < 6) {
+    const state = next as
+      | { analyticsConsent?: { sentry?: boolean; posthog?: boolean; capturedAt?: string | null } }
+      | undefined;
+    const consent = state?.analyticsConsent;
+    if (
+      consent &&
+      (consent.capturedAt ?? null) === null &&
+      consent.posthog === false
+    ) {
+      next = {
+        ...(state as object),
+        analyticsConsent: { ...consent, posthog: true },
+      };
+    }
+  }
+
   return next;
 };
 
@@ -639,14 +667,19 @@ export const useAppStore = create<AppStore>()(
       //   Art 6(1)(f) / ANSPDCP Law 506/2004 equivalent for service-stability
       //   diagnostics). User can object via Profile > Privacy & Analytics —
       //   the toggle still exists, just defaults on.
-      // - posthog: defaults FALSE. Legal basis = consent (Art 6(1)(a)) since
-      //   product analytics is non-essential under ePrivacy. Requires affirmative
-      //   opt-in.
-      // - capturedAt: null until the user is shown the consent screen. Existing
-      //   persisted users with capturedAt !== null keep their saved choice (no
-      //   silent flip — Zustand persist merges the previous state on hydration).
-      // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      analyticsConsent: { sentry: true, posthog: false, capturedAt: null },
+      // - posthog: defaults TRUE since 2026-07-19 — product-owner decision,
+      //   knowingly overriding the 2026-05-25 opt-in design and the 2026-07-16
+      //   default-ON withdrawal, WITHOUT the ANSPDCP/ePrivacy review that
+      //   CLAUDE.md required. Opt-OUT stays one toggle away in Profile >
+      //   Privacy & Analytics; the onboarding transparency notice and Privacy
+      //   Policy disclose both channels. Explicit user choices (capturedAt
+      //   !== null) are never flipped — see the v5→v6 persist migration.
+      // - capturedAt: null until the user acts in Settings. It records the
+      //   user's affirmative act — defaults (including this ON default) must
+      //   NEVER stamp it.
+      // Decision history: docs/legal/consent-split-2026-05-25.md (opt-in),
+      // overridden 2026-07-19 per Victor's direction (session 95).
+      analyticsConsent: { sentry: true, posthog: true, capturedAt: null },
       cyclingGoal: null,
       cachedStreak: null,
       cachedImpact: null,
@@ -1396,7 +1429,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => migratePersistedAppState(persistedState, version),
       partialize: (state) => ({
         appState: state.appState,
