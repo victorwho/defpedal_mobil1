@@ -636,6 +636,13 @@ export const en = {
     // Community-visibility ladder scope chip (only shown when widened)
     scopeRegion: 'Showing rides from your region',
     scopeCommunity: 'Showing rides from across the Defensive Pedal community',
+    // "N new riders joined" aggregate card (real profile counts only)
+    newRiders_nearby_one: 'One new rider joined near you this week',
+    newRiders_nearby_other: '{{count}} new riders joined near you this week',
+    newRiders_region_one: 'One new rider joined in your region this week',
+    newRiders_region_other: '{{count}} new riders joined in your region this week',
+    newRiders_community_one: 'One new rider joined the Defensive Pedal community this week',
+    newRiders_community_other: '{{count}} new riders joined the Defensive Pedal community this week',
   },
 
   // ── Community Stats ──

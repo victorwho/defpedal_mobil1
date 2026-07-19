@@ -21,12 +21,13 @@ vi.mock('../lib/supabaseAdmin', () => {
     const chain: Record<string, unknown> = {};
     const methods = [
       'from', 'select', 'insert', 'upsert', 'update', 'delete',
-      'eq', 'in', 'gt', 'order', 'limit', 'head',
+      'eq', 'in', 'gt', 'not', 'order', 'limit', 'head',
     ];
     for (const m of methods) {
       chain[m] = vi.fn().mockReturnValue(chain);
     }
     chain.single = vi.fn().mockImplementation(() => Promise.resolve(dequeueResult()));
+    chain.maybeSingle = vi.fn().mockImplementation(() => Promise.resolve(dequeueResult()));
     chain.rpc = vi.fn().mockImplementation(() => Promise.resolve(dequeueResult()));
     (chain as unknown as { then: unknown }).then = (
       resolve: (v: unknown) => unknown,
@@ -264,7 +265,17 @@ describe('autoPublishBadgeUnlock', () => {
     vi.clearAllMocks();
   });
 
+  // Badge/tier publishes now look up the profile first (location stamping,
+  // feed densification 2026-07-19): sharing OFF → 1 profile read + insert;
+  // sharing ON → profile read + latest-ride-location read + insert.
+  const enqueueProfileSharingOff = () =>
+    enqueueResult({
+      data: { auto_share_rides: false, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+
   it('returns activity ID on successful publish', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: { id: 'activity-badge-1' }, error: null });
 
     const result = await autoPublishBadgeUnlock({
@@ -278,7 +289,33 @@ describe('autoPublishBadgeUnlock', () => {
     expect(result).toBe('activity-badge-1');
   });
 
-  it('creates feed item with correct payload structure', async () => {
+  it('stamps the latest ride location when the sharing toggle is on', async () => {
+    enqueueResult({
+      data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+    // Latest located ride activity (WKB hex echoed verbatim)
+    enqueueResult({ data: { location: '0101000020E6100000AABBCCDD' }, error: null });
+    enqueueResult({ data: { id: 'activity-badge-loc' }, error: null });
+
+    const result = await autoPublishBadgeUnlock({
+      userId: USER_ID,
+      badgeKey: 'first_ride',
+      badgeName: 'First Ride',
+      iconKey: 'bicycle',
+      category: 'milestones',
+      flavorText: 'You completed your first ride!',
+    });
+    expect(result).toBe('activity-badge-loc');
+
+    const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+    const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
+    expect(insertCalls).toHaveLength(1);
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe('0101000020E6100000AABBCCDD');
+  });
+
+  it('publishes without location when the sharing toggle is off', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: { id: 'activity-badge-2' }, error: null });
 
     const params = {
@@ -292,10 +329,15 @@ describe('autoPublishBadgeUnlock', () => {
 
     const result = await autoPublishBadgeUnlock(params);
     expect(result).toBe('activity-badge-2');
-    // The insert was called — if it returned an ID, the payload was accepted
+
+    const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+    const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
+    expect(insertCalls).toHaveLength(1);
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBeNull();
   });
 
   it('returns null when insert fails', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: null, error: { message: 'constraint violation' } });
 
     const result = await autoPublishBadgeUnlock({
@@ -320,7 +362,14 @@ describe('autoPublishTierUp', () => {
     vi.clearAllMocks();
   });
 
+  const enqueueProfileSharingOff = () =>
+    enqueueResult({
+      data: { auto_share_rides: false, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+
   it('returns activity ID on successful publish', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: { id: 'activity-tier-1' }, error: null });
 
     const result = await autoPublishTierUp({
@@ -333,7 +382,31 @@ describe('autoPublishTierUp', () => {
     expect(result).toBe('activity-tier-1');
   });
 
+  it('stamps the latest ride location when the sharing toggle is on', async () => {
+    enqueueResult({
+      data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+    enqueueResult({ data: { location: '0101000020E6100000EEFF0011' }, error: null });
+    enqueueResult({ data: { id: 'activity-tier-loc' }, error: null });
+
+    const result = await autoPublishTierUp({
+      userId: USER_ID,
+      tierName: 'Legend',
+      tierLevel: 10,
+      tierDisplayName: 'Legend',
+      tierColor: '#FFD700',
+    });
+    expect(result).toBe('activity-tier-loc');
+
+    const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+    const insertCalls = (supabaseAdmin as unknown as { insert: ReturnType<typeof vi.fn> }).insert.mock.calls;
+    expect(insertCalls).toHaveLength(1);
+    expect((insertCalls[0][0] as Record<string, unknown>).location).toBe('0101000020E6100000EEFF0011');
+  });
+
   it('creates feed item with correct payload structure', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: { id: 'activity-tier-2' }, error: null });
 
     const result = await autoPublishTierUp({
@@ -347,6 +420,7 @@ describe('autoPublishTierUp', () => {
   });
 
   it('returns null when insert fails', async () => {
+    enqueueProfileSharingOff();
     enqueueResult({ data: null, error: { message: 'DB error' } });
 
     const result = await autoPublishTierUp({

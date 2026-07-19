@@ -628,6 +628,13 @@ export const es: TranslationKeys = {
     // Etiqueta de alcance ampliado del feed
     scopeRegion: 'Mostrando rutas de tu región',
     scopeCommunity: 'Mostrando rutas de toda la comunidad Defensive Pedal',
+    // Tarjeta agregada de nuevos ciclistas (solo cuentas reales)
+    newRiders_nearby_one: 'Un nuevo ciclista se unió cerca de ti esta semana',
+    newRiders_nearby_other: '{{count}} nuevos ciclistas se unieron cerca de ti esta semana',
+    newRiders_region_one: 'Un nuevo ciclista se unió en tu región esta semana',
+    newRiders_region_other: '{{count}} nuevos ciclistas se unieron en tu región esta semana',
+    newRiders_community_one: 'Un nuevo ciclista se unió a la comunidad Defensive Pedal esta semana',
+    newRiders_community_other: '{{count}} nuevos ciclistas se unieron a la comunidad Defensive Pedal esta semana',
   },
 
   // ── Community Stats ──

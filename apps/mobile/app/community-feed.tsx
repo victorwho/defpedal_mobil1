@@ -18,6 +18,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { Mascot } from '../src/design-system/atoms/Mascot';
+import { NewRidersCard } from '../src/design-system/molecules/NewRidersCard';
 import { ActivityCommentSheet } from '../src/design-system/organisms/ActivityCommentSheet';
 import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { BottomNav } from '../src/design-system/organisms/BottomNav';
@@ -39,7 +40,8 @@ import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
 type MergedItem =
   | { kind: 'activity'; data: ActivityFeedItem }
-  | { kind: 'suggested'; key: string };
+  | { kind: 'suggested'; key: string }
+  | { kind: 'newRiders'; count: number };
 
 function CommunityFeedScreen() {
   const t = useT();
@@ -112,6 +114,10 @@ function CommunityFeedScreen() {
         ? t('communityScreen.scopeCommunity')
         : null;
 
+  // Server-computed "N new riders joined" aggregate (first page only;
+  // real profile counts, never rendered when < 1).
+  const newRidersCount = data?.pages[0]?.newRiders?.count ?? 0;
+
   // Merge activity items with "suggested users" separators every 10 items
   const mergedItems: readonly MergedItem[] = useMemo(() => {
     const result: MergedItem[] = [];
@@ -122,8 +128,13 @@ function CommunityFeedScreen() {
         result.push({ kind: 'suggested', key: `suggested-${i}` });
       }
     }
+    // Light aggregate card after the second activity (or at the end when
+    // the feed is shorter) — trip shares stay the hero content.
+    if (newRidersCount >= 1 && result.length > 0) {
+      result.splice(Math.min(2, result.length), 0, { kind: 'newRiders', count: newRidersCount });
+    }
     return result;
-  }, [activityItems, suggestedUsers.length]);
+  }, [activityItems, suggestedUsers.length, newRidersCount]);
 
   const handleReact = useCallback(
     (id: string, type: 'like' | 'love', active: boolean) => {
@@ -200,6 +211,10 @@ function CommunityFeedScreen() {
         );
       }
 
+      if (item.kind === 'newRiders') {
+        return <NewRidersCard count={item.count} scope={scopeUsed ?? 'nearby'} />;
+      }
+
       return (
         <FadeSlideIn delay={Math.min(index * 50, 300)}>
           <ActivityFeedCard
@@ -214,11 +229,12 @@ function CommunityFeedScreen() {
         </FadeSlideIn>
       );
     },
-    [visibleIds, handleReact, handleComment, handleUserPress, handleSharePress, handleFollow, suggestedUsers, currentUserId],
+    [visibleIds, handleReact, handleComment, handleUserPress, handleSharePress, handleFollow, suggestedUsers, currentUserId, scopeUsed],
   );
 
   const keyExtractor = useCallback(
-    (item: MergedItem) => (item.kind === 'activity' ? item.data.id : item.key),
+    (item: MergedItem) =>
+      item.kind === 'activity' ? item.data.id : item.kind === 'suggested' ? item.key : 'new-riders',
     [],
   );
 

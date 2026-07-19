@@ -11,6 +11,7 @@ import type {
 import {
   COMMUNITY_FEED_MAX_AGE_DAYS,
   COMMUNITY_FEED_NEARBY_RADIUS_KM,
+  COMMUNITY_NEW_RIDERS_WINDOW_DAYS,
   COMMUNITY_REGION_RADIUS_KM,
   kmToMeters,
   pickCommunityFeedScope,
@@ -164,7 +165,26 @@ export const buildActivityFeedRoutes = (
           ? `${lastItem.score}:${lastItem.id}`
           : null;
 
-        return { items, cursor, scopeUsed };
+        // "N new riders joined this week" aggregate (Change 5) — first page
+        // only, computed from real profile + first-share rows at the same
+        // scope as the feed. Count-only: no per-user data. Non-fatal.
+        let newRiders: { count: number } | null = null;
+        if (cursorScore == null && cursorId == null) {
+          try {
+            const { data: newRiderData, error: newRiderError } = await db.rpc('get_new_rider_count', {
+              user_lat: lat,
+              user_lon: lon,
+              radius_meters: radiusMeters,
+              p_days: COMMUNITY_NEW_RIDERS_WINDOW_DAYS,
+            });
+            const count = Number(newRiderData ?? 0);
+            if (!newRiderError && count >= 1) {
+              newRiders = { count };
+            }
+          } catch { /* aggregate is optional — never fail the feed */ }
+        }
+
+        return { items, cursor, scopeUsed, newRiders };
       },
     );
 

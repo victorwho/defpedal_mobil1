@@ -628,6 +628,13 @@ export const ro: TranslationKeys = {
     // Etichetă pentru aria lărgită a fluxului
     scopeRegion: 'Îți arătăm curse din regiunea ta',
     scopeCommunity: 'Îți arătăm curse din toată comunitatea Defensive Pedal',
+    // Card agregat „cicliști noi" (numai conturi reale)
+    newRiders_nearby_one: 'Un ciclist nou s-a alăturat săptămâna aceasta în zona ta',
+    newRiders_nearby_other: '{{count}} cicliști noi s-au alăturat săptămâna aceasta în zona ta',
+    newRiders_region_one: 'Un ciclist nou s-a alăturat săptămâna aceasta în regiunea ta',
+    newRiders_region_other: '{{count}} cicliști noi s-au alăturat săptămâna aceasta în regiunea ta',
+    newRiders_community_one: 'Un ciclist nou s-a alăturat comunității Defensive Pedal săptămâna aceasta',
+    newRiders_community_other: '{{count}} cicliști noi s-au alăturat comunității Defensive Pedal săptămâna aceasta',
   },
 
   // ── Community Stats ──

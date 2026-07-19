@@ -99,6 +99,35 @@ const countAcceptedFollowers = async (userId: string): Promise<number> => {
   return count ?? 0;
 };
 
+/**
+ * Location to stamp on badge_unlock / tier_up rows so get_ranked_feed can
+ * show them to NEARBY riders, not just followers (feed densification,
+ * 2026-07-19). Privacy: only when the user's sharing toggle is on — a
+ * location-NULL row stays follower-only in the ranked feed.
+ *
+ * The value is the user's latest located ride activity, echoed verbatim
+ * (PostgREST returns geography as WKB hex — see error-log #70 — which
+ * PostGIS accepts back as input, so no parsing is needed). Used only for
+ * spatial filtering; never rendered.
+ */
+const getShareableLocation = async (userId: string): Promise<string | null> => {
+  if (!supabaseAdmin) return null;
+  const profile = await getUserProfile(userId);
+  if (!profile?.auto_share_rides) return null;
+
+  const { data } = await supabaseAdmin
+    .from('activity_feed')
+    .select('location')
+    .eq('user_id', userId)
+    .eq('type', 'ride')
+    .not('location', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return (data as { location: string } | null)?.location ?? null;
+};
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -237,13 +266,16 @@ export const autoPublishBadgeUnlock = async (params: AutoPublishBadgeParams): Pr
     flavorText: params.flavorText,
   };
 
+  // Stamped only when auto_share_rides is on (null = follower-only).
+  const location = await getShareableLocation(params.userId);
+
   const { data, error } = await supabaseAdmin
     .from('activity_feed')
     .insert({
       user_id: params.userId,
       type: 'badge_unlock',
       payload,
-      // No location for badge unlocks
+      location,
     })
     .select('id')
     .single();
@@ -265,13 +297,16 @@ export const autoPublishTierUp = async (params: AutoPublishTierUpParams): Promis
     tierColor: params.tierColor,
   };
 
+  // Stamped only when auto_share_rides is on (null = follower-only).
+  const location = await getShareableLocation(params.userId);
+
   const { data, error } = await supabaseAdmin
     .from('activity_feed')
     .insert({
       user_id: params.userId,
       type: 'tier_up',
       payload,
-      // No location for tier promotions
+      location,
     })
     .select('id')
     .single();
