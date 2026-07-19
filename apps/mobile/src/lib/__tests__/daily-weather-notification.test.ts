@@ -1,20 +1,21 @@
 // @vitest-environment node
 /**
- * Five comprehensive tests for the daily-weather-notification module.
+ * Comprehensive tests for the weather-notification content pipeline.
  *
  * Each test pins a high-risk axis of the feature:
  *
- *   Test 1 — computeTriggerSeconds across wall-clock boundaries (8:30 anchor).
+ *   Test 1 — the 08:30 waking-window anchor constants are exported for the
+ *            cadence module (daily-weather-schedule.ts, tested separately).
  *   Test 2 — buildCyclingAdvice on a good day emits a witty title + factual body.
  *   Test 3 — buildCyclingAdvice on bad weather emits the correct safety warning
  *            (table-driven across the 7 dangerous branches) and never a witty title.
- *   Test 4 — pickForecastIndex honours the 8:30 today-vs-tomorrow cutoff.
  *   Test 5 — parseForecastResponse is resilient: returns null for malformed,
  *            missing, or partially-defined Open-Meteo payloads (the silent
  *            bail-out path that prevents scheduling a junk notification).
  *
- * The SUT's thin scheduler glue (`scheduleDailyWeatherNotification`) is
- * verified indirectly: every branch it calls is covered here.
+ * The SUT's thin scheduler glue (`scheduleDailyWeatherNotifications`) is
+ * verified indirectly: every branch it calls is covered here and in
+ * daily-weather-schedule.test.ts.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -23,66 +24,16 @@ import {
   TRIGGER_HOUR,
   TRIGGER_MINUTE,
   buildCyclingAdvice,
-  computeTriggerSeconds,
   parseForecastResponse,
-  pickForecastIndex,
   type GoodWeatherForecast,
 } from '../daily-weather-messages';
 
 // ---------------------------------------------------------------------------
-// Test 1 — computeTriggerSeconds anchors on 8:30
+// Test 1 — waking-window anchor constants
 // ---------------------------------------------------------------------------
 
-describe('Test 1: computeTriggerSeconds anchors on the 8:30 fire-time', () => {
-  const cases = [
-    {
-      name: '07:00 → fires today at 08:30 (~5400s)',
-      now: new Date(2026, 4, 19, 7, 0, 0),
-      expect: 90 * 60,
-      tolerance: 2,
-    },
-    {
-      name: '08:29:00 → fires today at 08:30 (~60s, clamp floor still 60)',
-      now: new Date(2026, 4, 19, 8, 29, 0),
-      expect: 60,
-      tolerance: 2,
-    },
-    {
-      name: '08:30:00 exactly → rolls to tomorrow (~24h)',
-      now: new Date(2026, 4, 19, 8, 30, 0),
-      expect: 24 * 60 * 60,
-      tolerance: 2,
-    },
-    {
-      name: '08:30:30 (inside trigger minute) → rolls to tomorrow, clamps to ≥60',
-      now: new Date(2026, 4, 19, 8, 30, 30),
-      expect: 24 * 60 * 60 - 30,
-      tolerance: 2,
-    },
-    {
-      name: '23:00 → fires tomorrow at 08:30 (~9.5h)',
-      now: new Date(2026, 4, 19, 23, 0, 0),
-      expect: (9 * 60 + 30) * 60,
-      tolerance: 2,
-    },
-    {
-      name: 'midnight → fires today at 08:30 (~8.5h)',
-      now: new Date(2026, 4, 19, 0, 0, 0),
-      expect: (8 * 60 + 30) * 60,
-      tolerance: 2,
-    },
-  ];
-
-  for (const c of cases) {
-    it(c.name, () => {
-      const secs = computeTriggerSeconds(c.now);
-      expect(secs).toBeGreaterThanOrEqual(c.expect - c.tolerance);
-      expect(secs).toBeLessThanOrEqual(c.expect + c.tolerance);
-      expect(secs).toBeGreaterThanOrEqual(60); // floor invariant
-    });
-  }
-
-  it('exports the constants the scheduler reads at runtime', () => {
+describe('Test 1: exports the 08:30 anchor constants the cadence module reads', () => {
+  it('anchors on 08:30 local', () => {
     expect(TRIGGER_HOUR).toBe(8);
     expect(TRIGGER_MINUTE).toBe(30);
   });
@@ -191,36 +142,6 @@ describe('Test 3: every bad-weather branch emits the correct safety warning', ()
       expect(GOOD_WEATHER_TITLES).not.toContain(title);
     });
   }
-});
-
-// ---------------------------------------------------------------------------
-// Test 4 — pickForecastIndex respects the 8:30 cutoff
-// ---------------------------------------------------------------------------
-
-describe('Test 4: pickForecastIndex honours the 8:30 today-vs-tomorrow cutoff', () => {
-  const cases = [
-    { name: '00:00 → today',           hour: 0,  minute: 0,  expected: 0 },
-    { name: '07:59 → today',           hour: 7,  minute: 59, expected: 0 },
-    { name: '08:00 → today',           hour: 8,  minute: 0,  expected: 0 },
-    { name: '08:29 → today (last min before cutoff)', hour: 8,  minute: 29, expected: 0 },
-    { name: '08:30 → tomorrow (cutoff itself flips)', hour: 8,  minute: 30, expected: 1 },
-    { name: '08:31 → tomorrow',        hour: 8,  minute: 31, expected: 1 },
-    { name: '09:00 → tomorrow',        hour: 9,  minute: 0,  expected: 1 },
-    { name: '23:59 → tomorrow',        hour: 23, minute: 59, expected: 1 },
-  ] as const;
-
-  for (const c of cases) {
-    it(c.name, () => {
-      const now = new Date(2026, 4, 19, c.hour, c.minute, 0);
-      expect(pickForecastIndex(now)).toBe(c.expected);
-    });
-  }
-
-  it('honours custom hour/minute (e.g. if the trigger time ever moves)', () => {
-    const now = new Date(2026, 4, 19, 9, 30, 0);
-    expect(pickForecastIndex(now, 10, 0)).toBe(0);
-    expect(pickForecastIndex(now, 9, 0)).toBe(1);
-  });
 });
 
 // ---------------------------------------------------------------------------

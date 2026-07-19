@@ -25,6 +25,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { PLAY_STORE_URL, resolveQuizCountry, type QuizCountryPreference } from '@defensivepedal/core';
 import { getDeviceRegion } from '../src/i18n';
 import { mobileApi } from '../src/lib/api';
+import { cancelDailyWeatherNotifications } from '../src/lib/daily-weather-notification';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
 import { PRIVACY_URL } from '../src/lib/legal-urls';
@@ -731,7 +732,14 @@ export default function ProfileScreen() {
               label={t('profile.dailyWeather')}
               description={notifyWeather ? t('profile.dailyWeatherOn') : t('profile.dailyWeatherOff')}
               checked={notifyWeather}
-              onChange={(checked) => { setNotifyWeather(checked); syncNotifPref({ notifyWeather: checked }); }}
+              onChange={(checked) => {
+                setNotifyWeather(checked);
+                syncNotifPref({ notifyWeather: checked });
+                // Up to ~10 one-shots can be queued (random cadence + day-3
+                // escalation) — toggling off must cancel them all, not just
+                // stop future scheduling.
+                if (!checked) void cancelDailyWeatherNotifications();
+              }}
             />
 
             <SettingRow

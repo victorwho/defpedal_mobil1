@@ -7,8 +7,8 @@ vi.mock('expo-modules-core', () => ({
 }));
 
 import {
-  scheduleDailyWeatherNotification,
-  cancelDailyWeatherNotification,
+  scheduleDailyWeatherNotifications,
+  cancelDailyWeatherNotifications,
 } from './daily-weather-notification';
 
 describe('daily-weather-notification', () => {
@@ -17,27 +17,27 @@ describe('daily-weather-notification', () => {
   });
 
   describe('when native module is unavailable', () => {
-    it('scheduleDailyWeatherNotification returns early without fetching', async () => {
+    it('scheduleDailyWeatherNotifications returns early without fetching', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
-      await scheduleDailyWeatherNotification(44.43, 26.1);
+      await scheduleDailyWeatherNotifications(44.43, 26.1);
 
       // Should not fetch weather since NativeModules is {} (from vitest.setup.ts)
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('cancelDailyWeatherNotification returns early without error', async () => {
-      await cancelDailyWeatherNotification();
+    it('cancelDailyWeatherNotifications returns early without error', async () => {
+      await cancelDailyWeatherNotifications();
     });
   });
 
   describe('module exports', () => {
-    it('exports scheduleDailyWeatherNotification as a function', () => {
-      expect(typeof scheduleDailyWeatherNotification).toBe('function');
+    it('exports scheduleDailyWeatherNotifications as a function', () => {
+      expect(typeof scheduleDailyWeatherNotifications).toBe('function');
     });
 
-    it('exports cancelDailyWeatherNotification as a function', () => {
-      expect(typeof cancelDailyWeatherNotification).toBe('function');
+    it('exports cancelDailyWeatherNotifications as a function', () => {
+      expect(typeof cancelDailyWeatherNotifications).toBe('function');
     });
   });
 });

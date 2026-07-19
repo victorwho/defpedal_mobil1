@@ -137,7 +137,10 @@ export const buildGoodWeatherBody = (f: GoodWeatherForecast): string => {
 // in expo-notifications / react-native mocks.
 // ---------------------------------------------------------------------------
 
-/** Local trigger time (rider's timezone). */
+/**
+ * Morning anchor (rider's timezone) — the waking-window start that random
+ * fire times snap to in daily-weather-schedule.ts.
+ */
 export const TRIGGER_HOUR = 8;
 export const TRIGGER_MINUTE = 30;
 
@@ -236,39 +239,6 @@ export const buildCyclingAdvice = (
     title: "Today's cycling forecast",
     body: `${tempRange}, ${precipChance}% rain, wind ${windMax} km/h. Ride prepared!`,
   };
-};
-
-/**
- * Compute the number of seconds from `now` until the next 8:30 fire-time.
- * Clamps to ≥60 so a same-day call inside the trigger minute doesn't fire
- * immediately. If `now` is at or past the trigger, rolls to tomorrow.
- */
-export const computeTriggerSeconds = (
-  now: Date,
-  hour: number = TRIGGER_HOUR,
-  minute: number = TRIGGER_MINUTE,
-): number => {
-  const trigger = new Date(now);
-  trigger.setHours(hour, minute, 0, 0);
-  if (trigger.getTime() <= now.getTime()) {
-    trigger.setDate(trigger.getDate() + 1);
-  }
-  return Math.max(60, Math.floor((trigger.getTime() - now.getTime()) / 1000));
-};
-
-/**
- * Pick which Open-Meteo daily row to use:
- *   - row 0 (today)    when we'll still fire today
- *   - row 1 (tomorrow) when we've passed today's 8:30 window
- */
-export const pickForecastIndex = (
-  now: Date,
-  hour: number = TRIGGER_HOUR,
-  minute: number = TRIGGER_MINUTE,
-): 0 | 1 => {
-  const beforeTrigger =
-    now.getHours() < hour || (now.getHours() === hour && now.getMinutes() < minute);
-  return beforeTrigger ? 0 : 1;
 };
 
 /**

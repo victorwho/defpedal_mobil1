@@ -118,6 +118,12 @@ type AppStore = QueueSlice & {
     supplies: boolean;
   };
   notifyWeather: boolean;
+  // Upcoming cycling-weather notification fire times (ISO), the persisted
+  // random-cadence chain from daily-weather-schedule.ts. Device-scoped
+  // scheduling state (like reviewPromptState) — NOT reset on account switch;
+  // losing it would just re-roll the cadence, never duplicate notifications.
+  dailyWeatherChain: string[];
+  setDailyWeatherChain: (times: string[]) => void;
   notifyHazard: boolean;
   notifyCommunity: boolean;
   quietHoursStart: string;
@@ -565,6 +571,7 @@ export const useAppStore = create<AppStore>()(
       avoidUnpaved: false,
       avoidHills: false,
       notifyWeather: true,
+      dailyWeatherChain: [],
       notifyHazard: true,
       notifyCommunity: true,
       // Consent opt-in — default OFF, unlike every other notify pref.
@@ -905,6 +912,8 @@ export const useAppStore = create<AppStore>()(
         })),
       setNotifyWeather: (enabled) =>
         set(() => ({ notifyWeather: enabled })),
+      setDailyWeatherChain: (times) =>
+        set(() => ({ dailyWeatherChain: times })),
       setNotifyHazard: (enabled) =>
         set(() => ({ notifyHazard: enabled })),
       setNotifyCommunity: (enabled) =>
@@ -1403,6 +1412,7 @@ export const useAppStore = create<AppStore>()(
         showRouteFeatures: state.showRouteFeatures,
         poiVisibility: state.poiVisibility,
         notifyWeather: state.notifyWeather,
+        dailyWeatherChain: state.dailyWeatherChain,
         notifyHazard: state.notifyHazard,
         notifyCommunity: state.notifyCommunity,
         notifyRidingTips: state.notifyRidingTips,
