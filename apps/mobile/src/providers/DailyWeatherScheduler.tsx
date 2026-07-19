@@ -34,7 +34,11 @@ export const DailyWeatherScheduler = () => {
     let lastPassAt = 0;
 
     const runPass = async (promptForPermission: boolean) => {
-      if (Date.now() - lastPassAt < MIN_PASS_INTERVAL_MS) return;
+      // Only foreground re-runs are rate-limited. The mount pass is exempt
+      // so an early AppState flap (e.g. notification-tap launch briefly
+      // blurring) can never consume the window and starve the ONE pass
+      // allowed to show the OS permission prompt (review 2026-07-19, M3).
+      if (!promptForPermission && Date.now() - lastPassAt < MIN_PASS_INTERVAL_MS) return;
       lastPassAt = Date.now();
       try {
         const Location = require('expo-location') as typeof import('expo-location');

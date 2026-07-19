@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHAIN_HORIZON_DAYS,
-  ESCALATION_AFTER_HOURS,
+  ESCALATION_AFTER_DAYS,
   MAX_INTERVAL_HOURS,
   MAX_SCHEDULED_FIRES,
   MIN_GAP_HOURS,
@@ -187,13 +187,25 @@ describe('buildEscalationFires', () => {
     expect(fires).toHaveLength(4); // days 3, 4, 5, 6
     for (const f of fires) {
       expect(inWakingWindow(f)).toBe(true);
-      expect(f.getTime()).toBeLessThan(
-        now.getTime() + CHAIN_HORIZON_DAYS * 24 * HOUR_MS,
-      );
+      expect(f.getTime()).toBeLessThan(new Date(2026, 6, 27, 10, 0, 0).getTime());
       expect(f.getTime()).toBeGreaterThanOrEqual(
-        now.getTime() + ESCALATION_AFTER_HOURS * HOUR_MS,
+        new Date(2026, 6, 23, 10, 0, 0).getTime(),
       );
     }
+    expect(ESCALATION_AFTER_DAYS).toBe(3);
+  });
+
+  it('preserves local wall-clock across DST transitions (calendar-day math)', () => {
+    // 2026-03-27 10:00 local; +3 days crosses the EU spring-forward night
+    // (Mar 29) in timezones that observe it. Calendar-day math lands at
+    // 10:00 local on Mar 30 regardless; the raw-millisecond math this
+    // replaced (review 2026-07-19, M1) would land at 11:00 in EU timezones.
+    // In non-DST timezones (e.g. UTC CI) both agree, so this never flakes.
+    const now = new Date(2026, 2, 27, 10, 0, 0);
+    const fires = buildEscalationFires(now);
+    expect(fires[0].getDate()).toBe(30);
+    expect(fires[0].getHours()).toBe(10);
+    expect(fires[0].getMinutes()).toBe(0);
   });
 });
 
@@ -204,9 +216,9 @@ describe('buildEscalationFires', () => {
 describe('buildWeatherSchedule', () => {
   const now = new Date(2026, 6, 20, 10, 0, 0);
 
-  it('baseline fires stay inside [now+60s, now+72h); escalation beyond', () => {
+  it('baseline fires stay inside [now+60s, now+3d); escalation beyond', () => {
     const { fires } = buildWeatherSchedule([], now, () => 0.5);
-    const escalationStart = now.getTime() + ESCALATION_AFTER_HOURS * HOUR_MS;
+    const escalationStart = new Date(2026, 6, 23, 10, 0, 0).getTime();
     for (const f of fires) {
       expect(f.getTime()).toBeGreaterThanOrEqual(now.getTime() + 60 * 1000);
     }
@@ -217,9 +229,9 @@ describe('buildWeatherSchedule', () => {
 
   it('a 5-day draw still produces escalation fires from day 3 (the whole point)', () => {
     const { fires } = buildWeatherSchedule([], now, () => 1); // 120h draws
-    // Baseline contributes nothing before 72h; the inactive user still hears
-    // from us daily starting day 3.
-    const escalationStart = now.getTime() + ESCALATION_AFTER_HOURS * HOUR_MS;
+    // Baseline contributes nothing before day 3; the inactive user still
+    // hears from us daily starting day 3.
+    const escalationStart = new Date(2026, 6, 23, 10, 0, 0).getTime();
     expect(fires.length).toBeGreaterThanOrEqual(4);
     expect(fires[0].getTime()).toBeGreaterThanOrEqual(escalationStart);
   });

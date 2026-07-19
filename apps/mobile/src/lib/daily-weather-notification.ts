@@ -64,18 +64,33 @@ const fetchForecastRows = async (
   }
 };
 
-const cancelAllWeatherNotifications = async (
+/**
+ * Cancel every weather notification EXCEPT the given generation (pass null
+ * to cancel everything, e.g. from the Profile toggle-off). Covers all older
+ * generations plus the pre-2026-07-18 legacy single id via the shared prefix.
+ */
+const cancelWeatherNotificationsExcept = async (
   N: typeof import('expo-notifications'),
+  keepGeneration: string | null,
 ): Promise<void> => {
+  const keepPrefix = keepGeneration
+    ? `${NOTIFICATION_ID_PREFIX}-${keepGeneration}-`
+    : null;
   try {
     const scheduled = await N.getAllScheduledNotificationsAsync();
     await Promise.all(
       scheduled
-        .filter((s) => s.identifier.startsWith(NOTIFICATION_ID_PREFIX))
+        .filter(
+          (s) =>
+            s.identifier.startsWith(NOTIFICATION_ID_PREFIX) &&
+            (!keepPrefix || !s.identifier.startsWith(keepPrefix)),
+        )
         .map((s) => N.cancelScheduledNotificationAsync(s.identifier).catch(() => {})),
     );
   } catch {
-    // Fall back to the legacy single id — better than leaving it queued.
+    // Enumeration failed — cancel the legacy fixed id (the only one
+    // addressable without a list). Stale generations left behind get swept
+    // by the next successful pass; duplicates beat silence.
     await N.cancelScheduledNotificationAsync(NOTIFICATION_ID_PREFIX).catch(() => {});
   }
 };
@@ -114,6 +129,11 @@ export const scheduleDailyWeatherNotifications = async (
     .filter((d) => Number.isFinite(d.getTime()));
   const { chain, fires } = buildWeatherSchedule(persistedChain, now);
 
+  // Persist the cadence truth BEFORE touching OS state — the scheduled set
+  // is derived from the chain, so after a crash mid-pass the next pass
+  // rebuilds the same fires instead of re-rolling (review 2026-07-19, M2).
+  store.getState().setDailyWeatherChain(chain.map((d) => d.toISOString()));
+
   if (Platform.OS === 'android') {
     await N.setNotificationChannelAsync('daily-weather', {
       name: 'Cycling Weather',
@@ -122,7 +142,11 @@ export const scheduleDailyWeatherNotifications = async (
     });
   }
 
-  await cancelAllWeatherNotifications(N);
+  // Generation-tagged ids, scheduled BEFORE the old generation is cancelled:
+  // a crash between the two steps worst-cases as duplicate pings the next
+  // pass sweeps — never as an empty queue, which would silently defeat the
+  // day-3 inactivity escalation (review 2026-07-19, M2).
+  const generation = `g${now.getTime().toString(36)}`;
 
   await Promise.all(
     fires.map((fireAt, index) => {
@@ -132,7 +156,7 @@ export const scheduleDailyWeatherNotifications = async (
       const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
       const seconds = Math.max(60, Math.floor((fireAt.getTime() - now.getTime()) / 1000));
       return N.scheduleNotificationAsync({
-        identifier: `${NOTIFICATION_ID_PREFIX}-${index}`,
+        identifier: `${NOTIFICATION_ID_PREFIX}-${generation}-${index}`,
         content: {
           title,
           body,
@@ -150,7 +174,7 @@ export const scheduleDailyWeatherNotifications = async (
     }),
   );
 
-  store.getState().setDailyWeatherChain(chain.map((d) => d.toISOString()));
+  await cancelWeatherNotificationsExcept(N, generation);
 };
 
 /**
@@ -160,7 +184,7 @@ export const scheduleDailyWeatherNotifications = async (
 export const cancelDailyWeatherNotifications = async (): Promise<void> => {
   const N = getNotifications();
   if (!N) return;
-  await cancelAllWeatherNotifications(N);
+  await cancelWeatherNotificationsExcept(N, null);
   try {
     getAppStore().getState().setDailyWeatherChain([]);
   } catch {

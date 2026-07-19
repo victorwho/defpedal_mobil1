@@ -28,10 +28,8 @@ import { TRIGGER_HOUR, TRIGGER_MINUTE } from './daily-weather-messages';
 export const MIN_INTERVAL_HOURS = 12;
 /** Once every 5 days. */
 export const MAX_INTERVAL_HOURS = 120;
-/** After 3 consecutive days without an app open, escalate. */
-export const ESCALATION_AFTER_HOURS = 72;
-/** Escalated cadence: one per day. */
-export const ESCALATION_INTERVAL_HOURS = 24;
+/** After 3 consecutive days without an app open, escalate (daily fires). */
+export const ESCALATION_AFTER_DAYS = 3;
 /** How far past `now` the persisted chain is kept extended. */
 export const CHAIN_HORIZON_DAYS = 7;
 /** No fires at or after this local hour — snap to next morning instead. */
@@ -45,6 +43,19 @@ const HOUR_MS = 60 * 60 * 1000;
 
 const addHours = (d: Date, hours: number): Date =>
   new Date(d.getTime() + hours * HOUR_MS);
+
+/**
+ * Calendar-day addition preserving local wall-clock time (setDate-based).
+ * "N days later" must survive DST transitions — raw-millisecond addition
+ * drifts by the DST offset twice a year (review 2026-07-19, finding M1).
+ * Chain draws deliberately keep millisecond math: they are elapsed-time
+ * intervals, not calendar anchors.
+ */
+const addDays = (d: Date, days: number): Date => {
+  const next = new Date(d);
+  next.setDate(next.getDate() + days);
+  return next;
+};
 
 /** Uniform draw in [MIN_INTERVAL_HOURS, MAX_INTERVAL_HOURS]. */
 export const drawIntervalHours = (
@@ -90,7 +101,7 @@ export const advanceWeatherChain = (
   now: Date,
   random: () => number = Math.random,
 ): Date[] => {
-  const horizonEnd = addHours(now, CHAIN_HORIZON_DAYS * 24);
+  const horizonEnd = addDays(now, CHAIN_HORIZON_DAYS);
   const future = chain
     .filter((t) => t.getTime() > now.getTime())
     .sort((a, b) => a.getTime() - b.getTime());
@@ -104,18 +115,15 @@ export const advanceWeatherChain = (
 };
 
 /**
- * Escalation fires for a user who stays away: one per day starting exactly
- * 3 days after the current app open, snapped to the waking window.
+ * Escalation fires for a user who stays away: one per calendar day starting
+ * exactly 3 days after the current app open (same local wall-clock time,
+ * DST-safe), snapped to the waking window.
  */
 export const buildEscalationFires = (now: Date): Date[] => {
   const fires: Date[] = [];
-  const horizonEnd = addHours(now, CHAIN_HORIZON_DAYS * 24);
-  for (
-    let offset = ESCALATION_AFTER_HOURS;
-    ;
-    offset += ESCALATION_INTERVAL_HOURS
-  ) {
-    const raw = addHours(now, offset);
+  const horizonEnd = addDays(now, CHAIN_HORIZON_DAYS);
+  for (let day = ESCALATION_AFTER_DAYS; ; day += 1) {
+    const raw = addDays(now, day);
     if (raw.getTime() >= horizonEnd.getTime()) break;
     fires.push(clampToWakingWindow(raw));
   }
@@ -143,8 +151,9 @@ export interface WeatherScheduleResult {
 
 /**
  * One scheduling pass. Materializes:
- *   - chain entries within [now+60s, now+72h)  — the random baseline cadence
- *   - daily escalation fires in [now+72h, now+7d)
+ *   - chain entries within [now+60s, now+3 calendar days) — the random
+ *     baseline cadence
+ *   - daily escalation fires in [now+3d, now+7d) (calendar days)
  * merged, min-gap-enforced, capped. The returned `chain` (NOT the same thing
  * as `fires`) is what must be persisted for the next pass.
  */
@@ -154,7 +163,7 @@ export const buildWeatherSchedule = (
   random: () => number = Math.random,
 ): WeatherScheduleResult => {
   const chain = advanceWeatherChain(persistedChain, now, random);
-  const escalationStart = addHours(now, ESCALATION_AFTER_HOURS);
+  const escalationStart = addDays(now, ESCALATION_AFTER_DAYS);
   const minFireTime = new Date(now.getTime() + 60 * 1000);
   const baseline = chain.filter(
     (t) =>
