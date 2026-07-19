@@ -85,7 +85,12 @@ export const __resetLocationCache = (): void => {
 
 /**
  * Parse a PostGIS geography(Point, 4326) value into {lat, lon}. Handles
- * both serialisations the Supabase JS client emits:
+ * every serialisation the Supabase stack emits:
+ *   - **WKB/EWKB hex string**: `"0101000020E6100000…"` — what PostgREST
+ *     actually returns for a bare `select start_location` (discovered
+ *     2026-07-19, error-log #70: this branch was missing, so EVERY user
+ *     silently fell to the Bucharest fallback and the City Pulse named the
+ *     wrong city / the safety floor gated on the wrong weather)
  *   - WKT/EWKT string: `"POINT(26.10 44.43)"` (lon first)
  *   - GeoJSON object: `{ type: 'Point', coordinates: [26.10, 44.43] }`
  *
@@ -101,7 +106,7 @@ const parseGeographyPoint = (
       const lat = Number.parseFloat(match[2]!);
       if (Number.isFinite(lat) && Number.isFinite(lon)) return { lat, lon };
     }
-    return null;
+    return parseWkbHexPoint(raw);
   }
   if (raw && typeof raw === 'object') {
     const coords = (raw as { coordinates?: unknown }).coordinates;
@@ -112,4 +117,31 @@ const parseGeographyPoint = (
     }
   }
   return null;
+};
+
+/**
+ * Decode a (E)WKB hex Point: byte-order flag, uint32 geometry type (low byte
+ * 1 = Point; 0x20000000 flag = embedded SRID), optional SRID, then X (lon)
+ * and Y (lat) as doubles in the declared byte order.
+ */
+const parseWkbHexPoint = (
+  hex: string,
+): { lat: number; lon: number } | null => {
+  if (hex.length < 42 || !/^[0-9A-Fa-f]+$/.test(hex)) return null;
+  const buf = Buffer.from(hex, 'hex');
+  const littleEndian = buf[0] === 1;
+  if (buf[0] !== 0 && buf[0] !== 1) return null;
+  const type = littleEndian ? buf.readUInt32LE(1) : buf.readUInt32BE(1);
+  if ((type & 0xff) !== 1) return null; // not a Point
+  const coordOffset = 5 + ((type & 0x20000000) !== 0 ? 4 : 0);
+  if (buf.length < coordOffset + 16) return null;
+  const lon = littleEndian
+    ? buf.readDoubleLE(coordOffset)
+    : buf.readDoubleBE(coordOffset);
+  const lat = littleEndian
+    ? buf.readDoubleLE(coordOffset + 8)
+    : buf.readDoubleBE(coordOffset + 8);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return { lat, lon };
 };
