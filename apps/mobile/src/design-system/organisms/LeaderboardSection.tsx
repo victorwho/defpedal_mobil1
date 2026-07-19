@@ -126,6 +126,13 @@ export function LeaderboardSection() {
                 styles.pillText,
                 period === p.key && styles.pillTextActive,
               ]}
+              // One line, shrink-to-fit: the active pill's semibold font is
+              // wider than the medium it was measured with, which wrapped
+              // "This Week" and clipped the second line ("This" bug,
+              // 2026-07-19). Also keeps long RO/ES labels on one line.
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
             >
               {p.label}
             </Text>
@@ -252,6 +259,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     pill: {
       flex: 1,
       paddingVertical: space[1],
+      paddingHorizontal: space[2],
       borderRadius: radii.full,
       borderWidth: 1,
       borderColor: colors.borderDefault,
