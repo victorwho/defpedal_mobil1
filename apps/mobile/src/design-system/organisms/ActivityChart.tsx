@@ -5,7 +5,7 @@
  * as ElevationChart. Two metrics: ride count (bars) and community seconds
  * (line overlay). Fills missing days with zero values.
  */
-import type { DailyActivity } from '@defensivepedal/core';
+import type { DailyActivity, WeeklyActivity } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, {
@@ -31,6 +31,15 @@ import { fontFamily, textXs } from '../tokens/typography';
 interface ActivityChartProps {
   readonly daily: readonly DailyActivity[];
   readonly days?: number;
+  /**
+   * 'weekly' renders 4 bars from `weekly` (one per 7-day bucket) instead of
+   * the daily bars — used when the last week is too sparse to look alive
+   * (community-visibility ladder). Defaults to the original daily view.
+   */
+  readonly mode?: 'daily' | 'weekly';
+  readonly weekly?: readonly WeeklyActivity[];
+  /** Honest header label (e.g. "Last 7 days" / "Last 4 weeks"). */
+  readonly title?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,22 +113,40 @@ const buildLinePath = (
 // Component
 // ---------------------------------------------------------------------------
 
-export const ActivityChart = ({ daily, days = 7 }: ActivityChartProps) => {
+export const ActivityChart = ({ daily, days = 7, mode = 'daily', weekly, title }: ActivityChartProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
 
   const chart = useMemo(() => {
-    const filled = fillDays(daily, days);
+    const isWeekly = mode === 'weekly' && weekly != null && weekly.length > 0;
+
+    // Weekly buckets reuse the daily rendering pipeline: each 7-day bucket
+    // becomes one "day" keyed by its weekStart, labeled with the start date.
+    const filled: DailyActivity[] = isWeekly
+      ? weekly.map((w) => ({
+          day: w.weekStart,
+          rides: w.rides,
+          distanceMeters: w.distanceMeters,
+          co2SavedKg: w.co2SavedKg,
+          communitySeconds: w.communitySeconds,
+        }))
+      : fillDays(daily, days);
+
+    const barCount = filled.length || 1;
     const rides = filled.map((d) => d.rides);
     const seconds = filled.map((d) => d.communitySeconds);
     const maxRides = Math.max(...rides, 1);
     const maxSeconds = Math.max(...seconds, 1);
 
     const gap = 6;
-    const barWidth = Math.max(4, (PLOT_W - gap * (days - 1)) / days);
+    const barWidth = Math.max(4, (PLOT_W - gap * (barCount - 1)) / barCount);
 
     const dayLabels = filled.map((d) => {
       const dt = new Date(d.day + 'T12:00:00');
+      if (isWeekly) {
+        // Locale-neutral numeric "22.6" week-start label
+        return `${dt.getDate()}.${dt.getMonth() + 1}`;
+      }
       return DAY_NAMES[dt.getDay()];
     });
 
@@ -129,12 +156,12 @@ export const ActivityChart = ({ daily, days = 7 }: ActivityChartProps) => {
     const linePath = buildLinePath(seconds, maxSeconds, barWidth, gap);
 
     return { filled, rides, maxRides, maxSeconds, barWidth, gap, dayLabels, yTicks, linePath };
-  }, [daily, days]);
+  }, [daily, days, mode, weekly]);
 
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>Activity</Text>
+        <Text style={styles.header}>{title ?? 'Activity'}</Text>
         <View style={styles.legendRow}>
           <View style={[styles.legendDot, { backgroundColor: BAR_COLOR }]} />
           <Text style={styles.legendText}>Rides</Text>

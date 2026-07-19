@@ -191,6 +191,71 @@ describe('GET /v1/feed', () => {
     await app.close();
   });
 
+  it('widens through the radius ladder and labels the scope when nearby is sparse', async () => {
+    const makeRow = (id: string) => ({
+      id,
+      user_id: 'user-a',
+      title: 'Ride',
+      start_location_text: 'A',
+      destination_text: 'B',
+      distance_meters: 1000,
+      duration_seconds: 300,
+      elevation_gain_meters: null,
+      average_speed_mps: null,
+      safety_rating: null,
+      safety_tags: [],
+      geometry_polyline6: 'abc',
+      note: null,
+      shared_at: '2026-07-01T08:00:00Z',
+      like_count: 0,
+      love_count: 0,
+      comment_count: 0,
+      liked_by_me: false,
+      loved_by_me: false,
+      profiles: { display_name: 'Alice', avatar_url: null, rider_tier: 'kickstand' },
+    });
+
+    // nearby → 1 item (< 3), region → 1 item (< 3), community → 3 items
+    enqueueResult({ data: [makeRow('s1')], error: null });
+    enqueueResult({ data: [makeRow('s1')], error: null });
+    enqueueResult({ data: [makeRow('s1'), makeRow('s2'), makeRow('s3')], error: null });
+    // champion lookup (leaderboard_snapshots): empty
+    enqueueResult({ data: [], error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/feed?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body.scopeUsed).toBe('community');
+    expect(body.items).toHaveLength(3);
+
+    await app.close();
+  });
+
+  it('respects an explicit scope from cursored pages (no re-laddering)', async () => {
+    enqueueResult({ data: [], error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/feed?lat=44.4&lon=26.1&scope=region',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().scopeUsed).toBe('region');
+
+    await app.close();
+  });
+
   it('returns 502 when Supabase RPC returns an error', async () => {
     enqueueResult({ data: null, error: { message: 'RPC failed' } });
 
@@ -204,6 +269,126 @@ describe('GET /v1/feed', () => {
     });
     expect(response.statusCode).toBe(502);
     expect(response.json().code).toBe('UPSTREAM_ERROR');
+
+    await app.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/community/heartbeat — pulse ladder
+// ---------------------------------------------------------------------------
+
+describe('GET /v1/community/heartbeat', () => {
+  beforeEach(() => {
+    supabaseResultQueue.length = 0;
+    vi.clearAllMocks();
+  });
+
+  const pulseStats = { rides: 5, distanceMeters: 12000, co2SavedKg: 1.44, communitySeconds: 54, activeRiders: 2 };
+  const zeroStats = { rides: 0, distanceMeters: 0, co2SavedKg: 0, communitySeconds: 0, activeRiders: 0 };
+  const lifetimeTotals = { rides: 325, distanceMeters: 900000, durationSeconds: 200000, co2SavedKg: 108, communitySeconds: 4050, uniqueRiders: 50 };
+
+  const heartbeatRpcResult = {
+    today: zeroStats,
+    pulse: pulseStats,
+    daily: [],
+    chartDaily: [],
+    chartWeekly: [
+      { weekStart: '2026-06-22', rides: 0, distanceMeters: 0, co2SavedKg: 0, communitySeconds: 0 },
+      { weekStart: '2026-06-29', rides: 2, distanceMeters: 5000, co2SavedKg: 0.6, communitySeconds: 23 },
+      { weekStart: '2026-07-06', rides: 1, distanceMeters: 3000, co2SavedKg: 0.36, communitySeconds: 14 },
+      { weekStart: '2026-07-13', rides: 2, distanceMeters: 4000, co2SavedKg: 0.48, communitySeconds: 18 },
+    ],
+    totals: { rides: 0, distanceMeters: 0, durationSeconds: 0, co2SavedKg: 0, communitySeconds: 0, uniqueRiders: 0 },
+    communityTotals: lifetimeTotals,
+    hazardHotspots: [],
+    topContributors: [],
+  };
+
+  it('resolves the ladder rung, labels it, and forwards pulse + lifetime totals', async () => {
+    // Counts: nothing nearby/region in any window; month-community has 5.
+    enqueueResult({
+      data: {
+        today: { nearby: 0, region: 0, community: 0 },
+        week: { nearby: 0, region: 0, community: 2 },
+        month: { nearby: 0, region: 0, community: 5 },
+      },
+      error: null,
+    });
+    enqueueResult({ data: heartbeatRpcResult, error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/community/heartbeat?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body.windowUsed).toBe('month');
+    expect(body.scopeUsed).toBe('community');
+    // 2 rides in the resolved scope's week < 7 → 4-week chart
+    expect(body.chartMode).toBe('weekly');
+    expect(body.pulse).toEqual(pulseStats);
+    expect(body.communityTotals).toEqual(lifetimeTotals);
+    expect(body.chartWeekly).toHaveLength(4);
+    // Legacy keys keep their literal today/nearby semantics
+    expect(body.today.rides).toBe(0);
+
+    await app.close();
+  });
+
+  it('degrades to the legacy today/nearby view when the counts RPC fails', async () => {
+    enqueueResult({ data: null, error: { message: 'counts unavailable' } });
+    enqueueResult({ data: heartbeatRpcResult, error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/community/heartbeat?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body.windowUsed).toBe('today');
+    expect(body.scopeUsed).toBe('nearby');
+    expect(body.chartMode).toBe('daily');
+
+    await app.close();
+  });
+
+  it('keeps (today, nearby) when today already has enough local rides', async () => {
+    enqueueResult({
+      data: {
+        today: { nearby: 4, region: 6, community: 8 },
+        week: { nearby: 9, region: 12, community: 15 },
+        month: { nearby: 20, region: 30, community: 40 },
+      },
+      error: null,
+    });
+    enqueueResult({ data: heartbeatRpcResult, error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/community/heartbeat?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    expect(body.windowUsed).toBe('today');
+    expect(body.scopeUsed).toBe('nearby');
+    // 9 rides this week ≥ 7 → daily chart
+    expect(body.chartMode).toBe('daily');
 
     await app.close();
   });

@@ -1,4 +1,8 @@
 import type {
+  CommunityScope,
+  CommunityWindow,
+} from './communityVisibility';
+import type {
   GeoJsonLineString,
   GeoJsonMultiLineString,
   Maneuver,
@@ -741,6 +745,17 @@ export type ActivityFeedItem =
 export interface ActivityFeedResponse {
   readonly items: readonly ActivityFeedItem[];
   readonly cursor: string | null;
+  /**
+   * Geographic scope the ladder resolved for this page (2026-07-19).
+   * Optional — older servers/caches omit it; the client only renders the
+   * scope chip when present and wider than 'nearby'.
+   */
+  readonly scopeUsed?: CommunityScope;
+  /**
+   * "N new riders joined this week" aggregate (first page only, real
+   * profile rows, never rendered when count < 1). Null/omitted otherwise.
+   */
+  readonly newRiders?: { readonly count: number } | null;
 }
 
 export interface FollowRequest {
@@ -843,6 +858,8 @@ export interface ShareTripRequest {
 export interface FeedResponse {
   items: FeedItem[];
   cursor: string | null;
+  /** Ladder scope this page was served from (2026-07-19); optional for old caches. */
+  scopeUsed?: CommunityScope;
 }
 
 export interface FeedCommentRequest {
@@ -1114,8 +1131,28 @@ export interface TopContributor {
   readonly distanceKm: number;
 }
 
+/** One bucket of the 4-week fallback chart (weekStart = ISO date of day 1). */
+export interface WeeklyActivity {
+  readonly weekStart: string;
+  readonly rides: number;
+  readonly distanceMeters: number;
+  readonly co2SavedKg: number;
+  readonly communitySeconds: number;
+}
+
+/** Lifetime, community-wide (no radius filter) totals — only ever go up. */
+export interface CommunityLifetimeTotals {
+  readonly rides: number;
+  readonly distanceMeters: number;
+  readonly durationSeconds: number;
+  readonly co2SavedKg: number;
+  readonly communitySeconds: number;
+  readonly uniqueRiders: number;
+}
+
 export interface CityHeartbeat {
   readonly localityName: string | null;
+  /** Literal today @ nearby radius — kept for old clients; prefer `pulse`. */
   readonly today: {
     readonly rides: number;
     readonly distanceMeters: number;
@@ -1123,7 +1160,9 @@ export interface CityHeartbeat {
     readonly communitySeconds: number;
     readonly activeRiders: number;
   };
+  /** Literal last-7-days @ nearby radius — kept for old clients; prefer `chartDaily`/`chartWeekly`. */
   readonly daily: readonly DailyActivity[];
+  /** All-time within the nearby radius (unchanged legacy shape). */
   readonly totals: {
     readonly rides: number;
     readonly distanceMeters: number;
@@ -1134,6 +1173,30 @@ export interface CityHeartbeat {
   };
   readonly hazardHotspots: readonly HazardHotspot[];
   readonly topContributors: readonly TopContributor[];
+
+  // ── Community-visibility ladder additions (2026-07-19). All optional so
+  // persisted pre-ladder cached heartbeats hydrate without crashing. ──
+
+  /** Pulse stats for the resolved (windowUsed, scopeUsed) rung. */
+  readonly pulse?: {
+    readonly rides: number;
+    readonly distanceMeters: number;
+    readonly co2SavedKg: number;
+    readonly communitySeconds: number;
+    readonly activeRiders: number;
+  };
+  /** Which time window `pulse` covers — drives the honest label. */
+  readonly windowUsed?: CommunityWindow;
+  /** Which geographic scope `pulse`/charts/contributors cover. */
+  readonly scopeUsed?: CommunityScope;
+  /** 'daily' → render chartDaily (7 days); 'weekly' → chartWeekly (4 weeks). */
+  readonly chartMode?: 'daily' | 'weekly';
+  /** Last 7 days at the resolved scope. */
+  readonly chartDaily?: readonly DailyActivity[];
+  /** Last 4 weeks (7-day buckets ending today) at the resolved scope. */
+  readonly chartWeekly?: readonly WeeklyActivity[];
+  /** Lifetime community-wide totals (no radius filter, labeled as such). */
+  readonly communityTotals?: CommunityLifetimeTotals;
 }
 
 // ── Neighborhood Leaderboard ──

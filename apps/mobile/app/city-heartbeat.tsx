@@ -61,6 +61,29 @@ export default function CityHeartbeatScreen() {
   const t = useT();
   const screenTitle = t('cityHeartbeat.title');
 
+  // ── Community-visibility ladder (honest labels). Every fallback keeps
+  // the pre-ladder behavior so persisted old-shape caches render fine. ──
+  const windowUsed = heartbeat?.windowUsed ?? 'today';
+  const scopeUsed = heartbeat?.scopeUsed ?? 'nearby';
+  const pulse = heartbeat?.pulse ?? heartbeat?.today;
+  const chartMode = heartbeat?.chartMode ?? 'daily';
+  const chartDaily = heartbeat?.chartDaily ?? heartbeat?.daily ?? [];
+  const chartWeekly = heartbeat?.chartWeekly ?? [];
+
+  const cityLabel = heartbeat?.localityName ?? t('cityHeartbeat.cityFallback');
+  // Header title follows the scope: city name nearby, honest wider labels
+  // otherwise — never a city name over region/community-wide numbers.
+  const headerTitle =
+    scopeUsed === 'nearby'
+      ? heartbeat?.localityName ?? null
+      : scopeUsed === 'region'
+        ? t('cityHeartbeat.scopeRegionTitle')
+        : t('cityHeartbeat.scopeCommunityTitle');
+  const pulseLabel = t(`cityHeartbeat.pulse_${windowUsed}_${scopeUsed}`, { city: cityLabel });
+  const activeRidersLabel = t(
+    `cityHeartbeat.activeRiders_${windowUsed}_${(pulse?.activeRiders ?? 0) === 1 ? 'one' : 'other'}`,
+  );
+
   if (isLoading && !heartbeat) {
     return (
       <Screen title={screenTitle} headerVariant="back">
@@ -116,23 +139,24 @@ export default function CityHeartbeatScreen() {
           />
         }
       >
-        {/* Pulse header */}
+        {/* Pulse header — honest window/scope labeling */}
         <FadeSlideIn delay={0}>
           <PulseHeader
-            cityName={heartbeat.localityName}
-            activeRidersToday={heartbeat.today.activeRiders}
-            totalRidesToday={heartbeat.today.rides}
+            cityName={headerTitle}
+            activeRidersToday={pulse?.activeRiders ?? 0}
+            totalRidesToday={pulse?.rides ?? 0}
+            activeRidersLabel={activeRidersLabel}
           />
         </FadeSlideIn>
 
-        {/* Today's live stats */}
+        {/* Pulse stats for the resolved (window, scope) rung */}
         <FadeSlideIn delay={100}>
           <Surface>
-            <Text style={styles.sectionLabel}>{t('cityHeartbeat.todayPulse')}</Text>
+            <Text style={styles.sectionLabel}>{pulseLabel}</Text>
             <View style={styles.statGrid}>
               <StatCell
                 label={t('cityHeartbeat.rides')}
-                value={heartbeat.today.rides}
+                value={pulse?.rides ?? 0}
                 suffix=""
                 decimals={0}
                 color={colors.accent}
@@ -140,7 +164,7 @@ export default function CityHeartbeatScreen() {
               />
               <StatCell
                 label={t('cityHeartbeat.distance')}
-                value={heartbeat.today.distanceMeters / 1000}
+                value={(pulse?.distanceMeters ?? 0) / 1000}
                 suffix=" km"
                 decimals={1}
                 color={colors.info}
@@ -148,7 +172,7 @@ export default function CityHeartbeatScreen() {
               />
               <StatCell
                 label={t('cityHeartbeat.co2Saved')}
-                value={heartbeat.today.co2SavedKg}
+                value={pulse?.co2SavedKg ?? 0}
                 suffix=" kg"
                 decimals={1}
                 color={colors.safe}
@@ -156,7 +180,7 @@ export default function CityHeartbeatScreen() {
               />
               <StatCell
                 label={t('cityHeartbeat.donated')}
-                value={heartbeat.today.communitySeconds}
+                value={pulse?.communitySeconds ?? 0}
                 suffix=" sec"
                 decimals={0}
                 color={colors.info}
@@ -166,9 +190,19 @@ export default function CityHeartbeatScreen() {
           </Surface>
         </FadeSlideIn>
 
-        {/* 7-day activity chart */}
+        {/* Activity chart — daily (7 days) or weekly (4 weeks) at the resolved scope */}
         <FadeSlideIn delay={200}>
-          <ActivityChart daily={heartbeat.daily} days={7} />
+          <ActivityChart
+            daily={chartDaily}
+            days={7}
+            mode={chartMode}
+            weekly={chartWeekly}
+            title={t(
+              chartMode === 'weekly'
+                ? 'cityHeartbeat.chartTitleWeekly'
+                : 'cityHeartbeat.chartTitleDaily',
+            )}
+          />
         </FadeSlideIn>
 
         {/* Cumulative totals */}

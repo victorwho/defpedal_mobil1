@@ -28,6 +28,12 @@ interface PulseHeaderProps {
   readonly cityName: string | null;
   readonly activeRidersToday: number;
   readonly totalRidesToday: number;
+  /**
+   * Honest label for the active-riders row (e.g. "riders active this
+   * week") — pass the localized, pluralized string. Falls back to the
+   * legacy hardcoded "rider(s) active today".
+   */
+  readonly activeRidersLabel?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,6 +51,7 @@ export const PulseHeader = ({
   cityName,
   activeRidersToday,
   totalRidesToday,
+  activeRidersLabel,
 }: PulseHeaderProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -147,7 +154,8 @@ export const PulseHeader = ({
           <View style={styles.riderRow}>
             <Text style={styles.riderCount}>{activeRidersToday}</Text>
             <Text style={styles.riderLabel}>
-              {activeRidersToday === 1 ? 'rider active today' : 'riders active today'}
+              {activeRidersLabel ??
+                (activeRidersToday === 1 ? 'rider active today' : 'riders active today')}
             </Text>
           </View>
         </View>

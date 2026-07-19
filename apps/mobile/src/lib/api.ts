@@ -2,6 +2,7 @@ import type {
   ActivityFeedResponse,
   AutocompleteRequest,
   AutocompleteResponse,
+  CommunityScope,
   BadgeResponse,
   CityHeartbeat,
   CitySuggestionRequest,
@@ -212,10 +213,13 @@ export const mobileApi = {
 
   // ── Community Feed ──
 
-  getFeed: (lat: number, lon: number, cursor?: string, limit?: number) => {
+  getFeed: (lat: number, lon: number, cursor?: string, limit?: number, scope?: CommunityScope) => {
     const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
     if (cursor) params.set('cursor', cursor);
     if (limit) params.set('limit', String(limit));
+    // Cursored pages echo the first page's ladder scope so pagination stays
+    // within one consistent radius (see feed routes, Change 2).
+    if (scope) params.set('scope', scope);
     return mobileApiFetch<FeedResponse>(`/v1/feed?${params.toString()}`).then((data) =>
       validateResponse<FeedResponse>(FeedResponseSchema, data, '/v1/feed'),
     );

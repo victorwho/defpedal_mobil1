@@ -24,13 +24,28 @@ const PROFILE_KEY = 'user-profile';
 // Feed (infinite scroll)
 // ---------------------------------------------------------------------------
 
+/**
+ * Page param carries both the cursor and the ladder scope the server
+ * resolved on the first page, so every subsequent page stays within one
+ * consistent radius (Change 2 — see feed routes).
+ */
+interface FeedPageParam {
+  readonly cursor: string;
+  readonly scope?: FeedResponse['scopeUsed'];
+}
+
 export const useFeedQuery = (lat: number | null, lon: number | null) =>
   useInfiniteQuery<FeedResponse>({
     queryKey: [FEED_KEY, lat, lon],
-    queryFn: ({ pageParam }) =>
-      mobileApi.getFeed(lat!, lon!, pageParam as string | undefined),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.cursor ?? undefined,
+    queryFn: ({ pageParam }) => {
+      const page = pageParam as FeedPageParam | undefined;
+      return mobileApi.getFeed(lat!, lon!, page?.cursor, undefined, page?.scope);
+    },
+    initialPageParam: undefined as FeedPageParam | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.cursor
+        ? ({ cursor: lastPage.cursor, scope: lastPage.scopeUsed } satisfies FeedPageParam)
+        : undefined,
     enabled: lat != null && lon != null,
     staleTime: 60_000,
   });

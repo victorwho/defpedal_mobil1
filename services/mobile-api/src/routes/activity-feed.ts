@@ -2,10 +2,18 @@ import type {
   ActivityFeedItem,
   ActivityFeedResponse,
   ActivityType,
+  CommunityScope,
   ErrorResponse,
   FeedComment,
   RiderTierName,
   WriteAckResponse,
+} from '@defensivepedal/core';
+import {
+  COMMUNITY_FEED_MAX_AGE_DAYS,
+  COMMUNITY_FEED_NEARBY_RADIUS_KM,
+  COMMUNITY_REGION_RADIUS_KM,
+  kmToMeters,
+  pickCommunityFeedScope,
 } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
@@ -91,6 +99,39 @@ export const buildActivityFeedRoutes = (
         const { lat, lon, cursorScore, cursorId, limit: rawLimit } = request.query;
         const limit = rawLimit ?? DEFAULT_FEED_LIMIT;
 
+        // ── Radius ladder (Change 2) ────────────────────────────────────
+        // Count located candidates per scope, then settle on the first
+        // scope with enough real items (core's pickCommunityFeedScope:
+        // nearby 50 km → region 100 km → community/no bound). The counts
+        // are a function of the data, not the page, so cursored pages
+        // resolve the same scope without any cursor-format change. A
+        // counts failure degrades to the legacy nearby behavior.
+        let scopeUsed: CommunityScope = 'nearby';
+        try {
+          const { data: countsData, error: countsError } = await db.rpc('get_activity_feed_scope_counts', {
+            user_lat: lat,
+            user_lon: lon,
+            nearby_radius_meters: kmToMeters(COMMUNITY_FEED_NEARBY_RADIUS_KM),
+            region_radius_meters: kmToMeters(COMMUNITY_REGION_RADIUS_KM),
+            p_max_age_days: COMMUNITY_FEED_MAX_AGE_DAYS,
+          });
+          if (!countsError && countsData) {
+            const counts = (typeof countsData === 'string'
+              ? JSON.parse(countsData)
+              : countsData) as Record<CommunityScope, number>;
+            scopeUsed = pickCommunityFeedScope(counts);
+          } else if (countsError) {
+            request.log.warn({ event: 'feed_scope_counts_error', error: countsError.message }, 'feed scope counts failed');
+          }
+        } catch {
+          scopeUsed = 'nearby';
+        }
+
+        const radiusMeters =
+          scopeUsed === 'nearby' ? kmToMeters(COMMUNITY_FEED_NEARBY_RADIUS_KM)
+            : scopeUsed === 'region' ? kmToMeters(COMMUNITY_REGION_RADIUS_KM)
+              : null;
+
         const { data, error } = await db.rpc('get_ranked_feed', {
           p_viewer_id: user.id,
           p_lat: lat,
@@ -98,6 +139,11 @@ export const buildActivityFeedRoutes = (
           p_cursor_score: cursorScore ?? null,
           p_cursor_id: cursorId ?? null,
           p_limit: limit,
+          p_radius_meters: radiusMeters,
+          // Change 3: latest N regardless of age — the old hard 30-day
+          // cutoff becomes a 365-day sanity bound (score decay already
+          // sorts year-old items last).
+          p_max_age_days: COMMUNITY_FEED_MAX_AGE_DAYS,
         });
 
         if (error) {
@@ -118,7 +164,7 @@ export const buildActivityFeedRoutes = (
           ? `${lastItem.score}:${lastItem.id}`
           : null;
 
-        return { items, cursor };
+        return { items, cursor, scopeUsed };
       },
     );
 

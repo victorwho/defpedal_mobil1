@@ -175,7 +175,14 @@ describe('GET /v1/v2/feed', () => {
     await app.close();
   });
 
+  // The handler now makes TWO rpc calls per request: (1) the ladder's
+  // get_activity_feed_scope_counts, (2) get_ranked_feed. Success-path
+  // fixtures enqueue the counts result first.
+  const enqueueRichScopeCounts = () =>
+    enqueueResult({ data: { nearby: 10, region: 10, community: 10 }, error: null });
+
   it('returns 200 with items array and null cursor on success', async () => {
+    enqueueRichScopeCounts();
     enqueueResult({ data: [], error: null });
 
     const app = buildTestApp();
@@ -191,11 +198,59 @@ describe('GET /v1/v2/feed', () => {
     const body = response.json();
     expect(Array.isArray(body.items)).toBe(true);
     expect(body.cursor).toBeNull();
+    expect(body.scopeUsed).toBe('nearby');
+
+    await app.close();
+  });
+
+  it('widens to the community scope when local candidates are sparse', async () => {
+    // 0 nearby, 1 region — both under COMMUNITY_MIN_FEED_ITEMS (3).
+    enqueueResult({ data: { nearby: 0, region: 1, community: 5 }, error: null });
+    enqueueResult({ data: [], error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/v2/feed?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().scopeUsed).toBe('community');
+
+    // The ranked-feed call must drop the spatial filter (null radius) and
+    // use the extended recency bound.
+    const { supabaseAdmin } = await import('../lib/supabaseAdmin');
+    const rpcCalls = (supabaseAdmin as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc.mock.calls;
+    const rankedCall = rpcCalls.find((c: unknown[]) => c[0] === 'get_ranked_feed');
+    expect(rankedCall).toBeDefined();
+    expect((rankedCall![1] as Record<string, unknown>).p_radius_meters).toBeNull();
+    expect((rankedCall![1] as Record<string, unknown>).p_max_age_days).toBe(365);
+
+    await app.close();
+  });
+
+  it('degrades to nearby scope when the counts RPC fails', async () => {
+    enqueueResult({ data: null, error: { message: 'counts unavailable' } });
+    enqueueResult({ data: [], error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/v2/feed?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().scopeUsed).toBe('nearby');
 
     await app.close();
   });
 
   it('returns items mapped from RPC data', async () => {
+    enqueueRichScopeCounts();
     enqueueResult({
       data: [
         {
@@ -241,6 +296,7 @@ describe('GET /v1/v2/feed', () => {
   });
 
   it('returns cursor when result count matches limit', async () => {
+    enqueueRichScopeCounts();
     // Create exactly 1 item and pass limit=1 so cursor is populated
     enqueueResult({
       data: [
@@ -283,6 +339,7 @@ describe('GET /v1/v2/feed', () => {
   });
 
   it('returns 502 when RPC fails', async () => {
+    enqueueRichScopeCounts();
     enqueueResult({ data: null, error: { message: 'RPC failed' } });
 
     const app = buildTestApp();

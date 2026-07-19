@@ -52,6 +52,19 @@ export const activityFeedResponseSchema = {
   properties: {
     items: { type: 'array', items: activityFeedItemSchema },
     cursor: { type: ['string', 'null'] },
+    // Community-visibility ladder (2026-07-19). Gotcha #9: undeclared
+    // fields are silently stripped by Fastify.
+    scopeUsed: { type: 'string', enum: ['nearby', 'region', 'community'] },
+    // "N new riders joined this week" aggregate — first page only; null
+    // when the window has no new riders.
+    newRiders: {
+      type: ['object', 'null'],
+      additionalProperties: false,
+      required: ['count'],
+      properties: {
+        count: { type: 'integer' },
+      },
+    },
   },
 } as const;
 

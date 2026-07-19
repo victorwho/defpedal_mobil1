@@ -116,7 +116,42 @@ describe('useFeedQuery', () => {
 
     expect(result.current.data?.pages).toHaveLength(1);
     expect(result.current.data?.pages[0].items).toHaveLength(1);
-    expect(mockMobileApi.getFeed).toHaveBeenCalledWith(44.43, 26.1, undefined);
+    // First page: no cursor and no ladder scope yet (the server decides it).
+    expect(mockMobileApi.getFeed).toHaveBeenCalledWith(44.43, 26.1, undefined, undefined, undefined);
+  });
+
+  it('echoes the first page cursor AND ladder scope into the next page request', async () => {
+    const firstPage = {
+      items: [],
+      cursor: '2026-07-01T08:00:00Z',
+      scopeUsed: 'community',
+    };
+    const secondPage = { items: [], cursor: null, scopeUsed: 'community' };
+    mockMobileApi.getFeed
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(secondPage);
+
+    const { result } = renderHook(() => useFeedQuery(44.43, 26.1), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.data).toBeDefined();
+    });
+
+    await result.current.fetchNextPage();
+
+    await waitFor(() => {
+      expect(result.current.data?.pages).toHaveLength(2);
+    });
+
+    expect(mockMobileApi.getFeed).toHaveBeenLastCalledWith(
+      44.43,
+      26.1,
+      '2026-07-01T08:00:00Z',
+      undefined,
+      'community',
+    );
   });
 });
 

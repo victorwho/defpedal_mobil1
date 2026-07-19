@@ -3,6 +3,7 @@ export * from './breadcrumbs';
 export * from './calories';
 export * from './cityPulse';
 export * from './co2';
+export * from './communityVisibility';
 export * from './cyclingWeather';
 export * from './microlives';
 export * from './contracts';

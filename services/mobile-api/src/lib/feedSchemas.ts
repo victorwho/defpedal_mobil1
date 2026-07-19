@@ -34,6 +34,9 @@ export const feedQuerystringSchema = {
     radiusKm: { type: 'number', minimum: 1, maximum: 100 },
     cursor: { type: 'string', maxLength: 50, format: 'date-time' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
+    // Ladder scope for cursored pages: the client echoes back the first
+    // page's scopeUsed so pagination stays within one consistent scope.
+    scope: { type: 'string', enum: ['nearby', 'region', 'community'] },
   },
 } as const;
 
@@ -162,6 +165,9 @@ export const feedResponseSchema = {
   properties: {
     items: { type: 'array', items: feedItemSchema },
     cursor: { type: ['string', 'null'] },
+    // Community-visibility ladder (2026-07-19): which scope this page was
+    // served from. Optional so old cached responses stay valid.
+    scopeUsed: { type: 'string', enum: ['nearby', 'region', 'community'] },
   },
 } as const;
 
@@ -276,6 +282,46 @@ const dailyActivitySchema = {
   },
 } as const;
 
+const weeklyActivitySchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['weekStart', 'rides', 'distanceMeters', 'co2SavedKg', 'communitySeconds'],
+  properties: {
+    weekStart: { type: 'string' },
+    rides: { type: 'integer' },
+    distanceMeters: { type: 'number' },
+    co2SavedKg: { type: 'number' },
+    communitySeconds: { type: 'number' },
+  },
+} as const;
+
+const pulseStatsSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['rides', 'distanceMeters', 'co2SavedKg', 'communitySeconds', 'activeRiders'],
+  properties: {
+    rides: { type: 'integer' },
+    distanceMeters: { type: 'number' },
+    co2SavedKg: { type: 'number' },
+    communitySeconds: { type: 'number' },
+    activeRiders: { type: 'integer' },
+  },
+} as const;
+
+const communityLifetimeTotalsSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['rides', 'distanceMeters', 'durationSeconds', 'co2SavedKg', 'communitySeconds', 'uniqueRiders'],
+  properties: {
+    rides: { type: 'integer' },
+    distanceMeters: { type: 'number' },
+    durationSeconds: { type: 'number' },
+    co2SavedKg: { type: 'number' },
+    communitySeconds: { type: 'number' },
+    uniqueRiders: { type: 'integer' },
+  },
+} as const;
+
 const hazardHotspotSchema = {
   type: 'object',
   additionalProperties: false,
@@ -334,6 +380,17 @@ export const heartbeatResponseSchema = {
     },
     hazardHotspots: { type: 'array', items: hazardHotspotSchema },
     topContributors: { type: 'array', items: topContributorSchema },
+    // ── Community-visibility ladder additions (2026-07-19). Gotcha #9:
+    // Fastify strips any response field not declared here. Not in
+    // `required` — the handler degrades to the legacy shape when the
+    // counts RPC fails. ──
+    pulse: pulseStatsSchema,
+    windowUsed: { type: 'string', enum: ['today', 'week', 'month'] },
+    scopeUsed: { type: 'string', enum: ['nearby', 'region', 'community'] },
+    chartMode: { type: 'string', enum: ['daily', 'weekly'] },
+    chartDaily: { type: 'array', items: dailyActivitySchema },
+    chartWeekly: { type: 'array', items: weeklyActivitySchema },
+    communityTotals: communityLifetimeTotalsSchema,
   },
 } as const;
 
@@ -354,6 +411,7 @@ export type FeedQuerystring = {
   radiusKm?: number;
   cursor?: string;
   limit?: number;
+  scope?: 'nearby' | 'region' | 'community';
 };
 
 export type ShareTripBody = ShareTripRequest;
