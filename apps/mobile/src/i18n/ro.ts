@@ -685,6 +685,8 @@ export const ro: TranslationKeys = {
     activeRiders_month_other: 'cicliști activi luna aceasta',
     chartTitleDaily: 'Ultimele 7 zile',
     chartTitleWeekly: 'Ultimele 4 săptămâni',
+    communityAllTime: 'Total în comunitate',
+    communityAllTimeSub: 'În toată comunitatea Defensive Pedal',
   },
 
   // ── Feed Card ──

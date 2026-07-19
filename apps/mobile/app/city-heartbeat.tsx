@@ -149,6 +149,51 @@ export default function CityHeartbeatScreen() {
           />
         </FadeSlideIn>
 
+        {/* Lifetime community totals — community-wide, only ever go up, so
+            the first stat card a user reads is never a zero (Change 4) */}
+        {heartbeat.communityTotals && heartbeat.communityTotals.rides > 0 && (
+          <FadeSlideIn delay={50}>
+            <Surface>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.communityAllTime')}</Text>
+              <Text style={styles.sectionSub}>{t('cityHeartbeat.communityAllTimeSub')}</Text>
+              <View style={styles.statGrid}>
+                <StatCell
+                  label={t('cityHeartbeat.totalRides')}
+                  value={heartbeat.communityTotals.rides}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.distance')}
+                  value={heartbeat.communityTotals.distanceMeters / 1000}
+                  suffix=" km"
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.co2Saved')}
+                  value={heartbeat.communityTotals.co2SavedKg}
+                  suffix=" kg"
+                  decimals={1}
+                  color={colors.safe}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.riders')}
+                  value={heartbeat.communityTotals.uniqueRiders}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+              </View>
+            </Surface>
+          </FadeSlideIn>
+        )}
+
         {/* Pulse stats for the resolved (window, scope) rung */}
         <FadeSlideIn delay={100}>
           <Surface>

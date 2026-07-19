@@ -685,6 +685,8 @@ export const es: TranslationKeys = {
     activeRiders_month_other: 'ciclistas activos este mes',
     chartTitleDaily: 'Últimos 7 días',
     chartTitleWeekly: 'Últimas 4 semanas',
+    communityAllTime: 'Total de la comunidad',
+    communityAllTimeSub: 'En toda la comunidad Defensive Pedal',
   },
 
   // ── Feed Card ──

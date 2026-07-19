@@ -693,6 +693,8 @@ export const en = {
     activeRiders_month_other: 'riders active this month',
     chartTitleDaily: 'Last 7 days',
     chartTitleWeekly: 'Last 4 weeks',
+    communityAllTime: 'Community all-time',
+    communityAllTimeSub: 'Across the entire Defensive Pedal community',
   },
 
   // ── Feed Card ──
