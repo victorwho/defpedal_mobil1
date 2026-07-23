@@ -44,6 +44,11 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - **Security:** `DEV_AUTH_BYPASS_ENABLED=false` on Cloud Run (disabled 2026-04-11, revision 00044). Do NOT re-enable in production. Defense-in-depth: as of revision 00074-dzg (2026-05-06), `services/mobile-api/src/lib/auth.ts` also refuses bypass when `process.env.NODE_ENV === 'production'`, and the Dockerfile bakes `ENV NODE_ENV=production` so the gate fires regardless of Cloud Run env config.
 - **Startup validation:** Server boots through `validateConfig()` in `config.ts`. Required env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `MAPBOX_ACCESS_TOKEN`. In production, missing vars → `process.exit(1)` before `app.listen()`. Avoids the "boots with null clients, fails per-request as confusing 401s" failure mode.
 
+## Monitoring (Sentry + PostHog)
+
+- **Runbook: `docs/runbooks/monitoring.md`** — access paths, standard health-check queries, healthy baselines, known-benign error catalog. Sentry: one project `defensive-pedal-mobile` for BOTH mobile + API (discriminate by release prefix); MCP plugin for reads, `SENTRY_AUTH_TOKEN` in `apps/mobile/.env` for writes; burst alert rule 733370 emails on `defpedal-api*` error spikes. PostHog: EU project 162527, personal API key at `C:\dev\adminInfo\posthog\personal-api-key.txt` (NEVER commit), HogQL via `POST /api/projects/162527/query/`.
+- **Periodic duty:** when a session starts after ≥2 days without a health check, run the runbook's standard check unprompted and surface anomalies (or say all-clear in one line). A PostHog volume DROP is as significant as an error spike.
+
 ## Play Store Release
 
 - **Developer account type:** Organizational (business) Google Play Developer account. **Exempt from the Nov-2023 14-day closed-test requirement** that applies to personal accounts registered after 2023-11-13 (see https://support.google.com/googleplay/android-developer/answer/14151465). Direct production publishing is allowed; no mandatory 12-tester / 14-day closed test.
