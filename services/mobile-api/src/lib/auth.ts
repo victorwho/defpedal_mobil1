@@ -58,6 +58,12 @@ export const authenticateDeveloperBypassToken = (
   };
 };
 
+// Supabase-js surfaces network failures (ECONNRESET, UND_ERR_CONNECT_TIMEOUT)
+// as AuthRetryableFetchError with status 0 — no HTTP response was received.
+// Real auth rejections (invalid/expired JWT) have a 4xx status and must NOT
+// be retried (retrying a bad token just wastes a round-trip).
+const isNetworkError = (error: { status?: number }): boolean => error.status === 0;
+
 export const authenticateUser = async (
   accessToken: string,
 ): Promise<AuthenticatedUser | null> => {
@@ -76,14 +82,26 @@ export const authenticateUser = async (
     error,
   } = await supabaseAuthClient.auth.getUser(accessToken);
 
-  if (error || !user) {
+  if (!error) {
+    return user ? { id: user.id, email: user.email ?? null } : null;
+  }
+
+  // Retry once on network errors (stale keep-alive socket). Cloud Run NAT
+  // idle-kills TCP connections; undici reuses them until the first attempt
+  // fails with ECONNRESET, which supabase-js returns as status 0. The retry
+  // opens a fresh connection and succeeds. Auth failures (4xx) are not retried.
+  if (!isNetworkError(error)) {
     return null;
   }
 
-  return {
-    id: user.id,
-    email: user.email ?? null,
-  };
+  // eslint-disable-next-line no-console
+  console.warn('[mobile-api] auth.getUser network error, retrying once:', error.message);
+
+  const { data: { user: retryUser }, error: retryError } =
+    await supabaseAuthClient.auth.getUser(accessToken);
+
+  if (retryError || !retryUser) return null;
+  return { id: retryUser.id, email: retryUser.email ?? null };
 };
 
 export const requireAuthenticatedUser = async (

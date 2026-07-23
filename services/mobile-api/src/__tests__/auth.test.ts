@@ -1,12 +1,22 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock supabaseAuth before any imports so auth.ts gets the mocked client.
+// vi.mock is hoisted to the top of the file by vitest's transform.
+vi.mock('../lib/supabaseAuth', () => ({
+  supabaseAuthClient: {
+    auth: { getUser: vi.fn() },
+  },
+}));
+
 import {
   authenticateDeveloperBypassToken,
+  authenticateUser,
   requireAuthenticatedUser,
   getAuthenticatedUserFromRequest,
   type DeveloperAuthBypassConfig,
 } from '../lib/auth';
+import { supabaseAuthClient } from '../lib/supabaseAuth';
 import { HttpError } from '../lib/http';
 
 // ---------------------------------------------------------------------------
@@ -188,5 +198,73 @@ describe('getAuthenticatedUserFromRequest', () => {
     const user = await getAuthenticatedUserFromRequest(request, verifyReturnsNull);
     expect(user).toBeNull();
     expect(verifyReturnsNull).toHaveBeenCalledWith('expired-token');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// authenticateUser — retry on network errors
+// ---------------------------------------------------------------------------
+
+describe('authenticateUser', () => {
+  // supabaseAuthClient is mocked at module level above.
+  // Cast through unknown because the mock only has the shape we need.
+  const mockGetUser = vi.mocked(
+    (supabaseAuthClient as unknown as { auth: { getUser: ReturnType<typeof vi.fn> } }).auth.getUser,
+  );
+
+  beforeEach(() => {
+    mockGetUser.mockReset();
+  });
+
+  it('returns user when getUser succeeds on first attempt', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'u1', email: 'rider@example.com' } },
+      error: null,
+    });
+    const result = await authenticateUser('valid-token');
+    expect(result).toEqual({ id: 'u1', email: 'rider@example.com' });
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null (no retry) on a real auth failure (status 401)', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { status: 401, message: 'Invalid JWT' },
+    });
+    const result = await authenticateUser('bad-token');
+    expect(result).toBeNull();
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries once on network error (status 0) and returns user when retry succeeds', async () => {
+    const networkError = { status: 0, message: 'fetch failed' };
+    mockGetUser
+      .mockResolvedValueOnce({ data: { user: null }, error: networkError })
+      .mockResolvedValueOnce({ data: { user: { id: 'u2', email: null } }, error: null });
+
+    const result = await authenticateUser('valid-token');
+    expect(result).toEqual({ id: 'u2', email: null });
+    expect(mockGetUser).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns null when retry also fails (two consecutive network errors)', async () => {
+    const networkError = { status: 0, message: 'fetch failed' };
+    mockGetUser
+      .mockResolvedValueOnce({ data: { user: null }, error: networkError })
+      .mockResolvedValueOnce({ data: { user: null }, error: networkError });
+
+    const result = await authenticateUser('valid-token');
+    expect(result).toBeNull();
+    expect(mockGetUser).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry on a non-zero error status (e.g. 500)', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: null },
+      error: { status: 500, message: 'Internal Server Error' },
+    });
+    const result = await authenticateUser('some-token');
+    expect(result).toBeNull();
+    expect(mockGetUser).toHaveBeenCalledTimes(1);
   });
 });
