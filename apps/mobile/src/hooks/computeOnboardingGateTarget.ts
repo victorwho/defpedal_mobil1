@@ -7,7 +7,6 @@
 export interface OnboardingGateState {
   pathname: string;
   onboardingCompleted: boolean;
-  anonymousOpenCount: number;
   storeHydrated: boolean;
   isLoading: boolean;
   hasRealAccount: boolean;
@@ -20,8 +19,10 @@ export interface OnboardingGateState {
  * - `/feedback` — post-ride summary. Users land here from navigation via the
  *   state machine, NOT from signup. Redirecting away would drop their feedback.
  * - `/navigation` — active navigation. Redirecting away would kill the ride.
+ *   (Anonymous users can no longer start rides, but a pre-mandatory-signup
+ *   install can update mid-persisted-ride — never yank them out of it.)
  * - `/auth` — the email signup/signin surface. Users routed here by the
- *   mandatory prompt's "Sign up with email" button are actively complying
+ *   mandatory prompt's "Use email instead" link are actively complying
  *   with the gate; bouncing them back would silently strand them on the
  *   prompt with no apparent reaction (the bug this exemption fixes).
  */
@@ -34,6 +35,11 @@ const isExemptPath = (pathname: string): boolean =>
 /**
  * Pure decision function for the signup gate.
  *
+ * Registration is MANDATORY from first open (2026-07-24). The old
+ * count-based escalation (silent → dismissible prompt on 2nd open →
+ * mandatory on 3rd) is gone: an anonymous session is never allowed into the
+ * main app.
+ *
  * Returns the route to redirect the user to, or `null` if the user should be
  * allowed through. The rules encoded here:
  *
@@ -42,27 +48,20 @@ const isExemptPath = (pathname: string): boolean =>
  *    when hydration finishes).
  * 2. Users with a real (non-anonymous) account always pass through.
  * 3. Pages the user reached for a legit reason (onboarding itself, active
- *    navigation, post-ride feedback) are never redirected.
- * 4. **Mandatory gate** (`count >= 3`, onboarding already done) fires on every
- *    render so hardware back / nav-away can't escape it.
- * 5. **One-shot branches** (initial onboarding, `count == 2` dismissible
- *    prompt) fire once per session. `hasRedirected` turns them off once the
- *    caller records that the redirect has fired — otherwise dismissing would
- *    immediately re-redirect.
+ *    navigation, post-ride feedback, the /auth email form) are never
+ *    redirected.
+ * 4. Everyone else is walled on EVERY render — hardware back / nav-away
+ *    can't escape it. Fresh installs re-enter the intro flow; users who
+ *    finished the intro (including pre-update anonymous accounts) land on
+ *    the signup prompt. Both targets terminate: once there, the path is
+ *    exempt and the gate goes silent.
  */
 export const computeOnboardingGateTarget = (
   state: OnboardingGateState,
-  hasRedirected: boolean,
 ): string | null => {
   if (!state.storeHydrated) return null;
   if (state.isLoading || state.hasRealAccount) return null;
   if (isExemptPath(state.pathname)) return null;
-
-  if (state.onboardingCompleted !== false && state.anonymousOpenCount >= 3) {
-    return '/onboarding/signup-prompt?mandatory=true';
-  }
-
-  if (hasRedirected) return null;
 
   // `/onboarding` resolves to `app/onboarding/index.tsx`. Matching the path
   // Expo Router's file-router actually exposes (profile sign-out uses the
@@ -70,6 +69,5 @@ export const computeOnboardingGateTarget = (
   // which the router did not normalize reliably under bridgeless — the
   // resulting silent-nav caused an infinite effect loop.
   if (state.onboardingCompleted === false) return '/onboarding';
-  if (state.anonymousOpenCount >= 2) return '/onboarding/signup-prompt';
-  return null;
+  return '/onboarding/signup-prompt';
 };

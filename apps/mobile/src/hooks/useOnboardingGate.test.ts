@@ -13,7 +13,6 @@ import {
 const fresh = (overrides: Partial<OnboardingGateState> = {}): OnboardingGateState => ({
   pathname: '/route-planning',
   onboardingCompleted: false,
-  anonymousOpenCount: 1,
   storeHydrated: true,
   isLoading: false,
   hasRealAccount: false,
@@ -26,28 +25,19 @@ describe('computeOnboardingGateTarget', () => {
   it('returns null while the store has not hydrated yet', () => {
     // This is the decision that kept the increment-effect from clobbering
     // persisted state. The gate should do NOTHING until hydration settles.
-    expect(
-      computeOnboardingGateTarget(fresh({ storeHydrated: false }), false),
-    ).toBeNull();
+    expect(computeOnboardingGateTarget(fresh({ storeHydrated: false }))).toBeNull();
   });
 
   it('returns null while auth is still loading', () => {
-    expect(
-      computeOnboardingGateTarget(fresh({ isLoading: true }), false),
-    ).toBeNull();
+    expect(computeOnboardingGateTarget(fresh({ isLoading: true }))).toBeNull();
   });
 
   it('returns null for users with a real (non-anonymous) account', () => {
     // Real accounts bypass the gate entirely, even on fresh installs where
-    // they somehow have count=0/onboardingCompleted=false.
+    // they somehow have onboardingCompleted=false.
     expect(
       computeOnboardingGateTarget(
-        fresh({
-          hasRealAccount: true,
-          onboardingCompleted: false,
-          anonymousOpenCount: 99,
-        }),
-        false,
+        fresh({ hasRealAccount: true, onboardingCompleted: false }),
       ),
     ).toBeNull();
   });
@@ -63,119 +53,55 @@ describe('computeOnboardingGateTarget', () => {
     '/auth',
   ])('does not redirect away from exempt path %s', (pathname) => {
     expect(
-      computeOnboardingGateTarget(
-        fresh({
-          pathname,
-          onboardingCompleted: false,
-          anonymousOpenCount: 5,
-        }),
-        false,
-      ),
+      computeOnboardingGateTarget(fresh({ pathname, onboardingCompleted: false })),
+    ).toBeNull();
+    expect(
+      computeOnboardingGateTarget(fresh({ pathname, onboardingCompleted: true })),
     ).toBeNull();
   });
 
-  // ── The regression this fix targets: fresh install, count == 1 ────────
+  // ── Fresh installs re-enter the intro flow ────────────────────────────
 
-  it('redirects fresh-install users (onboardingCompleted=false, count=1) to /onboarding/index', () => {
-    // This is the EXACT state described in GH issue #23:
-    //   Anonymous open count: 1
-    //   Onboarding completed: false
-    //   Is anonymous: true
-    //   Has real account: false
-    //   Storage engine: async-storage
-    // The user reported no redirect firing; after the fix, this case must
-    // resolve to /onboarding/index.
-    const target = computeOnboardingGateTarget(
-      fresh({ onboardingCompleted: false, anonymousOpenCount: 1 }),
-      false,
-    );
-    expect(target).toBe('/onboarding');
-  });
-
-  it('still redirects to /onboarding/index when count is zero (first-ever boot before increment fires)', () => {
-    // If we happen to evaluate the gate before the count-increment effect
-    // runs on cold start, onboarding must still fire — otherwise a race
-    // where hydration completes before the increment runs could leak the
-    // user to /route-planning.
+  it('redirects fresh-install users (onboardingCompleted=false) to /onboarding', () => {
     expect(
-      computeOnboardingGateTarget(fresh({ anonymousOpenCount: 0 }), false),
+      computeOnboardingGateTarget(fresh({ onboardingCompleted: false })),
     ).toBe('/onboarding');
   });
 
-  // ── Count-based escalation ────────────────────────────────────────────
+  // ── Mandatory registration (2026-07-24) ───────────────────────────────
 
-  it('does not redirect when onboarding is complete and count is below 2', () => {
-    // Normal anonymous user post-onboarding, on their first prompt-eligible
-    // open: no prompt until count reaches 2.
+  it('walls anonymous users at the signup prompt once onboarding is complete', () => {
+    // No count escalation, no dismissible variant: an anonymous session with
+    // onboarding done is ALWAYS sent to the signup prompt.
     expect(
-      computeOnboardingGateTarget(
-        fresh({ onboardingCompleted: true, anonymousOpenCount: 1 }),
-        false,
-      ),
-    ).toBeNull();
+      computeOnboardingGateTarget(fresh({ onboardingCompleted: true })),
+    ).toBe('/onboarding/signup-prompt');
   });
 
-  it('redirects to the dismissible signup prompt at count == 2', () => {
-    const target = computeOnboardingGateTarget(
-      fresh({ onboardingCompleted: true, anonymousOpenCount: 2 }),
-      false,
-    );
-    expect(target).toBe('/onboarding/signup-prompt');
+  it('keeps firing on every evaluation — hardware back / nav-away cannot escape', () => {
+    // The gate is stateless: evaluating the same non-exempt state twice
+    // yields the same redirect. Loop-termination comes from the exempt-path
+    // rule once the user actually lands on the target.
+    const state = fresh({ onboardingCompleted: true });
+    expect(computeOnboardingGateTarget(state)).toBe('/onboarding/signup-prompt');
+    expect(computeOnboardingGateTarget(state)).toBe('/onboarding/signup-prompt');
   });
 
-  it('escalates to the mandatory signup prompt at count >= 3', () => {
-    const target = computeOnboardingGateTarget(
-      fresh({ onboardingCompleted: true, anonymousOpenCount: 3 }),
-      false,
-    );
-    expect(target).toBe('/onboarding/signup-prompt?mandatory=true');
-  });
-
-  it('keeps firing the mandatory prompt even when already redirected (hardware back can not escape)', () => {
-    // The mandatory branch intentionally ignores `hasRedirected` so hardware
-    // back from the prompt loops back to the prompt.
-    const target = computeOnboardingGateTarget(
-      fresh({ onboardingCompleted: true, anonymousOpenCount: 5 }),
-      true, // hasRedirected=true
-    );
-    expect(target).toBe('/onboarding/signup-prompt?mandatory=true');
-  });
-
-  // ── One-shot protection ───────────────────────────────────────────────
-
-  it('does NOT re-fire the initial-onboarding redirect once hasRedirected is true', () => {
-    // Otherwise dismissing /onboarding/index via hardware back would just
-    // bounce right back.
-    expect(
-      computeOnboardingGateTarget(
-        fresh({ onboardingCompleted: false, anonymousOpenCount: 1 }),
-        true,
-      ),
-    ).toBeNull();
-  });
-
-  it('does NOT re-fire the dismissible count-2 prompt once hasRedirected is true', () => {
-    expect(
-      computeOnboardingGateTarget(
-        fresh({ onboardingCompleted: true, anonymousOpenCount: 2 }),
-        true,
-      ),
-    ).toBeNull();
+  it('also keeps re-firing the intro-flow redirect — the intro cannot be dismissed either', () => {
+    const state = fresh({ onboardingCompleted: false });
+    expect(computeOnboardingGateTarget(state)).toBe('/onboarding');
+    expect(computeOnboardingGateTarget(state)).toBe('/onboarding');
   });
 
   // ── Active navigation / post-ride feedback guarantees ─────────────────
 
-  it('never yanks an anonymous user out of the navigation screen even at count >= 3', () => {
-    // If the mandatory gate fired during a live ride, the user would lose
-    // their navigation session mid-ride — unacceptable.
+  it('never yanks an anonymous user out of the navigation screen', () => {
+    // A pre-mandatory-signup install can update mid-persisted-ride. If the
+    // gate fired during a live ride, the user would lose their navigation
+    // session mid-ride — unacceptable.
     expect(
       computeOnboardingGateTarget(
-        fresh({
-          pathname: '/navigation',
-          onboardingCompleted: true,
-          anonymousOpenCount: 10,
-        }),
-        false,
+        fresh({ pathname: '/navigation', onboardingCompleted: true }),
       ),
     ).toBeNull();
   });
@@ -183,44 +109,29 @@ describe('computeOnboardingGateTarget', () => {
   it('never yanks an anonymous user out of the post-ride feedback screen', () => {
     expect(
       computeOnboardingGateTarget(
-        fresh({
-          pathname: '/feedback',
-          onboardingCompleted: true,
-          anonymousOpenCount: 10,
-        }),
-        false,
+        fresh({ pathname: '/feedback', onboardingCompleted: true }),
       ),
     ).toBeNull();
   });
 
-  it('never bounces an anonymous user off /auth even at count >= 3 — they are actively complying with the gate', () => {
-    // Regression test: tapping "Sign up with email" on the mandatory prompt
-    // navigates to /auth. Without an /auth exemption, the guard re-fires the
-    // mandatory branch immediately and bounces the user back to the prompt,
-    // making the button look like a no-op.
+  it('never bounces an anonymous user off /auth — they are actively complying with the gate', () => {
+    // Regression test: tapping "Use email instead" on the mandatory prompt
+    // navigates to /auth. Without an /auth exemption, the guard re-fires
+    // immediately and bounces the user back to the prompt, making the button
+    // look like a no-op.
     expect(
       computeOnboardingGateTarget(
-        fresh({
-          pathname: '/auth',
-          onboardingCompleted: true,
-          anonymousOpenCount: 10,
-        }),
-        false,
+        fresh({ pathname: '/auth', onboardingCompleted: true }),
       ),
     ).toBeNull();
   });
 
-  // ── Boundary conditions from the issue's hypothesis list ──────────────
+  // ── Boundary conditions ───────────────────────────────────────────────
 
   it('handles initial expo-router pathname "/" as a non-exempt path', () => {
-    // Hypothesis #2 from the issue: "Expo Router initial pathname is
-    // /route-planning on cold start". Whether it's "/" or "/route-planning",
-    // both must trigger the gate.
+    // Whether it's "/" or "/route-planning", both must trigger the gate.
     expect(
-      computeOnboardingGateTarget(
-        fresh({ pathname: '/', onboardingCompleted: false }),
-        false,
-      ),
+      computeOnboardingGateTarget(fresh({ pathname: '/', onboardingCompleted: false })),
     ).toBe('/onboarding');
   });
 
@@ -228,10 +139,7 @@ describe('computeOnboardingGateTarget', () => {
     // Defensive: usePathname() has been observed to return '' in very early
     // renders under bridgeless. The gate must still decide sanely.
     expect(
-      computeOnboardingGateTarget(
-        fresh({ pathname: '', onboardingCompleted: false }),
-        false,
-      ),
+      computeOnboardingGateTarget(fresh({ pathname: '', onboardingCompleted: false })),
     ).toBe('/onboarding');
   });
 });

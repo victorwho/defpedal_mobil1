@@ -988,7 +988,6 @@ export const es: TranslationKeys = {
     goalSelected: 'Objetivo seleccionado',
     firstRouteExplored: 'Primera ruta explorada',
     regionConfirmed: 'País confirmado',
-    privacySaved: 'Preferencias de privacidad guardadas',
     accountCreated: 'Cuenta creada',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Omitir',
@@ -1035,7 +1034,8 @@ export const es: TranslationKeys = {
     usernameHint: 'Mínimo 3 caracteres. Solo letras, números y guion bajo.',
     almostThere: 'Ya casi',
     createYourAccount: 'Crea tu cuenta',
-    signupSubMandatory: 'Crea una cuenta para continuar — tus rutas, rachas e insignias se transfieren a ella.',
+    signupSubMandatory:
+      'Las alertas de peligro y las puntuaciones de seguridad solo funcionan porque cada aviso viene de un ciclista real. Tu cuenta gratuita mantiene esos datos fiables — y guarda tus rutas, rachas e insignias en cualquier teléfono.',
     signupSub: 'Tus rutas, rachas e insignias se conservan. Sincronízalas y únete a la comunidad. Siempre puedes hacerlo más tarde.',
     percentComplete: '{{percent}}% completado',
     continueWithGoogle: 'Continuar con Google',
@@ -1043,14 +1043,11 @@ export const es: TranslationKeys = {
     signUpWithEmail: 'Regístrate con email',
     maybeLater: 'Quizás más tarde',
     a11yGoogle: 'Iniciar sesión con Google',
-    a11ySkipAccount: 'Omitir la creación de cuenta por ahora',
-    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
-    signupPromptTitle: 'Mira tus rutas. Sigue tu progreso',
-    signupPromptSub:
-      'Tu historial de rutas, XP e insignias se guardan en tu cuenta gratuita — en cualquier teléfono.',
+    // -- Mandatory registration (2026-07-24): Google dominant, email demoted,
+    //    guest path removed. The sub copy is `signupSubMandatory` above. --
+    signupPromptTitle: 'Únete a los ciclistas que hacen tu ciudad más segura',
     useEmailInstead: 'Prefiero usar el correo',
     trustMicroline: 'Gratis para siempre. Tus rutas son privadas por defecto.',
-    rideAsGuest: 'Ahora no — pedaleo como invitado',
     telemetryNotice:
       'Recopilamos informes anónimos de fallos y analíticas anónimas de producto (sin trazas GPS) para mantener la app estable y mejorarla. Desactiva cualquiera cuando quieras en Perfil › Privacidad.',
     // -- Region gate (disponibilidad global, 2026-07-12) --

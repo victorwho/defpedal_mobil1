@@ -100,7 +100,6 @@ describe('useOnboardingGate integration', () => {
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
@@ -108,7 +107,6 @@ describe('useOnboardingGate integration', () => {
     expect(result.current).toMatchObject({
       pathname: '/route-planning',
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
       storeHydrated: true,
       isLoading: false,
       hasRealAccount: false,
@@ -166,11 +164,10 @@ describe('useOnboardingGate integration', () => {
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
-    const target = computeOnboardingGateTarget(result.current, false);
+    const target = computeOnboardingGateTarget(result.current);
 
     expect(target).toBe('/onboarding');
   });
@@ -183,13 +180,10 @@ describe('useOnboardingGate integration', () => {
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
-    expect(computeOnboardingGateTarget(result.current, false)).toBe(
-      '/onboarding',
-    );
+    expect(computeOnboardingGateTarget(result.current)).toBe('/onboarding');
   });
 
   it('gate remains silent while auth is still loading', () => {
@@ -200,50 +194,34 @@ describe('useOnboardingGate integration', () => {
     mockAuth({ isLoading: true, user: null, isAnonymous: false });
 
     const { result } = renderHook(() => useOnboardingGate());
-    expect(computeOnboardingGateTarget(result.current, false)).toBeNull();
+    expect(computeOnboardingGateTarget(result.current)).toBeNull();
   });
 
-  // ── Count escalation end-to-end ────────────────────────────────────
+  // ── Mandatory registration end-to-end (2026-07-24) ─────────────────
 
-  it('escalates from silent → dismissible → mandatory as anonymousOpenCount increments', () => {
+  it('walls an onboarded anonymous user at the signup prompt immediately — no count escalation', () => {
     mockPathname('/route-planning');
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: true,
-      anonymousOpenCount: 1,
     });
 
-    const { result, rerender } = renderHook(() => useOnboardingGate());
-    expect(computeOnboardingGateTarget(result.current, false)).toBeNull();
-
-    act(() => {
-      useAppStore.setState({ anonymousOpenCount: 2 });
-    });
-    rerender();
-    expect(computeOnboardingGateTarget(result.current, false)).toBe(
+    const { result } = renderHook(() => useOnboardingGate());
+    expect(computeOnboardingGateTarget(result.current)).toBe(
       '/onboarding/signup-prompt',
     );
-
-    act(() => {
-      useAppStore.setState({ anonymousOpenCount: 3 });
-    });
-    rerender();
-    expect(computeOnboardingGateTarget(result.current, false)).toBe(
-      '/onboarding/signup-prompt?mandatory=true',
-    );
   });
 
-  it('signing in with a real Google account makes the gate go silent even at high counts', () => {
+  it('signing in with a real Google account makes the gate go silent', () => {
     mockPathname('/route-planning');
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: true,
-      anonymousOpenCount: 10,
     });
 
     const { result, rerender } = renderHook(() => useOnboardingGate());
-    expect(computeOnboardingGateTarget(result.current, false)).toBe(
-      '/onboarding/signup-prompt?mandatory=true',
+    expect(computeOnboardingGateTarget(result.current)).toBe(
+      '/onboarding/signup-prompt',
     );
 
     // User signs in
@@ -255,7 +233,7 @@ describe('useOnboardingGate integration', () => {
       });
     });
     rerender();
-    expect(computeOnboardingGateTarget(result.current, false)).toBeNull();
+    expect(computeOnboardingGateTarget(result.current)).toBeNull();
   });
 
   // ── Hydration race (the reason useStoreHydrated exists) ────────────
@@ -279,14 +257,13 @@ describe('useOnboardingGate integration', () => {
     mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result, rerender } = renderHook(() => useOnboardingGate());
 
     // Pre-hydration: gate silent.
     expect(result.current.storeHydrated).toBe(false);
-    expect(computeOnboardingGateTarget(result.current, false)).toBeNull();
+    expect(computeOnboardingGateTarget(result.current)).toBeNull();
 
     // Hydration completes.
     act(() => {
@@ -295,9 +272,7 @@ describe('useOnboardingGate integration', () => {
     rerender();
 
     expect(result.current.storeHydrated).toBe(true);
-    expect(computeOnboardingGateTarget(result.current, false)).toBe(
-      '/onboarding',
-    );
+    expect(computeOnboardingGateTarget(result.current)).toBe('/onboarding');
   });
 });
 
@@ -314,7 +289,7 @@ const resolveIndexHref = (
   appState: 'IDLE' | 'NAVIGATING' | 'ROUTE_PREVIEW' | 'AWAITING_FEEDBACK',
 ): string | null => {
   if (!gate.storeHydrated || gate.isLoading) return null;
-  const gateTarget = computeOnboardingGateTarget(gate, false);
+  const gateTarget = computeOnboardingGateTarget(gate);
   if (gateTarget) return gateTarget;
   if (appState === 'NAVIGATING') return '/navigation';
   if (appState === 'ROUTE_PREVIEW') return '/route-preview';
@@ -332,7 +307,6 @@ describe('app/index.tsx decision logic', () => {
     mockAuth({ isLoading: true, user: null, isAnonymous: false });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 0,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
@@ -346,36 +320,21 @@ describe('app/index.tsx decision logic', () => {
     mockAuth({ isLoading: false, user: { id: 'anon' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
     expect(resolveIndexHref(result.current, 'IDLE')).toBe('/onboarding');
   });
 
-  it('onboarded anonymous user at count==2 lands on /onboarding/signup-prompt', () => {
+  it('onboarded anonymous user lands on the signup prompt — registration is mandatory', () => {
     mockAuth({ isLoading: false, user: { id: 'anon' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: true,
-      anonymousOpenCount: 2,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
     expect(resolveIndexHref(result.current, 'IDLE')).toBe(
       '/onboarding/signup-prompt',
-    );
-  });
-
-  it('onboarded anonymous user at count>=3 lands on mandatory signup prompt', () => {
-    mockAuth({ isLoading: false, user: { id: 'anon' }, isAnonymous: true });
-    useAppStore.setState({
-      onboardingCompleted: true,
-      anonymousOpenCount: 3,
-    });
-
-    const { result } = renderHook(() => useOnboardingGate());
-    expect(resolveIndexHref(result.current, 'IDLE')).toBe(
-      '/onboarding/signup-prompt?mandatory=true',
     );
   });
 
@@ -387,7 +346,6 @@ describe('app/index.tsx decision logic', () => {
     });
     useAppStore.setState({
       onboardingCompleted: true,
-      anonymousOpenCount: 100, // irrelevant for real accounts
     });
 
     const { result } = renderHook(() => useOnboardingGate());
@@ -402,7 +360,6 @@ describe('app/index.tsx decision logic', () => {
     });
     useAppStore.setState({
       onboardingCompleted: true,
-      anonymousOpenCount: 0,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
@@ -422,7 +379,6 @@ describe('app/index.tsx decision logic', () => {
     mockAuth({ isLoading: false, user: { id: 'anon' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());
@@ -440,7 +396,6 @@ describe('app/index.tsx decision logic', () => {
     mockAuth({ isLoading: false, user: { id: 'anon' }, isAnonymous: true });
     useAppStore.setState({
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     const { result } = renderHook(() => useOnboardingGate());

@@ -38,7 +38,6 @@ vi.mock('../../../src/lib/storage', () => ({
 type GateReturn = {
   pathname: string;
   onboardingCompleted: boolean;
-  anonymousOpenCount: number;
   storeHydrated: boolean;
   isLoading: boolean;
   hasRealAccount: boolean;
@@ -47,7 +46,6 @@ type GateReturn = {
 let gateState: GateReturn = {
   pathname: '/',
   onboardingCompleted: true,
-  anonymousOpenCount: 0,
   storeHydrated: true,
   isLoading: false,
   hasRealAccount: true, // default: real account → no gate redirect
@@ -70,7 +68,6 @@ const setGate = (overrides: Partial<GateReturn>) => {
   gateState = {
     pathname: '/',
     onboardingCompleted: true,
-    anonymousOpenCount: 0,
     storeHydrated: true,
     isLoading: false,
     hasRealAccount: true,
@@ -182,7 +179,6 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
       isLoading: false,
       hasRealAccount: false,
       onboardingCompleted: false,
-      anonymousOpenCount: 0,
     });
 
     render(<Index />);
@@ -196,7 +192,6 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
       isLoading: true,
       hasRealAccount: false,
       onboardingCompleted: false,
-      anonymousOpenCount: 0,
     });
 
     render(<Index />);
@@ -206,7 +201,6 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
 
   it('redirects fresh-install anonymous users to /onboarding/index (NOT /route-planning)', () => {
     // The exact state from GH #23:
-    //   Anonymous open count: 1
     //   Onboarding completed: false
     //   Is anonymous: true  →  hasRealAccount: false
     //   Session exists: true
@@ -216,7 +210,6 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
       isLoading: false,
       hasRealAccount: false,
       onboardingCompleted: false,
-      anonymousOpenCount: 1,
     });
 
     render(<Index />);
@@ -224,32 +217,17 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
     expect(lastRedirectHref).toBe('/onboarding');
   });
 
-  it('redirects anonymous users with onboarding complete + count==2 to the dismissible signup prompt', () => {
+  it('redirects onboarded anonymous users to the signup prompt — registration is mandatory', () => {
     setGate({
       storeHydrated: true,
       isLoading: false,
       hasRealAccount: false,
       onboardingCompleted: true,
-      anonymousOpenCount: 2,
     });
 
     render(<Index />);
 
     expect(lastRedirectHref).toBe('/onboarding/signup-prompt');
-  });
-
-  it('redirects anonymous users with onboarding complete + count>=3 to the mandatory signup prompt', () => {
-    setGate({
-      storeHydrated: true,
-      isLoading: false,
-      hasRealAccount: false,
-      onboardingCompleted: true,
-      anonymousOpenCount: 3,
-    });
-
-    render(<Index />);
-
-    expect(lastRedirectHref).toBe('/onboarding/signup-prompt?mandatory=true');
   });
 
   it('never yanks an anonymous user out of an active NAVIGATING session', () => {
@@ -297,15 +275,14 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
         generatedAt: new Date().toISOString(),
       },
     });
-    // But the gate would normally fire (anonymous, onboarding complete,
-    // count==5). The pathname is `/navigation` here, which the gate exempts.
+    // But the gate would normally fire (anonymous, onboarding complete).
+    // The pathname is `/navigation` here, which the gate exempts.
     setGate({
       pathname: '/navigation',
       storeHydrated: true,
       isLoading: false,
       hasRealAccount: false,
       onboardingCompleted: true,
-      anonymousOpenCount: 5,
     });
 
     render(<Index />);

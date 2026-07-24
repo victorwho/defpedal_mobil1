@@ -997,7 +997,6 @@ export const en = {
     goalSelected: 'Goal selected',
     firstRouteExplored: 'First route explored',
     regionConfirmed: 'Country confirmed',
-    privacySaved: 'Privacy choices saved',
     accountCreated: 'Account created',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Skip',
@@ -1044,7 +1043,8 @@ export const en = {
     usernameHint: 'Min 3 characters. Letters, numbers, underscore only.',
     almostThere: 'Almost there',
     createYourAccount: 'Create your account',
-    signupSubMandatory: 'Create an account to continue — your rides, streaks, and badges carry over to it.',
+    signupSubMandatory:
+      'Hazard alerts and safety scores only work because every report comes from a real rider. Your free account keeps that data trustworthy — and saves your rides, streaks, and badges on any phone.',
     signupSub: 'Your rides, streaks, and badges carry over. Sync them, and join the community. You can always do this later.',
     percentComplete: '{{percent}}% complete',
     continueWithGoogle: 'Continue with Google',
@@ -1052,14 +1052,11 @@ export const en = {
     signUpWithEmail: 'Sign up with email',
     maybeLater: 'Maybe later',
     a11yGoogle: 'Sign in with Google',
-    a11ySkipAccount: 'Skip account creation for now',
-    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
-    signupPromptTitle: 'See your rides. Track your progress',
-    signupPromptSub:
-      'Your ride history, XP, and badges live in your free account — on any phone.',
+    // -- Mandatory registration (2026-07-24): Google dominant, email demoted,
+    //    guest path removed. The sub copy is `signupSubMandatory` above. --
+    signupPromptTitle: 'Join the riders making your city safer',
     useEmailInstead: 'Use email instead',
     trustMicroline: 'Free forever. Rides private by default. No spam.',
-    rideAsGuest: 'Not now — ride as guest',
     // Transparency notice on the first onboarding screen (2026-07-16 — the
     // legal condition for removing the consent screen from the flow).
     telemetryNotice:

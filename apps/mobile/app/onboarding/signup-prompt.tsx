@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,6 @@ import { brandTints } from '../../src/design-system/tokens/tints';
 import {
   fontFamily,
   text2xl,
-  text2xs,
   textBase,
   textSm,
   textXs,
@@ -28,14 +27,13 @@ import { useAppStore } from '../../src/store/appStore';
 // Progress steps
 // ---------------------------------------------------------------------------
 
-// Mirrors the REAL onboarding flow since 592b751 (2026-07-04): location
-// permission (index) → country check (region-check) → privacy choices
-// (consent) → account (this screen). The old safety-score / goal / first-route
-// steps were removed from the flow then; listing them here lied to the user.
+// Mirrors the REAL onboarding flow: location permission (index) → country
+// check (region-check) → account (this screen). The old safety-score / goal /
+// first-route steps were cut in 592b751 (2026-07-04) and the consent screen
+// was removed 2026-07-16 — listing steps the user never saw lied to them.
 const PROGRESS_STEPS = [
   { labelKey: 'onboarding.locationEnabled', completed: true },
   { labelKey: 'onboarding.regionConfirmed', completed: true },
-  { labelKey: 'onboarding.privacySaved', completed: true },
   { labelKey: 'onboarding.accountCreated', completed: false },
 ] as const;
 
@@ -54,28 +52,8 @@ export default function OnboardingSignupPromptScreen() {
   const authCtx = useAuthSessionOptional();
   const setOnboardingCompleted = useAppStore((s) => s.setOnboardingCompleted);
   const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
-  const params = useLocalSearchParams<{ mandatory?: string }>();
-  const isMandatory = params.mandatory === 'true';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const finishOnboarding = () => {
-    // Only reset the open-count on the *initial* onboarding completion (the
-    // user is finishing the 5-screen onboarding flow for the first time).
-    // When this screen is shown as a count-based re-prompt (`anonymousOpenCount >= 2`
-    // with `onboardingCompleted` already true), dismissing with "Maybe later"
-    // must NOT reset the count — otherwise the user loops at count 0↔2 forever
-    // and never reaches the count >= 3 mandatory gate.
-    const wasInitialOnboarding = useAppStore.getState().onboardingCompleted === false;
-    setOnboardingCompleted(true);
-    if (wasInitialOnboarding) {
-      resetAnonymousOpenCount();
-    }
-    // If /onboarding/first-route generated a demo route this session, land on
-    // /route-preview so the user sees the safe route their onboarding just
-    // produced. Otherwise the helper resets and goes to a clean planner.
-    navigateAfterOnboarding();
-  };
 
   const handleGoogleSignIn = async () => {
     if (!authCtx) return;
@@ -135,33 +113,29 @@ export default function OnboardingSignupPromptScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        // Bottom inset folded in here now that the pinned guest-path footer
+        // (which used to own it) is gone — keeps the legal links clear of the
+        // system nav bar.
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + space[4] }]}
         showsVerticalScrollIndicator={false}
       >
-        {!isMandatory ? (
-          <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12} accessibilityLabel="Go back" accessibilityRole="button">
-            <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-          </Pressable>
-        ) : <View style={styles.backButton} />}
+        {/* No back button: registration is mandatory (2026-07-24). The region
+            gate behind this screen forwards straight back here anyway, and the
+            root-layout gate walls every other escape route. */}
+        <View style={styles.backButton} />
 
         <View style={styles.headerSection}>
           <View style={styles.mascotRow}>
             <Mascot pose="point" size="md" />
           </View>
           <Text style={styles.eyebrow}>{t('onboarding.almostThere')}</Text>
-          {/* Benefit-framed headline (2026-07-16): "See your rides. Track your
-              progress" — the account as the key to history + progression.
-              Endowed-progress step list stays below. */}
+          {/* Community-framed headline + the honest "why we require this"
+              (2026-07-24, mandatory registration): trustworthy hazard/safety
+              data needs real riders, and the account saves their progress.
+              The anonymous→account merge is live (merge_anonymous_account +
+              AnonMergeManager), so the copy can promise continuity. */}
           <Text style={styles.title}>{t('onboarding.signupPromptTitle')}</Text>
-          <Text style={styles.subtitle}>
-            {/* Mandatory gate keeps its "create an account to continue" copy —
-                it must explain why the user can't dismiss. The anonymous→account
-                merge is live (merge_anonymous_account + AnonMergeManager), so
-                both variants can promise continuity. */}
-            {isMandatory
-              ? t('onboarding.signupSubMandatory')
-              : t('onboarding.signupPromptSub')}
-          </Text>
+          <Text style={styles.subtitle}>{t('onboarding.signupSubMandatory')}</Text>
         </View>
 
         {/* Primary action — single dominant button, directly under the benefit
@@ -239,23 +213,6 @@ export default function OnboardingSignupPromptScreen() {
           </Text>
         </View>
       </ScrollView>
-
-      {/* Guest path — tertiary plain-text link, pinned outside the scroll so it
-          stays clear of the system nav bar. hitSlop 16 keeps the small text at
-          a ≥44pt touch target. Completion logic unchanged (finishOnboarding →
-          setOnboardingCompleted + navigateAfterOnboarding). */}
-      {!isMandatory ? (
-        <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
-          <Pressable
-            onPress={finishOnboarding}
-            hitSlop={16}
-            accessibilityRole="button"
-            accessibilityLabel={t('onboarding.a11ySkipAccount')}
-          >
-            <Text style={styles.dismissText}>{t('onboarding.rideAsGuest')}</Text>
-          </Pressable>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -374,22 +331,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.danger,
       textAlign: 'center',
       lineHeight: 20,
-    },
-    footer: {
-      alignItems: 'center',
-      paddingTop: space[4],
-      paddingHorizontal: space[5],
-      backgroundColor: colors.bgDeep,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: colors.borderDefault,
-    },
-    dismissText: {
-      // Deliberately tiny (10px) — the guest path is the most-demoted action
-      // on the screen. hitSlop 16 on the Pressable keeps the touch target
-      // ≥44pt despite the small glyphs.
-      ...text2xs,
-      fontFamily: fontFamily.body.medium,
-      color: colors.textSecondary,
     },
     legalFooter: {
       paddingHorizontal: space[4],

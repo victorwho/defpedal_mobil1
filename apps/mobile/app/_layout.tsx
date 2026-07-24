@@ -66,15 +66,18 @@ const RouteTelemetryObserver = () => {
 };
 
 /**
- * Guards app entry based on auth state and anonymous open count.
+ * Guards app entry based on auth state. Registration is mandatory
+ * (2026-07-24):
  *
- * Logic:
- * - Real account (Google): always pass through, no prompts.
- * - Anonymous, count 1, onboarding not done: onboarding flow.
- * - Anonymous, count == 2, onboarding done: dismissible signup prompt.
- * - Anonymous, count >= 3: mandatory signup (no skip).
+ * - Real account (Google/email): always pass through, no prompts.
+ * - Anonymous, onboarding not done: intro flow → signup prompt.
+ * - Anonymous, onboarding done: signup prompt, on every render — there is
+ *   no guest mode and no count-based escalation anymore.
  *
- * The anonymousOpenCount is incremented once per app launch (via ref).
+ * The anonymousOpenCount is still incremented once per app launch (via
+ * ref) — it no longer drives the gate, but it remains a useful funnel
+ * diagnostic ("how many opens before this user registered"), surfaced in
+ * Diagnostics.
  */
 // Minimum time the app must spend in the background before a foreground
 // transition counts as a new "session" for signup-gate purposes. Chosen to
@@ -89,14 +92,6 @@ const OnboardingGuard = () => {
   // Tracks when the app last went to background so we can decide if a
   // foreground transition should count as a new session.
   const lastBackgroundAtRef = useRef<number | null>(null);
-  // One-shot guard for the initial-onboarding and count-2 dismissible-prompt
-  // redirects. The mandatory gate ignores this ref and fires on every render
-  // so hardware-back / nav-away can't escape it. `app/index.tsx` also runs
-  // the gate once when it mounts (covers cold start), but this effect is the
-  // authority for mid-session transitions and for any route reached without
-  // passing through index (deep links, state-driven navigation, etc.).
-  const hasRedirectedRef = useRef(false);
-
   const { storeHydrated, isLoading, hasRealAccount } = state;
 
   // Increment anonymous open count once per app launch.
@@ -143,13 +138,16 @@ const OnboardingGuard = () => {
   // them to. Using `router.replace` directly from an effect sidesteps the
   // focus-context requirement entirely.
   useEffect(() => {
-    const target = computeOnboardingGateTarget(state, hasRedirectedRef.current);
+    // The gate fires on every evaluation (registration is inescapable);
+    // loop-termination comes from the exempt-path rule — once the user is ON
+    // the target, the gate returns null. `app/index.tsx` also runs the gate
+    // when it mounts (covers cold start), but this effect is the authority
+    // for mid-session transitions and for any route reached without passing
+    // through index (deep links, state-driven navigation, etc.).
+    const target = computeOnboardingGateTarget(state);
     if (!target) return;
-    if (!target.includes('mandatory=true')) {
-      hasRedirectedRef.current = true;
-    }
     // Already on the target — nothing to do.
-    if (state.pathname === target.split('?')[0]) return;
+    if (state.pathname === target) return;
     router.replace(target as never);
     // `state` is a fresh object every render (plain return from the hook),
     // so including it in the dep array would cause an infinite effect loop.
@@ -159,7 +157,6 @@ const OnboardingGuard = () => {
     state.isLoading,
     state.hasRealAccount,
     state.onboardingCompleted,
-    state.anonymousOpenCount,
     state.pathname,
   ]);
 

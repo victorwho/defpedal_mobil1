@@ -25,7 +25,6 @@ export {
 export const useOnboardingGate = (): OnboardingGateState => {
   const pathname = usePathname();
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
-  const anonymousOpenCount = useAppStore((s) => s.anonymousOpenCount);
   const storeHydrated = useStoreHydrated();
   const authCtx = useAuthSessionOptional();
 
@@ -35,7 +34,6 @@ export const useOnboardingGate = (): OnboardingGateState => {
   return {
     pathname,
     onboardingCompleted,
-    anonymousOpenCount,
     storeHydrated,
     isLoading,
     hasRealAccount,

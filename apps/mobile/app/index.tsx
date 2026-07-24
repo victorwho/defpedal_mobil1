@@ -22,20 +22,15 @@ export default function Index() {
   // is where `<Redirect>`'s `useFocusEffect` actually fires — the previous
   // attempt to render `<Redirect>` at root-layout level silently dropped the
   // navigation because no screen was focused.
-  //
-  // `hasRedirected=false` is safe here because this component only mounts on
-  // cold start (and on explicit router.replace('/')); the "don't re-fire the
-  // one-shot branches" guarantee is handled by _layout.tsx's imperative
-  // gate effect, which manages its own ref across the app lifetime.
-  const gateTarget = computeOnboardingGateTarget(gate, false);
+  const gateTarget = computeOnboardingGateTarget(gate);
 
   // Real-account cold starts always land on a clean route-planning screen.
   // Drop any persisted ROUTE_PREVIEW / AWAITING_FEEDBACK so the user picks
   // a fresh destination instead of resuming where they left off. Anonymous
-  // sessions are intentionally untouched (their open count drives the signup
-  // gate, and resuming a half-built route nudges them toward signing up).
-  // NAVIGATING is also untouched — that's the active-ride recovery path
-  // owned by NavigationResumeGuard.
+  // sessions are untouched — the mandatory signup gate walls them before any
+  // of this state matters, and their persisted route survives the merge on
+  // signup. NAVIGATING is also untouched — that's the active-ride recovery
+  // path owned by NavigationResumeGuard.
   const shouldClearStalePreview =
     gate.storeHydrated &&
     !gate.isLoading &&

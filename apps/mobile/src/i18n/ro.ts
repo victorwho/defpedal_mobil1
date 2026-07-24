@@ -988,7 +988,6 @@ export const ro: TranslationKeys = {
     goalSelected: 'Obiectiv selectat',
     firstRouteExplored: 'Primul traseu explorat',
     regionConfirmed: 'Țară confirmată',
-    privacySaved: 'Preferințe de confidențialitate salvate',
     accountCreated: 'Cont creat',
     // -- Wired screen copy (review 2026-06-12 i18n) --
     skipShort: 'Omite',
@@ -1035,7 +1034,8 @@ export const ro: TranslationKeys = {
     usernameHint: 'Minim 3 caractere. Doar litere, cifre și underscore.',
     almostThere: 'Aproape gata',
     createYourAccount: 'Creează-ți contul',
-    signupSubMandatory: 'Creează un cont pentru a continua — cursele, seriile și insignele tale se transferă pe el.',
+    signupSubMandatory:
+      'Alertele de pericol și scorurile de siguranță funcționează doar pentru că fiecare raport vine de la un ciclist real. Contul tău gratuit păstrează aceste date de încredere — și îți salvează turele, seriile și insignele pe orice telefon.',
     signupSub: 'Cursele, seriile și insignele tale se păstrează. Sincronizează-le și alătură-te comunității. Poți face asta oricând mai târziu.',
     percentComplete: '{{percent}}% finalizat',
     continueWithGoogle: 'Continuă cu Google',
@@ -1043,14 +1043,11 @@ export const ro: TranslationKeys = {
     signUpWithEmail: 'Înscrie-te cu emailul',
     maybeLater: 'Poate mai târziu',
     a11yGoogle: 'Autentificare cu Google',
-    a11ySkipAccount: 'Omite crearea contului deocamdată',
-    // -- Signup action hierarchy (2026-07-16): Google dominant, email + guest demoted --
-    signupPromptTitle: 'Vezi turele tale. Urmărește-ți progresul',
-    signupPromptSub:
-      'Istoricul turelor, XP-ul și insignele tale se păstrează în contul tău gratuit — pe orice telefon.',
+    // -- Mandatory registration (2026-07-24): Google dominant, email demoted,
+    //    guest path removed. The sub copy is `signupSubMandatory` above. --
+    signupPromptTitle: 'Alătură-te cicliștilor care fac orașul mai sigur',
     useEmailInstead: 'Folosește emailul în schimb',
     trustMicroline: 'Gratuit pentru totdeauna. Traseele tale sunt private implicit.',
-    rideAsGuest: 'Mai târziu — pedalez ca invitat',
     telemetryNotice:
       'Colectăm rapoarte anonime de erori și analize anonime de produs (fără trasee GPS) pentru a menține aplicația stabilă și a o îmbunătăți. Le poți dezactiva oricând din Profil › Confidențialitate.',
     // -- Region gate (disponibilitate globală, 2026-07-12) --
