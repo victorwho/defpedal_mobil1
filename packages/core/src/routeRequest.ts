@@ -1,5 +1,6 @@
 import type { Coordinate, RerouteRequest, RoutePreviewRequest } from './contracts';
-import { findClosestPointIndex } from './distance';
+import { findClosestPointIndex, haversineDistance } from './distance';
+import { decodePolyline } from './polyline';
 
 export const hasStartOverride = (
   request: Pick<RoutePreviewRequest, 'startOverride'>,
@@ -8,6 +9,55 @@ export const hasStartOverride = (
 export const getPreviewOrigin = (
   request: Pick<RoutePreviewRequest, 'origin' | 'startOverride'>,
 ): Coordinate => request.startOverride ?? request.origin;
+
+/**
+ * Routers snap the requested endpoints onto the road network, so a route's
+ * first/last vertex sits some distance from the raw request coordinates.
+ * 250 m comfortably covers real snap distances while still discriminating a
+ * genuinely different start (a custom start within 250 m of the rider renders
+ * near-identically anyway, so a false "match" there is harmless).
+ */
+const ENDPOINT_MATCH_TOLERANCE_METERS = 250;
+
+/**
+ * Whether an already-calculated route still connects the given endpoints.
+ *
+ * Used by route-preview to decide if the stored preview belongs to the
+ * current request: after the rider changes the start (e.g. clears a custom
+ * start back to "current location"), the stored route still runs from the
+ * OLD start and must not be drawn or centered on while the fresh calculation
+ * is in flight. Same-endpoint refetches (mode/hill cycling) keep showing the
+ * previous route on purpose — this returns true for those.
+ *
+ * Degenerate geometry (fewer than 2 vertices) fails OPEN (returns true):
+ * suppression is cosmetic, and hiding a route we can't measure would turn a
+ * decode hiccup into a blank map.
+ */
+export const routeMatchesEndpoints = (
+  geometryPolyline6: string,
+  origin: Coordinate,
+  destination: Coordinate,
+  toleranceMeters: number = ENDPOINT_MATCH_TOLERANCE_METERS,
+): boolean => {
+  const coordinates = decodePolyline(geometryPolyline6);
+  if (coordinates.length < 2) return true;
+
+  const first = coordinates[0]!;
+  const last = coordinates[coordinates.length - 1]!;
+
+  // decodePolyline yields [lon, lat] (GeoJSON order); haversineDistance
+  // expects [lat, lon].
+  const startDistance = haversineDistance(
+    [first[1], first[0]],
+    [origin.lat, origin.lon],
+  );
+  const endDistance = haversineDistance(
+    [last[1], last[0]],
+    [destination.lat, destination.lon],
+  );
+
+  return startDistance <= toleranceMeters && endDistance <= toleranceMeters;
+};
 
 /**
  * Strip waypoints the rider has already passed.

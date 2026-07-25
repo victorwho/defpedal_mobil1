@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildRerouteRequest, getPreviewOrigin, hasStartOverride } from './routeRequest';
+import {
+  buildRerouteRequest,
+  getPreviewOrigin,
+  hasStartOverride,
+  routeMatchesEndpoints,
+} from './routeRequest';
 import { encodePolyline } from './index';
 
 describe('routeRequest helpers', () => {
@@ -92,6 +97,67 @@ describe('routeRequest helpers', () => {
           lon: 26.09,
         },
       }),
+    ).toBe(true);
+  });
+});
+
+describe('routeMatchesEndpoints — stale-preview detection', () => {
+  // Straight-ish line through central Bucharest: A(44.4268,26.1025) → D(44.4500,26.0500).
+  // encodePolyline expects [lon, lat] pairs, matching decodePolyline's output.
+  const geometry = encodePolyline([
+    [26.1025, 44.4268],
+    [26.08, 44.435],
+    [26.05, 44.45],
+  ]);
+  const origin = { lat: 44.4268, lon: 26.1025 };
+  const destination = { lat: 44.45, lon: 26.05 };
+
+  it('matches when the request endpoints equal the route endpoints', () => {
+    expect(routeMatchesEndpoints(geometry, origin, destination)).toBe(true);
+  });
+
+  it('tolerates road-network snap distance at both endpoints (~100m)', () => {
+    // ~0.001° lat ≈ 111 m — inside the 250 m snap tolerance.
+    expect(
+      routeMatchesEndpoints(
+        geometry,
+        { lat: origin.lat + 0.001, lon: origin.lon },
+        { lat: destination.lat - 0.001, lon: destination.lon },
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects when the origin moved (custom start cleared back to current location)', () => {
+    // The rider's actual position is ~2 km from the stale route's start.
+    expect(
+      routeMatchesEndpoints(
+        geometry,
+        { lat: origin.lat + 0.02, lon: origin.lon },
+        destination,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects when the destination moved', () => {
+    expect(
+      routeMatchesEndpoints(geometry, origin, {
+        lat: destination.lat + 0.02,
+        lon: destination.lon,
+      }),
+    ).toBe(false);
+  });
+
+  it('respects a caller-supplied tolerance', () => {
+    // ~111 m offset fails a 50 m tolerance but passes the default 250 m.
+    const offsetOrigin = { lat: origin.lat + 0.001, lon: origin.lon };
+    expect(routeMatchesEndpoints(geometry, offsetOrigin, destination, 50)).toBe(false);
+    expect(routeMatchesEndpoints(geometry, offsetOrigin, destination)).toBe(true);
+  });
+
+  it('fails open (matches) on degenerate geometry — suppression is cosmetic', () => {
+    expect(routeMatchesEndpoints('', origin, destination)).toBe(true);
+    expect(
+      routeMatchesEndpoints(encodePolyline([[26.1025, 44.4268]]), origin, destination),
     ).toBe(true);
   });
 });

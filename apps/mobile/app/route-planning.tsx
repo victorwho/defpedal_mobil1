@@ -802,6 +802,13 @@ export default function RoutePlanningScreen() {
     setStartOverrideQuery('');
     setStartOverrideDisplay(null);
     setActiveField(null);
+    // Returning the start to "current location" is an explicit "route from
+    // where I am" — recenter the map on the rider via the same path as the
+    // recenter FAB. Without this the static camera never re-asserts: its
+    // fallback target (usually the destination) hasn't changed, so the
+    // viewport silently stays wherever the custom-start editing left it.
+    void refreshLocation();
+    setRecenterKey((key) => key + 1);
   };
 
   const handleAddStop = () => {

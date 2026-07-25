@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride } from '@defensivepedal/core';
+import { getPreviewOrigin, hasStartOverride, routeMatchesEndpoints } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -338,6 +338,34 @@ function RoutePreviewScreen() {
   const previewOrigin = getPreviewOrigin(routeRequest);
   const usingCustomStart = hasStartOverride(routeRequest);
 
+  // The store's routePreview survives from the previous calculation while the
+  // fresh previewQuery is in flight. When the rider changed an ENDPOINT since
+  // it was generated (e.g. cleared a custom start back to "current location"),
+  // that stored route still runs from the old start — drawing it would show a
+  // misleading route AND park the camera on its midpoint instead of anywhere
+  // near the current request. Suppress it so the camera frames the
+  // destination until the fresh route lands (which then re-centers the camera
+  // via its new midpoint). Same-endpoint refetches (Safe/Fast/Flat cycling,
+  // avoid-hills toggles) match and keep the previous route visible — that's
+  // the deliberate session-54 UX.
+  const displayedRoutes = useMemo(() => {
+    const routes = routePreview?.routes;
+    if (!routes || routes.length === 0) return routes;
+    // All alternatives of one calculation share endpoints — check the first.
+    const matches = routeMatchesEndpoints(
+      routes[0]!.geometryPolyline6,
+      previewOrigin,
+      routeRequest.destination,
+    );
+    return matches ? routes : undefined;
+  }, [
+    routePreview,
+    previewOrigin.lat,
+    previewOrigin.lon,
+    routeRequest.destination.lat,
+    routeRequest.destination.lon,
+  ]);
+
   const returnToPlanning = () => {
     router.replace('/route-planning');
   };
@@ -574,7 +602,7 @@ function RoutePreviewScreen() {
       ) : null}
       map={
         <RouteMap
-          routes={routePreview?.routes}
+          routes={displayedRoutes}
           selectedRouteId={selectedRouteId}
           origin={previewOrigin}
           destination={routeRequest.destination}
