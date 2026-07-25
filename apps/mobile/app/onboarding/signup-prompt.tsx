@@ -4,6 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { AppleSignInButton } from '../../src/components/AppleSignInButton';
 import { GoogleSignInButton } from '../../src/components/GoogleSignInButton';
 import { Mascot } from '../../src/design-system/atoms';
 import { useTheme, type ThemeColors } from '../../src/design-system';
@@ -55,6 +56,32 @@ export default function OnboardingSignupPromptScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Shared post-sign-in bookkeeping for every provider (Google, Apple).
+  const completeSignup = async () => {
+    setOnboardingCompleted(true);
+    resetAnonymousOpenCount();
+
+    // Returning users keep their existing username; only first-time sign-ups
+    // (profile.username === null) need the choose-username step.
+    let alreadyHasUsername = false;
+    try {
+      const profile = await mobileApi.getProfile();
+      alreadyHasUsername = profile.username != null && profile.username.length > 0;
+    } catch {
+      // Network/profile fetch failure: fall back to the prompt rather than
+      // dropping the user into the app with a half-known account state.
+    }
+
+    if (alreadyHasUsername) {
+      // Preserve the demo circuit route from /onboarding/first-route so the
+      // user lands on /route-preview with the safe route they just saw being
+      // calculated — a concrete value moment, not an empty planner.
+      navigateAfterOnboarding();
+    } else {
+      router.replace('/onboarding/choose-username');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     if (!authCtx) return;
     setIsSubmitting(true);
@@ -72,28 +99,21 @@ export default function OnboardingSignupPromptScreen() {
         return;
       }
 
-      setOnboardingCompleted(true);
-      resetAnonymousOpenCount();
+      await completeSignup();
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      // Returning users keep their existing username; only first-time sign-ups
-      // (profile.username === null) need the choose-username step.
-      let alreadyHasUsername = false;
-      try {
-        const profile = await mobileApi.getProfile();
-        alreadyHasUsername = profile.username != null && profile.username.length > 0;
-      } catch {
-        // Network/profile fetch failure: fall back to the prompt rather than
-        // dropping the user into the app with a half-known account state.
-      }
-
-      if (alreadyHasUsername) {
-        // Preserve the demo circuit route from /onboarding/first-route so the
-        // user lands on /route-preview with the safe route they just saw being
-        // calculated — a concrete value moment, not an empty planner.
-        navigateAfterOnboarding();
-      } else {
-        router.replace('/onboarding/choose-username');
-      }
+  // The Apple button owns its native sheet + Supabase session; this runs after
+  // the session exists. Cancelling the sheet fires no callback, so isSubmitting
+  // is only raised here — never on sheet-open — to avoid a stuck disabled UI.
+  const handleAppleSignInSuccess = async () => {
+    setIsSubmitting(true);
+    try {
+      await completeSignup();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {
@@ -138,9 +158,19 @@ export default function OnboardingSignupPromptScreen() {
           <Text style={styles.subtitle}>{t('onboarding.signupSubMandatory')}</Text>
         </View>
 
-        {/* Primary action — single dominant button, directly under the benefit
-            copy so it sits above the fold on a 6.1" screen. */}
+        {/* Primary actions — directly under the benefit copy so they sit above
+            the fold on a 6.1" screen. */}
         <View style={styles.ctaSection}>
+          {/* Sign in with Apple — iOS only (renders null on Android/web).
+              Required by App Store Guideline 4.8 because Google sign-in is
+              offered, and this screen is now the mandatory registration wall —
+              the first surface every iOS reviewer sees. Equal prominence,
+              above Google, matching auth.tsx. */}
+          <AppleSignInButton
+            onStart={() => setErrorMessage(null)}
+            onSuccess={() => void handleAppleSignInSuccess()}
+            onError={(message) => setErrorMessage(message)}
+          />
           <GoogleSignInButton
             label={t('onboarding.continueWithGoogle')}
             onPress={() => void handleGoogleSignIn()}
