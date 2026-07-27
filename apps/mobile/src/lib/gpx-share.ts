@@ -11,6 +11,7 @@
 // impact-summary bug). Legacy API matches the rest of the codebase.
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { sendGpxToGarminConnect } from './garmin';
 import { preloadSharing, shareFile } from './shareImage';
 
 /**
@@ -29,6 +30,13 @@ export interface WriteAndShareGpxOptions {
   /** Filename prefix, e.g. 'defensive-pedal-route'. A timestamp + .gpx is appended. */
   readonly fileBaseName: string;
   readonly dialogTitle: string;
+  /**
+   * 'garmin' hands the file straight to the Garmin Connect app (explicit
+   * Android intent — its course-import screen opens directly). Falls back
+   * to the generic share sheet when the hand-off can't happen, so the file
+   * never dead-ends. Default: 'share'.
+   */
+  readonly target?: 'share' | 'garmin';
 }
 
 const GPX_MIME_TYPE = 'application/gpx+xml';
@@ -46,6 +54,15 @@ export async function writeAndShareGpx(
 
     const fileUri = `${cacheDir}${options.fileBaseName}-${Date.now()}.gpx`;
     await FileSystem.writeAsStringAsync(fileUri, gpx);
+
+    if (options.target === 'garmin') {
+      const sent = await sendGpxToGarminConnect(fileUri);
+      if (sent) {
+        return { ok: true, fileUri };
+      }
+      // Hand-off failed (app uninstalled since detection, intent error) —
+      // fall through to the generic share sheet rather than dead-ending.
+    }
 
     const shared = await shareFile(fileUri, {
       mimeType: GPX_MIME_TYPE,

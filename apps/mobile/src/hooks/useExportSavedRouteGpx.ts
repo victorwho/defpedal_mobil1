@@ -31,7 +31,10 @@ export type ExportSavedRouteGpxResult =
   | { exported: false; reason: 'offline' | 'fetch_failed' };
 
 export interface UseExportSavedRouteGpxReturn {
-  readonly exportSavedRoute: (saved: SavedRoute) => Promise<ExportSavedRouteGpxResult>;
+  readonly exportSavedRoute: (
+    saved: SavedRoute,
+    target?: 'share' | 'garmin',
+  ) => Promise<ExportSavedRouteGpxResult>;
   /** The id of the saved route currently exporting, for per-row spinners. */
   readonly exportingRouteId: string | null;
   readonly toastMessage: string | null;
@@ -67,7 +70,7 @@ export function useExportSavedRouteGpx(): UseExportSavedRouteGpxReturn {
   const exportSavedRoute = useCallback<
     UseExportSavedRouteGpxReturn['exportSavedRoute']
   >(
-    async (saved) => {
+    async (saved, target) => {
       if (!isOnline) {
         setFetchToastMessage(t('preview.exportGpxOffline'));
         return { exported: false, reason: 'offline' };
@@ -98,6 +101,7 @@ export function useExportSavedRouteGpx(): UseExportSavedRouteGpxReturn {
           destination: saved.destination,
           waypoints: saved.waypoints,
           name: saved.name,
+          target,
         });
       } catch (error: unknown) {
         const message =

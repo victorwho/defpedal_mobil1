@@ -3,7 +3,10 @@
  * shareImage — Unit Tests
  *
  * Verifies the native-module guard, happy-path share+save, permission-denied
- * save path, and cancellation semantics.
+ * save path, and cancellation semantics. Modules load via sync require behind
+ * injectable loaders (vi.mock can't intercept runtime require), so tests
+ * substitute mocks through `setShareModuleLoadersForTesting` and gate
+ * native-module presence by mocking `hasExpoNativeModule`.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
@@ -21,14 +24,11 @@ const mediaLibraryMocks = {
   saveToLibraryAsync: vi.fn<(uri: string) => Promise<void>>(),
 };
 
-vi.mock('expo-sharing', () => sharingMocks);
-vi.mock('expo-media-library', () => mediaLibraryMocks);
-
 // Toggleable guard — each test controls which native modules exist
 let nativeModulesPresent: Record<string, boolean> = {};
 
-vi.mock('expo-modules-core', () => ({
-  requireOptionalNativeModule: (name: string) => (nativeModulesPresent[name] ? {} : null),
+vi.mock('../expoNativeModule', () => ({
+  hasExpoNativeModule: (name: string) => nativeModulesPresent[name] ?? false,
 }));
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,12 @@ vi.mock('expo-modules-core', () => ({
 
 const importShareImage = async () => {
   vi.resetModules();
-  return (await import('../shareImage')) as typeof import('../shareImage');
+  const mod = (await import('../shareImage')) as typeof import('../shareImage');
+  mod.setShareModuleLoadersForTesting({
+    sharing: () => sharingMocks,
+    mediaLibrary: () => mediaLibraryMocks,
+  });
+  return mod;
 };
 
 // ---------------------------------------------------------------------------
@@ -135,5 +140,17 @@ describe('shareImage', () => {
     const result = await shareImage('file:///tmp/ride.png', 'caption');
 
     expect(result).toEqual({ shared: false, savedToLibrary: true });
+  });
+
+  it('loader throwing degrades to unavailable instead of crashing', async () => {
+    const mod = await importShareImage();
+    mod.setShareModuleLoadersForTesting({
+      sharing: () => {
+        throw new Error('require failed');
+      },
+    });
+
+    const result = await mod.shareImage('file:///tmp/ride.png', 'caption');
+    expect(result.shared).toBe(false);
   });
 });

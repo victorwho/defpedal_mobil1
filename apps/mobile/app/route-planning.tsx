@@ -21,6 +21,7 @@ import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useExportSavedRouteGpx } from '../src/hooks/useExportSavedRouteGpx';
+import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useResolvedCountry } from '../src/hooks/useResolvedCountry';
 import { useWeather } from '../src/hooks/useWeather';
@@ -374,6 +375,7 @@ export default function RoutePlanningScreen() {
     toastMessage: gpxToastMessage,
     consumeToast: consumeGpxToast,
   } = useExportSavedRouteGpx();
+  const { chooseGpxDestination } = useGpxDestinationChooser();
 
   const handleMapTap = useCallback(() => {
     // Don't toggle UI while in any crosshair placement mode
@@ -1725,7 +1727,9 @@ export default function RoutePlanningScreen() {
                 hitSlop={8}
                 disabled={exportingRouteId !== null}
                 onPress={() => {
-                  void exportSavedRoute(route);
+                  chooseGpxDestination((target) => {
+                    void exportSavedRoute(route, target);
+                  });
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={`Export saved route as GPX: ${route.name}`}

@@ -29,6 +29,11 @@
       <category android:name="android.intent.category.BROWSABLE"/>
       <data android:scheme="https"/>
     </intent>
+    <!-- Garmin Connect: package visibility for the "Send to Garmin" GPX
+         hand-off (explicit ACTION_VIEW intent + installed-app detection).
+         Android 11+ package-visibility filtering hides other apps without
+         a matching <queries> entry. -->
+    <package android:name="com.garmin.android.apps.connectmobile"/>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false" android:fullBackupContent="@xml/secure_store_backup_rules" android:dataExtractionRules="@xml/secure_store_data_extraction_rules">
     <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/notification_icon"/>

@@ -12,16 +12,18 @@
  *   - If the media-library permission is denied, the function still reports
  *     the share outcome truthfully rather than throwing.
  *
- * Mirrors the guard pattern in `push-notifications.ts` and the lazy-require
- * discipline enforced by `.claude/error-log.md` errors #2, #21, #23.
- *
- * Note: We use `await import()` for the Expo modules rather than `require()`
- * because `require()` of Expo modules triggers eager resolution of transitive
- * dependencies (some with side effects) at module-load time, which can throw
- * outside of a try/catch boundary. Dynamic `import()` is deferred and its
- * rejection is catchable.
+ * Module loading: sync `require()` behind the `hasExpoNativeModule` guard —
+ * the project-standard pattern (CLAUDE.md Notifications §1/§3, errors #2,
+ * #21, #23). Metro inlines `require('literal')` into the main bundle as a
+ * static dependency. This file previously used `await import()`, which
+ * creates an async split point whose chunk fetch dies with the Metro USB
+ * tether in dev (observed 2026-07-27: "expo-sharing native module
+ * unavailable" on a build where the module was present) and has a history
+ * of silent failure in Hermes release bytecode (see useShareRide.ts).
+ * Requires are routed through injectable loaders so unit tests can
+ * substitute mocks (vi.mock does not intercept runtime `require()`).
  */
-import { NativeModules } from 'react-native';
+import { hasExpoNativeModule } from './expoNativeModule';
 
 // Lightweight warn helper — centralised so tests can silence it and production
 // builds can swap in a remote logger without touching call-sites.
@@ -41,61 +43,6 @@ export interface ShareImageResult {
   readonly savedToLibrary: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// Native module guards
-// ---------------------------------------------------------------------------
-
-/**
- * expo-sharing + expo-media-library register via Expo Modules API
- * (`globalThis.expo.modules.ExpoSharing`), NOT the classic RN bridge.
- * See error-log #21. Probe presence via `requireOptionalNativeModule`
- * from `expo-modules-core` — returns null when the native side is absent.
- *
- * `NativeModules[name]` is kept as a belt-and-braces fallback for builds
- * where the Expo Modules runtime is not installed.
- */
-type OptionalNativeProbe = (name: string) => unknown | null;
-
-let _probe: OptionalNativeProbe | null | undefined;
-let _probePromise: Promise<OptionalNativeProbe | null> | null = null;
-const getNativeProbe = async (): Promise<OptionalNativeProbe | null> => {
-  if (_probe !== undefined) return _probe;
-  // Serialise concurrent callers onto a single import promise — prevents
-  // two concurrent `import('expo-modules-core')` evaluations racing each
-  // other, which in some test runtimes hits the un-mocked module path.
-  if (_probePromise) return _probePromise;
-  _probePromise = (async () => {
-    try {
-      const mod = (await import('expo-modules-core')) as unknown as {
-        requireOptionalNativeModule?: OptionalNativeProbe;
-      };
-      _probe = typeof mod.requireOptionalNativeModule === 'function'
-        ? mod.requireOptionalNativeModule
-        : null;
-    } catch {
-      _probe = null;
-    }
-    return _probe;
-  })();
-  return _probePromise;
-};
-
-const hasExpoNative = async (name: string): Promise<boolean> => {
-  const probe = await getNativeProbe();
-  if (typeof probe !== 'function') {
-    return Boolean(NativeModules[name]);
-  }
-  try {
-    return probe(name) != null;
-  } catch {
-    return false;
-  }
-};
-
-// ---------------------------------------------------------------------------
-// Lazy-loaded JS wrappers
-// ---------------------------------------------------------------------------
-
 type SharingModule = {
   isAvailableAsync: () => Promise<boolean>;
   shareAsync: (url: string, options?: Record<string, unknown>) => Promise<void>;
@@ -106,40 +53,51 @@ type MediaLibraryModule = {
   saveToLibraryAsync: (localUri: string) => Promise<void>;
 };
 
+// ---------------------------------------------------------------------------
+// Guarded sync module loading (injectable for tests)
+// ---------------------------------------------------------------------------
+
+let loadSharingModule: () => SharingModule = () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('expo-sharing') as SharingModule;
+let loadMediaLibraryModule: () => MediaLibraryModule = () =>
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  require('expo-media-library') as MediaLibraryModule;
+
 let _sharing: SharingModule | null | undefined;
-let _sharingPromise: Promise<SharingModule | null> | null = null;
-const getSharing = async (): Promise<SharingModule | null> => {
-  if (!(await hasExpoNative('ExpoSharing'))) return null;
-  if (_sharing !== undefined) return _sharing;
-  if (_sharingPromise) return _sharingPromise;
-  _sharingPromise = (async () => {
-    try {
-      const mod = (await import('expo-sharing')) as unknown as SharingModule;
-      _sharing = mod;
-    } catch {
-      _sharing = null;
-    }
-    return _sharing;
-  })();
-  return _sharingPromise;
+let _media: MediaLibraryModule | null | undefined;
+
+/** Test-only: substitutes module loaders and clears caches. */
+export const setShareModuleLoadersForTesting = (loaders: {
+  sharing?: () => SharingModule;
+  mediaLibrary?: () => MediaLibraryModule;
+}): void => {
+  if (loaders.sharing) loadSharingModule = loaders.sharing;
+  if (loaders.mediaLibrary) loadMediaLibraryModule = loaders.mediaLibrary;
+  _sharing = undefined;
+  _media = undefined;
 };
 
-let _media: MediaLibraryModule | null | undefined;
-let _mediaPromise: Promise<MediaLibraryModule | null> | null = null;
-const getMediaLibrary = async (): Promise<MediaLibraryModule | null> => {
-  if (!(await hasExpoNative('ExpoMediaLibrary'))) return null;
+const getSharing = (): SharingModule | null => {
+  if (!hasExpoNativeModule('ExpoSharing')) return null;
+  if (_sharing !== undefined) return _sharing;
+  try {
+    _sharing = loadSharingModule();
+  } catch {
+    _sharing = null;
+  }
+  return _sharing;
+};
+
+const getMediaLibrary = (): MediaLibraryModule | null => {
+  if (!hasExpoNativeModule('ExpoMediaLibrary')) return null;
   if (_media !== undefined) return _media;
-  if (_mediaPromise) return _mediaPromise;
-  _mediaPromise = (async () => {
-    try {
-      const mod = (await import('expo-media-library')) as unknown as MediaLibraryModule;
-      _media = mod;
-    } catch {
-      _media = null;
-    }
-    return _media;
-  })();
-  return _mediaPromise;
+  try {
+    _media = loadMediaLibraryModule();
+  } catch {
+    _media = null;
+  }
+  return _media;
 };
 
 // ---------------------------------------------------------------------------
@@ -153,7 +111,7 @@ const tryShare = async (fileUri: string, caption: string): Promise<boolean> =>
   });
 
 const trySaveToLibrary = async (fileUri: string): Promise<boolean> => {
-  const MediaLibrary = await getMediaLibrary();
+  const MediaLibrary = getMediaLibrary();
   if (!MediaLibrary) {
     logWarn('shareImage: expo-media-library native module unavailable');
     return false;
@@ -177,15 +135,12 @@ const trySaveToLibrary = async (fileUri: string): Promise<boolean> => {
 // ---------------------------------------------------------------------------
 
 /**
- * Warms the lazy native-module chain (expo-modules-core probe + expo-sharing
- * import) so the first share call isn't delayed by dynamic module loading —
- * in dev builds Metro serves `await import()` chunks over the bridge, which
- * can add seconds to the first tap. Call on mount of any screen with a share
- * or export affordance. Safe to call repeatedly (module-level caches); never
- * throws — a failed preload just falls back to loading at call time.
+ * Warms the sharing module. With sync require the module lives in the main
+ * bundle, so this is nearly free — kept as the mount-time hook contract so
+ * a future loading-strategy change stays behind this seam.
  */
 export function preloadSharing(): void {
-  void getSharing().catch(() => null);
+  getSharing();
 }
 
 export interface ShareFileOptions {
@@ -207,7 +162,7 @@ export async function shareFile(
   fileUri: string,
   options: ShareFileOptions,
 ): Promise<boolean> {
-  const Sharing = await getSharing();
+  const Sharing = getSharing();
   if (!Sharing) {
     logWarn('shareImage: expo-sharing native module unavailable');
     return false;

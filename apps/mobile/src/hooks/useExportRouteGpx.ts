@@ -30,6 +30,8 @@ export interface ExportRouteGpxInput {
   readonly waypoints?: readonly Coordinate[];
   /** Course name inside the GPX (e.g. a saved route's name). Defaults to the generic localized name. */
   readonly name?: string;
+  /** 'garmin' hands the file to Garmin Connect directly; default 'share' opens the share sheet. */
+  readonly target?: 'share' | 'garmin';
 }
 
 export type ExportRouteGpxResult =
@@ -117,6 +119,7 @@ export function useExportRouteGpx(): UseExportRouteGpxReturn {
         const result = await writeAndShareGpx(gpx, {
           fileBaseName: 'defensive-pedal-route',
           dialogTitle: t('preview.exportGpxDialogTitle'),
+          target: input.target,
         });
 
         if (!result.ok) {

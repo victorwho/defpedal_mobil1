@@ -45,6 +45,7 @@ import { mobileApi } from '../../src/lib/api';
 import { useAuthSession } from '../../src/providers/AuthSessionProvider';
 import { useConnectivity } from '../../src/providers/ConnectivityMonitor';
 import { useExportTripGpx } from '../../src/hooks/useExportTripGpx';
+import { useGpxDestinationChooser } from '../../src/hooks/useGpxDestinationChooser';
 import { useT } from '../../src/hooks/useTranslation';
 
 const MAP_HEIGHT = 300;
@@ -158,6 +159,8 @@ export default function TripDetailScreen() {
     consumeToast: consumeGpxToast,
   } = useExportTripGpx();
 
+  const { chooseGpxDestination } = useGpxDestinationChooser();
+
   const handleExportGpx = useCallback(() => {
     if (!trip) return;
     // The elevation profile was fetched for `elevationCoords` — the GPS
@@ -165,12 +168,15 @@ export default function TripDetailScreen() {
     // matching track; the builder drops it on any length mismatch.
     const profile = elevationQuery.data?.elevationProfile;
     const usedTrail = trailCoords.length >= 2;
-    void exportTripGpx({
-      trip,
-      trailElevations: usedTrail ? profile : undefined,
-      plannedElevations: usedTrail ? undefined : profile,
+    chooseGpxDestination((target) => {
+      void exportTripGpx({
+        trip,
+        trailElevations: usedTrail ? profile : undefined,
+        plannedElevations: usedTrail ? undefined : profile,
+        target,
+      });
     });
-  }, [trip, trailCoords, elevationQuery.data, exportTripGpx]);
+  }, [trip, trailCoords, elevationQuery.data, exportTripGpx, chooseGpxDestination]);
 
   // Ride impact — async, fails soft (we degrade to client-side derived stats).
   const impactQuery = useQuery({

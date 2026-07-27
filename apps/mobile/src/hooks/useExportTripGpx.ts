@@ -28,6 +28,8 @@ export interface ExportTripGpxInput {
   readonly trailElevations?: readonly number[];
   /** Per-point elevations for the planned polyline; emitted only when 1:1. */
   readonly plannedElevations?: readonly number[];
+  /** 'garmin' hands the file to Garmin Connect directly; default 'share' opens the share sheet. */
+  readonly target?: 'share' | 'garmin';
 }
 
 export type ExportTripGpxResult =
@@ -81,6 +83,7 @@ export function useExportTripGpx(): UseExportTripGpxReturn {
         const result = await writeAndShareGpx(gpx, {
           fileBaseName: 'defensive-pedal-ride',
           dialogTitle: t('history.exportGpxDialogTitle'),
+          target: input.target,
         });
 
         if (!result.ok) {

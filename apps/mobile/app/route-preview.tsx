@@ -53,6 +53,7 @@ import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
 import { useExportRouteGpx } from '../src/hooks/useExportRouteGpx';
+import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -316,17 +317,22 @@ function RoutePreviewScreen() {
     shareShortRouteFallback,
   ]);
 
+  const { chooseGpxDestination } = useGpxDestinationChooser();
+
   const handleExportGpx = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;
-    void exportGpx({
-      route: selectedRoute,
-      // Actual route start — honors a custom start override, unlike
-      // routeRequest.origin which is always the rider's GPS position.
-      origin: getPreviewOrigin(routeRequest),
-      destination: routeRequest.destination,
-      waypoints: routeRequest.waypoints,
+    chooseGpxDestination((target) => {
+      void exportGpx({
+        route: selectedRoute,
+        // Actual route start — honors a custom start override, unlike
+        // routeRequest.origin which is always the rider's GPS position.
+        origin: getPreviewOrigin(routeRequest),
+        destination: routeRequest.destination,
+        waypoints: routeRequest.waypoints,
+        target,
+      });
     });
-  }, [selectedRoute, routeRequest, exportGpx]);
+  }, [selectedRoute, routeRequest, exportGpx, chooseGpxDestination]);
 
   const handleDownloadOffline = useCallback(() => {
     if (!selectedRoute) return;
