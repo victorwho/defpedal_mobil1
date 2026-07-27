@@ -47,10 +47,12 @@ import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsMo
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge } from '../src/design-system/atoms/Badge';
+import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { ShareRouteButton } from '../src/design-system/atoms/ShareRouteButton';
+import { useExportRouteGpx } from '../src/hooks/useExportRouteGpx';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -115,6 +117,14 @@ function RoutePreviewScreen() {
     toastMessage: shareToastMessage,
     consumeToast: consumeShareToast,
   } = useShareRoute();
+
+  // ── GPX export (Garmin/Strava/Komoot course import) ──
+  const {
+    exportGpx,
+    isExporting: isExportingGpx,
+    toastMessage: gpxToastMessage,
+    consumeToast: consumeGpxToast,
+  } = useExportRouteGpx();
 
   // ── Offline download state ──
   type OfflineDownloadStatus = 'idle' | 'downloading' | 'complete' | 'error';
@@ -305,6 +315,18 @@ function RoutePreviewScreen() {
     shareHideEndpoints,
     shareShortRouteFallback,
   ]);
+
+  const handleExportGpx = useCallback(() => {
+    if (!selectedRoute || !routeRequest) return;
+    void exportGpx({
+      route: selectedRoute,
+      // Actual route start — honors a custom start override, unlike
+      // routeRequest.origin which is always the rider's GPS position.
+      origin: getPreviewOrigin(routeRequest),
+      destination: routeRequest.destination,
+      waypoints: routeRequest.waypoints,
+    });
+  }, [selectedRoute, routeRequest, exportGpx]);
 
   const handleDownloadOffline = useCallback(() => {
     if (!selectedRoute) return;
@@ -648,6 +670,22 @@ function RoutePreviewScreen() {
                 loading={isSharingRoute}
               />
             ) : null}
+            {selectedRoute ? (
+              <IconButton
+                icon={
+                  <Ionicons
+                    name="download-outline"
+                    size={22}
+                    color={colors.accent}
+                  />
+                }
+                onPress={handleExportGpx}
+                accessibilityLabel={t('preview.exportGpxA11y')}
+                variant="accent"
+                size="md"
+                disabled={isExportingGpx}
+              />
+            ) : null}
             {user ? (
               <Pressable
                 style={styles.saveRouteButton}
@@ -921,6 +959,17 @@ function RoutePreviewScreen() {
           message={shareToastMessage}
           variant="info"
           onDismiss={consumeShareToast}
+        />
+      </View>
+    ) : null}
+
+    {/* GPX export feedback toast (error only — success opens the share sheet) */}
+    {gpxToastMessage ? (
+      <View style={styles.shareToastContainer}>
+        <Toast
+          message={gpxToastMessage}
+          variant="info"
+          onDismiss={consumeGpxToast}
         />
       </View>
     ) : null}

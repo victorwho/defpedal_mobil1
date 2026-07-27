@@ -146,32 +146,11 @@ const getMediaLibrary = async (): Promise<MediaLibraryModule | null> => {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const tryShare = async (fileUri: string, caption: string): Promise<boolean> => {
-  const Sharing = await getSharing();
-  if (!Sharing) {
-    logWarn('shareImage: expo-sharing native module unavailable');
-    return false;
-  }
-
-  try {
-    const available = await Sharing.isAvailableAsync();
-    if (!available) {
-      logWarn('shareImage: Sharing.isAvailableAsync returned false');
-      return false;
-    }
-
-    // Expo's shareAsync resolves normally even on user cancel — we treat
-    // that as a successful share attempt (the sheet was shown).
-    await Sharing.shareAsync(fileUri, {
-      mimeType: 'image/png',
-      dialogTitle: caption || 'Share your ride',
-    });
-    return true;
-  } catch (error: unknown) {
-    logWarn('shareImage: shareAsync failed', error);
-    return false;
-  }
-};
+const tryShare = async (fileUri: string, caption: string): Promise<boolean> =>
+  shareFile(fileUri, {
+    mimeType: 'image/png',
+    dialogTitle: caption || 'Share your ride',
+  });
 
 const trySaveToLibrary = async (fileUri: string): Promise<boolean> => {
   const MediaLibrary = await getMediaLibrary();
@@ -196,6 +175,50 @@ const trySaveToLibrary = async (fileUri: string): Promise<boolean> => {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+export interface ShareFileOptions {
+  readonly mimeType: string;
+  readonly dialogTitle: string;
+  /** iOS Uniform Type Identifier, e.g. 'com.topografix.gpx'. */
+  readonly uti?: string;
+}
+
+/**
+ * Presents the system share sheet for an arbitrary local file. Never throws;
+ * returns `false` when the native module is absent, the sheet is unavailable,
+ * or `shareAsync` fails.
+ *
+ * Expo's `shareAsync` resolves normally even on user cancel — we treat that
+ * as a successful share attempt (the sheet was shown).
+ */
+export async function shareFile(
+  fileUri: string,
+  options: ShareFileOptions,
+): Promise<boolean> {
+  const Sharing = await getSharing();
+  if (!Sharing) {
+    logWarn('shareImage: expo-sharing native module unavailable');
+    return false;
+  }
+
+  try {
+    const available = await Sharing.isAvailableAsync();
+    if (!available) {
+      logWarn('shareImage: Sharing.isAvailableAsync returned false');
+      return false;
+    }
+
+    await Sharing.shareAsync(fileUri, {
+      mimeType: options.mimeType,
+      dialogTitle: options.dialogTitle,
+      ...(options.uti ? { UTI: options.uti } : {}),
+    });
+    return true;
+  } catch (error: unknown) {
+    logWarn('shareImage: shareAsync failed', error);
+    return false;
+  }
+}
 
 /**
  * Presents the system share sheet for the given local PNG file and saves the
