@@ -176,6 +176,18 @@ const trySaveToLibrary = async (fileUri: string): Promise<boolean> => {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Warms the lazy native-module chain (expo-modules-core probe + expo-sharing
+ * import) so the first share call isn't delayed by dynamic module loading —
+ * in dev builds Metro serves `await import()` chunks over the bridge, which
+ * can add seconds to the first tap. Call on mount of any screen with a share
+ * or export affordance. Safe to call repeatedly (module-level caches); never
+ * throws — a failed preload just falls back to loading at call time.
+ */
+export function preloadSharing(): void {
+  void getSharing().catch(() => null);
+}
+
 export interface ShareFileOptions {
   readonly mimeType: string;
   readonly dialogTitle: string;

@@ -84,6 +84,7 @@ export const es: TranslationKeys = {
     exportGpxA11y: 'Exportar la ruta como archivo GPX',
     exportGpxDialogTitle: 'Exportar ruta GPX',
     exportGpxFailed: 'No se pudo exportar el archivo GPX. Inténtalo de nuevo.',
+    exportGpxOffline: 'Sin conexión — exportar una ruta guardada requiere calcularla primero.',
     gpxRouteName: 'Ruta Defensive Pedal',
     gpxStart: 'Inicio',
     gpxDestination: 'Destino',
@@ -572,6 +573,8 @@ export const es: TranslationKeys = {
     currentStreak: 'Racha actual',
     longestStreak: 'Mejor racha',
     exportGpx: 'Exportar GPX',
+    exportGpxDialogTitle: 'Exportar recorrido GPX',
+    gpxRideName: 'Recorrido Defensive Pedal',
     viewTrips: 'Ver mis rutas',
     dailyQuiz: 'Cuestionario diario de seguridad',
     dailyQuizSub: 'Pon a prueba tus conocimientos de ciclismo',
@@ -605,6 +608,7 @@ export const es: TranslationKeys = {
     deleteConfirm: 'Eliminar',
     deleteFailed: 'No se pudo eliminar la ruta. Inténtalo de nuevo.',
     noGpsTrail: 'No hay traza GPS para esta ruta.',
+    exportGpxA11y: 'Exportar el recorrido como archivo GPX',
   },
 
   // ── Community ──

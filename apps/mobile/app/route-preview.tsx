@@ -673,11 +673,15 @@ function RoutePreviewScreen() {
             {selectedRoute ? (
               <IconButton
                 icon={
-                  <Ionicons
-                    name="download-outline"
-                    size={22}
-                    color={colors.accent}
-                  />
+                  isExportingGpx ? (
+                    <Spinner size={16} />
+                  ) : (
+                    <Ionicons
+                      name="download-outline"
+                      size={22}
+                      color={colors.accent}
+                    />
+                  )
                 }
                 onPress={handleExportGpx}
                 accessibilityLabel={t('preview.exportGpxA11y')}

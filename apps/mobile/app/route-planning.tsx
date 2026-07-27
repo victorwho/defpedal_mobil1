@@ -20,6 +20,7 @@ import { useBikeShops } from '../src/hooks/useBikeShops';
 import { useNearbyHazards } from '../src/hooks/useNearbyHazards';
 import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
+import { useExportSavedRouteGpx } from '../src/hooks/useExportSavedRouteGpx';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useResolvedCountry } from '../src/hooks/useResolvedCountry';
 import { useWeather } from '../src/hooks/useWeather';
@@ -39,6 +40,7 @@ import { NearbySheet } from '../src/design-system/organisms/NearbySheet';
 import { Button } from '../src/design-system/atoms/Button';
 import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
+import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -364,6 +366,14 @@ export default function RoutePlanningScreen() {
     void mobileApi.useSavedRoute(route.id);
     router.push('/route-preview');
   }, [setRouteRequest, setDestinationQuery, setDestinationHydrated, setWaypointQueries]);
+
+  // ── Saved-route GPX export (fetches the route, then shares the file) ──
+  const {
+    exportSavedRoute,
+    exportingRouteId,
+    toastMessage: gpxToastMessage,
+    consumeToast: consumeGpxToast,
+  } = useExportSavedRouteGpx();
 
   const handleMapTap = useCallback(() => {
     // Don't toggle UI while in any crosshair placement mode
@@ -1640,6 +1650,17 @@ export default function RoutePlanningScreen() {
       </View>
     ) : null}
 
+    {/* Saved-route GPX export toast (offline / error) */}
+    {gpxToastMessage ? (
+      <View style={styles.hazardToastContainer}>
+        <Toast
+          message={gpxToastMessage}
+          variant="info"
+          onDismiss={consumeGpxToast}
+        />
+      </View>
+    ) : null}
+
     {/* Hazard toast */}
     {hazardToast ? (
       <View style={styles.hazardToastContainer}>
@@ -1699,6 +1720,22 @@ export default function RoutePlanningScreen() {
                   {route.waypoints.length > 0 ? ` · ${route.waypoints.length} stop${route.waypoints.length > 1 ? 's' : ''}` : ''}
                 </Text>
               </View>
+              <Pressable
+                style={styles.savedRouteExportButton}
+                hitSlop={8}
+                disabled={exportingRouteId !== null}
+                onPress={() => {
+                  void exportSavedRoute(route);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Export saved route as GPX: ${route.name}`}
+              >
+                {exportingRouteId === route.id ? (
+                  <Spinner size={16} />
+                ) : (
+                  <Ionicons name="download-outline" size={18} color={colors.accent} />
+                )}
+              </Pressable>
               <Ionicons name="chevron-forward" size={16} color={gray[500]} />
             </Pressable>
           ))}
@@ -2073,6 +2110,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontSize: 12,
       fontFamily: fontFamily.body.regular,
       color: gray[400],
+    },
+    // 32px visual box + hitSlop 8 ≈ the 44pt touch-target minimum, without
+    // making the row taller.
+    savedRouteExportButton: {
+      width: 32,
+      height: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.full,
     },
     savedRoutesCancel: {
       alignItems: 'center',

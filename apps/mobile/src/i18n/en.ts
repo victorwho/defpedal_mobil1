@@ -82,6 +82,7 @@ export const en = {
     exportGpxA11y: 'Export route as GPX file',
     exportGpxDialogTitle: 'Export GPX route',
     exportGpxFailed: 'Couldn’t export the GPX file. Try again.',
+    exportGpxOffline: 'No connection — exporting a saved route needs to calculate it first.',
     gpxRouteName: 'Defensive Pedal route',
     gpxStart: 'Start',
     gpxDestination: 'Destination',
@@ -580,6 +581,8 @@ export const en = {
     currentStreak: 'Current streak',
     longestStreak: 'Longest streak',
     exportGpx: 'Export GPX',
+    exportGpxDialogTitle: 'Export GPX ride',
+    gpxRideName: 'Defensive Pedal ride',
     viewTrips: 'View My Trips',
     dailyQuiz: 'Daily Safety Quiz',
     dailyQuizSub: 'Test your cycling knowledge',
@@ -613,6 +616,7 @@ export const en = {
     deleteConfirm: 'Delete',
     deleteFailed: 'Could not delete the trip. Please try again.',
     noGpsTrail: 'No GPS trail recorded for this trip.',
+    exportGpxA11y: 'Export ride as GPX file',
   },
 
   // ── Community ──

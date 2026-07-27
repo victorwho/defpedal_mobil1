@@ -9,17 +9,13 @@
  * Mirrors `useShareRide`'s surface (exportGpx / isExporting / toastMessage /
  * consumeToast) so screens wire it the same way.
  */
-import { useCallback, useState } from 'react';
-// Static (not dynamic) import of expo-file-system — dynamic `await import()`
-// fails silently in Hermes release bytecode on this project (see error log /
-// impact-summary bug). Legacy API matches the rest of the codebase.
-import * as FileSystem from 'expo-file-system/legacy';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { Coordinate, RouteOption } from '@defensivepedal/core';
 import { decodePolyline, downsampleCoordinates } from '@defensivepedal/core';
 
 import { buildRouteGpx, type GpxWaypoint } from '../lib/gpx-export';
-import { shareFile } from '../lib/shareImage';
+import { preloadGpxShare, writeAndShareGpx } from '../lib/gpx-share';
 import { useT } from './useTranslation';
 
 // ---------------------------------------------------------------------------
@@ -32,6 +28,8 @@ export interface ExportRouteGpxInput {
   readonly origin: Coordinate;
   readonly destination: Coordinate;
   readonly waypoints?: readonly Coordinate[];
+  /** Course name inside the GPX (e.g. a saved route's name). Defaults to the generic localized name. */
+  readonly name?: string;
 }
 
 export type ExportRouteGpxResult =
@@ -56,8 +54,6 @@ export interface UseExportRouteGpxReturn {
  * keeps coordinates and elevations 1:1 so `<ele>` attaches per point.
  */
 const MAX_GPX_POINTS = 12_000;
-const GPX_MIME_TYPE = 'application/gpx+xml';
-const GPX_UTI = 'com.topografix.gpx';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -65,6 +61,12 @@ const GPX_UTI = 'com.topografix.gpx';
 
 export function useExportRouteGpx(): UseExportRouteGpxReturn {
   const t = useT();
+
+  // Warm the share-sheet module at mount so the tap-to-sheet delay is the
+  // file write alone, not dynamic module loading.
+  useEffect(() => {
+    preloadGpxShare();
+  }, []);
 
   const [isExporting, setIsExporting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -105,34 +107,24 @@ export function useExportRouteGpx(): UseExportRouteGpxReturn {
         ];
 
         const gpx = buildRouteGpx({
-          name: t('preview.gpxRouteName'),
+          name: input.name?.trim() || t('preview.gpxRouteName'),
           coordinates,
           elevations: input.route.elevationProfile,
           waypoints,
           time: new Date().toISOString(),
         });
 
-        const cacheDir = FileSystem.cacheDirectory;
-        if (!cacheDir) {
-          setToastMessage(t('preview.exportGpxFailed'));
-          return { exported: false, reason: 'unavailable' };
-        }
-
-        const fileUri = `${cacheDir}defensive-pedal-route-${Date.now()}.gpx`;
-        await FileSystem.writeAsStringAsync(fileUri, gpx);
-
-        const shared = await shareFile(fileUri, {
-          mimeType: GPX_MIME_TYPE,
+        const result = await writeAndShareGpx(gpx, {
+          fileBaseName: 'defensive-pedal-route',
           dialogTitle: t('preview.exportGpxDialogTitle'),
-          uti: GPX_UTI,
         });
 
-        if (!shared) {
-          setToastMessage(t('preview.exportGpxFailed'));
-          return { exported: false, reason: 'unavailable' };
+        if (!result.ok) {
+          setToastMessage(result.message ?? t('preview.exportGpxFailed'));
+          return { exported: false, reason: result.reason };
         }
 
-        return { exported: true, fileUri };
+        return { exported: true, fileUri: result.fileUri };
       } catch (error: unknown) {
         const message =
           error instanceof Error && error.message

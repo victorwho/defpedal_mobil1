@@ -84,6 +84,7 @@ export const ro: TranslationKeys = {
     exportGpxA11y: 'Exportă traseul ca fișier GPX',
     exportGpxDialogTitle: 'Exportă traseul GPX',
     exportGpxFailed: 'Nu am putut exporta fișierul GPX. Încearcă din nou.',
+    exportGpxOffline: 'Fără conexiune — exportul unui traseu salvat necesită mai întâi calcularea lui.',
     gpxRouteName: 'Traseu Defensive Pedal',
     gpxStart: 'Start',
     gpxDestination: 'Destinație',
@@ -572,6 +573,8 @@ export const ro: TranslationKeys = {
     currentStreak: 'Serie curentă',
     longestStreak: 'Cea mai lungă serie',
     exportGpx: 'Exportă GPX',
+    exportGpxDialogTitle: 'Exportă cursa GPX',
+    gpxRideName: 'Cursă Defensive Pedal',
     viewTrips: 'Vezi cursele mele',
     dailyQuiz: 'Quiz zilnic de siguranță',
     dailyQuizSub: 'Testează-ți cunoștințele de ciclism',
@@ -605,6 +608,7 @@ export const ro: TranslationKeys = {
     deleteConfirm: 'Șterge',
     deleteFailed: 'Cursa nu a putut fi ștearsă. Încearcă din nou.',
     noGpsTrail: 'Nu există traseu GPS pentru această cursă.',
+    exportGpxA11y: 'Exportă cursa ca fișier GPX',
   },
 
   // ── Community ──

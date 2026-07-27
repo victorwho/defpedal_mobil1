@@ -105,31 +105,64 @@ ${trackPoints}
 // Completed-trip GPX (GPS trail + planned track)
 // ---------------------------------------------------------------------------
 
-export const buildGpxString = (trip: TripHistoryItem): string => {
-  const name = `Trip ${trip.tripId.slice(0, 8)} - ${trip.routingMode}`;
-  const time = trip.startedAt;
+export interface TripGpxOptions {
+  /** Overrides the default "Trip <id> - <mode>" name. */
+  readonly name?: string;
+  /** Per-breadcrumb elevations (meters); emitted only when 1:1 with gpsBreadcrumbs. */
+  readonly trailElevations?: readonly number[];
+  /** Per-point elevations for the planned polyline; emitted only when 1:1. */
+  readonly plannedElevations?: readonly number[];
+}
 
-  const gpsTrackPoints = trip.gpsBreadcrumbs
-    .map(
-      (pt) =>
-        `      <trkpt lat="${pt.lat}" lon="${pt.lon}"><time>${time}</time></trkpt>`,
+const renderTrack = (
+  name: string,
+  points: ReadonlyArray<{ lat: number; lon: number }>,
+  elevations?: readonly number[],
+): string => {
+  const withElevations =
+    elevations !== undefined && elevations.length === points.length;
+  const trackPoints = points
+    .map((pt, index) =>
+      renderTrackPoint(pt.lat, pt.lon, withElevations ? elevations[index] : undefined),
     )
     .join('\n');
+  return `
+  <trk>
+    <name>${escapeXml(name)}</name>
+    <trkseg>
+${trackPoints}
+    </trkseg>
+  </trk>`;
+};
+
+export const buildGpxString = (
+  trip: TripHistoryItem,
+  options?: TripGpxOptions,
+): string => {
+  const name =
+    options?.name?.trim() || `Trip ${trip.tripId.slice(0, 8)} - ${trip.routingMode}`;
+
+  // No per-trkpt <time>: breadcrumbs carry no timestamps, and stamping every
+  // point with startedAt (the old behavior) produced a zero-duration track
+  // that confuses importers computing speed. The ride time lives in metadata.
+  const trailTrack =
+    trip.gpsBreadcrumbs.length >= 2
+      ? renderTrack(
+          `${name} - GPS Trail`,
+          trip.gpsBreadcrumbs,
+          options?.trailElevations,
+        )
+      : '';
 
   let plannedTrack = '';
   if (trip.plannedRoutePolyline6) {
     // decodePolyline returns [lon, lat] pairs — swap for GPX which expects lat/lon attributes
     const decoded = decodePolyline(trip.plannedRoutePolyline6);
-    const plannedPoints = decoded
-      .map(([lon, lat]) => `      <trkpt lat="${lat}" lon="${lon}"></trkpt>`)
-      .join('\n');
-    plannedTrack = `
-  <trk>
-    <name>${escapeXml(name)} - Planned Route</name>
-    <trkseg>
-${plannedPoints}
-    </trkseg>
-  </trk>`;
+    plannedTrack = renderTrack(
+      `${name} - Planned Route`,
+      decoded.map(([lon, lat]) => ({ lat, lon })),
+      options?.plannedElevations,
+    );
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -137,13 +170,7 @@ ${plannedPoints}
   xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${escapeXml(name)}</name>
-    <time>${time}</time>
-  </metadata>
-  <trk>
-    <name>${escapeXml(name)} - GPS Trail</name>
-    <trkseg>
-${gpsTrackPoints}
-    </trkseg>
-  </trk>${plannedTrack}
+    <time>${trip.startedAt}</time>
+  </metadata>${trailTrack}${plannedTrack}
 </gpx>`;
 };

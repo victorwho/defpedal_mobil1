@@ -168,4 +168,43 @@ describe('buildGpxString — trip export', () => {
     expect(gpx).toContain('GPS Trail');
     expect(gpx).not.toContain('Planned Route');
   });
+
+  it('omits the GPS trail track when there are fewer than 2 breadcrumbs', () => {
+    const gpx = buildGpxString({ ...trip, gpsBreadcrumbs: [] });
+
+    expect(gpx).not.toContain('GPS Trail');
+    expect(gpx).toContain('Planned Route');
+  });
+
+  it('does not stamp per-point timestamps (zero-duration track trap)', () => {
+    const gpx = buildGpxString(trip);
+
+    // Time lives in metadata only — a repeated startedAt on every trkpt
+    // makes importers compute infinite speed.
+    expect(gpx.match(/<time>/g)).toHaveLength(1);
+  });
+
+  it('accepts a name override and per-track elevations', () => {
+    const gpx = buildGpxString(trip, {
+      name: 'Sunday loop',
+      trailElevations: [80, 85],
+      plannedElevations: [81, 90],
+    });
+
+    expect(gpx).toContain('<name>Sunday loop - GPS Trail</name>');
+    expect(gpx).toContain('<name>Sunday loop - Planned Route</name>');
+    expect(gpx).toContain('<trkpt lat="44.43" lon="26.1"><ele>80</ele></trkpt>');
+    expect(gpx).toContain('<ele>85</ele>');
+    expect(gpx).toContain('<trkpt lat="44.43" lon="26.1"><ele>81</ele></trkpt>');
+    expect(gpx).toContain('<ele>90</ele>');
+  });
+
+  it('drops elevations that mismatch their track length', () => {
+    const gpx = buildGpxString(trip, {
+      trailElevations: [80],
+      plannedElevations: [80, 85, 90],
+    });
+
+    expect(gpx).not.toContain('<ele>');
+  });
 });

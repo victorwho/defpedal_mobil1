@@ -44,6 +44,7 @@ import {
 import { mobileApi } from '../../src/lib/api';
 import { useAuthSession } from '../../src/providers/AuthSessionProvider';
 import { useConnectivity } from '../../src/providers/ConnectivityMonitor';
+import { useExportTripGpx } from '../../src/hooks/useExportTripGpx';
 import { useT } from '../../src/hooks/useTranslation';
 
 const MAP_HEIGHT = 300;
@@ -148,6 +149,28 @@ export default function TripDetailScreen() {
     staleTime: 24 * 60 * 60 * 1000,
     retry: 1,
   });
+
+  // ── GPX export (ride record for Garmin/Strava/Komoot) ──
+  const {
+    exportGpx: exportTripGpx,
+    isExporting: isExportingGpx,
+    toastMessage: gpxToastMessage,
+    consumeToast: consumeGpxToast,
+  } = useExportTripGpx();
+
+  const handleExportGpx = useCallback(() => {
+    if (!trip) return;
+    // The elevation profile was fetched for `elevationCoords` — the GPS
+    // trail when one exists, else the planned polyline. Route it to the
+    // matching track; the builder drops it on any length mismatch.
+    const profile = elevationQuery.data?.elevationProfile;
+    const usedTrail = trailCoords.length >= 2;
+    void exportTripGpx({
+      trip,
+      trailElevations: usedTrail ? profile : undefined,
+      plannedElevations: usedTrail ? undefined : profile,
+    });
+  }, [trip, trailCoords, elevationQuery.data, exportTripGpx]);
 
   // Ride impact — async, fails soft (we degrade to client-side derived stats).
   const impactQuery = useQuery({
@@ -336,24 +359,48 @@ export default function TripDetailScreen() {
         variant="back"
         title={formatDateLong(trip.startedAt)}
         rightAccessory={
-          <Pressable
-            onPress={handleShare}
-            disabled={isSharing}
-            accessibilityRole="button"
-            accessibilityLabel={t('share.shareRide')}
-            accessibilityState={{ disabled: isSharing }}
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.headerShareButton,
-              pressed && !isSharing && styles.headerShareButtonPressed,
-            ]}
-          >
-            <Ionicons
-              name="share-social"
-              size={22}
-              color={isSharing ? gray[500] : brandColors.textInverse}
-            />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              onPress={handleExportGpx}
+              disabled={isExportingGpx}
+              accessibilityRole="button"
+              accessibilityLabel={t('tripsScreen.exportGpxA11y')}
+              accessibilityState={{ disabled: isExportingGpx }}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.headerShareButton,
+                pressed && !isExportingGpx && styles.headerShareButtonPressed,
+              ]}
+            >
+              {isExportingGpx ? (
+                <ActivityIndicator size="small" color={brandColors.textInverse} />
+              ) : (
+                <Ionicons
+                  name="download-outline"
+                  size={22}
+                  color={brandColors.textInverse}
+                />
+              )}
+            </Pressable>
+            <Pressable
+              onPress={handleShare}
+              disabled={isSharing}
+              accessibilityRole="button"
+              accessibilityLabel={t('share.shareRide')}
+              accessibilityState={{ disabled: isSharing }}
+              hitSlop={10}
+              style={({ pressed }) => [
+                styles.headerShareButton,
+                pressed && !isSharing && styles.headerShareButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name="share-social"
+                size={22}
+                color={isSharing ? gray[500] : brandColors.textInverse}
+              />
+            </Pressable>
+          </View>
         }
       />
       <ScrollView
@@ -550,6 +597,15 @@ export default function TripDetailScreen() {
             message={shareToast}
             variant="warning"
             onDismiss={() => setShareToast(null)}
+          />
+        </View>
+      ) : null}
+      {gpxToastMessage ? (
+        <View style={styles.toastContainer} pointerEvents="box-none">
+          <Toast
+            message={gpxToastMessage}
+            variant="warning"
+            onDismiss={consumeGpxToast}
           />
         </View>
       ) : null}
@@ -803,6 +859,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       right: 0,
       bottom: 80,
       alignItems: 'center',
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
     },
     // Mirrors ScreenHeader.backButton — same 44px yellow accent circle so
     // the share affordance is unmissable. A subtler styling round-tripped

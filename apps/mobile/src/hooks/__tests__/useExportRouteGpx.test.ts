@@ -25,6 +25,7 @@ vi.mock('expo-file-system/legacy', () => ({
 const shareFileSpy = vi.fn<(uri: string, opts: unknown) => Promise<boolean>>();
 vi.mock('../../lib/shareImage', () => ({
   shareFile: (uri: string, opts: unknown) => shareFileSpy(uri, opts),
+  preloadSharing: () => undefined,
 }));
 
 // t() passthrough — assertions target keys, not copy, so locale files can
