@@ -35,6 +35,7 @@ import {
 import { PRIVACY_URL, TERMS_URL } from '../src/lib/legal-urls';
 import { markPasswordResetRequested } from '../src/lib/passwordReset';
 import { requestPasswordReset, type GoogleSignInErrorCode } from '../src/lib/supabase';
+import { telemetry } from '../src/lib/telemetry';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
 
@@ -131,6 +132,15 @@ export default function AuthScreen() {
       if (result.error) {
         setErrorMessage(result.error.message);
         return;
+      }
+
+      // Registration funnel: only the sign-UP branch is a new account. OAuth
+      // successes on this screen are deliberately NOT captured as
+      // signup_completed — Google/Apple here can't distinguish a returning
+      // sign-in from a first signup, and mislabeled events poison the funnel.
+      // (Wall conversions are captured in onboarding/signup-prompt.tsx.)
+      if (mode === 'sign-up') {
+        telemetry.capture('signup_completed', { method: 'email', source: 'auth' });
       }
 
       setStatusMessage(

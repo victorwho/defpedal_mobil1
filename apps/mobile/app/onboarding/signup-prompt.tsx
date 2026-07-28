@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -21,6 +21,7 @@ import { useT } from '../../src/hooks/useTranslation';
 import { mobileApi } from '../../src/lib/api';
 import { PRIVACY_URL, TERMS_URL } from '../../src/lib/legal-urls';
 import { navigateAfterOnboarding } from '../../src/lib/post-onboarding-nav';
+import { telemetry } from '../../src/lib/telemetry';
 import { useAuthSessionOptional } from '../../src/providers/AuthSessionProvider';
 import { useAppStore } from '../../src/store/appStore';
 
@@ -56,8 +57,18 @@ export default function OnboardingSignupPromptScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Registration-funnel top: one event per wall mount. Pairs with
+  // signup_completed below (PostHog "Registration funnel" dashboard).
+  useEffect(() => {
+    telemetry.capture('signup_wall_shown');
+  }, []);
+
   // Shared post-sign-in bookkeeping for every provider (Google, Apple).
-  const completeSignup = async () => {
+  const completeSignup = async (method: 'google' | 'apple') => {
+    // Fired only after the provider session exists, so every event is a real
+    // wall conversion (anonymous session → account) regardless of whether the
+    // account itself is new or returning.
+    telemetry.capture('signup_completed', { method, source: 'wall' });
     setOnboardingCompleted(true);
     resetAnonymousOpenCount();
 
@@ -99,7 +110,7 @@ export default function OnboardingSignupPromptScreen() {
         return;
       }
 
-      await completeSignup();
+      await completeSignup('google');
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {
@@ -113,7 +124,7 @@ export default function OnboardingSignupPromptScreen() {
   const handleAppleSignInSuccess = async () => {
     setIsSubmitting(true);
     try {
-      await completeSignup();
+      await completeSignup('apple');
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Sign-in failed.');
     } finally {
