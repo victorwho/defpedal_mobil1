@@ -46,6 +46,10 @@ export const hazardExpireResponseSchema = {
     // delete_stale_anonymous_push_tokens(90). -1 = the RPC call failed
     // (best-effort — never fails the hazard cron).
     prunedAnonPushTokens: { type: 'integer' },
+    // Stale-trip reaper (GPS audit 2026-07-29): in_progress trips >48h old
+    // stamped end_action='abandoned' (ended_at stays NULL). -1 = the reap
+    // failed (best-effort — never fails the hazard cron).
+    reapedStaleTrips: { type: 'integer' },
     runAt: { type: 'string', format: 'date-time' },
   },
 } as const;

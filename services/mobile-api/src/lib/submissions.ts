@@ -227,6 +227,11 @@ export const finishTripRecord = async (
         ended_at: request.endedAt,
         early_end_reason: request.earlyEndReason ?? null,
         early_end_reason_note: request.earlyEndReasonNote ?? null,
+        // Always written, even when the client didn't send one (null =
+        // "ended by a pre-endAction client"). This also clears a reaper's
+        // 'abandoned' stamp when a genuinely late trip_end arrives from a
+        // device that came back online.
+        end_action: request.endAction ?? null,
       })
       .eq('id', request.tripId)
       .eq('user_id', userId);

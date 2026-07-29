@@ -540,6 +540,9 @@ describe('mobile-api v1 routes', () => {
         reason: 'completed',
         earlyEndReason: null,
         earlyEndReasonNote: null,
+        // Pre-endAction clients don't send one; the route persists null
+        // ("unknown") rather than guessing (added 2026-07-29, GPS audit).
+        endAction: null,
       }, 'user-123');
     } finally {
       await app.close();

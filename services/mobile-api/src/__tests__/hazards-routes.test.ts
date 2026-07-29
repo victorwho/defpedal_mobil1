@@ -394,13 +394,17 @@ describe('POST /v1/hazards/expire', () => {
     process.env.CRON_SECRET = previous;
   });
 
-  it('returns 200 with deletedCount + purgedCount + runAt on success', async () => {
+  it('returns 200 with deletedCount + purgedCount + reapedStaleTrips + runAt on success', async () => {
     // Purge branch A (score<=-3, last_confirmed_at IS NULL).
     enqueueResult({ data: [{ id: 'p1' }], error: null });
     // Purge branch B (score<=-3, last_confirmed_at < dwellCutoff).
     enqueueResult({ data: [{ id: 'p2' }], error: null });
     // Grace DELETE (expires_at < now-45d).
     enqueueResult({ data: [{ id: 'd1' }], error: null });
+    // Anonymous push-token prune RPC.
+    enqueueResult({ data: 4, error: null });
+    // Stale-trip reaper UPDATE (in_progress >48h → end_action='abandoned').
+    enqueueResult({ data: [{ id: 't1' }, { id: 't2' }], error: null });
 
     const app = buildTestApp();
     await app.ready();
@@ -411,8 +415,28 @@ describe('POST /v1/hazards/expire', () => {
     const body = res.json();
     expect(body.purgedCount).toBe(2);
     expect(body.deletedCount).toBe(1);
+    expect(body.prunedAnonPushTokens).toBe(4);
+    expect(body.reapedStaleTrips).toBe(2);
     expect(typeof body.runAt).toBe('string');
     expect(new Date(body.runAt).toISOString()).toBe(body.runAt);
+    await app.close();
+  });
+
+  it('a stale-trip reap failure is best-effort — cron still succeeds with reapedStaleTrips=-1', async () => {
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: 0, error: null });
+    // Reaper UPDATE fails.
+    enqueueResult({ data: null, error: { message: 'trips table on fire' } });
+
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST', url: '/v1/hazards/expire', headers: cronHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().reapedStaleTrips).toBe(-1);
     await app.close();
   });
 

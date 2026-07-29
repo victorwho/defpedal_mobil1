@@ -1322,6 +1322,7 @@ export const buildV1Routes = (
             deletedCount: number;
             purgedCount: number;
             prunedAnonPushTokens: number;
+            reapedStaleTrips: number;
             runAt: string;
           }
         | ErrorResponse;
@@ -1431,18 +1432,56 @@ export const buildV1Routes = (
         );
       }
 
+      // Stale-trip reaper (GPS audit 2026-07-29): trips whose trip_end never
+      // arrived — the device churned mid-ride or was killed before the queue
+      // drained — sit `in_progress` forever and are indistinguishable from
+      // active rides in analytics. Stamp them end_action='abandoned' after
+      // 48h (no active ride lasts that long). ended_at deliberately stays
+      // NULL so duration analytics never see a fake 14h "ride"; a genuinely
+      // late trip_end from a returning device overwrites the stamp because
+      // finishTripRecord always writes end_action. Piggybacks on this daily
+      // cron like the push-token hygiene — best-effort, never breaks expiry.
+      let reapedStaleTrips = -1;
+      try {
+        const reapCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+        const { data: reapedRows, error: reapError } = await supabaseAdmin
+          .from('trips')
+          .update({ end_action: 'abandoned' })
+          .is('ended_at', null)
+          .is('end_action', null)
+          .lt('started_at', reapCutoff)
+          .select('id');
+        if (reapError) {
+          request.log.warn(
+            { event: 'stale_trip_reap_failed', error: reapError.message },
+            'stale-trip reaper failed',
+          );
+        } else {
+          reapedStaleTrips = reapedRows?.length ?? 0;
+        }
+      } catch (reapErr) {
+        request.log.warn(
+          {
+            event: 'stale_trip_reap_failed',
+            error: reapErr instanceof Error ? reapErr.message : 'unknown',
+          },
+          'stale-trip reaper failed',
+        );
+      }
+
       request.log.info(
         {
           event: 'hazards_expire_run',
           purgedCount,
           deletedCount,
           prunedAnonPushTokens,
+          reapedStaleTrips,
           runAt: nowIso,
         },
         'Hazard expire cron completed.',
       );
 
-      return { deletedCount, purgedCount, prunedAnonPushTokens, runAt: nowIso };
+      return { deletedCount, purgedCount, prunedAnonPushTokens, reapedStaleTrips, runAt: nowIso };
     });
 
     app.post<{ Body: NavigationFeedbackBody; Reply: WriteAckResponse | ErrorResponse }>(

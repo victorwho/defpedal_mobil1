@@ -353,7 +353,33 @@ export interface TripEndRequest {
   earlyEndReason?: EarlyEndReason | null;
   /** Free-text note when earlyEndReason === 'other'. */
   earlyEndReasonNote?: string | null;
+  /**
+   * How the end was triggered — the analytics discriminator that separates
+   * deliberate discards from data loss (GPS audit 2026-07-29). Optional so
+   * pre-endAction clients keep working; null persists as "unknown".
+   */
+  endAction?: TripEndAction | null;
 }
+
+/**
+ * The surface/choice that ended the ride:
+ * - 'saved'            — in-ride End Ride → Save (and arrival auto-complete)
+ * - 'discarded'        — in-ride End Ride → Discard
+ * - 'prompt_saved'     — resume prompt → "Save ride"
+ * - 'prompt_discarded' — resume prompt → "Discard ride"
+ * - 'auto_recovered'   — resume guard's automatic close-out (cached route
+ *                        missing; trail preserved like the old kill recovery)
+ *
+ * A seventh value, 'abandoned', exists only in the database: the server's
+ * stale-trip reaper stamps it on trips whose trip_end never arrived. Clients
+ * never send it, so it is deliberately NOT part of this union.
+ */
+export type TripEndAction =
+  | 'saved'
+  | 'discarded'
+  | 'prompt_saved'
+  | 'prompt_discarded'
+  | 'auto_recovered';
 
 /**
  * Why a rider ended turn-by-turn guidance before reaching the destination.

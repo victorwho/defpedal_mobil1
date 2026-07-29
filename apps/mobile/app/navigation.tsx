@@ -454,6 +454,10 @@ function NavigationScreen() {
       reason,
       earlyEndReason,
       earlyEndReasonNote,
+      // Analytics discriminator (GPS audit 2026-07-29): lets the DB separate
+      // deliberate discards from lost rides. Arrival auto-complete counts as
+      // 'saved' — reason='completed' already marks it.
+      endAction: discard ? 'discarded' : 'saved',
     });
 
     // Discarded rides skip the trip_track + trip_share writes. The trip lifecycle

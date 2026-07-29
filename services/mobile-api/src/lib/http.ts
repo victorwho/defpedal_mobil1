@@ -700,6 +700,19 @@ export const tripEndRequestSchema = {
       ],
     },
     earlyEndReasonNote: { type: ['string', 'null'], maxLength: 280 },
+    // 'abandoned' is deliberately absent — it is server-assigned by the
+    // stale-trip reaper and must never arrive from a client.
+    endAction: {
+      type: ['string', 'null'],
+      enum: [
+        'saved',
+        'discarded',
+        'prompt_saved',
+        'prompt_discarded',
+        'auto_recovered',
+        null,
+      ],
+    },
   },
 } as const;
 
@@ -993,6 +1006,7 @@ export const normalizeTripEndRequest = (body: TripEndBody): TripEndRequest => ({
   reason: body.reason,
   earlyEndReason: body.earlyEndReason ?? null,
   earlyEndReasonNote: body.earlyEndReasonNote ?? null,
+  endAction: body.endAction ?? null,
 });
 
 export const normalizeNavigationFeedbackRequest = (

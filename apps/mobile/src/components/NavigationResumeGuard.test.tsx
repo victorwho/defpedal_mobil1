@@ -252,7 +252,10 @@ describe('NavigationResumeGuard', () => {
 
     expect(finishSpy).not.toHaveBeenCalled();
     const queued = useAppStore.getState().queuedMutations;
-    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    const endMutation = queued.find((m) => m.type === 'trip_end');
+    expect(endMutation).toBeTruthy();
+    // Automatic close-out stamps the analytics discriminator.
+    expect((endMutation!.payload as { endAction?: string }).endAction).toBe('auto_recovered');
     // Automatic cleanup preserves the GPS trail (ride lands in History).
     expect(queued.some((m) => m.type === 'trip_track')).toBe(true);
     expect(useAppStore.getState().appState).toBe('IDLE');
@@ -335,7 +338,9 @@ describe('NavigationResumeGuard', () => {
     expect(finishSpy).not.toHaveBeenCalled();
     const state = useAppStore.getState();
     const queued = state.queuedMutations;
-    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    const endMutation = queued.find((m) => m.type === 'trip_end');
+    expect(endMutation).toBeTruthy();
+    expect((endMutation!.payload as { endAction?: string }).endAction).toBe('prompt_saved');
     // The whole point of Save ride: the recorded trail survives into a
     // trip_track (end_reason app_killed → lands in History like the
     // automatic kill-recovery path).
@@ -384,7 +389,9 @@ describe('NavigationResumeGuard', () => {
     const state = useAppStore.getState();
     const queued = state.queuedMutations;
     // The orphaned server trip is closed...
-    expect(queued.some((m) => m.type === 'trip_end')).toBe(true);
+    const endMutation = queued.find((m) => m.type === 'trip_end');
+    expect(endMutation).toBeTruthy();
+    expect((endMutation!.payload as { endAction?: string }).endAction).toBe('prompt_discarded');
     // ...but an explicit discard mirrors in-ride discard semantics: no
     // History trail, no impact/XP.
     expect(queued.some((m) => m.type === 'trip_track')).toBe(false);

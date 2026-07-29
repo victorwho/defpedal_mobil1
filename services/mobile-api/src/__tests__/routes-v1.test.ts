@@ -511,6 +511,47 @@ describe('POST /v1/trips/end', () => {
 
     await app.close();
   });
+
+  it('passes endAction through to finishTripRecord', async () => {
+    const finishTripRecord = vi.fn().mockResolvedValue({
+      clientTripId: 'client-trip-001',
+      tripId: 'server-trip-1',
+      acceptedAt: new Date().toISOString(),
+    });
+    const app = buildTestApp({ finishTripRecord });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/end',
+      headers: authHeaders,
+      payload: { ...validTripEndBody, endAction: 'prompt_saved' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(finishTripRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ endAction: 'prompt_saved' }),
+      expect.any(String),
+    );
+
+    await app.close();
+  });
+
+  it('rejects the server-only end action "abandoned"', async () => {
+    // 'abandoned' is stamped exclusively by the stale-trip reaper — a client
+    // sending it must be rejected, or a buggy build could fake reaped trips.
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/end',
+      headers: authHeaders,
+      payload: { ...validTripEndBody, endAction: 'abandoned' },
+    });
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
 });
 
 // ---------------------------------------------------------------------------

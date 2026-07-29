@@ -80,22 +80,28 @@ const getSessionAgeMs = (session: {
 };
 
 /**
- * Close out an interrupted/discarded ride: queue trip_end (and, when
- * `saveTrack` is set, the trip_track GPS trail with end_reason 'app_killed')
- * for the active trip, then reset the flow to IDLE and clear the route cache.
+ * Close out an interrupted/discarded ride: queue trip_end (and, unless the
+ * rider explicitly discarded, the trip_track GPS trail with end_reason
+ * 'app_killed') for the active trip, then reset the flow to IDLE and clear
+ * the route cache.
  *
- * `saveTrack: true`  — automatic cleanup paths (no user input): preserve the
- *                      old kill-recovery behavior so the interrupted ride
- *                      still shows up in History.
- * `saveTrack: false` — explicit user Discard: mirror the in-ride discard
- *                      semantics (trip closed server-side, nothing in
- *                      History, no impact/XP).
+ * `endAction` doubles as the behavior switch and the analytics discriminator
+ * recorded on trips.end_action (GPS audit 2026-07-29):
+ * - 'auto_recovered'   — automatic cleanup (no user input): preserve the old
+ *                        kill-recovery behavior so the ride shows in History.
+ * - 'prompt_saved'     — rider chose "Save ride": same save path.
+ * - 'prompt_discarded' — rider chose "Discard ride": mirror the in-ride
+ *                        discard semantics (trip closed server-side, nothing
+ *                        in History, no impact/XP).
  *
  * A missing activeTripClientId (defensive — since the GPS-audit P0-1 fix
  * every ride enqueues trip_start and sets the id, session or not) means
  * there is no server trip to close; only the local reset runs.
  */
-const closeInterruptedRide = async (saveTrack: boolean): Promise<void> => {
+const closeInterruptedRide = async (
+  endAction: 'prompt_saved' | 'prompt_discarded' | 'auto_recovered',
+): Promise<void> => {
+  const saveTrack = endAction !== 'prompt_discarded';
   // Drain any background-recorded samples (the screen-off / process-dead
   // stretch) into the trail BEFORE building the trip_track, so a kill-recovered
   // ride keeps the distance it covered while locked (review 2026-06-12 P1).
@@ -129,6 +135,7 @@ const closeInterruptedRide = async (saveTrack: boolean): Promise<void> => {
         clientTripId,
         endedAt,
         reason: 'stopped',
+        endAction,
       });
     }
 
@@ -203,7 +210,7 @@ export const NavigationResumeGuard: React.FC = () => {
       // the ride still lands in History, like the old kill recovery).
       if (cachedRoute == null) {
         telemetry.capture('resume_guard_outcome', { choice: 'auto_close_save' });
-        await closeInterruptedRide(true);
+        await closeInterruptedRide('auto_recovered');
         return;
       }
 
@@ -234,14 +241,14 @@ export const NavigationResumeGuard: React.FC = () => {
     // Same close-out as the automatic kill-recovery path: trip_end +
     // trip_track ('app_killed') → the ride lands in History with its trail.
     telemetry.capture('resume_guard_outcome', { choice: 'save' });
-    void closeInterruptedRide(true);
+    void closeInterruptedRide('prompt_saved');
   }, []);
 
   const handleDiscard = useCallback(() => {
     setShowPrompt(false);
     // Explicit discard: close the server trip, skip the History trail.
     telemetry.capture('resume_guard_outcome', { choice: 'discard' });
-    void closeInterruptedRide(false);
+    void closeInterruptedRide('prompt_discarded');
   }, []);
 
   const t = useT();
