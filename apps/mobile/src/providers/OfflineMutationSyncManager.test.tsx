@@ -28,8 +28,13 @@ vi.mock('../lib/env', () => ({
   mobileEnv: { mobileApiUrl: 'https://api.test' },
 }));
 
+const mockTelemetryFlush = vi.fn();
 vi.mock('../lib/telemetry', () => ({
-  telemetry: { capture: vi.fn(), captureError: vi.fn() },
+  telemetry: {
+    capture: vi.fn(),
+    captureError: vi.fn(),
+    flush: (...args: unknown[]) => mockTelemetryFlush(...args),
+  },
 }));
 
 vi.mock('./ConnectivityMonitor', () => ({
@@ -103,6 +108,9 @@ describe('OfflineMutationSyncManager — immediate drain on trip-critical enqueu
 
     expect(mockStartTrip).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().queuedMutations).toHaveLength(0);
+    // Trip-critical delivery flushes telemetry so the evidence outlives an
+    // immediate app-kill (GPS audit 2026-07-29).
+    expect(mockTelemetryFlush).toHaveBeenCalled();
     view.unmount();
   });
 
@@ -161,6 +169,8 @@ describe('OfflineMutationSyncManager — immediate drain on trip-critical enqueu
       await vi.advanceTimersByTimeAsync(SYNC_INTERVAL_MS);
     });
     expect(mockVoteHazard).toHaveBeenCalledTimes(1);
+    // Non-trip-critical deliveries don't force a telemetry flush.
+    expect(mockTelemetryFlush).not.toHaveBeenCalled();
     view.unmount();
   });
 

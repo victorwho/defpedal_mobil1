@@ -156,6 +156,10 @@ const closeInterruptedRide = async (
 
   state.resetFlow();
   void clearCachedRoute();
+  // The resume_guard_outcome capture (and anything else pending) must
+  // outlive the process — riders often close the app right after answering
+  // the prompt, and an unflushed batch dies with it (GPS audit 2026-07-29).
+  void telemetry.flush();
 };
 
 // ---------------------------------------------------------------------------

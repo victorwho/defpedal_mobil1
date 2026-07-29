@@ -279,6 +279,13 @@ export const OfflineMutationSyncManager = () => {
                 0,
               ),
             });
+            // A trip-critical delivery is the evidence a loss investigation
+            // needs ("the ride made it"), and it lands at exactly the moment
+            // riders swipe the app away — flush so the batch outlives the
+            // process (GPS audit 2026-07-29). Fire-and-forget.
+            if (TRIP_CRITICAL_TYPES.has(mutation.type)) {
+              void telemetry.flush();
+            }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Offline sync failed.';
             const nextRetryCount = mutation.retryCount + 1;
@@ -325,6 +332,11 @@ export const OfflineMutationSyncManager = () => {
                 // after 5 transient retries" in Sentry/PostHog dashboards.
                 reason: permanentFailure ? 'permanent_4xx' : 'retries_exhausted',
               });
+              // Dead-lettered ride data is the loss evidence itself — make
+              // sure it reaches the dashboards even if the app dies next.
+              if (TRIP_CRITICAL_TYPES.has(mutation.type)) {
+                void telemetry.flush();
+              }
             } else {
               state.failMutation(mutation.id, errorMessage);
               telemetry.capture('offline_sync_failed', {

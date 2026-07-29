@@ -472,6 +472,11 @@ function NavigationScreen() {
         breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
         discarded: true,
       });
+      // Ride-end evidence must outlive the process: this is the moment
+      // riders swipe the app away, and an unflushed batch dies with it
+      // (GPS audit 2026-07-29 — the 07-24 loss case's trip_end_queued
+      // never reached PostHog). Fire-and-forget.
+      void telemetry.flush();
       return;
     }
 
@@ -521,6 +526,9 @@ function NavigationScreen() {
       signed_in: Boolean(user),
       breadcrumbs: currentSession?.gpsBreadcrumbs.length ?? 0,
     });
+    // See the discard branch: flush so ride-end telemetry survives an
+    // immediate app-kill.
+    void telemetry.flush();
   }, [enqueueMutation, selectedRoute, user]);
 
   // Completes the End Ride flow after the rider answered (or skipped) the

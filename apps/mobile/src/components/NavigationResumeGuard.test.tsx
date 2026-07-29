@@ -44,8 +44,12 @@ vi.mock('../providers/AuthSessionProvider', () => ({
 }));
 
 const mockTelemetryCapture = vi.fn();
+const mockTelemetryFlush = vi.fn();
 vi.mock('../lib/telemetry', () => ({
-  telemetry: { capture: (...args: unknown[]) => mockTelemetryCapture(...args) },
+  telemetry: {
+    capture: (...args: unknown[]) => mockTelemetryCapture(...args),
+    flush: (...args: unknown[]) => mockTelemetryFlush(...args),
+  },
 }));
 
 // Mock the design system organisms and atoms to avoid rendering heavy UI
@@ -352,6 +356,9 @@ describe('NavigationResumeGuard', () => {
     // Background-recorded samples are drained into the trail before the
     // trip_track is built.
     expect(mockMergeBackground).toHaveBeenCalled();
+    // The outcome telemetry is flushed so it survives an immediate app-kill
+    // (GPS audit 2026-07-29).
+    expect(mockTelemetryFlush).toHaveBeenCalled();
     // resetFlow semantics: IDLE, no completed-ride inflation.
     expect(state.appState).toBe('IDLE');
     expect(state.completedRideCount).toBe(3);
