@@ -5,6 +5,8 @@ import type { QueuedMutationPayloadByType, QueuedTripEndPayload, QueuedTripTrack
 import { mobileApi } from '../lib/api';
 import { mobileEnv } from '../lib/env';
 import {
+  ENQUEUE_FLUSH_DEBOUNCE_MS,
+  ENQUEUE_FLUSH_RETRY_MS,
   getBackoffDelay,
   getMutationBackstopTimeoutMs,
   getResolvedTripId,
@@ -16,6 +18,7 @@ import {
 } from '../lib/offlineSyncHelpers';
 import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
+import { TRIP_CRITICAL_TYPES } from '../store/queueSlice';
 import { useAuthSessionOptional } from './AuthSessionProvider';
 import { useConnectivity } from './ConnectivityMonitor';
 
@@ -379,9 +382,57 @@ export const OfflineMutationSyncManager = () => {
       void flushQueue();
     }, SYNC_INTERVAL_MS);
 
+    // Immediate drain when a trip-critical mutation is enqueued (GPS audit
+    // 2026-07-29 P1-A). Waiting for the 15s tick loses a race at exactly the
+    // wrong moment: ride end is when riders background/kill the app, and a
+    // trip_end/trip_track enqueued seconds before the final kill never got a
+    // tick — fully-ridden trips stranded on devices that never reopen the app
+    // (3 confirmed in 14 days with the device provably online: the feedback
+    // screen's live impact POST landed, the queued mutations didn't). The
+    // debounce coalesces ride end's back-to-back enqueues into one drain.
+    let kickTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const kickFlush = () => {
+      kickTimer = null;
+      if (cancelled) {
+        return;
+      }
+      if (flushingRef.current) {
+        // An in-flight flush loop re-reads the store each iteration and will
+        // usually deliver the new mutation itself; one retry covers the tail
+        // race where its final scan already came up empty.
+        kickTimer = setTimeout(kickFlush, ENQUEUE_FLUSH_RETRY_MS);
+        return;
+      }
+      void flushQueue();
+    };
+
+    const unsubscribe = useAppStore.subscribe((state, prevState) => {
+      // Reference check first: the store churns at breadcrumb rate during
+      // navigation, but queuedMutations is immutably replaced only on queue
+      // operations — everything else exits here on one comparison.
+      if (state.queuedMutations === prevState.queuedMutations) {
+        return;
+      }
+      if (kickTimer !== null) {
+        return;
+      }
+      const prevIds = new Set(prevState.queuedMutations.map((mutation) => mutation.id));
+      const hasNewTripCritical = state.queuedMutations.some(
+        (mutation) => TRIP_CRITICAL_TYPES.has(mutation.type) && !prevIds.has(mutation.id),
+      );
+      if (hasNewTripCritical) {
+        kickTimer = setTimeout(kickFlush, ENQUEUE_FLUSH_DEBOUNCE_MS);
+      }
+    });
+
     return () => {
       cancelled = true;
       clearInterval(intervalHandle);
+      unsubscribe();
+      if (kickTimer !== null) {
+        clearTimeout(kickTimer);
+      }
     };
   }, [isOnline, hasSession]);
 

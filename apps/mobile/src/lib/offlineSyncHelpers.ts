@@ -12,6 +12,27 @@ import type { QueuedTripEndPayload } from './offlineQueue';
  */
 
 export const SYNC_INTERVAL_MS = 15_000;
+
+/**
+ * Debounce before the flush kicked by a trip-critical enqueue (GPS audit
+ * 2026-07-29 P1-A). Ride end is exactly when riders background/kill the app,
+ * and the 15s interval loses that race: a trip_end/trip_track enqueued
+ * seconds before the final app-kill never got a tick, stranding fully-ridden
+ * trips on devices that never reopen the app. The window is sized to
+ * coalesce the back-to-back enqueues at ride end (trip_end + trip_track +
+ * trip_share land in the same JS tick) into a single drain while still
+ * beating any realistic swipe-away.
+ */
+export const ENQUEUE_FLUSH_DEBOUNCE_MS = 300;
+
+/**
+ * Retry delay when the enqueue-kicked flush finds another flush in flight.
+ * The in-flight loop re-reads the store each iteration and usually picks the
+ * new mutation up itself; this covers the tail race where its final scan
+ * already came up empty.
+ */
+export const ENQUEUE_FLUSH_RETRY_MS = 1_000;
+
 export const MAX_RETRY_COUNT = 5;
 export const BACKOFF_BASE_MS = 1_000;
 export const BACKOFF_JITTER_RATIO = 0.25;
