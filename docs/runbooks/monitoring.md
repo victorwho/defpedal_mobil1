@@ -54,6 +54,13 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
   (external Mapbox Terrain flake, no user impact — clients fall back).
 - PostHog: ~1,000–1,200 events/day, 50–75 distinct users/day (post
   default-ON, 07-20). `mobile_error` ≤ ~10/day, all known messages.
+  **Baseline correction (2026-07-29):** the 07-20/21 peak was inflated by
+  the default-ON update wave (every fleet device flipped analytics ON on its
+  first open after updating to 0.2.119). Observed steady state since 07-24:
+  ~200–450 events/day, 19–28 users/day, decaying gradually — no cliff, no
+  error signals, so read as wave-settling, not breakage. Re-baseline once
+  the v0.2.121 rollout reaches 100%; investigate only if users/day drops
+  below ~15 or falls suddenly between adjacent days.
 - A sudden PostHog volume DROP is as significant as an error spike — it can
   mean the consent plumbing or the SDK broke.
 
