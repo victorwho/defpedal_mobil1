@@ -271,6 +271,28 @@ every documented fix held; fully non-interactive.
   TestFlight before submitting, and confirm the App Privacy answers cover the new user-entered
   weight (fitness data).
 
+## Log: 2026-07-30 — build 24 (v0.2.122), clean headless run through Submit-for-Review
+
+GPS-audit client-fix release (immediate ride-end queue drain, `end_action` stamps, ride-end
+telemetry flush + registration-funnel events). Fully headless end-to-end, including the ASC
+version/review step — no App Store Connect web UI touched.
+
+- **Build 24** — id `cae65754-fbbb-4a63-9e88-07e378b7836a`, version 0.2.122, buildNumber auto
+  23 → 24, finished in <10 min. No new blockers; all documented fixes held.
+- **Submit** — temporary `ascApiKey*` triplet in `eas.json`, `eas submit … --id cae65754…`,
+  triplet reverted (`git diff` empty). Apple processing → **build 24 `VALID`** in ~4 min
+  (`2e43a146-bd85-4804-a1ff-c63ee8e67ee6`).
+- **Headless promote via ASC REST** (pattern first used session 98 for 1.14; scripted this time):
+  `POST /v1/appStoreVersions` (1.15, `releaseType: AFTER_APPROVAL`) → `PATCH …/relationships/build`
+  (build 24) → `PATCH` en-US `whatsNew` → `PATCH appStoreReviewDetails` (demo account carried over;
+  **stale "fully usable anonymously" line corrected** — registration is mandatory since v0.2.120,
+  the notes now direct reviewers to the demo account up front) → `POST /v1/reviewSubmissions` +
+  `reviewSubmissionItems` + `PATCH {submitted: true}`.
+- **Result: ASC version `1.15` = `WAITING_FOR_REVIEW`** (submission `a6a63a80-062e-4e8f-bd12-7bcf7af9eb69`).
+- API notes for next time: creating an appStoreVersion auto-copies localizations AND the review
+  detail from the previous version — GET-then-PATCH them, don't blindly POST. A fresh upload is
+  invisible in `/v1/builds` for ~1–2 min (known ingest lag; filter by buildNumber).
+
 ## Log: 2026-07-13 — build 19 (v0.2.101), clean run to TestFlight
 
 Store-submission build for v0.2.101 — the global-availability release (31-country region gate +
