@@ -55,7 +55,11 @@ In the 07-24 case the device's last ~30 min of events (including the diagnostic 
 
 ## Recommended actions (priority order)
 
-1. **P1** Immediate queue drain on trip-critical enqueue (debounced) in `OfflineMutationSyncManager` — closes the ride-end race; largest lever on both true losses and stranded churn rides.
-2. **P2** Add `end_action` to `trip_end` + a stale-`in_progress` reaper (mark `abandoned`, don't delete) — makes loss measurable and stops this recurring investigation.
-3. **P2** Flush telemetry at ride end alongside the queue drain.
+> **Status 2026-07-30: all three items SHIPPED (same session, 2026-07-29).** Client halves reach riders with the next app build (v0.2.122+); server halves are live.
+
+1. ~~**P1** Immediate queue drain on trip-critical enqueue (debounced) in `OfflineMutationSyncManager`~~ — **DONE** (commit `1b0c5ec`): 300ms-debounced flush kicked by a store subscription when a trip-critical mutation appears (`ENQUEUE_FLUSH_DEBOUNCE_MS` in `offlineSyncHelpers.ts`; reference-equality fast path keeps breadcrumb churn at one comparison; 1s retry if a flush is in flight). Rides with the next app build.
+2. ~~**P2** Add `end_action` to `trip_end` + a stale-`in_progress` reaper~~ — **DONE** (commit `d82b06e`): `trips.end_action` (saved / discarded / prompt_saved / prompt_discarded / auto_recovered / server-only abandoned; migration `202607290001` **applied live** 2026-07-29). Reaper piggybacks on the daily hazards-expire cron (in_progress >48h → `abandoned`, `ended_at` stays NULL); **264 historical stranded trips backfilled**; first scheduled cron run verified 2026-07-30 (264→267). Cloud Run `defpedal-api-00124-98l`. Monitoring query added to `docs/runbooks/monitoring.md` (health check #7). Client stamps ride the next app build; a client sending `abandoned` is 400-rejected.
+3. ~~**P2** Flush telemetry at ride end alongside the queue drain~~ — **DONE** (commit `5248037`): `telemetry.flush()` fire-and-forget in `queueTripEnd` (both branches), `closeInterruptedRide`, and the sync manager after a trip-critical delivery or dead-letter.
 4. **P3** Nothing further on the old-fleet tail — it retires itself as v0.2.120/121 roll out.
+
+Deliberately deferred: a headless background drain shortly after ride end (covers a rider killing the app *during* the immediate flush's network round-trip and never returning). Revisit only if the post-v0.2.122 true-loss count doesn't hit ~0.

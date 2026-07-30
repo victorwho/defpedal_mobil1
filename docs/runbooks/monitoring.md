@@ -45,6 +45,27 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
    ```
 6. **Cloud Run revision sanity**: `gcloud run revisions list …` — confirm
    which revision serves 100% and that Sentry errors aren't pinned to it.
+7. **Trip-tracking loss check** (`trips.end_action`, live since 2026-07-29 —
+   see `docs/reviews/gps-tracking-audit-2026-07-29.md`):
+   ```sql
+   SELECT end_action, count(*) FROM trips
+   WHERE started_at > now() - interval '14 days'
+   GROUP BY 1 ORDER BY 2 DESC;
+   ```
+   Reading it: `saved`/`discarded`/`prompt_*`/`auto_recovered` are explicit
+   rider outcomes (stamped by v0.2.122+ clients); `abandoned` = the nightly
+   reaper closed a trip whose trip_end never arrived (churned one-ride
+   users — ~25/week at the 07-29 baseline, `ended_at` stays NULL on these);
+   NULL with `ended_at` set = pre-endAction client. TRUE LOSS is a ride
+   with a `ride_impacts` row but no `trip_tracks` row (3/14d before the
+   ride-end drain fix; expect ~0 once v0.2.122+ dominates):
+   ```sql
+   SELECT count(*) FROM ride_impacts ri
+   WHERE ri.created_at > now() - interval '14 days'
+     AND NOT EXISTS (SELECT 1 FROM trip_tracks tt WHERE tt.trip_id = ri.trip_id);
+   ```
+   A sudden jump in `abandoned` or in the true-loss count is a regression
+   in the offline queue / ride-end drain — treat like an error spike.
 
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
 
