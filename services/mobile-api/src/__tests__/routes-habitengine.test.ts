@@ -522,6 +522,68 @@ describe('POST /v1/rides/:tripId/impact', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().equivalentText).toBeNull();
   });
+
+  // Regression guard (calories-0 bug, POST leg): fielded clients through
+  // v0.2.122 never sent durationMinutes, so the handler computed
+  // kcal = MET x weight x 0 hours and stored 0 for every ride. When the
+  // body omits duration, the handler must fall back to the track's
+  // started_at/ended_at — same derivation as the GET auto-compute path.
+  it('derives duration and calories from the track when the body omits durationMinutes', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
+      error: null,
+    });
+    mockFrom
+      .mockReturnValueOnce(chainResult({
+        bike_type: 'acoustic',
+        started_at: '2026-07-01T10:00:00.000Z',
+        ended_at: '2026-07-01T10:30:00.000Z', // 30 min -> 18 km/h -> MET 6.8
+      }))                                      // trip_tracks meta
+      .mockReturnValueOnce(chainResult([]));   // reward_equivalents
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const args = (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact')?.[1] ?? {}) as {
+      p_duration_minutes?: number; p_calories_burned?: number;
+    };
+    expect(args.p_duration_minutes).toBe(30);
+    // MET 6.8 (18 km/h) x 70 kg (default weight) x 0.5 h = 238 kcal
+    expect(args.p_calories_burned).toBe(238);
+  });
+
+  it('prefers client-sent durationMinutes and weightKg over track timestamps', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
+      error: null,
+    });
+    mockFrom
+      .mockReturnValueOnce(chainResult({
+        bike_type: 'acoustic',
+        started_at: '2026-07-01T10:00:00.000Z',
+        ended_at: '2026-07-01T12:00:00.000Z', // track says 2 h — must be ignored
+      }))
+      .mockReturnValueOnce(chainResult([]));
+
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, durationMinutes: 30, weightKg: 80 },
+    });
+
+    const args = (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact')?.[1] ?? {}) as {
+      p_duration_minutes?: number; p_calories_burned?: number;
+    };
+    expect(args.p_duration_minutes).toBe(30);
+    // MET 6.8 (18 km/h) x 80 kg x 0.5 h = 272 kcal
+    expect(args.p_calories_burned).toBe(272);
+  });
 });
 
 // ===========================================================================

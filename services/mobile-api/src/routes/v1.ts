@@ -328,6 +328,19 @@ const requireOAuthUser = (
   dependencies: MobileApiDependencies,
 ) => requireFullUser(request, dependencies.authenticateUser);
 
+/**
+ * Ride duration in whole seconds from a trip_tracks row's timestamps.
+ * Returns 0 when either timestamp is missing/invalid or the interval is
+ * non-positive (ended_at is null while a trip is in progress).
+ */
+const deriveTrackDurationSeconds = (startedAt: unknown, endedAt: unknown): number => {
+  const startMs = startedAt ? new Date(String(startedAt)).getTime() : NaN;
+  const endMs = endedAt ? new Date(String(endedAt)).getTime() : NaN;
+  return Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+    ? Math.round((endMs - startMs) / 1000)
+    : 0;
+};
+
 export const buildV1Routes = (
   dependencies: MobileApiDependencies,
 ): FastifyPluginAsync => {
@@ -2525,23 +2538,32 @@ export const buildV1Routes = (
           weightKg,
         } = request.body;
 
-        // Compute calories — fetch bike_type from trip_tracks (non-fatal, defaults to acoustic)
+        // Compute calories — fetch bike_type + timestamps from trip_tracks
+        // (non-fatal). Fielded clients through v0.2.122 never sent
+        // durationMinutes, and kcal = MET × weight × hours, so every POSTed
+        // impact stored 0 kcal (see 202607110001 backfill). When the body
+        // omits duration, derive it from the track's own timestamps — same
+        // derivation as the GET auto-compute path.
         let vehicleType: 'acoustic' | 'ebike' = 'acoustic';
+        let durationSeconds = Math.max(0, Math.round((durationMinutes ?? 0) * 60));
         try {
           const { data: trackMeta } = await supabaseAdmin
             .from('trip_tracks')
-            .select('bike_type')
+            .select('bike_type, started_at, ended_at')
             .eq('trip_id', tripId)
             .single();
           const bt = String(trackMeta?.bike_type ?? '').toLowerCase();
           if (bt === 'ebike' || bt === 'electric' || bt.includes('e-bike')) {
             vehicleType = 'ebike';
           }
+          if (durationSeconds <= 0) {
+            durationSeconds = deriveTrackDurationSeconds(trackMeta?.started_at, trackMeta?.ended_at);
+          }
         } catch { /* non-fatal */ }
 
         const caloriesBurned = calculateCaloriesBurned(
           distanceMeters,
-          (durationMinutes ?? 0) * 60,
+          durationSeconds,
           vehicleType,
           weightKg,
         );
@@ -2557,7 +2579,7 @@ export const buildV1Routes = (
           p_temperature_c:     temperatureC    ?? null,
           p_aqi_level:         aqiLevel        ?? null,
           p_ride_start_hour:   rideStartHour   ?? null,
-          p_duration_minutes:  durationMinutes  ?? 0,
+          p_duration_minutes:  durationMinutes ?? (durationSeconds > 0 ? Math.round(durationSeconds / 60) : 0),
           p_calories_burned:   caloriesBurned,
         });
 
@@ -3017,12 +3039,7 @@ export const buildV1Routes = (
           // MET x weight x hours, so a 0 duration always yields 0 kcal and the
           // client hides the calorie block — auto-computed impacts therefore
           // never showed calories. ended_at is null for in-progress trips -> 0.
-          const startMs = track.started_at ? new Date(track.started_at as string).getTime() : NaN;
-          const endMs = track.ended_at ? new Date(track.ended_at as string).getTime() : NaN;
-          const autoDurationSeconds =
-            Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
-              ? Math.round((endMs - startMs) / 1000)
-              : 0;
+          const autoDurationSeconds = deriveTrackDurationSeconds(track.started_at, track.ended_at);
           const autoDurationMinutes = autoDurationSeconds > 0 ? Math.round(autoDurationSeconds / 60) : 0;
           const autoCalories = calculateCaloriesBurned(distMeters, autoDurationSeconds, autoVehicle);
 

@@ -531,13 +531,26 @@ export default function FeedbackScreen() {
           const dest = storeState.routeRequest.destination;
           const hadDestination = dest.lat !== 0 || dest.lon !== 0;
 
+          // The server computes kcal = MET × weight × hours from
+          // durationMinutes; omitting it stored 0 kcal for every ride.
+          // Clamp to the request schema's 1440-min cap so an overlong
+          // session can't 400 the whole XP-award call.
+          const sessionStartedAt = storeState.navigationSession?.startedAt;
+          const durationMinutes = sessionStartedAt
+            ? Math.min(1_440, Math.max(1, Math.round((Date.now() - new Date(sessionStartedAt).getTime()) / 60_000)))
+            : undefined;
+
           // POST first to award XP, then use the response
           let result: RideImpact;
           try {
             result = await mobileApi.recordRideImpact(
               tripServerId,
               initialImpact.distanceMeters,
-              { hadDestination, weightKg: useAppStore.getState().weightKg },
+              {
+                hadDestination,
+                weightKg: storeState.weightKg,
+                ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+              },
             );
           } catch {
             // POST may 409 (already recorded) — fall back to GET
@@ -557,6 +570,12 @@ export default function FeedbackScreen() {
                 communitySeconds: result.communitySeconds > 0
                   ? result.communitySeconds
                   : prev.communitySeconds,
+                // ride_impacts rows written before the duration fix hold
+                // 0 kcal — never let a server zero clobber the locally
+                // computed value.
+                caloriesBurned: (result.caloriesBurned ?? 0) > 0
+                  ? result.caloriesBurned
+                  : prev.caloriesBurned,
                 newBadges: result.newBadges.length > 0 ? result.newBadges : prev.newBadges,
                 equivalentText: result.equivalentText ?? prev.equivalentText,
               };
