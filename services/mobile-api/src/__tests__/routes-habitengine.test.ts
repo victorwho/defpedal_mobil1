@@ -533,13 +533,19 @@ describe('POST /v1/rides/:tripId/impact', () => {
       data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
       error: null,
     });
-    mockFrom
-      .mockReturnValueOnce(chainResult({
-        bike_type: 'acoustic',
-        started_at: '2026-07-01T10:00:00.000Z',
-        ended_at: '2026-07-01T10:30:00.000Z', // 30 min -> 18 km/h -> MET 6.8
-      }))                                      // trip_tracks meta
-      .mockReturnValueOnce(chainResult([]));   // reward_equivalents
+    // Table-keyed mock, NOT mockReturnValueOnce: a fire-and-forget block
+    // from the previous test can consume once-queue slots mid-test (this
+    // file's documented flake mode), which starved this test's trip_tracks
+    // row on CI and made the handler derive a 0 duration.
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'trip_tracks'
+        ? chainResult({
+            bike_type: 'acoustic',
+            started_at: '2026-07-01T10:00:00.000Z',
+            ended_at: '2026-07-01T10:30:00.000Z', // 30 min -> 18 km/h -> MET 6.8
+          })
+        : chainResult([]),
+    );
 
     const response = await app.inject({
       method: 'POST',
@@ -562,13 +568,16 @@ describe('POST /v1/rides/:tripId/impact', () => {
       data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
       error: null,
     });
-    mockFrom
-      .mockReturnValueOnce(chainResult({
-        bike_type: 'acoustic',
-        started_at: '2026-07-01T10:00:00.000Z',
-        ended_at: '2026-07-01T12:00:00.000Z', // track says 2 h — must be ignored
-      }))
-      .mockReturnValueOnce(chainResult([]));
+    // Table-keyed for the same stray-call immunity as the test above.
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'trip_tracks'
+        ? chainResult({
+            bike_type: 'acoustic',
+            started_at: '2026-07-01T10:00:00.000Z',
+            ended_at: '2026-07-01T12:00:00.000Z', // track says 2 h — must be ignored
+          })
+        : chainResult([]),
+    );
 
     await app.inject({
       method: 'POST',
