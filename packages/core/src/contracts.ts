@@ -812,6 +812,11 @@ export interface UserStats {
   readonly totalDistanceMeters: number;
   readonly totalCo2SavedKg: number;
   readonly totalDurationSeconds: number;
+  /**
+   * Sum of stored per-ride ride_impacts.calories_burned. Optional because
+   * only the stats-dashboard RPC returns it — getUserStats does not.
+   */
+  readonly totalCaloriesBurned?: number;
 }
 
 // ── Trip Statistics Dashboard ──

@@ -844,6 +844,7 @@ export const es: TranslationKeys = {
     distance: 'Distancia',
     duration: 'Duración',
     co2Saved: 'CO2 ahorrado',
+    caloriesBurned: 'Calorías',
     avgSpeed: 'Velocidad media',
   },
 

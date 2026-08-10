@@ -853,6 +853,7 @@ export const en = {
     distance: 'Distance',
     duration: 'Duration',
     co2Saved: 'CO2 Saved',
+    caloriesBurned: 'Calories',
     avgSpeed: 'Avg Speed',
   },
 

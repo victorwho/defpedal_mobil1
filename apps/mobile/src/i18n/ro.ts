@@ -844,6 +844,7 @@ export const ro: TranslationKeys = {
     distance: 'Distanță',
     duration: 'Durată',
     co2Saved: 'CO2 economisit',
+    caloriesBurned: 'Calorii',
     avgSpeed: 'Viteză medie',
   },
 

@@ -2053,6 +2053,7 @@ export const buildV1Routes = (
                 totalDistanceMeters: { type: 'number' },
                 totalCo2SavedKg: { type: 'number' },
                 totalDurationSeconds: { type: 'number' },
+                totalCaloriesBurned: { type: 'number' },
               },
             } as const;
             const bucketsSchema = {

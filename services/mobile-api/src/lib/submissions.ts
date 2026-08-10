@@ -542,7 +542,7 @@ export const getTripStatsDashboard = async (
     throw new Error(error.message);
   }
 
-  type RawTotals = { totalTrips?: number; totalDistanceMeters?: number; totalDurationSeconds?: number } | null | undefined;
+  type RawTotals = { totalTrips?: number; totalDistanceMeters?: number; totalDurationSeconds?: number; totalCaloriesBurned?: number } | null | undefined;
   type RawModeSplit = { safeTrips?: number; fastTrips?: number } | null | undefined;
   const raw = data as {
     totals: RawTotals;
@@ -568,6 +568,7 @@ export const getTripStatsDashboard = async (
       totalDistanceMeters: distance,
       totalCo2SavedKg: calculateCo2SavedKg(distance),
       totalDurationSeconds: Number(row?.totalDurationSeconds ?? 0),
+      totalCaloriesBurned: Number(row?.totalCaloriesBurned ?? 0),
     };
   };
 
