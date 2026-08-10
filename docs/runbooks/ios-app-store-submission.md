@@ -271,6 +271,30 @@ every documented fix held; fully non-interactive.
   TestFlight before submitting, and confirm the App Privacy answers cover the new user-entered
   weight (fitness data).
 
+## Log: 2026-08-10 — build 25 (v0.2.123), clean headless run through Submit-for-Review
+
+Calories-burned release (client duration+weight to the impact endpoint, post-ride merge guard,
+Stats Dashboard Calories tile — server halves already live). Fully headless.
+
+- **Build 25** — id `bfa008d2-5570-4bdf-a7b5-fa2dd9d35e5e`, v0.2.123, buildNumber auto 24 → 25,
+  built from a CLEAN main worktree (`C:\dev\dp-rel`, junctioned node_modules — `.easignore`
+  excludes them from the upload) because the working tree carried uncommitted shade/avoidHeat WIP.
+- **Submit** — submission `6f800259-b8c3-4ef1-8a5b-de7f96be8e63`. The local CLI got killed
+  mid-wait; the server-side submission completed anyway (known behavior — killing the CLI never
+  cancels it). Build **25 `VALID`** ~15 min after scheduling. Temporary `ascApiKey*` triplet lived
+  only in the worktree's eas.json and was reverted.
+- **Promote** — scripted (same REST pattern as 1.15): version `1.16` created (`AFTER_APPROVAL`),
+  build attached, en-US whatsNew set, review details carried over unchanged →
+  reviewSubmission `09aab852-42dd-41ea-8200-00ac9f242e83` = **WAITING_FOR_REVIEW**.
+- **New gotcha for worktree-built releases (Android leg, same session):** `apps/mobile/android/`
+  is gitignored EXCEPT three TRACKED files — `app/build.gradle`, `app/src/main/AndroidManifest.xml`,
+  `gradle.properties`. A fresh worktree therefore checks out a SKELETON android tree; running
+  `build-preview.sh` with `SRC=<worktree>` then `/MIR`-guts `C:\dpb`'s android/app/src (deletes
+  res/, java/, flavor manifests) AND regresses the versionCode to the last committed value. Fix:
+  copy the full hand-managed `android/` from `C:\dev\defpedal` into the worktree BEFORE building,
+  and COMMIT versionCode bumps — they are tracked, contrary to the old "android/ is gitignored"
+  session note.
+
 ## Log: 2026-07-30 — build 24 (v0.2.122), clean headless run through Submit-for-Review
 
 GPS-audit client-fix release (immediate ride-end queue drain, `end_action` stamps, ride-end
