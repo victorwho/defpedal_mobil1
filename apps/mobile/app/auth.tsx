@@ -34,7 +34,11 @@ import {
 } from '../src/lib/clockSkew';
 import { PRIVACY_URL, TERMS_URL } from '../src/lib/legal-urls';
 import { markPasswordResetRequested } from '../src/lib/passwordReset';
-import { requestPasswordReset, type GoogleSignInErrorCode } from '../src/lib/supabase';
+import {
+  requestPasswordReset,
+  resendSignupConfirmation,
+  type GoogleSignInErrorCode,
+} from '../src/lib/supabase';
 import { telemetry } from '../src/lib/telemetry';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
@@ -68,6 +72,10 @@ export default function AuthScreen() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Shows the "Resend confirmation email" link: set after a successful
+  // signup, and when a sign-in fails because the email isn't confirmed yet
+  // (the original link may be expired, consumed, or lost).
+  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
   // Signed device-vs-server clock skew (seconds), or null while unknown. A large
   // skew breaks native Google sign-in (AppAuth `iat` validation) — we warn the
   // user proactively. See lib/clockSkew.ts + App Store 2.1(a) note.
@@ -131,6 +139,12 @@ export default function AuthScreen() {
 
       if (result.error) {
         setErrorMessage(result.error.message);
+        // GoTrue's sign-in error for an unconfirmed account. Offer a fresh
+        // confirmation email — the original link may be dead (expired,
+        // consumed by a mail scanner, or from a superseded signup).
+        if (/not confirmed/i.test(result.error.message)) {
+          setShowResendConfirmation(true);
+        }
         return;
       }
 
@@ -148,6 +162,9 @@ export default function AuthScreen() {
           ? t('auth.signedInSuccess')
           : t('auth.accountCreated'),
       );
+      if (mode === 'sign-up') {
+        setShowResendConfirmation(true);
+      }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('auth.authFailed'));
     } finally {
@@ -193,6 +210,33 @@ export default function AuthScreen() {
       }
       await markPasswordResetRequested();
       setStatusMessage(t('auth.resetEmailSent'));
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t('auth.authFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Re-send the signup confirmation email. The original link can die in
+  // several ways (mail-scanner prefetch consumed it, 24h expiry, a repeat
+  // signup rotated the token) and previously there was NO recovery path —
+  // the user was permanently stuck at "Email not confirmed".
+  const handleResendConfirmation = async () => {
+    if (!email.trim()) {
+      setErrorMessage(t('auth.resetEnterEmailFirst'));
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const { error } = await resendSignupConfirmation(email);
+      if (error) {
+        // GoTrue enforces a 60s resend cooldown — its message is readable.
+        setErrorMessage(error.message);
+        return;
+      }
+      setStatusMessage(t('auth.confirmResent'));
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : t('auth.authFailed'));
     } finally {
@@ -356,6 +400,18 @@ export default function AuthScreen() {
             ) : null}
             {displayError ? (
               <Text style={styles.errorText}>{displayError}</Text>
+            ) : null}
+            {showResendConfirmation ? (
+              <Pressable
+                onPress={() => void handleResendConfirmation()}
+                disabled={isSubmitting || !isSupabaseConfigured}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.resendConfirmation')}
+                style={styles.resendRow}
+              >
+                <Text style={styles.toggleLink}>{t('auth.resendConfirmation')}</Text>
+              </Pressable>
             ) : null}
 
             {!showEmailForm ? (
@@ -718,6 +774,10 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     forgotRow: {
       alignSelf: 'flex-end',
+    },
+    resendRow: {
+      alignSelf: 'center',
+      paddingVertical: space[1],
     },
     // Dev card
     devCard: {

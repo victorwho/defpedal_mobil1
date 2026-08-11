@@ -1,56 +1,96 @@
-# Branded signup email setup
+# Branded signup email + confirmation flow
 
-Checklist for turning Supabase default signup emails into branded
-`team@defensivepedal.com` emails that reopen the app after confirmation.
+How Defensive Pedal's signup-confirmation and password-reset emails reach the
+app, and the manual infra/dashboard pieces behind them.
 
-Code is already wired up (edge function + `emailRedirectTo` + deep-link
-handler). The steps below are the manual infra/dashboard work.
+## Flow (reworked 2026-08-11 — scanner-proof token_hash links)
 
----
+**History:** the original 2026-04 flow used `{{ .ConfirmationURL }}`, which
+routes through `GET /auth/v1/verify` — a single-use GET that is consumed by
+*any* HTTP fetch. Mail-provider link scanners (Outlook SafeLinks, corporate
+AV), double-taps, and stale emails after a repeat signup all killed the link
+before/instead of the user, producing "Email link is invalid or has expired"
+for a meaningful slice of signups. Pasting the link in Chrome's omnibox also
+dead-ended (Chrome refuses to launch `intent://` from typed navigations) while
+still consuming the token. See error-log #77.
 
-## 1. Deploy the edge function
+**Current flow:** the email templates link DIRECTLY at this edge function with
+a `token_hash` — no server-side verify happens on GET, so the link cannot be
+consumed by a browser or scanner. Only the app's `verifyOtp` call consumes it.
 
-From repo root:
+```
+email link:
+  https://<project>.supabase.co/functions/v1/email-confirm
+      ?scheme=<app scheme>&token_hash={{ .TokenHash }}&type=signup|recovery
 
-```bash
-supabase functions deploy email-confirm --project-ref uobubaulcdcuggnetzei
+edge function (this dir):
+  Android  → 302 intent://auth/callback?token_hash=...&type=...
+  iOS      → HTML page; JS opens <scheme>://auth/callback?token_hash=...
+  Desktop  → 302 to routes.defensivepedal.com/email-open-on-phone
+             (token untouched — user is told to open the email on the phone)
+
+app (AuthSessionProvider deep-link handler, shipped since v0.2.9x 2026-04-20):
+  verifyOtp({ token_hash, type }) → session. No PKCE verifier needed →
+  works cross-device and after reinstall.
 ```
 
-Verify it responds:
+Properties: scanner-prefetch immune, double-click immune, repeat-signup emails
+only die when GoTrue rotates the token (resend gets a fresh one), and the
+sign-in screen now has a "Resend confirmation email" affordance
+(`resendSignupConfirmation` in `apps/mobile/src/lib/supabase.ts`).
+
+**Legacy links** (emails sent before the switch, valid ≤24h) still route
+through `/auth/v1/verify` and arrive here with `?code=` (success) or
+`?error_code=` (failure). Both are handled: code → app exchange; error →
+forwarded to the app (mobile) or `routes.defensivepedal.com/email-link-expired`
+(desktop). Keep the `code`/`error` handling until at least 2026-09 in case a
+straggler clicks an old email.
+
+`{{ .TokenHash }}` renders the *stored* `auth.users.confirmation_token`
+including the `pkce_` prefix for PKCE-initiated signups — `verifyOtp` accepts
+it as-is (validated live 2026-08-11 against production GoTrue).
+
+## Deploy
 
 ```bash
-curl -i "https://uobubaulcdcuggnetzei.supabase.co/functions/v1/email-confirm?scheme=defensivepedal-dev&code=TEST"
+supabase functions deploy email-confirm --project-ref uobubaulcdcuggnetzei --no-verify-jwt --use-api
 ```
 
-Should return HTTP 200 with HTML containing `defensivepedal-dev://auth/callback?code=TEST`.
+`--no-verify-jwt` is REQUIRED — browsers hitting this from an email link carry
+no Authorization header. There is no `config.toml` pinning this, so pass the
+flag on every deploy.
 
-## 2. Resend account + domain verification
+Desktop pages live in `apps/web` (Next.js on Vercel, project `defpedal-web`,
+Root Directory `apps/web` — deploy from the REPO ROOT, from a clean `main`
+worktree): `/email-confirmed`, `/email-open-on-phone`, `/email-link-expired`.
 
-1. Sign up at [resend.com](https://resend.com) with `victorrotariu@gmail.com`.
-2. Domains → Add Domain → `defensivepedal.com`.
-3. Add the three DNS records Resend shows (SPF `TXT`, DKIM `CNAME` x2 or `TXT`, optional DMARC `TXT`) to whoever hosts `defensivepedal.com` DNS.
-4. Wait for "Verified" status (usually < 15 min).
-5. Create an API key → store safely.
+## Email templates (Supabase Dashboard → Auth → Email Templates)
 
-## 3. Supabase SMTP config
+Both managed via Management API `PATCH /v1/projects/<ref>/config/auth`
+(fields `mailer_templates_confirmation_content`,
+`mailer_templates_recovery_content`, `mailer_subjects_*`).
 
-Dashboard → Project Settings → Auth → **SMTP Settings** → Enable custom SMTP:
+- **Confirm signup**: branded HTML; every link is
+  `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=signup`
+- **Reset password**: branded HTML; links are
+  `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=recovery`
 
-| Field | Value |
-|---|---|
-| Sender email | `team@defensivepedal.com` |
-| Sender name | `Defensive Pedal` |
-| Host | `smtp.resend.com` |
-| Port | `465` |
-| Username | `resend` |
-| Password | `<the Resend API key from step 2>` |
-| Minimum interval | leave default |
+`{{ .RedirectTo }}` is the per-request `emailRedirectTo`/`redirectTo` the app
+sends (`https://<project>.supabase.co/functions/v1/email-confirm?scheme=<scheme>`,
+built by `buildEmailConfirmRedirect()` in `apps/mobile/src/lib/supabase.ts`).
+It already carries `?scheme=`, hence the `&` when appending. Caveat: a signup
+triggered WITHOUT a redirect (e.g. dashboard invite) renders `{{ .RedirectTo }}`
+as the Site URL and produces a broken link — all app flows send it.
 
-Save. Send a test email from Supabase to confirm it arrives from `team@defensivepedal.com`.
+## SMTP (Resend)
 
-## 4. Redirect URL allowlist
+Dashboard → Project Settings → Auth → SMTP: `smtp.resend.com`, sender
+`team@defensivepedal.com`. Keep Resend link/click tracking OFF for the domain —
+tracking rewrites add a redirect hop and invite scanner clicks.
 
-Dashboard → Auth → **URL Configuration** → Redirect URLs → add:
+## Redirect URL allowlist (Dashboard → Auth → URL Configuration)
+
+Must contain (already live):
 
 ```
 https://uobubaulcdcuggnetzei.supabase.co/functions/v1/email-confirm?*
@@ -59,38 +99,19 @@ defensivepedal-dev://auth/callback
 defensivepedal-preview://auth/callback
 ```
 
-(Keep the existing `beta.defensivepedal.com` entries — they're used by the web build.)
+## End-to-end test
 
-Site URL can stay as-is — the per-request `emailRedirectTo` overrides it.
-
-## 5. Email template (placeholder for now)
-
-Dashboard → Auth → **Email Templates** → **Confirm signup**. Replace the body with a placeholder until we write the real copy:
-
-```html
-<h2>Confirm your Defensive Pedal account</h2>
-<p>Tap the button below on your phone to finish signing in.</p>
-<p><a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 20px;background:#facc15;color:#0b0d10;text-decoration:none;border-radius:10px;font-weight:600">Confirm my account</a></p>
-<p style="color:#666;font-size:12px">If you didn't create a Defensive Pedal account, ignore this email.</p>
-```
-
-Subject: `Confirm your Defensive Pedal account`.
-
-Leave "Magic Link", "Change Email", "Reset Password" on defaults for now.
-
-## 6. End-to-end test
-
-1. Rebuild dev APK (`./gradlew installDevelopmentDebug` from `apps/mobile/android`) — not strictly required for this change, but useful if you haven't recently.
-2. In the app, open Account → Sign up → enter a test email + password.
-3. Tap Sign up → see "Check your inbox" message.
-4. Open the email on the phone (must be the device the app is installed on, so the PKCE verifier matches).
-5. Tap the confirm button → browser opens `functions/v1/email-confirm` → bounces to `defensivepedal-dev://auth/callback?code=...` → the app handles the deep link and exchanges the code for a session.
-6. The Account screen should now show the signed-in state with the confirmed email.
+1. In the app: Account → Sign up with a `+tag` email you control.
+2. Open the email on the SAME phone → tap the button → browser bounces to
+   `defensivepedal://auth/callback?token_hash=...` → app signs in.
+3. Negative checks: open the link on desktop FIRST → "open on your phone" page,
+   then the phone tap must STILL work (token not consumed).
+4. `resend` path: sign-in with an unconfirmed account → "Resend confirmation
+   email" appears under the error.
 
 ## Rollback
 
-If anything breaks:
-
-- Disable custom SMTP in Supabase dashboard → reverts to default sender.
-- Remove `emailRedirectTo` from `signUpWithEmail` in `apps/mobile/src/lib/supabase.ts` → reverts to using Site URL.
-- The edge function can stay deployed; nothing calls it unless `emailRedirectTo` is wired.
+- Templates: restore `{{ .ConfirmationURL }}` in the Confirm-signup template
+  (Management API or dashboard) — reverts to the /verify flow.
+- Edge function changes are backward compatible with both flows; no rollback
+  needed independently of the templates.

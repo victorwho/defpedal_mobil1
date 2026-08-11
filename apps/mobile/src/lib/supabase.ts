@@ -210,23 +210,45 @@ export const signInWithEmail = async (email: string, password: string) => {
   });
 };
 
+// Email confirmation links are https:// and cannot open a custom scheme
+// directly from an email client. We route through an HTTPS intermediary
+// edge function that redirects to ${appScheme}://auth/callback. The email
+// template appends `token_hash={{ .TokenHash }}&type=signup` to this URL
+// (NOT a /auth/v1/verify link), so nothing is consumed until the app itself
+// calls verifyOtp — mail-provider link scanners and double-clicks can no
+// longer kill the link, and confirmation works cross-device / after
+// reinstall (no PKCE verifier needed).
+const buildEmailConfirmRedirect = () => {
+  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
+  return `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
+};
+
 export const signUpWithEmail = async (email: string, password: string) => {
   await clearDeveloperBypassSession();
   const client = requireSupabaseClient();
-
-  // Email confirmation links are https:// and cannot open a custom scheme
-  // directly from an email client. We route through an HTTPS intermediary
-  // edge function that JS-redirects to ${appScheme}://auth/callback while
-  // preserving the PKCE code appended by Supabase.
-  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
-  const emailRedirectTo = `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
 
   await captureAnonForMerge();
   return client.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo,
+      emailRedirectTo: buildEmailConfirmRedirect(),
+    },
+  });
+};
+
+/**
+ * Re-send the signup confirmation email. GoTrue enforces its own 60s
+ * resend cooldown (429 with a human-readable message) — no client-side
+ * throttle needed beyond disabling the button while in flight.
+ */
+export const resendSignupConfirmation = async (email: string) => {
+  const client = requireSupabaseClient();
+  return client.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+    options: {
+      emailRedirectTo: buildEmailConfirmRedirect(),
     },
   });
 };
@@ -241,9 +263,9 @@ export const signUpWithEmail = async (email: string, password: string) => {
  */
 export const requestPasswordReset = async (email: string) => {
   const client = requireSupabaseClient();
-  const supabaseUrl = mobileEnv.supabaseUrl ?? '';
-  const redirectTo = `${supabaseUrl}/functions/v1/email-confirm?scheme=${encodeURIComponent(appScheme)}`;
-  return client.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+  return client.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: buildEmailConfirmRedirect(),
+  });
 };
 
 /** Set a new password on the current (recovery) session. */
