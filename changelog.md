@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-11 — Signup confirmation emails no longer error — server-side fix, live for all app versions
+
+Some users' confirmation emails threw an error when clicked or pasted ("Email link is invalid or has expired"), leaving them unable to finish registration — a hard wall since registration became mandatory in v0.2.120.
+
+### Behavior
+- **Confirmation links survive scanners and double-taps.** The link only "spends" itself when the app actually confirms it — email-provider security scanners (Outlook SafeLinks, corporate AV), tapping twice, or opening it on desktop first no longer kill it.
+- **Works cross-device and after reinstall.** Confirmation no longer depends on hidden state stored at signup time on the original device.
+- **Password-reset emails** get the same hardening plus a branded template.
+- **Honest desktop pages.** Opening the link on a computer now shows "open this on your phone" (link stays valid) or "link expired" with recovery steps — previously it claimed "Email confirmed!" even when verification had failed.
+- **Next app release:** a "Resend confirmation email" button on the sign-in screen, shown after signup and on "Email not confirmed" errors (previously a permanent dead-end).
+
+### Under the hood
+- Email templates switched from `{{ .ConfirmationURL }}` (single-use `GET /auth/v1/verify`) to direct edge-function links carrying `{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=…`; consumption moves to the fielded app's `verifyOtp` (deep-link branch shipped 2026-04-20 — entire fleet covered, no app update needed).
+- `email-confirm` edge fn redeployed with state-aware desktop redirects; `apps/web` gains `/email-open-on-phone` + `/email-link-expired`, deployed to Vercel production. Legacy `/verify` links in flight (≤24h) remain handled.
+- Validated end-to-end against production, including the delivered email in Gmail's rendered DOM. Details: error-log #77, `supabase/functions/email-confirm/README.md`. Commit `70d96c2`.
+
 ## 2026-06-27 — Trip-recording regression fixed — v0.2.92 (build 95 Android / build 17 iOS)
 
 Fixes a silent bug where many completed rides were never saved — no GPS track, ride stuck "in progress", missing from History and stats. Track-save coverage had fallen from ~85% to 15% by late June (108 users / 190 trips affected).
