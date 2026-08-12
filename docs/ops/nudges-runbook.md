@@ -204,7 +204,7 @@ The 2-h attribution sweep looks for `trip_tracks` rows with `created_at >= sent_
 
 ### "Variant distribution looks wrong"
 
-`pickVariantIndex(userId, trigger, 3)` is a deterministic djb2 hash. Same user + same trigger always picks the same variant. If you're seeing one variant dominate, run query 3 above grouped by `variant_id` — uniform-ish distribution across `v1` / `v2` / `v3` is expected only with hundreds of users. With fewer than 30 users per trigger the distribution can look skewed because the hash output is finite.
+Variant selection rotates per send (since 2026-08-12): `pickMessage` seeds from djb2(userId|trigger|sendDate), then skips the variants recently sent to that user (`nudge_log.variant_id`, fetched by `dispatchNudge`) — so the same rider never gets the same line twice in a row, and a 3-variant pool cycles strictly. The old sticky per-user bucket (`pickVariantIndex`) is gone; do not reintroduce it — it pinned one phrase per rider for life on the per-ride P0 triggers. Distribution across `v1` / `v2` / `v3` should now be near-uniform per user over ≥3 sends; if query 3 grouped by `variant_id` shows one variant dominating for a single user, the rotation lookback is broken (check that the `nudge_log` select filters `outcome = 'sent'` and that sends actually reach that outcome).
 
 ## Roll-back procedure
 

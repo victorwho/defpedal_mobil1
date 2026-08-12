@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATALOG_ROTATION_MEMORY,
   TRIGGERS_BY_PRIORITY,
   getTriggerPose,
   getTriggerPriority,
   pickMessage,
-  pickVariantIndex,
   type NudgeTrigger,
 } from './pedalVoice';
 
@@ -144,83 +144,116 @@ describe('pickMessage — placeholder fallback', () => {
   });
 });
 
-describe('pickVariantIndex — sticky bucket', () => {
-  it('returns the same index for the same user + trigger across calls', () => {
-    const first = pickVariantIndex('user-1', 'streak_at_risk_dramatic', 3);
-    const second = pickVariantIndex('user-1', 'streak_at_risk_dramatic', 3);
-    expect(first).toBe(second);
+describe('pickMessage — per-send variant rotation', () => {
+  const ctx = { riderName: 'V', streakCount: 10, city: 'Cluj' };
+
+  it('is deterministic given identical inputs (cron preview mirror invariant)', () => {
+    const req = {
+      trigger: 'streak_at_risk_dramatic' as const,
+      locale: 'en' as const,
+      sassy: true,
+      userId: 'rotation-user',
+      context: ctx,
+      sendDateISO: '2026-08-12',
+      recentVariantIds: ['v2'],
+    };
+    expect(pickMessage(req).variantId).toBe(pickMessage(req).variantId);
   });
 
-  it('returns a value in [0, variantCount)', () => {
-    for (let i = 0; i < 50; i++) {
-      const idx = pickVariantIndex(`u${i}`, 'milestone_celebration', 3);
-      expect(idx).toBeGreaterThanOrEqual(0);
-      expect(idx).toBeLessThan(3);
+  it('never repeats the most recently sent variant (no phrase twice in a row)', () => {
+    for (let u = 0; u < 20; u++) {
+      for (const last of ['v1', 'v2', 'v3']) {
+        const msg = pickMessage({
+          trigger: 'post_ride_celebration',
+          locale: 'en',
+          sassy: true,
+          userId: `repeat-check-${u}`,
+          context: ctx,
+          sendDateISO: '2026-08-12',
+          recentVariantIds: [last],
+        });
+        expect(msg.variantId).not.toBe(last);
+      }
     }
   });
 
-  it('distributes across all 3 buckets given 30 different user ids', () => {
-    const counts = [0, 0, 0];
-    for (let i = 0; i < 30; i++) {
-      const idx = pickVariantIndex(`bucket-test-${i}`, 'post_ride_celebration', 3);
-      counts[idx]!++;
+  it('rotates strictly through a 3-variant pool: two recents force the third', () => {
+    const cases: Array<{ recent: string[]; expected: string }> = [
+      { recent: ['v1', 'v2'], expected: 'v3' },
+      { recent: ['v2', 'v3'], expected: 'v1' },
+      { recent: ['v3', 'v1'], expected: 'v2' },
+    ];
+    for (const { recent, expected } of cases) {
+      const msg = pickMessage({
+        trigger: 'post_ride_celebration',
+        locale: 'en',
+        sassy: true,
+        userId: 'strict-rotation',
+        context: ctx,
+        sendDateISO: '2026-08-12',
+        recentVariantIds: recent,
+      });
+      expect(msg.variantId).toBe(expected);
     }
-    // Each bucket should have at least 1 hit (loose bound for hash quality).
-    for (const c of counts) {
-      expect(c).toBeGreaterThan(0);
-    }
   });
 
-  it('different triggers yield different indices for same user (typical case)', () => {
-    // Not strictly required by the spec, but a hash collision across all
-    // triggers for the same user would suggest something is very wrong.
-    const indices = TRIGGER_LIST.map((t) => pickVariantIndex('test-user', t, 3));
-    const uniqueCount = new Set(indices).size;
-    expect(uniqueCount).toBeGreaterThan(1);
-  });
-
-  it('handles 0 variantCount by returning 0', () => {
-    expect(pickVariantIndex('user-x', 'post_ride_celebration', 0)).toBe(0);
-  });
-});
-
-describe('pickMessage — variant stickiness end-to-end', () => {
-  it('same user + same trigger gets same variant_id across renders', () => {
-    const ctx = { riderName: 'V', streakCount: 10, city: 'Cluj' };
-    const a = pickMessage({
-      trigger: 'streak_at_risk_dramatic',
+  it('clamps memory to variantCount - 1 so the rotation always terminates', () => {
+    // All three ids recent: memory clamps to 2, so the third-most-recent
+    // ('v3') is eligible again — never the two most recent.
+    const msg = pickMessage({
+      trigger: 'post_ride_celebration',
       locale: 'en',
       sassy: true,
-      userId: 'sticky-user',
+      userId: 'clamp-user',
       context: ctx,
+      sendDateISO: '2026-08-12',
+      recentVariantIds: ['v1', 'v2', 'v3'],
     });
-    const b = pickMessage({
-      trigger: 'streak_at_risk_dramatic',
-      locale: 'en',
-      sassy: true,
-      userId: 'sticky-user',
-      context: ctx,
-    });
-    expect(a.variantId).toBe(b.variantId);
+    expect(msg.variantId).toBe('v3');
+    expect(CATALOG_ROTATION_MEMORY).toBe(3);
+  });
+
+  it('varies the pick across send dates for the same user (no lifetime pin)', () => {
+    const seen = new Set<string>();
+    for (let day = 1; day <= 10; day++) {
+      const msg = pickMessage({
+        trigger: 'post_ride_celebration',
+        locale: 'en',
+        sassy: true,
+        userId: 'date-rotation-user',
+        context: ctx,
+        sendDateISO: `2026-08-${String(day).padStart(2, '0')}`,
+      });
+      seen.add(msg.variantId);
+    }
+    expect(seen.size).toBeGreaterThan(1);
   });
 
   it('changing locale does NOT change variant assignment', () => {
-    const ctx = { riderName: 'V', streakCount: 10, city: 'Cluj' };
-    const en = pickMessage({
-      trigger: 'milestone_celebration',
-      locale: 'en',
+    const shared = {
+      trigger: 'milestone_celebration' as const,
       sassy: true,
       userId: 'locale-test',
       context: { ...ctx, milestoneDay: 30 },
-    });
-    const ro = pickMessage({
-      trigger: 'milestone_celebration',
-      locale: 'ro',
-      sassy: true,
-      userId: 'locale-test',
-      context: { ...ctx, milestoneDay: 30 },
-    });
+      sendDateISO: '2026-08-12',
+      recentVariantIds: ['v1'],
+    };
+    const en = pickMessage({ ...shared, locale: 'en' });
+    const ro = pickMessage({ ...shared, locale: 'ro' });
     expect(en.variantId).toBe(ro.variantId);
+  });
+
+  it('neutral mode ignores rotation and always renders v1', () => {
+    const msg = pickMessage({
+      trigger: 'post_ride_celebration',
+      locale: 'en',
+      sassy: false,
+      userId: 'neutral-user',
+      context: ctx,
+      sendDateISO: '2026-08-12',
+      recentVariantIds: ['v1'],
+    });
+    expect(msg.variantId).toBe('v1');
   });
 });
 

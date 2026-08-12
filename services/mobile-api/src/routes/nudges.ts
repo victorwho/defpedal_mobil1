@@ -23,7 +23,6 @@
 import type { ErrorResponse, NudgeTrigger } from '@defensivepedal/core';
 import {
   CITY_PULSE_FALLBACK_POPULATION,
-  CITY_PULSE_ROTATION_MEMORY,
   CITY_PULSE_WEATHER_FACTOR_FLOOR,
   computeCityRiderCount,
   computeRidePattern,
@@ -48,7 +47,7 @@ import { HttpError } from '../lib/http';
 import { verifyBearerSecret } from '../lib/cronAuth';
 import { fetchCyclingForecast } from '../lib/clients/openMeteo';
 import { cityKey, findNearestCity } from '../lib/nudges/cities';
-import { dispatchNudge } from '../lib/nudges/dispatcher';
+import { dispatchNudge, fetchRecentVariantIds } from '../lib/nudges/dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from '../lib/nudges/eligibility';
 import { areNudgesEnabled, isCityPulseEnabled } from '../lib/nudges/killSwitch';
 import { pickHighestPriorityTrigger } from '../lib/nudges/priorityQueue';
@@ -463,7 +462,7 @@ export const buildNudgeRoutes = (
                 dateISO,
                 weatherFactor,
               );
-              recentVariantIds = await fetchRecentCityPulseVariants(db, userId);
+              recentVariantIds = await fetchRecentVariantIds(db, userId, 'city_riders_pulse');
               sendDateISO = dateISO;
               priorityOverride = priorityOverrides?.city_riders_pulse;
               dispatchContext = {
@@ -1252,25 +1251,6 @@ const updateCityPulseSchedule = async (
     .eq('trigger_id', 'city_riders_pulse');
 };
 
-/**
- * Last variant ids actually sent to this user for the pulse (most recent
- * first) — the per-send rotation skips them so no line repeats within four
- * sends.
- */
-const fetchRecentCityPulseVariants = async (
-  db: ReturnType<typeof ensureSupabase>,
-  userId: string,
-): Promise<readonly string[]> => {
-  const { data } = await db
-    .from('nudge_log')
-    .select('variant_id')
-    .eq('user_id', userId)
-    .eq('trigger_id', 'city_riders_pulse')
-    .eq('outcome', 'sent')
-    .order('created_at', { ascending: false })
-    .limit(CITY_PULSE_ROTATION_MEMORY);
-  return ((data ?? []) as Array<{ variant_id: string }>).map((r) => r.variant_id);
-};
 
 /**
  * True if a `nudge_log` row with the given trigger exists for the user

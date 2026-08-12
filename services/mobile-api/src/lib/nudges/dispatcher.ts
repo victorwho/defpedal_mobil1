@@ -10,6 +10,7 @@
  */
 
 import {
+  CATALOG_ROTATION_MEMORY,
   pickMessage,
   type NudgeContext,
   type NudgeLocale,
@@ -19,6 +20,29 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isDeadTokenError, sendPushNotification } from '../push';
+
+/**
+ * Last variant ids actually sent to this user for a trigger (most recent
+ * first, from nudge_log) — pickMessage's per-send rotation skips them so
+ * no rider gets the same line twice in a row. Filtered to outcome 'sent':
+ * suppressed rows also carry a variant_id but were never seen by the user,
+ * so they must not advance the rotation.
+ */
+export const fetchRecentVariantIds = async (
+  db: SupabaseClient,
+  userId: string,
+  trigger: NudgeTrigger,
+): Promise<readonly string[]> => {
+  const { data } = await db
+    .from('nudge_log')
+    .select('variant_id')
+    .eq('user_id', userId)
+    .eq('trigger_id', trigger)
+    .eq('outcome', 'sent')
+    .order('created_at', { ascending: false })
+    .limit(CATALOG_ROTATION_MEMORY);
+  return ((data ?? []) as Array<{ variant_id: string }>).map((r) => r.variant_id);
+};
 
 export interface DispatchRequest {
   readonly userId: string;
@@ -33,9 +57,18 @@ export interface DispatchRequest {
    * on guarantee breach). Falls back to the catalog priority when absent.
    */
   readonly priorityOverride?: NudgePriority;
-  /** city_riders_pulse rotation input — forwarded to pickMessage. */
+  /**
+   * Rotation seed date ("YYYY-MM-DD") forwarded to pickMessage. Optional —
+   * the dispatcher defaults it to today (UTC) so every send rotates.
+   */
   readonly sendDateISO?: string;
-  /** city_riders_pulse rotation input — forwarded to pickMessage. */
+  /**
+   * Recently-sent variant ids forwarded to pickMessage. Optional — when
+   * absent and this dispatch will actually send, the dispatcher reads them
+   * from nudge_log itself. Callers that need the pick ahead of dispatch
+   * (city pulse mirrors it into context) pass the same list to keep the
+   * two computations identical.
+   */
   readonly recentVariantIds?: readonly string[];
   /** Outcome captured by the eligibility/queue layer. */
   readonly outcome:
@@ -82,14 +115,21 @@ export const dispatchNudge = async (
   db: SupabaseClient,
   req: DispatchRequest,
 ): Promise<DispatchResult> => {
+  // Rotation inputs: only a dispatch that will actually send pays for the
+  // nudge_log lookback — suppression rows record a variant purely for
+  // telemetry, and the lookback filters to outcome 'sent' anyway.
+  const willSend = req.outcome === 'scheduled' || req.outcome === 'sent';
+  const recentVariantIds =
+    req.recentVariantIds ??
+    (willSend ? await fetchRecentVariantIds(db, req.userId, req.trigger) : []);
   const message = pickMessage({
     trigger: req.trigger,
     locale: req.locale,
     context: req.context,
     sassy: req.sassy,
     userId: req.userId,
-    sendDateISO: req.sendDateISO,
-    recentVariantIds: req.recentVariantIds,
+    sendDateISO: req.sendDateISO ?? new Date().toISOString().slice(0, 10),
+    recentVariantIds,
   });
   const logPriority = req.priorityOverride ?? message.priority;
 
