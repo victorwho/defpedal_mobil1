@@ -12,17 +12,33 @@ vi.mock('../push', () => ({
 const mockSend = vi.mocked(sendPushNotification);
 
 /**
- * Minimal chainable Supabase fake capturing nudge_log inserts/updates and
- * push_tokens deletes — just enough surface for the dispatcher.
+ * Minimal chainable Supabase fake capturing nudge_log inserts/updates/selects
+ * and push_tokens deletes — just enough surface for the dispatcher.
+ * `recentVariantRows` feeds the rotation lookback query.
  */
-const createDbMock = () => {
+const createDbMock = (recentVariantRows: Array<{ variant_id: string }> = []) => {
   const inserts: Array<{ table: string; row: Record<string, unknown> }> = [];
   const updates: Array<{ table: string; patch: Record<string, unknown> }> = [];
   const deletes: Array<{ table: string }> = [];
+  const selects: Array<{ table: string }> = [];
 
   const db = {
     from(table: string) {
       return {
+        select() {
+          selects.push({ table });
+          return {
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  order: () => ({
+                    limit: async () => ({ data: recentVariantRows, error: null }),
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
         insert(row: Record<string, unknown>) {
           inserts.push({ table, row });
           return {
@@ -43,7 +59,7 @@ const createDbMock = () => {
     },
   } as unknown as SupabaseClient;
 
-  return { db, inserts, updates, deletes };
+  return { db, inserts, updates, deletes, selects };
 };
 
 const baseRequest = {
@@ -173,5 +189,65 @@ describe('dispatchNudge — per-token delivery telemetry (error-log #69)', () =>
     expect(updates).toHaveLength(0);
     const row = inserts.find((i) => i.table === 'nudge_log')!.row as { context: Record<string, unknown> };
     expect(row.context).not.toHaveProperty('delivery');
+  });
+});
+
+describe('dispatchNudge — per-send variant rotation (no phrase twice in a row)', () => {
+  beforeEach(() => {
+    mockSend.mockReset();
+  });
+
+  const catalogRequest = {
+    userId: 'user-1',
+    trigger: 'post_ride_celebration' as const,
+    context: { streakCount: 7 },
+    locale: 'en' as const,
+    sassy: true,
+    outcome: 'scheduled' as const,
+    pushTokens: ['ExponentPushToken[t1]'],
+  };
+
+  it('reads recently-sent variants from nudge_log and never repeats them', async () => {
+    mockSend.mockResolvedValue({ token: 'ExponentPushToken[t1]', ticketId: 'ticket-1' });
+    // v2 then v1 were the last two sends → the 3-variant pool forces v3,
+    // regardless of the rotation's hash seed.
+    const { db, inserts, selects } = createDbMock([
+      { variant_id: 'v2' },
+      { variant_id: 'v1' },
+    ]);
+
+    const result = await dispatchNudge(db, catalogRequest);
+
+    expect(result.outcome).toBe('sent');
+    expect(result.variantId).toBe('v3');
+    expect(selects.some((s) => s.table === 'nudge_log')).toBe(true);
+    const scheduledRow = inserts.find((i) => i.table === 'nudge_log')!.row;
+    expect(scheduledRow.variant_id).toBe('v3');
+  });
+
+  it('uses caller-supplied recentVariantIds without a nudge_log lookback', async () => {
+    mockSend.mockResolvedValue({ token: 'ExponentPushToken[t1]', ticketId: 'ticket-1' });
+    const { db, selects } = createDbMock([{ variant_id: 'v3' }]);
+
+    const result = await dispatchNudge(db, {
+      ...catalogRequest,
+      recentVariantIds: ['v1', 'v3'],
+    });
+
+    expect(selects).toHaveLength(0);
+    expect(result.variantId).toBe('v2');
+  });
+
+  it('skips the lookback entirely on suppression outcomes', async () => {
+    const { db, selects } = createDbMock([{ variant_id: 'v1' }]);
+
+    await dispatchNudge(db, {
+      ...catalogRequest,
+      pushTokens: [],
+      outcome: 'suppressed_weather',
+    });
+
+    expect(selects).toHaveLength(0);
+    expect(mockSend).not.toHaveBeenCalled();
   });
 });

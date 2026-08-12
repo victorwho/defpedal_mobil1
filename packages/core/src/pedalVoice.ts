@@ -12,10 +12,14 @@
  *   4. No emoji as load-bearing semantics. Pedal pose carries the visual.
  *   5. RO register is slightly more formal but stays cheeky.
  *
- * Each trigger ships with 3 sassy variants for A/B testing. Variant
- * selection is sticky per (user_id, trigger_id) via deterministic hash —
- * the same user always sees the same variant of a given trigger, so
- * A/B groups stay stable across sessions and don't fragment attribution.
+ * Each trigger ships with 3 sassy variants. Variant selection ROTATES per
+ * send: djb2(userId|trigger|sendDate) seeds the pick, then the rotation
+ * walks past any variant the user received recently (`recentVariantIds`,
+ * read back from nudge_log by the dispatcher) — a rider never hears the
+ * same line twice in a row. Do NOT reintroduce per-user sticky assignment:
+ * it pins one phrase per rider for life, which on the per-ride P0 triggers
+ * meant the same joke on every single ride. Per-send A/B analysis still
+ * works via nudge_log.variant_id.
  *
  * Neutral mode (rider toggled "sassy off") always renders the FIRST
  * variant. Neutral copy is intentionally functional, never edgy.
@@ -41,9 +45,9 @@ export type NudgeTrigger =
   | 'city_riders_pulse';
 
 /**
- * Triggers that live in the standard sticky-bucket CATALOG below.
- * `city_riders_pulse` is catalogued separately: 20 variants per voice with
- * per-send rotation instead of one sticky variant per user (see plan doc
+ * Triggers that live in the standard CATALOG below (3 variants per locale,
+ * per-send rotation). `city_riders_pulse` is catalogued separately: 20
+ * variants per voice with its own voice-prefixed rotation (see plan doc
  * docs/plans/city-riders-pulse-notification.md §Copy).
  */
 type CatalogNudgeTrigger = Exclude<NudgeTrigger, 'city_riders_pulse'>;
@@ -78,17 +82,20 @@ export interface PedalVoiceRequest {
   readonly context: NudgeContext;
   /** Profile setting — false renders the neutral first variant. */
   readonly sassy: boolean;
-  /** Required for sticky-bucket variant assignment. */
+  /** Required — seeds the per-send rotation hash. */
   readonly userId: string;
   /**
-   * city_riders_pulse only: the send date ("YYYY-MM-DD") feeding the
-   * per-send rotation hash. Other triggers ignore it.
+   * The send date ("YYYY-MM-DD") feeding the per-send rotation hash for
+   * EVERY trigger. The dispatcher fills it in; omitting it just weakens
+   * the rotation seed (recentVariantIds still prevents repeats).
    */
   readonly sendDateISO?: string;
   /**
-   * city_riders_pulse only: the last variant ids shown to this user for the
-   * trigger (most recent first, from nudge_log). The rotation skips the
-   * first three so the same line never repeats within four sends.
+   * The last variant ids actually sent to this user for the trigger (most
+   * recent first, from nudge_log). The rotation skips them — clamped to
+   * variantCount - 1 for small pools — so the same line never repeats
+   * twice in a row. Applies to every trigger; the dispatcher fetches this
+   * when the caller doesn't supply it.
    */
   readonly recentVariantIds?: readonly string[];
 }
@@ -713,7 +720,7 @@ const CATALOG: Record<CatalogNudgeTrigger, TriggerCatalog> = {
 };
 
 // ---------------------------------------------------------------------------
-// Variant assignment (sticky bucket)
+// Variant assignment (per-send rotation)
 // ---------------------------------------------------------------------------
 
 /**
@@ -721,7 +728,7 @@ const CATALOG: Record<CatalogNudgeTrigger, TriggerCatalog> = {
  * djb2 variant — small, no deps, stable across server + client.
  * Returns a non-negative 32-bit integer.
  *
- * Exported as THE project hash for deterministic seeding (sticky buckets
+ * Exported as THE project hash for deterministic seeding (rotation seeds
  * here, city/date seeding in cityPulse.ts) — reuse it, don't add another.
  */
 export const djb2Hash = (input: string): number => {
@@ -732,19 +739,37 @@ export const djb2Hash = (input: string): number => {
   return Math.abs(hash);
 };
 
-const hashKey = djb2Hash;
+/**
+ * How many recently-sent variants the per-send rotation refuses to repeat.
+ * Clamped to variantCount - 1 for small pools: today's 3-variant catalogs
+ * get an effective memory of 2 (strict rotation — never the same line
+ * twice in a row); larger pools use the full 3, matching city pulse.
+ */
+export const CATALOG_ROTATION_MEMORY = 3;
 
 /**
- * Pick a variant index in [0, variantCount). Sticky across calls for the
- * same (userId, trigger) pair. Used so A/B groups stay stable per user.
+ * Per-send rotation for catalog triggers: base index from
+ * djb2(userId|trigger|sendDate), then walk forward past any variant id the
+ * user already received recently. Always terminates — the memory is
+ * clamped below the pool size, so at least one variant survives the skip.
  */
-export const pickVariantIndex = (
+const pickCatalogIndex = (
   userId: string,
   trigger: NudgeTrigger,
-  variantCount: number,
+  variants: readonly VariantTemplate[],
+  sendDateISO: string | undefined,
+  recentVariantIds: readonly string[] | undefined,
 ): number => {
-  if (variantCount <= 0) return 0;
-  return hashKey(`${userId}|${trigger}`) % variantCount;
+  const count = variants.length;
+  if (count <= 1) return 0;
+  const base = djb2Hash(`${userId}|${trigger}|${sendDateISO ?? ''}`) % count;
+  const memory = Math.min(count - 1, CATALOG_ROTATION_MEMORY);
+  const recent = new Set((recentVariantIds ?? []).slice(0, memory));
+  for (let step = 0; step < count; step++) {
+    const index = (base + step) % count;
+    if (!recent.has(variants[index]!.id)) return index;
+  }
+  return base;
 };
 
 // ---------------------------------------------------------------------------
@@ -972,9 +997,17 @@ export const pickMessage = (req: PedalVoiceRequest): PedalVoiceMessage => {
   const catalog = CATALOG[req.trigger];
   const variants = catalog.variants[req.locale];
 
-  // Neutral mode always renders variant index 0; sassy mode uses sticky-bucket.
+  // Neutral mode always renders variant index 0 (the only functional copy —
+  // rotating it would serve edgy lines to riders who turned sassy off);
+  // sassy mode rotates per send.
   const index = req.sassy
-    ? pickVariantIndex(req.userId, req.trigger, variants.length)
+    ? pickCatalogIndex(
+        req.userId,
+        req.trigger,
+        variants,
+        req.sendDateISO,
+        req.recentVariantIds,
+      )
     : 0;
 
   // Safety guard — defensive, the catalog is statically sized so this should
