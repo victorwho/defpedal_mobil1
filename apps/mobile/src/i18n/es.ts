@@ -116,6 +116,82 @@ export const es: TranslationKeys = {
     downloadFailed: 'Error al descargar',
     downloadForOffline: 'Descargar para sin conexión',
     downloadForOfflineA11y: 'Descargar ruta para uso sin conexión',
+    // Safe-vs-fast comparison badge
+    comparison: {
+      calmerCost: '+{{minutes}} min por una ruta más tranquila',
+      calmerCostSub: 'Un poco más de distancia a cambio de mucho menos tráfico.',
+      calmerFree: 'Más tranquila que la ruta rápida — sin tiempo extra',
+      similarFast: 'Seguridad similar a la ruta rápida',
+      sameFast: 'La misma seguridad que la ruta rápida',
+      lessSafe: 'Un {{percent}}% menos segura que la ruta segura',
+      slightlyLessSafe: 'Algo menos segura que la ruta segura',
+      similarSafe: 'Seguridad similar a la ruta segura',
+      sameSafe: 'La misma seguridad que la ruta segura',
+    },
+  },
+
+  // ── Risk Score ──
+  risk: {
+    cardTitle: 'Riesgo de la ruta',
+    cardInfoA11y: 'Cómo funciona la Puntuación de Riesgo',
+    takeawayMostlyGreen: 'Mayormente por calles seguras — el {{percent}}% de esta ruta va por verde.',
+    takeawayNeutral: 'El {{percent}}% de esta ruta va por calles tranquilas.',
+    busyStretch:
+      '{{distance}} por una vía con mucho tráfico — aquí no hay alternativa más tranquila. Extrema la precaución en este tramo o camina con la bici donde esté permitido.',
+    explainer: {
+      title: 'Cómo puntuamos cada calle',
+      intro:
+        'Cada carretera, camino y carril de la app lleva una Puntuación de Riesgo — nuestra estimación de cuánto te expone una calle al peligro cuando la recorres. Cuanto más baja, más segura.',
+      anchor:
+        'Una calle residencial tranquila queda hacia la mitad de la escala. Las calles por debajo se sienten más calmadas que tu calle de casa; las de arriba, más transitadas y exigentes.',
+      legendTitle: 'Qué significan los colores',
+      factorsTitle: 'Qué determina la puntuación',
+      factorSeparation: 'Separación de los coches — carriles protegidos, carril bici o nada. Es lo que más pesa.',
+      factorTraffic: 'Velocidad y tamaño del tráfico — límites de velocidad, número de carriles, vehículos pesados.',
+      factorVolume: 'Volumen de tráfico — cuántos vehículos usan realmente la calle, incluidas las calles-atajo.',
+      factorDesign: 'Diseño de la calle — rotondas, túneles, vías de tranvía, coches aparcados que pueden abrir la puerta.',
+      factorSurface: 'Superficie — calidad del pavimento, adoquines, gravilla, badenes.',
+      factorEnvironment: 'Entorno — iluminación nocturna, zonas escolares, obras.',
+      routing:
+        'Al crear una ruta, equilibramos seguridad y distancia — añadimos con gusto algo de longitud para mantenerte en calles tranquilas.',
+      disclaimer:
+        'La puntuación describe la calle, no el momento — no puede ver el tiempo de hoy ni cómo se comporta el tráfico ahora mismo. Circula siempre según lo que tengas delante.',
+      attribution: 'Basado en datos de OpenStreetMap, modelos de elevación y modelado de tráfico.',
+    },
+    bands: {
+      verySafe: {
+        label: 'Muy segura',
+        desc: 'Totalmente apartada de los coches — carriles protegidos, vías verdes, zonas sin coches. Cómoda para casi cualquiera.',
+      },
+      safe: {
+        label: 'Segura',
+        desc: 'Calles tranquilas y buena infraestructura ciclista. Hay coches, pero pocos y lentos.',
+      },
+      average: {
+        label: 'Media',
+        desc: 'Una calle residencial tranquila típica. Tráfico mixto, pero ligero y lento.',
+      },
+      elevated: {
+        label: 'Elevado',
+        desc: 'Más transitada que una calle de barrio — más tráfico, más velocidad o sin carril bici. Mantente alerta.',
+      },
+      risky: {
+        label: 'Arriesgada',
+        desc: 'Exigente para la mayoría. Tráfico más denso y rápido, con poca protección.',
+      },
+      veryRisky: {
+        label: 'Muy arriesgada',
+        desc: 'Vías principales con tráfico rápido y denso, sin separación. Tu ruta las evita siempre que puede.',
+      },
+      extreme: {
+        label: 'Extrema',
+        desc: 'No pensada para bicicletas — corredores de alta velocidad, túneles, rutas de vehículos pesados. La ruta nunca te enviará por aquí.',
+      },
+      noData: {
+        label: 'Sin datos',
+        desc: 'Esta calle aún no tiene puntuación.',
+      },
+    },
   },
 
   // ── Navigation ──
@@ -1038,6 +1114,9 @@ export const es: TranslationKeys = {
     firstRouteTitleGeneric: 'Una ruta segura cerca de ti y de vuelta',
     firstRouteSubBeginner: 'Una ruta corta y segura para empezar.',
     firstRouteSub: 'La ruta en bici más segura a un destino cercano.',
+    firstRouteRiskHint:
+      'Las calles verdes son tranquilas y protegidas — tu ruta se mantiene en ellas. Naranja significa más tráfico; rojo, tráfico rápido y denso.',
+    firstRouteRiskLink: 'Cómo puntuamos las calles',
     findingRoute: 'Buscando una ruta segura cerca...',
     routeUnavailable: 'Ruta no disponible — continúa para explorar manualmente.',
     statDistance: 'Distancia',

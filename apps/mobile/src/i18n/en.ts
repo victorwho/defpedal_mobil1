@@ -114,6 +114,82 @@ export const en = {
     downloadFailed: 'Download failed',
     downloadForOffline: 'Download for offline',
     downloadForOfflineA11y: 'Download route for offline use',
+    // Safe-vs-fast comparison badge
+    comparison: {
+      calmerCost: '+{{minutes}} min for a calmer ride',
+      calmerCostSub: 'A little distance traded for a lot less traffic.',
+      calmerFree: 'Calmer than the fast route — at no extra time',
+      similarFast: 'Similar safety to the fast route',
+      sameFast: 'Same safety as the fast route',
+      lessSafe: '{{percent}}% less safe than the safe route',
+      slightlyLessSafe: 'Slightly less safe than the safe route',
+      similarSafe: 'Similar safety to the safe route',
+      sameSafe: 'Same safety as the safe route',
+    },
+  },
+
+  // ── Risk Score ──
+  risk: {
+    cardTitle: 'Route risk',
+    cardInfoA11y: 'How the Risk Score works',
+    takeawayMostlyGreen: 'Mostly on safe streets — {{percent}}% of this route is on green.',
+    takeawayNeutral: '{{percent}}% of this route is on calm streets.',
+    busyStretch:
+      '{{distance}} on a busy road — there’s no calmer alternative here. Take extra care on this stretch, or walk your bike where allowed.',
+    explainer: {
+      title: 'How we score every street',
+      intro:
+        'Every road, path and cycleway on the map carries a Risk Score — our estimate of how much a street exposes you to danger when you ride it. Lower is safer.',
+      anchor:
+        'A quiet residential street sits around the middle of the scale. Streets below it feel calmer than your home street; streets above it feel busier and more demanding.',
+      legendTitle: 'What the colors mean',
+      factorsTitle: 'What shapes the score',
+      factorSeparation: 'Separation from cars — protected tracks, bike lanes, or nothing at all. This matters most.',
+      factorTraffic: 'Traffic speed and size — speed limits, number of lanes, heavy vehicles.',
+      factorVolume: 'Traffic volume — how many vehicles actually use the street, including shortcut streets.',
+      factorDesign: 'Street design — roundabouts, tunnels, tram tracks, parked cars you could get doored by.',
+      factorSurface: 'Surface — pavement quality, cobbles, gravel, speed bumps.',
+      factorEnvironment: 'Environment — lighting after dark, school zones, construction.',
+      routing:
+        'When you build a route, we weigh safety against distance — happily adding a little length to keep you on calm streets.',
+      disclaimer:
+        'The score describes the street, not the moment — it can’t see today’s weather or how traffic behaves right now. Always ride to the conditions in front of you.',
+      attribution: 'Built on OpenStreetMap data, elevation models and traffic modeling.',
+    },
+    bands: {
+      verySafe: {
+        label: 'Very safe',
+        desc: 'Away from cars entirely — protected cycle tracks, greenways, car-free zones. Comfortable for nearly everyone.',
+      },
+      safe: {
+        label: 'Safe',
+        desc: 'Calm streets and good bike infrastructure. Cars are present but slow and few.',
+      },
+      average: {
+        label: 'Average',
+        desc: 'A typical quiet residential street. Mixed traffic, but light and slow.',
+      },
+      elevated: {
+        label: 'Elevated',
+        desc: 'Busier than a home street — more traffic, higher speeds, or no bike lane. Stay alert.',
+      },
+      risky: {
+        label: 'Risky',
+        desc: 'Demanding for most riders. Heavier, faster traffic with little protection.',
+      },
+      veryRisky: {
+        label: 'Very risky',
+        desc: 'Main roads with fast, dense traffic and no separation. Your route avoids these whenever possible.',
+      },
+      extreme: {
+        label: 'Extreme',
+        desc: 'Not meant for bicycles — high-speed corridors, tunnels, heavy-vehicle routes. Routing will not send you here.',
+      },
+      noData: {
+        label: 'No data',
+        desc: 'No score for this street yet.',
+      },
+    },
   },
 
   // ── Navigation ──
@@ -1047,6 +1123,9 @@ export const en = {
     firstRouteTitleGeneric: 'A safe route near you and back',
     firstRouteSubBeginner: 'A short, safe route to get you started.',
     firstRouteSub: 'The safest cycling route to a nearby destination.',
+    firstRouteRiskHint:
+      'Green streets are calm and protected — your route sticks to them. Orange means busier; red means fast, dense traffic.',
+    firstRouteRiskLink: 'How we score streets',
     findingRoute: 'Finding a safe route nearby...',
     routeUnavailable: 'Route unavailable — continue to explore manually.',
     statDistance: 'Distance',

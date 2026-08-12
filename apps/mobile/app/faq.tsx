@@ -41,14 +41,29 @@ const FAQ_SECTIONS: FaqSection[] = [
           'Safe mode uses our custom OSRM server with a safety-weighted profile that avoids high-risk road segments. Fast mode uses standard Mapbox cycling directions optimised for shortest travel time.',
       },
       {
-        question: 'How accurate is the risk data?',
+        question: "Why doesn't my route take the shortest way?",
         answer:
-          'Risk scores are computed from OpenStreetMap road attributes (surface type, road class, speed limits, cycling infrastructure) combined with historical incident data where available. The model is updated regularly.',
+          "Because the shortest way is often the busiest. Defensive Pedal weighs safety against distance and prefers calm, protected streets. You can see the trade on the route card — usually it's a couple of minutes for a much calmer ride.",
+      },
+      {
+        question: 'Where does the Risk Score come from?',
+        answer:
+          'From the street itself: speed limits, lanes, bike infrastructure and how well it separates you from cars, modeled traffic volumes, surface quality, lighting, and dozens of other signals — sourced from OpenStreetMap, elevation data and traffic modeling. Lower is safer. Street-by-street scores are currently live in Romania and Spain, with more countries on the way.',
+      },
+      {
+        question: 'Why is this street the wrong color?',
+        answer:
+          'Our map data comes from OpenStreetMap and is refreshed regularly, but streets change — new bike lanes, roadworks, retagged roads. If a score looks wrong, tell us via the suggestion button on the planning screen, and always trust what you see over what the map says.',
+      },
+      {
+        question: 'Is a green street guaranteed to be safe?',
+        answer:
+          "No score can promise that. Green means the street's design and traffic conditions are favorable — it can't see today's weather, a delivery van in the bike lane, or an individual driver. The Risk Score is decision support, not a guarantee. Ride defensively; it's in our name.",
       },
       {
         question: 'Which countries are supported?',
         answer:
-          'Safe routing is currently available in Romania and Spain (mainland and the Balearic Islands). Fast routing works worldwide via Mapbox. More countries are on the way.',
+          'Safe routing is available across 31 European countries (the EU, EEA and Switzerland). Street-by-street risk colors are currently live in Romania and Spain. Fast routing works worldwide via Mapbox.',
       },
       {
         question: 'What does "Avoid unpaved" do?',

@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride, routeMatchesEndpoints } from '@defensivepedal/core';
+import { getPreviewOrigin, hasStartOverride, longestHighRiskStretchMeters, routeMatchesEndpoints } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,6 +42,7 @@ import { useAppStore } from '../src/store/appStore';
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
+import { RiskScoreExplainerSheet } from '../src/design-system/organisms/RiskScoreExplainerSheet';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
 import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -77,6 +78,14 @@ const formatDuration = (seconds: number): string => {
   const mins = totalMinutes % 60;
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 };
+
+/** Minimum contiguous high-risk stretch (m) before the busy-road callout shows. */
+const BUSY_STRETCH_MIN_M = 150;
+
+const formatStretchDistance = (meters: number): string =>
+  meters >= 1000
+    ? `${(meters / 1000).toFixed(1)} km`
+    : `${Math.round(meters / 10) * 10} m`;
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function RoutePreviewScreen() {
@@ -190,6 +199,7 @@ function RoutePreviewScreen() {
   // dismissed flag re-showed it every time).
   const weatherWarningAllowedRef = useRef(!weatherWarningSeenThisSession);
   const [switchingToSafe, setSwitchingToSafe] = useState(false);
+  const [riskExplainerVisible, setRiskExplainerVisible] = useState(false);
   const isFocused = useIsFocused();
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
@@ -268,6 +278,55 @@ function RoutePreviewScreen() {
       null,
     [routePreview, selectedRouteId],
   );
+
+  // Honest-stretch callout: only on safe routes (the copy claims "no calmer
+  // alternative here", which is only true when the safe router placed it).
+  const busyStretchMeters = useMemo(() => {
+    if (!selectedRoute || routePreview?.selectedMode !== 'safe') return 0;
+    return longestHighRiskStretchMeters(selectedRoute.riskSegments);
+  }, [selectedRoute, routePreview?.selectedMode]);
+
+  // Safe-vs-fast comparison badge content. Prefers the structured
+  // `comparison` (localized copy); falls back to the legacy free-text
+  // `comparisonLabel` for previews persisted by pre-2026-08 builds.
+  const comparisonContent = useMemo(() => {
+    const comparison = routePreview?.comparison;
+    if (comparison) {
+      let title: string;
+      let subtitle: string | null = null;
+      if (comparison.against === 'fast') {
+        if (comparison.verdict === 'safer') {
+          if (comparison.extraMinutes) {
+            title = t('preview.comparison.calmerCost', { minutes: comparison.extraMinutes });
+            subtitle = t('preview.comparison.calmerCostSub');
+          } else {
+            title = t('preview.comparison.calmerFree');
+          }
+        } else if (comparison.verdict === 'similar') {
+          title = t('preview.comparison.similarFast');
+        } else {
+          title = t('preview.comparison.sameFast');
+        }
+      } else if (comparison.verdict === 'less_safe') {
+        title = comparison.diffPercent >= 1
+          ? t('preview.comparison.lessSafe', { percent: comparison.diffPercent })
+          : t('preview.comparison.slightlyLessSafe');
+      } else if (comparison.verdict === 'similar') {
+        title = t('preview.comparison.similarSafe');
+      } else {
+        title = t('preview.comparison.sameSafe');
+      }
+      return { title, subtitle, isWarning: comparison.verdict === 'less_safe' };
+    }
+    if (routePreview?.comparisonLabel) {
+      return {
+        title: routePreview.comparisonLabel,
+        subtitle: null,
+        isWarning: routePreview.comparisonLabel.includes('less safe'),
+      };
+    }
+    return null;
+  }, [routePreview?.comparison, routePreview?.comparisonLabel, t]);
 
   // Slice 6: the share button no longer jumps straight to the native
   // share sheet — it opens ShareOptionsModal where the user can flip
@@ -612,6 +671,10 @@ function RoutePreviewScreen() {
       shortRouteFallback={shareShortRouteFallback}
       distanceKm={((selectedRoute?.distanceMeters ?? 0) / 1000).toFixed(1)}
     />
+    <RiskScoreExplainerSheet
+      visible={riskExplainerVisible}
+      onDismiss={() => setRiskExplainerVisible(false)}
+    />
     <MapStageScreen
       useBottomSheet
       peekContent={selectedRoute ? (
@@ -787,28 +850,45 @@ function RoutePreviewScreen() {
       ) : null}
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
-        <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
+        <RiskDistributionCard
+          riskSegments={selectedRoute.riskSegments}
+          onInfoPress={() => setRiskExplainerVisible(true)}
+        />
       ) : null}
 
-      {routePreview?.comparisonLabel ? (
+      {busyStretchMeters >= BUSY_STRETCH_MIN_M ? (
+        <View style={styles.busyStretchRow}>
+          <Ionicons name="warning-outline" size={16} color={colors.caution} />
+          <Text style={styles.busyStretchText}>
+            {t('risk.busyStretch', { distance: formatStretchDistance(busyStretchMeters) })}
+          </Text>
+        </View>
+      ) : null}
+
+      {comparisonContent ? (
         <View>
           <View style={[
             styles.comparisonBadge,
-            routePreview.comparisonLabel.includes('less safe') && styles.comparisonBadgeWarning,
+            comparisonContent.isWarning && styles.comparisonBadgeWarning,
           ]}>
             <Ionicons
-              name={routePreview.comparisonLabel.includes('less safe') ? 'warning' : 'shield-checkmark'}
+              name={comparisonContent.isWarning ? 'warning' : 'shield-checkmark'}
               size={18}
-              color={routePreview.comparisonLabel.includes('less safe') ? colors.caution : colors.safe}
+              color={comparisonContent.isWarning ? colors.caution : colors.safe}
             />
-            <Text style={[
-              styles.comparisonText,
-              routePreview.comparisonLabel.includes('less safe') && styles.comparisonTextWarning,
-            ]}>
-              {routePreview.comparisonLabel}
-            </Text>
+            <View style={styles.comparisonTextColumn}>
+              <Text style={[
+                styles.comparisonText,
+                comparisonContent.isWarning && styles.comparisonTextWarning,
+              ]}>
+                {comparisonContent.title}
+              </Text>
+              {comparisonContent.subtitle ? (
+                <Text style={styles.comparisonSubtext}>{comparisonContent.subtitle}</Text>
+              ) : null}
+            </View>
           </View>
-          {routePreview.comparisonLabel.includes('less safe') ? (
+          {comparisonContent.isWarning ? (
             <Pressable
               style={styles.switchToSafeButton}
               onPress={() => {
@@ -1111,12 +1191,37 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.heading.bold,
       color: colors.safe,
     },
+    comparisonTextColumn: {
+      flex: 1,
+      gap: 2,
+    },
+    comparisonSubtext: {
+      ...textXs,
+      color: colors.textSecondary,
+    },
     comparisonBadgeWarning: {
       borderColor: safetyTints.cautionBorder,
       backgroundColor: safetyTints.cautionLight,
     },
     comparisonTextWarning: {
       color: colors.caution,
+    },
+    busyStretchRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: safetyTints.cautionBorder,
+      backgroundColor: safetyTints.cautionLight,
+    },
+    busyStretchText: {
+      ...textXs,
+      color: colors.textSecondary,
+      flex: 1,
+      lineHeight: 16,
     },
     switchToSafeButton: {
       flexDirection: 'row',

@@ -21,6 +21,7 @@ export * from './routeAnalysis';
 export * from './reviewEligibility';
 export * from './ridePattern';
 export * from './riskDistribution';
+export * from './riskStretch';
 export * from './savedPlaceKeywords';
 export * from './shareCaption';
 export * from './shareCodeGenerator';

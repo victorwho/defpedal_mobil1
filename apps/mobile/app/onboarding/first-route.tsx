@@ -8,6 +8,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
 import { Button, Surface } from '../../src/design-system/atoms';
+import { RiskScoreExplainerSheet } from '../../src/design-system/organisms/RiskScoreExplainerSheet';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { useT } from '../../src/hooks/useTranslation';
 import { safetyColors } from '../../src/design-system/tokens/colors';
@@ -117,6 +118,7 @@ export default function OnboardingFirstRouteScreen() {
   const [destinationName, setDestinationName] = useState<string | null>(null);
   const [destination, setDestination] = useState<Coordinate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [riskExplainerVisible, setRiskExplainerVisible] = useState(false);
   const fetchedRef = useRef(false);
 
   // Find nearby destinations, generate safe routes, pick the safest one
@@ -340,6 +342,21 @@ export default function OnboardingFirstRouteScreen() {
         </View>
       </Surface>
 
+      {/* Risk color hint — the rider is looking at their first green route */}
+      <View style={styles.riskHintBlock}>
+        <Text style={styles.riskHintText}>{t('onboarding.firstRouteRiskHint')}</Text>
+        <Pressable
+          onPress={() => setRiskExplainerVisible(true)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('risk.cardInfoA11y')}
+          style={styles.riskHintLink}
+        >
+          <Text style={styles.riskHintLinkText}>{t('onboarding.firstRouteRiskLink')}</Text>
+          <Ionicons name="chevron-forward" size={12} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+
       {/* Impact counters */}
       <View style={styles.impactRow}>
         <ImpactTile value={String(co2Kg)} unit="kg" label={t('onboarding.impactCo2')} color={safetyColors.safe} />
@@ -358,6 +375,11 @@ export default function OnboardingFirstRouteScreen() {
           {t('onboarding.continue')}
         </Button>
       </View>
+
+      <RiskScoreExplainerSheet
+        visible={riskExplainerVisible}
+        onDismiss={() => setRiskExplainerVisible(false)}
+      />
     </View>
   );
 }
@@ -455,6 +477,28 @@ const createThemedStyles = (colors: ThemeColors) =>
       width: 1,
       height: 28,
       backgroundColor: colors.borderDefault,
+    },
+    riskHintBlock: {
+      paddingTop: space[2],
+      gap: space[1],
+    },
+    riskHintText: {
+      ...textXs,
+      color: colors.textSecondary,
+      lineHeight: 16,
+    },
+    riskHintLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      alignSelf: 'flex-start',
+      minHeight: 28,
+    },
+    riskHintLinkText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: colors.textSecondary,
+      textDecorationLine: 'underline',
     },
     impactRow: {
       flexDirection: 'row',

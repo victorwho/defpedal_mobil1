@@ -699,8 +699,62 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
     });
 
     expect(vi.mocked(fetch).mock.calls).toHaveLength(5);
-    // Empty risk arrays → no label produced (graceful)
+    // Empty risk arrays → no comparison produced (graceful)
+    expect(result.comparison).toBeUndefined();
     expect(result.comparisonLabel).toBeUndefined();
+  });
+
+  it('produces a structured comparison with extraMinutes for a slower safe route', async () => {
+    setupFetchMock([
+      { data: createRouteResponse([createOsrmRoute({ duration: 1200 })]) }, // OSRM safe (20 min)
+      { data: createElevationResponse() },                                  // elevation
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 10, riskLevel: 'low' }] } },
+      { data: createRouteResponse([createOsrmRoute({ duration: 900 })] ) }, // Mapbox fast (15 min)
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 50, riskLevel: 'high' }] } },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      showRouteComparison: true,
+    });
+
+    expect(result.comparison).toEqual({
+      against: 'fast',
+      verdict: 'safer',
+      diffPercent: 80, // |1 - 10/50| = 80%
+      extraMinutes: 5, // 1200s vs 900s
+    });
+    // The legacy free-text label is no longer produced.
+    expect(result.comparisonLabel).toBeUndefined();
+  });
+
+  it('reports less_safe without extraMinutes when riding the fast route', async () => {
+    setupFetchMock([
+      { data: createRouteResponse([createOsrmRoute({ duration: 900 })]) },  // Mapbox fast
+      { data: createElevationResponse() },                                  // elevation
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 50, riskLevel: 'high' }] } },
+      { data: createRouteResponse([createOsrmRoute({ duration: 1200 })]) }, // OSRM safe (comparison)
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 10, riskLevel: 'low' }] } },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+      showRouteComparison: true,
+    });
+
+    expect(result.comparison).toEqual({
+      against: 'safe',
+      verdict: 'less_safe',
+      diffPercent: 400, // |1 - 50/10| = 400%
+    });
   });
 });
 

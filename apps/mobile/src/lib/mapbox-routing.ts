@@ -12,6 +12,7 @@ import type {
   NavigationStep,
   RerouteRequest,
   RiskSegment,
+  RouteComparison,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
@@ -517,7 +518,7 @@ export const directPreviewRoute = async (
     !osrmCoverageMiss &&
     COMPARISON_ELIGIBLE_COUNTRIES.includes(support.country);
 
-  let comparisonLabel: string | undefined;
+  let comparison: RouteComparison | undefined;
   if (comparisonEligible && enrichedRoutes.length > 0) {
     try {
       const avgRisk = (segments: readonly RiskSegment[]) => {
@@ -528,11 +529,12 @@ export const directPreviewRoute = async (
 
       const currentSegments = enrichedRoutes[0].riskSegments;
       let comparisonSegments: readonly RiskSegment[] = [];
+      let comparisonDurationSeconds: number | undefined;
 
       if (effectiveMode === 'safe') {
         // Skip comparison for very long routes — Mapbox 422s at > ~400km (MOBILE-2)
         if (haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
-          // Leave comparisonLabel undefined; no label for extreme-distance routes.
+          // Leave comparison undefined; no comparison for extreme-distance routes.
         } else {
         // Fetch fast route for comparison
         const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
@@ -540,6 +542,9 @@ export const directPreviewRoute = async (
           const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0, locale);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
           comparisonSegments = fastEnriched.riskSegments;
+          // Raw (not elevation-adjusted) duration — the comparison route is
+          // never elevation-enriched, so compare raw vs raw for a fair delta.
+          comparisonDurationSeconds = fastRoute.durationSeconds;
         }
         }
       } else {
@@ -567,26 +572,47 @@ export const directPreviewRoute = async (
           : 0;
 
         if (effectiveMode === 'safe') {
+          let verdict: RouteComparison['verdict'];
           if (currentAvg < comparisonAvg) {
-            comparisonLabel = diffPercent >= 1
-              ? `${diffPercent}% safer than fast route`
-              : 'Slightly safer than fast route';
+            verdict = 'safer';
           } else if (currentAvg > comparisonAvg) {
             // Edge case: safe route scored worse — still inform the user
-            comparisonLabel = 'Similar safety to fast route';
+            verdict = 'similar';
           } else {
-            comparisonLabel = 'Same safety as fast route';
+            verdict = 'same';
           }
+
+          // Time cost of the calmer route vs the fast one — feeds the
+          // "+X min for a calmer ride" line on the preview screen.
+          let extraMinutes: number | undefined;
+          if (verdict === 'safer' && comparisonDurationSeconds !== undefined) {
+            const extra = Math.round(
+              (enrichedRoutes[0].durationSeconds - comparisonDurationSeconds) / 60,
+            );
+            if (extra >= 1) extraMinutes = extra;
+          }
+
+          comparison = {
+            against: 'fast',
+            verdict,
+            diffPercent: verdict === 'safer' ? diffPercent : 0,
+            extraMinutes,
+          };
         } else if (effectiveMode === 'fast') {
+          let verdict: RouteComparison['verdict'];
           if (currentAvg > comparisonAvg) {
-            comparisonLabel = diffPercent >= 1
-              ? `${diffPercent}% less safe than safe route`
-              : 'Slightly less safe than safe route';
+            verdict = 'less_safe';
           } else if (currentAvg < comparisonAvg) {
-            comparisonLabel = 'Similar safety to safe route';
+            verdict = 'similar';
           } else {
-            comparisonLabel = 'Same safety as safe route';
+            verdict = 'same';
           }
+
+          comparison = {
+            against: 'safe',
+            verdict,
+            diffPercent: verdict === 'less_safe' ? diffPercent : 0,
+          };
         }
       }
     } catch {
@@ -616,7 +642,7 @@ export const directPreviewRoute = async (
     routes: enrichedRoutes,
     selectedMode: effectiveMode,
     coverage,
-    comparisonLabel,
+    comparison,
     generatedAt: new Date().toISOString(),
   };
 };

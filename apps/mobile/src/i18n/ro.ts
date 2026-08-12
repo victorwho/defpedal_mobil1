@@ -116,6 +116,82 @@ export const ro: TranslationKeys = {
     downloadFailed: 'Descărcarea a eșuat',
     downloadForOffline: 'Descarcă pentru offline',
     downloadForOfflineA11y: 'Descarcă traseul pentru utilizare offline',
+    // Safe-vs-fast comparison badge
+    comparison: {
+      calmerCost: '+{{minutes}} min pentru o rută mai liniștită',
+      calmerCostSub: 'Puțină distanță în plus pentru mult mai puțin trafic.',
+      calmerFree: 'Mai liniștită decât ruta rapidă — fără timp în plus',
+      similarFast: 'Siguranță similară cu ruta rapidă',
+      sameFast: 'Aceeași siguranță ca ruta rapidă',
+      lessSafe: 'Cu {{percent}}% mai puțin sigură decât ruta sigură',
+      slightlyLessSafe: 'Puțin mai puțin sigură decât ruta sigură',
+      similarSafe: 'Siguranță similară cu ruta sigură',
+      sameSafe: 'Aceeași siguranță ca ruta sigură',
+    },
+  },
+
+  // ── Risk Score ──
+  risk: {
+    cardTitle: 'Riscul rutei',
+    cardInfoA11y: 'Cum funcționează Scorul de Risc',
+    takeawayMostlyGreen: 'În mare parte pe străzi sigure — {{percent}}% din rută e pe verde.',
+    takeawayNeutral: '{{percent}}% din această rută e pe străzi liniștite.',
+    busyStretch:
+      '{{distance}} pe un drum aglomerat — nu există o alternativă mai liniștită aici. Fii extra atent pe această porțiune sau mergi pe lângă bicicletă unde e permis.',
+    explainer: {
+      title: 'Cum evaluăm fiecare stradă',
+      intro:
+        'Fiecare drum, alee și pistă de pe hartă are un Scor de Risc — estimarea noastră despre cât de mult te expune o stradă la pericol când o parcurgi. Mai mic înseamnă mai sigur.',
+      anchor:
+        'O stradă rezidențială liniștită se află pe la mijlocul scalei. Străzile de sub ea se simt mai calme decât strada ta de acasă; cele de deasupra, mai aglomerate și mai solicitante.',
+      legendTitle: 'Ce înseamnă culorile',
+      factorsTitle: 'Ce influențează scorul',
+      factorSeparation: 'Separarea de mașini — piste protejate, benzi pentru biciclete sau nimic. Contează cel mai mult.',
+      factorTraffic: 'Viteza și dimensiunea traficului — limite de viteză, număr de benzi, vehicule grele.',
+      factorVolume: 'Volumul de trafic — câte vehicule folosesc efectiv strada, inclusiv străzile-scurtătură.',
+      factorDesign: 'Configurația străzii — sensuri giratorii, tuneluri, linii de tramvai, mașini parcate care pot deschide portiera.',
+      factorSurface: 'Suprafața — calitatea asfaltului, pavele, pietriș, limitatoare de viteză.',
+      factorEnvironment: 'Mediul — iluminatul pe timp de noapte, zone școlare, șantiere.',
+      routing:
+        'Când construiești o rută, punem în balanță siguranța și distanța — adăugăm bucuroși puțină lungime ca să rămâi pe străzi liniștite.',
+      disclaimer:
+        'Scorul descrie strada, nu momentul — nu poate vedea vremea de azi sau cum se comportă traficul chiar acum. Mergi întotdeauna după condițiile din fața ta.',
+      attribution: 'Construit pe date OpenStreetMap, modele de elevație și modelare de trafic.',
+    },
+    bands: {
+      verySafe: {
+        label: 'Foarte sigură',
+        desc: 'Complet departe de mașini — piste protejate, alei verzi, zone fără mașini. Confortabilă pentru aproape oricine.',
+      },
+      safe: {
+        label: 'Sigură',
+        desc: 'Străzi liniștite și infrastructură bună pentru biciclete. Mașinile există, dar sunt puține și lente.',
+      },
+      average: {
+        label: 'Medie',
+        desc: 'O stradă rezidențială liniștită, tipică. Trafic mixt, dar redus și lent.',
+      },
+      elevated: {
+        label: 'Ridicat',
+        desc: 'Mai aglomerată decât o stradă de cartier — mai mult trafic, viteze mai mari sau fără bandă de biciclete. Fii atent.',
+      },
+      risky: {
+        label: 'Riscantă',
+        desc: 'Solicitantă pentru majoritatea bicicliștilor. Trafic mai intens și mai rapid, cu protecție redusă.',
+      },
+      veryRisky: {
+        label: 'Foarte riscantă',
+        desc: 'Drumuri principale cu trafic rapid și dens, fără separare. Ruta ta le evită ori de câte ori se poate.',
+      },
+      extreme: {
+        label: 'Extremă',
+        desc: 'Nu e făcută pentru biciclete — coridoare de mare viteză, tuneluri, rute de vehicule grele. Rutarea nu te va trimite aici.',
+      },
+      noData: {
+        label: 'Fără date',
+        desc: 'Această stradă nu are încă un scor.',
+      },
+    },
   },
 
   // ── Navigation ──
@@ -1038,6 +1114,9 @@ export const ro: TranslationKeys = {
     firstRouteTitleGeneric: 'O rută sigură aproape de tine și înapoi',
     firstRouteSubBeginner: 'O rută scurtă și sigură ca să începi.',
     firstRouteSub: 'Cea mai sigură rută cu bicicleta către o destinație apropiată.',
+    firstRouteRiskHint:
+      'Străzile verzi sunt calme și protejate — ruta ta rămâne pe ele. Portocaliu înseamnă mai aglomerat; roșu, trafic rapid și dens.',
+    firstRouteRiskLink: 'Cum evaluăm străzile',
     findingRoute: 'Căutăm o rută sigură în apropiere...',
     routeUnavailable: 'Rută indisponibilă — continuă pentru a explora manual.',
     statDistance: 'Distanță',
