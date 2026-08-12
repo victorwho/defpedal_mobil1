@@ -92,20 +92,24 @@ if (GOOD_WEATHER_TITLES.length < 30) {
 }
 
 /**
- * Pick a random title. Accepts an optional `random` function so tests can
- * inject a deterministic source (or seeded PRNG) without monkey-patching
- * `Math.random` globally.
+ * Pick a random title, never one from `excludeTitles` (recently used —
+ * within this scheduling pass plus the persisted memory of the previous
+ * pass) so consecutive notifications don't repeat a line. Falls back to
+ * the full pool if the exclusion list somehow swallows everything.
+ * Accepts an optional `random` function so tests can inject a
+ * deterministic source without monkey-patching `Math.random` globally.
  */
 export const pickRandomGoodWeatherTitle = (
   random: () => number = Math.random,
+  excludeTitles: readonly string[] = [],
 ): string => {
+  const excluded = new Set(excludeTitles);
+  const available = GOOD_WEATHER_TITLES.filter((t) => !excluded.has(t));
+  const pool = available.length > 0 ? available : GOOD_WEATHER_TITLES;
   const r = random();
   // Clamp defensively — a misbehaving PRNG returning 1.0 would index OOB.
-  const idx = Math.min(
-    GOOD_WEATHER_TITLES.length - 1,
-    Math.max(0, Math.floor(r * GOOD_WEATHER_TITLES.length)),
-  );
-  return GOOD_WEATHER_TITLES[idx];
+  const idx = Math.min(pool.length - 1, Math.max(0, Math.floor(r * pool.length)));
+  return pool[idx];
 };
 
 const formatTempRange = (min: number, max: number): string =>
@@ -154,12 +158,14 @@ const weatherCodeIsFog = (code: number): boolean => code >= 45 && code <= 48;
  *
  * Safety warnings fire first (storm / snow / extreme cold / strong wind /
  * heavy or moderate rain / freezing / windy) regardless of the good-weather
- * variants. When the day is genuinely good, picks a random witty title and
- * pairs it with a factual body.
+ * variants. When the day is genuinely good, picks a random witty title
+ * (skipping `excludeTitles`, the recently used ones) and pairs it with a
+ * factual body.
  */
 export const buildCyclingAdvice = (
   forecast: GoodWeatherForecast,
   random: () => number = Math.random,
+  excludeTitles: readonly string[] = [],
 ): { title: string; body: string } => {
   const tempRange = formatTempRange(forecast.tempMin, forecast.tempMax);
   const precipChance = forecast.precipitationProbability;
@@ -223,7 +229,9 @@ export const buildCyclingAdvice = (
 
   if (isGoodCyclingWeather(forecast)) {
     return {
-      title: pickRandomGoodWeatherTitle(random),
+      // Only the witty pool rotates — the safety warnings above are factual
+      // and deliberately repeat verbatim.
+      title: pickRandomGoodWeatherTitle(random, excludeTitles),
       body: buildGoodWeatherBody(forecast),
     };
   }

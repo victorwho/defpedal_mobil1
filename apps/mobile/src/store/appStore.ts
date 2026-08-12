@@ -129,6 +129,11 @@ type AppStore = QueueSlice & {
   // enumerate scheduled notifications (review 2026-07-19, LOW).
   dailyWeatherGeneration: string | null;
   setDailyWeatherGeneration: (generation: string | null) => void;
+  // Witty good-weather titles assigned to the most recent scheduled set —
+  // the next scheduling pass excludes them so the user never gets the same
+  // line twice in a row across generations. Device-scoped like the chain.
+  dailyWeatherRecentTitles: string[];
+  setDailyWeatherRecentTitles: (titles: string[]) => void;
   notifyHazard: boolean;
   notifyCommunity: boolean;
   quietHoursStart: string;
@@ -606,6 +611,7 @@ export const useAppStore = create<AppStore>()(
       notifyWeather: true,
       dailyWeatherChain: [],
       dailyWeatherGeneration: null,
+      dailyWeatherRecentTitles: [],
       notifyHazard: true,
       notifyCommunity: true,
       // Consent opt-in — default OFF, unlike every other notify pref.
@@ -955,6 +961,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ dailyWeatherChain: times })),
       setDailyWeatherGeneration: (generation) =>
         set(() => ({ dailyWeatherGeneration: generation })),
+      setDailyWeatherRecentTitles: (titles) =>
+        set(() => ({ dailyWeatherRecentTitles: titles })),
       setNotifyHazard: (enabled) =>
         set(() => ({ notifyHazard: enabled })),
       setNotifyCommunity: (enabled) =>
@@ -1455,6 +1463,7 @@ export const useAppStore = create<AppStore>()(
         notifyWeather: state.notifyWeather,
         dailyWeatherChain: state.dailyWeatherChain,
         dailyWeatherGeneration: state.dailyWeatherGeneration,
+        dailyWeatherRecentTitles: state.dailyWeatherRecentTitles,
         notifyHazard: state.notifyHazard,
         notifyCommunity: state.notifyCommunity,
         notifyRidingTips: state.notifyRidingTips,

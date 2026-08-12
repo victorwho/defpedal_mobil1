@@ -85,7 +85,11 @@ describe('scheduleDailyWeatherNotifications (behavioral)', () => {
     h.permissionStatus = 'granted';
     h.listThrows = false;
     h.scheduleFailures = 0;
-    useAppStore.setState({ dailyWeatherChain: [], dailyWeatherGeneration: null });
+    useAppStore.setState({
+      dailyWeatherChain: [],
+      dailyWeatherGeneration: null,
+      dailyWeatherRecentTitles: [],
+    });
     stubFetch(true);
   });
 
@@ -171,6 +175,30 @@ describe('scheduleDailyWeatherNotifications (behavioral)', () => {
     expect(indices).toContain(0);
     expect(h.scheduled.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('never assigns the same witty title twice in a set, and never echoes the previous set', async () => {
+    await scheduleDailyWeatherNotifications(45.0, 25.0);
+
+    // All-good-weather payload → every fire gets a witty title. Consecutive
+    // deliveries come from the same set, so no repeats inside it.
+    const firstTitles = h.scheduled.map((s) => s.content.data.title as string);
+    expect(firstTitles.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(firstTitles).size).toBe(firstTitles.length);
+
+    // The assigned titles are persisted for the next pass.
+    const remembered = useAppStore.getState().dailyWeatherRecentTitles;
+    expect(new Set(remembered)).toEqual(new Set(firstTitles));
+
+    // Second pass (new generation) excludes everything the first assigned —
+    // the delivered tail of the superseded set can't echo into the new head.
+    h.scheduled.length = 0;
+    await scheduleDailyWeatherNotifications(45.0, 25.0);
+    const secondTitles = h.scheduled.map((s) => s.content.data.title as string);
+    expect(secondTitles.length).toBeGreaterThanOrEqual(4);
+    for (const title of secondTitles) {
+      expect(firstTitles).not.toContain(title);
+    }
+  });
 });
 
 describe('cancelDailyWeatherNotifications (behavioral)', () => {
@@ -182,7 +210,11 @@ describe('cancelDailyWeatherNotifications (behavioral)', () => {
     h.permissionStatus = 'granted';
     h.listThrows = false;
     h.scheduleFailures = 0;
-    useAppStore.setState({ dailyWeatherChain: [], dailyWeatherGeneration: null });
+    useAppStore.setState({
+      dailyWeatherChain: [],
+      dailyWeatherGeneration: null,
+      dailyWeatherRecentTitles: [],
+    });
   });
 
   it('cancels every weather id (toggle-off) and clears chain + generation', async () => {
