@@ -1,0 +1,261 @@
+/**
+ * Pedal voice catalog — ROMANIAN pools.
+ *
+ * Adapted in-voice, not translated literally (plan §6.1 rule 5: RO register
+ * is slightly more formal than EN but keeps the wit). Same id scheme and
+ * pool sizes as EN — the rotation picks by index, so pools must stay
+ * aligned across locales (locked by test).
+ */
+import type { LocaleCatalog } from './pedalVoiceTypes';
+
+export const RO_CATALOG: LocaleCatalog = {
+  post_ride_celebration: {
+    sassy: [
+      { id: 'v1', title: 'Cursă salvată', body: 'Ziua {streakCount} din streak. Bravo, {riderName}.' },
+      { id: 'v2', title: 'Uite-te la tine', body: '{streakCount} zile la rând. Eu? Nu plâng deloc.' },
+      { id: 'v3', title: 'Pedal e mândru', body: '{streakCount} zile. Îmi schimb biografia să spună că te cunosc.' },
+      { id: 'v4', title: 'Legendă personală', body: 'Ziua {streakCount}. Într-o zi o să spui povestea asta la petreceri.' },
+      { id: 'v5', title: 'Oficial te lauzi', body: '{streakCount} zile la rând. Mai lasă și altora din glorie, {riderName}.' },
+      { id: 'v6', title: 'Pedal a văzut tot', body: 'Cursa aia? Ca la carte. Ziua {streakCount}, bifată.' },
+      { id: 'v7', title: 'Raport de pe canapea', body: 'Eu n-am făcut nimic azi, tu ai {streakCount} zile la rând. Nu suntem la fel.' },
+      { id: 'v8', title: 'Picioare de legendă', body: 'Ziua {streakCount}, gata. Bicicleta ți-ar bate palma dacă ar putea.' },
+      { id: 'v9', title: 'Încă una', body: '{streakCount} zile. Orașul ar trebui să numească o pistă după tine.' },
+      { id: 'v10', title: 'Oamenii de știință, uimiți', body: '{streakCount} zile la rând. Experții îi spun "efectul {riderName}".' },
+      { id: 'v11', title: 'Laudă discretă', body: 'Cursă salvată, ziua {streakCount}. Nici măcar n-ai lăsat să pară greu.' },
+      { id: 'v12', title: 'Aprobat de un câine bun', body: '{streakCount} zile la rând. Aș da din coadă, dar sunt o notificare.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Cursă salvată', body: 'Ziua {streakCount} din streak. Bravo, {riderName}.' },
+      { id: 'n2', title: 'Cursă încheiată', body: 'Ziua {streakCount} din streak e bifată.' },
+      { id: 'n3', title: 'Ziua {streakCount} din streak', body: 'Încă o cursă salvată. Ține-o tot așa, {riderName}.' },
+      { id: 'n4', title: 'Cursă salvată', body: 'Asta înseamnă {streakCount} zile la rând. Bine pedalat.' },
+      { id: 'n5', title: 'Frumos pedalat', body: 'Cursa ta e salvată. Streak: {streakCount} zile.' },
+      { id: 'n6', title: 'Ziua {streakCount} încheiată', body: 'Cursă înregistrată. Ne vedem la următoarea, {riderName}.' },
+    ],
+  },
+
+  post_hazard_thanks: {
+    sassy: [
+      { id: 'v1', title: 'Pericol raportat', body: 'Mulțumesc, {riderName}. Ceilalți cicliști vor vedea raportul.' },
+      { id: 'v2', title: 'Anunț public', body: 'Pedal a notat. Următorul ciclist prin {city} îți datorează o bere.' },
+      { id: 'v3', title: 'Ai salvat o roată azi', body: 'Raportul e activ. Pedal te salută cu o lăbuță.' },
+      { id: 'v4', title: 'Paza cartierului', body: 'Un raport de la tine, o cursă mai lină pentru toți din {city}.' },
+      { id: 'v5', title: 'Comportament de erou', body: 'Ai văzut, ai raportat. {city} nu te merită, {riderName}.' },
+      { id: 'v6', title: 'Străzile îți mulțumesc', body: 'Undeva în {city}, o jantă pe care n-o vei cunoaște tocmai a scăpat.' },
+      { id: 'v7', title: 'Pedal a luat notițe', body: 'Înregistrat, ștampilat, live pe hartă. Birocrația n-a fost niciodată așa rapidă.' },
+      { id: 'v8', title: 'Depozit de karma primit', body: 'Raportul e live. Universul îți datorează o cursă lină.' },
+      { id: 'v9', title: 'Ochi pe drum', body: '{city} are mulți bicicliști. Azi tu ai fost cel atent.' },
+      { id: 'v10', title: 'Pârăști gropile', body: 'Singura bârfă pe care Pedal o aprobă. Raportul e live, {riderName}.' },
+      { id: 'v11', title: 'MVP-ul comunității', body: 'Raport live. Bicicliștii din {city} sunt un pic mai în siguranță.' },
+      { id: 'v12', title: 'Lăbuță de aprobare', body: 'Notat. Dacă aveam degete mari, îți dădeam două.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Pericol raportat', body: 'Mulțumesc, {riderName}. Ceilalți cicliști vor vedea raportul.' },
+      { id: 'n2', title: 'Raport primit', body: 'Raportul tău e acum vizibil pentru bicicliștii din {city}.' },
+      { id: 'n3', title: 'Raport activ', body: 'Mulțumim pentru semnalare. Cei din zonă îl pot evita acum.' },
+      { id: 'n4', title: 'Pericol notat', body: 'Raportul tău îi ajută pe bicicliștii din {city} să circule mai sigur.' },
+      { id: 'n5', title: 'Mulțumim, {riderName}', body: 'Pericolul e pe hartă pentru toți cei din apropiere.' },
+      { id: 'n6', title: 'Raport salvat', body: 'Ceilalți cicliști îți vor vedea avertismentul pe traseu.' },
+    ],
+  },
+
+  streak_at_risk_mild: {
+    sassy: [
+      { id: 'v1', title: 'Reamintire streak', body: 'Streak-ul tău de {streakCount} zile are nevoie de o cursă azi, {riderName}.' },
+      { id: 'v2', title: 'Salut, {riderName}', body: 'O cursă scurtă, mare lucru. {streakCount} zile la rând. Să nu strici tabelul.' },
+      { id: 'v3', title: 'Mică reamintire', body: '{streakCount} zile. {city} e chiar aici. Doar zic.' },
+      { id: 'v4', title: 'Ghiont blând', body: 'Zece minute pe bicicletă țin în viață streak-ul de {streakCount} zile. Am cronometrat.' },
+      { id: 'v5', title: 'Încă fără dramă', body: '{streakCount} zile e un număr frumos. Azi se decide dacă mai crește.' },
+      { id: 'v6', title: 'Pedal, în șoaptă', body: 'Streak-ul e bine. Streak-ul e calm. Streak-ului i-ar prinde bine o tură scurtă.' },
+      { id: 'v7', title: 'Tură mică, matematică mare', body: 'O tură în jurul blocului și {streakCount} devine {streakCount}+1. Simplu.' },
+      { id: 'v8', title: 'Observație discretă', body: 'Bicicleta ta a fost foarte tăcută azi, {riderName}. Suspect de tăcută.' },
+      { id: 'v9', title: 'Un ghiont prietenesc', body: '{city} mai are lumină și tu mai ai un streak de {streakCount} zile. Coincidență?' },
+      { id: 'v10', title: 'Doar o șoaptă', body: 'O tură mică azi și nu mai vorbim niciodată despre asta.' },
+      { id: 'v11', title: 'Pentru arhivă', body: 'Primele {streakCount} zile au fost partea grea. Azi e doar întreținere.' },
+      { id: 'v12', title: 'Alertă fără presiune', body: 'Asta e varianta calmă. Nu vrei s-o cunoști pe cea dramatică.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Reamintire streak', body: 'Streak-ul tău de {streakCount} zile are nevoie de o cursă azi, {riderName}.' },
+      { id: 'n2', title: 'Verificare streak', body: 'O cursă azi îți menține streak-ul de {streakCount} zile.' },
+      { id: 'n3', title: 'Nicio cursă azi', body: 'Streak-ul tău e la {streakCount} zile. Mai e timp.' },
+      { id: 'n4', title: 'Ține-l în viață', body: 'O cursă scurtă azi îți prelungește streak-ul de {streakCount} zile.' },
+      { id: 'n5', title: 'Azi contează', body: 'Orice cursă azi îți păstrează streak-ul, {riderName}.' },
+      { id: 'n6', title: 'Reamintire streak', body: '{streakCount} zile până acum. O tură scurtă azi îl continuă.' },
+    ],
+  },
+
+  streak_at_risk_dramatic: {
+    sassy: [
+      { id: 'v1', title: 'Streak-ul se termină', body: 'Streak-ul de {streakCount} zile se încheie curând. E momentul, {riderName}.' },
+      { id: 'v2', title: '{riderName}', body: '{streakCount} zile. {city} e uscat. Stau lângă fereastră. Aștept.' },
+      { id: 'v3', title: 'Pedal e îngrijorat', body: '{streakCount} zile pedalat. Azi e singurul lucru între tine și zero.' },
+      { id: 'v4', title: 'Asta e varianta dramatică', body: '{streakCount} zile în joc. Am repetat un discurs. Nu mă face să-l folosesc.' },
+      { id: 'v5', title: 'Cod roșu, oarecum', body: 'Contorul de streak n-are sentimente. Eu am destule. {streakCount} zile, {riderName}.' },
+      { id: 'v6', title: 'Pedal se plimbă agitat', body: 'Au mai rămas câteva ore. {streakCount} zile în joc. Ronțăi un papuc de stres.' },
+      { id: 'v7', title: 'Respiră adânc', body: '{streakCount} zile nu s-au întâmplat din greșeală. Nici azi n-ar trebui.' },
+      { id: 'v8', title: 'Fereastra se închide', body: 'Nu a mea. Cea metaforică. {streakCount} zile, {riderName}. Hai.' },
+      { id: 'v9', title: 'Ședință de urgență', body: 'Prezenți: eu, bicicleta ta, streak-ul de {streakCount} zile. Pe ordinea de zi: unde ești?' },
+      { id: 'v10', title: 'Zero nu-ți stă bine', body: '{streakCount} zile sau de la capăt. Știu ce poveste prefer.' },
+      { id: 'v11', title: 'Ultimul apel', body: 'În {city} încă se poate pedala. Ceasul streak-ului, în schimb, ne judecă pe amândoi.' },
+      { id: 'v12', title: 'Cred în tine, cu voce tare', body: '{streakCount} zile. O cursă și legenda rămâne intactă, {riderName}.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Streak-ul se termină', body: 'Streak-ul de {streakCount} zile se încheie curând. E momentul, {riderName}.' },
+      { id: 'n2', title: 'Streak în pericol', body: 'Fără o cursă azi, streak-ul de {streakCount} zile se resetează.' },
+      { id: 'n3', title: 'Timpul e scurt', body: 'Streak-ul tău de {streakCount} zile are nevoie de o cursă până la finalul zilei.' },
+      { id: 'n4', title: 'Ultima reamintire azi', body: 'Pedalează azi ca să-ți păstrezi streak-ul de {streakCount} zile, {riderName}.' },
+      { id: 'n5', title: 'Streak-ul e în joc', body: '{streakCount} zile în joc. O cursă scurtă e de ajuns.' },
+      { id: 'n6', title: 'Streak-ul se încheie azi', body: 'Fără o cursă azi, streak-ul de {streakCount} zile se pierde.' },
+    ],
+  },
+
+  daily_ride_reminder: {
+    sassy: [
+      { id: 'v1', title: 'Fereastră pentru cursă', body: 'Ora ta obișnuită, {riderName}. Condițiile arată bine în {city}.' },
+      { id: 'v2', title: 'E momentul', body: '{city} cheamă. Bicicleta e gata. Pedal la fel.' },
+      { id: 'v3', title: 'Verificare rapidă', body: 'La fel ca ieri, {riderName}? Ți-am păstrat locul cald.' },
+      { id: 'v4', title: 'Fix la program', body: 'Cam pe-acum pedalezi de obicei. Știu lucruri. Sunt un câine foarte organizat.' },
+      { id: 'v5', title: 'Intervalul tău e liber', body: 'Raport de trafic din {city}: ora ta preferată de pedalat tocmai a început.' },
+      { id: 'v6', title: 'Ding', body: 'Ăsta a fost sunetul orei tale obișnuite de cursă. Nu eu fac regulile.' },
+      { id: 'v7', title: 'Ora obiceiului', body: 'Tu, o bicicletă, {city}, fix ora asta. A mai funcționat.' },
+      { id: 'v8', title: 'Rutina te cheamă', body: 'Aceeași oră ca de obicei, {riderName}. Picioarele tale știu drumul pe de rost.' },
+      { id: 'v9', title: 'Pedal a verificat calendarul', body: 'Am o singură intrare și ești tu, pe bicicletă, cam pe-acum.' },
+      { id: 'v10', title: 'Fereastră de oportunitate', body: 'Ora asta are numele tău pe ea. {city} confirmă.' },
+      { id: 'v11', title: 'Străzile sunt pregătite', body: 'Ora perfectă pentru tura ta obișnuită. Am verificat. De două ori.' },
+      { id: 'v12', title: 'Conform tradiției', body: 'Ora ta de pedalat, {riderName}. E legal s-o sari, dar devastator emoțional.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Fereastră pentru cursă', body: 'Ora ta obișnuită, {riderName}. Condițiile arată bine în {city}.' },
+      { id: 'n2', title: 'Reamintire cursă', body: 'Cam la ora asta pedalezi de obicei.' },
+      { id: 'n3', title: 'Ora ta obișnuită', body: 'Condițiile din {city} arată bine pentru o cursă acum.' },
+      { id: 'n4', title: 'O tură?', body: 'Fereastra ta obișnuită de pedalat tocmai s-a deschis, {riderName}.' },
+      { id: 'n5', title: 'Reamintire', body: 'Un moment bun pentru cursa ta obișnuită în {city}.' },
+      { id: 'n6', title: 'Fereastră de cursă', body: 'De obicei pedalezi cam pe-acum. Azi poate fi la fel.' },
+    ],
+  },
+
+  milestone_celebration: {
+    sassy: [
+      { id: 'v1', title: 'Streak de {milestoneDay} zile', body: 'Etapă deblocată, {riderName}. {milestoneDay} zile la rând.' },
+      { id: 'v2', title: '{milestoneDay}. {milestoneDay}!', body: '{riderName}, ești oficial o obișnuință. Îmi fac un tatuaj cu tine.' },
+      { id: 'v3', title: 'Pedal te întreabă', body: 'Ce sunt {milestoneDay} zile de pedalat? O mișcare. Bine ai venit, {riderName}.' },
+      { id: 'v4', title: 'S-a scris istorie', body: '{milestoneDay} zile. Undeva, un statistician tocmai a rămas fără aer.' },
+      { id: 'v5', title: 'Vreme de trofee', body: '{milestoneDay} zile la rând. Te port în triumf în jurul blocului. Mental.' },
+      { id: 'v6', title: 'Icoană certificată', body: '{milestoneDay} zile la rând, {riderName}. Pista de biciclete îți șoptește numele.' },
+      { id: 'v7', title: 'Breaking news', body: 'Un ciclist local atinge {milestoneDay} zile. Câinele, "foarte mândru", spun sursele.' },
+      { id: 'v8', title: 'Asta e una mare', body: '{milestoneDay} zile. Am lătrat la un porumbel în onoarea ta.' },
+      { id: 'v9', title: 'Pune-o în ramă', body: 'Ziua {milestoneDay}, {riderName}. Mulți nu ajung la numărul ăsta. Tu locuiești aici.' },
+      { id: 'v10', title: 'Etapă deblocată', body: '{milestoneDay} zile consecutive. Consecvența ta se laudă din nou.' },
+      { id: 'v11', title: 'Numărul vorbește singur', body: '{milestoneDay}. N-am nimic de adăugat. Totuși: wow, {riderName}.' },
+      { id: 'v12', title: 'Comportament de dinastie', body: '{milestoneDay} zile și numărăm. Vremea verifică acum prognoza pentru tine.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Streak de {milestoneDay} zile', body: 'Etapă deblocată, {riderName}. {milestoneDay} zile la rând.' },
+      { id: 'n2', title: 'Etapă atinsă', body: '{milestoneDay} zile consecutive de pedalat. Felicitări.' },
+      { id: 'n3', title: '{milestoneDay} zile', body: 'O nouă etapă pentru streak-ul tău. Bravo, {riderName}.' },
+      { id: 'n4', title: 'Etapă nouă', body: 'Ai pedalat {milestoneDay} zile la rând.' },
+      { id: 'n5', title: 'Felicitări', body: 'Streak-ul tău a ajuns la {milestoneDay} zile.' },
+      { id: 'n6', title: 'Etapă deblocată', body: '{milestoneDay} zile de pedalat constant. Muncă impresionantă.' },
+    ],
+  },
+
+  badge_proximity: {
+    sassy: [
+      { id: 'v1', title: 'O cursă rămasă', body: 'O cursă în plus deblochează {badgeLabel}, {riderName}.' },
+      { id: 'v2', title: 'Ești atât de aproape', body: '{badgeLabel} e la o cursă. Pedal a scris deja discursul.' },
+      { id: 'v3', title: 'Aproape gata', body: 'Următoarea cursă finalizează {badgeLabel}. Fără presiune.' },
+      { id: 'v4', title: 'Atât de aproape că doare', body: '{badgeLabel} e la o cursă distanță. Stau cu ochii pe ușă.' },
+      { id: 'v5', title: 'Încă una, {riderName}', body: '{badgeLabel} e practic a ta. Insigna îți exersează deja numele.' },
+      { id: 'v6', title: 'N-o lăsa în aer', body: 'O cursă între tine și {badgeLabel}. Atât e toată distanța.' },
+      { id: 'v7', title: 'Pedal a făcut calculul', body: 'O (1) cursă. Ăsta e prețul întreg pentru {badgeLabel}.' },
+      { id: 'v8', title: 'Raftul e pregătit', body: 'Am șters praful pentru {badgeLabel}. Nu mă face să pun o plantă acolo.' },
+      { id: 'v9', title: 'Cliffhanger', body: 'Tu, la o cursă de {badgeLabel}. Cel mai prost loc să pui povestea pe pauză, {riderName}.' },
+      { id: 'v10', title: 'Aproape ora insignei', body: '{badgeLabel} se deblochează la următoarea cursă. Eu am făcut deja turele de bucurie.' },
+      { id: 'v11', title: 'La un pas', body: '{badgeLabel}: o cursă rămasă. Până și insigna are emoții.' },
+      { id: 'v12', title: 'Termină misiunea', body: 'O cursă și {badgeLabel} intră în vitrina cu trofee. Efecte secundare: mândria.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'O cursă rămasă', body: 'O cursă în plus deblochează {badgeLabel}, {riderName}.' },
+      { id: 'n2', title: 'Insignă aproape', body: 'Următoarea ta cursă deblochează {badgeLabel}.' },
+      { id: 'n3', title: 'Aproape câștigată', body: '{badgeLabel} se deblochează după încă o cursă.' },
+      { id: 'n4', title: 'O cursă rămasă', body: 'Mai fă o cursă ca să obții {badgeLabel}, {riderName}.' },
+      { id: 'n5', title: 'Aproape de insignă', body: 'Încă o cursă și {badgeLabel} e a ta.' },
+      { id: 'n6', title: 'Stadiu progres', body: 'Ești la o cursă distanță de {badgeLabel}.' },
+    ],
+  },
+
+  lapsed_reengagement: {
+    sassy: [
+      { id: 'v1', title: 'Pedal te-așteaptă', body: '{lapsedDays} zile. Bicicleta e unde ai lăsat-o, {riderName}.' },
+      { id: 'v2', title: 'Verific tot e bine', body: 'Am verificat. Bicicleta e tot acolo. {city} la fel. Doar zic.' },
+      { id: 'v3', title: 'Fără presiune', body: 'Când ești gata, {riderName}. Pedal are răbdare.' },
+      { id: 'v4', title: 'Tot aici', body: '{lapsedDays} zile fără o cursă. Eu nu m-am mișcat. Așa suntem noi, câinii.' },
+      { id: 'v5', title: 'Bicicleta a întrebat de tine', body: 'N-a zis multe. E o bicicletă. Dar se simțea dorul.' },
+      { id: 'v6', title: 'Dispărut: un ciclist', body: 'Văzut ultima dată acum {lapsedDays} zile. Recompensă: aer curat și puțină mândrie.' },
+      { id: 'v7', title: 'Bântuire blândă', body: 'O să tot apar până pedalezi, {riderName}. Timp am berechet.' },
+      { id: 'v8', title: 'Vești din {city}', body: 'Străzile sunt tot acolo. Le-am numărat. Toate, așteaptă.' },
+      { id: 'v9', title: 'Fără vinovăție, doar fapte', body: '{lapsedDays} zile. Prima cursă de revenire e mereu mai bună decât te aștepți.' },
+      { id: 'v10', title: 'A sunat șaua ta', body: 'Zice că e doar o fază cu canapeaua. E dispusă să aștepte. În mare.' },
+      { id: 'v11', title: 'Revenirea e ușoară', body: 'O cursă scurtă și cele {lapsedDays} zile nici n-au existat.' },
+      { id: 'v12', title: 'Jurnalul lui Pedal', body: 'Ziua {lapsedDays}: tot nicio cursă. Omul ne lipsește. Cu drag, câinele.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Pedal te-așteaptă', body: '{lapsedDays} zile. Bicicleta e unde ai lăsat-o, {riderName}.' },
+      { id: 'n2', title: 'A trecut ceva timp', body: '{lapsedDays} zile de la ultima cursă. Și una scurtă contează.' },
+      { id: 'n3', title: 'Gata când ești și tu', body: 'Bicicleta ta și {city} te așteaptă pentru următoarea cursă.' },
+      { id: 'n4', title: 'Revino oricând', body: 'Fără grabă, {riderName}. O cursă scurtă e un restart bun.' },
+      { id: 'n5', title: 'Reamintire rapidă', body: 'Au trecut {lapsedDays} zile. Chiar și zece minute înseamnă o cursă.' },
+      { id: 'n6', title: 'Următoarea ta cursă', body: 'Când ești gata, harta te așteaptă.' },
+    ],
+  },
+
+  community_signal: {
+    sassy: [
+      { id: 'v1', title: 'Cartierul tău', body: 'Cicliștii din {city} sunt activi. Clasamentul tău s-a schimbat.' },
+      { id: 'v2', title: 'Atenție', body: 'Cineva din {city} tocmai a atins o etapă. Cartierul se mișcă.' },
+      { id: 'v3', title: 'Știri locale', body: 'Activitatea crește în {city} săptămâna asta. Pedal recomandă să te alături.' },
+      { id: 'v4', title: 'Dramă în {city}', body: 'Clasamentul s-a amestecat și numele tău s-a mutat. Nu zic încotro. Pedalează.' },
+      { id: 'v5', title: 'Vecinii sunt ocupați', body: 'Cicliștii din {city} adună kilometri serioși. E rândul tău.' },
+      { id: 'v6', title: 'Bârfe de clasament', body: 'Lumea din {city} urcă. Știi ce bate bârfa? O cursă.' },
+      { id: 'v7', title: 'Alertă de rivalitate amicală', body: 'Cineva din {city} pedalează de parcă e concurs. Tehnic, chiar este.' },
+      { id: 'v8', title: 'Se aude prin oraș', body: 'Cicliștii din {city} adună curse săptămâna asta. Strada vorbește. Eu ascult.' },
+      { id: 'v9', title: 'Clasamentul a observat', body: 'Pozițiile se mișcă în {city}. O cursă face minuni pentru moral.' },
+      { id: 'v10', title: 'Cartierul e în mișcare', body: '{city} pedalează serios săptămâna asta. Nu-i lăsa să aibă toată distracția.' },
+      { id: 'v11', title: 'Actualizare clasament', body: 'Clasamentul din {city} se încinge. Locul tău ar aprecia o cursă de apărare.' },
+      { id: 'v12', title: 'Spirit competitiv activat', body: 'Cicliștii din {city} fac mutări. Poate am mârâit. De susținere.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Cartierul tău', body: 'Cicliștii din {city} sunt activi. Clasamentul tău s-a schimbat.' },
+      { id: 'n2', title: 'Actualizare clasament', body: 'Clasamentul din {city} s-a schimbat săptămâna asta.' },
+      { id: 'n3', title: 'Actualizare comunitate', body: 'Cicliștii din {city} au fost activi în ultima vreme.' },
+      { id: 'n4', title: 'Poziția ta s-a schimbat', body: 'Vezi clasamentul din {city} ca să afli unde ești.' },
+      { id: 'n5', title: 'Activitate în cartier', body: 'Ciclismul prinde viteză în {city} săptămâna asta.' },
+      { id: 'n6', title: 'Clasament modificat', body: 'Cursele recente din {city} au mișcat clasamentul.' },
+    ],
+  },
+
+  streak_lost_apology: {
+    sassy: [
+      { id: 'v1', title: 'Reîncepem', body: 'Streak-ul s-a resetat. Gata pentru trei zile, {riderName}? Apoi vedem.' },
+      { id: 'v2', title: '{riderName}', body: 'În legătură cu ieri. Se întâmplă. Vrei să încercăm 3 zile, fără presiune? Pedal păstrează calmul.' },
+      { id: 'v3', title: 'Pedal reîncepe', body: 'Streak resetat. Trei curse, trei zile, restart lent. Pedal e cu tine.' },
+      { id: 'v4', title: 'Nu vorbim despre ieri', body: 'Zi nouă, numărătoare nouă. Eu am uitat deja numărul vechi. Norocul câinilor.' },
+      { id: 'v5', title: 'Răsturnare de situație, nu final', body: 'Orice streak mare are un sezon doi, {riderName}. Ăsta e trailerul.' },
+      { id: 'v6', title: 'Zero e doar un număr', body: 'Unul urât, ce-i drept. Dar temporar. O cursă rezolvă estetica.' },
+      { id: 'v7', title: 'Comunicat oficial Pedal', body: 'Streak-ul s-a resetat. Loialitatea mea, nu. Mergem?' },
+      { id: 'v8', title: 'Foaie curată', body: 'Un streak nou are miros de bicicletă nouă. Ziua unu te așteaptă, {riderName}.' },
+      { id: 'v9', title: 'Dacă ajută cu ceva', body: 'Streak-urile se resetează. Cicliștii rămân. L-ai construit pe ultimul. Poți și pe ăsta.' },
+      { id: 'v10', title: 'Montaj de revenire', body: 'Orice comeback începe cu o primă cursă. Eu fredonez muzica de antrenament.' },
+      { id: 'v11', title: 'Fără morală', body: 'Contorul a ajuns la zero. Picioarele tale, nu. Când vrei tu, {riderName}.' },
+      { id: 'v12', title: 'Clubul zilei zero', body: 'Toată lumea trece pe aici. Nimeni nu stă mult. O cursă și ai ieșit.' },
+    ],
+    neutral: [
+      { id: 'n1', title: 'Reîncepem', body: 'Streak-ul s-a resetat. Gata pentru trei zile, {riderName}? Apoi vedem.' },
+      { id: 'n2', title: 'Streak resetat', body: 'Un streak nou începe cu următoarea ta cursă.' },
+      { id: 'n3', title: 'De la capăt', body: 'Vechiul streak s-a încheiat. Azi poate începe unul nou.' },
+      { id: 'n4', title: 'Streak nou disponibil', body: 'O cursă pornește următorul lanț, {riderName}.' },
+      { id: 'n5', title: 'Resetările se întâmplă', body: 'Streak-urile vin și pleacă. Următoarea cursă pornește unul proaspăt.' },
+      { id: 'n6', title: 'Gata când ești și tu', body: 'Un streak nou e la o cursă distanță.' },
+    ],
+  },
+};

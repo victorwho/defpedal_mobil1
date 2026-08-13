@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CATALOG_NEUTRAL_VARIANT_COUNT,
   CATALOG_ROTATION_MEMORY,
+  CATALOG_SASSY_VARIANT_COUNT,
   TRIGGERS_BY_PRIORITY,
+  getCatalogPools,
   getTriggerPose,
   getTriggerPriority,
   pickMessage,
-  type NudgeTrigger,
+  type CatalogNudgeTrigger,
+  type NudgeLocale,
 } from './pedalVoice';
 
-const TRIGGER_LIST: NudgeTrigger[] = [
+const TRIGGER_LIST: CatalogNudgeTrigger[] = [
   'post_ride_celebration',
   'post_hazard_thanks',
   'streak_at_risk_mild',
@@ -21,6 +25,21 @@ const TRIGGER_LIST: NudgeTrigger[] = [
   'streak_lost_apology',
 ];
 
+const LOCALES: NudgeLocale[] = ['en', 'ro', 'es'];
+
+const SASSY_ID_RE = /^v([1-9]|1[0-2])$/;
+const NEUTRAL_ID_RE = /^n[1-6]$/;
+
+/** Force the rotation onto one specific variant by marking all others recent. */
+const allIdsExcept = (
+  trigger: CatalogNudgeTrigger,
+  voice: 'sassy' | 'neutral',
+  keepId: string,
+): string[] =>
+  getCatalogPools(trigger, 'en')
+    [voice].map((v) => v.id)
+    .filter((id) => id !== keepId);
+
 describe('pickMessage — basic rendering', () => {
   it('renders post-ride celebration with rider name and streak in EN sassy', () => {
     const msg = pickMessage({
@@ -32,8 +51,7 @@ describe('pickMessage — basic rendering', () => {
     });
     expect(msg.title).toBeTruthy();
     expect(msg.body).toContain('7');
-    // Variant id is one of v1 / v2 / v3
-    expect(['v1', 'v2', 'v3']).toContain(msg.variantId);
+    expect(msg.variantId).toMatch(SASSY_ID_RE);
   });
 
   it('renders RO message when locale is ro', () => {
@@ -44,13 +62,12 @@ describe('pickMessage — basic rendering', () => {
       userId: 'user-a',
       context: { riderName: 'Victor', streakCount: 7 },
     });
-    // The RO catalog uses "zile" (days) / "streak" / "Bravo" — at minimum
-    // it shouldn't contain English word "Streak" with capital S.
+    // The RO catalog talks about "zile" (days) — at minimum it shouldn't
+    // contain the English word "day".
     expect(msg.body).not.toContain('day');
-    expect(msg.body.toLowerCase()).toMatch(/zi|streak|bravo|pedal|mândru/);
   });
 
-  it('renders neutral copy when sassy is false (always variant v1)', () => {
+  it('renders neutral copy from the neutral pool when sassy is false', () => {
     const msg = pickMessage({
       trigger: 'post_ride_celebration',
       locale: 'en',
@@ -58,20 +75,35 @@ describe('pickMessage — basic rendering', () => {
       userId: 'user-b',
       context: { riderName: 'Ana', streakCount: 3 },
     });
-    expect(msg.variantId).toBe('v1');
+    expect(msg.variantId).toMatch(NEUTRAL_ID_RE);
+  });
+
+  it('keeps the legacy n1 neutral line reachable (rotation forced onto n1)', () => {
+    const msg = pickMessage({
+      trigger: 'post_ride_celebration',
+      locale: 'en',
+      sassy: false,
+      userId: 'user-b',
+      context: { riderName: 'Ana', streakCount: 3 },
+      recentVariantIds: allIdsExcept('post_ride_celebration', 'neutral', 'n1'),
+    });
+    expect(msg.variantId).toBe('n1');
     expect(msg.title).toBe('Ride saved');
     expect(msg.body).toBe('Streak day 3. Nicely done, Ana.');
   });
 });
 
 describe('pickMessage — placeholder fallback', () => {
+  const forceN1 = allIdsExcept('post_ride_celebration', 'neutral', 'n1');
+
   it('substitutes "rider" when riderName is missing in EN', () => {
     const msg = pickMessage({
       trigger: 'post_ride_celebration',
       locale: 'en',
-      sassy: false, // v1 contains {riderName}
+      sassy: false,
       userId: 'user-x',
       context: { streakCount: 1 },
+      recentVariantIds: forceN1,
     });
     expect(msg.body).toBe('Streak day 1. Nicely done, rider.');
     expect(msg.body).not.toContain('{riderName}');
@@ -84,19 +116,21 @@ describe('pickMessage — placeholder fallback', () => {
       sassy: false,
       userId: 'user-x',
       context: { streakCount: 1 },
+      recentVariantIds: forceN1,
     });
     expect(msg.body).toContain('prietene');
   });
 
-  it('renders ES neutral copy for post_ride_celebration', () => {
+  it('renders ES neutral n1 copy for post_ride_celebration', () => {
     const msg = pickMessage({
       trigger: 'post_ride_celebration',
       locale: 'es',
       sassy: false,
       userId: 'user-x',
       context: { riderName: 'Ana', streakCount: 3 },
+      recentVariantIds: forceN1,
     });
-    expect(msg.variantId).toBe('v1');
+    expect(msg.variantId).toBe('n1');
     expect(msg.title).toBe('Ruta guardada');
     expect(msg.body).toBe('Día 3 de racha. Bien hecho, Ana.');
   });
@@ -108,6 +142,7 @@ describe('pickMessage — placeholder fallback', () => {
       sassy: false,
       userId: 'user-x',
       context: { streakCount: 1 },
+      recentVariantIds: forceN1,
     });
     expect(msg.body).toContain('ciclista');
   });
@@ -119,25 +154,36 @@ describe('pickMessage — placeholder fallback', () => {
       sassy: false,
       userId: 'user-x',
       context: { riderName: 'V' },
+      recentVariantIds: allIdsExcept('daily_ride_reminder', 'neutral', 'n1'),
     });
     expect(msg.body).toContain('your city');
     expect(msg.body).not.toContain('{city}');
   });
 
   it('never leaks raw placeholders for any variant or locale', () => {
+    // Every {token} in every raw template must be a key the renderer knows,
+    // otherwise it would leak to the user verbatim.
+    const KNOWN = new Set([
+      'riderName',
+      'streakCount',
+      'milestoneDay',
+      'city',
+      'badgeLabel',
+      'lapsedDays',
+      'n',
+    ]);
     for (const trigger of TRIGGER_LIST) {
-      for (const locale of ['en', 'ro', 'es'] as const) {
-        // Pass empty context — every placeholder should fall back gracefully
-        for (let i = 0; i < 3; i++) {
-          const msg = pickMessage({
-            trigger,
-            locale,
-            sassy: true,
-            userId: `seed-${trigger}-${i}`,
-            context: {},
-          });
-          expect(msg.title).not.toMatch(/\{[a-zA-Z]+\}/);
-          expect(msg.body).not.toMatch(/\{[a-zA-Z]+\}/);
+      for (const locale of LOCALES) {
+        const pools = getCatalogPools(trigger, locale);
+        for (const variant of [...pools.sassy, ...pools.neutral]) {
+          for (const text of [variant.title, variant.body]) {
+            for (const match of text.matchAll(/\{([a-zA-Z]+)\}/g)) {
+              expect(
+                KNOWN.has(match[1]!),
+                `unknown placeholder {${match[1]}} in ${trigger}/${locale}/${variant.id}`,
+              ).toBe(true);
+            }
+          }
         }
       }
     }
@@ -161,8 +207,9 @@ describe('pickMessage — per-send variant rotation', () => {
   });
 
   it('never repeats the most recently sent variant (no phrase twice in a row)', () => {
+    const sassyIds = getCatalogPools('post_ride_celebration', 'en').sassy.map((v) => v.id);
     for (let u = 0; u < 20; u++) {
-      for (const last of ['v1', 'v2', 'v3']) {
+      for (const last of sassyIds) {
         const msg = pickMessage({
           trigger: 'post_ride_celebration',
           locale: 'en',
@@ -177,18 +224,36 @@ describe('pickMessage — per-send variant rotation', () => {
     }
   });
 
-  it('rotates strictly through a 3-variant pool: two recents force the third', () => {
+  it('sassy rotation avoids everything inside the 6-send memory window', () => {
+    const recent = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6'];
+    for (let u = 0; u < 20; u++) {
+      const msg = pickMessage({
+        trigger: 'post_ride_celebration',
+        locale: 'en',
+        sassy: true,
+        userId: `window-check-${u}`,
+        context: ctx,
+        sendDateISO: '2026-08-12',
+        recentVariantIds: recent,
+      });
+      expect(recent).not.toContain(msg.variantId);
+    }
+  });
+
+  it('neutral rotates strictly: five recents force the sixth line', () => {
+    // Neutral pools have 6 variants; memory clamps to 5, so listing five ids
+    // as recent deterministically forces the remaining one.
     const cases: Array<{ recent: string[]; expected: string }> = [
-      { recent: ['v1', 'v2'], expected: 'v3' },
-      { recent: ['v2', 'v3'], expected: 'v1' },
-      { recent: ['v3', 'v1'], expected: 'v2' },
+      { recent: ['n1', 'n2', 'n3', 'n4', 'n5'], expected: 'n6' },
+      { recent: ['n2', 'n3', 'n4', 'n5', 'n6'], expected: 'n1' },
+      { recent: ['n6', 'n1', 'n2', 'n3', 'n4'], expected: 'n5' },
     ];
     for (const { recent, expected } of cases) {
       const msg = pickMessage({
         trigger: 'post_ride_celebration',
         locale: 'en',
-        sassy: true,
-        userId: 'strict-rotation',
+        sassy: false,
+        userId: 'strict-neutral-rotation',
         context: ctx,
         sendDateISO: '2026-08-12',
         recentVariantIds: recent,
@@ -197,36 +262,57 @@ describe('pickMessage — per-send variant rotation', () => {
     }
   });
 
-  it('clamps memory to variantCount - 1 so the rotation always terminates', () => {
-    // All three ids recent: memory clamps to 2, so the third-most-recent
-    // ('v3') is eligible again — never the two most recent.
+  it('neutral never repeats the most recent line (the old always-n1 pin is gone)', () => {
+    const neutralIds = getCatalogPools('post_ride_celebration', 'en').neutral.map((v) => v.id);
+    for (let u = 0; u < 20; u++) {
+      for (const last of neutralIds) {
+        const msg = pickMessage({
+          trigger: 'post_ride_celebration',
+          locale: 'en',
+          sassy: false,
+          userId: `neutral-repeat-${u}`,
+          context: ctx,
+          sendDateISO: '2026-08-12',
+          recentVariantIds: [last],
+        });
+        expect(msg.variantId).not.toBe(last);
+      }
+    }
+  });
+
+  it('clamps memory below the pool size so the rotation always terminates', () => {
+    // Every neutral id marked recent: memory clamps to 5, so the OLDEST
+    // recent id ('n6', position 6 in the list) is eligible again — the
+    // rotation can never dead-end.
     const msg = pickMessage({
       trigger: 'post_ride_celebration',
       locale: 'en',
-      sassy: true,
+      sassy: false,
       userId: 'clamp-user',
       context: ctx,
       sendDateISO: '2026-08-12',
-      recentVariantIds: ['v1', 'v2', 'v3'],
+      recentVariantIds: ['n1', 'n2', 'n3', 'n4', 'n5', 'n6'],
     });
-    expect(msg.variantId).toBe('v3');
-    expect(CATALOG_ROTATION_MEMORY).toBe(3);
+    expect(msg.variantId).toBe('n6');
+    expect(CATALOG_ROTATION_MEMORY).toBe(6);
   });
 
   it('varies the pick across send dates for the same user (no lifetime pin)', () => {
-    const seen = new Set<string>();
-    for (let day = 1; day <= 10; day++) {
-      const msg = pickMessage({
-        trigger: 'post_ride_celebration',
-        locale: 'en',
-        sassy: true,
-        userId: 'date-rotation-user',
-        context: ctx,
-        sendDateISO: `2026-08-${String(day).padStart(2, '0')}`,
-      });
-      seen.add(msg.variantId);
+    for (const sassy of [true, false]) {
+      const seen = new Set<string>();
+      for (let day = 1; day <= 10; day++) {
+        const msg = pickMessage({
+          trigger: 'post_ride_celebration',
+          locale: 'en',
+          sassy,
+          userId: 'date-rotation-user',
+          context: ctx,
+          sendDateISO: `2026-08-${String(day).padStart(2, '0')}`,
+        });
+        seen.add(msg.variantId);
+      }
+      expect(seen.size).toBeGreaterThan(1);
     }
-    expect(seen.size).toBeGreaterThan(1);
   });
 
   it('changing locale does NOT change variant assignment', () => {
@@ -242,36 +328,51 @@ describe('pickMessage — per-send variant rotation', () => {
     const ro = pickMessage({ ...shared, locale: 'ro' });
     expect(en.variantId).toBe(ro.variantId);
   });
-
-  it('neutral mode ignores rotation and always renders v1', () => {
-    const msg = pickMessage({
-      trigger: 'post_ride_celebration',
-      locale: 'en',
-      sassy: false,
-      userId: 'neutral-user',
-      context: ctx,
-      sendDateISO: '2026-08-12',
-      recentVariantIds: ['v1'],
-    });
-    expect(msg.variantId).toBe('v1');
-  });
 });
 
 describe('Catalog completeness', () => {
-  it('every trigger has 3 variants per locale', () => {
+  it('every trigger has 12 sassy + 6 neutral variants in every locale', () => {
     for (const trigger of TRIGGER_LIST) {
-      for (let i = 0; i < 3; i++) {
-        const msg = pickMessage({
-          trigger,
-          locale: 'en',
-          sassy: true,
-          userId: `gap-${trigger}-${i}`,
-          context: { riderName: 'V', streakCount: 5, city: 'Cluj', milestoneDay: 7, badgeLabel: 'X', lapsedDays: 7 },
-        });
-        expect(msg.title.length).toBeGreaterThan(0);
-        expect(msg.body.length).toBeGreaterThan(0);
+      for (const locale of LOCALES) {
+        const pools = getCatalogPools(trigger, locale);
+        expect(pools.sassy, `${trigger}/${locale} sassy`).toHaveLength(
+          CATALOG_SASSY_VARIANT_COUNT,
+        );
+        expect(pools.neutral, `${trigger}/${locale} neutral`).toHaveLength(
+          CATALOG_NEUTRAL_VARIANT_COUNT,
+        );
+        for (const variant of [...pools.sassy, ...pools.neutral]) {
+          expect(variant.title.length).toBeGreaterThan(0);
+          expect(variant.body.length).toBeGreaterThan(0);
+        }
       }
     }
+  });
+
+  it('variant ids are positional and voice-namespaced in every locale', () => {
+    // The rotation picks by index and skips by id, so ids must sit at the
+    // same position in every locale (v1 first, v12 last; n1 first, n6 last).
+    for (const trigger of TRIGGER_LIST) {
+      for (const locale of LOCALES) {
+        const pools = getCatalogPools(trigger, locale);
+        pools.sassy.forEach((v, i) => expect(v.id).toBe(`v${i + 1}`));
+        pools.neutral.forEach((v, i) => expect(v.id).toBe(`n${i + 1}`));
+      }
+    }
+  });
+
+  it('legacy lines survive at stable positions (nudge_log history stays coherent)', () => {
+    // v1–v3 are the pre-2026-08 sassy lines; n1 mirrors the old v1 neutral
+    // duty. Spot-check one per locale.
+    expect(getCatalogPools('post_ride_celebration', 'en').sassy[1]!.body).toBe(
+      '{streakCount} days in a row. I am not crying, you are crying.',
+    );
+    expect(getCatalogPools('post_ride_celebration', 'ro').sassy[2]!.body).toBe(
+      '{streakCount} zile. Îmi schimb biografia să spună că te cunosc.',
+    );
+    expect(getCatalogPools('post_ride_celebration', 'es').neutral[0]!.title).toBe(
+      'Ruta guardada',
+    );
   });
 
   it('every trigger has a defined priority and pose', () => {
@@ -284,8 +385,6 @@ describe('Catalog completeness', () => {
   });
 
   it('TRIGGERS_BY_PRIORITY lists all triggers, ordered ascending by priority', () => {
-    // TRIGGER_LIST covers the sticky-catalog triggers; city_riders_pulse is
-    // catalogued separately (per-send rotation) but still counts here.
     expect(new Set(TRIGGERS_BY_PRIORITY).size).toBe(TRIGGER_LIST.length + 1);
     expect(TRIGGERS_BY_PRIORITY).toContain('city_riders_pulse');
     for (let i = 1; i < TRIGGERS_BY_PRIORITY.length; i++) {
@@ -310,26 +409,22 @@ describe('Catalog completeness', () => {
 
 describe('No emoji in any catalog string', () => {
   // Mapbox SymbolLayer + brand rule: no emoji as load-bearing semantics.
-  // Spot-check the catalog by rendering every variant and asserting no
-  // surrogate-pair codepoint above U+1F000 appears.
+  // Check every raw template of every pool — no sampling.
   const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 
-  it('renders no emoji across all triggers/locales/variants', () => {
+  it('contains no emoji across all triggers/locales/voices/variants', () => {
     for (const trigger of TRIGGER_LIST) {
-      for (const locale of ['en', 'ro', 'es'] as const) {
-        for (let i = 0; i < 3; i++) {
-          const msg = pickMessage({
-            trigger,
-            locale,
-            sassy: true,
-            userId: `emoji-check-${trigger}-${locale}-${i}`,
-            context: {
-              riderName: 'V', streakCount: 5, city: 'Cluj',
-              milestoneDay: 7, badgeLabel: 'X', lapsedDays: 7,
-            },
-          });
-          expect(EMOJI_RE.test(msg.title)).toBe(false);
-          expect(EMOJI_RE.test(msg.body)).toBe(false);
+      for (const locale of LOCALES) {
+        const pools = getCatalogPools(trigger, locale);
+        for (const variant of [...pools.sassy, ...pools.neutral]) {
+          expect(
+            EMOJI_RE.test(variant.title),
+            `emoji in ${trigger}/${locale}/${variant.id} title`,
+          ).toBe(false);
+          expect(
+            EMOJI_RE.test(variant.body),
+            `emoji in ${trigger}/${locale}/${variant.id} body`,
+          ).toBe(false);
         }
       }
     }

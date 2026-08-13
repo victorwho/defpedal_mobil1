@@ -3,7 +3,7 @@
  *
  * Pure functions only — no I/O, no clock side effects. The caller supplies
  * a context (rider name, streak count, city, locale, sassy/neutral, userId
- * for sticky-bucket variant assignment) and gets back a rendered message.
+ * for rotation seeding) and gets back a rendered message.
  *
  * Voice rules (locked in plan section 6.1):
  *   1. Witty, never cruel. Pedal teases but doesn't insult.
@@ -12,49 +12,46 @@
  *   4. No emoji as load-bearing semantics. Pedal pose carries the visual.
  *   5. RO register is slightly more formal but stays cheeky.
  *
- * Each trigger ships with 3 sassy variants. Variant selection ROTATES per
- * send: djb2(userId|trigger|sendDate) seeds the pick, then the rotation
- * walks past any variant the user received recently (`recentVariantIds`,
- * read back from nudge_log by the dispatcher) — a rider never hears the
- * same line twice in a row. Do NOT reintroduce per-user sticky assignment:
- * it pins one phrase per rider for life, which on the per-ride P0 triggers
- * meant the same joke on every single ride. Per-send A/B analysis still
- * works via nudge_log.variant_id.
- *
- * Neutral mode (rider toggled "sassy off") always renders the FIRST
- * variant. Neutral copy is intentionally functional, never edgy.
+ * Catalog shape (since 2026-08-13): each trigger has VOICE-KEYED pools per
+ * locale — 12 sassy variants (`v1`..`v12`) and 6 neutral variants
+ * (`n1`..`n6`) — in pedalVoiceCatalog.{en,ro,es}.ts. BOTH voices rotate
+ * per send: djb2(userId|trigger|sendDate) seeds the pick, then the
+ * rotation walks past any variant the user received recently
+ * (`recentVariantIds`, read back from nudge_log by the dispatcher) — a
+ * rider never hears the same line twice in a row. Do NOT reintroduce
+ * per-user sticky assignment: it pins one phrase per rider for life,
+ * which on the per-ride P0 triggers meant the same joke on every single
+ * ride (and neutral's old always-v1 rule was the same defect in disguise).
+ * Per-send A/B analysis still works via nudge_log.variant_id.
  */
 
 import type { MascotPose } from './mascotPose';
+import { EN_CATALOG } from './pedalVoiceCatalog.en';
+import { RO_CATALOG } from './pedalVoiceCatalog.ro';
+import { ES_CATALOG } from './pedalVoiceCatalog.es';
+import type {
+  CatalogNudgeTrigger,
+  LocaleCatalog,
+  NudgeLocale,
+  NudgePriority,
+  NudgeTrigger,
+  VariantTemplate,
+  VoicePools,
+} from './pedalVoiceTypes';
+
+export type {
+  CatalogNudgeTrigger,
+  LocaleCatalog,
+  NudgeLocale,
+  NudgePriority,
+  NudgeTrigger,
+  VariantTemplate,
+  VoicePools,
+} from './pedalVoiceTypes';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type NudgeTrigger =
-  | 'post_ride_celebration'
-  | 'post_hazard_thanks'
-  | 'streak_at_risk_mild'
-  | 'streak_at_risk_dramatic'
-  | 'daily_ride_reminder'
-  | 'milestone_celebration'
-  | 'badge_proximity'
-  | 'lapsed_reengagement'
-  | 'community_signal'
-  | 'streak_lost_apology'
-  | 'city_riders_pulse';
-
-/**
- * Triggers that live in the standard CATALOG below (3 variants per locale,
- * per-send rotation). `city_riders_pulse` is catalogued separately: 20
- * variants per voice with its own voice-prefixed rotation (see plan doc
- * docs/plans/city-riders-pulse-notification.md §Copy).
- */
-type CatalogNudgeTrigger = Exclude<NudgeTrigger, 'city_riders_pulse'>;
-
-export type NudgeLocale = 'en' | 'ro' | 'es';
-
-export type NudgePriority = 0 | 1 | 2 | 3;
 
 export interface NudgeContext {
   readonly riderName?: string;
@@ -80,7 +77,7 @@ export interface PedalVoiceRequest {
   readonly trigger: NudgeTrigger;
   readonly locale: NudgeLocale;
   readonly context: NudgeContext;
-  /** Profile setting — false renders the neutral first variant. */
+  /** Profile setting — false renders from the neutral pool. */
   readonly sassy: boolean;
   /** Required — seeds the per-send rotation hash. */
   readonly userId: string;
@@ -94,8 +91,10 @@ export interface PedalVoiceRequest {
    * The last variant ids actually sent to this user for the trigger (most
    * recent first, from nudge_log). The rotation skips them — clamped to
    * variantCount - 1 for small pools — so the same line never repeats
-   * twice in a row. Applies to every trigger; the dispatcher fetches this
-   * when the caller doesn't supply it.
+   * twice in a row. Applies to every trigger and both voices (the sassy
+   * `v*` / neutral `n*` id namespaces are disjoint, so history from the
+   * other voice is inert); the dispatcher fetches this when the caller
+   * doesn't supply it.
    */
   readonly recentVariantIds?: readonly string[];
 }
@@ -108,616 +107,47 @@ export interface PedalVoiceMessage {
   readonly priority: NudgePriority;
 }
 
-interface VariantTemplate {
-  readonly id: string;
-  readonly title: string;
-  readonly body: string;
-}
+// ---------------------------------------------------------------------------
+// Catalog assembly
+// ---------------------------------------------------------------------------
 
-interface TriggerCatalog {
+/** Pool sizes — locked by the catalog-completeness tests. */
+export const CATALOG_SASSY_VARIANT_COUNT = 12;
+export const CATALOG_NEUTRAL_VARIANT_COUNT = 6;
+
+interface TriggerMeta {
   readonly priority: NudgePriority;
   readonly mascotPose: MascotPose;
-  /** Variants are ordered: index 0 is also the neutral copy. */
-  readonly variants: {
-    readonly en: readonly VariantTemplate[];
-    readonly ro: readonly VariantTemplate[];
-    readonly es: readonly VariantTemplate[];
-  };
 }
 
-// ---------------------------------------------------------------------------
-// Catalog
-// ---------------------------------------------------------------------------
+/** Locale-independent trigger metadata (copy lives in the locale files). */
+const TRIGGER_META: Record<CatalogNudgeTrigger, TriggerMeta> = {
+  post_ride_celebration: { priority: 0, mascotPose: 'cheer' },
+  post_hazard_thanks: { priority: 0, mascotPose: 'cheer' },
+  streak_at_risk_mild: { priority: 3, mascotPose: 'stand' },
+  streak_at_risk_dramatic: { priority: 1, mascotPose: 'stand' },
+  daily_ride_reminder: { priority: 2, mascotPose: 'ride' },
+  milestone_celebration: { priority: 0, mascotPose: 'trophy' },
+  badge_proximity: { priority: 2, mascotPose: 'climb' },
+  lapsed_reengagement: { priority: 3, mascotPose: 'study' },
+  community_signal: { priority: 3, mascotPose: 'cheer' },
+  streak_lost_apology: { priority: 0, mascotPose: 'stand' },
+};
+
+const LOCALE_CATALOGS: Record<NudgeLocale, LocaleCatalog> = {
+  en: EN_CATALOG,
+  ro: RO_CATALOG,
+  es: ES_CATALOG,
+};
 
 /**
- * Master message catalog. 10 triggers × 3 locales × 3 variants = 90 entries.
- * Title and body templates use `{placeholder}` interpolation.
- *
- * IMPORTANT: When adding a placeholder, also list it in the renderer's
- * known-keys map so a missing context value falls back gracefully instead
- * of leaking a literal `{name}` to the user.
+ * Read-only pool accessor for tests and audit tooling — iterate every
+ * variant without reaching through pickMessage's rotation.
  */
-const CATALOG: Record<CatalogNudgeTrigger, TriggerCatalog> = {
-  post_ride_celebration: {
-    priority: 0,
-    mascotPose: 'cheer',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Ride saved',
-          body: 'Streak day {streakCount}. Nicely done, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Look at you',
-          body: '{streakCount} days in a row. I am not crying, you are crying.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal is thrilled',
-          body: '{streakCount} days. I am updating my LinkedIn to say I know you.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Cursă salvată',
-          body: 'Ziua {streakCount} din streak. Bravo, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Uite-te la tine',
-          body: '{streakCount} zile la rând. Eu? Nu plâng deloc.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal e mândru',
-          body: '{streakCount} zile. Îmi schimb biografia să spună că te cunosc.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Ruta guardada',
-          body: 'Día {streakCount} de racha. Bien hecho, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Mírate a ti',
-          body: '{streakCount} días seguidos. No estoy llorando, lloras tú.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal está encantado',
-          body: '{streakCount} días. Voy a actualizar mi LinkedIn diciendo que te conozco.',
-        },
-      ],
-    },
-  },
-
-  post_hazard_thanks: {
-    priority: 0,
-    mascotPose: 'cheer',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Hazard reported',
-          body: 'Thanks, {riderName}. Other riders nearby will see this.',
-        },
-        {
-          id: 'v2',
-          title: 'Public service announcement',
-          body: 'Pedal logged it. The next rider through {city} owes you a beer.',
-        },
-        {
-          id: 'v3',
-          title: 'Saved a tire today',
-          body: 'Your report is live. Pedal salutes you with one paw.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Pericol raportat',
-          body: 'Mulțumesc, {riderName}. Ceilalți cicliști vor vedea raportul.',
-        },
-        {
-          id: 'v2',
-          title: 'Anunț public',
-          body: 'Pedal a notat. Următorul ciclist prin {city} îți datorează o bere.',
-        },
-        {
-          id: 'v3',
-          title: 'Ai salvat o roată azi',
-          body: 'Raportul e activ. Pedal te salută cu o lăbuță.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Peligro reportado',
-          body: 'Gracias, {riderName}. Los demás ciclistas cerca lo verán.',
-        },
-        {
-          id: 'v2',
-          title: 'Aviso público',
-          body: 'Pedal lo ha registrado. El próximo ciclista por {city} te debe una caña.',
-        },
-        {
-          id: 'v3',
-          title: 'Has salvado una rueda hoy',
-          body: 'Tu reporte está en directo. Pedal te saluda con una pata.',
-        },
-      ],
-    },
-  },
-
-  streak_at_risk_mild: {
-    priority: 3,
-    mascotPose: 'stand',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Streak reminder',
-          body: 'Your {streakCount}-day streak needs a ride today, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Hey {riderName}',
-          body: 'Short ride, big deal. {streakCount} days riding. Do not let me ruin the spreadsheet.',
-        },
-        {
-          id: 'v3',
-          title: 'Small reminder',
-          body: '{streakCount} days. {city} is right there. Just saying.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Reamintire streak',
-          body: 'Streak-ul tău de {streakCount} zile are nevoie de o cursă azi, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Salut, {riderName}',
-          body: 'O cursă scurtă, mare lucru. {streakCount} zile la rând. Să nu strici tabelul.',
-        },
-        {
-          id: 'v3',
-          title: 'Mică reamintire',
-          body: '{streakCount} zile. {city} e chiar aici. Doar zic.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Recordatorio de racha',
-          body: 'Tu racha de {streakCount} días necesita una ruta hoy, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Oye, {riderName}',
-          body: 'Una ruta corta, gran cosa. {streakCount} días seguidos. No me dejes estropear la hoja de cálculo.',
-        },
-        {
-          id: 'v3',
-          title: 'Pequeño recordatorio',
-          body: '{streakCount} días. {city} está ahí mismo. Solo digo.',
-        },
-      ],
-    },
-  },
-
-  streak_at_risk_dramatic: {
-    priority: 1,
-    mascotPose: 'stand',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Streak ending soon',
-          body: '{streakCount}-day streak ending soon. Time to ride, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: '{streakCount} days. {city} is dry. I am sitting by the window. I am waiting.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal is concerned',
-          body: '{streakCount} days riding. Today is the only thing between you and zero.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Streak-ul se termină',
-          body: 'Streak-ul de {streakCount} zile se încheie curând. E momentul, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: '{streakCount} zile. {city} e uscat. Stau lângă fereastră. Aștept.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal e îngrijorat',
-          body: '{streakCount} zile pedalat. Azi e singurul lucru între tine și zero.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'La racha está a punto de acabar',
-          body: 'Tu racha de {streakCount} días termina pronto. Hora de montar, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: '{streakCount} días. {city} está seco. Estoy junto a la ventana. Estoy esperando.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal está preocupado',
-          body: '{streakCount} días pedaleando. Hoy es lo único entre tú y el cero.',
-        },
-      ],
-    },
-  },
-
-  daily_ride_reminder: {
-    priority: 2,
-    mascotPose: 'ride',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Ride window open',
-          body: 'Your usual ride hour, {riderName}. Conditions look good in {city}.',
-        },
-        {
-          id: 'v2',
-          title: 'It is time',
-          body: '{city} is calling. The bike is ready. So is Pedal.',
-        },
-        {
-          id: 'v3',
-          title: 'Quick check-in',
-          body: 'Same time as yesterday, {riderName}? Pedal kept your spot warm.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Fereastră pentru cursă',
-          body: 'Ora ta obișnuită, {riderName}. Condițiile arată bine în {city}.',
-        },
-        {
-          id: 'v2',
-          title: 'E momentul',
-          body: '{city} cheamă. Bicicleta e gata. Pedal la fel.',
-        },
-        {
-          id: 'v3',
-          title: 'Verificare rapidă',
-          body: 'La fel ca ieri, {riderName}? Ți-am păstrat locul cald.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Ventana para rodar',
-          body: 'Tu hora habitual, {riderName}. Las condiciones pintan bien en {city}.',
-        },
-        {
-          id: 'v2',
-          title: 'Es la hora',
-          body: '{city} te llama. La bici está lista. Pedal también.',
-        },
-        {
-          id: 'v3',
-          title: 'Chequeo rápido',
-          body: '¿Misma hora que ayer, {riderName}? Pedal te guardó el sitio calentito.',
-        },
-      ],
-    },
-  },
-
-  milestone_celebration: {
-    priority: 0,
-    mascotPose: 'trophy',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: '{milestoneDay}-day streak',
-          body: 'Milestone unlocked, {riderName}. {milestoneDay} days in a row.',
-        },
-        {
-          id: 'v2',
-          title: '{milestoneDay}. {milestoneDay}!',
-          body: '{riderName}, you are officially a habit. I am getting a tattoo of you.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal pop quiz',
-          body: 'What is {milestoneDay} days of riding? A movement. Welcome to it, {riderName}.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Streak de {milestoneDay} zile',
-          body: 'Etapă deblocată, {riderName}. {milestoneDay} zile la rând.',
-        },
-        {
-          id: 'v2',
-          title: '{milestoneDay}. {milestoneDay}!',
-          body: '{riderName}, ești oficial o obișnuință. Îmi fac un tatuaj cu tine.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal te întreabă',
-          body: 'Ce sunt {milestoneDay} zile de pedalat? O mișcare. Bine ai venit, {riderName}.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Racha de {milestoneDay} días',
-          body: 'Hito desbloqueado, {riderName}. {milestoneDay} días seguidos.',
-        },
-        {
-          id: 'v2',
-          title: '{milestoneDay}. ¡{milestoneDay}!',
-          body: '{riderName}, eres oficialmente un hábito. Voy a tatuarme tu cara.',
-        },
-        {
-          id: 'v3',
-          title: 'Pregunta de Pedal',
-          body: '¿Qué son {milestoneDay} días de rodar? Un movimiento. Bienvenido, {riderName}.',
-        },
-      ],
-    },
-  },
-
-  badge_proximity: {
-    priority: 2,
-    mascotPose: 'climb',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'One ride away',
-          body: 'One more ride unlocks {badgeLabel}, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'You are this close',
-          body: '{badgeLabel} is one ride away. Pedal already wrote the speech.',
-        },
-        {
-          id: 'v3',
-          title: 'Almost there',
-          body: 'Your next ride finishes {badgeLabel}. No pressure though.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'O cursă rămasă',
-          body: 'O cursă în plus deblochează {badgeLabel}, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Ești atât de aproape',
-          body: '{badgeLabel} e la o cursă. Pedal a scris deja discursul.',
-        },
-        {
-          id: 'v3',
-          title: 'Aproape gata',
-          body: 'Următoarea cursă finalizează {badgeLabel}. Fără presiune.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'A una ruta',
-          body: 'Una ruta más desbloquea {badgeLabel}, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Estás así de cerca',
-          body: '{badgeLabel} está a una ruta. Pedal ya ha escrito el discurso.',
-        },
-        {
-          id: 'v3',
-          title: 'Casi lo tienes',
-          body: 'Tu próxima ruta cierra {badgeLabel}. Sin presión, eh.',
-        },
-      ],
-    },
-  },
-
-  lapsed_reengagement: {
-    priority: 3,
-    mascotPose: 'study',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Pedal misses you',
-          body: '{lapsedDays} days. Your bike is where you left it, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Welfare check',
-          body: 'I checked. The bike is still there. {city} is still there. Just saying.',
-        },
-        {
-          id: 'v3',
-          title: 'No pressure',
-          body: 'Whenever you are ready, {riderName}. Pedal is patient.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Pedal te-așteaptă',
-          body: '{lapsedDays} zile. Bicicleta e unde ai lăsat-o, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Verific tot e bine',
-          body: 'Am verificat. Bicicleta e tot acolo. {city} la fel. Doar zic.',
-        },
-        {
-          id: 'v3',
-          title: 'Fără presiune',
-          body: 'Când ești gata, {riderName}. Pedal are răbdare.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Pedal te echa de menos',
-          body: '{lapsedDays} días. Tu bici sigue donde la dejaste, {riderName}.',
-        },
-        {
-          id: 'v2',
-          title: 'Comprobación de bienestar',
-          body: 'Comprobado. La bici sigue ahí. {city} también. Solo digo.',
-        },
-        {
-          id: 'v3',
-          title: 'Sin presión',
-          body: 'Cuando estés listo, {riderName}. Pedal es paciente.',
-        },
-      ],
-    },
-  },
-
-  community_signal: {
-    priority: 3,
-    mascotPose: 'cheer',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Neighborhood update',
-          body: '{city} riders are active. Your ranking moved.',
-        },
-        {
-          id: 'v2',
-          title: 'Heads up',
-          body: 'Someone in {city} just hit a milestone. The neighborhood is moving.',
-        },
-        {
-          id: 'v3',
-          title: 'Local news',
-          body: 'Activity is up in {city} this week. Pedal recommends joining in.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Cartierul tău',
-          body: 'Cicliștii din {city} sunt activi. Clasamentul tău s-a schimbat.',
-        },
-        {
-          id: 'v2',
-          title: 'Atenție',
-          body: 'Cineva din {city} tocmai a atins o etapă. Cartierul se mișcă.',
-        },
-        {
-          id: 'v3',
-          title: 'Știri locale',
-          body: 'Activitatea crește în {city} săptămâna asta. Pedal recomandă să te alături.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Tu barrio',
-          body: 'Los ciclistas de {city} están activos. Tu puesto en el ranking ha cambiado.',
-        },
-        {
-          id: 'v2',
-          title: 'Atención',
-          body: 'Alguien en {city} acaba de alcanzar un hito. El barrio se mueve.',
-        },
-        {
-          id: 'v3',
-          title: 'Noticias locales',
-          body: 'La actividad sube en {city} esta semana. Pedal recomienda unirse.',
-        },
-      ],
-    },
-  },
-
-  streak_lost_apology: {
-    priority: 0,
-    mascotPose: 'stand',
-    variants: {
-      en: [
-        {
-          id: 'v1',
-          title: 'Fresh start',
-          body: 'Your streak reset. Ready for three days, {riderName}? Then we see.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: 'About yesterday. Look. It happens. Want to try 3 days, no pressure? I keep it chill.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal regroup',
-          body: 'Streak reset. Three rides, three days, soft restart. Pedal has your back.',
-        },
-      ],
-      ro: [
-        {
-          id: 'v1',
-          title: 'Reîncepem',
-          body: 'Streak-ul s-a resetat. Gata pentru trei zile, {riderName}? Apoi vedem.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: 'În legătură cu ieri. Se întâmplă. Vrei să încercăm 3 zile, fără presiune? Pedal păstrează calmul.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal reîncepe',
-          body: 'Streak resetat. Trei curse, trei zile, restart lent. Pedal e cu tine.',
-        },
-      ],
-      es: [
-        {
-          id: 'v1',
-          title: 'Empezamos de nuevo',
-          body: 'Tu racha se ha reseteado. ¿Listo para tres días, {riderName}? Luego vemos.',
-        },
-        {
-          id: 'v2',
-          title: '{riderName}',
-          body: 'Sobre lo de ayer. Pasa. ¿Probamos 3 días, sin presión? Pedal lo lleva con calma.',
-        },
-        {
-          id: 'v3',
-          title: 'Pedal se reagrupa',
-          body: 'Racha reseteada. Tres rutas, tres días, reinicio suave. Pedal está contigo.',
-        },
-      ],
-    },
-  },
-};
+export const getCatalogPools = (
+  trigger: CatalogNudgeTrigger,
+  locale: NudgeLocale,
+): VoicePools => LOCALE_CATALOGS[locale][trigger];
 
 // ---------------------------------------------------------------------------
 // Variant assignment (per-send rotation)
@@ -741,11 +171,14 @@ export const djb2Hash = (input: string): number => {
 
 /**
  * How many recently-sent variants the per-send rotation refuses to repeat.
- * Clamped to variantCount - 1 for small pools: today's 3-variant catalogs
- * get an effective memory of 2 (strict rotation — never the same line
- * twice in a row); larger pools use the full 3, matching city pulse.
+ * The dispatcher's nudge_log lookback LIMIT rides on this constant — raise
+ * or lower them together by editing here only. Clamped to variantCount - 1
+ * for small pools: the 6-variant neutral pools get an effective memory of
+ * 5 (strict full-cycle rotation — every line fires once before any
+ * repeats); the 12-variant sassy pools use the full 6, so no line returns
+ * within 6 sends.
  */
-export const CATALOG_ROTATION_MEMORY = 3;
+export const CATALOG_ROTATION_MEMORY = 6;
 
 /**
  * Per-send rotation for catalog triggers: base index from
@@ -819,7 +252,7 @@ const renderTemplate = (
 
 /**
  * 2 locales × 2 voices × 20 variants, verbatim from the plan doc
- * (docs/plans/city-riders-pulse-notification.md). Unlike every other trigger,
+ * (docs/plans/city-riders-pulse-notification.md §Copy). Unlike every other trigger,
  * variety is the point here: variant = djb2(userId + sendDate) % 20, skipping
  * the last 3 variant ids the user saw. Voice (sassy/neutral) stays sticky via
  * the pedal_voice_sassy toggle, as everywhere else.
@@ -989,37 +422,34 @@ const pickCityPulseMessage = (req: PedalVoiceRequest): PedalVoiceMessage => {
  * inputs — safe to call from server cron or mobile P0 fast path.
  */
 export const pickMessage = (req: PedalVoiceRequest): PedalVoiceMessage => {
-  // city_riders_pulse rotates per send instead of sticky-bucketing.
+  // city_riders_pulse keeps its own 20-variant voice-prefixed rotation.
   if (req.trigger === 'city_riders_pulse') {
     return pickCityPulseMessage(req);
   }
 
-  const catalog = CATALOG[req.trigger];
-  const variants = catalog.variants[req.locale];
-
-  // Neutral mode always renders variant index 0 (the only functional copy —
-  // rotating it would serve edgy lines to riders who turned sassy off);
-  // sassy mode rotates per send.
-  const index = req.sassy
-    ? pickCatalogIndex(
-        req.userId,
-        req.trigger,
-        variants,
-        req.sendDateISO,
-        req.recentVariantIds,
-      )
-    : 0;
+  const pools = LOCALE_CATALOGS[req.locale][req.trigger];
+  // Both voices rotate through their own pool — neutral riders stopped
+  // getting one pinned line when the neutral pools shipped (2026-08-13).
+  const variants = req.sassy ? pools.sassy : pools.neutral;
+  const index = pickCatalogIndex(
+    req.userId,
+    req.trigger,
+    variants,
+    req.sendDateISO,
+    req.recentVariantIds,
+  );
 
   // Safety guard — defensive, the catalog is statically sized so this should
   // never miss, but a NaN hash would be a silent disaster otherwise.
   const variant = variants[index] ?? variants[0]!;
+  const meta = TRIGGER_META[req.trigger];
 
   return {
     title: renderTemplate(variant.title, req.context, req.locale),
     body: renderTemplate(variant.body, req.context, req.locale),
     variantId: variant.id,
-    mascotPose: catalog.mascotPose,
-    priority: catalog.priority,
+    mascotPose: meta.mascotPose,
+    priority: meta.priority,
   };
 };
 
@@ -1028,10 +458,10 @@ export const pickMessage = (req: PedalVoiceRequest): PedalVoiceMessage => {
  * without rendering a full message.
  */
 export const getTriggerPriority = (trigger: NudgeTrigger): NudgePriority =>
-  trigger === 'city_riders_pulse' ? CITY_PULSE_PRIORITY : CATALOG[trigger].priority;
+  trigger === 'city_riders_pulse' ? CITY_PULSE_PRIORITY : TRIGGER_META[trigger].priority;
 
 export const getTriggerPose = (trigger: NudgeTrigger): MascotPose =>
-  trigger === 'city_riders_pulse' ? CITY_PULSE_POSE : CATALOG[trigger].mascotPose;
+  trigger === 'city_riders_pulse' ? CITY_PULSE_POSE : TRIGGER_META[trigger].mascotPose;
 
 /**
  * All trigger IDs, ordered by priority (P0 → P3). Useful for the cron loop.
@@ -1040,8 +470,8 @@ export const getTriggerPose = (trigger: NudgeTrigger): MascotPose =>
  */
 export const TRIGGERS_BY_PRIORITY: readonly NudgeTrigger[] = (
   [
-    ...Object.entries(CATALOG).map(
-      ([id, c]) => [id as NudgeTrigger, c.priority] as const,
+    ...Object.entries(TRIGGER_META).map(
+      ([id, m]) => [id as NudgeTrigger, m.priority] as const,
     ),
     ['city_riders_pulse', CITY_PULSE_PRIORITY] as const,
   ] as ReadonlyArray<readonly [NudgeTrigger, NudgePriority]>

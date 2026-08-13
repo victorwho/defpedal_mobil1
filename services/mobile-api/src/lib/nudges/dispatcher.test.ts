@@ -209,8 +209,8 @@ describe('dispatchNudge — per-send variant rotation (no phrase twice in a row)
 
   it('reads recently-sent variants from nudge_log and never repeats them', async () => {
     mockSend.mockResolvedValue({ token: 'ExponentPushToken[t1]', ticketId: 'ticket-1' });
-    // v2 then v1 were the last two sends → the 3-variant pool forces v3,
-    // regardless of the rotation's hash seed.
+    // v2 then v1 were the last two sends → whatever the rotation's hash
+    // seed picks from the 12-variant pool, it must skip both.
     const { db, inserts, selects } = createDbMock([
       { variant_id: 'v2' },
       { variant_id: 'v1' },
@@ -219,10 +219,11 @@ describe('dispatchNudge — per-send variant rotation (no phrase twice in a row)
     const result = await dispatchNudge(db, catalogRequest);
 
     expect(result.outcome).toBe('sent');
-    expect(result.variantId).toBe('v3');
+    expect(['v1', 'v2']).not.toContain(result.variantId);
+    expect(result.variantId).toMatch(/^v\d+$/);
     expect(selects.some((s) => s.table === 'nudge_log')).toBe(true);
     const scheduledRow = inserts.find((i) => i.table === 'nudge_log')!.row;
-    expect(scheduledRow.variant_id).toBe('v3');
+    expect(scheduledRow.variant_id).toBe(result.variantId);
   });
 
   it('uses caller-supplied recentVariantIds without a nudge_log lookback', async () => {
@@ -235,7 +236,8 @@ describe('dispatchNudge — per-send variant rotation (no phrase twice in a row)
     });
 
     expect(selects).toHaveLength(0);
-    expect(result.variantId).toBe('v2');
+    expect(['v1', 'v3']).not.toContain(result.variantId);
+    expect(result.variantId).toMatch(/^v\d+$/);
   });
 
   it('skips the lookback entirely on suppression outcomes', async () => {
