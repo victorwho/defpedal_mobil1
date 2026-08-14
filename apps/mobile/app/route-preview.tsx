@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride, longestHighRiskStretchMeters, routeMatchesEndpoints } from '@defensivepedal/core';
+import { getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -114,8 +114,10 @@ function RoutePreviewScreen() {
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
+  const avoidHeat = useAppStore((state) => state.avoidHeat);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const setAvoidHills = useAppStore((state) => state.setAvoidHills);
+  const setAvoidHeat = useAppStore((state) => state.setAvoidHeat);
   const resolvedCountry = useResolvedCountry();
 
   const { isOnline } = useConnectivity();
@@ -218,7 +220,7 @@ function RoutePreviewScreen() {
   }, [showWeatherWarning, markWeatherWarningSeen]);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, showRouteComparison };
+  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, avoidHeat, showRouteComparison };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -354,9 +356,11 @@ function RoutePreviewScreen() {
   const handleShareConfirm = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;
     setShareOptionsVisible(false);
-    const routingMode: 'safe' | 'fast' | 'flat' = avoidHills
-      ? 'flat'
-      : routeRequest.mode;
+    const routingMode: 'safe' | 'fast' | 'flat' | 'cool' = avoidHeat
+      ? 'cool'
+      : avoidHills
+        ? 'flat'
+        : routeRequest.mode;
     void shareRoute({
       route: selectedRoute,
       origin: routeRequest.origin,
@@ -371,6 +375,7 @@ function RoutePreviewScreen() {
     selectedRoute,
     routeRequest,
     avoidHills,
+    avoidHeat,
     shareRoute,
     shareHideEndpoints,
     shareShortRouteFallback,
@@ -558,6 +563,7 @@ function RoutePreviewScreen() {
         mode: routeRequest.mode,
         avoidUnpaved: routeRequest.avoidUnpaved,
         avoidHills: routeRequest.avoidHills,
+        avoidHeat: routeRequest.avoidHeat,
       });
       void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
       setSaveModalVisible(false);
@@ -572,26 +578,39 @@ function RoutePreviewScreen() {
     }
   }, [saveRouteName, routeRequest, queryClient]);
 
-  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Safe) ──
-  // Mirrors the 3-way ModeTogglePill row on route-planning so the user can
-  // switch profiles directly from the preview without going back. Changing
-  // `routeRequest.mode` and/or `avoidHills` invalidates the previewQuery key
-  // (`effectiveRequest`), which triggers an automatic refetch.
-  type RoutingDisplay = 'safe' | 'fast' | 'flat';
+  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Cool → Safe) ──
+  // Mirrors the ModeTogglePill row on route-planning so the user can switch
+  // profiles directly from the preview without going back. Changing
+  // `routeRequest.mode` and/or `avoidHills`/`avoidHeat` invalidates the
+  // previewQuery key (`effectiveRequest`), which triggers an automatic
+  // refetch. Cool is skipped outside the shade-graph countries (RO at
+  // launch) — same gate as the Cool pill on route-planning.
+  const coolAvailable =
+    resolvedCountry.routeSupported &&
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+
+  type RoutingDisplay = 'safe' | 'fast' | 'flat' | 'cool';
   const currentDisplayMode: RoutingDisplay =
-    routeRequest.mode === 'fast' ? 'fast' : avoidHills ? 'flat' : 'safe';
+    routeRequest.mode === 'fast'
+      ? 'fast'
+      : avoidHeat && coolAvailable
+        ? 'cool'
+        : avoidHills
+          ? 'flat'
+          : 'safe';
 
   const modeDisplay: Record<
     RoutingDisplay,
     {
       label: string;
-      variant: 'risk-safe' | 'info' | 'accent';
+      variant: 'risk-safe' | 'info' | 'accent' | 'cool';
       next: RoutingDisplay;
     }
   > = {
     safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
     fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
-    flat: { label: t('planning.flat'), variant: 'accent', next: 'safe' },
+    flat: { label: t('planning.flat'), variant: 'accent', next: coolAvailable ? 'cool' : 'safe' },
+    cool: { label: t('planning.cool'), variant: 'cool', next: 'safe' },
   };
 
   const cycleRoutingMode = useCallback(() => {
@@ -599,15 +618,22 @@ function RoutePreviewScreen() {
     void Speech.stop();
     if (currentDisplayMode === 'safe') {
       setAvoidHills(false);
+      setAvoidHeat(false);
       setRoutingMode('fast');
     } else if (currentDisplayMode === 'fast') {
       setAvoidHills(true);
+      setAvoidHeat(false);
+      setRoutingMode('safe');
+    } else if (currentDisplayMode === 'flat' && coolAvailable) {
+      setAvoidHills(false);
+      setAvoidHeat(true);
       setRoutingMode('safe');
     } else {
       setAvoidHills(false);
+      setAvoidHeat(false);
       setRoutingMode('safe');
     }
-  }, [currentDisplayMode, setAvoidHills, setRoutingMode]);
+  }, [currentDisplayMode, coolAvailable, setAvoidHills, setAvoidHeat, setRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
   // Outside the covered countries (EU-27 + EEA + CH) we only have Mapbox
@@ -854,6 +880,17 @@ function RoutePreviewScreen() {
           riskSegments={selectedRoute.riskSegments}
           onInfoPress={() => setRiskExplainerVisible(true)}
         />
+      ) : selectedRoute && !isRiskDataAvailable(resolvedCountry.destinationCountry) ? (
+        // Route outside risk-data coverage (since the 2026-08-01 EU-wide
+        // dataset that means: outside the 31 covered countries — the
+        // "Continue anyway" cohort): explain the missing risk card instead
+        // of rendering nothing (review G-05). Inside coverage an empty
+        // riskSegments means load-failure/not-yet — keep the silent null
+        // there rather than claiming "not available".
+        <View style={styles.riskUnavailableRow}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+          <Text style={styles.riskUnavailableText}>{t('risk.dataUnavailable')}</Text>
+        </View>
       ) : null}
 
       {busyStretchMeters >= BUSY_STRETCH_MIN_M ? (
@@ -1216,6 +1253,23 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: safetyTints.cautionBorder,
       backgroundColor: safetyTints.cautionLight,
+    },
+    riskUnavailableRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: safetyTints.infoLight,
+      backgroundColor: safetyTints.infoSubtle,
+    },
+    riskUnavailableText: {
+      ...textXs,
+      flex: 1,
+      color: colors.textSecondary,
+      lineHeight: 16,
     },
     busyStretchText: {
       ...textXs,

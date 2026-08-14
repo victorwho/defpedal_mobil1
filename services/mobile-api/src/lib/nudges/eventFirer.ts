@@ -18,6 +18,7 @@ import {
 import { dispatchNudge } from './dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from './eligibility';
 import { areNudgesEnabled } from './killSwitch';
+import { toNudgeLocale } from './locale';
 import { supabaseAdmin } from '../supabaseAdmin';
 
 interface ProfileRow {
@@ -29,10 +30,11 @@ interface ProfileRow {
   quiet_hours_end: string | null;
   quiet_hours_timezone: string | null;
   pedal_voice_sassy: boolean | null;
+  preferred_locale: string | null;
 }
 
 const PROFILE_COLUMNS =
-  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy';
+  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy, preferred_locale';
 
 const toProfile = (row: ProfileRow): UserNudgeProfile => ({
   userId: row.id,
@@ -47,7 +49,10 @@ const toProfile = (row: ProfileRow): UserNudgeProfile => ({
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',
   quietHoursEnd: row.quiet_hours_end ?? '07:00',
-  timezone: row.quiet_hours_timezone ?? 'Europe/Bucharest',
+  // NULL → UTC, unified with routes/nudges.ts + lib/notifications.ts
+  // (review 2026-08-13 G-06). Client syncs the real device timezone at
+  // session bootstrap.
+  timezone: row.quiet_hours_timezone ?? 'UTC',
 });
 
 /**
@@ -114,7 +119,7 @@ const fireP0EventAsync = async (
       userId,
       trigger,
       context: mergedContext,
-      locale: 'en', // Phase 2 stores locale on profile
+      locale: toNudgeLocale(typed.preferred_locale),
       sassy: typed.pedal_voice_sassy ?? true,
       pushTokens,
       outcome: outcome as Parameters<typeof dispatchNudge>[1]['outcome'],

@@ -35,16 +35,17 @@ export type TripStartBody = TripStartRequest;
 export type TripEndBody = TripEndRequest;
 export type NavigationFeedbackBody = NavigationFeedbackRequest;
 
-export type SavedRouteCreateBody = SavedRouteCreateRequest;
+// avoidHeat optional: clients that pre-date cool routing don't send it.
+export type SavedRouteCreateBody = WithOptional<SavedRouteCreateRequest, 'avoidHeat'>;
 
 export type RoutePreviewBody = WithOptional<
   RoutePreviewRequest,
-  'startOverride' | 'avoidUnpaved' | 'locale' | 'countryHint' | 'debug'
+  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'locale' | 'countryHint' | 'debug'
 >;
 
 export type RerouteBody = WithOptional<
   RerouteRequest,
-  'startOverride' | 'avoidUnpaved' | 'locale' | 'countryHint' | 'debug' | 'activeRouteId'
+  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'locale' | 'countryHint' | 'debug' | 'activeRouteId'
 >;
 
 const coordinatePairSchema = {
@@ -815,6 +816,9 @@ export const routePreviewRequestSchema = {
     avoidHills: {
       type: 'boolean',
     },
+    avoidHeat: {
+      type: 'boolean',
+    },
     locale: localeSchema,
     countryHint: countryHintSchema,
     debug: {
@@ -877,6 +881,7 @@ export const savedRouteCreateRequestSchema = {
     mode: { type: 'string', enum: ['safe', 'fast'] },
     avoidUnpaved: { type: 'boolean' },
     avoidHills: { type: 'boolean' },
+    avoidHeat: { type: 'boolean' },
   },
 } as const;
 
@@ -891,6 +896,7 @@ export const savedRouteResponseSchema = {
     mode: { type: 'string' },
     avoidUnpaved: { type: 'boolean' },
     avoidHills: { type: 'boolean' },
+    avoidHeat: { type: 'boolean' },
     createdAt: { type: 'string' },
     lastUsedAt: { type: 'string' },
   },
@@ -916,6 +922,7 @@ export const normalizeSavedRouteCreateRequest = (
   mode: body.mode,
   avoidUnpaved: body.avoidUnpaved,
   avoidHills: body.avoidHills,
+  avoidHeat: body.avoidHeat ?? false,
 });
 
 export class HttpError extends Error {
@@ -1033,6 +1040,7 @@ export const normalizeRoutePreviewRequest = (
   mode: body.mode,
   avoidUnpaved: body.avoidUnpaved ?? false,
   avoidHills: body.avoidHills ?? false,
+  avoidHeat: body.avoidHeat ?? false,
   locale: body.locale ?? 'en',
   countryHint: body.countryHint,
   debug: body.debug ?? false,

@@ -92,7 +92,7 @@ describe('offlineRouteCache', () => {
     expect(await keyValueStorage.getString(STORAGE_KEY)).toBeNull();
   });
 
-  it('validates routingMode is one of safe | fast | flat', async () => {
+  it('validates routingMode is one of safe | fast | flat | cool', async () => {
     const safeRoute = makeCachedRoute({ routingMode: 'safe' });
     await cacheActiveRoute(safeRoute);
     expect(await loadCachedRoute()).toEqual(safeRoute);
@@ -104,6 +104,10 @@ describe('offlineRouteCache', () => {
     const flatRoute = makeCachedRoute({ routingMode: 'flat' });
     await cacheActiveRoute(flatRoute);
     expect(await loadCachedRoute()).toEqual(flatRoute);
+
+    const coolRoute = makeCachedRoute({ routingMode: 'cool' });
+    await cacheActiveRoute(coolRoute);
+    expect(await loadCachedRoute()).toEqual(coolRoute);
   });
 
   it('rejects invalid routingMode (e.g. turbo) and returns null', async () => {

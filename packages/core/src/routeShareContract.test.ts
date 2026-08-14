@@ -63,8 +63,8 @@ describe('routeShareCreateSchema — accept', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts routingMode "safe" | "fast" | "flat"', () => {
-    for (const mode of ['safe', 'fast', 'flat'] as const) {
+  it('accepts routingMode "safe" | "fast" | "flat" | "cool"', () => {
+    for (const mode of ['safe', 'fast', 'flat', 'cool'] as const) {
       const result = routeShareCreateSchema.safeParse({
         ...validPlannedCreate,
         route: { ...validPlannedRoute, routingMode: mode },

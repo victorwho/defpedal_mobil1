@@ -1,8 +1,9 @@
 /**
  * ISO 3166-1 alpha-2 country list for the onboarding region-gate picker.
  *
- * English names only (v1): the picker is only reached by riders outside the
- * supported EU+EEA+CH+UK region, and Hermes does not reliably ship
+ * English names only (v1): the picker is mostly reached by riders whose
+ * country could not be auto-detected (the supported region is EU+EEA+CH —
+ * the UK is deliberately NOT supported), and Hermes does not reliably ship
  * `Intl.DisplayNames`, so a static list is the dependable option. Sorted by
  * English name; the screen offers a search field so ordering is a fallback,
  * not the primary navigation.

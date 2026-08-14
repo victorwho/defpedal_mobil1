@@ -200,6 +200,7 @@ describe('mobile-api v1 routes', () => {
         },
         avoidUnpaved: false,
         avoidHills: false,
+        avoidHeat: false,
       });
 
       const payload = response.json();
@@ -383,6 +384,7 @@ describe('mobile-api v1 routes', () => {
         },
         avoidUnpaved: false,
         avoidHills: false,
+        avoidHeat: false,
       });
     } finally {
       await app.close();

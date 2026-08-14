@@ -103,6 +103,7 @@ export const profileUpdateRequestSchema = {
     shareConversionFeedOptin: { type: 'boolean' },
     keepFullGpsHistory: { type: 'boolean' },
     pedalVoiceSassy: { type: 'boolean' },
+    preferredLocale: { type: 'string', enum: ['en', 'ro', 'es'] },
   },
 } as const;
 

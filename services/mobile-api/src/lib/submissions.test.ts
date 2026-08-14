@@ -117,9 +117,9 @@ describe('getTripStatsDashboard', () => {
   it('maps RPC data to TripStatsDashboard with per-period totals + mode splits', async () => {
     mockRpc.mockResolvedValue({
       data: {
-        totals: { totalTrips: 20, totalDistanceMeters: 100000, totalDurationSeconds: 28800 },
-        weeklyTotals: { totalTrips: 4, totalDistanceMeters: 18000, totalDurationSeconds: 5400 },
-        monthlyTotals: { totalTrips: 10, totalDistanceMeters: 48000, totalDurationSeconds: 14400 },
+        totals: { totalTrips: 20, totalDistanceMeters: 100000, totalDurationSeconds: 28800, totalCaloriesBurned: 2380 },
+        weeklyTotals: { totalTrips: 4, totalDistanceMeters: 18000, totalDurationSeconds: 5400, totalCaloriesBurned: 430 },
+        monthlyTotals: { totalTrips: 10, totalDistanceMeters: 48000, totalDurationSeconds: 14400, totalCaloriesBurned: 1150 },
         weekly: [
           { period_start: '2026-03-30', trips: 3, distance_meters: 15000, duration_seconds: 5400 },
           { period_start: '2026-03-31', trips: 2, distance_meters: 8000, duration_seconds: 3600 },
@@ -145,6 +145,12 @@ describe('getTripStatsDashboard', () => {
     expect(dashboard.totals.totalDistanceMeters).toBe(100000);
     expect(dashboard.totals.totalCo2SavedKg).toBe(12);
     expect(dashboard.totals.totalDurationSeconds).toBe(28800);
+    // Calories pass through from the RPC's stored per-ride sums — never
+    // re-derived from aggregate distance/speed (would drift from the
+    // Impact Dashboard's totalCaloriesBurned).
+    expect(dashboard.totals.totalCaloriesBurned).toBe(2380);
+    expect(dashboard.weeklyTotals.totalCaloriesBurned).toBe(430);
+    expect(dashboard.monthlyTotals.totalCaloriesBurned).toBe(1150);
 
     // Period-scoped totals (per-period CO2 derived from per-period distance)
     expect(dashboard.weeklyTotals.totalTrips).toBe(4);

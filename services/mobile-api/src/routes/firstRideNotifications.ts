@@ -10,6 +10,16 @@ import {
   type FirstRideProfile,
 } from '../lib/firstRideNotifications';
 import { isAnonPushEnabled } from '../lib/nudges/killSwitch';
+import { parseGeographyPoint } from '../lib/nudges/userLocation';
+
+/**
+ * profiles.preferred_locale is rolling out in a separate migration. Asking
+ * PostgREST for a column that does not exist fails the WHOLE query, which
+ * would take the cron down, so the select is attempted with the column and
+ * retried without it. Drop the retry once the column is live everywhere.
+ */
+const BASE_PROFILE_COLUMNS = 'id, notify_mia, created_at, is_anonymous, notify_riding_tips';
+const PROFILE_COLUMNS_WITH_LOCALE = `${BASE_PROFILE_COLUMNS}, preferred_locale`;
 
 interface NotificationEvaluateResponse {
   evaluated: number;
@@ -80,16 +90,24 @@ export const buildFirstRideNotificationRoutes = (
         // profile) silently included all anonymous users — 285 consent-less
         // sends had gone out by 2026-07-16.
         const CANDIDATE_LIMIT = 1000;
-        let candidateQuery = db
-          .from('profiles')
-          .select('id, notify_mia, created_at, is_anonymous, notify_riding_tips')
-          .eq('notify_mia', true);
-        candidateQuery = isAnonPushEnabled()
-          ? candidateQuery.or('is_anonymous.eq.false,notify_riding_tips.eq.true')
-          : candidateQuery.eq('is_anonymous', false);
-        const { data: profileRows, error: queryError } = await candidateQuery.limit(
-          CANDIDATE_LIMIT,
+        const runCandidateQuery = async (columns: string) => {
+          let candidateQuery = db.from('profiles').select(columns).eq('notify_mia', true);
+          candidateQuery = isAnonPushEnabled()
+            ? candidateQuery.or('is_anonymous.eq.false,notify_riding_tips.eq.true')
+            : candidateQuery.eq('is_anonymous', false);
+          return candidateQuery.limit(CANDIDATE_LIMIT);
+        };
+
+        let { data: profileRows, error: queryError } = await runCandidateQuery(
+          PROFILE_COLUMNS_WITH_LOCALE,
         );
+        if (queryError) {
+          // Pre-migration deployments have no preferred_locale column; every
+          // rider then gets English copy instead of a dead cron.
+          ({ data: profileRows, error: queryError } = await runCandidateQuery(
+            BASE_PROFILE_COLUMNS,
+          ));
+        }
 
         if ((profileRows?.length ?? 0) >= CANDIDATE_LIMIT) {
           // PostgREST caps unpaginated reads — hitting the limit means users
@@ -112,12 +130,13 @@ export const buildFirstRideNotificationRoutes = (
           });
         }
 
-        const profiles = (profileRows ?? []) as Array<{
+        const profiles = (profileRows ?? []) as unknown as Array<{
           id: string;
           notify_mia: boolean;
           created_at: string;
           is_anonymous: boolean | null;
           notify_riding_tips: boolean | null;
+          preferred_locale?: string | null;
         }>;
 
         let evaluated = 0;
@@ -136,9 +155,15 @@ export const buildFirstRideNotificationRoutes = (
             // Compute last_ride_at from trips (no profiles.last_ride_at column).
             // post_first_ride and lapsed_reengagement gate on this; null is
             // treated as "never rode" by the evaluator.
+            //
+            // start_location rides along on the SAME row (no extra query) and
+            // gives weather_invitation the rider's actual coordinates — it
+            // sends nothing without them (G-25). PostgREST hands geography
+            // columns back as WKB hex, so it must go through the shared
+            // parser, never a `.lat ?? 0` read (error-log #70).
             const { data: lastTrip } = await db
               .from('trips')
-              .select('ended_at')
+              .select('ended_at, start_location')
               .eq('user_id', row.id)
               .not('ended_at', 'is', null)
               .order('ended_at', { ascending: false })
@@ -152,6 +177,8 @@ export const buildFirstRideNotificationRoutes = (
               created_at: row.created_at,
               last_ride_at: (lastTrip?.ended_at as string | null | undefined) ?? null,
               is_anonymous: row.is_anonymous ?? false,
+              preferred_locale: row.preferred_locale ?? null,
+              location: parseGeographyPoint(lastTrip?.start_location),
             };
 
             const results = await evaluateFirstRideNotifications(db, profile);

@@ -24,8 +24,14 @@ const ALLOWLIST = {
     'protobufjs — DoS via unbounded Any expansion during JSON conversion. Pulled by posthog-js -> @opentelemetry/otlp-transformer (web telemetry export). The vulnerable Any->JSON conversion path is not exercised by our usage.',
   'GHSA-vxpw-j846-p89q':
     'undici — WebSocket-client DoS via fragment-count bypass. Pulled only by @sentry/cli (@sentry/react-native -> @sentry/cli -> undici@6.24.1), a BUILD-TIME source-map upload tool — never bundled into the shipped Hermes app. @sentry/cli performs HTTPS uploads to Sentry, not undici WebSocket connections, and the advisory requires connecting undici’s WebSocket client to a malicious server, so the path is unreachable in our usage. `npm audit fix` is destructive here (its dry-run removes vitest/jsdom/@types/react, breaking the test setup) and an npm override does not apply to this nested @sentry sub-tree (npm 11). Re-review when @sentry/react-native is bumped.',
-  'GHSA-mh99-v99m-4gvg':
-    'brace-expansion 1.x — DoS via unbounded expansion length (OOM). The only fixed version is 5.0.8+, but minimatch@3 (inside react-native / @react-native/codegen / rimraf / test-exclude) hard-requires ^1.1.7 — unsatisfiable without React Native 0.86 (blocked on the Expo SDK). These copies run ONLY in build-time tooling (codegen globs over our own source paths, coverage exclude matching, build cleanup) with first-party patterns — never bundled into the shipped Hermes app, never fed untrusted input. Deduping them onto 5.0.8 was tried 2026-07-27 and BREAKS iOS pod install (codegen "expand is not a function") — do not retry. Re-review on the next React Native / Expo SDK bump.',
+  // GHSA-mh99-v99m-4gvg (brace-expansion 1.x) removed 2026-08-10: upstream
+  // released the 1.1.18 backport, so the minimatch@3 copies updated in-range
+  // and the advisory no longer matches. The earlier note that deduping onto
+  // 5.x breaks iOS pod install still stands — 1.1.18 makes that irrelevant.
+  'GHSA-w3rx-r6r6-pgpr':
+    'image-size — ICNS parser infinite-loop DoS. Sole production-classified path is metro (expo -> @expo/metro -> metro@0.83 -> image-size@1.2.1), the BUILD-time bundler measuring our own first-party image assets; npm\'s only "fix" is a semver-major react-native downgrade to 0.72 (nonsense) — no fixed image-size satisfies metro\'s range. Never bundled into the shipped Hermes app, never fed untrusted ICNS files. Re-review on the next Expo SDK / metro bump.',
+  'GHSA-5p2g-fcmc-qvqq':
+    'image-size — JXL/HEIF parser infinite-loop DoS. Same metro-only build-time path and reasoning as GHSA-w3rx-r6r6-pgpr: only first-party assets are ever measured, nothing ships. Re-review on the next Expo SDK / metro bump.',
   'GHSA-6g55-p6wh-862q':
     'postcss — arbitrary file read via attacker-controlled sourceMappingURL in CSS comments. next pins postcss EXACTLY at 8.4.31 (no in-range fix; npm suggests a next downgrade to 9.x, nonsense). PostCSS runs at BUILD time processing only our own first-party CSS — the advisory requires processing attacker-controlled CSS, which never happens; the compiled site ships no postcss. Re-review when next is bumped past its exact pin.',
   'GHSA-r28c-9q8g-f849':

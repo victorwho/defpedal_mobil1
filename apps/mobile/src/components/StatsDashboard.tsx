@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import {
+  formatCaloriesBurned,
   formatCo2Saved,
   formatDistance,
   formatDuration,
@@ -423,6 +424,14 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
           label={t('stats.co2Saved')}
           value={formatCo2Saved(totals.totalCo2SavedKg)}
         />
+        {(totals.totalCaloriesBurned ?? 0) > 0 && (
+          <SummaryCard
+            icon="flame-outline"
+            iconColor="#F97316"
+            label={t('stats.caloriesBurned')}
+            value={formatCaloriesBurned(Math.round(totals.totalCaloriesBurned ?? 0))}
+          />
+        )}
         <SummaryCard
           icon="cash-outline"
           iconColor={brandColors.accent}

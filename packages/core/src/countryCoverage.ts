@@ -188,3 +188,49 @@ export const isRouteSupported = (
 
   return { supported: true, country: originCountry };
 };
+
+/**
+ * Countries with `road_risk_data` coverage — where street-level Risk
+ * Scores, colored risk segments, and the safe-vs-fast comparison exist.
+ *
+ * Since 2026-08-01 the risk dataset is generated ALONGSIDE the routing
+ * graph (b36v1 generation, 67.9M segments, `export_risk_eu.py` in the
+ * OSRM_Server project) and covers the SAME 31 countries — verified live
+ * 2026-08-13 (Berlin 28k segments in the center alone; RPCs return scored
+ * segments for Berlin/Paris routes). It was RO+ES-only from launch until
+ * then, which is why this gate exists as a named list rather than a
+ * constant `true`: if data and routing generations ever diverge again,
+ * narrow THIS list — the comparison eligibility in `mapbox-routing.ts` and
+ * the "supported, no risk data" notices all derive from it.
+ */
+export const RISK_DATA_COUNTRIES: readonly SupportedCountry[] =
+  ROUTING_COVERED_COUNTRIES;
+
+export const isRiskDataAvailable = (
+  country: SupportedCountry | null | undefined,
+): boolean => country != null && RISK_DATA_COUNTRIES.includes(country);
+
+/**
+ * Geometric center of a country's primary bounding box. Rough by nature
+ * (bbox midpoint, first box only for multi-box countries) — intended for
+ * "roughly the right country" defaults like the map camera's cold-start
+ * center, never for routing or attribution.
+ */
+export const getCountryCenter = (country: SupportedCountry): Coordinate => {
+  const [minLon, minLat, maxLon, maxLat] = COUNTRY_BBOXES[country][0]!;
+  return { lat: (minLat + maxLat) / 2, lon: (minLon + maxLon) / 2 };
+};
+
+/**
+ * Countries where the shade/heat-model OSRM instance
+ * (osrm-shade.defensivepedal.com, `bicycle36shade.lua`) has graph data.
+ * Cool routing is offered only when the route attributes to one of these
+ * countries; elsewhere the Cool pill is hidden and any persisted avoidHeat
+ * preference is ignored at dispatch. RO-only at launch — widen this list as
+ * shade graphs are built for more countries.
+ */
+export const HEAT_ROUTING_COUNTRIES: readonly SupportedCountry[] = ['RO'];
+
+export const isHeatRoutingAvailable = (
+  country: SupportedCountry | null | undefined,
+): boolean => country != null && HEAT_ROUTING_COUNTRIES.includes(country);

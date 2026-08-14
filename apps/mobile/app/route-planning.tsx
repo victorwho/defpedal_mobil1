@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
+import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -125,6 +125,8 @@ export default function RoutePlanningScreen() {
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const avoidHills = useAppStore((state) => state.avoidHills);
   const setAvoidHills = useAppStore((state) => state.setAvoidHills);
+  const avoidHeat = useAppStore((state) => state.avoidHeat);
+  const setAvoidHeat = useAppStore((state) => state.setAvoidHeat);
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
   const addWaypoint = useAppStore((state) => state.addWaypoint);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
@@ -154,6 +156,7 @@ export default function RoutePlanningScreen() {
     if (resolvedCountry.routeSupported) return;
     if (routeRequest.mode !== 'fast') {
       setAvoidHills(false);
+      setAvoidHeat(false);
       setRoutingMode('fast');
     }
     if (resolvedCountry.unsupportedReason === 'origin_unsupported') {
@@ -166,9 +169,24 @@ export default function RoutePlanningScreen() {
     resolvedCountry.unsupportedReason,
     routeRequest.mode,
     setAvoidHills,
+    setAvoidHeat,
     setRoutingMode,
     setRoutePreview,
   ]);
+
+  // Cool routing is served by the shade-model OSRM whose graph covers fewer
+  // countries than safe/flat (HEAT_ROUTING_COUNTRIES — RO at launch). Gates
+  // the Cool pill, and heals a stale avoidHeat preference when the route
+  // lands in a supported-but-not-cool country so the pill row and the
+  // dispatcher (which ignores avoidHeat outside coverage) agree.
+  const coolAvailable =
+    resolvedCountry.routeSupported &&
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+  useEffect(() => {
+    if (!hasDestination) return;
+    if (!resolvedCountry.routeSupported) return; // force-fast effect owns this case
+    if (avoidHeat && !coolAvailable) setAvoidHeat(false);
+  }, [hasDestination, resolvedCountry.routeSupported, coolAvailable, avoidHeat, setAvoidHeat]);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
@@ -343,6 +361,8 @@ export default function RoutePlanningScreen() {
       mode: route.mode,
       avoidUnpaved: route.avoidUnpaved,
       avoidHills: route.avoidHills,
+      // Nullish-guard: rows saved by pre-cool clients / servers lack the field.
+      avoidHeat: route.avoidHeat ?? false,
     });
     // Slice 5a: stash the saved route id so a subsequent Share action on
     // route-preview emits `source: 'saved'` and populates `source_ref_id`
@@ -1333,11 +1353,12 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat routing toggle — gated by coverage support.
-              Outside the 31 covered countries (EU-27 + EEA + CH) we hide
-              Safe + Flat (no OSRM data) and surface a banner so the rider
-              understands why only Fast is on offer. Cross-border rides
-              within coverage are supported (single EU graph). */}
+          {/* Safe / Fast / Flat / Cool routing toggle — gated by coverage
+              support. Outside the 31 covered countries (EU-27 + EEA + CH) we
+              hide Safe + Flat + Cool (no OSRM data) and surface a banner so
+              the rider understands why only Fast is on offer. Cross-border
+              rides within coverage are supported (single EU graph). Cool is
+              additionally gated to the shade-graph countries (RO at launch). */}
           {hasValidDestination ? (
             resolvedCountry.routeSupported ? (
               <View>
@@ -1345,10 +1366,10 @@ export default function RoutePlanningScreen() {
                   <ModeTogglePill
                     iconName="shield-checkmark-outline"
                     label={t('planning.safe')}
-                    isActive={routeRequest.mode === 'safe' && !avoidHills}
+                    isActive={routeRequest.mode === 'safe' && !avoidHills && !avoidHeat}
                     activeBgColor={safetyTints.infoLight}
                     activeFgColor={colors.info}
-                    onPress={() => { setAvoidHills(false); setRoutingMode('safe'); }}
+                    onPress={() => { setAvoidHills(false); setAvoidHeat(false); setRoutingMode('safe'); }}
                     accessibilityLabel="Safe routing"
                   />
                   <ModeTogglePill
@@ -1357,7 +1378,7 @@ export default function RoutePlanningScreen() {
                     isActive={routeRequest.mode === 'fast'}
                     activeBgColor={safetyTints.infoLight}
                     activeFgColor={colors.info}
-                    onPress={() => { setAvoidHills(false); setRoutingMode('fast'); }}
+                    onPress={() => { setAvoidHills(false); setAvoidHeat(false); setRoutingMode('fast'); }}
                     accessibilityLabel="Fast routing"
                   />
                   <ModeTogglePill
@@ -1366,10 +1387,34 @@ export default function RoutePlanningScreen() {
                     isActive={avoidHills && routeRequest.mode === 'safe'}
                     activeBgColor={safetyTints.safeGreenLight}
                     activeFgColor={colors.safe}
-                    onPress={() => { setAvoidHills(true); setRoutingMode('safe'); }}
+                    onPress={() => { setAvoidHills(true); setAvoidHeat(false); setRoutingMode('safe'); }}
                     accessibilityLabel="Flat routing — avoid hills"
                   />
+                  {coolAvailable ? (
+                    <ModeTogglePill
+                      iconName="partly-sunny-outline"
+                      label={t('planning.cool')}
+                      isActive={avoidHeat && routeRequest.mode === 'safe'}
+                      activeBgColor={safetyTints.coolLight}
+                      activeFgColor={colors.cool}
+                      onPress={() => { setAvoidHills(false); setAvoidHeat(true); setRoutingMode('safe'); }}
+                      accessibilityLabel="Cool routing — least heat"
+                    />
+                  ) : null}
                 </View>
+                {/* Supported country WITHOUT road_risk_data: unreachable
+                    since the b36v1 EU-wide dataset (2026-08-01) put risk
+                    data in all 31 covered countries, but kept armed — if
+                    RISK_DATA_COUNTRIES ever narrows again this notice is
+                    the honest-degradation surface (review G-05). */}
+                {!isRiskDataAvailable(resolvedCountry.destinationCountry) ? (
+                  <View style={styles.coverageNotice} accessibilityLiveRegion="polite">
+                    <Ionicons name="information-circle-outline" size={16} color={gray[600]} />
+                    <Text style={styles.coverageNoticeText}>
+                      {t('planning.riskDataUnavailable')}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ) : (
               <View

@@ -75,6 +75,7 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   mode: 'safe',
   avoidUnpaved: false,
   avoidHills: false,
+  avoidHeat: false,
   locale: getDeviceLocale(),
   // Intentionally undefined so cold-start search isn't locked to a single
   // country before GPS resolves. `useResolvedCountry` writes the resolved
@@ -108,6 +109,7 @@ type AppStore = QueueSlice & {
   weightKg: number;
   avoidUnpaved: boolean;
   avoidHills: boolean;
+  avoidHeat: boolean;
   showBicycleLanes: boolean;
   poiVisibility: {
     hydration: boolean;
@@ -363,6 +365,7 @@ type AppStore = QueueSlice & {
   setWeightKg: (kg: number) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
   setAvoidHills: (enabled: boolean) => void;
+  setAvoidHeat: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
@@ -608,6 +611,7 @@ export const useAppStore = create<AppStore>()(
       weightKg: 70,
       avoidUnpaved: false,
       avoidHills: false,
+      avoidHeat: false,
       notifyWeather: true,
       dailyWeatherChain: [],
       dailyWeatherGeneration: null,
@@ -1015,6 +1019,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ avoidUnpaved: enabled })),
       setAvoidHills: (enabled) =>
         set(() => ({ avoidHills: enabled })),
+      setAvoidHeat: (enabled) =>
+        set(() => ({ avoidHeat: enabled })),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -1036,6 +1042,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           // Sync top-level preference flags when present in the request
           ...(request.avoidHills !== undefined ? { avoidHills: request.avoidHills } : {}),
+          ...(request.avoidHeat !== undefined ? { avoidHeat: request.avoidHeat } : {}),
           ...(request.avoidUnpaved !== undefined ? { avoidUnpaved: request.avoidUnpaved } : {}),
           routeRequest: {
             ...state.routeRequest,
@@ -1482,6 +1489,7 @@ export const useAppStore = create<AppStore>()(
         weightKg: state.weightKg,
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
+        avoidHeat: state.avoidHeat,
         onboardingCompleted: state.onboardingCompleted,
         regionGate: state.regionGate,
         analyticsConsent: state.analyticsConsent,

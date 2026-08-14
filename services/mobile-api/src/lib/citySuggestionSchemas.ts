@@ -17,7 +17,7 @@ const routeContextSchema = {
   additionalProperties: false,
   required: ['mode', 'distanceMeters'],
   properties: {
-    mode: { type: 'string', enum: ['safe', 'fast', 'flat'] },
+    mode: { type: 'string', enum: ['safe', 'fast', 'flat', 'cool'] },
     distanceMeters: { type: 'number', minimum: 0 },
     routeId: { type: 'string', maxLength: 64 },
   },

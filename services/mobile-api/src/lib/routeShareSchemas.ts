@@ -59,7 +59,7 @@ const plannedRoutePayloadRequestSchema = {
     geometryPolyline6: { type: 'string', minLength: 1 },
     distanceMeters: { type: 'number', minimum: 0 },
     durationSeconds: { type: 'number', minimum: 0 },
-    routingMode: { type: 'string', enum: ['safe', 'fast', 'flat'] },
+    routingMode: { type: 'string', enum: ['safe', 'fast', 'flat', 'cool'] },
     riskSegments: { type: 'array', items: riskSegmentSchema },
     safetyScore: { type: ['number', 'null'], minimum: 0, maximum: 100 },
   },
@@ -87,7 +87,7 @@ const plannedRoutePayloadResponseSchema = {
     geometryPolyline6: { type: 'string', minLength: 1 },
     distanceMeters: { type: 'number', minimum: 0 },
     durationSeconds: { type: 'number', minimum: 0 },
-    routingMode: { type: 'string', enum: ['safe', 'fast', 'flat'] },
+    routingMode: { type: 'string', enum: ['safe', 'fast', 'flat', 'cool'] },
     riskSegments: { type: 'array', items: riskSegmentSchema },
     safetyScore: { type: ['number', 'null'], minimum: 0, maximum: 100 },
   },
@@ -116,7 +116,7 @@ type PlannedRouteRequestPayload = {
   geometryPolyline6: string;
   distanceMeters: number;
   durationSeconds: number;
-  routingMode: 'safe' | 'fast' | 'flat';
+  routingMode: 'safe' | 'fast' | 'flat' | 'cool';
   riskSegments?: RouteShareRiskSegment[];
   safetyScore?: number | null;
 };

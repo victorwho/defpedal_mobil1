@@ -16,20 +16,34 @@ store-listing/
 │   ├── title.txt
 │   ├── short_description.txt
 │   └── full_description.txt
+├── es-ES/                     (mirror of en-US/, Spanish translation)
+│   ├── title.txt
+│   ├── short_description.txt
+│   └── full_description.txt
 └── README.md (this file)
 ```
 
-Romania is the launch country, so `ro-RO` is the **default** listing language
-in Play Console. `en-US` is added as a translation for English-speaking
-visitors and Play reviewers.
+`en-US` is the **default** listing language in Play Console. The app is
+available across 31 European countries, and Play serves the default language
+to every locale that has no dedicated translation — so the default has to be
+the one that reads sensibly everywhere. `ro-RO` and `es-ES` are added as
+translations for the two markets with street-by-street risk data and a fully
+localized UI.
+
+> **Migration note (2026-08-13):** this repo previously instructed setting
+> `ro-RO` as the default, from when Romania was the only launch market. If the
+> live console still has Romanian as the default, riders in Germany, Poland,
+> France and everywhere else without a translation are being served a Romanian
+> store page. **Verify the default in Play Console and flip it to
+> `English (United States)`**, keeping `ro-RO` as a translation.
 
 ## How to use
 
 1. In Play Console, go to **Grow → Store presence → Main store listing**.
-2. Set default language to `Romanian (ro-RO)`. Paste the `ro-RO/*.txt` contents
-   into the corresponding fields.
-3. Click **Add language → English (United States)** to add a translation.
-   Paste the `en-US/*.txt` contents.
+2. Confirm the default language is `English (United States)` (see the migration
+   note above). Paste the `en-US/*.txt` contents into the corresponding fields.
+3. Click **Add language → Romanian (Romania)** and **→ Spanish (Spain)** to add
+   the translations. Paste the `ro-RO/*.txt` and `es-ES/*.txt` contents.
 4. Click **Save**. Submit a new release for changes to go live (listing-only
    changes still need a release submission).
 

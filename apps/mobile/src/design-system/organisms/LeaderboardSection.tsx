@@ -71,9 +71,15 @@ export function LeaderboardSection() {
     return data.entries.some((e) => e.userId === data.userRank!.userId);
   }, [data]);
 
-  // Trophy celebration when the requesting user is currently #1
+  // Trophy celebration when the requesting user is currently #1 — but only
+  // with real competition. In a sparse country the only rider within the
+  // fixed radius is trivially "rank #1" after a single ride, and the weekly
+  // settlement cron ranks globally, so the local trophy was an unbacked
+  // celebration (review 2026-08-13 G-23). Floor: at least 3 ranked riders.
+  const CHAMPION_MIN_PARTICIPANTS = 3;
   const userIsChampion = useMemo(() => {
     if (!data) return false;
+    if (data.entries.length < CHAMPION_MIN_PARTICIPANTS) return false;
     if (data.userRank?.rank === 1) return true;
     return data.entries[0]?.isRequestingUser ?? false;
   }, [data]);

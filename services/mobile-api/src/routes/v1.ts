@@ -242,6 +242,7 @@ const buildRouteResponse = async (
             destination: normalizedRequest.destination,
             avoidUnpaved: normalizedRequest.avoidUnpaved,
             avoidHills: normalizedRequest.avoidHills,
+            avoidHeat: normalizedRequest.avoidHeat,
           })
         : await dependencies.fetchFastRoutes(
             previewOrigin,
@@ -327,6 +328,19 @@ const requireOAuthUser = (
   request: Parameters<typeof requireFullUser>[0],
   dependencies: MobileApiDependencies,
 ) => requireFullUser(request, dependencies.authenticateUser);
+
+/**
+ * Ride duration in whole seconds from a trip_tracks row's timestamps.
+ * Returns 0 when either timestamp is missing/invalid or the interval is
+ * non-positive (ended_at is null while a trip is in progress).
+ */
+const deriveTrackDurationSeconds = (startedAt: unknown, endedAt: unknown): number => {
+  const startMs = startedAt ? new Date(String(startedAt)).getTime() : NaN;
+  const endMs = endedAt ? new Date(String(endedAt)).getTime() : NaN;
+  return Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+    ? Math.round((endMs - startMs) / 1000)
+    : 0;
+};
 
 export const buildV1Routes = (
   dependencies: MobileApiDependencies,
@@ -2040,6 +2054,7 @@ export const buildV1Routes = (
                 totalDistanceMeters: { type: 'number' },
                 totalCo2SavedKg: { type: 'number' },
                 totalDurationSeconds: { type: 'number' },
+                totalCaloriesBurned: { type: 'number' },
               },
             } as const;
             const bucketsSchema = {
@@ -2525,23 +2540,32 @@ export const buildV1Routes = (
           weightKg,
         } = request.body;
 
-        // Compute calories — fetch bike_type from trip_tracks (non-fatal, defaults to acoustic)
+        // Compute calories — fetch bike_type + timestamps from trip_tracks
+        // (non-fatal). Fielded clients through v0.2.122 never sent
+        // durationMinutes, and kcal = MET × weight × hours, so every POSTed
+        // impact stored 0 kcal (see 202607110001 backfill). When the body
+        // omits duration, derive it from the track's own timestamps — same
+        // derivation as the GET auto-compute path.
         let vehicleType: 'acoustic' | 'ebike' = 'acoustic';
+        let durationSeconds = Math.max(0, Math.round((durationMinutes ?? 0) * 60));
         try {
           const { data: trackMeta } = await supabaseAdmin
             .from('trip_tracks')
-            .select('bike_type')
+            .select('bike_type, started_at, ended_at')
             .eq('trip_id', tripId)
             .single();
           const bt = String(trackMeta?.bike_type ?? '').toLowerCase();
           if (bt === 'ebike' || bt === 'electric' || bt.includes('e-bike')) {
             vehicleType = 'ebike';
           }
+          if (durationSeconds <= 0) {
+            durationSeconds = deriveTrackDurationSeconds(trackMeta?.started_at, trackMeta?.ended_at);
+          }
         } catch { /* non-fatal */ }
 
         const caloriesBurned = calculateCaloriesBurned(
           distanceMeters,
-          (durationMinutes ?? 0) * 60,
+          durationSeconds,
           vehicleType,
           weightKg,
         );
@@ -2557,7 +2581,7 @@ export const buildV1Routes = (
           p_temperature_c:     temperatureC    ?? null,
           p_aqi_level:         aqiLevel        ?? null,
           p_ride_start_hour:   rideStartHour   ?? null,
-          p_duration_minutes:  durationMinutes  ?? 0,
+          p_duration_minutes:  durationMinutes ?? (durationSeconds > 0 ? Math.round(durationSeconds / 60) : 0),
           p_calories_burned:   caloriesBurned,
         });
 
@@ -3017,12 +3041,7 @@ export const buildV1Routes = (
           // MET x weight x hours, so a 0 duration always yields 0 kcal and the
           // client hides the calorie block — auto-computed impacts therefore
           // never showed calories. ended_at is null for in-progress trips -> 0.
-          const startMs = track.started_at ? new Date(track.started_at as string).getTime() : NaN;
-          const endMs = track.ended_at ? new Date(track.ended_at as string).getTime() : NaN;
-          const autoDurationSeconds =
-            Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
-              ? Math.round((endMs - startMs) / 1000)
-              : 0;
+          const autoDurationSeconds = deriveTrackDurationSeconds(track.started_at, track.ended_at);
           const autoDurationMinutes = autoDurationSeconds > 0 ? Math.round(autoDurationSeconds / 60) : 0;
           const autoCalories = calculateCaloriesBurned(distMeters, autoDurationSeconds, autoVehicle);
 
@@ -3349,11 +3368,15 @@ export const buildV1Routes = (
 
     // GET /v1/quiz/daily — random unasked question (30-day cooldown)
     //
-    // `country` query param selects the question pool (RO or ES). Defaults to
-    // RO when omitted so older app builds without country awareness keep
-    // working. Pool IDs do not collide, so a `user_quiz_history` row scoped to
-    // one pool is invisible to the other — that's intentional: switching pools
-    // mid-life simply re-opens the catalogue rather than orphaning history.
+    // `country` query param selects the question pool (RO, ES, or GENERIC).
+    // Defaults to GENERIC when omitted: current clients (>= v0.2.101) always
+    // send the resolved country, so the fallback only serves pre-gate builds
+    // and manual API consumers — and a generally-true EU question anywhere is
+    // a far smaller failure than Romanian law served to a rider in Germany
+    // (review 2026-08-13 G-20; the default was 'RO' until then). Pool IDs do
+    // not collide, so a `user_quiz_history` row scoped to one pool is
+    // invisible to the other — that's intentional: switching pools mid-life
+    // simply re-opens the catalogue rather than orphaning history.
     app.get<{
       Querystring: { country?: QuizCountry; locale?: 'en' | 'ro' | 'es' };
       Reply: QuizQuestion | ErrorResponse;
@@ -3392,37 +3415,54 @@ export const buildV1Routes = (
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
-        const country: QuizCountry = request.query?.country ?? 'RO';
+        const country: QuizCountry = request.query?.country ?? 'GENERIC';
         const locale: 'en' | 'ro' | 'es' = request.query?.locale ?? 'en';
         const pool = getQuizPool(country);
 
-        // Get question IDs answered in the last 30 days from user_quiz_history
-        let excludeIds: string[] = [];
+        // Get questions answered in the last 30 days from user_quiz_history.
+        // `answered_at` rides along so pool exhaustion can fall back to the
+        // least-recently-answered question instead of a 404 the client renders
+        // as a permanent "Failed to load quiz" (review 2026-08-13 G-02 — the
+        // GENERIC pool used to be smaller than the 30-day window, hard-locking
+        // daily players outside RO/ES from day ~31).
+        let recentRows: { question_id: string; answered_at: string }[] = [];
         if (supabaseAdmin) {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
           const { data: recentAnswers } = await supabaseAdmin
             .from('user_quiz_history')
-            .select('question_id')
+            .select('question_id, answered_at')
             .eq('user_id', user.id)
             .gte('answered_at', thirtyDaysAgo);
 
-          excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
+          recentRows = (recentAnswers ?? []) as { question_id: string; answered_at: string }[];
         }
+        const excludeIds = recentRows.map((r) => r.question_id);
 
         // Filter the chosen country's pool, excluding recently answered.
         const available = excludeIds.length > 0
           ? pool.filter((q) => !excludeIds.includes(q.id))
           : pool;
 
-        if (available.length === 0) {
-          throw new HttpError('No quiz questions available.', {
-            statusCode: 404,
-            code: 'NOT_FOUND',
-          });
+        let q: (typeof pool)[number];
+        if (available.length > 0) {
+          q = available[Math.floor(Math.random() * available.length)];
+        } else {
+          // Whole pool answered within the window: re-serve the question this
+          // user saw longest ago rather than locking them out.
+          const oldestFirst = [...recentRows].sort((a, b) =>
+            a.answered_at.localeCompare(b.answered_at),
+          );
+          const fallback = oldestFirst
+            .map((row) => pool.find((question) => question.id === row.question_id))
+            .find((question) => question !== undefined);
+          if (!fallback) {
+            throw new HttpError('No quiz questions available.', {
+              statusCode: 404,
+              code: 'NOT_FOUND',
+            });
+          }
+          q = fallback;
         }
-
-        // Pick a random question
-        const q = available[Math.floor(Math.random() * available.length)];
 
         return {
           id: q.id,
@@ -3486,7 +3526,7 @@ export const buildV1Routes = (
         }
 
         const { questionId, selectedIndex } = request.body;
-        const country: QuizCountry = request.body.country ?? 'RO';
+        const country: QuizCountry = request.body.country ?? 'GENERIC';
         const locale: 'en' | 'ro' | 'es' = request.body.locale ?? 'en';
 
         // Look up from the country's pool only. We don't fall back to the
@@ -3687,6 +3727,7 @@ export const buildV1Routes = (
           mode: (row.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (row.avoid_unpaved as boolean) ?? false,
           avoidHills: (row.avoid_hills as boolean) ?? false,
+          avoidHeat: (row.avoid_heat as boolean) ?? false,
           createdAt: row.created_at as string,
           lastUsedAt: row.last_used_at as string,
         }));
@@ -3718,6 +3759,7 @@ export const buildV1Routes = (
             mode: payload.mode,
             avoid_unpaved: payload.avoidUnpaved,
             avoid_hills: payload.avoidHills,
+            avoid_heat: payload.avoidHeat,
           })
           .select()
           .single();
@@ -3737,6 +3779,7 @@ export const buildV1Routes = (
           mode: (data.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (data.avoid_unpaved as boolean) ?? false,
           avoidHills: (data.avoid_hills as boolean) ?? false,
+          avoidHeat: (data.avoid_heat as boolean) ?? false,
           createdAt: data.created_at as string,
           lastUsedAt: data.last_used_at as string,
         };

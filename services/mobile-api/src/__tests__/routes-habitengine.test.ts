@@ -522,6 +522,77 @@ describe('POST /v1/rides/:tripId/impact', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json().equivalentText).toBeNull();
   });
+
+  // Regression guard (calories-0 bug, POST leg): fielded clients through
+  // v0.2.122 never sent durationMinutes, so the handler computed
+  // kcal = MET x weight x 0 hours and stored 0 for every ride. When the
+  // body omits duration, the handler must fall back to the track's
+  // started_at/ended_at — same derivation as the GET auto-compute path.
+  it('derives duration and calories from the track when the body omits durationMinutes', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
+      error: null,
+    });
+    // Table-keyed mock, NOT mockReturnValueOnce: a fire-and-forget block
+    // from the previous test can consume once-queue slots mid-test (this
+    // file's documented flake mode), which starved this test's trip_tracks
+    // row on CI and made the handler derive a 0 duration.
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'trip_tracks'
+        ? chainResult({
+            bike_type: 'acoustic',
+            started_at: '2026-07-01T10:00:00.000Z',
+            ended_at: '2026-07-01T10:30:00.000Z', // 30 min -> 18 km/h -> MET 6.8
+          })
+        : chainResult([]),
+    );
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const args = (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact')?.[1] ?? {}) as {
+      p_duration_minutes?: number; p_calories_burned?: number;
+    };
+    expect(args.p_duration_minutes).toBe(30);
+    // MET 6.8 (18 km/h) x 70 kg (default weight) x 0.5 h = 238 kcal
+    expect(args.p_calories_burned).toBe(238);
+  });
+
+  it('prefers client-sent durationMinutes and weightKg over track timestamps', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 1.08, money_saved_eur: 3.15, hazards_warned_count: 0, distance_meters: 9000 }],
+      error: null,
+    });
+    // Table-keyed for the same stray-call immunity as the test above.
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'trip_tracks'
+        ? chainResult({
+            bike_type: 'acoustic',
+            started_at: '2026-07-01T10:00:00.000Z',
+            ended_at: '2026-07-01T12:00:00.000Z', // track says 2 h — must be ignored
+          })
+        : chainResult([]),
+    );
+
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, durationMinutes: 30, weightKg: 80 },
+    });
+
+    const args = (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact')?.[1] ?? {}) as {
+      p_duration_minutes?: number; p_calories_burned?: number;
+    };
+    expect(args.p_duration_minutes).toBe(30);
+    // MET 6.8 (18 km/h) x 80 kg x 0.5 h = 272 kcal
+    expect(args.p_calories_burned).toBe(272);
+  });
 });
 
 // ===========================================================================
@@ -758,10 +829,14 @@ describe('GET /v1/quiz/daily', () => {
   });
 
   it('excludes recently answered questions', async () => {
-    // Mock user_quiz_history — pretend ALL static questions were answered recently
-    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
-    const allIds = QUIZ_QUESTIONS.map((q) => ({ question_id: q.id }));
-    mockFrom.mockReturnValueOnce(chainResult(allIds));
+    // Default pool is GENERIC (2026-08-13 G-20). Pretend every question
+    // except one was answered recently — the survivor must be served.
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const answered = QUIZ_QUESTIONS_GENERIC.slice(1).map((q, i) => ({
+      question_id: q.id,
+      answered_at: new Date(Date.now() - (i + 1) * 60_000).toISOString(),
+    }));
+    mockFrom.mockReturnValueOnce(chainResult(answered));
 
     const response = await app.inject({
       method: 'GET',
@@ -769,8 +844,32 @@ describe('GET /v1/quiz/daily', () => {
       headers: authHeaders,
     });
 
-    expect(response.statusCode).toBe(404);
-    expect(response.json().error).toBe('No quiz questions available.');
+    expect(response.statusCode).toBe(200);
+    expect(response.json().id).toBe(QUIZ_QUESTIONS_GENERIC[0]!.id);
+  });
+
+  it('serves the least-recently-answered question instead of 404 when the pool is exhausted', async () => {
+    // Every question answered inside the 30-day window (the old permanent
+    // "Failed to load quiz" lockout, review 2026-08-13 G-02). The question
+    // with the OLDEST answered_at must come back.
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const answered = QUIZ_QUESTIONS_GENERIC.map((q, i) => ({
+      question_id: q.id,
+      // Index 3 gets the oldest timestamp; everything else is newer.
+      answered_at: new Date(
+        Date.now() - (i === 3 ? 29 : 5) * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    }));
+    mockFrom.mockReturnValueOnce(chainResult(answered));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().id).toBe(QUIZ_QUESTIONS_GENERIC[3]!.id);
   });
 });
 
@@ -790,7 +889,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: authHeaders,
-      payload: { questionId, selectedIndex: 2 },
+      payload: { questionId, selectedIndex: 2, country: 'RO' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -808,7 +907,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: authHeaders,
-      payload: { questionId, selectedIndex: 0 },
+      payload: { questionId, selectedIndex: 0, country: 'RO' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -823,7 +922,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: { ...authHeaders, 'x-timezone': 'Europe/Bucharest' },
-      payload: { questionId, selectedIndex: 2 },
+      payload: { questionId, selectedIndex: 2, country: 'RO' },
     });
 
     // qualifyStreakAsync calls rpc('qualify_streak_action')
@@ -915,11 +1014,13 @@ describe('Quiz country dispatch', () => {
     expect(esIds.has(body.id)).toBe(false);
   });
 
-  it('GET /v1/quiz/daily defaults to RO when no country query is provided', async () => {
+  it('GET /v1/quiz/daily defaults to GENERIC when no country query is provided', async () => {
+    // Was 'RO' until 2026-08-13 (G-20): a client that omits the param now
+    // gets generally-true EU content, never another country's law.
     mockFrom.mockReturnValueOnce(chainResult([]));
 
-    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
-    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const genericIds = new Set(QUIZ_QUESTIONS_GENERIC.map((q) => q.id));
 
     const response = await app.inject({
       method: 'GET',
@@ -928,7 +1029,7 @@ describe('Quiz country dispatch', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(roIds.has(response.json().id)).toBe(true);
+    expect(genericIds.has(response.json().id)).toBe(true);
   });
 
   it('GET /v1/quiz/daily?country=FR returns 400 (unsupported enum value)', async () => {
@@ -1096,7 +1197,9 @@ describe('GENERIC quiz pool integrity', () => {
   it('has a sane pool size and valid correctIndex on every question', async () => {
     const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
 
-    expect(QUIZ_QUESTIONS_GENERIC.length).toBeGreaterThanOrEqual(25);
+    // Floor is above the endpoint's 30-day answered-question exclusion window:
+    // a pool at or below ~30 hard-locks a daily player with a 404 (G-02).
+    expect(QUIZ_QUESTIONS_GENERIC.length).toBeGreaterThanOrEqual(40);
     for (const q of QUIZ_QUESTIONS_GENERIC) {
       for (const locale of ['en', 'ro', 'es'] as const) {
         expect(q.options[locale]).toHaveLength(4);

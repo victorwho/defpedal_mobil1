@@ -68,11 +68,12 @@ export const mapShareClaimToPreview = (claim: ShareClaim): MappedShareClaim => {
   } = routePayload;
 
   // The store's RoutingMode is 'safe' | 'fast'. The share payload's
-  // routingMode is 'safe' | 'fast' | 'flat' — 'flat' is a refinement of
-  // 'safe' via the avoidHills flag. Collapse here and set avoidHills in
-  // the request.
+  // routingMode is 'safe' | 'fast' | 'flat' | 'cool' — 'flat' and 'cool'
+  // are refinements of 'safe' via the avoidHills/avoidHeat flags. Collapse
+  // here and set the flags in the request.
   const storeMode: RoutingMode = routingMode === 'fast' ? 'fast' : 'safe';
   const avoidHills = routingMode === 'flat';
+  const avoidHeat = routingMode === 'cool';
 
   // Single synthesized RouteOption. `id` is stable per claim code so the
   // store's `selectedRouteId` stays pointing at the same object across
@@ -109,6 +110,7 @@ export const mapShareClaimToPreview = (claim: ShareClaim): MappedShareClaim => {
     destination,
     mode: storeMode,
     avoidHills,
+    avoidHeat,
     avoidUnpaved: false,
   };
 

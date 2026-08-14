@@ -14,8 +14,11 @@
  * the queue. Keeping the full slur list out of source control reduces the
  * chance the file leaks into screenshots / PR diffs / search indexes.
  *
- * The two languages match the launch market (Romania) and the secondary
- * (English) one. Add other locales as they're rolled out.
+ * Covered languages track the shipped UI locales: English, Romanian, and
+ * Spanish (added 2026-08-13, review finding G-26 — the ES UI had shipped
+ * long before the filter learned any Spanish). The app serves 31 countries,
+ * so most languages still rely on the report flow; add locales here as
+ * moderation volume in them appears.
  */
 
 // Patterns are kept loose intentionally — `\b` boundaries on Unicode letters
@@ -30,15 +33,34 @@ const SLUR_PATTERNS_RO = [
   /\bjid[a4]ni?\b/i,
 ];
 
+// Spanish slurs. Terms that are only slurs in context (`moro`, `gitano` —
+// both ordinary words, and `Moro` is also a surname) are matched ONLY in an
+// unambiguously abusive compound, so a rider writing about the Gitano
+// community or the Moros y Cristianos festival is not queued for review.
+const SLUR_PATTERNS_ES = [
+  /\b(?:sudac|negrat)[ao]s?\b/i, // ethnic / racial
+  /\b(?:mor|gitan|sudac)[ao]s?\s+de\s+mierda\b/i, // ethnonym + abuse
+  /\b(?:maric[oó]n(?:es)?|bolleras?|travelos?)\b/i, // homophobic / transphobic
+  /\b(?:subnormal(?:es)?|mong[oó]lic[ao]s?|retrasad[ao]s?\s+mental(?:es)?)\b/i, // ableist
+];
+
 const THREAT_PATTERNS = [
   /\b(?:i\s+will\s+kill\s+you|kill\s+yourself|kys)\b/i,
   /\b(?:te\s+omor|te\s+bat)\b/i,
+  // ES — direct violence, then the "kill yourself" analogues.
+  /\bte\s+voy\s+a\s+(?:matar|reventar|romper|partir)\b/i,
+  /\bvoy\s+a\s+(?:matarte|reventarte|romperte)\b/i,
+  /\bte\s+(?:mato|reviento)\b|\bte\s+parto\s+la\s+cara\b/i,
+  /\b(?:m[aá]tate|mu[eé]rete)\b/i,
 ];
 
 // Doxxing: phone-number-shaped sequences and full-address fragments.
-// Romanian mobile numbers start with 07x and are 10 digits.
+// Romanian mobile numbers start with 07x and are 10 digits; Spanish mobiles
+// are 9 digits starting 6/7, so they need the +34 prefix to be distinctive
+// enough — the generic 10-digit rule below never sees them.
 const DOXX_PATTERNS = [
   /\+?40\s*7\d{2}[\s.-]?\d{3}[\s.-]?\d{3}/, // RO mobile
+  /\+?34\s*[67]\d{2}[\s.-]?\d{3}[\s.-]?\d{3}/, // ES mobile
   /\b\d{3}[\s.-]?\d{3}[\s.-]?\d{4}\b/, // generic 10-digit phone
 ];
 
@@ -73,6 +95,9 @@ export const checkContentAgainstFilter = (text: string): FilterResult => {
 
   const slurRo = checkAgainst(text, SLUR_PATTERNS_RO, 'slur');
   if (slurRo.flagged) return slurRo;
+
+  const slurEs = checkAgainst(text, SLUR_PATTERNS_ES, 'slur');
+  if (slurEs.flagged) return slurEs;
 
   const threats = checkAgainst(text, THREAT_PATTERNS, 'threat');
   if (threats.flagged) return threats;

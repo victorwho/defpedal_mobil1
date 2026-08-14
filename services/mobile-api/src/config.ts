@@ -50,6 +50,13 @@ export const config = {
       ['SAFE_OSRM_FLAT_BASE_URL'],
       'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
     ),
+  // Cool routing — bicycle36shade.lua heat-model instance. Narrower graph
+  // coverage than safe/flat (HEAT_ROUTING_COUNTRIES in core — RO at launch).
+  safeOsrmCoolBaseUrl:
+    resolveConfigValue(
+      ['SAFE_OSRM_COOL_BASE_URL'],
+      'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
+    ),
   // safeOsrmEs(Flat)BaseUrl removed 2026-07-12 — the EU-wide graph on the
   // main pair covers Spain; the osrm-es.* servers are retired.
   mapboxAccessToken: resolveConfigValue(

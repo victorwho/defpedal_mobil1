@@ -262,7 +262,7 @@ const drawWindowMinute = (rng: Rng): number => {
 export const drawNextFireAt = (
   lastSentAt: Date,
   rng: Rng,
-  utcOffsetHours = 2,
+  utcOffsetHours = 2, // test-convenience default; production callers always pass a real offset (2026-08-13 G-18)
 ): Date => {
   const days = 1 + Math.min(4, Math.floor(rng() * 5));
   return atLocalMinute(
@@ -280,7 +280,7 @@ export const drawNextFireAt = (
 export const drawInitialFireAt = (
   now: Date,
   rng: Rng,
-  utcOffsetHours = 2,
+  utcOffsetHours = 2, // test-convenience default; production callers always pass a real offset (2026-08-13 G-18)
 ): Date => {
   const days = Math.min(5, Math.floor(rng() * 6));
   const fireAt = atLocalMinute(

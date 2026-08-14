@@ -123,6 +123,8 @@ export interface RoutePreviewRequest {
   mode: RoutingMode;
   avoidUnpaved: boolean;
   avoidHills: boolean;
+  /** Cool routing — dispatch safe-mode requests to the shade/heat-model OSRM instance. */
+  avoidHeat: boolean;
   showRouteComparison?: boolean;
   locale: string;
   countryHint?: string;
@@ -546,7 +548,7 @@ export interface CitySuggestionRequest {
   source: 'route_preview';
   locality?: string | null;
   routeContext?: {
-    mode: 'safe' | 'fast' | 'flat';
+    mode: 'safe' | 'fast' | 'flat' | 'cool';
     distanceMeters: number;
     routeId?: string;
   } | null;
@@ -830,6 +832,11 @@ export interface UserStats {
   readonly totalDistanceMeters: number;
   readonly totalCo2SavedKg: number;
   readonly totalDurationSeconds: number;
+  /**
+   * Sum of stored per-ride ride_impacts.calories_burned. Optional because
+   * only the stats-dashboard RPC returns it — getUserStats does not.
+   */
+  readonly totalCaloriesBurned?: number;
 }
 
 // ── Trip Statistics Dashboard ──
@@ -940,6 +947,11 @@ export interface ProfileUpdateRequest {
   // profiles.pedal_voice_sassy. The server-side voice renderer reads
   // this column when picking message variants.
   pedalVoiceSassy?: boolean;
+  // App UI locale, synced at session bootstrap so server-sent pushes
+  // (nudges, first-ride notifications) speak the rider's language. Mirrors
+  // profiles.preferred_locale; absent/null → server falls back to EN
+  // (review 2026-08-13 G-11).
+  preferredLocale?: 'en' | 'ro' | 'es';
 }
 
 export interface ProfileResponse {
@@ -1278,6 +1290,7 @@ export interface SavedRoute {
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
+  readonly avoidHeat: boolean;
   readonly createdAt: string;
   readonly lastUsedAt: string;
 }
@@ -1290,4 +1303,5 @@ export interface SavedRouteCreateRequest {
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
+  readonly avoidHeat: boolean;
 }

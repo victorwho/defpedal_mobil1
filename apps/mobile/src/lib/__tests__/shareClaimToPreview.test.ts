@@ -66,6 +66,17 @@ describe('mapShareClaimToPreview', () => {
     expect(request.avoidHills).toBe(true);
   });
 
+  it('collapses routingMode="cool" to safe + avoidHeat=true', () => {
+    const { response, request } = mapShareClaimToPreview(
+      baseClaim({ routingMode: 'cool' }),
+    );
+    expect(response.selectedMode).toBe('safe');
+    expect(response.routes[0]?.source).toBe('custom_osrm');
+    expect(request.mode).toBe('safe');
+    expect(request.avoidHeat).toBe(true);
+    expect(request.avoidHills).toBe(false);
+  });
+
   it('emits a Partial<RoutePreviewRequest> with origin/destination/mode/avoid flags', () => {
     const { request } = mapShareClaimToPreview(baseClaim());
     expect(request.origin).toEqual({ lat: 44.4268, lon: 26.1025 });

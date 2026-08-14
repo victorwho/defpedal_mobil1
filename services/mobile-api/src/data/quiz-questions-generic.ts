@@ -13,8 +13,13 @@
  *
  * Provenance: curated from the RO pool (plus one EU-rule question adapted
  * from the ES pool) with fresh UUIDs; country-specific clauses were stripped
- * from the explanations in all three locales. When editing, keep the rule:
- * if a sentence is only true in SOME countries, it does not belong here.
+ * from the explanations in all three locales. Expanded 2026-08-13 with 16
+ * net-new questions written directly for this pool. When editing, keep the
+ * rule: if a sentence is only true in SOME countries, it does not belong here.
+ *
+ * Pool SIZE is load-bearing: the daily-quiz endpoint excludes questions the
+ * rider answered in the last 30 days and 404s once nothing is left, so a pool
+ * at or below ~30 hard-locks a daily player. Grow this pool, never shrink it.
  *
  * Same multilingual model as the other pools: `id`, `correctIndex`,
  * `category`, `difficulty` are locale-independent; `questionText`,
@@ -1103,5 +1108,581 @@ export const QUIZ_QUESTIONS_GENERIC: readonly StaticQuizQuestion[] = [
     },
     category: 'road_safety',
     difficulty: 2,
+  },
+  {
+    id: '37da8301-14e1-4c2d-9821-22e52d7b6269',
+    questionText: {
+      en: 'A car overtakes you much too closely. What is the safest immediate reaction?',
+      ro: 'O mașină te depășește mult prea aproape. Care este cea mai sigură reacție imediată?',
+      es: 'Un coche te adelanta demasiado cerca. ¿Cuál es la reacción inmediata más segura?',
+    },
+    options: {
+      en: [
+        'Swerve towards the kerb to open up more space',
+        'Hold your line, keep pedalling smoothly, and let the car clear you',
+        'Brake hard so the car gets past faster',
+        "Match the car's speed to stay alongside it",
+      ],
+      ro: [
+        'Tragi brusc spre bordură ca să faci mai mult spațiu',
+        'Îți menții traiectoria, pedalezi constant și lași mașina să te depășească',
+        'Frânezi puternic ca mașina să treacă mai repede',
+        'Ții pasul cu mașina ca să rămâi lângă ea',
+      ],
+      es: [
+        'Desviarte hacia el bordillo para dejar más espacio',
+        'Mantener tu trayectoria, seguir pedaleando de forma constante y dejar que el coche termine el adelantamiento',
+        'Frenar con fuerza para que el coche pase antes',
+        'Igualar la velocidad del coche para quedarte a su lado',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'A sudden swerve or hard brake is what turns a close pass into a crash — you lose stability and become unpredictable to whoever is behind. Hold a straight, steady line until the vehicle has fully passed, then return to your normal riding position.',
+      ro: 'O smucitură de ghidon sau o frânare bruscă transformă o depășire prea apropiată într-un accident — pierzi stabilitatea și devii imprevizibil pentru cel din spate. Ține o linie dreaptă și constantă până când vehiculul te-a depășit complet, apoi revino la poziția normală de mers.',
+      es: 'Un volantazo o un frenazo es lo que convierte un adelantamiento cercano en una caída — pierdes estabilidad y te vuelves imprevisible para quien viene detrás. Mantén una línea recta y estable hasta que el vehículo te haya rebasado por completo y después vuelve a tu posición habitual.',
+    },
+    category: 'road_safety',
+    difficulty: 2,
+  },
+  {
+    id: '3aa4dc79-4c83-4611-bf69-04ff026cf12a',
+    questionText: {
+      en: 'What makes you most visible to drivers when riding after dark?',
+      ro: 'Ce te face cel mai vizibil pentru șoferi când pedalezi pe întuneric?',
+      es: '¿Qué te hace más visible para los conductores al pedalear de noche?',
+    },
+    options: {
+      en: [
+        'A white front light, a red rear light, and reflective material on your moving parts',
+        'Light-coloured clothing on its own',
+        'A single flashing light on your helmet',
+        'Riding closer to the middle of the road',
+      ],
+      ro: [
+        'Un far alb în față, o lumină roșie în spate și material reflectorizant pe părțile aflate în mișcare',
+        'Doar haine de culoare deschisă',
+        'O singură lumină intermitentă pe cască',
+        'Mersul mai aproape de mijlocul drumului',
+      ],
+      es: [
+        'Una luz blanca delante, una luz roja detrás y material reflectante en las partes que se mueven',
+        'Solo ropa de color claro',
+        'Una única luz intermitente en el casco',
+        'Circular más cerca del centro de la calzada',
+      ],
+    },
+    correctIndex: 0,
+    explanation: {
+      en: 'Lights make you detectable; reflective material on ankles, pedals or shoes makes you recognisable as a cyclist, because the eye picks out moving reflections first. Clothing colour alone is nearly invisible in a headlight beam.',
+      ro: 'Luminile te fac detectabil, iar reflectorizantele de pe glezne, pedale sau pantofi te fac recognoscibil drept biciclist, pentru că ochiul sesizează primul reflexiile în mișcare. Culoarea hainelor, singură, este aproape invizibilă în fasciculul farurilor.',
+      es: 'Las luces te hacen detectable; el material reflectante en tobillos, pedales o zapatillas te hace reconocible como ciclista, porque el ojo detecta antes los reflejos en movimiento. El color de la ropa por sí solo resulta casi invisible bajo los faros.',
+    },
+    category: 'road_safety',
+    difficulty: 1,
+  },
+  {
+    id: '779efede-d3ef-42c0-ae2c-09b72ec89886',
+    questionText: {
+      en: 'How should you brake on a wet road?',
+      ro: 'Cum trebuie să frânezi pe carosabil ud?',
+      es: '¿Cómo debes frenar sobre calzada mojada?',
+    },
+    options: {
+      en: [
+        'Use the front brake only, as hard as you can',
+        'Start braking earlier and apply both brakes progressively',
+        'Use the rear brake only and skid to a stop',
+        'Brake at the same point as in the dry, but harder',
+      ],
+      ro: [
+        'Folosești doar frâna din față, cât de tare poți',
+        'Începi să frânezi mai devreme și acționezi progresiv ambele frâne',
+        'Folosești doar frâna din spate și derapezi până la oprire',
+        'Frânezi din același punct ca pe uscat, dar mai puternic',
+      ],
+      es: [
+        'Usar solo el freno delantero, con toda la fuerza posible',
+        'Empezar a frenar antes y accionar ambos frenos de forma progresiva',
+        'Usar solo el freno trasero y derrapar hasta parar',
+        'Frenar en el mismo punto que en seco, pero más fuerte',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'Wet rims and tyres need noticeably more distance to stop, and grabbing either brake can lock a wheel. Begin braking earlier than you would in the dry and squeeze both levers progressively, keeping the bike upright and straight.',
+      ro: 'Jantele și cauciucurile ude au nevoie de o distanță vizibil mai mare până la oprire, iar o strângere bruscă a oricărei frâne poate bloca roata. Începe să frânezi mai devreme decât pe uscat și strânge progresiv ambele manete, menținând bicicleta dreaptă și verticală.',
+      es: 'Con las llantas y los neumáticos mojados la distancia de frenado crece de forma notable, y un tirón brusco de cualquiera de los frenos puede bloquear la rueda. Empieza a frenar antes que en seco y aprieta las dos manetas de forma progresiva, con la bici recta y vertical.',
+    },
+    category: 'road_safety',
+    difficulty: 2,
+  },
+  {
+    id: 'cbf7f814-06e0-4551-81db-f41453eb5fe3',
+    questionText: {
+      en: 'You need to turn left across several lanes of fast traffic. What is the safer alternative to merging left?',
+      ro: 'Trebuie să virezi la stânga peste mai multe benzi cu trafic rapid. Care este alternativa mai sigură la încadrarea spre stânga?',
+      es: 'Tienes que girar a la izquierda cruzando varios carriles de tráfico rápido. ¿Cuál es la alternativa más segura a incorporarte a la izquierda?',
+    },
+    options: {
+      en: [
+        'Dismount and run across between the cars',
+        'A two-stage turn: ride straight through, stop at the far corner, then set off in the new direction',
+        'Turn from the right-hand edge without looking back',
+        'Wait on the centre line until every lane is empty',
+      ],
+      ro: [
+        'Cobori și treci în fugă printre mașini',
+        'Un viraj în doi timpi: treci drept prin intersecție, te oprești în colțul opus, apoi pleci în noua direcție',
+        'Virezi de pe marginea din dreapta, fără să privești în spate',
+        'Aștepți pe axul drumului până se golesc toate benzile',
+      ],
+      es: [
+        'Bajarte y cruzar corriendo entre los coches',
+        'Un giro en dos tiempos: cruzar recto, parar en la esquina opuesta y salir después en la nueva dirección',
+        'Girar desde el borde derecho sin mirar atrás',
+        'Esperar sobre la línea central hasta que todos los carriles estén vacíos',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'A two-stage turn keeps you out of fast-moving lanes: ride straight through the junction, stop and reposition in the far corner facing your new direction, then set off with that flow of traffic. It costs a few seconds and removes the most exposed manoeuvre in urban cycling.',
+      ro: 'Virajul în doi timpi te ține în afara benzilor cu trafic rapid: treci drept prin intersecție, te oprești și te repoziționezi în colțul opus, orientat pe noua direcție, apoi pleci odată cu acel flux de trafic. Costă câteva secunde și elimină cea mai expusă manevră din ciclismul urban.',
+      es: 'El giro en dos tiempos te mantiene fuera de los carriles rápidos: cruzas recto el cruce, paras y te recolocas en la esquina opuesta mirando hacia tu nueva dirección y sales con ese flujo de tráfico. Cuesta unos segundos y elimina la maniobra más expuesta del ciclismo urbano.',
+    },
+    category: 'road_safety',
+    difficulty: 3,
+  },
+  {
+    id: '0fbbd5c1-032d-4bd6-b8bc-3451691e70fb',
+    questionText: {
+      en: 'A long truck is stopped at a junction with its right indicator on. Where should you be?',
+      ro: 'Un camion lung este oprit într-o intersecție cu semnalizatorul dreapta pornit. Unde ar trebui să fii?',
+      es: 'Un camión largo está parado en un cruce con el intermitente derecho puesto. ¿Dónde deberías situarte?',
+    },
+    options: {
+      en: [
+        'Alongside its right side, in the gap next to the kerb',
+        'Behind it, where you can see its mirrors, until the turn is finished',
+        'Directly in front of the cab as it starts to move',
+        'Overtaking on its left while it is turning',
+      ],
+      ro: [
+        'Pe partea lui dreaptă, în spațiul de lângă bordură',
+        'În spatele lui, de unde îi vezi oglinzile, până termină virajul',
+        'Chiar în fața cabinei, în momentul în care pornește',
+        'Îl depășești pe stânga în timp ce virează',
+      ],
+      es: [
+        'A su derecha, en el hueco junto al bordillo',
+        'Detrás de él, donde puedas ver sus espejos, hasta que termine el giro',
+        'Justo delante de la cabina en el momento en que arranca',
+        'Adelantándolo por la izquierda mientras gira',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'The gap between a turning truck and the kerb closes as the trailer cuts the corner, and that space sits in the worst blind spot the driver has. Stay behind the vehicle where you can see its mirrors — if you cannot see the mirrors, the driver cannot see you — and wait for the turn to finish.',
+      ro: 'Spațiul dintre un camion care virează și bordură se închide pe măsură ce semiremorca taie colțul, iar acolo se află cel mai prost unghi mort al șoferului. Rămâi în spatele vehiculului, de unde îi vezi oglinzile — dacă tu nu vezi oglinzile, nici șoferul nu te vede — și așteaptă să termine virajul.',
+      es: 'El hueco entre un camión que gira y el bordillo se cierra según el remolque recorta la curva, y ese espacio queda en el peor ángulo muerto del conductor. Quédate detrás del vehículo, donde puedas ver sus espejos — si tú no ves los espejos, el conductor no te ve a ti — y espera a que complete el giro.',
+    },
+    category: 'road_safety',
+    difficulty: 3,
+  },
+  {
+    id: '2a61bde7-f734-4223-8ed5-abf393969587',
+    questionText: {
+      en: 'How should a cycling helmet sit on your head?',
+      ro: 'Cum trebuie să stea casca de ciclism pe cap?',
+      es: '¿Cómo debe asentarse el casco en la cabeza?',
+    },
+    options: {
+      en: [
+        'Level, about two fingers above the eyebrows, with the straps forming a V under each ear',
+        'Tilted back so it does not block your view',
+        'Loose, so it can move if you fall',
+        'Low over the eyes with the chin strap unfastened',
+      ],
+      ro: [
+        'Drept, la aproximativ două degete deasupra sprâncenelor, cu chingile formând un V sub fiecare ureche',
+        'Înclinată spre spate, ca să nu îți acopere vederea',
+        'Lejer, ca să se poată mișca la o cădere',
+        'Trasă peste ochi, cu cureaua de bărbie desfăcută',
+      ],
+      es: [
+        'Nivelado, unos dos dedos por encima de las cejas, con las cintas formando una V bajo cada oreja',
+        'Inclinado hacia atrás para que no te tape la vista',
+        'Holgado, para que pueda moverse en una caída',
+        'Calado sobre los ojos y con la cinta de la barbilla suelta',
+      ],
+    },
+    correctIndex: 0,
+    explanation: {
+      en: 'A helmet only protects the part of your head it covers. Sit it level, two finger-widths above the eyebrows, adjust the side straps into a V just under the ears, and tighten the chin strap so only one finger fits underneath. A helmet tilted back leaves your forehead exposed in exactly the impact that matters most.',
+      ro: 'Casca protejează doar zona pe care o acoperă. Așaz-o drept, la două lățimi de deget deasupra sprâncenelor, reglează chingile laterale într-un V chiar sub urechi și strânge cureaua de bărbie astfel încât să încapă un singur deget sub ea. O cască împinsă pe spate îți lasă fruntea descoperită exact la impactul care contează cel mai mult.',
+      es: 'El casco solo protege la zona que cubre. Colócalo nivelado, a dos dedos por encima de las cejas, ajusta las cintas laterales en forma de V justo bajo las orejas y aprieta la correa de la barbilla hasta que solo quepa un dedo. Un casco echado hacia atrás deja la frente al descubierto justo en el impacto que más importa.',
+    },
+    category: 'road_safety',
+    difficulty: 1,
+  },
+  {
+    id: 'a8f4edc1-a172-4510-bb14-22f254d121c6',
+    questionText: {
+      en: 'What is the safest way to carry a heavy load on a bicycle?',
+      ro: 'Care este cel mai sigur mod de a transporta o greutate mare pe bicicletă?',
+      es: '¿Cuál es la forma más segura de llevar carga pesada en bici?',
+    },
+    options: {
+      en: [
+        'Hanging from the handlebars',
+        'Low and centred, in panniers over the wheels or in a rack basket',
+        'In one hand while you steer with the other',
+        'On your back in a loose rucksack that shifts as you ride',
+      ],
+      ro: [
+        'Atârnată de ghidon',
+        'Jos și centrat, în coșuri laterale deasupra roților sau într-un coș pe portbagaj',
+        'Într-o mână, în timp ce conduci cu cealaltă',
+        'În spate, într-un rucsac care se mișcă liber în timpul mersului',
+      ],
+      es: [
+        'Colgada del manillar',
+        'Baja y centrada, en alforjas sobre las ruedas o en una cesta del portabultos',
+        'En una mano, mientras manejas con la otra',
+        'A la espalda, en una mochila suelta que se desplaza al rodar',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'Weight on the handlebars destabilises the steering and makes the front wheel flop at low speed; a bag held in one hand does the same and blocks your braking. Carry loads low and close to the wheel axles so the centre of gravity stays put, and remember a loaded bike needs more distance to stop.',
+      ro: 'Greutatea pe ghidon destabilizează direcția și face roata din față să cadă în lateral la viteză mică; o sacoșă ținută în mână are același efect și îți blochează frânarea. Transportă încărcătura jos și aproape de axele roților, ca centrul de greutate să rămână stabil, și ține minte că o bicicletă încărcată frânează pe o distanță mai mare.',
+      es: 'El peso en el manillar desestabiliza la dirección y hace que la rueda delantera se venza a baja velocidad; una bolsa en la mano hace lo mismo y te impide frenar. Lleva la carga baja y cerca de los ejes de las ruedas para que el centro de gravedad no se desplace, y recuerda que una bici cargada necesita más distancia para detenerse.',
+    },
+    category: 'road_safety',
+    difficulty: 2,
+  },
+  {
+    id: 'f7c3214d-131f-4776-9494-ded170ffd51d',
+    questionText: {
+      en: 'You realise you have ridden onto a patch of ice. What should you do?',
+      ro: 'Îți dai seama că ai intrat pe o porțiune de gheață. Ce faci?',
+      es: 'Te das cuenta de que has entrado en una placa de hielo. ¿Qué haces?',
+    },
+    options: {
+      en: [
+        'Brake hard immediately',
+        'Keep the bike upright and straight, stop pedalling, and coast across without braking or steering',
+        'Turn sharply to get off the ice',
+        'Stand up on the pedals and accelerate',
+      ],
+      ro: [
+        'Frânezi imediat, puternic',
+        'Ții bicicleta dreaptă și verticală, oprești pedalatul și te lași să aluneci peste, fără să frânezi sau să virezi',
+        'Virezi brusc ca să ieși de pe gheață',
+        'Te ridici pe pedale și accelerezi',
+      ],
+      es: [
+        'Frenar con fuerza de inmediato',
+        'Mantener la bici recta y vertical, dejar de pedalear y pasar por inercia sin frenar ni girar',
+        'Girar bruscamente para salir del hielo',
+        'Ponerte de pie sobre los pedales y acelerar',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'On ice the tyres have almost no grip, and braking, steering and pedalling all demand grip you do not have. Stay relaxed, keep your weight centred and the bars straight, and simply roll across; make any correction only once you are back on a surface with traction.',
+      ro: 'Pe gheață, cauciucurile aproape că nu au aderență, iar frânarea, virarea și pedalatul cer exact aderența pe care nu o ai. Rămâi relaxat, ține greutatea centrată și ghidonul drept și treci pur și simplu peste porțiune; fă orice corecție abia după ce ai revenit pe o suprafață cu aderență.',
+      es: 'Sobre hielo los neumáticos apenas tienen agarre, y frenar, girar o pedalear exigen justo el agarre que no tienes. Mantente relajado, con el peso centrado y el manillar recto, y limítate a pasar por inercia; corrige solo cuando vuelvas a una superficie con adherencia.',
+    },
+    category: 'road_safety',
+    difficulty: 3,
+  },
+  {
+    id: 'abd63afe-f558-474a-a54b-6a6d930302f5',
+    questionText: {
+      en: 'You are riding in a group on a narrow road with traffic behind. What is the safest formation?',
+      ro: 'Pedalezi în grup pe un drum îngust, cu trafic în spate. Care este formația cea mai sigură?',
+      es: 'Ruedas en grupo por una vía estrecha con tráfico detrás. ¿Cuál es la formación más segura?',
+    },
+    options: {
+      en: [
+        'Spread across the full width so nobody can overtake',
+        'Single file, with gaps that let drivers overtake in stages',
+        'Side by side in a tight bunch with no gaps',
+        'Each rider weaving so the group is more noticeable',
+      ],
+      ro: [
+        'Ocupați toată lățimea, ca nimeni să nu vă poată depăși',
+        'Coloană pe un singur rând, cu spații care permit șoferilor să depășească pe etape',
+        'Câte doi, într-un pluton strâns, fără spații',
+        'Fiecare ciclist șerpuiește, ca grupul să fie mai vizibil',
+      ],
+      es: [
+        'Ocupar todo el ancho para que nadie pueda adelantar',
+        'En fila india, con huecos que permitan adelantar por tramos',
+        'En paralelo y muy juntos, sin huecos',
+        'Que cada ciclista zigzaguee para que el grupo se vea más',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'A long unbroken line is as hard to overtake as a wide one — drivers commit to a pass they cannot finish. Ride single file on narrow roads and leave a gap every few riders so vehicles can leapfrog the group safely. Call hazards out loud: the riders behind cannot see the road surface.',
+      ro: 'O coloană lungă și neîntreruptă este la fel de greu de depășit ca una lată — șoferii încep o depășire pe care nu o pot termina. Pe drumuri înguste mergeți pe un singur rând și lăsați un spațiu la câțiva cicliști, ca vehiculele să poată depăși grupul pe etape. Semnalați vocal obstacolele: cei din spate nu văd carosabilul.',
+      es: 'Una fila larga e ininterrumpida es tan difícil de adelantar como un grupo ancho — el conductor inicia un adelantamiento que no puede terminar. En vías estrechas rodad en fila india y dejad un hueco cada pocos ciclistas para que los vehículos puedan rebasar el grupo por tramos. Cantad los obstáculos en voz alta: quien va detrás no ve el asfalto.',
+    },
+    category: 'risk_awareness',
+    difficulty: 2,
+  },
+  {
+    id: 'a2d29eee-b5a1-400c-a453-3393217f6619',
+    questionText: {
+      en: 'Why is a low sun behind you especially dangerous when riding?',
+      ro: 'De ce este periculos în mod special un soare jos aflat în spatele tău?',
+      es: '¿Por qué resulta especialmente peligroso un sol bajo situado a tu espalda?',
+    },
+    options: {
+      en: [
+        'It heats your back and causes fatigue',
+        'Drivers coming up behind look straight into the glare and may not see you at all',
+        'Your shadow confuses other cyclists',
+        'It has no effect — only a sun in front of you matters',
+      ],
+      ro: [
+        'Îți încălzește spatele și te obosește',
+        'Șoferii care vin din spate privesc direct în lumina orbitoare și pot să nu te vadă deloc',
+        'Umbra ta îi derutează pe ceilalți cicliști',
+        'Nu are niciun efect — contează doar soarele din față',
+      ],
+      es: [
+        'Te calienta la espalda y provoca fatiga',
+        'Los conductores que se acercan por detrás miran directamente al deslumbramiento y pueden no verte',
+        'Tu sombra confunde a otros ciclistas',
+        'No influye — solo importa el sol de frente',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'When the sun sits low behind you, every driver approaching from behind is looking straight into it and you are in the middle of that glare. Assume you are invisible: run a rear light even in daylight, hold a predictable line, and take extra care at junctions where a driver would have to pick you out of the light.',
+      ro: 'Când soarele este jos în spatele tău, fiecare șofer care se apropie din spate privește direct în el, iar tu ești chiar în mijlocul acelei lumini. Presupune că ești invizibil: folosește lumina roșie din spate chiar și ziua, ține o traiectorie previzibilă și fii extrem de atent în intersecții, unde șoferul ar trebui să te distingă din lumină.',
+      es: 'Con el sol bajo a tu espalda, todo conductor que se aproxima por detrás mira directamente hacia él y tú quedas en mitad de ese deslumbramiento. Da por hecho que eres invisible: lleva luz trasera incluso de día, mantén una trayectoria previsible y extrema la precaución en los cruces, donde el conductor tendría que distinguirte a contraluz.',
+    },
+    category: 'risk_awareness',
+    difficulty: 3,
+  },
+  {
+    id: '1acd1347-9830-4660-a5c6-57625a932d2f',
+    questionText: {
+      en: 'What changes when you ride a pedal-assist e-bike instead of a regular bicycle?',
+      ro: 'Ce se schimbă când pedalezi pe o bicicletă electrică cu asistență la pedalare, față de una obișnuită?',
+      es: '¿Qué cambia al rodar en una bici eléctrica con asistencia al pedaleo en lugar de una convencional?',
+    },
+    options: {
+      en: [
+        'Nothing — they handle identically',
+        'It is heavier and reaches junctions sooner, so braking distances grow and drivers misjudge your speed',
+        'It stops faster because the motor helps slow it down',
+        'It is more stable, so you can leave braking later',
+      ],
+      ro: [
+        'Nimic — se comportă identic',
+        'Este mai grea și ajunge mai repede în intersecții, deci distanțele de frânare cresc, iar șoferii îți subestimează viteza',
+        'Se oprește mai repede, pentru că motorul ajută la frânare',
+        'Este mai stabilă, deci poți frâna mai târziu',
+      ],
+      es: [
+        'Nada — se comportan igual',
+        'Pesa más y llega antes a los cruces, así que la distancia de frenado aumenta y los conductores calculan mal tu velocidad',
+        'Frena antes porque el motor ayuda a detenerla',
+        'Es más estable, así que puedes frenar más tarde',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'A pedal-assist e-bike typically weighs 8-12 kg more and carries that mass into every stop, so it needs more distance to brake. It also arrives at junctions sooner than drivers expect from a bicycle, which is why they pull out in front of one. Brake earlier and leave room for others to misjudge you.',
+      ro: 'O bicicletă electrică cu asistență cântărește de obicei cu 8-12 kg mai mult și duce masa asta în fiecare frânare, deci are nevoie de o distanță mai mare până la oprire. În plus, ajunge în intersecție mai devreme decât se așteaptă șoferii de la o bicicletă — de aceea îi taie calea. Frânează mai devreme și lasă loc pentru estimările greșite ale celorlalți.',
+      es: 'Una bici con asistencia al pedaleo suele pesar entre 8 y 12 kg más y arrastra esa masa en cada frenada, por lo que necesita más distancia para detenerse. Además llega a los cruces antes de lo que el conductor espera de una bici, y por eso se le cruzan. Frena antes y deja margen para que otros calculen mal tu velocidad.',
+    },
+    category: 'risk_awareness',
+    difficulty: 2,
+  },
+  {
+    id: 'c271d617-6f14-4037-92f8-2915ba1b36f3',
+    questionText: {
+      en: 'Why are wet leaves on the road a serious hazard for cyclists?',
+      ro: 'De ce sunt frunzele ude de pe carosabil un pericol serios pentru cicliști?',
+      es: '¿Por qué las hojas mojadas en la calzada son un peligro serio para el ciclista?',
+    },
+    options: {
+      en: [
+        'They clog the chain',
+        'They form a slippery layer and hide potholes, kerbs and drain covers underneath',
+        'They make the bike heavier',
+        'They only matter for motorcycles',
+      ],
+      ro: [
+        'Înfundă lanțul',
+        'Formează un strat alunecos și ascund gropi, borduri și capace de canalizare',
+        'Îngreunează bicicleta',
+        'Contează doar pentru motociclete',
+      ],
+      es: [
+        'Atascan la cadena',
+        'Forman una capa deslizante y ocultan baches, bordillos y tapas de alcantarilla',
+        'Hacen la bici más pesada',
+        'Solo afectan a las motos',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'A layer of wet leaves behaves like a thin film of oil, and it also conceals whatever is underneath — holes, edges, metal covers. Cross leafy patches upright and at steady speed, without braking or turning on them, and take extra care in shaded corners where they stay wet all day.',
+      ro: 'Un strat de frunze ude se comportă ca o peliculă subțire de ulei și, în plus, ascunde tot ce se află dedesubt — gropi, muchii, capace metalice. Treci peste porțiunile cu frunze în poziție verticală și la viteză constantă, fără să frânezi sau să virezi pe ele, și fii atent în curbele umbrite, unde rămân ude toată ziua.',
+      es: 'Una capa de hojas mojadas se comporta como una fina película de aceite y además tapa lo que hay debajo: baches, resaltes, tapas metálicas. Cruza esas zonas con la bici vertical y a velocidad constante, sin frenar ni girar sobre ellas, y extrema el cuidado en curvas sombrías, donde siguen mojadas todo el día.',
+    },
+    category: 'risk_awareness',
+    difficulty: 1,
+  },
+  {
+    id: '1e18ec01-bee2-4a1f-b449-b967ae29fb40',
+    questionText: {
+      en: 'How should you pass pedestrians on a path you share with them?',
+      ro: 'Cum treci pe lângă pietoni pe o alee pe care o împarți cu ei?',
+      es: '¿Cómo debes adelantar a los peatones en un camino compartido?',
+    },
+    options: {
+      en: [
+        'Ring the bell continuously and keep your speed',
+        'Slow down, warn them early with a bell or your voice, and pass wide',
+        'Pass as close as possible so you do not leave the path',
+        'Pass from behind without any warning so you do not startle them',
+      ],
+      ro: [
+        'Suni continuu din clopoțel și îți păstrezi viteza',
+        'Încetinești, îi avertizezi din timp cu clopoțelul sau vocea și treci la distanță',
+        'Treci cât mai aproape, ca să nu ieși de pe alee',
+        'Treci pe la spate fără niciun avertisment, ca să nu îi sperii',
+      ],
+      es: [
+        'Tocar el timbre sin parar y mantener la velocidad',
+        'Reducir la velocidad, avisar con tiempo con el timbre o la voz y pasar con holgura',
+        'Pasar lo más cerca posible para no salirte del camino',
+        'Pasar por detrás sin avisar, para no asustarlos',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'Pedestrians on a shared path can step sideways without looking, and children and dogs move unpredictably. Drop your speed well in advance, give a friendly warning early rather than at their shoulder, and leave as much lateral space as you would want from a car.',
+      ro: 'Pietonii de pe o alee comună pot păși lateral fără să se uite, iar copiii și câinii se mișcă imprevizibil. Redu viteza cu mult înainte, avertizează prietenos din timp, nu chiar lângă umărul lor, și lasă la fel de mult spațiu lateral cât ți-ai dori de la o mașină.',
+      es: 'En un camino compartido los peatones pueden desplazarse de lado sin mirar, y los niños y los perros se mueven de forma imprevisible. Baja la velocidad con antelación, avisa pronto y de forma amable en lugar de hacerlo pegado a su hombro, y deja tanto espacio lateral como te gustaría recibir de un coche.',
+    },
+    category: 'infrastructure',
+    difficulty: 1,
+  },
+  {
+    id: '48441693-4a1f-4b76-8605-a0a43207db14',
+    questionText: {
+      en: 'Where does a cycle track separated from the road become most dangerous?',
+      ro: 'Unde devine cel mai periculoasă o pistă de biciclete separată de carosabil?',
+      es: '¿Dónde se vuelve más peligroso un carril bici separado de la calzada?',
+    },
+    options: {
+      en: [
+        'In the middle of a long straight section',
+        'At driveways and side-street crossings, where turning drivers look late and see you late',
+        'Wherever it runs downhill',
+        'Where it is at its widest',
+      ],
+      ro: [
+        'În mijlocul unui tronson lung și drept',
+        'La intrările în curți și la traversările străzilor laterale, unde șoferii care virează se uită târziu și te văd târziu',
+        'Oriunde coboară în pantă',
+        'Acolo unde este cea mai lată',
+      ],
+      es: [
+        'En mitad de un tramo recto y largo',
+        'En los vados y cruces con calles laterales, donde el conductor que gira mira tarde y te ve tarde',
+        'En cualquier tramo en bajada',
+        'Donde es más ancho',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'Separation removes the danger between junctions and concentrates it wherever a vehicle crosses the track. A driver turning in or out is looking for traffic on the carriageway, often checking only once the nose of the car is already over the cycle track. Cover your brakes, slow at each crossing, and try to make eye contact before you commit.',
+      ro: 'Separarea elimină pericolul dintre intersecții și îl concentrează în fiecare punct în care un vehicul traversează pista. Șoferul care intră sau iese caută traficul de pe carosabil și de multe ori se uită abia după ce botul mașinii a ajuns deja peste pistă. Ține degetele pe manete, încetinește la fiecare traversare și încearcă să prinzi contactul vizual înainte de a trece.',
+      es: 'La separación elimina el peligro entre cruces y lo concentra en cada punto donde un vehículo atraviesa el carril. Quien entra o sale busca el tráfico de la calzada y muchas veces mira cuando el morro del coche ya está sobre el carril bici. Lleva los dedos en las manetas, reduce en cada cruce y busca el contacto visual antes de pasar.',
+    },
+    category: 'infrastructure',
+    difficulty: 3,
+  },
+  {
+    id: 'dbefc4f0-add0-4934-b716-fa5a8a664f8a',
+    questionText: {
+      en: 'After a fall, a rider is confused, dizzy and cannot remember the crash. What should you do?',
+      ro: 'După o cădere, un ciclist este confuz, amețit și nu își amintește accidentul. Ce faci?',
+      es: 'Tras una caída, un ciclista está confuso, mareado y no recuerda el golpe. ¿Qué haces?',
+    },
+    options: {
+      en: [
+        'Let them ride home slowly if they can stand up',
+        'Treat it as a possible head injury: end the ride, keep them still, and get medical help',
+        'Give them water and carry on after a short rest',
+        'Remove the helmet straight away to check for bumps',
+      ],
+      ro: [
+        'Îl lași să meargă încet acasă cu bicicleta, dacă se poate ridica',
+        'Tratezi situația ca pe o posibilă traumă craniană: încheiați cursa, îl ții nemișcat și ceri ajutor medical',
+        'Îi dai apă și continuați după o scurtă pauză',
+        'Îi scoți imediat casca, ca să verifici dacă are cucuie',
+      ],
+      es: [
+        'Dejar que vuelva a casa pedaleando despacio si se tiene en pie',
+        'Tratarlo como posible traumatismo craneal: terminar la salida, mantenerlo quieto y buscar asistencia médica',
+        'Darle agua y seguir tras un breve descanso',
+        'Quitarle el casco de inmediato para buscar chichones',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'Confusion, dizziness and memory gaps are warning signs of concussion, which can get worse over hours. End the ride, keep the person still and watched, and seek a medical assessment — do not let them cycle off alone. Leave the helmet in place unless it obstructs breathing, since moving the head can worsen a neck injury.',
+      ro: 'Confuzia, amețeala și lipsurile de memorie sunt semne de alarmă pentru comoție, care se poate agrava în câteva ore. Încheie cursa, ține persoana nemișcată și sub supraveghere și cere o evaluare medicală — nu o lăsa să plece singură pe bicicletă. Lasă casca pe cap dacă nu împiedică respirația, pentru că mișcarea capului poate agrava o leziune a gâtului.',
+      es: 'La confusión, el mareo y las lagunas de memoria son señales de alarma de conmoción, que puede agravarse en horas. Termina la salida, mantén a la persona quieta y vigilada y busca valoración médica — no la dejes marcharse sola en bici. Deja el casco puesto salvo que dificulte la respiración, porque mover la cabeza puede empeorar una lesión cervical.',
+    },
+    category: 'first_aid',
+    difficulty: 2,
+  },
+  {
+    id: 'd9f4e0ca-d27c-4fb0-be72-45969f32686f',
+    questionText: {
+      en: 'An injured rider is unconscious but breathing normally. What should you do while waiting for the ambulance?',
+      ro: 'Un ciclist rănit este inconștient, dar respiră normal. Ce faci până vine ambulanța?',
+      es: 'Un ciclista herido está inconsciente pero respira con normalidad. ¿Qué haces mientras llega la ambulancia?',
+    },
+    options: {
+      en: [
+        'Sit them up and give them water',
+        'Call the emergency number, roll them onto their side into the recovery position, and keep checking their breathing',
+        'Leave them exactly as they are and stand back',
+        'Try to wake them by shaking their shoulders hard',
+      ],
+      ro: [
+        'Îl ridici în șezut și îi dai apă',
+        'Suni la numărul de urgență, îl întorci pe o parte în poziția laterală de siguranță și îi verifici constant respirația',
+        'Îl lași exact așa cum este și te dai la o parte',
+        'Încerci să îl trezești scuturându-l puternic de umeri',
+      ],
+      es: [
+        'Sentarlo y darle agua',
+        'Llamar al número de emergencias, girarlo de lado en posición lateral de seguridad y vigilar su respiración',
+        'Dejarlo tal cual está y apartarte',
+        'Intentar despertarlo sacudiéndolo con fuerza por los hombros',
+      ],
+    },
+    correctIndex: 1,
+    explanation: {
+      en: 'An unconscious person lying on their back can choke on their own tongue or vomit. Call the emergency number first, then roll them gently onto their side so the airway stays open, keep them warm, and re-check breathing until help arrives. Never give food or drink to someone who is not fully conscious.',
+      ro: 'O persoană inconștientă întinsă pe spate se poate îneca cu propria limbă sau cu vomă. Sună întâi la numărul de urgență, apoi întoarce-o ușor pe o parte, ca să rămână căile respiratorii libere, ține-o la cald și reverifică respirația până sosește ajutorul. Nu da niciodată mâncare sau băutură unei persoane care nu este pe deplin conștientă.',
+      es: 'Una persona inconsciente boca arriba puede asfixiarse con su propia lengua o con el vómito. Llama primero al número de emergencias, después gírala con suavidad de lado para mantener la vía aérea abierta, mantenla abrigada y comprueba la respiración hasta que llegue la ayuda. Nunca des comida ni bebida a alguien que no esté plenamente consciente.',
+    },
+    category: 'first_aid',
+    difficulty: 1,
   },
 ];
