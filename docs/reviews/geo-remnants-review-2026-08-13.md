@@ -191,7 +191,7 @@ The findings below were accurate for what the app *rendered* at review time; onl
 
 ## Fix status (same day, 2026-08-13 — session 105)
 
-All phases executed in-session. Changes live in the working tree (uncommitted — entangled with avoidHeat WIP; snapshot at `git stash@{0}`). Migration `202608130001` applied to the live DB. Full verification green (typecheck, core 871 / api 674 / mobile 120 files, lint ratchet, bundle HTTP 200).
+All phases executed in-session and **shipped as commit `e0784c6` on `shade`** (pushed; 93 files, +4233/−1881 — carries the cool/avoidHeat work too, since the two share ~20 files and no split typechecks standalone). Migration `202608130001` applied to the live DB. Full verification green (typecheck, core 871 / api 674 / mobile 1450, lint ratchet, bundle HTTP 200), and preview **v0.2.124 (vc 127)** was device-tested and approved before the commit.
 
 | Finding | Status | Notes |
 |---|---|---|
