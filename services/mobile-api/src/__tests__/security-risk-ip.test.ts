@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Security tests: Risk Score IP Protection (P0 fixes from securityfix.md)
+ * Security tests: Risk Score IP Protection (P0 fixes from docs/archive/securityfix.md)
  *
  * Verifies that:
  * 1. Risk scores are quantized to bucket midpoints (not raw floats)

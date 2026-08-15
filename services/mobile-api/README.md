@@ -35,4 +35,4 @@ environments directly.
 
 Deployment, Redis rollout, and load-test guidance live in:
 
-- `mobile_api_operations_runbook.md`
+- `docs/archive/mobile_api_operations_runbook.md`

@@ -116,7 +116,7 @@ Each phase: **entry criteria → work items (owner DEV or USER) → exit criteri
 
 **Entry:** Phase B smoke passed.
 
-Walk the HIG-delta checklist (02 §5) + the historical 10-item iOS risk surface. File each finding as `iOS-N` in `issuefix.md`, fix → rebuild → retest.
+Walk the HIG-delta checklist (02 §5) + the historical 10-item iOS risk surface. File each finding as `iOS-N` in `docs/archive/issuefix.md`, fix → rebuild → retest.
 
 | Verify | Where | Owner |
 |---|---|---|
