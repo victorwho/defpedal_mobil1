@@ -167,6 +167,37 @@ export const scheduleDailyWeatherNotifications = async (
   // rebuilds the same fires instead of re-rolling (review 2026-07-19, M2).
   store.getState().setDailyWeatherChain(chain.map((d) => d.toISOString()));
 
+  // Assign titles in fire order BEFORE scheduling, threading an exclusion
+  // list of recently used witty lines (earlier fires this pass + the
+  // persisted previous pass) so back-to-back deliveries never repeat a
+  // phrase. Safety-warning titles are exempt — they repeat verbatim by
+  // design and never enter the memory.
+  const previousTitles = store.getState().dailyWeatherRecentTitles ?? [];
+  const usedTitles: string[] = [];
+  const plans = fires.map((fireAt, index) => {
+    const forecast = rows[Math.min(forecastDayIndex(fireAt, now), rows.length - 1)];
+    if (!forecast) return null;
+    const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
+    const { title, body } = buildCyclingAdvice(forecast, undefined, [
+      ...previousTitles,
+      ...usedTitles,
+    ]);
+    if (tone === 'good') usedTitles.push(title);
+    return { fireAt, index, title, body, tone };
+  });
+
+  // Persist the title memory before the OS calls (same crash-safety rule as
+  // the chain: over-excluding after a crash is harmless, repeating is not).
+  // Newest-first; an all-caution pass keeps the previous memory so the next
+  // witty title still can't echo the last one the user saw.
+  store
+    .getState()
+    .setDailyWeatherRecentTitles(
+      usedTitles.length > 0
+        ? usedTitles.slice().reverse().slice(0, MAX_SCHEDULED_FIRES)
+        : [...previousTitles],
+    );
+
   if (Platform.OS === 'android') {
     await N.setNotificationChannelAsync('daily-weather', {
       name: 'Cycling Weather',
@@ -182,11 +213,9 @@ export const scheduleDailyWeatherNotifications = async (
   const generation = `g${now.getTime().toString(36)}`;
 
   await Promise.all(
-    fires.map((fireAt, index) => {
-      const forecast = rows[Math.min(forecastDayIndex(fireAt, now), rows.length - 1)];
-      if (!forecast) return Promise.resolve();
-      const { title, body } = buildCyclingAdvice(forecast);
-      const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
+    plans.map((plan) => {
+      if (!plan) return Promise.resolve();
+      const { fireAt, index, title, body, tone } = plan;
       const seconds = Math.max(60, Math.floor((fireAt.getTime() - now.getTime()) / 1000));
       const input = {
         identifier: `${NOTIFICATION_ID_PREFIX}-${generation}-${index}`,

@@ -1176,13 +1176,14 @@ function PrivateProfileSection({ isPrivate, onToggle, styles, colors }: PrivateP
 //
 // We intentionally do NOT call `useResolvedQuizCountry()` here: that hook
 // drives `useCurrentLocation()`, which would surface an OS location-permission
-// prompt the moment a user opens the Profile screen. The subtitle's
-// "detected: X" hint uses the cheap, permissionless device-locale path only
-// (`getDeviceRegion()` → `resolveQuizCountry({ coords: null, ... })`). The
-// real runtime resolver (with GPS) still runs on the quiz screen itself, so
-// the served pool can be more accurate than what the subtitle implies — which
-// is fine: a rider holidaying in Spain with a Romanian phone will see "Auto ·
-// detected: Romania" here but get Spanish questions on the quiz screen.
+// prompt the moment a user opens the Profile screen. Instead the subtitle's
+// "detected: X" hint feeds the PERSISTED planning origin (last known GPS fix,
+// no prompt) into the same `resolveQuizCountry` policy the quiz screen uses —
+// so the label and the served pool agree in practice (review 2026-08-13 G-21;
+// the old locale-only resolution told a Spanish-locale rider in Berlin
+// "detected: Spain" while the quiz correctly served GENERIC). The quiz screen
+// still resolves with live GPS, so a rider who just crossed a border can be
+// one fix ahead of this subtitle — acceptable drift.
 
 interface QuizRegionPickerProps {
   readonly preference: QuizCountryPreference;
@@ -1215,31 +1216,34 @@ const formatQuizCountryName = (
   switch (country) {
     case 'ES':
       return t('profile.quizRegionSpain');
-    case 'GENERIC':
-      return t('profile.quizRegionGeneric');
     case 'RO':
-    default:
       return t('profile.quizRegionRomania');
+    case 'GENERIC':
+    default:
+      // GENERIC is the safe default for any future pool value — never fall
+      // through to a country name (review 2026-08-13 P3).
+      return t('profile.quizRegionGeneric');
   }
 };
 
 function QuizRegionPicker({ preference, setPreference, t, styles }: QuizRegionPickerProps) {
-  // Resolve the LOCALE-ONLY hint for the subtitle. No GPS — see component
-  // header for the reason.
-  const localeResolved = useMemo(
-    () =>
-      resolveQuizCountry({
-        preference,
-        coords: null,
-        deviceLocaleRegion: getDeviceRegion(),
-      }),
-    [preference],
-  );
+  // Resolve the hint from the persisted last-known GPS origin — no live
+  // location request, no permission prompt. See component header.
+  const physicalOrigin = useAppStore((s) => s.routeRequest.origin);
+  const autoResolved = useMemo(() => {
+    const hasFix =
+      physicalOrigin && !(physicalOrigin.lat === 0 && physicalOrigin.lon === 0);
+    return resolveQuizCountry({
+      preference,
+      coords: hasFix ? { lat: physicalOrigin.lat, lon: physicalOrigin.lon } : null,
+      deviceLocaleRegion: getDeviceRegion(),
+    });
+  }, [preference, physicalOrigin]);
 
   const subtitle =
     preference === 'auto'
       ? t('profile.quizRegionSubtitleAuto', {
-          country: formatQuizCountryName(localeResolved.country, t),
+          country: formatQuizCountryName(autoResolved.country, t),
         })
       : t('profile.quizRegionSubtitleOverride', {
           country: formatQuizCountryName(preference, t),

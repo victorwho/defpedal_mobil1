@@ -1,6 +1,9 @@
 import type { Coordinate } from '@defensivepedal/core';
 import type { PoiVisibility } from './types';
 
+// Last-resort camera fallback only. `useCameraConfig` prefers the region
+// gate's country centroid before falling here (review 2026-08-13 G-17), so
+// this Bucharest coordinate is reachable only when no gate country resolved.
 export const DEFAULT_CENTER: [number, number] = [26.1025, 44.4268];
 
 export const STANDARD_STYLE_URL = 'mapbox://styles/mapbox/standard';

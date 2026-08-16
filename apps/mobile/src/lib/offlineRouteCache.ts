@@ -23,7 +23,7 @@ export interface CachedRouteData {
   readonly durationSeconds: number;
   readonly originLabel: string;
   readonly destinationLabel: string;
-  readonly routingMode: 'safe' | 'fast' | 'flat';
+  readonly routingMode: 'safe' | 'fast' | 'flat' | 'cool';
   readonly waypoints: readonly { readonly lat: number; readonly lon: number; readonly label: string }[];
   readonly cachedAt: string; // ISO timestamp
 }
@@ -54,7 +54,7 @@ const isValidCachedRouteData = (data: unknown): data is CachedRouteData => {
     typeof record.originLabel === 'string' &&
     typeof record.destinationLabel === 'string' &&
     typeof record.routingMode === 'string' &&
-    ['safe', 'fast', 'flat'].includes(record.routingMode as string) &&
+    ['safe', 'fast', 'flat', 'cool'].includes(record.routingMode as string) &&
     Array.isArray(record.waypoints) &&
     typeof record.cachedAt === 'string'
   );

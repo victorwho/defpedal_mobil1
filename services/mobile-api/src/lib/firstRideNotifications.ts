@@ -7,8 +7,14 @@
  * Templates:
  *  1. first_ride_nudge    — 48h after signup, no ride yet
  *  2. post_first_ride     — 24h after first ride
- *  3. weather_invitation  — favorable riding conditions (weekend + 3+ days lapsed)
+ *  3. weather_invitation  — weekend + 3+ days lapsed + a forecast at the
+ *                           rider's own location that clears the
+ *                           good-cycling-day window (G-25)
  *  4. lapsed_reengagement — 7+ days inactive, max 2 total ever
+ *
+ * Copy is locale-keyed (en/ro/es) in firstRideNotificationCopy.ts. The
+ * caller supplies `preferred_locale` and `location` on the profile; both
+ * degrade safely (English / no weather send) when absent.
  *
  * Replaces the original Mia-persona notification engine. Persona-based
  * gating was removed when the multi-level Mia journey was retired
@@ -17,7 +23,15 @@
  * backwards-compat with the existing profiles schema; rename in a
  * future migration).
  */
+import { isGoodCyclingDay } from '@defensivepedal/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { fetchCyclingForecast } from './clients/openMeteo';
+import {
+  FIRST_RIDE_COPY,
+  dedupeFilter,
+  normalizeFirstRideLocale,
+  type FirstRideLocale,
+} from './firstRideNotificationCopy';
 import { dispatchNotification } from './notifications';
 import { ANONYMOUS_ALLOWED_TRIGGERS } from './nudges/eligibility';
 
@@ -44,6 +58,18 @@ export interface FirstRideProfile {
    * responsible for the notify_riding_tips + ANON_PUSH_ENABLED gates.
    */
   readonly is_anonymous: boolean;
+  /**
+   * profiles.preferred_locale, narrowed by the caller. Undefined/unknown
+   * renders English — safe while the column is still rolling out.
+   */
+  readonly preferred_locale?: string | null;
+  /**
+   * Where the rider actually is, resolved by the caller from their most
+   * recent trip. `weather_invitation` fetches the forecast for this point
+   * and stays silent without it (fail closed) — it must never promise good
+   * weather it has not checked. Every other template ignores it.
+   */
+  readonly location?: { readonly lat: number; readonly lon: number } | null;
 }
 
 interface TemplateResult {
@@ -112,6 +138,47 @@ const hoursSince = (isoDate: string): number =>
 
 const daysSince = (isoDate: string): number => hoursSince(isoDate) / 24;
 
+const localeOf = (profile: FirstRideProfile): FirstRideLocale =>
+  normalizeFirstRideLocale(profile.preferred_locale);
+
+/**
+ * How many times this template already went out to the user, matched across
+ * every locale's marker (see firstRideNotificationCopy.ts). Fails open with
+ * 0 so a query error can't permanently mute a template.
+ */
+const priorSendCount = async (
+  db: SupabaseClient,
+  userId: string,
+  template: FirstRideTemplate,
+): Promise<number> => {
+  const filter = dedupeFilter(template);
+  if (!filter) return 0;
+
+  const { count } = await db
+    .from('notification_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('category', LOG_CATEGORY)
+    .or(filter);
+
+  return count ?? 0;
+};
+
+/** Send one template in the rider's language. */
+const send = async (
+  profile: FirstRideProfile,
+  template: FirstRideTemplate,
+): Promise<void> => {
+  const copy = FIRST_RIDE_COPY[template][localeOf(profile)];
+  await dispatchNotification(profile.id, LOG_CATEGORY, {
+    title: copy.title,
+    body: copy.body,
+    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
+    // routes to the planner instead of dead-ending (payloads had no data).
+    data: { type: 'first_ride', screen: 'route-planning', template },
+  });
+};
+
 // ---------------------------------------------------------------------------
 // 4 Notification trigger functions
 // ---------------------------------------------------------------------------
@@ -130,24 +197,11 @@ export const checkFirstRideNudge = async (
     return { template, sent: false, reason: 'too_early' };
   }
 
-  const { count } = await db
-    .from('notification_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', profile.id)
-    .eq('category', LOG_CATEGORY)
-    .ilike('body', '%first route%');
-
-  if ((count ?? 0) > 0) {
+  if ((await priorSendCount(db, profile.id, template)) > 0) {
     return { template, sent: false, reason: 'already_sent' };
   }
 
-  await dispatchNotification(profile.id, LOG_CATEGORY, {
-    title: 'Your First Ride Awaits',
-    body: 'Your first route is ready — just 5 minutes on quiet streets near home. This weekend could be the start of something great.',
-    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
-    // routes to the planner instead of dead-ending (payloads had no data).
-    data: { type: 'first_ride', screen: 'route-planning' },
-  });
+  await send(profile, template);
 
   return { template, sent: true };
 };
@@ -169,29 +223,26 @@ export const checkPostFirstRide = async (
     return { template, sent: false, reason: 'too_early' };
   }
 
-  const { count } = await db
-    .from('notification_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', profile.id)
-    .eq('category', LOG_CATEGORY)
-    .ilike('body', '%first time%');
-
-  if ((count ?? 0) > 0) {
+  if ((await priorSendCount(db, profile.id, template)) > 0) {
     return { template, sent: false, reason: 'already_sent' };
   }
 
-  await dispatchNotification(profile.id, LOG_CATEGORY, {
-    title: 'You Did It!',
-    body: 'Yesterday you rode for the first time. Remember how good that felt? Another short ride is waiting for you.',
-    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
-    // routes to the planner instead of dead-ending (payloads had no data).
-    data: { type: 'first_ride', screen: 'route-planning' },
-  });
+  await send(profile, template);
 
   return { template, sent: true };
 };
 
-/** 3. Weather invitation: weekend + 3+ days since last ride. */
+/**
+ * 3. Weather invitation: weekend window + 3+ days since last ride + a real
+ * forecast that clears the good-cycling-day window at the rider's location.
+ *
+ * Until 2026-08-13 (review finding G-25) this template asserted "Perfect
+ * cycling weather this weekend" from the weekday alone — no forecast was
+ * ever fetched, so it promised sunshine into a Dublin downpour. It now
+ * fails closed at three points: no resolved location, no forecast, or a
+ * forecast outside `isGoodCyclingDay` all mean no send. The copy claims
+ * only what was verified (a single day — the forecast client fetches one).
+ */
 export const checkWeatherInvitation = async (
   _db: SupabaseClient,
   profile: FirstRideProfile,
@@ -209,13 +260,20 @@ export const checkWeatherInvitation = async (
     return { template, sent: false, reason: 'rode_recently' };
   }
 
-  await dispatchNotification(profile.id, LOG_CATEGORY, {
-    title: 'Perfect Weekend Ride',
-    body: 'Perfect cycling weather this weekend. A short ride through quiet streets?',
-    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
-    // routes to the planner instead of dead-ending (payloads had no data).
-    data: { type: 'first_ride', screen: 'route-planning' },
-  });
+  const location = profile.location;
+  if (!location) {
+    return { template, sent: false, reason: 'no_location' };
+  }
+
+  const forecast = await fetchCyclingForecast(location.lat, location.lon);
+  if (!forecast) {
+    return { template, sent: false, reason: 'no_forecast' };
+  }
+  if (!isGoodCyclingDay(forecast)) {
+    return { template, sent: false, reason: 'bad_weather' };
+  }
+
+  await send(profile, template);
 
   return { template, sent: true };
 };
@@ -235,24 +293,11 @@ export const checkLapsedReengagement = async (
     return { template, sent: false, reason: 'not_lapsed' };
   }
 
-  const { count } = await db
-    .from('notification_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', profile.id)
-    .eq('category', LOG_CATEGORY)
-    .ilike('body', '%been a while%');
-
-  if ((count ?? 0) >= LAPSED_MAX_TOTAL) {
+  if ((await priorSendCount(db, profile.id, template)) >= LAPSED_MAX_TOTAL) {
     return { template, sent: false, reason: 'max_lapsed_reached' };
   }
 
-  await dispatchNotification(profile.id, LOG_CATEGORY, {
-    title: 'We Miss You',
-    body: "It's been a while — that's okay. Your route is still here whenever you're ready. No pressure.",
-    // Audit 2026-07-05 UX-5: 'type' discriminator so the mobile tap handler
-    // routes to the planner instead of dead-ending (payloads had no data).
-    data: { type: 'first_ride', screen: 'route-planning' },
-  });
+  await send(profile, template);
 
   return { template, sent: true };
 };

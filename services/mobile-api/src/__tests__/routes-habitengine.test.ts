@@ -829,10 +829,14 @@ describe('GET /v1/quiz/daily', () => {
   });
 
   it('excludes recently answered questions', async () => {
-    // Mock user_quiz_history — pretend ALL static questions were answered recently
-    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
-    const allIds = QUIZ_QUESTIONS.map((q) => ({ question_id: q.id }));
-    mockFrom.mockReturnValueOnce(chainResult(allIds));
+    // Default pool is GENERIC (2026-08-13 G-20). Pretend every question
+    // except one was answered recently — the survivor must be served.
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const answered = QUIZ_QUESTIONS_GENERIC.slice(1).map((q, i) => ({
+      question_id: q.id,
+      answered_at: new Date(Date.now() - (i + 1) * 60_000).toISOString(),
+    }));
+    mockFrom.mockReturnValueOnce(chainResult(answered));
 
     const response = await app.inject({
       method: 'GET',
@@ -840,8 +844,32 @@ describe('GET /v1/quiz/daily', () => {
       headers: authHeaders,
     });
 
-    expect(response.statusCode).toBe(404);
-    expect(response.json().error).toBe('No quiz questions available.');
+    expect(response.statusCode).toBe(200);
+    expect(response.json().id).toBe(QUIZ_QUESTIONS_GENERIC[0]!.id);
+  });
+
+  it('serves the least-recently-answered question instead of 404 when the pool is exhausted', async () => {
+    // Every question answered inside the 30-day window (the old permanent
+    // "Failed to load quiz" lockout, review 2026-08-13 G-02). The question
+    // with the OLDEST answered_at must come back.
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const answered = QUIZ_QUESTIONS_GENERIC.map((q, i) => ({
+      question_id: q.id,
+      // Index 3 gets the oldest timestamp; everything else is newer.
+      answered_at: new Date(
+        Date.now() - (i === 3 ? 29 : 5) * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    }));
+    mockFrom.mockReturnValueOnce(chainResult(answered));
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/quiz/daily',
+      headers: authHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().id).toBe(QUIZ_QUESTIONS_GENERIC[3]!.id);
   });
 });
 
@@ -861,7 +889,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: authHeaders,
-      payload: { questionId, selectedIndex: 2 },
+      payload: { questionId, selectedIndex: 2, country: 'RO' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -879,7 +907,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: authHeaders,
-      payload: { questionId, selectedIndex: 0 },
+      payload: { questionId, selectedIndex: 0, country: 'RO' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -894,7 +922,7 @@ describe('POST /v1/quiz/answer', () => {
       method: 'POST',
       url: '/v1/quiz/answer',
       headers: { ...authHeaders, 'x-timezone': 'Europe/Bucharest' },
-      payload: { questionId, selectedIndex: 2 },
+      payload: { questionId, selectedIndex: 2, country: 'RO' },
     });
 
     // qualifyStreakAsync calls rpc('qualify_streak_action')
@@ -986,11 +1014,13 @@ describe('Quiz country dispatch', () => {
     expect(esIds.has(body.id)).toBe(false);
   });
 
-  it('GET /v1/quiz/daily defaults to RO when no country query is provided', async () => {
+  it('GET /v1/quiz/daily defaults to GENERIC when no country query is provided', async () => {
+    // Was 'RO' until 2026-08-13 (G-20): a client that omits the param now
+    // gets generally-true EU content, never another country's law.
     mockFrom.mockReturnValueOnce(chainResult([]));
 
-    const { QUIZ_QUESTIONS } = await import('../data/quiz-questions');
-    const roIds = new Set(QUIZ_QUESTIONS.map((q) => q.id));
+    const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
+    const genericIds = new Set(QUIZ_QUESTIONS_GENERIC.map((q) => q.id));
 
     const response = await app.inject({
       method: 'GET',
@@ -999,7 +1029,7 @@ describe('Quiz country dispatch', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(roIds.has(response.json().id)).toBe(true);
+    expect(genericIds.has(response.json().id)).toBe(true);
   });
 
   it('GET /v1/quiz/daily?country=FR returns 400 (unsupported enum value)', async () => {
@@ -1167,7 +1197,9 @@ describe('GENERIC quiz pool integrity', () => {
   it('has a sane pool size and valid correctIndex on every question', async () => {
     const { QUIZ_QUESTIONS_GENERIC } = await import('../data/quiz-questions-generic');
 
-    expect(QUIZ_QUESTIONS_GENERIC.length).toBeGreaterThanOrEqual(25);
+    // Floor is above the endpoint's 30-day answered-question exclusion window:
+    // a pool at or below ~30 hard-locks a daily player with a 404 (G-02).
+    expect(QUIZ_QUESTIONS_GENERIC.length).toBeGreaterThanOrEqual(40);
     for (const q of QUIZ_QUESTIONS_GENERIC) {
       for (const locale of ['en', 'ro', 'es'] as const) {
         expect(q.options[locale]).toHaveLength(4);

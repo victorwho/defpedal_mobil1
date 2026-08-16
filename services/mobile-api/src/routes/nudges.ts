@@ -50,8 +50,9 @@ import { cityKey, findNearestCity } from '../lib/nudges/cities';
 import { dispatchNudge, fetchRecentVariantIds } from '../lib/nudges/dispatcher';
 import { evaluateEligibility, type UserNudgeProfile } from '../lib/nudges/eligibility';
 import { areNudgesEnabled, isCityPulseEnabled } from '../lib/nudges/killSwitch';
+import { toNudgeLocale } from '../lib/nudges/locale';
 import { pickHighestPriorityTrigger } from '../lib/nudges/priorityQueue';
-import { resolveUserLocation, type UserLocation } from '../lib/nudges/userLocation';
+import { resolveUserLocation, utcOffsetFromLongitude, type UserLocation } from '../lib/nudges/userLocation';
 import {
   errorResponseSchema,
   nudgesAttributeRequestSchema,
@@ -108,6 +109,7 @@ interface ProfileRow {
   pedal_voice_sassy: boolean | null;
   is_anonymous: boolean | null;
   notify_riding_tips: boolean | null;
+  preferred_locale: string | null;
 }
 
 const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
@@ -126,11 +128,16 @@ const toUserNudgeProfile = (row: ProfileRow): UserNudgeProfile => ({
   notifyStreak: row.notify_streak ?? true,
   quietHoursStart: row.quiet_hours_start ?? '22:00',
   quietHoursEnd: row.quiet_hours_end ?? '07:00',
-  timezone: row.quiet_hours_timezone ?? 'Europe/Bucharest',
+  // NULL timezone → UTC, matching lib/notifications.ts (the two stacks used
+  // to disagree: 'Europe/Bucharest' here vs 'UTC' there — review 2026-08-13
+  // G-06). The schema default that populated every row with Bucharest is
+  // dropped by migration 202608130001; the client re-syncs the real device
+  // timezone at session bootstrap, so NULL/UTC is a short-lived state.
+  timezone: row.quiet_hours_timezone ?? 'UTC',
 });
 
 const PROFILE_COLUMNS =
-  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy, is_anonymous, notify_riding_tips';
+  'id, display_name, notify_pedal_nudges, notify_streak, quiet_hours_start, quiet_hours_end, quiet_hours_timezone, pedal_voice_sassy, is_anonymous, notify_riding_tips, preferred_locale';
 
 /**
  * Triggers whose intended follow-up action is "complete a ride / qualify
@@ -312,6 +319,7 @@ export const buildNudgeRoutes = (
             const typed = profileRow as ProfileRow;
             const profile = toUserNudgeProfile(typed);
             const sassy = typed.pedal_voice_sassy ?? true;
+            const locale = toNudgeLocale(typed.preferred_locale);
             evaluated++;
 
             const qualifiedToday = isQualifiedTodayInTz(
@@ -359,13 +367,20 @@ export const buildNudgeRoutes = (
 
             const pushesLast24h = await countPushesLast24h(db, userId);
 
-            // Safety floor: resolve the rider's lat/lon (recent trip start
-            // or Bucharest fallback) and check sunset + bad-weather. Both
-            // checks fail closed on missing data — eligibility suppresses
-            // the ride-asking triggers when conditions are unknown.
+            // Safety floor: resolve the rider's lat/lon (recent trip start)
+            // and check sunset + bad-weather. All three signals fail closed:
+            // missing forecast, AND a fallback location — when
+            // `fromFallback` is true the coords are the static Bucharest
+            // placeholder, so the floor cannot be verified for the rider's
+            // REAL sky and ride-asking triggers must be suppressed rather
+            // than gated on Bucharest's sunset/weather (review 2026-08-13
+            // G-07: `fromFallback` previously had no consumer, so a Helsinki
+            // rider could be nudged to ride 90 min after local dark).
             const location = await resolveUserLocation(db, userId);
             const afterSunset = isAfterSunset(location.lat, location.lon);
-            const forecast = await fetchCyclingForecast(location.lat, location.lon);
+            const forecast = location.fromFallback
+              ? null
+              : await fetchCyclingForecast(location.lat, location.lon);
             const badWeatherNow = forecast ? isBadCyclingWeather(forecast) : true;
 
             // City Riders Pulse guarantee: past 5 days unsent → escalate the
@@ -406,7 +421,7 @@ export const buildNudgeRoutes = (
                 userId,
                 trigger: considered.trigger,
                 context: baseContext,
-                locale: 'en',
+                locale,
                 sassy,
                 pushTokens: [],
                 outcome: considered.result.outcome as Parameters<typeof dispatchNudge>[1]['outcome'],
@@ -441,7 +456,8 @@ export const buildNudgeRoutes = (
             let priorityOverride: NudgePriority | undefined;
             if (decision.trigger === 'city_riders_pulse') {
               const city = findNearestCity(location.lat, location.lon);
-              const utcOffsetHours = city?.utcOffsetHours ?? 2;
+              const utcOffsetHours =
+                city?.utcOffsetHours ?? utcOffsetFromLongitude(location.lon);
               const dateISO = localDateISO(new Date(), utcOffsetHours);
               // Unreachable-null by construction: reaching this dispatch means
               // the trigger passed the SAFETY_GATED_TRIGGERS eligibility gate,
@@ -479,7 +495,7 @@ export const buildNudgeRoutes = (
               // rotation inputs.
               const preview = pickMessage({
                 trigger: 'city_riders_pulse',
-                locale: 'en',
+                locale,
                 context: dispatchContext,
                 sassy,
                 userId,
@@ -493,7 +509,7 @@ export const buildNudgeRoutes = (
               userId,
               trigger: decision.trigger,
               context: dispatchContext,
-              locale: 'en',
+              locale,
               sassy,
               pushTokens: tokens,
               outcome: 'scheduled',
@@ -722,7 +738,10 @@ export const buildNudgeRoutes = (
           quiet_hours_timezone: string | null;
         }>) {
           try {
-            const tz = row.quiet_hours_timezone ?? 'Europe/Bucharest';
+            // Same NULL→UTC fallback as toUserNudgeProfile: the pattern is
+            // derived AND compared in this timezone, so consistency matters
+            // more than the specific zone (review 2026-08-13 G-06).
+            const tz = row.quiet_hours_timezone ?? 'UTC';
             const { data: trips } = await db
               .from('trips')
               .select('started_at')
@@ -1183,7 +1202,11 @@ const seedCityPulseSchedules = async (
       if (seeded.has(userId)) continue;
       const location = await resolveUserLocation(db, userId);
       const city = findNearestCity(location.lat, location.lon);
-      const fireAt = drawInitialFireAt(new Date(), Math.random, city?.utcOffsetHours ?? 2);
+      const fireAt = drawInitialFireAt(
+        new Date(),
+        Math.random,
+        city?.utcOffsetHours ?? utcOffsetFromLongitude(location.lon),
+      );
       await db.from('nudge_schedule').upsert(
         {
           user_id: userId,
@@ -1232,7 +1255,9 @@ const updateCityPulseSchedule = async (
 ): Promise<void> => {
   if (CITY_PULSE_TRANSIENT_OUTCOMES.has(outcome)) return;
 
-  const utcOffsetHours = findNearestCity(location.lat, location.lon)?.utcOffsetHours ?? 2;
+  const utcOffsetHours =
+    findNearestCity(location.lat, location.lon)?.utcOffsetHours ??
+    utcOffsetFromLongitude(location.lon);
   const now = new Date();
   const nextFireAt = drawNextFireAt(now, Math.random, utcOffsetHours);
   const patch =

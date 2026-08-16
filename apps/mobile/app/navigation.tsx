@@ -127,6 +127,7 @@ function NavigationScreen() {
     queuedMutations,
     shareTripsPublicly,
     avoidHills,
+    avoidHeat,
     avoidUnpaved,
   } = useAppStore(useShallow((state) => ({
     routeRequest: state.routeRequest,
@@ -139,6 +140,7 @@ function NavigationScreen() {
     queuedMutations: state.queuedMutations,
     shareTripsPublicly: state.shareTripsPublicly,
     avoidHills: state.avoidHills,
+    avoidHeat: state.avoidHeat,
     avoidUnpaved: state.avoidUnpaved,
   })));
 
@@ -718,16 +720,20 @@ function NavigationScreen() {
   //   Safe  → reroute as Safe
   //   Fast  → reroute as Fast
   //   Flat  → reroute as Fast  (flat OSRM is slow; fast Mapbox is better for reroute)
+  //   Cool  → reroute as Cool  (heat avoidance is the mode's whole point and
+  //           must survive detours; the shade OSRM has the same latency
+  //           profile as the standard safe instance)
   const effectiveRouteRequest = useMemo(() => {
     const isFlat = routeRequest.mode === 'safe' && avoidHills;
     return {
       ...routeRequest,
       avoidUnpaved,
+      avoidHeat,
       // Flat mode reroutes as Fast (Mapbox) for speed; otherwise preserve original profile
       mode: isFlat ? 'fast' as const : routeRequest.mode,
       avoidHills: isFlat ? false : avoidHills,
     };
-  }, [routeRequest, avoidHills, avoidUnpaved]);
+  }, [routeRequest, avoidHills, avoidHeat, avoidUnpaved]);
 
   const rerouteMutation = useMutation({
     mutationFn: (origin: Coordinate) => {
@@ -741,6 +747,7 @@ function NavigationScreen() {
       const freshRequest = {
         ...base,
         avoidUnpaved: s.avoidUnpaved,
+        avoidHeat: s.avoidHeat,
         mode: isFlat ? ('fast' as const) : base.mode,
         avoidHills: isFlat ? false : s.avoidHills,
       };
@@ -754,6 +761,7 @@ function NavigationScreen() {
         route_id: selectedRoute?.id ?? 'unknown',
         mode: effectiveRouteRequest.mode,
         avoid_hills: effectiveRouteRequest.avoidHills,
+        avoid_heat: effectiveRouteRequest.avoidHeat,
       });
     },
     onSuccess: (response) => {
@@ -777,6 +785,7 @@ function NavigationScreen() {
         route_id: selectedRoute?.id ?? 'unknown',
         mode: effectiveRouteRequest.mode,
         avoid_hills: effectiveRouteRequest.avoidHills,
+        avoid_heat: effectiveRouteRequest.avoidHeat,
       });
       telemetry.captureError(error, {
         feature: 'reroute',
@@ -801,7 +810,11 @@ function NavigationScreen() {
     if (!selectedRoute || !navigationSession) return;
 
     const routingMode: CachedRouteData['routingMode'] =
-      routeRequest.mode === 'safe' && avoidHills ? 'flat' : routeRequest.mode;
+      routeRequest.mode === 'safe' && avoidHeat
+        ? 'cool'
+        : routeRequest.mode === 'safe' && avoidHills
+          ? 'flat'
+          : routeRequest.mode;
 
     const cachedData: CachedRouteData = {
       routeId: selectedRoute.id,
@@ -821,7 +834,7 @@ function NavigationScreen() {
     };
 
     void cacheActiveRoute(cachedData);
-  }, [selectedRoute?.id, navigationSession?.sessionId, routeRequest.mode, avoidHills]);
+  }, [selectedRoute?.id, navigationSession?.sessionId, routeRequest.mode, avoidHills, avoidHeat]);
 
   // ── Hazard proximity detection ──
   useEffect(() => {

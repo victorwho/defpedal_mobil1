@@ -118,7 +118,7 @@ For native Android builds with `@rnmapbox/maps`, provide a secret Mapbox downloa
 
 - `RNMAPBOX_MAPS_DOWNLOAD_TOKEN`
 
-The short-path Android validation flow in [native_android_validation.md](./native_android_validation.md)
+The short-path Android validation flow in [native_android_validation.md](./docs/archive/native_android_validation.md)
 uses that token during Expo prebuild so Gradle can resolve native Mapbox dependencies.
 
 ### Mobile observability
@@ -152,8 +152,8 @@ limiting, and optional shared Redis backing. See `services/mobile-api/.env.examp
 - GitHub Actions mobile release: [mobile-release.yml](./.github/workflows/mobile-release.yml)
 - EAS build profiles: [eas.json](./apps/mobile/eas.json)
 - Release runbook: [mobile_release_runbook.md](./mobile_release_runbook.md)
-- iPhone validation: [iphone_validation.md](./iphone_validation.md)
-- API operations runbook: [mobile_api_operations_runbook.md](./mobile_api_operations_runbook.md)
-- Load test baseline: [mobile_api_load_test_baseline.md](./mobile_api_load_test_baseline.md)
-- Stable baseline plan: [mobile_stable_baseline_plan.md](./mobile_stable_baseline_plan.md)
+- iPhone validation: [iphone_validation.md](./docs/archive/iphone_validation.md)
+- API operations runbook: [mobile_api_operations_runbook.md](./docs/archive/mobile_api_operations_runbook.md)
+- Load test baseline: [mobile_api_load_test_baseline.md](./docs/archive/mobile_api_load_test_baseline.md)
+- Stable baseline plan: [mobile_stable_baseline_plan.md](./docs/archive/mobile_stable_baseline_plan.md)
 - Database migrations: [supabase/README.md](./supabase/README.md)

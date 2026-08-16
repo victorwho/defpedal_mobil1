@@ -123,6 +123,8 @@ export interface RoutePreviewRequest {
   mode: RoutingMode;
   avoidUnpaved: boolean;
   avoidHills: boolean;
+  /** Cool routing — dispatch safe-mode requests to the shade/heat-model OSRM instance. */
+  avoidHeat: boolean;
   showRouteComparison?: boolean;
   locale: string;
   countryHint?: string;
@@ -133,11 +135,29 @@ export type RerouteRequest = RoutePreviewRequest & {
   activeRouteId?: string;
 };
 
+/**
+ * Structured safe-vs-fast risk comparison for the preview screen.
+ * The client renders localized copy from this — never a pre-baked string —
+ * so RO/ES riders no longer see English comparison labels.
+ */
+export interface RouteComparison {
+  /** Routing mode of the route this one was compared against. */
+  against: 'safe' | 'fast';
+  /** Risk relation of the current route vs the compared one. */
+  verdict: 'safer' | 'less_safe' | 'similar' | 'same';
+  /** Rounded % difference in average risk (0 for similar/same). */
+  diffPercent: number;
+  /** Whole minutes the current route costs vs the compared one; present only when >= 1. */
+  extraMinutes?: number;
+}
+
 export interface RoutePreviewResponse {
   routes: RouteOption[];
   selectedMode: RoutingMode;
   coverage: CoverageRegion;
+  /** @deprecated Pre-2026-08 free-text label; kept so old persisted previews still render. New code populates `comparison`. */
   comparisonLabel?: string;
+  comparison?: RouteComparison;
   generatedAt: string;
   debug?: RouteDebugInfo[];
 }
@@ -528,7 +548,7 @@ export interface CitySuggestionRequest {
   source: 'route_preview';
   locality?: string | null;
   routeContext?: {
-    mode: 'safe' | 'fast' | 'flat';
+    mode: 'safe' | 'fast' | 'flat' | 'cool';
     distanceMeters: number;
     routeId?: string;
   } | null;
@@ -927,6 +947,11 @@ export interface ProfileUpdateRequest {
   // profiles.pedal_voice_sassy. The server-side voice renderer reads
   // this column when picking message variants.
   pedalVoiceSassy?: boolean;
+  // App UI locale, synced at session bootstrap so server-sent pushes
+  // (nudges, first-ride notifications) speak the rider's language. Mirrors
+  // profiles.preferred_locale; absent/null → server falls back to EN
+  // (review 2026-08-13 G-11).
+  preferredLocale?: 'en' | 'ro' | 'es';
 }
 
 export interface ProfileResponse {
@@ -1265,6 +1290,7 @@ export interface SavedRoute {
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
+  readonly avoidHeat: boolean;
   readonly createdAt: string;
   readonly lastUsedAt: string;
 }
@@ -1277,4 +1303,5 @@ export interface SavedRouteCreateRequest {
   readonly mode: RoutingMode;
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
+  readonly avoidHeat: boolean;
 }

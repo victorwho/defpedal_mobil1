@@ -48,7 +48,7 @@ const haversineMeters = (
 };
 
 /** Compute the total length of a segment geometry in meters. */
-const segmentDistanceMeters = (segment: RiskSegment): number => {
+export const riskSegmentDistanceMeters = (segment: RiskSegment): number => {
   const coords =
     segment.geometry.type === 'MultiLineString'
       ? segment.geometry.coordinates.flat()
@@ -84,7 +84,7 @@ export const computeRiskDistribution = (
 
   for (const segment of riskSegments) {
     const label = segment.riskCategory ?? 'No data';
-    const distance = segmentDistanceMeters(segment);
+    const distance = riskSegmentDistanceMeters(segment);
     const existing = buckets.get(label);
     buckets.set(label, {
       distance: (existing?.distance ?? 0) + distance,

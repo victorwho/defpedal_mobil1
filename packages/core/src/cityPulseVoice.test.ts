@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CITY_PULSE_ROTATION_MEMORY,
   CITY_PULSE_VARIANT_COUNT,
+  getCityPulsePools,
   getTriggerPose,
   getTriggerPriority,
   pickMessage,
@@ -78,11 +79,20 @@ describe('city_riders_pulse — voice and locale', () => {
     expect(ro.body).not.toMatch(/\{n\}|\{city\}/);
   });
 
-  it('falls back to the EN catalog for es (no Spanish copy commissioned)', () => {
-    const es = pickMessage(baseRequest({ locale: 'es', sassy: false }));
-    const en = pickMessage(baseRequest({ locale: 'en', sassy: false }));
-    expect(es.body).toBe(en.body);
+  it('renders {n} and {city} in ES from the Spanish pool (G-24)', () => {
+    const es = pickMessage(
+      baseRequest({ locale: 'es', sassy: false, context: { city: 'Madrid', n: 520 } }),
+    );
+    const en = pickMessage(
+      baseRequest({ locale: 'en', sassy: false, context: { city: 'Madrid', n: 520 } }),
+    );
+    expect(es.body).toContain('520');
+    expect(es.body).toContain('Madrid');
+    expect(es.body).not.toMatch(/\{n\}|\{city\}/);
+    // Same index, different language — ES no longer borrows the EN catalog.
     expect(es.variantId).toBe(en.variantId);
+    expect(es.body).not.toBe(en.body);
+    expect(es.title).toBe('Ciclistas en Madrid');
   });
 
   it('never leaks raw placeholders when context is empty', () => {
@@ -107,6 +117,74 @@ describe('city_riders_pulse — voice and locale', () => {
       baseRequest({ locale: 'ro', sassy: false, context: { city: 'București' } }),
     );
     expect(ro.body).toContain('zeci');
+    const es = pickMessage(
+      baseRequest({ locale: 'es', sassy: false, context: { city: 'Madrid' } }),
+    );
+    expect(es.body).toContain('decenas de');
+  });
+});
+
+describe('city_riders_pulse — pool completeness', () => {
+  const LOCALES = ['en', 'ro', 'es'] as const;
+
+  it('every locale has 20 sassy + 20 neutral variants and a title', () => {
+    for (const locale of LOCALES) {
+      const pools = getCityPulsePools(locale);
+      expect(pools.sassy, `${locale} sassy`).toHaveLength(CITY_PULSE_VARIANT_COUNT);
+      expect(pools.neutral, `${locale} neutral`).toHaveLength(CITY_PULSE_VARIANT_COUNT);
+      expect(pools.title).toContain('{city}');
+      for (const body of [...pools.sassy, ...pools.neutral]) {
+        expect(body.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('every variant carries the rider count — the point of the trigger', () => {
+    for (const locale of LOCALES) {
+      const pools = getCityPulsePools(locale);
+      pools.sassy.forEach((body, i) =>
+        expect(body, `${locale} sassy #${i + 1}`).toContain('{n}'),
+      );
+      pools.neutral.forEach((body, i) =>
+        expect(body, `${locale} neutral #${i + 1}`).toContain('{n}'),
+      );
+    }
+  });
+
+  it('every ES variant names the city (the title alone is not enough)', () => {
+    // EN sassy #6 says "Your city" instead of interpolating — grandfathered.
+    // The ES pool authored for G-24 names the city in every line.
+    const pools = getCityPulsePools('es');
+    pools.sassy.forEach((body, i) =>
+      expect(body, `es sassy #${i + 1}`).toContain('{city}'),
+    );
+    pools.neutral.forEach((body, i) =>
+      expect(body, `es neutral #${i + 1}`).toContain('{city}'),
+    );
+  });
+
+  it('uses only placeholders the renderer knows', () => {
+    const KNOWN = new Set(['n', 'city']);
+    for (const locale of LOCALES) {
+      const pools = getCityPulsePools(locale);
+      for (const text of [pools.title, ...pools.sassy, ...pools.neutral]) {
+        for (const match of text.matchAll(/\{([a-zA-Z]+)\}/g)) {
+          expect(KNOWN.has(match[1]!), `unknown placeholder {${match[1]}} in ${locale}`).toBe(
+            true,
+          );
+        }
+      }
+    }
+  });
+
+  it('the ES pool carries no emoji', () => {
+    // EN/RO variant 1 predates the no-emoji rule and is grandfathered; every
+    // pool authored since (ES, 2026-08-13) follows the brand rule.
+    const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
+    const pools = getCityPulsePools('es');
+    for (const text of [pools.title, ...pools.sassy, ...pools.neutral]) {
+      expect(EMOJI_RE.test(text), `emoji in ES City Pulse copy: ${text}`).toBe(false);
+    }
   });
 });
 

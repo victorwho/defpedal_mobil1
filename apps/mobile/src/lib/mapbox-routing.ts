@@ -12,12 +12,12 @@ import type {
   NavigationStep,
   RerouteRequest,
   RiskSegment,
+  RouteComparison,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
-  SupportedCountry,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isRouteSupported } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -44,6 +44,10 @@ import { getAccessToken } from './supabase';
 const OSRM_BASE = {
   safe: 'https://osrm.defensivepedal.com/route/v1/bicycle',
   flat: 'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
+  // Cool routing — bicycle36shade.lua heat model. Coverage is narrower than
+  // the EU-wide safe/flat graphs (see HEAT_ROUTING_COUNTRIES in core), so
+  // dispatch gates on isHeatRoutingAvailable before selecting this base.
+  cool: 'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
 } as const;
 
 const MAPBOX_DIRECTIONS_BASE =
@@ -171,13 +175,15 @@ const fetchOsrmRoutes = async (
   destination: Coordinate,
   avoidUnpaved: boolean,
   avoidHills: boolean,
+  avoidHeat: boolean,
   waypoints?: readonly Coordinate[],
 ): Promise<Route[]> => {
   const coords = buildCoordString(origin, destination, waypoints);
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
-  // Use flat-profile endpoint when avoidHills is set (separate OSRM instance)
-  const base = avoidHills ? OSRM_BASE.flat : OSRM_BASE.safe;
+  // Profile flags select the OSRM instance (each is a separate graph):
+  // cool (shade/heat model) > flat (7x uphill penalty) > standard safe.
+  const base = avoidHeat ? OSRM_BASE.cool : avoidHills ? OSRM_BASE.flat : OSRM_BASE.safe;
   let url = `${base}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
@@ -458,6 +464,14 @@ export const directPreviewRoute = async (
     }
   };
 
+  // Cool routing only where the shade graph has data (RO at launch). A stale
+  // persisted avoidHeat preference outside coverage silently degrades to the
+  // standard safe profile — mirrors the safe→fast degrade above.
+  const effectiveAvoidHeat =
+    Boolean(request.avoidHeat) &&
+    support.supported &&
+    isHeatRoutingAvailable(support.country);
+
   let rawRoutes: Route[];
   if (effectiveMode === 'safe' && support.supported) {
     try {
@@ -466,6 +480,7 @@ export const directPreviewRoute = async (
         destination,
         request.avoidUnpaved,
         request.avoidHills,
+        effectiveAvoidHeat,
         waypoints,
       );
     } catch (error) {
@@ -494,30 +509,33 @@ export const directPreviewRoute = async (
     ),
   );
 
-  // Enrich all routes with risk segments in parallel (non-blocking)
-  const enrichedRoutes = await Promise.all(
-    rawRoutes.map((rawRoute, index) =>
-      enrichRouteWithRisk(elevationEnriched[index], rawRoute.geometry.coordinates),
-    ),
-  );
+  // Enrich all routes with risk segments in parallel (non-blocking).
+  // `road_risk_data` exists only in RISK_DATA_COUNTRIES — elsewhere every
+  // POST to /v1/risk-segments is a guaranteed-empty round trip per route
+  // alternative, so skip the fetch entirely.
+  const riskDataEligible =
+    support.supported && isRiskDataAvailable(support.country);
+  const enrichedRoutes = riskDataEligible
+    ? await Promise.all(
+        rawRoutes.map((rawRoute, index) =>
+          enrichRouteWithRisk(elevationEnriched[index], rawRoute.geometry.coordinates),
+        ),
+      )
+    : elevationEnriched;
 
   // Compute safe vs fast risk comparison if enabled — only meaningful when
   // we actually have an OSRM safe route to compare against, AND the country
-  // has road_risk_data populated. ES rows are being ingested via the external
-  // OSM scoring pipeline (same one that produced ~975k RO rows); until the
-  // bulk-insert lands the inner `currentSegments.length > 0 &&
-  // comparisonSegments.length > 0` guard means the eligibility check passes
-  // but no label is produced — graceful no-op. Once Spanish risk data ships,
-  // the comparison + RiskDistributionCard activate automatically with no
-  // further code change.
-  const COMPARISON_ELIGIBLE_COUNTRIES: readonly SupportedCountry[] = ['RO', 'ES'];
+  // has road_risk_data populated (gate shared with the risk enrichment above
+  // via core's RISK_DATA_COUNTRIES). The inner `currentSegments.length > 0 &&
+  // comparisonSegments.length > 0` guard stays as the backstop: `avgRisk([])`
+  // is 0, and a `'same'` verdict from two empty arrays would render a false
+  // "Same safety" label.
   const comparisonEligible =
     request.showRouteComparison &&
-    support.supported &&
     !osrmCoverageMiss &&
-    COMPARISON_ELIGIBLE_COUNTRIES.includes(support.country);
+    riskDataEligible;
 
-  let comparisonLabel: string | undefined;
+  let comparison: RouteComparison | undefined;
   if (comparisonEligible && enrichedRoutes.length > 0) {
     try {
       const avgRisk = (segments: readonly RiskSegment[]) => {
@@ -528,11 +546,12 @@ export const directPreviewRoute = async (
 
       const currentSegments = enrichedRoutes[0].riskSegments;
       let comparisonSegments: readonly RiskSegment[] = [];
+      let comparisonDurationSeconds: number | undefined;
 
       if (effectiveMode === 'safe') {
         // Skip comparison for very long routes — Mapbox 422s at > ~400km (MOBILE-2)
         if (haversineDistance([origin.lat, origin.lon], [destination.lat, destination.lon]) > MAPBOX_MAX_STRAIGHT_LINE_M) {
-          // Leave comparisonLabel undefined; no label for extreme-distance routes.
+          // Leave comparison undefined; no comparison for extreme-distance routes.
         } else {
         // Fetch fast route for comparison
         const fastRawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
@@ -540,6 +559,9 @@ export const directPreviewRoute = async (
           const fastRoute = mapRoute(fastRawRoutes[0], 'mapbox', 0, locale);
           const fastEnriched = await enrichRouteWithRisk(fastRoute, fastRawRoutes[0].geometry.coordinates);
           comparisonSegments = fastEnriched.riskSegments;
+          // Raw (not elevation-adjusted) duration — the comparison route is
+          // never elevation-enriched, so compare raw vs raw for a fair delta.
+          comparisonDurationSeconds = fastRoute.durationSeconds;
         }
         }
       } else {
@@ -549,6 +571,7 @@ export const directPreviewRoute = async (
           destination,
           request.avoidUnpaved,
           request.avoidHills,
+          effectiveAvoidHeat,
           waypoints,
         );
         if (safeRawRoutes.length > 0) {
@@ -567,26 +590,47 @@ export const directPreviewRoute = async (
           : 0;
 
         if (effectiveMode === 'safe') {
+          let verdict: RouteComparison['verdict'];
           if (currentAvg < comparisonAvg) {
-            comparisonLabel = diffPercent >= 1
-              ? `${diffPercent}% safer than fast route`
-              : 'Slightly safer than fast route';
+            verdict = 'safer';
           } else if (currentAvg > comparisonAvg) {
             // Edge case: safe route scored worse — still inform the user
-            comparisonLabel = 'Similar safety to fast route';
+            verdict = 'similar';
           } else {
-            comparisonLabel = 'Same safety as fast route';
+            verdict = 'same';
           }
+
+          // Time cost of the calmer route vs the fast one — feeds the
+          // "+X min for a calmer ride" line on the preview screen.
+          let extraMinutes: number | undefined;
+          if (verdict === 'safer' && comparisonDurationSeconds !== undefined) {
+            const extra = Math.round(
+              (enrichedRoutes[0].durationSeconds - comparisonDurationSeconds) / 60,
+            );
+            if (extra >= 1) extraMinutes = extra;
+          }
+
+          comparison = {
+            against: 'fast',
+            verdict,
+            diffPercent: verdict === 'safer' ? diffPercent : 0,
+            extraMinutes,
+          };
         } else if (effectiveMode === 'fast') {
+          let verdict: RouteComparison['verdict'];
           if (currentAvg > comparisonAvg) {
-            comparisonLabel = diffPercent >= 1
-              ? `${diffPercent}% less safe than safe route`
-              : 'Slightly less safe than safe route';
+            verdict = 'less_safe';
           } else if (currentAvg < comparisonAvg) {
-            comparisonLabel = 'Similar safety to safe route';
+            verdict = 'similar';
           } else {
-            comparisonLabel = 'Same safety as safe route';
+            verdict = 'same';
           }
+
+          comparison = {
+            against: 'safe',
+            verdict,
+            diffPercent: verdict === 'less_safe' ? diffPercent : 0,
+          };
         }
       }
     } catch {
@@ -616,7 +660,7 @@ export const directPreviewRoute = async (
     routes: enrichedRoutes,
     selectedMode: effectiveMode,
     coverage,
-    comparisonLabel,
+    comparison,
     generatedAt: new Date().toISOString(),
   };
 };

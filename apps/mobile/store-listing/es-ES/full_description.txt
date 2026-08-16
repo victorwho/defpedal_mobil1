@@ -1,0 +1,31 @@
+Defensive Pedal es la app de navegación ciclista para quienes quieren rutas más seguras — no solo las más rápidas.
+
+Casi todas las apps de navegación se hicieron para coches. Los perfiles de bici que ofrecen suelen ser un añadido superficial: el camino más corto, sin importar cuánto tráfico ni cuánto peligro haya. Defensive Pedal lo hace de otra manera. Puntuamos cada tramo de vía según el riesgo para quien pedalea y después te llevamos por fuera de los de mayor riesgo.
+
+FUNCIONES PRINCIPALES
+
+• RUTAS PUNTUADAS POR SEGURIDAD. Cada calle recibe una nota de riesgo ciclista. Elige Segura (evita las vías de mayor riesgo), Rápida (la más corta) o Llana (evita las cuestas) — y ve exactamente cómo se comparan las tres opciones antes de salir.
+
+• AVISOS DE PELIGRO EN TIEMPO REAL. Otros ciclistas señalan baches, cruces peligrosos, tráfico agresivo, zonas con perros y firmes en mal estado. La app te avisa de todo lo que hay en tu ruta, con votos a favor y en contra para que la comunidad lo mantenga al día.
+
+• NAVEGACIÓN GIRO A GIRO. Cámara 3D que sigue tu rumbo, guía por voz, recálculo automático cuando te sales de la ruta e indicador de señal GPS. Pensada para leerse de un vistazo, no para esconderse en menús.
+
+• FUNCIONA SIN CONEXIÓN. Descarga el pack de tu ciudad y tus rutas guardadas funcionan sin cobertura. Los datos se sincronizan en cuanto vuelves a estar en línea.
+
+• TU IMPACTO. Registra los kilómetros pedaleados, el tiempo ganado, el CO₂ que no llega al aire y el dinero ahorrado frente al coche. Rachas diarias, insignias y un sistema de progresión de 10 niveles convierten cada salida en progreso.
+
+• COMUNIDAD. Descubre qué han pedaleado esta semana otros ciclistas de tu ciudad. Comparte rutas que merecen la pena, comenta, reacciona y aprende de los demás.
+
+• TIEMPO Y CALIDAD DEL AIRE. Condiciones actuales, viento, índice europeo de calidad del aire (AQI) y un parte meteorológico ciclista que llega cuando la previsión de verdad merece la pena — una cadencia inteligente, atenta al tiempo, no la misma alarma cada mañana.
+
+LA PRIVACIDAD, PRIMERO
+
+Defensive Pedal está hecha para ciclistas europeos, con residencia de datos en la UE donde importa. No vendemos tus datos. No los usamos para publicidad. Crear una cuenta es gratis — entra con Google, Apple o correo electrónico — y tus trayectos se sincronizan en todos tus dispositivos. Eliminar la cuenta y los datos está a un toque en Perfil → Cuenta, o desde la web en routes.defensivepedal.com/account-deletion.
+
+DÓNDE FUNCIONA
+
+La ruta segura y los colores de riesgo calle a calle — la capa de seguridad que se dibuja sobre tu ruta — están disponibles en los 31 países europeos compatibles: la UE, el EEE y Suiza. La ruta rápida funciona en todo el mundo.
+
+La app está traducida por completo al español y al rumano, y el test diario de seguridad incluye preguntas adaptadas a la normativa de tráfico y a la etiqueta ciclista de España y de Rumanía.
+
+Hecha para quien va cada día al trabajo en bici, para quien explora los fines de semana y para cualquiera que quiera que la bicicleta se sienta menos como un riesgo calculado.

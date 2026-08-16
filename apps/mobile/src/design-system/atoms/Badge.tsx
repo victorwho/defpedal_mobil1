@@ -1,7 +1,7 @@
 /**
  * Design System v1.0 — Badge / Chip Atom
  *
- * 6 variants: risk-safe | risk-caution | risk-danger | info | neutral | accent
+ * 7 variants: risk-safe | risk-caution | risk-danger | info | neutral | accent | cool
  * 2 sizes: sm (24px) | md (28px)
  * Pill shape. Risk score numbers use mono font.
  */
@@ -23,7 +23,8 @@ type BadgeVariant =
   | 'risk-danger'
   | 'info'
   | 'neutral'
-  | 'accent';
+  | 'accent'
+  | 'cool';
 
 type BadgeSize = 'sm' | 'md';
 
@@ -47,6 +48,7 @@ const variantLabel: Record<BadgeVariant, string> = {
   info: 'Info',
   neutral: '',
   accent: '',
+  cool: 'Cool',
 };
 
 // ---------------------------------------------------------------------------
@@ -60,6 +62,7 @@ const variantMap: Record<BadgeVariant, { bg: string; text: string }> = {
   info: { bg: safetyColors.infoTint, text: safetyColors.infoText },
   neutral: { bg: darkTheme.bgSecondary, text: gray[300] },
   accent: { bg: darkTheme.accent, text: darkTheme.textInverse },
+  cool: { bg: safetyColors.coolTint, text: safetyColors.coolText },
 };
 
 const sizeMap: Record<BadgeSize, { height: number; px: number; fontSize: number }> = {

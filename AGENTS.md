@@ -64,7 +64,7 @@ This file defines the permanent multi-agent workflow for this repository.
 
 - `CONTEXT.md` is the required current-state snapshot.
 - `progress.md` is the implementation progress ledger.
-- `mobile_implementation_plan.md` is the broader migration plan.
+- `docs/archive/mobile_implementation_plan.md` is the broader migration plan.
 
 ## Collaboration Rules
 

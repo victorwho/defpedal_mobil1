@@ -1,5 +1,7 @@
-import type { Coordinate } from '@defensivepedal/core';
+import type { Coordinate, SupportedCountry } from '@defensivepedal/core';
+import { ROUTING_COVERED_COUNTRIES, getCountryCenter } from '@defensivepedal/core';
 import { useMemo } from 'react';
+import { useAppStore } from '../../store/appStore';
 import { DEFAULT_CENTER } from './constants';
 import type { DecodedRoute } from './types';
 
@@ -30,6 +32,22 @@ export const useCameraConfig = ({
     return mid ?? null;
   }, [trailCoordinates]);
 
+  // Cold-start fallback: before the first GPS fix (or forever, if location
+  // permission is denied) there is no route/trail/destination/user location.
+  // Seed from the region gate's persisted country so the map opens on the
+  // rider's own country instead of the hardcoded Bucharest default (review
+  // 2026-08-13 G-17). DEFAULT_CENTER remains the last resort for the sliver
+  // of users with no resolved gate country.
+  const gateCountryCode = useAppStore((s) => s.regionGate.countryCode);
+  const regionFallback = useMemo<[number, number] | null>(() => {
+    const code = gateCountryCode?.toUpperCase();
+    if (!code || !(ROUTING_COVERED_COUNTRIES as readonly string[]).includes(code)) {
+      return null;
+    }
+    const center = getCountryCenter(code as SupportedCountry);
+    return [center.lon, center.lat];
+  }, [gateCountryCode]);
+
   const cameraCoordinate =
     recenterKey > 0 && userLocation
       ? ([userLocation.lon, userLocation.lat] as [number, number])
@@ -39,6 +57,7 @@ export const useCameraConfig = ({
           trailMidpoint ??
           (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
           (userLocation ? ([userLocation.lon, userLocation.lat] as [number, number]) : null) ??
+          regionFallback ??
           DEFAULT_CENTER;
 
   return cameraCoordinate;

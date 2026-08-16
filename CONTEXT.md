@@ -11,9 +11,9 @@ The product direction is mobile-only, built on Expo/React Native with a custom s
 - the current mobile-first repo state is now captured in committed Git history on `codex/mobile-current-snapshot`
 - the default developer path targets `mobile app + mobile API + mobile-first validate`
 - release preflight guardrails live in `.github/workflows/mobile-release.yml` plus `scripts/check-mobile-release.mjs`
-- Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `iphone_validation.md`
+- Android release-style validation remains the default supported native QA path on this Windows machine, while the first in-repo iPhone smoke pass is still pending in `docs/archive/iphone_validation.md`
 - the repo now has a stable feature-development baseline for ongoing frontend and feature work, with remaining iPhone and staging/Redis items tracked as release-hardening backlog
-- the current local route-core backend load baseline is recorded in `mobile_api_load_test_baseline.md`
+- the current local route-core backend load baseline is recorded in `docs/archive/mobile_api_load_test_baseline.md`
 - preview mobile development can now auto-sync the active ngrok tunnel into `apps/mobile/.env.preview` through `scripts/sync-mobile-preview-url.mjs` and `npm run dev:mobile:preview`
 
 ## Tech Stack
@@ -168,13 +168,18 @@ defpedal_mobil1/
     migrations/             ordered database migrations
     migrations/legacy/      historical SQL files from webapp era
   progress.md               implementation progress tracker
-  mobile_implementation_plan.md
-  native_android_validation.md
-  physical_android_validation.md
-  iphone_validation.md
-  mobile_release_runbook.md
-  mobile_api_load_test_baseline.md
-  mobile_api_operations_runbook.md
+  changelog.md              release-by-release changelog
+  TODO.md                   live backlog (todo + issuestofix)
+  changestoimplement.md     habit-engine remaining work (TODO.md links into it)
+  sentryfix.md              error-reduction punch list (non-code follow-ups open)
+  mobile_release_runbook.md release automation (partly superseded — see banner)
+  docs/
+    runbooks/               monitoring, road-risk-data, iOS submission
+    ops/                    nudges, moderation, retention, sentry setup
+    reviews/                dated audits and review reports
+    plans/                  feature + initiative plans
+    legal/                  DPIA, counsel review bundle, data-safety
+    archive/                finished one-off docs (2026-03 → 2026-06)
 ```
 
 ## Working Agreement Notes
@@ -182,4 +187,4 @@ defpedal_mobil1/
 - `progress.md` is the current implementation tracker
 - the mobile app is the sole product direction
 - for any new session, this file should be read first before making architecture or implementation decisions
-- the current branch-level hardening work should also follow `mobile_stable_baseline_plan.md`
+- the current branch-level hardening work should also follow `docs/archive/mobile_stable_baseline_plan.md`

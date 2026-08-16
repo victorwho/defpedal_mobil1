@@ -1,8 +1,21 @@
 # Mobile Release Runbook
 
-Last updated: 2026-03-17
+Last updated: 2026-03-17 — ⚠️ **PARTLY SUPERSEDED.** Kept at the root because
+`apps/mobile/android/app/build.gradle` names this file in the error it prints
+when the `DEFPEDAL_UPLOAD_*` signing properties are missing, and the Gradle-
+properties section below is still correct. For everything else prefer:
 
-This runbook describes the current release automation for the React Native app and the safe path
+- **Build commands + variants + Play rollout gate** — `.claude/CLAUDE.md`
+  ("Project Paths", "Play Store Release", "App Variants"). Builds now run
+  through `scripts/build-preview.sh` (`npm run build:preview` /
+  `build:production`), not the flow described here.
+- **iOS** — `docs/runbooks/ios-app-store-submission.md`
+- **Post-release health** — `docs/runbooks/monitoring.md`
+- **Pre-release smoke checklist** — `apkreleases/release-notes-template.txt`
+- **Firebase preview distribution** — see the App Distribution steps in
+  `.claude/CLAUDE.md` and memory `reference_firebase-app-ids`.
+
+This runbook describes the release automation as of 2026-03 and the safe path
 to move builds from preview to store submission.
 
 ## Current Automation
@@ -30,11 +43,11 @@ waiting for the store build to complete.
 ## Supported Native QA Path
 
 - Default supported native QA path on this Windows machine: Android release-style validation via `npm run android:validate:native:release`
-- Reference validation notes: `native_android_validation.md` and `physical_android_validation.md`
-- iPhone status: no completed smoke pass is recorded in-repo yet; track the first one in `iphone_validation.md`
+- Reference validation notes: `docs/archive/native_android_validation.md` and `docs/archive/physical_android_validation.md`
+- iPhone status: no completed smoke pass is recorded in-repo yet; track the first one in `docs/archive/iphone_validation.md`
 
 That means Android release-style validation is the baseline sign-off path today. iOS release work
-should always include an explicit validation reference until `iphone_validation.md` contains a
+should always include an explicit validation reference until `docs/archive/iphone_validation.md` contains a
 completed smoke pass.
 
 ## Supported Release Paths
@@ -144,30 +157,30 @@ Recommended defaults:
   - `platform=android`
   - `profile=preview`
   - `auto_submit=true`
-  - `native_validation_ref=native_android_validation.md`
+  - `native_validation_ref=docs/archive/native_android_validation.md`
   - `release_notes_ref=<ticket or PR>`
   - `confirm_store_readiness=true`
 - production Android store-ready build:
   - `platform=android`
   - `profile=production`
   - `auto_submit=true`
-  - `native_validation_ref=physical_android_validation.md`
+  - `native_validation_ref=docs/archive/physical_android_validation.md`
   - `release_notes_ref=<release notes or ticket>`
   - `confirm_store_readiness=true`
 - production iOS store-ready build:
   - `platform=ios`
   - `profile=production`
   - `auto_submit=true`
-  - `native_validation_ref=iphone_validation.md or external smoke note`
+  - `native_validation_ref=docs/archive/iphone_validation.md or external smoke note`
   - `release_notes_ref=<release notes or ticket>`
   - `confirm_store_readiness=true`
 
 ## Release Preflight Checklist
 
 1. `npm run validate`
-2. Confirm latest Android release-style validation notes in `native_android_validation.md`
-3. Confirm latest physical Android notes in `physical_android_validation.md` for production-impacting changes
-4. If releasing iOS, confirm the latest iPhone smoke note in `iphone_validation.md` or capture an external validation reference
+2. Confirm latest Android release-style validation notes in `docs/archive/native_android_validation.md`
+3. Confirm latest physical Android notes in `docs/archive/physical_android_validation.md` for production-impacting changes
+4. If releasing iOS, confirm the latest iPhone smoke note in `docs/archive/iphone_validation.md` or capture an external validation reference
 5. Confirm EAS store credentials are still valid
 6. Confirm release notes or ticket reference is ready
 7. Prefer a preview release before any production release with substantial feature or native changes

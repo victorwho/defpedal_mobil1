@@ -4,16 +4,24 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 //
 // Supabase auth email links are forced to be https://. Mobile deep-link
 // schemes (defensivepedal://) cannot be opened directly from email clients.
-// This function receives the HTTPS redirect from /auth/v1/verify, then:
+// This function bounces the browser into the app:
 //   - Android browser → intent:// URI (Chrome handles natively, no JS)
 //   - iOS browser → HTML intermediate page; JS opens the app or shows App Store link
-//   - Desktop/other → branded "email confirmed" HTML page telling the
-//     user to open the app on their phone
+//   - Desktop/other → 302 to a state-appropriate page on the web app
 //
-// The user's email address is already marked confirmed by the preceding
-// /verify step (before this function is reached), so when the user opens
-// the link on desktop we don't need to complete the PKCE exchange — we
-// just reassure them and point them back to the phone.
+// Two link generations arrive here (2026-08-11 rework, see README):
+//
+//   NEW (signup + recovery emails since 2026-08-11): the email links point
+//   DIRECTLY at this function with `token_hash=...&type=...`. Nothing has
+//   been consumed when we run — the app calls verifyOtp with the forwarded
+//   token_hash. This makes the link immune to mail-scanner prefetch and
+//   double-clicks (a GET here has no side effects), and works cross-device
+//   (verifyOtp needs no PKCE verifier).
+//
+//   LEGACY (emails sent before the rework, valid up to 24h): the link went
+//   through /auth/v1/verify first, which consumed the one-time token and
+//   redirected here with `?code=` (success — email already confirmed) or
+//   `?error=...&error_code=...` (failure — expired/consumed token).
 
 const ALLOWED_SCHEMES = [
   'defensivepedal-dev',
@@ -27,10 +35,15 @@ const PACKAGE_MAP: Record<string, string> = {
   defensivepedal: 'com.defensivepedal.mobile',
 };
 
-// Desktop visitors get redirected here because Supabase's edge runtime
-// wraps non-redirect responses in CSP sandbox + text/plain (anti-phishing).
-// The static page lives in the Next.js web app (apps/web).
+// Desktop visitors get redirected to static pages on the web app because
+// Supabase's edge runtime wraps non-redirect responses in CSP sandbox +
+// text/plain (anti-phishing) — see error-log #31. Three states:
+//   - legacy ?code= link: /verify already confirmed the email → success page
+//   - token_hash link: NOT confirmed yet (needs the app) → "open on phone"
+//   - ?error_code= from a failed legacy /verify → expired/used-link page
 const DESKTOP_SUCCESS_URL = 'https://routes.defensivepedal.com/email-confirmed';
+const DESKTOP_OPEN_ON_PHONE_URL = 'https://routes.defensivepedal.com/email-open-on-phone';
+const DESKTOP_LINK_EXPIRED_URL = 'https://routes.defensivepedal.com/email-link-expired';
 
 Deno.serve((req: Request): Response => {
   const url = new URL(req.url);
@@ -50,13 +63,19 @@ Deno.serve((req: Request): Response => {
   const isMobile = isAndroid || isIOS;
 
   // Desktop / unknown user agent: the app isn't reachable from here, so
-  // redirect to a branded confirmation page on the web app. The user is
-  // already confirmed at the database level by the preceding /verify step.
+  // redirect to the state-appropriate branded page on the web app.
   if (!isMobile) {
+    const hasError = url.searchParams.has('error') || url.searchParams.has('error_code');
+    const hasTokenHash = url.searchParams.has('token_hash');
+    const location = hasError
+      ? DESKTOP_LINK_EXPIRED_URL
+      : hasTokenHash
+        ? DESKTOP_OPEN_ON_PHONE_URL
+        : DESKTOP_SUCCESS_URL;
     return new Response(null, {
       status: 302,
       headers: {
-        location: DESKTOP_SUCCESS_URL,
+        location,
         'cache-control': 'no-store',
       },
     });

@@ -83,6 +83,20 @@ export const CommunityStatsCard = ({
     ? `${t('communityStats.cyclistsIn')} ${stats.localityName}`
     : t('communityStats.title');
 
+  // Sparse-area honesty: the stats RPC is pinned to a 15 km radius and the
+  // server always returns a row, so a rider in a country with no local
+  // community used to open this tab on a wall of zeros ("0 trips / 0 km /
+  // 0 riders" — review 2026-08-13 G-09). Show an encouraging first-rider
+  // state instead; the feed below still widens to community scope.
+  if (stats.totalTrips === 0) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.heading}>{heading}</Text>
+        <Text style={styles.emptyBody}>{t('communityStats.emptyBody')}</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.card}>
       <Text style={styles.heading}>{heading}</Text>
@@ -221,6 +235,12 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       fontFamily: fontFamily.body.medium,
       color: colors.textSecondary,
+    },
+    emptyBody: {
+      ...textSm,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textSecondary,
+      lineHeight: 20,
     },
     loadingText: {
       ...textSm,

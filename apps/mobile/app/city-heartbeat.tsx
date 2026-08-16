@@ -250,10 +250,15 @@ export default function CityHeartbeatScreen() {
           />
         </FadeSlideIn>
 
-        {/* Cumulative totals */}
+        {/* Cumulative NEARBY totals. Deliberately pinned to the un-widened
+            radius (migration 202607190001) — so the label must say "near
+            you" and the card hides at zero: an unlabeled "ALL TIME" of
+            zeros sat in the same scroll as the community-scope all-time
+            card and read as a contradiction (review 2026-08-13 G-22). */}
+        {heartbeat.totals.rides > 0 && (
         <FadeSlideIn delay={300}>
           <Surface>
-            <Text style={styles.sectionLabel}>{t('cityHeartbeat.allTime')}</Text>
+            <Text style={styles.sectionLabel}>{t('cityHeartbeat.allTimeNearby')}</Text>
             <View style={styles.statGrid}>
               <StatCell
                 label={t('cityHeartbeat.totalRides')}
@@ -290,6 +295,7 @@ export default function CityHeartbeatScreen() {
             </View>
           </Surface>
         </FadeSlideIn>
+        )}
 
         {/* Hazard hotspots */}
         {heartbeat.hazardHotspots.length > 0 && (
@@ -309,11 +315,20 @@ export default function CityHeartbeatScreen() {
           </FadeSlideIn>
         )}
 
-        {/* Top contributors */}
+        {/* Top contributors — scope-aware header: when the ladder widened to
+            community scope these can be riders 1,000+ km away, so a bare
+            "TOP CONTRIBUTORS" under a city title misleads (review 2026-08-13
+            G-22). */}
         {heartbeat.topContributors.length > 0 && (
           <FadeSlideIn delay={500}>
             <Surface style={{ gap: space[2] }}>
-              <Text style={styles.sectionLabel}>{t('cityHeartbeat.topContributors')}</Text>
+              <Text style={styles.sectionLabel}>
+                {t(
+                  scopeUsed === 'nearby'
+                    ? 'cityHeartbeat.topContributors'
+                    : 'cityHeartbeat.topContributorsCommunity',
+                )}
+              </Text>
               {heartbeat.topContributors.map((c, i) => (
                 <View key={`contributor-${i}`} style={styles.contributorRow}>
                   <View style={styles.rankBadge}>

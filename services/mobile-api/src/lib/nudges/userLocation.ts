@@ -84,6 +84,17 @@ export const __resetLocationCache = (): void => {
 };
 
 /**
+ * Rough UTC offset from longitude (15° per hour), clamped to real-world
+ * bounds. Used as the fallback when no dataset city is within range —
+ * replaces the old hardcoded `?? 2` (Bucharest offset), which computed a
+ * rural Portuguese rider's "local" send window two hours early (review
+ * 2026-08-13 G-18). Approximate by design: political timezones deviate by
+ * ±1h, which is fine for a send-window heuristic.
+ */
+export const utcOffsetFromLongitude = (lon: number): number =>
+  Math.max(-12, Math.min(14, Math.round(lon / 15)));
+
+/**
  * Parse a PostGIS geography(Point, 4326) value into {lat, lon}. Handles
  * every serialisation the Supabase stack emits:
  *   - **WKB/EWKB hex string**: `"0101000020E6100000…"` — what PostgREST

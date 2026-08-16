@@ -64,6 +64,11 @@ export const safetyColors = {
   info: '#3B82F6',
   infoTint: '#DBEAFE',
   infoText: '#1E40AF',
+
+  /** Cool — shade/heat-model routing cues (routing-mode identity, not a risk tier) */
+  cool: '#06B6D4',
+  coolTint: '#CFFAFE',
+  coolText: '#155E75',
 } as const;
 
 // ---------------------------------------------------------------------------

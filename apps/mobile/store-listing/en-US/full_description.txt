@@ -16,14 +16,16 @@ KEY FEATURES
 
 • COMMUNITY. See what other cyclists in your city rode this week. Share routes worth doing, comment, react, and learn from each other.
 
-• WEATHER & AIR QUALITY. Current conditions, wind, European AQI, and a daily 9 AM forecast notification so you know what to expect before you head out.
+• WEATHER & AIR QUALITY. Current conditions, wind, European AQI, and a cycling weather brief that arrives when the forecast is actually worth knowing about — a smart, weather-aware cadence, not the same alarm every morning.
 
 PRIVACY-FIRST
 
-Defensive Pedal is built for European cyclists, with EU data residency where it matters. We do not sell your data. We do not use it for advertising. You can use the app anonymously, sign in only when you want to sync across devices. Account and data deletion are one tap away in Profile → Account, or via web at routes.defensivepedal.com/account-deletion.
+Defensive Pedal is built for European cyclists, with EU data residency where it matters. We do not sell your data. We do not use it for advertising. Creating an account is free — sign in with Google, Apple, or email — and your rides sync across every device you use. Account and data deletion are one tap away in Profile → Account, or via web at routes.defensivepedal.com/account-deletion.
 
-ROMANIA-FOCUSED FOR LAUNCH
+WHERE IT WORKS
 
-Defensive Pedal is launching first in Romania with full Romanian translation. Romanian users get the daily safety quiz in Romanian, with questions tailored to Romanian road law and cycling etiquette.
+Safe routing and street-by-street risk colors — the safety layer painted onto your route — are available across all 31 supported European countries: the EU, the EEA and Switzerland. Fast routing works worldwide.
+
+The app is fully translated into Romanian and Spanish, and the daily safety quiz includes questions tailored to Romanian and Spanish road law and cycling etiquette.
 
 Made for daily commuters, weekend explorers, and anyone who wants the bike to feel less like a calculated risk.

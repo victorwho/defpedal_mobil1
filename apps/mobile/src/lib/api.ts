@@ -684,7 +684,7 @@ export type RouteShareRoutePayload = {
   geometryPolyline6: string;
   distanceMeters: number;
   durationSeconds: number;
-  routingMode: 'safe' | 'fast' | 'flat';
+  routingMode: 'safe' | 'fast' | 'flat' | 'cool';
   /** Optional per-segment risk data (drives web viewer's safety colors). */
   riskSegments?: RouteShareRiskSegment[];
   /** Optional aggregate 0-100 safety score. Null when unscored. */

@@ -78,6 +78,8 @@ export const buildFeedProfileRoutes = (
           updates.keep_full_gps_history = request.body.keepFullGpsHistory;
         if (request.body.pedalVoiceSassy !== undefined)
           updates.pedal_voice_sassy = request.body.pedalVoiceSassy;
+        if (request.body.preferredLocale !== undefined)
+          updates.preferred_locale = request.body.preferredLocale;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db

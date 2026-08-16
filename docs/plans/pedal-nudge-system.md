@@ -324,6 +324,8 @@ Per error-log #21 + #2b, all calls to `expo-notifications` MUST go through `hasN
 
 Each trigger ships with **3 copy variants** (sassy register only — neutral users get the first variant always). Server randomly assigns variant on first eligibility; sticks to that variant for the user thereafter (sticky bucket via hash on `user_id + trigger_id`). After 4 weeks, daily aggregation surfaces win-rate per variant in a Looker/Metabase dashboard. Auto-winnow is **not** done in v1 — human reviews and promotes winners in code.
 
+> **Superseded (2026-08-12 / 2026-08-13).** The sticky bucket pinned one phrase per rider for life and was replaced by per-send rotation (session 102). Session 104 then expanded the pools: every trigger now carries **12 sassy + 6 neutral** variants per locale in `pedalVoiceCatalog.{en,ro,es}.ts`, both voices rotate through their own pool, and the rotation memory is 6 sends. Per-send A/B analysis still works via `nudge_log.variant_id`. The paragraph above is kept as the historical v1 design.
+
 ---
 
 ## 7. Telemetry & Measurement

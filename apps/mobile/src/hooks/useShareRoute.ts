@@ -36,8 +36,8 @@ export type ShareRouteInput = {
   readonly route: RouteOption;
   readonly origin: { readonly lat: number; readonly lon: number };
   readonly destination: { readonly lat: number; readonly lon: number };
-  /** Matches the server-side routingMode enum. Flat = avoid hills. */
-  readonly routingMode: 'safe' | 'fast' | 'flat';
+  /** Matches the server-side routingMode enum. Flat = avoid hills, cool = least heat. */
+  readonly routingMode: 'safe' | 'fast' | 'flat' | 'cool';
   /** Optional human-readable destination for the caption. */
   readonly destinationLabel?: string;
   /**

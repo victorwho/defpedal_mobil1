@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { SUPPORTED_APP_COUNTRIES } from './appAvailability';
 import {
+  HEAT_ROUTING_COUNTRIES,
+  RISK_DATA_COUNTRIES,
   ROUTING_COVERED_COUNTRIES,
+  isHeatRoutingAvailable,
+  isRiskDataAvailable,
   isRouteSupported,
   resolveCountryFromCoord,
 } from './countryCoverage';
@@ -15,6 +19,55 @@ describe('routing coverage ↔ region gate sync', () => {
     for (const country of ROUTING_COVERED_COUNTRIES) {
       expect(SUPPORTED_APP_COUNTRIES.has(country)).toBe(true);
     }
+  });
+});
+
+describe('isRiskDataAvailable', () => {
+  it('road_risk_data covers the full routing footprint (b36v1, 2026-08-01)', () => {
+    expect(RISK_DATA_COUNTRIES).toEqual(ROUTING_COVERED_COUNTRIES);
+    expect(isRiskDataAvailable('RO')).toBe(true);
+    expect(isRiskDataAvailable('ES')).toBe(true);
+    expect(isRiskDataAvailable('DE')).toBe(true);
+    expect(isRiskDataAvailable(null)).toBe(false);
+    expect(isRiskDataAvailable(undefined)).toBe(false);
+  });
+
+  it('risk-data countries are a subset of routing coverage', () => {
+    for (const country of RISK_DATA_COUNTRIES) {
+      expect(ROUTING_COVERED_COUNTRIES).toContain(country);
+    }
+  });
+
+  it('RO and ES stay FIRST in the bbox iteration order', () => {
+    // First-match attribution. Load-bearing while risk data was RO/ES-only
+    // (overlap losses silently killed the risk overlay + comparison there);
+    // cosmetic since risk data went EU-wide (2026-08-01), but kept locked so
+    // any future re-narrowing of RISK_DATA_COUNTRIES doesn't reopen the trap.
+    expect(ROUTING_COVERED_COUNTRIES.slice(0, 2)).toEqual(['RO', 'ES']);
+  });
+});
+
+describe('isHeatRoutingAvailable', () => {
+  it('heat-routing countries are a subset of routing coverage', () => {
+    // Cool is a refinement of Safe — offering it outside the safe graph
+    // would break the safe-degrade fallback in the dispatchers.
+    for (const country of HEAT_ROUTING_COUNTRIES) {
+      expect(ROUTING_COVERED_COUNTRIES).toContain(country);
+    }
+  });
+
+  it('is available in RO (launch coverage)', () => {
+    expect(isHeatRoutingAvailable('RO')).toBe(true);
+  });
+
+  it('is unavailable outside the shade-graph countries', () => {
+    expect(isHeatRoutingAvailable('DE')).toBe(false);
+    expect(isHeatRoutingAvailable('ES')).toBe(false);
+  });
+
+  it('is unavailable for null/undefined attribution', () => {
+    expect(isHeatRoutingAvailable(null)).toBe(false);
+    expect(isHeatRoutingAvailable(undefined)).toBe(false);
   });
 });
 

@@ -362,6 +362,111 @@ describe('directPreviewRoute', () => {
     expect(firstCallUrl).not.toContain('bicycle-flat');
   });
 
+  it('uses shade OSRM endpoint when avoidHeat is enabled inside heat coverage (RO)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      avoidHeat: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).toContain('/route/v1/bicycle/');
+  });
+
+  it('avoidHeat wins over avoidHills when both are set', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: true,
+      avoidHeat: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-flat.defensivepedal.com');
+  });
+
+  it('composes avoidHeat with avoidUnpaved (exclude param on shade endpoint)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+      avoidHeat: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).toContain('exclude=unpaved');
+  });
+
+  it('ignores avoidHeat outside heat-routing coverage (Berlin → standard safe OSRM)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 52.52, lon: 13.4 },
+      destination: { lat: 52.53, lon: 13.42 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      avoidHeat: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-shade.defensivepedal.com');
+  });
+
+  it('ignores avoidHeat in fast mode', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+      avoidHeat: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('api.mapbox.com');
+    expect(firstCallUrl).not.toContain('osrm-shade');
+  });
+
   it('includes coverage region in response', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
@@ -699,8 +804,62 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
     });
 
     expect(vi.mocked(fetch).mock.calls).toHaveLength(5);
-    // Empty risk arrays → no label produced (graceful)
+    // Empty risk arrays → no comparison produced (graceful)
+    expect(result.comparison).toBeUndefined();
     expect(result.comparisonLabel).toBeUndefined();
+  });
+
+  it('produces a structured comparison with extraMinutes for a slower safe route', async () => {
+    setupFetchMock([
+      { data: createRouteResponse([createOsrmRoute({ duration: 1200 })]) }, // OSRM safe (20 min)
+      { data: createElevationResponse() },                                  // elevation
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 10, riskLevel: 'low' }] } },
+      { data: createRouteResponse([createOsrmRoute({ duration: 900 })] ) }, // Mapbox fast (15 min)
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 50, riskLevel: 'high' }] } },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      showRouteComparison: true,
+    });
+
+    expect(result.comparison).toEqual({
+      against: 'fast',
+      verdict: 'safer',
+      diffPercent: 80, // |1 - 10/50| = 80%
+      extraMinutes: 5, // 1200s vs 900s
+    });
+    // The legacy free-text label is no longer produced.
+    expect(result.comparisonLabel).toBeUndefined();
+  });
+
+  it('reports less_safe without extraMinutes when riding the fast route', async () => {
+    setupFetchMock([
+      { data: createRouteResponse([createOsrmRoute({ duration: 900 })]) },  // Mapbox fast
+      { data: createElevationResponse() },                                  // elevation
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 50, riskLevel: 'high' }] } },
+      { data: createRouteResponse([createOsrmRoute({ duration: 1200 })]) }, // OSRM safe (comparison)
+      { data: { riskSegments: [{ start: 0, end: 1, riskScore: 10, riskLevel: 'low' }] } },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+      showRouteComparison: true,
+    });
+
+    expect(result.comparison).toEqual({
+      against: 'safe',
+      verdict: 'less_safe',
+      diffPercent: 400, // |1 - 50/10| = 400%
+    });
   });
 });
 

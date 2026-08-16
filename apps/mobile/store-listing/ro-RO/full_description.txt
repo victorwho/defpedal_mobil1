@@ -16,14 +16,16 @@ CARACTERISTICI PRINCIPALE
 
 • COMUNITATE. Vezi ce au pedalat alți bicicliști din orașul tău săptămâna aceasta. Partajează rute care merită făcute, comentează, reacționează și învață de la ceilalți.
 
-• VREMEA ȘI CALITATEA AERULUI. Condiții actuale, vânt, indice european de calitate a aerului (AQI) și o notificare zilnică la ora 9 dimineața cu prognoza, ca să știi la ce să te aștepți înainte să pornești.
+• VREMEA ȘI CALITATEA AERULUI. Condiții actuale, vânt, indice european de calitate a aerului (AQI) și un buletin de vreme pentru ciclism care ajunge atunci când prognoza chiar merită știută — o cadență inteligentă, adaptată vremii, nu aceeași alarmă în fiecare dimineață.
 
 CONFIDENȚIALITATE PE PRIMUL LOC
 
-Defensive Pedal este construită pentru bicicliștii europeni, cu rezidență a datelor în UE acolo unde contează. Nu vindem datele tale. Nu le folosim pentru publicitate. Poți folosi aplicația anonim și te conectezi doar când vrei să sincronizezi între dispozitive. Ștergerea contului și a datelor este la o singură atingere în Profil → Cont, sau prin web la routes.defensivepedal.com/account-deletion.
+Defensive Pedal este construită pentru bicicliștii europeni, cu rezidență a datelor în UE acolo unde contează. Nu vindem datele tale. Nu le folosim pentru publicitate. Crearea contului este gratuită — te conectezi cu Google, Apple sau e-mail — iar cursele tale se sincronizează pe toate dispozitivele pe care le folosești. Ștergerea contului și a datelor este la o singură atingere în Profil → Cont, sau prin web la routes.defensivepedal.com/account-deletion.
 
-LANSARE FOCALIZATĂ PE ROMÂNIA
+UNDE FUNCȚIONEAZĂ
 
-Defensive Pedal se lansează mai întâi în România, cu traducere completă în limba română. Utilizatorii români primesc quiz-ul zilnic de siguranță în română, cu întrebări adaptate la legislația rutieră românească și la eticheta ciclistă locală.
+Rutarea sigură și culorile de risc stradă cu stradă — stratul de siguranță desenat peste traseul tău — sunt disponibile în toate cele 31 de țări europene suportate: UE, SEE și Elveția. Rutarea rapidă funcționează în toată lumea.
+
+Aplicația este tradusă integral în română și spaniolă, iar quiz-ul zilnic de siguranță include întrebări adaptate legislației rutiere și etichetei cicliste din România și din Spania.
 
 Făcută pentru navetiștii zilnici, exploratorii de weekend și pentru oricine vrea ca bicicleta să se simtă mai puțin ca un risc calculat.

@@ -251,26 +251,33 @@ const renderTemplate = (
 // ---------------------------------------------------------------------------
 
 /**
- * 2 locales × 2 voices × 20 variants, verbatim from the plan doc
- * (docs/plans/city-riders-pulse-notification.md §Copy). Unlike every other trigger,
- * variety is the point here: variant = djb2(userId + sendDate) % 20, skipping
- * the last 3 variant ids the user saw. Voice (sassy/neutral) stays sticky via
- * the pedal_voice_sassy toggle, as everywhere else.
+ * 3 locales × 2 voices × 20 variants. EN + RO are verbatim from the plan doc
+ * (docs/plans/city-riders-pulse-notification.md §Copy); ES was authored
+ * 2026-08-13 (review finding G-24) in the same register as
+ * pedalVoiceCatalog.es.ts. Unlike every other trigger, variety is the point
+ * here: variant = djb2(userId + sendDate) % 20, skipping the last 3 variant
+ * ids the user saw. Voice (sassy/neutral) stays sticky via the
+ * pedal_voice_sassy toggle, as everywhere else.
  *
- * Locale note: the plan defines EN + RO only; 'es' renders the EN catalog
- * until Spanish copy is commissioned (recorded in the plan's deployment
- * section). RO grammar: every variant uses "{n} de …", correct because N is
- * floored at 40 (the "de" article is required for numbers >= 20).
+ * Pools are index-aligned across locales — the rotation picks an index and
+ * the locale only decides which string that index renders, so all three
+ * pools must stay the same length (locked by test).
+ *
+ * RO grammar: every variant uses "{n} de …", correct because N is floored at
+ * 40 (the "de" article is required for numbers >= 20). ES needs no such
+ * article, and its {n} fallback ("decenas de") reads correctly mid-sentence
+ * in every variant.
  */
 const CITY_PULSE_PRIORITY: NudgePriority = 3;
 const CITY_PULSE_POSE: MascotPose = 'ride';
 
-const CITY_PULSE_TITLES: Record<'en' | 'ro', string> = {
+const CITY_PULSE_TITLES: Record<NudgeLocale, string> = {
   en: 'Riders out in {city}',
   ro: 'Bicicliști în {city}',
+  es: 'Ciclistas en {city}',
 };
 
-const CITY_PULSE_BODIES: Record<'en' | 'ro', { sassy: readonly string[]; neutral: readonly string[] }> = {
+const CITY_PULSE_BODIES: Record<NudgeLocale, { sassy: readonly string[]; neutral: readonly string[] }> = {
   en: {
     sassy: [
       '🚴 {n} people are cycling in {city} today. The bike lane is starting to ask about you. — Pedal',
@@ -363,11 +370,70 @@ const CITY_PULSE_BODIES: Record<'en' | 'ro', { sassy: readonly string[]; neutral
       '{city} e plin de biciclete: {n} de bicicliști azi. Li te alături?',
     ],
   },
+  es: {
+    sassy: [
+      '{n} personas pedalean hoy por {city}. El carril bici ya pregunta por ti. — Pedal',
+      '{n} ciclistas por {city} ahora mismo. Tu bici se ha dado cuenta.',
+      'Recuento de hoy en {city}: {n} ciclistas y una bici aparcada de forma sospechosa. La tuya.',
+      '{n} personas de {city} han elegido hoy la bici. Presión de grupo, pero de la sana.',
+      'Última hora: {n} ciclistas hoy en {city}. Testigos afirman que una bici sigue en casa. — Pedal',
+      '{city} va por {n} ciclistas hoy. Tú podrías sumar uno más. Solo digo.',
+      '{n} personas pedalean por {city} y ninguna eres tú. Tiene arreglo.',
+      'Las calles de {city}: {n} bicis hoy. Cabe una más.',
+      '{n} ciclistas hoy en {city}. Tu sillín ha puesto una denuncia por abandono.',
+      'Lo hace todo el mundo. Bueno, {n} personas de {city}. — Pedal',
+      '{n} ciclistas por {city}. El tiempo ha cumplido. Te toca.',
+      'Hoy en {city}: {n} personas se han acordado de que tienen bici. ¿Te suena?',
+      '{n} ciclistas rodando por {city} ahora mismo. El FOMO es un recurso renovable.',
+      'Psst. {n} personas pedalean hoy por {city}. Esta es tu señal.',
+      'Clasificación del día en {city}: {n} ciclistas. Ausente: tú.',
+      '{n} bicis por {city} hoy y la tuya sigue sujetando la pared.',
+      'Dato curioso: {n} personas pedalean hoy en {city}. Dato menos curioso: tú lees esto en el sofá.',
+      '{n} ciclistas de {city} no pueden estar todos equivocados. — Pedal',
+      'Previsión de hoy para {city}: {n} ciclistas con probabilidad de ti.',
+      '{n} personas rodando por {city}. Tu casco echa de menos tu cabeza. — Pedal',
+    ],
+    neutral: [
+      '{n} personas pedalean hoy por {city}. ¿Buen día para unirte?',
+      '{n} personas van hoy en bici por {city}. ¿Te unes?',
+      '{n} ciclistas están hoy por {city}: buen momento para una ruta.',
+      'Día movido de ciclismo en {city}: {n} ciclistas hoy.',
+      '{n} personas han elegido hoy la bici en {city}. ¿Te apetece una ruta?',
+      'Hoy es un gran día ciclista en {city}: {n} ciclistas fuera.',
+      '{n} ciclistas ruedan hoy por las calles de {city}. ¿Te unes?',
+      'Hoy {n} personas pedalean por {city}. Tu bici está lista cuando tú lo estés.',
+      '{n} ciclistas hoy en {city}. Una ruta corta también cuenta.',
+      '{city} tiene hoy {n} ciclistas en la calle. Buenas condiciones para rodar.',
+      '{n} personas pedalean hoy por {city}. Únete cuando puedas.',
+      'Hay buena compañía ahí fuera: {n} ciclistas hoy en {city}.',
+      '{n} ciclistas han salido hoy a las calles de {city}. Cabe una más.',
+      'Actualización ciclista: {n} personas pedalean hoy en {city}.',
+      '{n} personas de {city} están hoy en bici. ¿Qué tal una vuelta rápida?',
+      'Recuento de hoy en {city}: {n} ciclistas. ¿Te unes?',
+      '{n} ciclistas disfrutan hoy de {city}. Tú también podrías.',
+      'Un buen día sobre dos ruedas: {n} ciclistas por {city}.',
+      '{n} personas pedalean ahora mismo por {city}. Una ruta hoy mantiene viva tu racha.',
+      '{city} está lleno de bicis: {n} ciclistas hoy. ¿Te unes?',
+    ],
+  },
 };
 
 export const CITY_PULSE_VARIANT_COUNT = 20;
 /** How many recently-shown variants the rotation refuses to repeat. */
 export const CITY_PULSE_ROTATION_MEMORY = 3;
+
+/**
+ * Read-only City Pulse pool accessor for tests and audit tooling — the
+ * counterpart of `getCatalogPools` for the trigger that keeps its own
+ * catalog.
+ */
+export const getCityPulsePools = (
+  locale: NudgeLocale,
+): { readonly title: string; readonly sassy: readonly string[]; readonly neutral: readonly string[] } => ({
+  title: CITY_PULSE_TITLES[locale],
+  sassy: CITY_PULSE_BODIES[locale].sassy,
+  neutral: CITY_PULSE_BODIES[locale].neutral,
+});
 
 const cityPulseVariantId = (voice: 'sassy' | 'neutral', index: number): string =>
   `${voice}-v${index + 1}`;
@@ -393,8 +459,7 @@ const pickCityPulseIndex = (
 };
 
 const pickCityPulseMessage = (req: PedalVoiceRequest): PedalVoiceMessage => {
-  // ES copy not commissioned yet — Spanish users get the EN catalog.
-  const locale: 'en' | 'ro' = req.locale === 'ro' ? 'ro' : 'en';
+  const locale = req.locale;
   const voice = req.sassy ? 'sassy' : 'neutral';
   const index = pickCityPulseIndex(
     req.userId,

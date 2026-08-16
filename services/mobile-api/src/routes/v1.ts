@@ -242,6 +242,7 @@ const buildRouteResponse = async (
             destination: normalizedRequest.destination,
             avoidUnpaved: normalizedRequest.avoidUnpaved,
             avoidHills: normalizedRequest.avoidHills,
+            avoidHeat: normalizedRequest.avoidHeat,
           })
         : await dependencies.fetchFastRoutes(
             previewOrigin,
@@ -3367,11 +3368,15 @@ export const buildV1Routes = (
 
     // GET /v1/quiz/daily — random unasked question (30-day cooldown)
     //
-    // `country` query param selects the question pool (RO or ES). Defaults to
-    // RO when omitted so older app builds without country awareness keep
-    // working. Pool IDs do not collide, so a `user_quiz_history` row scoped to
-    // one pool is invisible to the other — that's intentional: switching pools
-    // mid-life simply re-opens the catalogue rather than orphaning history.
+    // `country` query param selects the question pool (RO, ES, or GENERIC).
+    // Defaults to GENERIC when omitted: current clients (>= v0.2.101) always
+    // send the resolved country, so the fallback only serves pre-gate builds
+    // and manual API consumers — and a generally-true EU question anywhere is
+    // a far smaller failure than Romanian law served to a rider in Germany
+    // (review 2026-08-13 G-20; the default was 'RO' until then). Pool IDs do
+    // not collide, so a `user_quiz_history` row scoped to one pool is
+    // invisible to the other — that's intentional: switching pools mid-life
+    // simply re-opens the catalogue rather than orphaning history.
     app.get<{
       Querystring: { country?: QuizCountry; locale?: 'en' | 'ro' | 'es' };
       Reply: QuizQuestion | ErrorResponse;
@@ -3410,37 +3415,54 @@ export const buildV1Routes = (
         const user = await requireWriteUser(request, dependencies);
         await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
 
-        const country: QuizCountry = request.query?.country ?? 'RO';
+        const country: QuizCountry = request.query?.country ?? 'GENERIC';
         const locale: 'en' | 'ro' | 'es' = request.query?.locale ?? 'en';
         const pool = getQuizPool(country);
 
-        // Get question IDs answered in the last 30 days from user_quiz_history
-        let excludeIds: string[] = [];
+        // Get questions answered in the last 30 days from user_quiz_history.
+        // `answered_at` rides along so pool exhaustion can fall back to the
+        // least-recently-answered question instead of a 404 the client renders
+        // as a permanent "Failed to load quiz" (review 2026-08-13 G-02 — the
+        // GENERIC pool used to be smaller than the 30-day window, hard-locking
+        // daily players outside RO/ES from day ~31).
+        let recentRows: { question_id: string; answered_at: string }[] = [];
         if (supabaseAdmin) {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
           const { data: recentAnswers } = await supabaseAdmin
             .from('user_quiz_history')
-            .select('question_id')
+            .select('question_id, answered_at')
             .eq('user_id', user.id)
             .gte('answered_at', thirtyDaysAgo);
 
-          excludeIds = (recentAnswers ?? []).map((r: Record<string, unknown>) => r.question_id as string);
+          recentRows = (recentAnswers ?? []) as { question_id: string; answered_at: string }[];
         }
+        const excludeIds = recentRows.map((r) => r.question_id);
 
         // Filter the chosen country's pool, excluding recently answered.
         const available = excludeIds.length > 0
           ? pool.filter((q) => !excludeIds.includes(q.id))
           : pool;
 
-        if (available.length === 0) {
-          throw new HttpError('No quiz questions available.', {
-            statusCode: 404,
-            code: 'NOT_FOUND',
-          });
+        let q: (typeof pool)[number];
+        if (available.length > 0) {
+          q = available[Math.floor(Math.random() * available.length)];
+        } else {
+          // Whole pool answered within the window: re-serve the question this
+          // user saw longest ago rather than locking them out.
+          const oldestFirst = [...recentRows].sort((a, b) =>
+            a.answered_at.localeCompare(b.answered_at),
+          );
+          const fallback = oldestFirst
+            .map((row) => pool.find((question) => question.id === row.question_id))
+            .find((question) => question !== undefined);
+          if (!fallback) {
+            throw new HttpError('No quiz questions available.', {
+              statusCode: 404,
+              code: 'NOT_FOUND',
+            });
+          }
+          q = fallback;
         }
-
-        // Pick a random question
-        const q = available[Math.floor(Math.random() * available.length)];
 
         return {
           id: q.id,
@@ -3504,7 +3526,7 @@ export const buildV1Routes = (
         }
 
         const { questionId, selectedIndex } = request.body;
-        const country: QuizCountry = request.body.country ?? 'RO';
+        const country: QuizCountry = request.body.country ?? 'GENERIC';
         const locale: 'en' | 'ro' | 'es' = request.body.locale ?? 'en';
 
         // Look up from the country's pool only. We don't fall back to the
@@ -3705,6 +3727,7 @@ export const buildV1Routes = (
           mode: (row.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (row.avoid_unpaved as boolean) ?? false,
           avoidHills: (row.avoid_hills as boolean) ?? false,
+          avoidHeat: (row.avoid_heat as boolean) ?? false,
           createdAt: row.created_at as string,
           lastUsedAt: row.last_used_at as string,
         }));
@@ -3736,6 +3759,7 @@ export const buildV1Routes = (
             mode: payload.mode,
             avoid_unpaved: payload.avoidUnpaved,
             avoid_hills: payload.avoidHills,
+            avoid_heat: payload.avoidHeat,
           })
           .select()
           .single();
@@ -3755,6 +3779,7 @@ export const buildV1Routes = (
           mode: (data.mode as SavedRoute['mode']) ?? 'safe',
           avoidUnpaved: (data.avoid_unpaved as boolean) ?? false,
           avoidHills: (data.avoid_hills as boolean) ?? false,
+          avoidHeat: (data.avoid_heat as boolean) ?? false,
           createdAt: data.created_at as string,
           lastUsedAt: data.last_used_at as string,
         };

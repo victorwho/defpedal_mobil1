@@ -3,6 +3,21 @@
 Next.js 14 App Router workspace for the Defensive Pedal web surface.
 Deployed to Vercel at `routes.defensivepedal.com`.
 
+## Deploying
+
+The Vercel project (`defpedal-web`, team `victorwhos-projects`) has **Root
+Directory = `apps/web`**, so the CLI must run from the **monorepo root** —
+that's where the `.vercel/` project link lives:
+
+```bash
+# from C:\dev\defpedal (NOT from apps/web — that fails with
+# "The specified Root Directory \"apps/web\" does not exist")
+npx vercel deploy --prod --yes --scope victorwhos-projects
+```
+
+Deploy from a clean `main` worktree when the working tree carries uncommitted
+WIP — the build consumes `packages/core` from the uploaded tree.
+
 ## Status
 
 Slice 0 — infrastructure scaffold only. Real route-share viewer arrives in slice 1.

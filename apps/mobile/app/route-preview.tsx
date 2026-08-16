@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride, routeMatchesEndpoints } from '@defensivepedal/core';
+import { getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -42,6 +42,7 @@ import { useAppStore } from '../src/store/appStore';
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
+import { RiskScoreExplainerSheet } from '../src/design-system/organisms/RiskScoreExplainerSheet';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
 import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -77,6 +78,14 @@ const formatDuration = (seconds: number): string => {
   const mins = totalMinutes % 60;
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 };
+
+/** Minimum contiguous high-risk stretch (m) before the busy-road callout shows. */
+const BUSY_STRETCH_MIN_M = 150;
+
+const formatStretchDistance = (meters: number): string =>
+  meters >= 1000
+    ? `${(meters / 1000).toFixed(1)} km`
+    : `${Math.round(meters / 10) * 10} m`;
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function RoutePreviewScreen() {
@@ -105,8 +114,10 @@ function RoutePreviewScreen() {
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
+  const avoidHeat = useAppStore((state) => state.avoidHeat);
   const setRoutingMode = useAppStore((state) => state.setRoutingMode);
   const setAvoidHills = useAppStore((state) => state.setAvoidHills);
+  const setAvoidHeat = useAppStore((state) => state.setAvoidHeat);
   const resolvedCountry = useResolvedCountry();
 
   const { isOnline } = useConnectivity();
@@ -190,6 +201,7 @@ function RoutePreviewScreen() {
   // dismissed flag re-showed it every time).
   const weatherWarningAllowedRef = useRef(!weatherWarningSeenThisSession);
   const [switchingToSafe, setSwitchingToSafe] = useState(false);
+  const [riskExplainerVisible, setRiskExplainerVisible] = useState(false);
   const isFocused = useIsFocused();
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
@@ -208,7 +220,7 @@ function RoutePreviewScreen() {
   }, [showWeatherWarning, markWeatherWarningSeen]);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, showRouteComparison };
+  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, avoidHeat, showRouteComparison };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -269,6 +281,55 @@ function RoutePreviewScreen() {
     [routePreview, selectedRouteId],
   );
 
+  // Honest-stretch callout: only on safe routes (the copy claims "no calmer
+  // alternative here", which is only true when the safe router placed it).
+  const busyStretchMeters = useMemo(() => {
+    if (!selectedRoute || routePreview?.selectedMode !== 'safe') return 0;
+    return longestHighRiskStretchMeters(selectedRoute.riskSegments);
+  }, [selectedRoute, routePreview?.selectedMode]);
+
+  // Safe-vs-fast comparison badge content. Prefers the structured
+  // `comparison` (localized copy); falls back to the legacy free-text
+  // `comparisonLabel` for previews persisted by pre-2026-08 builds.
+  const comparisonContent = useMemo(() => {
+    const comparison = routePreview?.comparison;
+    if (comparison) {
+      let title: string;
+      let subtitle: string | null = null;
+      if (comparison.against === 'fast') {
+        if (comparison.verdict === 'safer') {
+          if (comparison.extraMinutes) {
+            title = t('preview.comparison.calmerCost', { minutes: comparison.extraMinutes });
+            subtitle = t('preview.comparison.calmerCostSub');
+          } else {
+            title = t('preview.comparison.calmerFree');
+          }
+        } else if (comparison.verdict === 'similar') {
+          title = t('preview.comparison.similarFast');
+        } else {
+          title = t('preview.comparison.sameFast');
+        }
+      } else if (comparison.verdict === 'less_safe') {
+        title = comparison.diffPercent >= 1
+          ? t('preview.comparison.lessSafe', { percent: comparison.diffPercent })
+          : t('preview.comparison.slightlyLessSafe');
+      } else if (comparison.verdict === 'similar') {
+        title = t('preview.comparison.similarSafe');
+      } else {
+        title = t('preview.comparison.sameSafe');
+      }
+      return { title, subtitle, isWarning: comparison.verdict === 'less_safe' };
+    }
+    if (routePreview?.comparisonLabel) {
+      return {
+        title: routePreview.comparisonLabel,
+        subtitle: null,
+        isWarning: routePreview.comparisonLabel.includes('less safe'),
+      };
+    }
+    return null;
+  }, [routePreview?.comparison, routePreview?.comparisonLabel, t]);
+
   // Slice 6: the share button no longer jumps straight to the native
   // share sheet — it opens ShareOptionsModal where the user can flip
   // the privacy toggle. PRD default is hideEndpoints=true; the toggle
@@ -295,9 +356,11 @@ function RoutePreviewScreen() {
   const handleShareConfirm = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;
     setShareOptionsVisible(false);
-    const routingMode: 'safe' | 'fast' | 'flat' = avoidHills
-      ? 'flat'
-      : routeRequest.mode;
+    const routingMode: 'safe' | 'fast' | 'flat' | 'cool' = avoidHeat
+      ? 'cool'
+      : avoidHills
+        ? 'flat'
+        : routeRequest.mode;
     void shareRoute({
       route: selectedRoute,
       origin: routeRequest.origin,
@@ -312,6 +375,7 @@ function RoutePreviewScreen() {
     selectedRoute,
     routeRequest,
     avoidHills,
+    avoidHeat,
     shareRoute,
     shareHideEndpoints,
     shareShortRouteFallback,
@@ -499,6 +563,7 @@ function RoutePreviewScreen() {
         mode: routeRequest.mode,
         avoidUnpaved: routeRequest.avoidUnpaved,
         avoidHills: routeRequest.avoidHills,
+        avoidHeat: routeRequest.avoidHeat,
       });
       void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
       setSaveModalVisible(false);
@@ -513,26 +578,39 @@ function RoutePreviewScreen() {
     }
   }, [saveRouteName, routeRequest, queryClient]);
 
-  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Safe) ──
-  // Mirrors the 3-way ModeTogglePill row on route-planning so the user can
-  // switch profiles directly from the preview without going back. Changing
-  // `routeRequest.mode` and/or `avoidHills` invalidates the previewQuery key
-  // (`effectiveRequest`), which triggers an automatic refetch.
-  type RoutingDisplay = 'safe' | 'fast' | 'flat';
+  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Cool → Safe) ──
+  // Mirrors the ModeTogglePill row on route-planning so the user can switch
+  // profiles directly from the preview without going back. Changing
+  // `routeRequest.mode` and/or `avoidHills`/`avoidHeat` invalidates the
+  // previewQuery key (`effectiveRequest`), which triggers an automatic
+  // refetch. Cool is skipped outside the shade-graph countries (RO at
+  // launch) — same gate as the Cool pill on route-planning.
+  const coolAvailable =
+    resolvedCountry.routeSupported &&
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+
+  type RoutingDisplay = 'safe' | 'fast' | 'flat' | 'cool';
   const currentDisplayMode: RoutingDisplay =
-    routeRequest.mode === 'fast' ? 'fast' : avoidHills ? 'flat' : 'safe';
+    routeRequest.mode === 'fast'
+      ? 'fast'
+      : avoidHeat && coolAvailable
+        ? 'cool'
+        : avoidHills
+          ? 'flat'
+          : 'safe';
 
   const modeDisplay: Record<
     RoutingDisplay,
     {
       label: string;
-      variant: 'risk-safe' | 'info' | 'accent';
+      variant: 'risk-safe' | 'info' | 'accent' | 'cool';
       next: RoutingDisplay;
     }
   > = {
     safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
     fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
-    flat: { label: t('planning.flat'), variant: 'accent', next: 'safe' },
+    flat: { label: t('planning.flat'), variant: 'accent', next: coolAvailable ? 'cool' : 'safe' },
+    cool: { label: t('planning.cool'), variant: 'cool', next: 'safe' },
   };
 
   const cycleRoutingMode = useCallback(() => {
@@ -540,15 +618,22 @@ function RoutePreviewScreen() {
     void Speech.stop();
     if (currentDisplayMode === 'safe') {
       setAvoidHills(false);
+      setAvoidHeat(false);
       setRoutingMode('fast');
     } else if (currentDisplayMode === 'fast') {
       setAvoidHills(true);
+      setAvoidHeat(false);
+      setRoutingMode('safe');
+    } else if (currentDisplayMode === 'flat' && coolAvailable) {
+      setAvoidHills(false);
+      setAvoidHeat(true);
       setRoutingMode('safe');
     } else {
       setAvoidHills(false);
+      setAvoidHeat(false);
       setRoutingMode('safe');
     }
-  }, [currentDisplayMode, setAvoidHills, setRoutingMode]);
+  }, [currentDisplayMode, coolAvailable, setAvoidHills, setAvoidHeat, setRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
   // Outside the covered countries (EU-27 + EEA + CH) we only have Mapbox
@@ -611,6 +696,10 @@ function RoutePreviewScreen() {
       onDismiss={() => setShareOptionsVisible(false)}
       shortRouteFallback={shareShortRouteFallback}
       distanceKm={((selectedRoute?.distanceMeters ?? 0) / 1000).toFixed(1)}
+    />
+    <RiskScoreExplainerSheet
+      visible={riskExplainerVisible}
+      onDismiss={() => setRiskExplainerVisible(false)}
     />
     <MapStageScreen
       useBottomSheet
@@ -787,28 +876,56 @@ function RoutePreviewScreen() {
       ) : null}
 
       {selectedRoute && selectedRoute.riskSegments.length > 0 ? (
-        <RiskDistributionCard riskSegments={selectedRoute.riskSegments} />
+        <RiskDistributionCard
+          riskSegments={selectedRoute.riskSegments}
+          onInfoPress={() => setRiskExplainerVisible(true)}
+        />
+      ) : selectedRoute && !isRiskDataAvailable(resolvedCountry.destinationCountry) ? (
+        // Route outside risk-data coverage (since the 2026-08-01 EU-wide
+        // dataset that means: outside the 31 covered countries — the
+        // "Continue anyway" cohort): explain the missing risk card instead
+        // of rendering nothing (review G-05). Inside coverage an empty
+        // riskSegments means load-failure/not-yet — keep the silent null
+        // there rather than claiming "not available".
+        <View style={styles.riskUnavailableRow}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+          <Text style={styles.riskUnavailableText}>{t('risk.dataUnavailable')}</Text>
+        </View>
       ) : null}
 
-      {routePreview?.comparisonLabel ? (
+      {busyStretchMeters >= BUSY_STRETCH_MIN_M ? (
+        <View style={styles.busyStretchRow}>
+          <Ionicons name="warning-outline" size={16} color={colors.caution} />
+          <Text style={styles.busyStretchText}>
+            {t('risk.busyStretch', { distance: formatStretchDistance(busyStretchMeters) })}
+          </Text>
+        </View>
+      ) : null}
+
+      {comparisonContent ? (
         <View>
           <View style={[
             styles.comparisonBadge,
-            routePreview.comparisonLabel.includes('less safe') && styles.comparisonBadgeWarning,
+            comparisonContent.isWarning && styles.comparisonBadgeWarning,
           ]}>
             <Ionicons
-              name={routePreview.comparisonLabel.includes('less safe') ? 'warning' : 'shield-checkmark'}
+              name={comparisonContent.isWarning ? 'warning' : 'shield-checkmark'}
               size={18}
-              color={routePreview.comparisonLabel.includes('less safe') ? colors.caution : colors.safe}
+              color={comparisonContent.isWarning ? colors.caution : colors.safe}
             />
-            <Text style={[
-              styles.comparisonText,
-              routePreview.comparisonLabel.includes('less safe') && styles.comparisonTextWarning,
-            ]}>
-              {routePreview.comparisonLabel}
-            </Text>
+            <View style={styles.comparisonTextColumn}>
+              <Text style={[
+                styles.comparisonText,
+                comparisonContent.isWarning && styles.comparisonTextWarning,
+              ]}>
+                {comparisonContent.title}
+              </Text>
+              {comparisonContent.subtitle ? (
+                <Text style={styles.comparisonSubtext}>{comparisonContent.subtitle}</Text>
+              ) : null}
+            </View>
           </View>
-          {routePreview.comparisonLabel.includes('less safe') ? (
+          {comparisonContent.isWarning ? (
             <Pressable
               style={styles.switchToSafeButton}
               onPress={() => {
@@ -1111,12 +1228,54 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.heading.bold,
       color: colors.safe,
     },
+    comparisonTextColumn: {
+      flex: 1,
+      gap: 2,
+    },
+    comparisonSubtext: {
+      ...textXs,
+      color: colors.textSecondary,
+    },
     comparisonBadgeWarning: {
       borderColor: safetyTints.cautionBorder,
       backgroundColor: safetyTints.cautionLight,
     },
     comparisonTextWarning: {
       color: colors.caution,
+    },
+    busyStretchRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: safetyTints.cautionBorder,
+      backgroundColor: safetyTints.cautionLight,
+    },
+    riskUnavailableRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: space[2],
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: safetyTints.infoLight,
+      backgroundColor: safetyTints.infoSubtle,
+    },
+    riskUnavailableText: {
+      ...textXs,
+      flex: 1,
+      color: colors.textSecondary,
+      lineHeight: 16,
+    },
+    busyStretchText: {
+      ...textXs,
+      color: colors.textSecondary,
+      flex: 1,
+      lineHeight: 16,
     },
     switchToSafeButton: {
       flexDirection: 'row',

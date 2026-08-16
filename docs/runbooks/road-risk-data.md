@@ -4,7 +4,29 @@
 > in Supabase. Read this before changing risk scores, bucket thresholds, or
 > the underlying data, and before adding a new country to the dataset.
 >
-> Last full rebuild: **2026-05-27 (v22, RO + ES, 6,155,120 rows)**.
+> ⚠️ **The dataset is now produced by the SEPARATE `C:\dev\OSRM_Server`
+> project, not by the pipeline described below.** Current generation:
+> **b36v1, 67,885,320 segments, all 31 supported countries** — swapped in
+> **2026-08-01** via that project's `export_risk_eu.py`, generated from the
+> same model as the routing graph ("risk data matches routing"), prior
+> generation retained as `road_risk_data_old4`. **Read
+> `C:\dev\OSRM_Server\CLAUDE.md` + its `EU Routing/eu-risk-data-pipeline.md`
+> before reasoning about coverage, row counts or generations — this repo is
+> downstream and has drifted before** (it described the RO+ES state for 12
+> days after the EU swap, which caused a UI review to be written on a false
+> premise; error-log #78). Verify claims against the live DB, not a doc.
+>
+> App-side gating of risk features lives in ONE place:
+> `RISK_DATA_COUNTRIES` / `isRiskDataAvailable` in
+> `packages/core/src/countryCoverage.ts` (currently = the full routing
+> footprint). If a future generation covers fewer countries, narrow that
+> list — the honest-degradation notices on route-planning/route-preview
+> re-arm automatically.
+>
+> Everything below documents the **historical RO+ES v22 pipeline**
+> (2026-05-27, 6,155,120 rows) — still accurate for the loader scripts in
+> `scripts/road-risk-data/` and the swap/rollback mechanics, which is why it
+> is kept.
 
 ## What this table is
 

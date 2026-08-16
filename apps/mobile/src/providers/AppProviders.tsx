@@ -12,6 +12,7 @@ import { DailyWeatherScheduler } from './DailyWeatherScheduler';
 import { NotificationProvider } from './NotificationProvider';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
 import { OffScreenCaptureHostProvider } from './OffScreenCaptureHost';
+import { ProfileDeviceSyncManager } from './ProfileDeviceSyncManager';
 import { ShareClaimProcessor } from './ShareClaimProcessor';
 import { ShareFallbackBootstrap } from './ShareFallbackBootstrap';
 import { TelemetryProvider } from './TelemetryProvider';
@@ -38,6 +39,12 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
               <NavigationLifecycleManager />
               <OfflineMutationSyncManager />
               <NotificationProvider />
+              {/*
+                ProfileDeviceSyncManager pushes device timezone + app locale
+                to the profile once per session so server-side quiet hours
+                and push copy use real values, not schema-era defaults.
+              */}
+              <ProfileDeviceSyncManager />
               <DailyWeatherScheduler />
               {/*
                 ActivationLadderScheduler mounted AFTER DailyWeatherScheduler:

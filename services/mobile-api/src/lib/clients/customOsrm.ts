@@ -3,7 +3,7 @@ import type {
   RoutePreviewRequest,
   RouteResponse,
 } from '@defensivepedal/core';
-import { isRouteSupported } from '@defensivepedal/core';
+import { isHeatRoutingAvailable, isRouteSupported } from '@defensivepedal/core';
 
 import { config } from '../../config';
 
@@ -47,15 +47,19 @@ const fetchOsrmWithRetry = async (url: string): Promise<Response> => {
 
 /**
  * Resolve the OSRM base URL. Single EU-wide deployment (2026-07-12): one
- * graph covers all 31 supported countries, so the only split left is the
- * safe vs flat profile. Mirrors the mobile-side dispatch in
- * `apps/mobile/src/lib/mapbox-routing.ts`.
+ * graph covers all 31 supported countries; the profile flags select the
+ * instance (cool shade-model > flat > standard safe). Mirrors the
+ * mobile-side dispatch in `apps/mobile/src/lib/mapbox-routing.ts`.
  */
-const resolveBaseUrl = (avoidHills: boolean): string =>
-  avoidHills ? config.safeOsrmFlatBaseUrl : config.safeOsrmBaseUrl;
+const resolveBaseUrl = (avoidHills: boolean, avoidHeat: boolean): string =>
+  avoidHeat
+    ? config.safeOsrmCoolBaseUrl
+    : avoidHills
+      ? config.safeOsrmFlatBaseUrl
+      : config.safeOsrmBaseUrl;
 
 export const fetchSafeRoutes = async (
-  request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills'> & {
+  request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills' | 'avoidHeat'> & {
     origin: Coordinate;
     destination: Coordinate;
   },
@@ -79,7 +83,12 @@ export const fetchSafeRoutes = async (
     params.set('exclude', 'unpaved');
   }
 
-  const baseUrl = resolveBaseUrl(request.avoidHills);
+  // Cool only where the shade graph has data — degrade to the standard safe
+  // instance elsewhere (mirrors the mobile dispatcher's effectiveAvoidHeat).
+  const baseUrl = resolveBaseUrl(
+    request.avoidHills,
+    Boolean(request.avoidHeat) && isHeatRoutingAvailable(support.country),
+  );
   const url = `${baseUrl}/${buildCoordinates(
     request.origin,
     request.destination,

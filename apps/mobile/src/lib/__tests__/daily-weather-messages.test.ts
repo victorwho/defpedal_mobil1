@@ -81,6 +81,27 @@ describe('pickRandomGoodWeatherTitle', () => {
     const title = pickRandomGoodWeatherTitle();
     expect(GOOD_WEATHER_TITLES).toContain(title);
   });
+
+  it('never returns an excluded (recently used) title, across the whole RNG range', () => {
+    const excluded = [GOOD_WEATHER_TITLES[0]!, GOOD_WEATHER_TITLES[5]!];
+    const N = GOOD_WEATHER_TITLES.length;
+    for (let i = 0; i < N; i++) {
+      const title = pickRandomGoodWeatherTitle(() => (i + 0.5) / N, excluded);
+      expect(excluded).not.toContain(title);
+    }
+  });
+
+  it('returns the sole survivor when every other title is excluded', () => {
+    const survivor = GOOD_WEATHER_TITLES[7]!;
+    const excluded = GOOD_WEATHER_TITLES.filter((t) => t !== survivor);
+    expect(pickRandomGoodWeatherTitle(() => 0, excluded)).toBe(survivor);
+    expect(pickRandomGoodWeatherTitle(() => 0.9999, excluded)).toBe(survivor);
+  });
+
+  it('falls back to the full pool when the exclusion list swallows everything', () => {
+    const title = pickRandomGoodWeatherTitle(() => 0.5, [...GOOD_WEATHER_TITLES]);
+    expect(GOOD_WEATHER_TITLES).toContain(title);
+  });
 });
 
 describe('isGoodCyclingWeather', () => {

@@ -46,7 +46,7 @@ describe('computeOnboardingGateTarget', () => {
 
   it.each([
     '/onboarding',
-    '/onboarding/safety-score',
+    '/onboarding/region-check',
     '/onboarding/signup-prompt',
     '/feedback',
     '/navigation',

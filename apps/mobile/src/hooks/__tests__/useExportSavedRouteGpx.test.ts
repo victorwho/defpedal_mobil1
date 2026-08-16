@@ -110,6 +110,7 @@ describe('useExportSavedRouteGpx', () => {
       mode: 'safe',
       avoidUnpaved: true,
       avoidHills: false,
+      avoidHeat: false,
       locale: 'en',
     });
     expect(exportGpxSpy).toHaveBeenCalledWith({

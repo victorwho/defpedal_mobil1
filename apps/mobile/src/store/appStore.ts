@@ -75,6 +75,7 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   mode: 'safe',
   avoidUnpaved: false,
   avoidHills: false,
+  avoidHeat: false,
   locale: getDeviceLocale(),
   // Intentionally undefined so cold-start search isn't locked to a single
   // country before GPS resolves. `useResolvedCountry` writes the resolved
@@ -108,6 +109,7 @@ type AppStore = QueueSlice & {
   weightKg: number;
   avoidUnpaved: boolean;
   avoidHills: boolean;
+  avoidHeat: boolean;
   showBicycleLanes: boolean;
   poiVisibility: {
     hydration: boolean;
@@ -129,6 +131,11 @@ type AppStore = QueueSlice & {
   // enumerate scheduled notifications (review 2026-07-19, LOW).
   dailyWeatherGeneration: string | null;
   setDailyWeatherGeneration: (generation: string | null) => void;
+  // Witty good-weather titles assigned to the most recent scheduled set —
+  // the next scheduling pass excludes them so the user never gets the same
+  // line twice in a row across generations. Device-scoped like the chain.
+  dailyWeatherRecentTitles: string[];
+  setDailyWeatherRecentTitles: (titles: string[]) => void;
   notifyHazard: boolean;
   notifyCommunity: boolean;
   quietHoursStart: string;
@@ -358,6 +365,7 @@ type AppStore = QueueSlice & {
   setWeightKg: (kg: number) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
   setAvoidHills: (enabled: boolean) => void;
+  setAvoidHeat: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
@@ -603,9 +611,11 @@ export const useAppStore = create<AppStore>()(
       weightKg: 70,
       avoidUnpaved: false,
       avoidHills: false,
+      avoidHeat: false,
       notifyWeather: true,
       dailyWeatherChain: [],
       dailyWeatherGeneration: null,
+      dailyWeatherRecentTitles: [],
       notifyHazard: true,
       notifyCommunity: true,
       // Consent opt-in — default OFF, unlike every other notify pref.
@@ -955,6 +965,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ dailyWeatherChain: times })),
       setDailyWeatherGeneration: (generation) =>
         set(() => ({ dailyWeatherGeneration: generation })),
+      setDailyWeatherRecentTitles: (titles) =>
+        set(() => ({ dailyWeatherRecentTitles: titles })),
       setNotifyHazard: (enabled) =>
         set(() => ({ notifyHazard: enabled })),
       setNotifyCommunity: (enabled) =>
@@ -1007,6 +1019,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ avoidUnpaved: enabled })),
       setAvoidHills: (enabled) =>
         set(() => ({ avoidHills: enabled })),
+      setAvoidHeat: (enabled) =>
+        set(() => ({ avoidHeat: enabled })),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -1028,6 +1042,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           // Sync top-level preference flags when present in the request
           ...(request.avoidHills !== undefined ? { avoidHills: request.avoidHills } : {}),
+          ...(request.avoidHeat !== undefined ? { avoidHeat: request.avoidHeat } : {}),
           ...(request.avoidUnpaved !== undefined ? { avoidUnpaved: request.avoidUnpaved } : {}),
           routeRequest: {
             ...state.routeRequest,
@@ -1455,6 +1470,7 @@ export const useAppStore = create<AppStore>()(
         notifyWeather: state.notifyWeather,
         dailyWeatherChain: state.dailyWeatherChain,
         dailyWeatherGeneration: state.dailyWeatherGeneration,
+        dailyWeatherRecentTitles: state.dailyWeatherRecentTitles,
         notifyHazard: state.notifyHazard,
         notifyCommunity: state.notifyCommunity,
         notifyRidingTips: state.notifyRidingTips,
@@ -1473,6 +1489,7 @@ export const useAppStore = create<AppStore>()(
         weightKg: state.weightKg,
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
+        avoidHeat: state.avoidHeat,
         onboardingCompleted: state.onboardingCompleted,
         regionGate: state.regionGate,
         analyticsConsent: state.analyticsConsent,
