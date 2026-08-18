@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { isDeadTokenError, sendPushNotification } from './push';
+import { recordPushTicket } from './pushReceipts';
 
 type NotificationCategory = 'weather' | 'hazard' | 'community' | 'system' | 'mia';
 
@@ -202,6 +203,17 @@ export const dispatchNotification = async (
         .delete()
         .eq('user_id', userId)
         .eq('expo_push_token', token.expo_push_token);
+    }
+
+    // Remember accepted tickets so the receipt cron can prune tokens that die
+    // AFTER the ticket (the inline DeviceNotRegistered above only catches
+    // accept-time rejections) — audit SCALE-18.
+    if (result.ticketId) {
+      await recordPushTicket(supabase, {
+        ticketId: result.ticketId,
+        userId,
+        token: token.expo_push_token,
+      });
     }
 
     await logNotification(

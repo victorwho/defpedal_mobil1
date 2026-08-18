@@ -148,26 +148,42 @@ export const sendBatchPushNotifications = async (
   return results;
 };
 
+/** Outcome of one receipt-polling pass. */
+export interface ReceiptCheckResult {
+  /** Tokens whose receipt reported `DeviceNotRegistered` — delete these. */
+  readonly deadTokens: string[];
+  /**
+   * Ticket ids Expo actually returned a receipt for. Callers use this to
+   * distinguish "resolved, safe to forget" from "not ready yet, ask again":
+   * Expo omits ids whose receipt has not been generated, and dropping those
+   * would silently discard the very failures this poll exists to catch.
+   */
+  readonly resolvedIds: string[];
+}
+
 /**
- * Poll Expo for delivery receipts. Takes a ticketId→token map (callers must
- * persist this at send time, since a receipt is keyed by TICKET ID and does
- * NOT carry the token). Returns the list of tokens whose receipt reported
- * `DeviceNotRegistered` — those rows should be deleted from `push_tokens`.
+ * Poll Expo for delivery receipts. Takes a ticketId→token map, which the caller
+ * persists at send time in `push_receipts` — a receipt is keyed by TICKET ID and
+ * does not carry the token, so without that table a receipt cannot be resolved
+ * back to the `push_tokens` row it condemns.
  *
- * Fixed 2026-06-12: the previous implementation pushed `receipt.message` (a
- * human-readable sentence) instead of a token, so it could never prune
- * anything even if it had been wired (it had zero callers).
+ * This is the DELAYED half of dead-token pruning. The immediate half (the
+ * in-ticket `DeviceNotRegistered` at accept time) is handled inline by
+ * `notifications.ts` / `nudges/dispatcher.ts`; the receipt catches tokens that
+ * are accepted and then rejected minutes later at the FCM/APNs hop, which the
+ * inline path structurally cannot see.
  *
- * NOTE: wiring this fully needs a persisted ticketId→token store + a cron to
- * poll ~15-30 min after send. Today the immediate in-ticket DeviceNotRegistered
- * path (see isDeadTokenError + callers) handles the common case without it.
+ * Fixed 2026-06-12: the original pushed `receipt.message` (a human-readable
+ * sentence) instead of a token, so it could never have pruned anything.
+ * Wired 2026-08-18 (audit SCALE-18) — before that it had zero callers.
  */
 export const checkReceipts = async (
   ticketIdToToken: Readonly<Record<string, string>>,
-): Promise<string[]> => {
+): Promise<ReceiptCheckResult> => {
   const deadTokens: string[] = [];
+  const resolvedIds: string[] = [];
   const ids = Object.keys(ticketIdToToken);
-  if (ids.length === 0) return deadTokens;
+  if (ids.length === 0) return { deadTokens, resolvedIds };
 
   try {
     const response = await fetch(EXPO_RECEIPTS_URL, {
@@ -179,20 +195,22 @@ export const checkReceipts = async (
       body: JSON.stringify({ ids }),
     });
 
-    if (!response.ok) return deadTokens;
+    if (!response.ok) return { deadTokens, resolvedIds };
 
     const result: { data?: Record<string, PushReceipt> } = await response.json();
     const receipts = result?.data ?? {};
 
     for (const [ticketId, receipt] of Object.entries(receipts)) {
+      resolvedIds.push(ticketId);
       if (receipt.status === 'error' && isDeadTokenError(receipt.details?.error)) {
         const token = ticketIdToToken[ticketId];
         if (token) deadTokens.push(token);
       }
     }
   } catch {
-    // Ignore receipt check failures — non-fatal.
+    // Ignore receipt check failures — non-fatal. Nothing is marked resolved, so
+    // the rows stay queued and the next pass retries them.
   }
 
-  return deadTokens;
+  return { deadTokens, resolvedIds };
 };

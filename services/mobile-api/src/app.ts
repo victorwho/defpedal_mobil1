@@ -15,6 +15,7 @@ import { buildFirstRideNotificationRoutes } from './routes/firstRideNotification
 import { buildModerationRoutes } from './routes/moderation';
 import { buildNudgeRoutes } from './routes/nudges';
 import { buildRetentionRoutes } from './routes/retention';
+import { buildPushReceiptRoutes } from './routes/pushReceipts';
 import { buildRouteShareRoutes, isRouteSharesEnabled } from './routes/route-shares';
 import { buildV1Routes } from './routes/v1';
 
@@ -278,6 +279,9 @@ export const buildApp = (options: {
   });
 
   void app.register(buildRetentionRoutes(dependencies), {
+    prefix: '/v1',
+  });
+  void app.register(buildPushReceiptRoutes(dependencies), {
     prefix: '/v1',
   });
 

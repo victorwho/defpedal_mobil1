@@ -20,6 +20,7 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { isDeadTokenError, sendPushNotification } from '../push';
+import { recordPushTicket } from '../pushReceipts';
 
 /**
  * Last variant ids actually sent to this user for a trigger (most recent
@@ -225,6 +226,10 @@ export const dispatchNudge = async (
     if (result.ticketId) {
       ticketCount++;
       if (!firstTicketId) firstTicketId = result.ticketId;
+      // Audit SCALE-18: persist ticket->token so the receipt cron can prune
+      // tokens that fail after acceptance. Note nudge_log keeps only the FIRST
+      // ticket id, so this is also the only per-token record of a fan-out send.
+      await recordPushTicket(db, { ticketId: result.ticketId, userId: req.userId, token });
     } else {
       tokenErrors.push({
         token: maskPushToken(result.token),
