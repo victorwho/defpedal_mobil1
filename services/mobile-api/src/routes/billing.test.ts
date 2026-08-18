@@ -15,6 +15,8 @@ const state: { eventInsertError: { code: string } | null; upsertError: { code: s
   eventInsertError: null,
   upsertError: null,
 };
+const meterState = { existing: 0 };
+const meterUpserts: Array<Record<string, unknown>> = [];
 
 vi.mock('../lib/supabaseAdmin', () => ({
   supabaseAdmin: {
@@ -38,6 +40,25 @@ vi.mock('../lib/supabaseAdmin', () => ({
           upsert: vi.fn((row: Record<string, unknown>) => {
             upserts.push(row);
             return Promise.resolve({ error: state.upsertError });
+          }),
+        };
+      }
+      if (table === 'usage_meters') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(() =>
+                    Promise.resolve({ data: { count: meterState.existing }, error: null }),
+                  ),
+                })),
+              })),
+            })),
+          })),
+          upsert: vi.fn((row: Record<string, unknown>) => {
+            meterUpserts.push(row);
+            return Promise.resolve({ error: null });
           }),
         };
       }
@@ -82,6 +103,8 @@ beforeEach(() => {
   state.upsertError = null;
   process.env.REVENUECAT_WEBHOOK_SECRET = SECRET;
   delete process.env.REVENUECAT_ALLOW_SANDBOX;
+  meterState.existing = 0;
+  meterUpserts.length = 0;
 });
 
 const payload = (event: Record<string, unknown> = {}) => ({
@@ -205,5 +228,75 @@ describe('POST /v1/billing/webhook — outcomes', () => {
   it('returns 500 on a transient database failure so RevenueCat retries', async () => {
     state.upsertError = { code: '08006' };
     expect((await post(payload(), `Bearer ${SECRET}`)).statusCode).toBe(500);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Flat-route meter reconcile.
+//
+// The first version of this endpoint shipped with the period-key regex
+// duplicated into the JSON Schema as '^\d{4}-\d{2}$'. The backslashes were
+// lost in transit, so the deployed pattern was '^d{4}-d{2}$' and EVERY valid
+// key was rejected — the endpoint was 100% unusable and no test noticed,
+// because it had none. These are those tests.
+// ---------------------------------------------------------------------------
+
+const postMeter = (body: unknown) =>
+  app.inject({
+    method: 'POST',
+    url: '/v1/premium/usage/flat-route',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer test-token' },
+    payload: body as Record<string, unknown>,
+  });
+
+describe('POST /v1/premium/usage/flat-route', () => {
+  it('accepts a well-formed period key', () => {
+    // The canary for the escaping bug above.
+    return postMeter({ periodKey: '2026-08', pending: 2 }).then((res) => {
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ periodKey: '2026-08', total: 2, accepted: 2 });
+    });
+  });
+
+  it('adds to an existing count', async () => {
+    meterState.existing = 1;
+    const res = await postMeter({ periodKey: '2026-08', pending: 2 });
+    expect(res.json()).toMatchObject({ total: 3, accepted: 2 });
+  });
+
+  it('rejects a malformed period key with 400, not a retryable 503', async () => {
+    const res = await postMeter({ periodKey: 'nope-08', pending: 1 });
+    expect(res.statusCode).toBe(400);
+    expect(meterUpserts).toHaveLength(0);
+  });
+
+  it('rejects a wrong-length period key at the schema', async () => {
+    expect((await postMeter({ periodKey: '2026-8', pending: 1 })).statusCode).toBe(400);
+  });
+
+  it('rejects a negative pending', async () => {
+    expect((await postMeter({ periodKey: '2026-08', pending: -1 })).statusCode).toBe(400);
+  });
+
+  it('rejects an absurd pending at the schema ceiling', async () => {
+    expect((await postMeter({ periodKey: '2026-08', pending: 10000 })).statusCode).toBe(400);
+  });
+
+  it('requires authentication', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/premium/usage/flat-route',
+      headers: { 'content-type': 'application/json' },
+      payload: { periodKey: '2026-08', pending: 1 },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('accepts a zero-pending poll without writing', async () => {
+    meterState.existing = 3;
+    const res = await postMeter({ periodKey: '2026-08', pending: 0 });
+    expect(res.json()).toMatchObject({ total: 3, accepted: 0 });
+    expect(meterUpserts).toHaveLength(0);
   });
 });

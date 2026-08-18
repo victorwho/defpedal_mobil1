@@ -8,7 +8,7 @@ import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
 import { applyRevenueCatWebhook } from '../lib/subscriptionWriter';
-import { reconcileFlatRouteMeter } from '../lib/usageMeters';
+import { isValidPeriodKey, reconcileFlatRouteMeter } from '../lib/usageMeters';
 import { ensureSupabase } from './feed-helpers';
 
 /**
@@ -211,7 +211,12 @@ export const buildBillingRoutes = (
             additionalProperties: false,
             required: ['periodKey', 'pending'],
             properties: {
-              periodKey: { type: 'string', pattern: '^\d{4}-\d{2}$' },
+              // Shape only. The period-key FORMAT is validated by
+              // `isValidPeriodKey`, which owns the one regex — a second copy
+              // as a JSON-Schema string silently lost its backslashes once
+              // (`\d` collapsing to a literal `d`), which rejected every valid
+              // key and made this endpoint unusable. One definition, tested.
+              periodKey: { type: 'string', minLength: 7, maxLength: 7 },
               pending: { type: 'integer', minimum: 0, maximum: 50 },
             },
           },
@@ -236,10 +241,22 @@ export const buildBillingRoutes = (
         const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
         const db = ensureSupabase();
 
+        const periodKey = String(request.body.periodKey);
+        // Format check lives here, against the one regex, so a malformed key
+        // is a 400 the client stops retrying — not the 503 that means "try
+        // again later".
+        if (!isValidPeriodKey(periodKey)) {
+          throw new HttpError('Malformed period key.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['periodKey must be YYYY-MM.'],
+          });
+        }
+
         const result = await reconcileFlatRouteMeter(
           db,
           user.id,
-          String(request.body.periodKey),
+          periodKey,
           Number(request.body.pending),
         );
 
