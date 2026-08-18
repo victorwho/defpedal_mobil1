@@ -51,6 +51,11 @@ import {
   INITIAL_CELEBRATION_WANTS,
   resolveActiveCelebration,
 } from './celebrationStage';
+import {
+  createPremiumSlice,
+  DEFAULT_PREMIUM_SLICE_STATE,
+  type PremiumSlice,
+} from './premiumSlice';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
 
 const MAX_RECENT_DESTINATIONS = 3;
@@ -91,7 +96,7 @@ export type WeatherNotice = {
   tone: 'good' | 'caution';
 };
 
-type AppStore = QueueSlice & {
+type AppStore = QueueSlice & PremiumSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
   routeRequest: RoutePreviewRequest;
@@ -604,6 +609,7 @@ export const useAppStore = create<AppStore>()(
       offlineRegions: [],
       showRouteComparison: true,
       ...createQueueSlice(set, get),
+      ...createPremiumSlice(set),
       shareTripsPublicly: true,
       shareConversionFeedOptin: true,
       bikeType: null,
@@ -1424,6 +1430,10 @@ export const useAppStore = create<AppStore>()(
           cachedCityHeartbeat: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,
+          // Pedal Plus is USER-scoped: a subscription that survived an account
+          // switch would grant Plus to whoever signs in next on this phone,
+          // and a spent flat-route quota would follow them too.
+          ...DEFAULT_PREMIUM_SLICE_STATE,
         }));
         // Ride mutations surviving a userId transition are recovery-critical
         // state — flush the debounced persist immediately (same rule as
@@ -1518,6 +1528,10 @@ export const useAppStore = create<AppStore>()(
         localeExplicitlySet: state.localeExplicitlySet,
         homeLocation: state.homeLocation,
         savedPlaces: state.savedPlaces,
+        // Offline entitlement cache — what lets a paying rider with no signal
+        // keep Plus for the grace window. User-scoped.
+        premiumSnapshot: state.premiumSnapshot,
+        flatRouteMeter: state.flatRouteMeter,
         // pendingShareClaim persisted — survives redirect-to-onboarding
         // that can drop in-memory state before auth finishes. Attempts
         // are intentionally NOT persisted (reset on cold start).

@@ -15,6 +15,13 @@
  * Fire-and-forget: a failed sync is retried on the next app open. The
  * Profile screen's own sync remains and stays authoritative for explicit
  * preference edits.
+ *
+ * It also hydrates Pedal Plus entitlement from the SAME response, at zero
+ * extra network cost: PATCH /v1/profile returns the full profile including the
+ * premium block, and this already runs at every session bootstrap. A failed
+ * sync simply leaves the previously cached snapshot in place, which is exactly
+ * the offline behaviour we want — `resolveEntitlement` ages it out via the
+ * grace window rather than dropping a paying rider to free on one bad request.
  */
 import { useEffect, useRef } from 'react';
 
@@ -36,6 +43,13 @@ export const ProfileDeviceSyncManager = () => {
 
     mobileApi
       .updateProfile({ quietHoursTimezone: timezone, preferredLocale: locale })
+      .then((profile) => {
+        if (profile?.premium) {
+          useAppStore
+            .getState()
+            .setPremiumFromProfile(profile.premium, new Date().toISOString());
+        }
+      })
       .catch(() => {
         // Best-effort: clear the key so a transient failure retries on the
         // next dependency change / app open rather than being latched.

@@ -131,3 +131,13 @@ export const PLUS_LAUNCH_AT_ISO = '2099-01-01T00:00:00.000Z';
  * paid for; the abuse window is small and bounded.
  */
 export const PLUS_OFFLINE_GRACE_DAYS = 7;
+
+/**
+ * How recently the server must have confirmed an entitlement for the client to
+ * treat it as a live answer rather than a cached one.
+ *
+ * Both are honoured — the grace window above decides whether a snapshot counts
+ * at all — but this is what lets the UI distinguish "confirmed just now" from
+ * "running on yesterday's answer" without a second network call.
+ */
+export const PLUS_SNAPSHOT_FRESH_MINUTES = 15;
