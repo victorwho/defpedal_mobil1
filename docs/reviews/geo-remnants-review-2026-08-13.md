@@ -1,5 +1,8 @@
 # Geographic Remnants Review — Romania-era / Romania+Spain-era leftovers
 Generated: 2026-08-13
+
+> 27 of 29 findings were fixed the same day — see the **Fix status** table at the bottom of this file. The four that remain (G-01 Play Console default language, G-28/G-29 counsel wording, EUR currency) are carried in [`TODO.md`](../../TODO.md) §issuestofix.
+
 Scope: UI/UX remnants from the RO-only era (launch → 2026-05) and RO+ES era (2026-05 → 2026-07-13) that are useless or confusing now that the app serves 31 countries (EU-27 + EEA + CH). Method: 4 parallel audit agents (static content / route+community screens / notifications+nudges / repo-wide geo sweep), top findings independently re-verified against source by the orchestrator.
 
 ## Summary

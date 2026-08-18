@@ -2,6 +2,8 @@
 
 **Generated:** 2026-07-05 · **Revised:** 2026-07-06 (rev 1) · **Fixes applied:** 2026-07-06 (rev 2), 2026-07-08 (rev 3)
 
+> ⚠️ **Current status lives in [`TODO.md`](../../TODO.md) §issuestofix, not here.** The `Status:` line on each finding below is an **audit-time snapshot (2026-07-05)** and was never updated by the rev-2/rev-3 fix passes — SEC-2/3/4, for example, still read "STILL OPEN" in the body but were fixed in rev 2. Read the rev-2/rev-3 header tables for what those passes changed, and `TODO.md` for what is actually open (re-verified against source 2026-08-17).
+
 > **Revision 3 (2026-07-08) — second fix pass ("best next bite").** Cleared the highest-leverage remaining backlog. Verified end-to-end: typecheck 0; core 762/762, mobile-api 535/535, mobile 1179/1179; lint 0; bundle 200.
 >
 > | Finding | Status | Notes |
@@ -452,6 +454,8 @@ Each finding below is self-contained: severity, exact file:line, the problem, th
 - Effort: M
 
 ### [SCALE-13] `get_segmented_risk_route` runs a per-segment correlated KNN over 6.15M rows per uncached preview
+
+> **RESOLVED 2026-08-18 — and the premise was wrong.** Measured live: 73 ms warm for a 629-segment route, index-backed; 6.15M→67.9M rows costs index *depth*, not linear scan, and the 347M figure is a planner estimate, not runtime. Measuring it surfaced a real **correctness** bug instead: probing with the 2-point route segment ties at distance 0 against every road at an intersection node, so 56%/79% of Bucharest/Berlin segments got an arbitrary score (avg spread 31.2/20.9 pts). Fixed by migration `202608170001` (midpoint probe + `<->` KNN + coverage-preserving fallback). See error-log #79.
 - File: `202603170001_get_segmented_risk_route.sql:20-39`; cache per-instance only · Threshold: >100k (sooner as instances multiply)
 - Fix: 1) Activate the shared route cache (SCALE-1). 2) Batch per-segment lookups into one `LATERAL` + `<->` KNN query instead of a correlated subquery. 3) Consider grid-snapping to raise cache hits. 4) Verify: 15km-route enrichment < 150ms, cache hit > 80% under load.
 - Effort: M

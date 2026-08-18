@@ -1,5 +1,7 @@
 # Full-App Review — Session Handoff
 
+> ⚠️ **Historical.** Superseded by `docs/reviews/full-app-audit-2026-07-05.md` (which re-verified this report's P0/P1s in code) and, for what is still open today, by [`TODO.md`](../../TODO.md) §issuestofix.
+
 **Date:** 2026-06-13
 **Branch:** `main` (all work pushed; `main` == `origin/main`)
 **Last commit:** `5d25a6a` — fix: Phase 4 (2/2) — /health/deep readiness probe

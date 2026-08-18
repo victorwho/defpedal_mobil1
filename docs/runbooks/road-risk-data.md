@@ -67,6 +67,30 @@ The API does `displayScore = 100 - avg_score` before returning to the
 client, so on the phone "higher = safer". Do NOT mistake the client-visible
 number for the DB scale.
 
+## How a route segment gets its score (and the tie trap)
+
+`get_segmented_risk_route(route_geojson)` splits the route with `ST_DumpSegments`, then scores each
+2-point segment from the nearest `road_risk_data` row within ~20 m (`0.0002` degrees).
+
+**Since migration `202608170001` (live 2026-08-18) the probe is the segment's MIDPOINT, not the segment.**
+Probing with the segment itself is wrong: a segment whose endpoint sits on an intersection node is at
+distance **exactly 0** from every road meeting at that node, so `order by ST_Distance(...) limit 1`
+returned an arbitrary one of them. Measured before the fix: 56% of Bucharest / 79% of Berlin route
+segments were ties, average `risk_score` spread 31.2 / 20.9 points — routinely two or more colour bands
+apart, and not even stable between identical requests. A midpoint is not on the node, so it
+discriminates the road the rider travels ALONG from the roads they merely cross. A `coalesce` fallback
+re-probes with the whole segment when the midpoint finds nothing within ~20 m, so coverage never regresses.
+
+If you ever rebuild or re-tune this function:
+
+- keep the midpoint probe, and order with the KNN operator `<->` (index-ordered; no sort of the candidates)
+- before trusting `limit 1`, measure the tie population — count candidates at `min(distance)` per segment
+- judge performance from **actual `EXPLAIN ANALYZE` time**, not `cost`: the planner estimates this query at
+  ~347M (old body) while it actually runs in tens of ms, because the GiST index does the work
+- this function does NOT feed `get_neighborhood_safety_score`, which aggregates the table directly
+
+See error-log #79 for the full diagnosis.
+
 ## Where the source data lives
 
 Outside the git repo, on the OSRM build machine:
