@@ -472,6 +472,10 @@ export const ro: TranslationKeys = {
     communityOn: 'Primește notificări despre aprecieri și comentarii',
     communityOff: 'Notificările comunității sunt dezactivate',
     quietHoursDesc: 'Fără notificări {{start}} → {{end}}',
+    quietHoursStart: 'Începutul orelor de liniște',
+    quietHoursEnd: 'Sfârșitul orelor de liniște',
+    quietHoursOff: 'Începutul și sfârșitul sunt identice, deci orele de liniște sunt oprite — notificările pot veni oricând.',
+    quietHoursOvernight: 'Interval peste noapte — continuă după miezul nopții, în ziua următoare.',
     shareTripsOn: 'Cursele tale sunt distribuite în fluxul comunitar',
     shareTripsOff: 'Cursele tale sunt private și nu sunt distribuite',
     // User card

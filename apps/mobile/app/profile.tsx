@@ -25,6 +25,11 @@ import { radii } from '../src/design-system/tokens/radii';
 import { PLAY_STORE_URL, resolveQuizCountry, type QuizCountryPreference } from '@defensivepedal/core';
 import { getDeviceRegion } from '../src/i18n';
 import { mobileApi } from '../src/lib/api';
+import {
+  QUIET_HOURS_OPTIONS,
+  quietHoursAreOff,
+  quietHoursWrapMidnight,
+} from '../src/lib/quietHours';
 import { cancelDailyWeatherNotifications } from '../src/lib/daily-weather-notification';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
@@ -756,6 +761,11 @@ export default function ProfileScreen() {
               onChange={(checked) => { setNotifyCommunity(checked); syncNotifPref({ notifyCommunity: checked }); }}
             />
 
+            {/* Audit UX-6: this was a static row with a clock icon for the app's
+                whole history — `setQuietHours` existed in the store with no UI
+                caller, so every rider was pinned to the 22:00-07:00 default.
+                Both ends are now editable and sync to the server, which is what
+                actually enforces the window (profiles.quiet_hours_*). */}
             <View style={styles.settingRow}>
               <View style={styles.settingTextCol}>
                 <Text style={styles.settingLabel}>{t('profile.quietHours')}</Text>
@@ -765,6 +775,32 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="time-outline" size={20} color={gray[400]} />
             </View>
+
+            <DropdownPicker
+              label={t('profile.quietHoursStart')}
+              value={quietHoursStart}
+              options={QUIET_HOURS_OPTIONS}
+              onSelect={(value) => {
+                setQuietHours(value, quietHoursEnd);
+                syncNotifPref({ quietHoursStart: value, quietHoursEnd });
+              }}
+            />
+
+            <DropdownPicker
+              label={t('profile.quietHoursEnd')}
+              value={quietHoursEnd}
+              options={QUIET_HOURS_OPTIONS}
+              onSelect={(value) => {
+                setQuietHours(quietHoursStart, value);
+                syncNotifPref({ quietHoursStart, quietHoursEnd: value });
+              }}
+            />
+
+            {quietHoursAreOff(quietHoursStart, quietHoursEnd) ? (
+              <Text style={styles.settingHint}>{t('profile.quietHoursOff')}</Text>
+            ) : quietHoursWrapMidnight(quietHoursStart, quietHoursEnd) ? (
+              <Text style={styles.settingHint}>{t('profile.quietHoursOvernight')}</Text>
+            ) : null}
           </View>
 
           {/* ── Section 2b: Pedal Nudges ─────────────────────────── */}
@@ -1422,6 +1458,15 @@ const createThemedStyles = (colors: ThemeColors) =>
     settingDescription: {
       ...textSm,
       color: colors.textSecondary,
+    },
+    // Explanatory line under the quiet-hours pickers (audit UX-6): surfaces the
+    // two window shapes a rider can pick that are easy to misread — an empty
+    // window (start === end, which disables quiet hours entirely) and an
+    // overnight one that wraps past midnight.
+    settingHint: {
+      ...textSm,
+      color: colors.textSecondary,
+      paddingBottom: space[3],
     },
     weightRow: {
       flexDirection: 'row',

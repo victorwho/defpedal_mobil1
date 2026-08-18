@@ -506,6 +506,10 @@ export const en = {
     communityOn: 'Get notified about likes and comments',
     communityOff: 'Community notifications are off',
     quietHoursDesc: 'No notifications {{start}} → {{end}}',
+    quietHoursStart: 'Quiet hours start',
+    quietHoursEnd: 'Quiet hours end',
+    quietHoursOff: 'Start and end are the same, so quiet hours are off — notifications can arrive at any time.',
+    quietHoursOvernight: 'Overnight window — runs past midnight into the next day.',
     shareTripsOn: 'Your rides are shared in the community feed',
     shareTripsOff: 'Your rides are private and not shared',
     // User card

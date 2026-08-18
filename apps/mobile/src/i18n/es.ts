@@ -472,6 +472,10 @@ export const es: TranslationKeys = {
     communityOn: 'Recibe notificaciones sobre me gusta y comentarios',
     communityOff: 'Las notificaciones de la comunidad están desactivadas',
     quietHoursDesc: 'Sin notificaciones {{start}} → {{end}}',
+    quietHoursStart: 'Inicio de las horas tranquilas',
+    quietHoursEnd: 'Fin de las horas tranquilas',
+    quietHoursOff: 'El inicio y el fin coinciden, así que las horas tranquilas están desactivadas — las notificaciones pueden llegar en cualquier momento.',
+    quietHoursOvernight: 'Intervalo nocturno — continúa pasada la medianoche, hasta el día siguiente.',
     shareTripsOn: 'Tus rutas se comparten en el feed de la comunidad',
     shareTripsOff: 'Tus rutas son privadas y no se comparten',
     // User card
