@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { requireFullUser } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
+import { loadPremiumProfileFields } from '../lib/entitlements';
 import {
   errorResponseSchema,
   profileResponseSchema,
@@ -117,6 +118,11 @@ export const buildFeedProfileRoutes = (
           });
         }
 
+        const premium = await loadPremiumProfileFields(db, {
+          userId: user.id,
+          nowIso: new Date().toISOString(),
+        });
+
         return {
           id: data.id as string,
           displayName: data.display_name as string,
@@ -139,6 +145,7 @@ export const buildFeedProfileRoutes = (
           notifyCommunity: data.notify_community !== false,
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
+          premium,
         };
       },
     );
@@ -183,6 +190,11 @@ export const buildFeedProfileRoutes = (
             });
           }
 
+          const premium = await loadPremiumProfileFields(db, {
+            userId: user.id,
+            nowIso: new Date().toISOString(),
+          });
+
           return {
             id: created.id as string,
             displayName: created.display_name as string,
@@ -205,8 +217,14 @@ export const buildFeedProfileRoutes = (
             notifyCommunity: created.notify_community !== false,
             quietHoursStart: (created.quiet_hours_start as string) ?? null,
             quietHoursEnd: (created.quiet_hours_end as string) ?? null,
+            premium,
           };
         }
+
+        const premium = await loadPremiumProfileFields(db, {
+          userId: user.id,
+          nowIso: new Date().toISOString(),
+        });
 
         return {
           id: data.id as string,
@@ -230,6 +248,7 @@ export const buildFeedProfileRoutes = (
           notifyCommunity: data.notify_community !== false,
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
+          premium,
         };
       },
     );

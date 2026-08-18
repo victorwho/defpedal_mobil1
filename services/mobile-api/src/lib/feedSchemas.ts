@@ -212,6 +212,7 @@ export const profileResponseSchema = {
     'notifyCommunity',
     'quietHoursStart',
     'quietHoursEnd',
+    'premium',
   ],
   properties: {
     id: { type: 'string' },
@@ -229,6 +230,28 @@ export const profileResponseSchema = {
     notifyCommunity: { type: 'boolean' },
     quietHoursStart: { type: ['string', 'null'] },
     quietHoursEnd: { type: ['string', 'null'] },
+    // Fastify strips anything not declared here (gotcha #9) — every premium
+    // field must be listed or it silently vanishes from the response.
+    premium: {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'tier',
+        'isTrial',
+        'isInBillingRetry',
+        'isGrandfathered',
+        'expiresAt',
+        'uiEnabled',
+      ],
+      properties: {
+        tier: { type: 'string', enum: ['free', 'plus'] },
+        isTrial: { type: 'boolean' },
+        isInBillingRetry: { type: 'boolean' },
+        isGrandfathered: { type: 'boolean' },
+        expiresAt: { type: ['string', 'null'] },
+        uiEnabled: { type: 'boolean' },
+      },
+    },
   },
 } as const;
 

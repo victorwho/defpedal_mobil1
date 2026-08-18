@@ -2,6 +2,7 @@ import type {
   CommunityScope,
   CommunityWindow,
 } from './communityVisibility';
+import type { PremiumTier } from './premiumCatalog';
 import type {
   GeoJsonLineString,
   GeoJsonMultiLineString,
@@ -954,6 +955,29 @@ export interface ProfileUpdateRequest {
   preferredLocale?: 'en' | 'ro' | 'es';
 }
 
+/**
+ * Pedal Plus block on the profile read.
+ *
+ * `uiEnabled` is paywall VISIBILITY and is deliberately independent of `tier`:
+ * a subscriber stays entitled while the paywall is hidden, which is exactly
+ * what makes the flag safe to use as an instant server-side kill switch.
+ *
+ * `isGrandfathered` marks accounts that predate the Plus launch. They are
+ * permanently exempt from limits that would otherwise take away a shipped free
+ * feature (today: Flat-route metering). It does NOT exempt them from the
+ * saved-route or offline-pack ceilings, which grandfather existing content
+ * while still capping new additions.
+ */
+export interface ProfilePremium {
+  tier: PremiumTier;
+  isTrial: boolean;
+  isInBillingRetry: boolean;
+  isGrandfathered: boolean;
+  /** End of the current paid period, ISO. Null when there is none. */
+  expiresAt: string | null;
+  uiEnabled: boolean;
+}
+
 export interface ProfileResponse {
   id: string;
   displayName: string;
@@ -978,6 +1002,8 @@ export interface ProfileResponse {
   notifyCommunity: boolean;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  /** Pedal Plus entitlement + paywall visibility. Server-owned. */
+  premium: ProfilePremium;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────
