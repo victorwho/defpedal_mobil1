@@ -69,3 +69,6 @@ export type { BadgeVisualProps } from './BadgeVisual';
 
 export { HoloMedallion } from './HoloMedallion';
 export type { HoloMedallionProps } from './HoloMedallion';
+
+export { PlusBadge } from './PlusBadge';
+export type { PlusBadgeProps, PlusBadgeSize } from './PlusBadge';

@@ -44,3 +44,9 @@ export type { CitySuggestionSheetProps } from './CitySuggestionSheet';
 
 export { ReviewPromptCard } from './ReviewPromptCard';
 export type { ReviewPromptCardProps } from './ReviewPromptCard';
+
+export { PaywallSheet } from './PaywallSheet';
+export type { PaywallSheetProps, PaywallPlan } from './PaywallSheet';
+
+export { PremiumLimitCard } from './PremiumLimitCard';
+export type { PremiumLimitCardProps, PremiumLimitKind } from './PremiumLimitCard';
