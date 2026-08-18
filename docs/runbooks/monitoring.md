@@ -92,6 +92,29 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
    logged as `failed`, no reason), so don't compare across that date.
 
 
+9. **Cron health** (Cloud Scheduler) — nothing watched cron OUTCOMES until
+   2026-08-18, and `mia-notification-cron` had been returning **504 at its 300s
+   deadline every single day for at least 8 days** across four revisions without
+   anyone noticing. Partial cron runs are silent by nature: the job writes some
+   rows, dies, and the next run starts over from the same place.
+   ```bash
+   gcloud scheduler jobs list --location europe-central2      --project gen-lang-client-0895796477      --format="table(name.basename(), schedule, state, lastAttemptTime, status.code)"
+   ```
+   `status.code` is the thing to read: **empty = OK**, `4` = DEADLINE_EXCEEDED,
+   `2` = UNKNOWN/5xx. For detail, the scheduler logs the outcome per attempt:
+   ```bash
+   gcloud logging read 'resource.type="cloud_scheduler_job" AND severity>=ERROR'      --project gen-lang-client-0895796477 --limit 10 --freshness 2d      --format="value(timestamp, resource.labels.job_id, jsonPayload.status, jsonPayload.debugInfo)"
+   ```
+   **Alerting (added 2026-08-18):** alert policy *"Cloud Scheduler job failed"*
+   (`alertPolicies/10278737109769293908`) fires on any `severity>=ERROR` entry in
+   `cloudscheduler.googleapis.com/executions`, i.e. ANY job, and emails the
+   *"Victor (defpedal ops)"* channel, rate-limited to one notification per hour.
+   ⚠️ **Deliverability of that email channel has not been proven** — it was
+   created via the Monitoring API and GCP reports no explicit verification
+   status. Confirm once with **Send test notification** on the policy page in the
+   Cloud Console; if no mail arrives, verify the channel there.
+
+
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
 
 - Mobile errors: ≤ ~5/day, dominated by known benign titles (OSRM NoRoute,
