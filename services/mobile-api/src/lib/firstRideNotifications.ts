@@ -27,6 +27,7 @@ import { isGoodCyclingDay } from '@defensivepedal/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchCyclingForecast } from './clients/openMeteo';
 import {
+  DEDUPE_MARKERS,
   FIRST_RIDE_COPY,
   dedupeFilter,
   normalizeFirstRideLocale,
@@ -94,20 +95,156 @@ const LOG_CATEGORY = 'mia';
 // Weekly budget check (Mon 4 AM UTC – Sun 23:59 UTC)
 // ---------------------------------------------------------------------------
 
-export const getWeeklyCount = async (
-  db: SupabaseClient,
-  userId: string,
-): Promise<number> => {
-  const now = new Date();
+/** Start of the current budget week (Mon 04:00 UTC), for a given instant. */
+export const weekStart = (now: Date = new Date()): Date => {
   const dayOfWeek = now.getUTCDay(); // 0=Sun, 1=Mon...
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const monday = new Date(now);
   monday.setUTCDate(monday.getUTCDate() - daysToMonday);
   monday.setUTCHours(4, 0, 0, 0);
-
   if (now < monday) {
     monday.setUTCDate(monday.getUTCDate() - 7);
   }
+  return monday;
+};
+
+/**
+ * Pre-loaded notification_log facts for a whole candidate set.
+ *
+ * Why this exists: the cron used to ask the database per user AND per template
+ * — one weekly-budget count plus one dedupe count for each of the three
+ * marker-bearing templates, so ~4 sequential round-trips per rider. At 687
+ * candidates that is ~2,750 serial queries, and Supabase lives in us-east-1
+ * while Cloud Run runs in europe-central2, so each costs ~100 ms of Atlantic.
+ * The job hit its 300 s deadline and returned 504 EVERY day for at least 8 days
+ * (error-log #82), always dying part-way through the same prefix of users, so
+ * the tail was never evaluated at all. Loading the same facts in a handful of
+ * `in (...)` queries collapses that to ~3 round-trips total.
+ */
+export interface FirstRideLogIndex {
+  /** userId -> rows with status='sent' since the week start. */
+  readonly weeklySent: ReadonlyMap<string, number>;
+  /** `${userId}|${template}` -> prior sends, matched on the dedupe markers. */
+  readonly priorSends: ReadonlyMap<string, number>;
+}
+
+/** Supabase `.in()` gets unwieldy well before this; keep URLs sane. */
+const LOG_INDEX_CHUNK = 200;
+
+const priorKey = (userId: string, template: FirstRideTemplate): string =>
+  `${userId}|${template}`;
+
+/**
+ * Load every `notification_log` fact the per-user checks need, for all
+ * candidates at once. Mirrors the semantics of the queries it replaces exactly:
+ * the weekly count filters `status='sent'`, while the dedupe count deliberately
+ * does NOT filter on status (a suppressed row still means "we already tried
+ * this template"), and matches the same locale markers `dedupeFilter` uses.
+ */
+export const loadFirstRideLogIndex = async (
+  db: SupabaseClient,
+  userIds: readonly string[],
+  now: Date = new Date(),
+): Promise<FirstRideLogIndex> => {
+  const weeklySent = new Map<string, number>();
+  const priorSends = new Map<string, number>();
+  if (userIds.length === 0) return { weeklySent, priorSends };
+
+  const since = weekStart(now).toISOString();
+  const templates = Object.keys(DEDUPE_MARKERS) as FirstRideTemplate[];
+
+  for (let i = 0; i < userIds.length; i += LOG_INDEX_CHUNK) {
+    const chunk = userIds.slice(i, i + LOG_INDEX_CHUNK);
+    const { data, error } = await db
+      .from('notification_log')
+      .select('user_id, status, body, created_at')
+      .eq('category', LOG_CATEGORY)
+      .in('user_id', chunk);
+
+    // Fail open, exactly like the per-user queries did: an index miss means the
+    // gates read zero, which can over-send but never permanently mutes a rider.
+    if (error || !data) continue;
+
+    for (const row of data as Array<{
+      user_id: string; status: string; body: string | null; created_at: string;
+    }>) {
+      if (row.status === 'sent' && row.created_at >= since) {
+        weeklySent.set(row.user_id, (weeklySent.get(row.user_id) ?? 0) + 1);
+      }
+      const body = (row.body ?? '').toLowerCase();
+      for (const template of templates) {
+        const markers = DEDUPE_MARKERS[template] ?? [];
+        if (markers.some((m) => body.includes(m.toLowerCase()))) {
+          const key = priorKey(row.user_id, template);
+          priorSends.set(key, (priorSends.get(key) ?? 0) + 1);
+        }
+      }
+    }
+  }
+
+  return { weeklySent, priorSends };
+};
+
+/**
+ * Trip-derived facts for a whole candidate set: how many trips each rider has,
+ * and their most recent COMPLETED trip (which carries the coordinates
+ * `weather_invitation` needs).
+ *
+ * Replaces two more per-user round-trips in the cron loop. Together with
+ * `loadFirstRideLogIndex` this takes the per-rider cost from ~6 sequential
+ * queries to zero — see that function's comment for why that mattered.
+ *
+ * Semantics are preserved exactly, including a quirk: the ride count includes
+ * trips with a NULL `ended_at` (the query it replaces never filtered on it), so
+ * an in-progress ride still counts toward `total_rides`. `lastTrip` on the other
+ * hand only considers completed trips.
+ */
+export interface RiderTripFacts {
+  readonly rideCounts: ReadonlyMap<string, number>;
+  readonly lastTrips: ReadonlyMap<string, { ended_at: string; start_location: unknown }>;
+}
+
+export const loadRiderTripFacts = async (
+  db: SupabaseClient,
+  userIds: readonly string[],
+): Promise<RiderTripFacts> => {
+  const rideCounts = new Map<string, number>();
+  const lastTrips = new Map<string, { ended_at: string; start_location: unknown }>();
+  if (userIds.length === 0) return { rideCounts, lastTrips };
+
+  for (let i = 0; i < userIds.length; i += LOG_INDEX_CHUNK) {
+    const chunk = userIds.slice(i, i + LOG_INDEX_CHUNK);
+    const { data, error } = await db
+      .from('trips')
+      .select('user_id, ended_at, start_location')
+      .in('user_id', chunk);
+
+    if (error || !data) continue; // fail open, same as the per-user queries
+
+    for (const row of data as Array<{
+      user_id: string; ended_at: string | null; start_location: unknown;
+    }>) {
+      rideCounts.set(row.user_id, (rideCounts.get(row.user_id) ?? 0) + 1);
+      if (!row.ended_at) continue;
+      const current = lastTrips.get(row.user_id);
+      if (!current || row.ended_at > current.ended_at) {
+        lastTrips.set(row.user_id, { ended_at: row.ended_at, start_location: row.start_location });
+      }
+    }
+  }
+
+  return { rideCounts, lastTrips };
+};
+
+export const getWeeklyCount = async (
+  db: SupabaseClient,
+  userId: string,
+  index?: FirstRideLogIndex,
+): Promise<number> => {
+  if (index) return index.weeklySent.get(userId) ?? 0;
+
+  const now = new Date();
+  const monday = weekStart(now);
 
   const { count, error } = await db
     .from('notification_log')
@@ -124,8 +261,9 @@ export const getWeeklyCount = async (
 export const isUnderWeeklyBudget = async (
   db: SupabaseClient,
   userId: string,
+  index?: FirstRideLogIndex,
 ): Promise<boolean> => {
-  const count = await getWeeklyCount(db, userId);
+  const count = await getWeeklyCount(db, userId, index);
   return count < WEEKLY_BUDGET;
 };
 
@@ -150,9 +288,11 @@ const priorSendCount = async (
   db: SupabaseClient,
   userId: string,
   template: FirstRideTemplate,
+  index?: FirstRideLogIndex,
 ): Promise<number> => {
   const filter = dedupeFilter(template);
   if (!filter) return 0;
+  if (index) return index.priorSends.get(priorKey(userId, template)) ?? 0;
 
   const { count } = await db
     .from('notification_log')
@@ -187,6 +327,7 @@ const send = async (
 export const checkFirstRideNudge = async (
   db: SupabaseClient,
   profile: FirstRideProfile,
+  index?: FirstRideLogIndex,
 ): Promise<TemplateResult> => {
   const template: FirstRideTemplate = 'first_ride_nudge';
 
@@ -197,7 +338,7 @@ export const checkFirstRideNudge = async (
     return { template, sent: false, reason: 'too_early' };
   }
 
-  if ((await priorSendCount(db, profile.id, template)) > 0) {
+  if ((await priorSendCount(db, profile.id, template, index)) > 0) {
     return { template, sent: false, reason: 'already_sent' };
   }
 
@@ -210,6 +351,7 @@ export const checkFirstRideNudge = async (
 export const checkPostFirstRide = async (
   db: SupabaseClient,
   profile: FirstRideProfile,
+  index?: FirstRideLogIndex,
 ): Promise<TemplateResult> => {
   const template: FirstRideTemplate = 'post_first_ride';
 
@@ -223,7 +365,7 @@ export const checkPostFirstRide = async (
     return { template, sent: false, reason: 'too_early' };
   }
 
-  if ((await priorSendCount(db, profile.id, template)) > 0) {
+  if ((await priorSendCount(db, profile.id, template, index)) > 0) {
     return { template, sent: false, reason: 'already_sent' };
   }
 
@@ -246,6 +388,7 @@ export const checkPostFirstRide = async (
 export const checkWeatherInvitation = async (
   _db: SupabaseClient,
   profile: FirstRideProfile,
+  _index?: FirstRideLogIndex,
 ): Promise<TemplateResult> => {
   const template: FirstRideTemplate = 'weather_invitation';
 
@@ -282,6 +425,7 @@ export const checkWeatherInvitation = async (
 export const checkLapsedReengagement = async (
   db: SupabaseClient,
   profile: FirstRideProfile,
+  index?: FirstRideLogIndex,
 ): Promise<TemplateResult> => {
   const template: FirstRideTemplate = 'lapsed_reengagement';
 
@@ -293,7 +437,7 @@ export const checkLapsedReengagement = async (
     return { template, sent: false, reason: 'not_lapsed' };
   }
 
-  if ((await priorSendCount(db, profile.id, template)) >= LAPSED_MAX_TOTAL) {
+  if ((await priorSendCount(db, profile.id, template, index)) >= LAPSED_MAX_TOTAL) {
     return { template, sent: false, reason: 'max_lapsed_reached' };
   }
 
@@ -313,16 +457,21 @@ export const checkLapsedReengagement = async (
 export const evaluateFirstRideNotifications = async (
   db: SupabaseClient,
   profile: FirstRideProfile,
+  index?: FirstRideLogIndex,
 ): Promise<TemplateResult[]> => {
   const results: TemplateResult[] = [];
 
-  if (!(await isUnderWeeklyBudget(db, profile.id))) {
+  if (!(await isUnderWeeklyBudget(db, profile.id, index))) {
     return [{ template: 'first_ride_nudge', sent: false, reason: 'weekly_budget_exceeded' }];
   }
 
   const allChecks: ReadonlyArray<{
     template: FirstRideTemplate;
-    check: (db: SupabaseClient, profile: FirstRideProfile) => Promise<TemplateResult>;
+    check: (
+      db: SupabaseClient,
+      profile: FirstRideProfile,
+      index?: FirstRideLogIndex,
+    ) => Promise<TemplateResult>;
   }> = [
     { template: 'first_ride_nudge', check: checkFirstRideNudge },
     { template: 'post_first_ride', check: checkPostFirstRide },
@@ -339,7 +488,7 @@ export const evaluateFirstRideNotifications = async (
   ).map((c) => c.check);
 
   for (const check of checks) {
-    const result = await check(db, profile);
+    const result = await check(db, profile, index);
     results.push(result);
     if (result.sent) break;
   }

@@ -7,6 +7,8 @@ import { verifyCronAuth } from '../lib/cronAuth';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import {
   evaluateFirstRideNotifications,
+  loadFirstRideLogIndex,
+  loadRiderTripFacts,
   type FirstRideProfile,
 } from '../lib/firstRideNotifications';
 import { isAnonPushEnabled } from '../lib/nudges/killSwitch';
@@ -142,37 +144,35 @@ export const buildFirstRideNotificationRoutes = (
         let evaluated = 0;
         let notified = 0;
 
+        // Everything the per-rider checks need, in a handful of `in (...)`
+        // queries instead of ~6 sequential round-trips EACH.
+        //
+        // This job returned 504 at its 300 s deadline every single day for at
+        // least 8 days (error-log #82). 687 candidates x ~6 queries x ~100 ms —
+        // Supabase is in us-east-1, Cloud Run in europe-central2, so every
+        // round-trip crosses the Atlantic — is ~410 s of pure latency. It always
+        // died part-way through the same prefix of users, so the tail was never
+        // evaluated at all, silently, for as long as the population has been
+        // this size.
+        const candidateIds = profiles.map((p) => p.id);
+        const [logIndex, tripFacts] = await Promise.all([
+          loadFirstRideLogIndex(db, candidateIds),
+          loadRiderTripFacts(db, candidateIds),
+        ]);
+
         for (const row of profiles) {
           try {
-            // Count completed trips for this user — drives first_ride_nudge
-            // and post_first_ride gating. Cheap because each user typically
-            // has 0–single-digit trips when they're still in this funnel.
-            const { count: rideCount } = await db
-              .from('trips')
-              .select('id', { count: 'exact', head: true })
-              .eq('user_id', row.id);
-
-            // Compute last_ride_at from trips (no profiles.last_ride_at column).
-            // post_first_ride and lapsed_reengagement gate on this; null is
-            // treated as "never rode" by the evaluator.
-            //
-            // start_location rides along on the SAME row (no extra query) and
-            // gives weather_invitation the rider's actual coordinates — it
-            // sends nothing without them (G-25). PostgREST hands geography
-            // columns back as WKB hex, so it must go through the shared
-            // parser, never a `.lat ?? 0` read (error-log #70).
-            const { data: lastTrip } = await db
-              .from('trips')
-              .select('ended_at, start_location')
-              .eq('user_id', row.id)
-              .not('ended_at', 'is', null)
-              .order('ended_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
+            // Trip facts come from the batch above. start_location rides along
+            // on the same row and gives weather_invitation the rider's actual
+            // coordinates — it sends nothing without them (G-25). PostgREST
+            // hands geography columns back as WKB hex, so it must go through the
+            // shared parser, never a `.lat ?? 0` read (error-log #70).
+            const rideCount = tripFacts.rideCounts.get(row.id) ?? 0;
+            const lastTrip = tripFacts.lastTrips.get(row.id);
 
             const profile: FirstRideProfile = {
               id: row.id,
-              total_rides: rideCount ?? 0,
+              total_rides: rideCount,
               notify_mia: row.notify_mia,
               created_at: row.created_at,
               last_ride_at: (lastTrip?.ended_at as string | null | undefined) ?? null,
@@ -181,7 +181,7 @@ export const buildFirstRideNotificationRoutes = (
               location: parseGeographyPoint(lastTrip?.start_location),
             };
 
-            const results = await evaluateFirstRideNotifications(db, profile);
+            const results = await evaluateFirstRideNotifications(db, profile, logIndex);
             evaluated++;
             if (results.some((r) => r.sent)) {
               notified++;
