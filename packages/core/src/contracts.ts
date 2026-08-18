@@ -965,6 +965,19 @@ export interface ProfileResponse {
   isPrivate: boolean;
   shareConversionFeedOptin: boolean;
   keepFullGpsHistory: boolean;
+  /**
+   * Notification prefs + quiet-hours window. Returned so the client can HYDRATE
+   * from the server instead of pushing local defaults over it: the store is
+   * device-scoped, so after a reinstall it holds factory defaults, and the
+   * Profile screen used to push those unconditionally — silently resetting a
+   * rider's configured window. `quietHours*` are null when never set.
+   * These are the values the server actually enforces (profiles.quiet_hours_*).
+   */
+  notifyWeather: boolean;
+  notifyHazard: boolean;
+  notifyCommunity: boolean;
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
 }
 
 // ─── Habit Engine Types ──────────────────────────────────────────

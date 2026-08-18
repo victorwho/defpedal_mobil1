@@ -105,7 +105,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
           .eq('id', user.id)
           .single();
 
@@ -132,6 +132,13 @@ export const buildFeedProfileRoutes = (
               ? true
               : Boolean(data.share_conversion_feed_optin),
           keepFullGpsHistory: Boolean(data.keep_full_gps_history),
+          // Returned so the client hydrates from the server rather than pushing
+          // device defaults over a configured window (see ProfileResponse).
+          notifyWeather: data.notify_weather !== false,
+          notifyHazard: data.notify_hazard !== false,
+          notifyCommunity: data.notify_community !== false,
+          quietHoursStart: (data.quiet_hours_start as string) ?? null,
+          quietHoursEnd: (data.quiet_hours_end as string) ?? null,
         };
       },
     );
@@ -154,7 +161,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
+          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
           .eq('id', user.id)
           .single();
 
@@ -165,7 +172,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history')
+            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
             .single();
 
           if (createError || !created) {
@@ -191,6 +198,13 @@ export const buildFeedProfileRoutes = (
                 ? true
                 : Boolean(created.share_conversion_feed_optin),
             keepFullGpsHistory: Boolean(created.keep_full_gps_history),
+            // Freshly-created row carries the column defaults; return them so a
+            // first-run client hydrates the same values the server will enforce.
+            notifyWeather: created.notify_weather !== false,
+            notifyHazard: created.notify_hazard !== false,
+            notifyCommunity: created.notify_community !== false,
+            quietHoursStart: (created.quiet_hours_start as string) ?? null,
+            quietHoursEnd: (created.quiet_hours_end as string) ?? null,
           };
         }
 
@@ -209,6 +223,13 @@ export const buildFeedProfileRoutes = (
               ? true
               : Boolean(data.share_conversion_feed_optin),
           keepFullGpsHistory: Boolean(data.keep_full_gps_history),
+          // Returned so the client hydrates from the server rather than pushing
+          // device defaults over a configured window (see ProfileResponse).
+          notifyWeather: data.notify_weather !== false,
+          notifyHazard: data.notify_hazard !== false,
+          notifyCommunity: data.notify_community !== false,
+          quietHoursStart: (data.quiet_hours_start as string) ?? null,
+          quietHoursEnd: (data.quiet_hours_end as string) ?? null,
         };
       },
     );

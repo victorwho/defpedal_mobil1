@@ -30,6 +30,7 @@ import {
   quietHoursAreOff,
   quietHoursWrapMidnight,
 } from '../src/lib/quietHours';
+import { resolveNotificationPrefSync } from '../src/lib/profilePrefSync';
 import { cancelDailyWeatherNotifications } from '../src/lib/daily-weather-notification';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
@@ -225,24 +226,57 @@ export default function ProfileScreen() {
     [user],
   );
 
-  // On first load, push local notification prefs + device timezone to the
-  // server so quiet hours enforcement uses the correct values.
+  // On first load, reconcile notification prefs with the server, then push the
+  // device timezone (which IS device truth and should always win).
+  //
+  // This used to push the local values unconditionally. The store is
+  // device-scoped, so after a reinstall it holds factory defaults — quiet hours
+  // 22:00-07:00, every notify flag on, sharing opted in — and merely opening
+  // Profile overwrote whatever the rider had configured, including re-opting
+  // them into conversion-feed sharing they had turned off. The server is
+  // authoritative for these fields because the server is what enforces them;
+  // local now only seeds fields the server has never held a value for.
   const initialSyncDone = useRef(false);
   useEffect(() => {
     if (!user || initialSyncDone.current) return;
     initialSyncDone.current = true;
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    mobileApi
-      .updateProfile({
-        notifyWeather,
-        notifyHazard,
-        notifyCommunity,
-        quietHoursStart,
-        quietHoursEnd,
-        quietHoursTimezone: tz,
-        shareConversionFeedOptin,
-      })
-      .catch(() => {/* best-effort */});
+    const localPrefs = {
+      notifyWeather,
+      notifyHazard,
+      notifyCommunity,
+      quietHoursStart,
+      quietHoursEnd,
+      shareConversionFeedOptin,
+    };
+
+    void (async () => {
+      let remote = null;
+      try {
+        remote = await mobileApi.getProfile();
+      } catch {
+        // Offline or 5xx: resolver falls back to the old push-local behaviour
+        // so a rider who has never synced still gets their prefs to the server.
+      }
+
+      const plan = resolveNotificationPrefSync(localPrefs, remote);
+
+      if (plan.hydrate.quietHoursStart && plan.hydrate.quietHoursEnd) {
+        setQuietHours(plan.hydrate.quietHoursStart, plan.hydrate.quietHoursEnd);
+      }
+      if (plan.hydrate.notifyWeather !== undefined) setNotifyWeather(plan.hydrate.notifyWeather);
+      if (plan.hydrate.notifyHazard !== undefined) setNotifyHazard(plan.hydrate.notifyHazard);
+      if (plan.hydrate.notifyCommunity !== undefined) setNotifyCommunity(plan.hydrate.notifyCommunity);
+      if (plan.hydrate.shareConversionFeedOptin !== undefined) {
+        setShareConversionFeedOptin(plan.hydrate.shareConversionFeedOptin);
+      }
+
+      // Always send the timezone: it comes from the device, so it is the one
+      // field where local genuinely wins (a travelling rider's zone changes).
+      mobileApi
+        .updateProfile({ ...plan.push, quietHoursTimezone: tz })
+        .catch(() => {/* best-effort */});
+    })();
   }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd, shareConversionFeedOptin]);
 
   // Sync local text state with the persisted weightKg once on mount.

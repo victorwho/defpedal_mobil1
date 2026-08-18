@@ -207,6 +207,11 @@ export const profileResponseSchema = {
     'isPrivate',
     'shareConversionFeedOptin',
     'keepFullGpsHistory',
+    'notifyWeather',
+    'notifyHazard',
+    'notifyCommunity',
+    'quietHoursStart',
+    'quietHoursEnd',
   ],
   properties: {
     id: { type: 'string' },
@@ -219,6 +224,11 @@ export const profileResponseSchema = {
     isPrivate: { type: 'boolean' },
     shareConversionFeedOptin: { type: 'boolean' },
     keepFullGpsHistory: { type: 'boolean' },
+    notifyWeather: { type: 'boolean' },
+    notifyHazard: { type: 'boolean' },
+    notifyCommunity: { type: 'boolean' },
+    quietHoursStart: { type: ['string', 'null'] },
+    quietHoursEnd: { type: ['string', 'null'] },
   },
 } as const;
 
