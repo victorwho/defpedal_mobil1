@@ -49,6 +49,35 @@ export const ProfileDeviceSyncManager = () => {
             .getState()
             .setPremiumFromProfile(profile.premium, new Date().toISOString());
         }
+
+        // Flat rides taken since the last successful sync. Piggy-backed here
+        // because reaching this point already proves we are online and
+        // authenticated; without a durable count the allowance would reset on
+        // reinstall. Best-effort: a failure leaves `pendingCount` intact so the
+        // next sync retries, and no ride is ever double-charged.
+        const meter = useAppStore.getState().flatRouteMeter;
+        if (meter.pendingCount > 0 && meter.periodKey) {
+          mobileApi
+            .reconcileFlatRoutes({
+              periodKey: meter.periodKey,
+              pending: meter.pendingCount,
+            })
+            .then((result) => {
+              const store = useAppStore.getState();
+              // Clear only what the server actually absorbed, then adopt its
+              // total. Order matters: acknowledging first keeps the running
+              // total stable across the two writes.
+              store.acknowledgeFlatRoutesLocally(result.accepted);
+              store.mergeFlatRouteMeterFromServer({
+                periodKey: result.periodKey,
+                syncedCount: result.total,
+                pendingCount: 0,
+              });
+            })
+            .catch(() => {
+              // Keep the pending count; the next sync retries.
+            });
+        }
       })
       .catch(() => {
         // Best-effort: clear the key so a transient failure retries on the

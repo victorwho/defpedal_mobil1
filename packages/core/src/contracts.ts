@@ -179,7 +179,14 @@ export interface ErrorResponse {
     | 'UPSTREAM_ERROR'
     | 'INTERNAL_ERROR'
     | 'NOT_FOUND'
-    | 'CONFLICT';
+    | 'CONFLICT'
+    /**
+     * A free-tier ceiling was reached (HTTP 402). Distinct from RATE_LIMITED:
+     * this is not transient and retrying never clears it — the rider must free
+     * a slot or subscribe. Clients switch on it to show the matching limit
+     * card rather than a generic failure.
+     */
+    | 'PREMIUM_LIMIT_REACHED';
   details?: string[];
 }
 

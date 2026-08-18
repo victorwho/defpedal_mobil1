@@ -40,6 +40,7 @@ import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
+import { assertCanSaveRoute, resolveHistoryCutoff } from '../lib/premiumEnforcement';
 import { sendWeeklyImpactSummary } from '../lib/scheduledNotifications';
 import {
   coverageQuerystringSchema,
@@ -736,7 +737,13 @@ export const buildV1Routes = (
         });
 
         try {
-          return await dependencies.getTripHistory(user.id);
+          // Free riders see a rolling window; Plus sees everything. Returns
+          // null (no filter) while the paywall is dark, so history behaves
+          // exactly as it does today until the tier is revealed.
+          const cutoff = supabaseAdmin
+            ? await resolveHistoryCutoff(supabaseAdmin, user.id, new Date().toISOString())
+            : null;
+          return await dependencies.getTripHistory(user.id, cutoff);
         } catch (error) {
           throw new HttpError('Trip history fetch failed.', {
             statusCode: 502,
@@ -3745,6 +3752,12 @@ export const buildV1Routes = (
           userId: user.id,
         });
         if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        // The binding free-tier ceiling. The client refuses first, but a
+        // client check is a courtesy — an old or modified build can post
+        // straight here. Inert while the paywall is dark, and it fails open
+        // on any uncertainty (see premiumEnforcement).
+        await assertCanSaveRoute(supabaseAdmin, user.id, new Date().toISOString());
 
         const payload = normalizeSavedRouteCreateRequest(request.body);
 

@@ -2,11 +2,13 @@ import type { ErrorResponse } from '@defensivepedal/core';
 import { PLUS_ENTITLEMENT_ID } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { requireAuthenticatedUser } from '../lib/auth';
 import { timingSafeStringEqual } from '../lib/cronAuth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
 import { applyRevenueCatWebhook } from '../lib/subscriptionWriter';
+import { reconcileFlatRouteMeter } from '../lib/usageMeters';
 import { ensureSupabase } from './feed-helpers';
 
 /**
@@ -73,7 +75,7 @@ interface WebhookReply {
 }
 
 export const buildBillingRoutes = (
-  _dependencies: MobileApiDependencies,
+  dependencies: MobileApiDependencies,
 ): FastifyPluginAsync => {
   const routes: FastifyPluginAsync = async (app) => {
     app.post<{ Reply: WebhookReply | ErrorResponse }>(
@@ -183,6 +185,74 @@ export const buildBillingRoutes = (
               code: 'INTERNAL_ERROR',
             });
         }
+      },
+    );
+
+    /**
+     * POST /v1/premium/usage/flat-route — durable half of flat-route metering.
+     *
+     * The device counts locally so a ride never waits on the network, then
+     * reports its unsynced rides here. Without this the allowance resets on
+     * reinstall, which would make the limit meaningless.
+     *
+     * Returns the authoritative total plus how many rides were absorbed. The
+     * client only clears that many from its pending count, so a partial or
+     * failed reconcile is retried rather than silently dropped.
+     */
+    app.post<{
+      Body: { periodKey?: unknown; pending?: unknown };
+      Reply: { periodKey: string; total: number; accepted: number } | ErrorResponse;
+    }>(
+      '/premium/usage/flat-route',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['periodKey', 'pending'],
+            properties: {
+              periodKey: { type: 'string', pattern: '^\d{4}-\d{2}$' },
+              pending: { type: 'integer', minimum: 0, maximum: 50 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['periodKey', 'total', 'accepted'],
+              properties: {
+                periodKey: { type: 'string' },
+                total: { type: 'integer' },
+                accepted: { type: 'integer' },
+              },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            503: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+        const db = ensureSupabase();
+
+        const result = await reconcileFlatRouteMeter(
+          db,
+          user.id,
+          String(request.body.periodKey),
+          Number(request.body.pending),
+        );
+
+        if (!result) {
+          // Could not write. Reported as retryable so the device keeps its
+          // pending count instead of acknowledging rides never recorded.
+          throw new HttpError('Usage meter unavailable.', {
+            statusCode: 503,
+            code: 'UPSTREAM_ERROR',
+          });
+        }
+
+        return result;
       },
     );
   };

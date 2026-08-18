@@ -379,13 +379,26 @@ export const getUserStats = async (
 
 export const getTripHistory = async (
   userId: string,
+  /**
+   * Oldest ride to return, ISO. `null` = the rider's full history.
+   *
+   * This is a READ FILTER for the free tier and nothing else: no row is ever
+   * deleted on account of it, so subscribing reveals everything again
+   * instantly, and lifetime totals, badges and XP continue to be computed over
+   * the complete history regardless of tier.
+   */
+  sinceIso: string | null = null,
 ): Promise<TripHistoryItem[]> => {
   if (!supabaseAdmin) return [];
 
-  const { data, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('trip_tracks')
     .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at')
-    .eq('user_id', userId)
+    .eq('user_id', userId);
+
+  if (sinceIso) query = query.gte('started_at', sinceIso);
+
+  const { data, error } = await query
     .order('started_at', { ascending: false })
     .limit(50);
 

@@ -505,6 +505,18 @@ export const mobileApi = {
   getSavedRoutes: () =>
     mobileApiFetch<{ routes: SavedRoute[] }>('/v1/saved-routes').then((res) => res.routes),
 
+  /**
+   * Reports flat rides taken since the last reconcile. The server returns the
+   * authoritative total plus how many it absorbed; only that many may be
+   * cleared locally, so a partial or failed reconcile is retried rather than
+   * silently forgiven.
+   */
+  reconcileFlatRoutes: (payload: { periodKey: string; pending: number }) =>
+    mobileApiFetch<{ periodKey: string; total: number; accepted: number }>(
+      '/v1/premium/usage/flat-route',
+      { method: 'POST', body: JSON.stringify(payload) },
+    ),
+
   saveRoute: (payload: SavedRouteCreateRequest) =>
     mobileApiFetch<SavedRoute>('/v1/saved-routes', {
       method: 'POST',
