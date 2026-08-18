@@ -76,6 +76,24 @@ export interface UsePremiumResult {
   /** True when running on a cached answer rather than a recent confirmation. */
   readonly isStale: boolean;
 
+  /**
+   * Whether limits are ENFORCED, not merely computed. False during the dark
+   * launch, which is what makes the rollout behaviour-neutral.
+   */
+  readonly enforcementEnabled: boolean;
+
+  /**
+   * The three enforcement decisions screens actually make. They fold in the
+   * dark-launch gate so no call site repeats it — a screen that wrote
+   * `uiEnabled && !canSaveRoute(n)` itself would be the call-site gate
+   * error-log #20 exists to prevent, and forgetting the first half would
+   * start refusing saves that work today.
+   */
+  readonly blockSaveRoute: (currentCount: number) => boolean;
+  readonly blockDownloadPack: (currentCount: number) => boolean;
+  /** Period key to charge a starting flat ride against, or null to charge nothing. */
+  readonly flatRideToCharge: () => string | null;
+
   readonly canSaveRoute: (currentCount: number) => boolean;
   readonly canDownloadPack: (currentCount: number) => boolean;
   readonly coolRouting: (country: SupportedCountry | null | undefined) => CoolRoutingAvailability;
@@ -117,6 +135,22 @@ export const usePremium = (): UsePremiumResult => {
       uiEnabled: snapshot?.uiEnabled === true,
       limits,
       isStale: entitlement.isStale,
+
+      enforcementEnabled: snapshot?.uiEnabled === true,
+
+      blockSaveRoute: (currentCount: number) =>
+        snapshot?.uiEnabled === true && !canSaveAnotherRoute(entitlement, currentCount),
+      blockDownloadPack: (currentCount: number) =>
+        snapshot?.uiEnabled === true && !canDownloadAnotherPack(entitlement, currentCount),
+      flatRideToCharge: () => {
+        if (snapshot?.uiEnabled !== true) return null;
+        const decision = canStartFlatRoute({ entitlement, meter, nowIso, timeZone });
+        // Only a metered ride is charged: Plus and grandfathered riders are
+        // unlimited, and charging them would corrupt a counter nobody reads.
+        return decision.allowed && decision.reason === 'within_quota'
+          ? decision.periodKey
+          : null;
+      },
 
       canSaveRoute: (currentCount: number) => canSaveAnotherRoute(entitlement, currentCount),
       canDownloadPack: (currentCount: number) => canDownloadAnotherPack(entitlement, currentCount),

@@ -33,6 +33,12 @@ import {
   buildOfflineRegionFromRoute,
   downloadOfflineRegion,
 } from '../src/lib/offlinePacks';
+import { PaywallSheet } from '../src/design-system/organisms/PaywallSheet';
+import {
+  PremiumLimitCard,
+  type PremiumLimitKind,
+} from '../src/design-system/organisms/PremiumLimitCard';
+import { usePremium } from '../src/hooks/usePremium';
 import { mobileApi } from '../src/lib/api';
 import { telemetry } from '../src/lib/telemetry';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -101,6 +107,9 @@ function RoutePreviewScreen() {
     requiredStates: ['IDLE', 'ROUTE_PREVIEW', 'NAVIGATING'],
   });
   useLockOrientation();
+  const premium = usePremium();
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [premiumLimit, setPremiumLimit] = useState<PremiumLimitKind | null>(null);
   const routeRequest = useAppStore((state) => state.routeRequest);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
@@ -112,6 +121,7 @@ function RoutePreviewScreen() {
   const startNavigation = useAppStore((state) => state.startNavigation);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const setActiveTripClientId = useAppStore((state) => state.setActiveTripClientId);
+  const consumeFlatRouteLocally = useAppStore((state) => state.consumeFlatRouteLocally);
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
   const avoidHeat = useAppStore((state) => state.avoidHeat);
@@ -400,6 +410,15 @@ function RoutePreviewScreen() {
 
   const handleDownloadOffline = useCallback(() => {
     if (!selectedRoute) return;
+
+    // Packs already held count toward the ceiling. `blockDownloadPack` folds
+    // in the dark-launch gate, so this cannot start refusing downloads that
+    // work today.
+    if (premium.blockDownloadPack(offlineRegions.length)) {
+      setPremiumLimit('offlinePacks');
+      return;
+    }
+
     setOfflineDownloadStatus('downloading');
     setOfflineDownloadProgress(0);
     setOfflineDownloadError(null);
@@ -501,6 +520,21 @@ function RoutePreviewScreen() {
     }
     navigationStartedRef.current = true;
 
+    // Flat-route quota is consumed HERE — when a ride actually begins — not
+    // when a route is previewed. The preview mode pill refetches on every
+    // tap, so metering the computation would drain a month of quota through
+    // idle exploration.
+    //
+    // Flatness is derived locally rather than from `currentDisplayMode`,
+    // which is declared further down. A Cool ride also sets avoidHills, but
+    // Cool is Plus-only and Plus is never metered, so the overlap cannot
+    // charge anyone. `flatRideToCharge` returns null while the paywall is
+    // dark and for unmetered riders, so a reveal starts everyone clean.
+    if (routeRequest.mode !== 'fast' && avoidHills) {
+      const chargeTo = premium.flatRideToCharge();
+      if (chargeTo) consumeFlatRouteLocally(chargeTo);
+    }
+
     const sessionId =
       typeof crypto !== 'undefined' && 'randomUUID' in crypto
         ? crypto.randomUUID()
@@ -553,6 +587,20 @@ function RoutePreviewScreen() {
 
   const handleSaveRoute = useCallback(async () => {
     if (!saveRouteName.trim()) return;
+
+    // Free-tier ceiling, read from the cache route-planning already
+    // populated rather than issuing a request: a limit check must not cost
+    // a round-trip. A cache miss falls through to allowed — never block a
+    // save because we could not count. `blockSaveRoute` folds in the
+    // dark-launch gate, so this is inert until the paywall is revealed.
+    const cachedSaved = queryClient.getQueryData(['saved-routes']);
+    const savedCount = Array.isArray(cachedSaved) ? cachedSaved.length : null;
+    if (savedCount !== null && premium.blockSaveRoute(savedCount)) {
+      setSaveModalVisible(false);
+      setPremiumLimit('savedRoutes');
+      return;
+    }
+
     setSavingRoute(true);
     try {
       await mobileApi.saveRoute({
@@ -576,7 +624,7 @@ function RoutePreviewScreen() {
     } finally {
       setSavingRoute(false);
     }
-  }, [saveRouteName, routeRequest, queryClient]);
+  }, [saveRouteName, routeRequest, queryClient, premium]);
 
   // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Cool → Safe) ──
   // Mirrors the ModeTogglePill row on route-planning so the user can switch
@@ -1069,6 +1117,36 @@ function RoutePreviewScreen() {
       </Pressable>
     ) : null}
 
+    {/* Pedal Plus — limit reached. Inline, above the footer, never a blocking
+        modal: the rider was mid-task and a ceiling is not an emergency. Only
+        reachable while `premium.uiEnabled` is true. */}
+    {premiumLimit ? (
+      <View style={styles.premiumLimitContainer}>
+        <PremiumLimitCard
+          kind={premiumLimit}
+          limitValue={
+            premiumLimit === 'offlinePacks'
+              ? (premium.limits.offlinePacks ?? 0)
+              : (premium.limits.savedRoutes ?? 0)
+          }
+          onUpgrade={() => {
+            setPremiumLimit(null);
+            setPaywallVisible(true);
+          }}
+          onDismiss={() => setPremiumLimit(null)}
+        />
+      </View>
+    ) : null}
+
+    <PaywallSheet
+      visible={paywallVisible}
+      onDismiss={() => setPaywallVisible(false)}
+      limits={premium.limits}
+      coolRoutingAvailable={coolAvailable}
+      onSubscribe={() => setPaywallVisible(false)}
+      onRestore={() => setPaywallVisible(false)}
+    />
+
     {/* Save toast */}
     {saveToast ? (
       <View style={styles.toastContainer}>
@@ -1374,6 +1452,13 @@ const createThemedStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       justifyContent: 'flex-end',
       gap: space[2],
+    },
+    premiumLimitContainer: {
+      position: 'absolute',
+      left: space[4],
+      right: space[4],
+      bottom: 140,
+      zIndex: 60,
     },
     toastContainer: {
       position: 'absolute',

@@ -17,6 +17,8 @@ import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
+import { PaywallSheet } from '../src/design-system/organisms/PaywallSheet';
+import { usePremium } from '../src/hooks/usePremium';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
@@ -65,6 +67,13 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, isAnonymous, signOut, signInAnonymously } = useAuthSession();
   const confirm = useConfirmation();
+  const premium = usePremium();
+  // The rider's own country, captured by the onboarding region gate. Used
+  // only to decide whether the paywall may advertise cool routing — this
+  // entry point has no destination, and over-promising coverage is worse
+  // than omitting a benefit.
+  const riderCountry = useAppStore((state) => state.regionGate.countryCode);
+  const [paywallVisible, setPaywallVisible] = useState(false);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -429,6 +438,45 @@ export default function ProfileScreen() {
     );
   };
 
+  /**
+   * Pedal Plus entry point.
+   *
+   * Renders NOTHING unless the server has turned paywall UI on for this
+   * account (`premium.uiEnabled`), which is false for everyone during the dark
+   * launch. Entitlement is deliberately not consulted for visibility — a
+   * subscriber with the flag off keeps their features, they just do not see
+   * the row.
+   */
+  const PedalPlusRow = () => {
+    if (!premium.uiEnabled) return null;
+
+    const active = premium.isPlus;
+    return (
+      <Pressable
+        onPress={() => setPaywallVisible(true)}
+        style={styles.helpFaqRow}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={active ? t('premium.profileRowActive') : t('premium.profileRowFree')}
+      >
+        <Ionicons
+          name={active ? 'star' : 'star-outline'}
+          size={22}
+          color={colors.accent}
+        />
+        <View style={styles.settingTextCol}>
+          <Text style={styles.settingLabel}>
+            {active ? t('premium.profileRowActive') : t('premium.profileRowFree')}
+          </Text>
+          <Text style={styles.settingDescription}>
+            {active ? t('premium.activeTitle') : t('premium.sheetSubtitle')}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+      </Pressable>
+    );
+  };
+
   const AchievementsRow = () => {
     const { data } = useBadges();
     const earned = data?.earned.length ?? 0;
@@ -590,6 +638,7 @@ export default function ProfileScreen() {
 
           {/* ── Progression ─────────────────────────────────────────── */}
           <TierRankSection />
+          <PedalPlusRow />
           <AchievementsRow />
           <ConfidentCyclistReferralRow />
 
@@ -1169,6 +1218,17 @@ export default function ProfileScreen() {
         </Screen>
       </View>
       <BottomNav activeTab="profile" onTabPress={handleTabPress} />
+      {/* Store prices are absent until the purchases adapter exists, so the
+          sheet renders its benefits without any purchase button. It is
+          unreachable anyway while premium.uiEnabled is false. */}
+      <PaywallSheet
+        visible={paywallVisible}
+        onDismiss={() => setPaywallVisible(false)}
+        limits={premium.limits}
+        coolRoutingAvailable={premium.coolRouting(riderCountry as never) !== 'country_unavailable'}
+        onSubscribe={() => setPaywallVisible(false)}
+        onRestore={() => setPaywallVisible(false)}
+      />
     </View>
   );
 }

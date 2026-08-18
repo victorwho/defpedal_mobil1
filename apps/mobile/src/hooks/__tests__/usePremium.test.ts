@@ -193,3 +193,71 @@ describe('usePremium — flat routing', () => {
     expect(read().flatRoutesLeft()).toBe(Number.POSITIVE_INFINITY);
   });
 });
+
+describe('usePremium — enforcement is dark-gated', () => {
+  // The single most important property of the whole rollout: with the paywall
+  // hidden, NOTHING a rider can do today starts being refused. Every screen
+  // goes through these helpers precisely so this cannot be forgotten at a call
+  // site.
+  it('never blocks a save while the paywall is dark, even far over the limit', () => {
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: false });
+    expect(read().blockSaveRoute(9999)).toBe(false);
+  });
+
+  it('never blocks a pack download while the paywall is dark', () => {
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: false });
+    expect(read().blockDownloadPack(9999)).toBe(false);
+  });
+
+  it('charges no flat-route quota while the paywall is dark', () => {
+    // Otherwise a reveal would find riders already part-way through an
+    // allowance they never knew existed.
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: false });
+    expect(read().flatRideToCharge()).toBeNull();
+  });
+
+  it('reports enforcement off while dark and on once revealed', () => {
+    seed({ tier: 'free', expiresAt: null, uiEnabled: false });
+    expect(read().enforcementEnabled).toBe(false);
+    seed({ tier: 'free', expiresAt: null, uiEnabled: true });
+    expect(read().enforcementEnabled).toBe(true);
+  });
+
+  it('blocks a save over the limit once the paywall is revealed', () => {
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: true });
+    expect(read().blockSaveRoute(FREE_LIMITS.savedRoutes!)).toBe(true);
+    expect(read().blockSaveRoute(FREE_LIMITS.savedRoutes! - 1)).toBe(false);
+  });
+
+  it('never blocks a subscriber', () => {
+    seed({ uiEnabled: true });
+    expect(read().blockSaveRoute(9999)).toBe(false);
+    expect(read().blockDownloadPack(9999)).toBe(false);
+  });
+
+  it('charges a metered rider once revealed', () => {
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: true });
+    expect(read().flatRideToCharge()).toBe(read().flatRoute().periodKey);
+  });
+
+  it('charges nothing for a grandfathered rider — the counter is meaningless there', () => {
+    seed({ tier: 'free', isGrandfathered: true, expiresAt: null, uiEnabled: true });
+    expect(read().flatRideToCharge()).toBeNull();
+  });
+
+  it('charges nothing for a subscriber', () => {
+    seed({ uiEnabled: true });
+    expect(read().flatRideToCharge()).toBeNull();
+  });
+
+  it('charges nothing once the allowance is spent', () => {
+    seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: true });
+    const periodKey = read().flatRoute().periodKey;
+    act(() => {
+      for (let i = 0; i < FREE_LIMITS.flatRidesPerMonth!; i += 1) {
+        useAppStore.getState().consumeFlatRouteLocally(periodKey);
+      }
+    });
+    expect(read().flatRideToCharge()).toBeNull();
+  });
+});
