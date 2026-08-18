@@ -8,6 +8,7 @@ import { captureServerException } from './lib/sentry';
 import { buildRequestTelemetry } from './lib/telemetry';
 import { buildAccountRoutes } from './routes/account';
 import { buildActivityFeedRoutes } from './routes/activity-feed';
+import { buildBillingRoutes } from './routes/billing';
 import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
@@ -282,6 +283,12 @@ export const buildApp = (options: {
     prefix: '/v1',
   });
   void app.register(buildPushReceiptRoutes(dependencies), {
+    prefix: '/v1',
+  });
+  // Pedal Plus billing webhook. Registered unconditionally: it fails closed on
+  // an unset REVENUECAT_WEBHOOK_SECRET, so an unconfigured deployment exposes
+  // a 500, never an open writer.
+  void app.register(buildBillingRoutes(dependencies), {
     prefix: '/v1',
   });
 
