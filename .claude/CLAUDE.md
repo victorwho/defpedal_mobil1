@@ -348,6 +348,8 @@ Server pushes reach Android ONLY if the Expo project (`@victorwho/defensive-peda
 
 **9. `notification_log.status` is alert-grade — keep it precise.** `failed` means "we had a token and Expo rejected the send", and `suppression_reason` carries the Expo error code. Anything we *chose* not to send is `suppressed` + a reason (`no_push_token`, `daily_budget`, `quiet_hours`, `category_disabled`). Collapsing "no device registered" into `failed` is what pinned the apparent failure rate at ~62% and blinded the failed-vs-sent detector (error-log #80). Health check #8 in `docs/runbooks/monitoring.md`.
 
+**10. Notification prefs + quiet hours are SERVER-owned; the client hydrates, it does not overwrite.** `GET /v1/profile` returns `notifyWeather/Hazard/Community`, `quietHoursStart/End` and `shareConversionFeedOptin`; `apps/mobile/src/lib/profilePrefSync.ts` resolves per field on Profile mount — server wins where it holds a value, local seeds only what the server never had, quiet hours move as a pair, and a failed read falls back to pushing local. Before 2026-08-18 the screen pushed the device-scoped store's defaults unconditionally, so a reinstall reset the rider's window and re-opted them into sharing they had disabled (error-log #81). **Device timezone is the one field where local wins** — it is device truth and a travelling rider's zone changes. Quiet hours became editable the same day (audit UX-6): two pickers over 48 half-hour options from `src/lib/quietHours.ts`; values MUST stay zero-padded `'HH:MM'` because `isInQuietHours` compares them lexicographically, and `start === end` is an empty window that disables quiet hours rather than blacking out the day.
+
 **New-notification checklist:** (a) guard with `hasNotificationsNativeModule()`; (b) request permission via `ensureNotificationPermissionAsync()` somewhere reachable; (c) set `content.data.type`; (d) add a `handleNotificationResponse` case; (e) if showing in-app, add a transient store field + overlay manager; (f) add the channel on Android; (g) bundle check + test on a **preview** build (dev's old-arch bridge hides the bridgeless-only failures).
 
 ## Key Decisions & Rationale
@@ -495,7 +497,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Bike lane overlay from Mapbox vector tiles
 - Shield Mode basemap with auto day/night lighting
 - Light/dark/system theme picker in Profile (persisted, navigation forces dark)
-- Profile with 3-section layout (Cycling Preferences / Display / Account), bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles
+- Profile with 3-section layout (Cycling Preferences / Display / Account), bike type, cycling frequency, avoid unpaved, sharing toggle, POI toggles, editable quiet hours (since 2026-08-18 — see Notifications §10)
 - Sign in (Google OAuth) / sign out
 - Offline mutation queue (trips, hazards, feedback sync when online)
 - CO2 savings per trip (actual GPS distance, EU avg 120g/km) on trip history cards, community feed, and "Your Impact" stats card in History tab
