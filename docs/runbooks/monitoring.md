@@ -67,6 +67,31 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
    A sudden jump in `abandoned` or in the true-loss count is a regression
    in the offline queue / ride-end drain — treat like an error spike.
 
+8. **Push delivery health** (Supabase SQL) — this is the signal that surfaced
+   error-log #69 (Android delivery silently dead for months, visible only as a
+   lopsided failed-vs-sent ratio). Since 2026-08-18 the statuses are precise:
+   `failed` means **we had a token and Expo rejected the send**, and
+   `suppression_reason` carries the Expo error code; everything we chose not to
+   send is `suppressed` with a reason (`no_push_token`, `daily_budget`,
+   `quiet_hours`, `category_disabled`):
+   ```sql
+   SELECT status, coalesce(suppression_reason,'(none)') AS reason,
+          category, count(*) AS n, max(created_at)::date AS last_seen
+   FROM notification_log
+   WHERE created_at > now() - interval '30 days'
+   GROUP BY 1,2,3 ORDER BY n DESC;
+   ```
+   **Any material count of `failed`** now deserves triage — look at the reason:
+   `InvalidCredentials` = a missing/expired FCM V1 key for that package (the #69
+   shape, NOT a stale token), `MessageRateExceeded` = throttling,
+   `DeviceNotRegistered` = a dead token that the immediate prune should have
+   removed. A large `suppressed/no_push_token` count is **expected and benign** —
+   it just means the cron targeted users who never registered a device (319 such
+   users at the 2026-08-17 baseline); it is a targeting-efficiency signal, not an
+   outage. Rows written before 2026-08-18 use the old semantics (token-less users
+   logged as `failed`, no reason), so don't compare across that date.
+
+
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
 
 - Mobile errors: ≤ ~5/day, dominated by known benign titles (OSRM NoRoute,

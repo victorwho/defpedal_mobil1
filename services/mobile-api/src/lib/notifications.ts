@@ -61,13 +61,22 @@ export const isInQuietHours = (prefs: UserPrefs): boolean => {
   return currentTime >= start && currentTime < end;
 };
 
+/**
+ * Append a row to `notification_log`.
+ *
+ * `reason` lands in the `suppression_reason` column. It carries the suppression
+ * cause on `suppressed` rows AND the Expo error code on `failed` rows — without
+ * it a failure is a bare row with nothing to triage. `status='failed'` means
+ * "we had a token and the send was rejected"; everything else that stops a
+ * notification is a `suppressed` row with a reason.
+ */
 const logNotification = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string,
   category: NotificationCategory,
   payload: NotificationPayload,
   status: 'sent' | 'failed' | 'suppressed',
-  suppressionReason?: string,
+  reason?: string,
   ticketId?: string,
 ) => {
   try {
@@ -78,7 +87,7 @@ const logNotification = async (
       body: payload.body,
       data: payload.data ?? null,
       status,
-      suppression_reason: suppressionReason ?? null,
+      suppression_reason: reason ?? null,
       expo_ticket_id: ticketId ?? null,
     });
   } catch {
@@ -160,7 +169,15 @@ export const dispatchNotification = async (
     .eq('user_id', userId);
 
   if (!tokens || tokens.length === 0) {
-    await logNotification(supabase, userId, category, payload, 'failed');
+    // A user with no registered device is NOT a delivery failure, and logging it
+    // as one saturated the only signal we have for real push outages: 2,329 of
+    // 2,329 'failed' rows in the 30 days to 2026-08-17 were this case (zero Expo
+    // tickets; 314 of 319 affected users had no token at all), pinning the
+    // apparent failure rate at ~62%. Error-log #69 — months of silently dead
+    // Android delivery — was caught precisely by eyeballing failed-vs-sent, and
+    // would have been invisible under that noise. Keep 'failed' meaning "Expo
+    // rejected a send we actually attempted".
+    await logNotification(supabase, userId, category, payload, 'suppressed', 'no_push_token');
     return;
   }
 
@@ -193,7 +210,7 @@ export const dispatchNotification = async (
       category,
       payload,
       result.ticketId ? 'sent' : 'failed',
-      undefined,
+      result.ticketId ? undefined : (result.errorCode ?? 'unknown_error'),
       result.ticketId ?? undefined,
     );
   }

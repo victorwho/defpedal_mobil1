@@ -518,7 +518,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
   - Share: native Share API from badge detail modal
   - Design system: BadgeIcon (3 sizes), BadgeCard, BadgeInlineChip, BadgeProgressBar, TrophyCaseHeader, CategoryTabBar, BadgeDetailModal, BadgeUnlockOverlay
 - **Rider Tier XP System (10 tiers: Kickstand → Legend):**
-  - Full-stack: `rider_xp_log` table, `award_ride_xp` RPC, `total_xp`/`rider_tier` on profiles
+  - Full-stack: `xp_events` table (docs/plans elsewhere still call it `rider_xp_log` — that name does not exist in the live DB), `award_ride_xp` RPC, `total_xp`/`rider_tier` on profiles
   - XP awarded on: ride completion, badge earning, streak days. Multipliers for distance/weather/hazards
   - Post-ride impact: XP breakdown always visible with total + tier progress bar. Tier backfilled from dashboard
   - Profile: compact two-column TierRankCard (mascot+name | XP+progress bar)
