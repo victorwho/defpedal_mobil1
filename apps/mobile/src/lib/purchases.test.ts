@@ -20,7 +20,11 @@ import Purchases from 'react-native-purchases';
 const { env } = vi.hoisted(() => ({
   // Both platforms keyed: the repo's RN mock reports iOS, and the test should
   // not silently depend on which one it picked.
-  env: { revenueCatAndroidKey: 'goog_test', revenueCatIosKey: 'appl_test' },
+  env: {
+    revenueCatAndroidKey: 'goog_test',
+    revenueCatIosKey: 'appl_test',
+    appEnv: 'development',
+  },
 }));
 
 vi.mock('./env', () => ({ mobileEnv: env }));
@@ -48,6 +52,7 @@ beforeEach(() => {
   nativeModules.RNPurchases = {};
   env.revenueCatAndroidKey = 'goog_test';
   env.revenueCatIosKey = 'goog_test';
+  env.appEnv = 'development';
   vi.clearAllMocks();
   sdk.getOfferings.mockResolvedValue({ current: null } as never);
   sdk.purchasePackage.mockResolvedValue({ customerInfo: {} } as never);
@@ -125,6 +130,26 @@ describe('identity', () => {
     await identifyPurchaser(null);
     expect(sdk.logOut).toHaveBeenCalled();
     expect(sdk.logIn).not.toHaveBeenCalled();
+  });
+
+  it('never logs verbosely in production — receipts must not reach logcat', async () => {
+    env.appEnv = 'production';
+    await identifyPurchaser('user-1');
+    expect(sdk.setLogLevel).toHaveBeenCalledWith('ERROR');
+  });
+
+  it('logs verbosely outside production', async () => {
+    env.appEnv = 'development';
+    await identifyPurchaser('user-1');
+    expect(sdk.setLogLevel).toHaveBeenCalledWith('VERBOSE');
+  });
+
+  it('configures even when the SDK has no setLogLevel', async () => {
+    // Logging is never load-bearing.
+    const noLogger = { ...sdk, setLogLevel: undefined };
+    __resetPurchasesForTests(noLogger);
+    await identifyPurchaser('user-1');
+    expect(sdk.configure).toHaveBeenCalled();
   });
 
   it('configures only once per process', async () => {

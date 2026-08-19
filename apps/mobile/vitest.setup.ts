@@ -98,6 +98,7 @@ vi.mock('react-native-purchases', () => ({
   __esModule: true,
   default: {
     configure: vi.fn(),
+    setLogLevel: vi.fn(),
     logIn: vi.fn().mockResolvedValue({}),
     logOut: vi.fn().mockResolvedValue({}),
     getOfferings: vi.fn().mockResolvedValue({ current: null }),

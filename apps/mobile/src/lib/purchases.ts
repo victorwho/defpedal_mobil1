@@ -130,6 +130,22 @@ const ensureConfigured = (appUserId: string | null): PurchasesModule | null => {
 
   if (!configured) {
     try {
+      // Verbose logging is a DEV-ONLY affordance. RevenueCat's own quickstart
+      // sets it unconditionally, which on a release build writes purchase and
+      // receipt detail to logcat where any app with log access can read it.
+      //
+      // The level is passed as a string rather than via the SDK's `LOG_LEVEL`
+      // enum on purpose: that enum's members ARE these strings
+      // (VERBOSE = "VERBOSE"), and importing it would mean a top-level import
+      // of the SDK — which is exactly what the lazy require above exists to
+      // avoid. Failures here never block configuration.
+      try {
+        const level = mobileEnv.appEnv === 'production' ? 'ERROR' : 'VERBOSE';
+        Purchases.setLogLevel?.(level);
+      } catch {
+        // Older SDKs expose a different shape; logging is never load-bearing.
+      }
+
       Purchases.configure({ apiKey: key, appUserID: appUserId ?? undefined });
       configured = true;
     } catch {
