@@ -143,6 +143,31 @@ const iosGoogleSignInInfoPlist =
       }
     : {};
 
+// RevenueCat SDK keys are PUBLIC and app-specific (`goog_` on Android,
+// `appl_` on iOS). They are embedded in the binary by design.
+//
+// A SECRET key (`sk_`) must never be — extracted from an APK it grants
+// read/write access to every subscriber in the project: granting entitlements,
+// revoking them, reading purchase history. The two are easy to confuse because
+// RevenueCat's "API keys" page offers secret keys, while the public one only
+// appears on the App's own page once the app is created.
+//
+// Fail the build rather than ship it.
+for (const [name, value] of [
+  ['EXPO_PUBLIC_REVENUECAT_ANDROID_KEY', process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY],
+  ['EXPO_PUBLIC_REVENUECAT_IOS_KEY', process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY],
+] as const) {
+  if (value && value.startsWith('sk_')) {
+    throw new Error(
+      `${name} holds a RevenueCat SECRET key (sk_...). Secret keys must never be ` +
+        'embedded in the app — anyone can extract them from the APK and modify ' +
+        'every subscriber in the project. Use the PUBLIC app-specific key instead: ' +
+        'RevenueCat > Project settings > Apps > (your app) > Public app-specific API key ' +
+        '(goog_... for Android, appl_... for iOS).',
+    );
+  }
+}
+
 // Sentry config plugin slugs. Read from env so we never commit org/project
 // values; activate the plugin only when both are set. SENTRY_AUTH_TOKEN is
 // expected to be an EAS secret (set via `eas secret:create`) for source-map
