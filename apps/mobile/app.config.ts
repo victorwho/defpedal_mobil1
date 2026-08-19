@@ -387,6 +387,8 @@ export default () => ({
         'MAPBOX_ACCESS_TOKEN',
         'VITE_MAPBOX_ACCESS_TOKEN',
       ]),
+      revenueCatAndroidKey: resolveExpoExtraValue(['EXPO_PUBLIC_REVENUECAT_ANDROID_KEY']),
+      revenueCatIosKey: resolveExpoExtraValue(['EXPO_PUBLIC_REVENUECAT_IOS_KEY']),
       supabaseUrl: resolveExpoExtraValue([
         'EXPO_PUBLIC_SUPABASE_URL',
         'SUPABASE_URL',

@@ -85,6 +85,27 @@ vi.mock('expo-clipboard', () => ({
 // real modules are never loaded, so their `require('react-native')` never
 // fires. This is what previously blocked LeaderboardSection / HazardDetailSheet
 // (re-enabled 2026-06-09).
+// `react-native-purchases` is externalized, so its CJS `require('react-native')`
+// at module load runs in Node and bypasses the `^react-native$` Vite alias —
+// resolving to the REAL react-native, whose Flow syntax then fails to parse
+// ("Unexpected token 'typeof'"). A per-FILE vi.mock does not prevent this;
+// the stub has to exist in the registry before anything requires it, exactly
+// like @sentry/react-native and posthog-react-native below.
+//
+// Exported as vi.fn()s so a test can `import Purchases from
+// 'react-native-purchases'` and drive each call.
+vi.mock('react-native-purchases', () => ({
+  __esModule: true,
+  default: {
+    configure: vi.fn(),
+    logIn: vi.fn().mockResolvedValue({}),
+    logOut: vi.fn().mockResolvedValue({}),
+    getOfferings: vi.fn().mockResolvedValue({ current: null }),
+    purchasePackage: vi.fn().mockResolvedValue({ customerInfo: {} }),
+    restorePurchases: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 vi.mock('@sentry/react-native', () => {
   const scope = { setContext: vi.fn(), setTag: vi.fn(), setExtra: vi.fn(), setLevel: vi.fn(), setUser: vi.fn() };
   return {

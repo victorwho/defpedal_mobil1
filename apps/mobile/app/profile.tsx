@@ -18,6 +18,7 @@ import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { PaywallSheet } from '../src/design-system/organisms/PaywallSheet';
+import { usePaywallOffer } from '../src/hooks/usePaywallOffer';
 import { usePremium } from '../src/hooks/usePremium';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
   // than omitting a benefit.
   const riderCountry = useAppStore((state) => state.regionGate.countryCode);
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const paywallOffer = usePaywallOffer(paywallVisible);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -1226,8 +1228,25 @@ export default function ProfileScreen() {
         onDismiss={() => setPaywallVisible(false)}
         limits={premium.limits}
         coolRoutingAvailable={premium.coolRouting(riderCountry as never) !== 'country_unavailable'}
-        onSubscribe={() => setPaywallVisible(false)}
-        onRestore={() => setPaywallVisible(false)}
+        monthlyPrice={paywallOffer.monthlyPrice}
+        annualPrice={paywallOffer.annualPrice}
+        trialDays={paywallOffer.trialDays}
+        busy={paywallOffer.busy}
+        onSubscribe={(plan) => {
+          void paywallOffer.subscribe(plan).then((outcome) => {
+            // A cancellation is the rider changing their mind — close quietly,
+            // never as an error. On success the sheet closes and entitlement
+            // arrives from the server on the next profile sync.
+            if (outcome.kind === 'purchased' || outcome.kind === 'cancelled') {
+              setPaywallVisible(false);
+            }
+          });
+        }}
+        onRestore={() => {
+          void paywallOffer.restore().then((outcome) => {
+            if (outcome.kind === 'restored') setPaywallVisible(false);
+          });
+        }}
       />
     </View>
   );

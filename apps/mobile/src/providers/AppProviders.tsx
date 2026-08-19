@@ -13,6 +13,7 @@ import { NotificationProvider } from './NotificationProvider';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
 import { OffScreenCaptureHostProvider } from './OffScreenCaptureHost';
 import { ProfileDeviceSyncManager } from './ProfileDeviceSyncManager';
+import { PurchasesIdentityManager } from './PurchasesIdentityManager';
 import { ShareClaimProcessor } from './ShareClaimProcessor';
 import { ShareFallbackBootstrap } from './ShareFallbackBootstrap';
 import { TelemetryProvider } from './TelemetryProvider';
@@ -45,6 +46,9 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
                 and push copy use real values, not schema-era defaults.
               */}
               <ProfileDeviceSyncManager />
+              {/* Ties the store SDK to the signed-in account so a
+                  subscription cannot follow the device to the next rider. */}
+              <PurchasesIdentityManager />
               <DailyWeatherScheduler />
               {/*
                 ActivationLadderScheduler mounted AFTER DailyWeatherScheduler:

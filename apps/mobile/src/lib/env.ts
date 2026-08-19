@@ -15,6 +15,8 @@ const extra =
     sentryDsn?: string;
     sentryEnvironment?: string;
     sentryTracesSampleRate?: string;
+    revenueCatAndroidKey?: string;
+    revenueCatIosKey?: string;
     posthogApiKey?: string;
     posthogHost?: string;
     devAuthBypassEnabled?: string;
@@ -56,6 +58,14 @@ export const mobileEnv = {
   appEnv: publicEnv.EXPO_PUBLIC_APP_ENV ?? extra.appEnv ?? 'development',
   appVariant: extra.appVariant ?? 'development',
   mobileApiUrl: publicEnv.EXPO_PUBLIC_MOBILE_API_URL ?? extra.mobileApiUrl ?? '',
+  // RevenueCat PUBLIC SDK keys — platform-specific and safe to ship (they can
+  // only read offerings and start purchases). Empty means billing is not
+  // configured for this build, which the adapter treats as "unavailable"
+  // rather than an error.
+  revenueCatAndroidKey:
+    publicEnv.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? extra.revenueCatAndroidKey ?? '',
+  revenueCatIosKey:
+    publicEnv.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? extra.revenueCatIosKey ?? '',
   mapboxPublicToken:
     publicEnv.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ?? extra.mapboxPublicToken ?? '',
   supabaseUrl: publicEnv.EXPO_PUBLIC_SUPABASE_URL ?? extra.supabaseUrl ?? '',

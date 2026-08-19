@@ -38,6 +38,7 @@ import {
   PremiumLimitCard,
   type PremiumLimitKind,
 } from '../src/design-system/organisms/PremiumLimitCard';
+import { usePaywallOffer } from '../src/hooks/usePaywallOffer';
 import { usePremium } from '../src/hooks/usePremium';
 import { mobileApi } from '../src/lib/api';
 import { telemetry } from '../src/lib/telemetry';
@@ -109,6 +110,7 @@ function RoutePreviewScreen() {
   useLockOrientation();
   const premium = usePremium();
   const [paywallVisible, setPaywallVisible] = useState(false);
+  const paywallOffer = usePaywallOffer(paywallVisible);
   const [premiumLimit, setPremiumLimit] = useState<PremiumLimitKind | null>(null);
   const routeRequest = useAppStore((state) => state.routeRequest);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
@@ -1143,8 +1145,22 @@ function RoutePreviewScreen() {
       onDismiss={() => setPaywallVisible(false)}
       limits={premium.limits}
       coolRoutingAvailable={coolAvailable}
-      onSubscribe={() => setPaywallVisible(false)}
-      onRestore={() => setPaywallVisible(false)}
+      monthlyPrice={paywallOffer.monthlyPrice}
+      annualPrice={paywallOffer.annualPrice}
+      trialDays={paywallOffer.trialDays}
+      busy={paywallOffer.busy}
+      onSubscribe={(plan) => {
+        void paywallOffer.subscribe(plan).then((outcome) => {
+          if (outcome.kind === 'purchased' || outcome.kind === 'cancelled') {
+            setPaywallVisible(false);
+          }
+        });
+      }}
+      onRestore={() => {
+        void paywallOffer.restore().then((outcome) => {
+          if (outcome.kind === 'restored') setPaywallVisible(false);
+        });
+      }}
     />
 
     {/* Save toast */}
