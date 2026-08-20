@@ -38,6 +38,7 @@ import {
   PremiumLimitCard,
   type PremiumLimitKind,
 } from '../src/design-system/organisms/PremiumLimitCard';
+import { awaitPremiumActivation, refreshPremiumEntitlement } from '../src/lib/premiumRefresh';
 import { usePaywallOffer } from '../src/hooks/usePaywallOffer';
 import { usePremium } from '../src/hooks/usePremium';
 import { mobileApi } from '../src/lib/api';
@@ -1149,16 +1150,29 @@ function RoutePreviewScreen() {
       annualPrice={paywallOffer.annualPrice}
       trialDays={paywallOffer.trialDays}
       busy={paywallOffer.busy}
+      isSubscribed={premium.isPlus}
+      expiresAt={premium.entitlement.expiresAt}
+      isInBillingRetry={premium.entitlement.isInBillingRetry}
       onSubscribe={(plan) => {
         void paywallOffer.subscribe(plan).then((outcome) => {
-          if (outcome.kind === 'purchased' || outcome.kind === 'cancelled') {
+          if (outcome.kind === 'cancelled') {
             setPaywallVisible(false);
+            return;
+          }
+          if (outcome.kind === 'purchased') {
+            setPaywallVisible(false);
+            // Entitlement arrives via webhook a moment after the store
+            // returns; poll so the rider sees Plus without a restart.
+            void awaitPremiumActivation();
           }
         });
       }}
       onRestore={() => {
         void paywallOffer.restore().then((outcome) => {
-          if (outcome.kind === 'restored') setPaywallVisible(false);
+          if (outcome.kind === 'restored') {
+            setPaywallVisible(false);
+            void refreshPremiumEntitlement();
+          }
         });
       }}
     />

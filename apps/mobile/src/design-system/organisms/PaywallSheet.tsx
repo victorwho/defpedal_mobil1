@@ -43,6 +43,8 @@ import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
 import { useT } from '../../hooks/useTranslation';
+import { useLocale } from '../../hooks/useTranslation';
+import { intlLocaleTag } from '../../lib/dateFormat';
 
 const SWIPE_DISMISS_DY = 120;
 const SWIPE_DISMISS_VY = 0.6;
@@ -70,6 +72,18 @@ export interface PaywallSheetProps {
   /** True only where the shade graph exists — gates the cool-routing benefit. */
   coolRoutingAvailable?: boolean;
   busy?: boolean;
+  /**
+   * True when the rider already has Plus. Replaces the plan buttons with their
+   * status — offering someone the subscription they are already paying for is
+   * both confusing and a real way to take a second payment.
+   */
+  isSubscribed?: boolean;
+  /** End of the current paid period, ISO. Shown when subscribed. */
+  expiresAt?: string | null;
+  /** True while the store is retrying a failed payment. */
+  isInBillingRetry?: boolean;
+  /** Opens the store's subscription management screen. */
+  onManage?: () => void;
   onSubscribe: (plan: PaywallPlan) => void;
   onRestore: () => void;
 }
@@ -83,6 +97,10 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
   trialDays,
   coolRoutingAvailable = false,
   busy = false,
+  isSubscribed = false,
+  expiresAt = null,
+  isInBillingRetry = false,
+  onManage,
   onSubscribe,
   onRestore,
 }) => {
@@ -90,6 +108,7 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
   const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const t = useT();
+  const { locale } = useLocale();
 
   const translateY = useRef(new Animated.Value(360)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
@@ -250,6 +269,29 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
             ))}
           </ScrollView>
 
+          {isSubscribed ? (
+            <View style={styles.activeBlock}>
+              <Text style={[styles.activeTitle, { color: colors.textPrimary }]}>
+                {t('premium.activeTitle')}
+              </Text>
+              {isInBillingRetry ? (
+                <Text style={[styles.activeMeta, { color: colors.danger }]}>
+                  {t('premium.billingRetry')}
+                </Text>
+              ) : expiresAt ? (
+                <Text style={[styles.activeMeta, { color: colors.textSecondary }]}>
+                  {t('premium.renews', {
+                    date: new Date(expiresAt).toLocaleDateString(intlLocaleTag(locale)),
+                  })}
+                </Text>
+              ) : null}
+              {onManage ? (
+                <Button fullWidth variant="secondary" onPress={onManage}>
+                  {t('premium.manage')}
+                </Button>
+              ) : null}
+            </View>
+          ) : (
           <View style={styles.plans}>
             {monthlyPrice ? (
               <Button
@@ -276,8 +318,9 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
               </Button>
             ) : null}
           </View>
+          )}
 
-          {trialDays && monthlyPrice ? (
+          {!isSubscribed && trialDays && monthlyPrice ? (
             <Text style={[styles.trialNote, { color: colors.textSecondary }]}>
               {t('premium.trialNote', { days: trialDays, price: monthlyPrice })}
             </Text>
@@ -323,6 +366,9 @@ const styles = StyleSheet.create({
   benefitTitle: { ...textSm, fontFamily: fontFamily.body.semiBold },
   benefitBody: { ...textXs, lineHeight: 18 },
   plans: { gap: space[2], marginTop: space[2] },
+  activeBlock: { gap: space[2], marginTop: space[2], alignItems: 'center' },
+  activeTitle: { ...textSm, fontFamily: fontFamily.body.semiBold },
+  activeMeta: { ...textXs, textAlign: 'center' },
   trialNote: { ...textXs, textAlign: 'center', marginTop: space[2] },
   restore: { ...textSm, textAlign: 'center', marginTop: space[3] },
   legal: { ...textXs, textAlign: 'center', marginTop: space[2], lineHeight: 16 },

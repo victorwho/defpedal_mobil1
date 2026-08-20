@@ -18,6 +18,7 @@ import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
 import { PaywallSheet } from '../src/design-system/organisms/PaywallSheet';
+import { awaitPremiumActivation, refreshPremiumEntitlement } from '../src/lib/premiumRefresh';
 import { usePaywallOffer } from '../src/hooks/usePaywallOffer';
 import { usePremium } from '../src/hooks/usePremium';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -1232,19 +1233,38 @@ export default function ProfileScreen() {
         annualPrice={paywallOffer.annualPrice}
         trialDays={paywallOffer.trialDays}
         busy={paywallOffer.busy}
+        isSubscribed={premium.isPlus}
+        expiresAt={premium.entitlement.expiresAt}
+        isInBillingRetry={premium.entitlement.isInBillingRetry}
+        onManage={() => {
+          void Linking.openURL(
+            'https://play.google.com/store/account/subscriptions?package=com.defensivepedal.mobile',
+          );
+        }}
         onSubscribe={(plan) => {
           void paywallOffer.subscribe(plan).then((outcome) => {
             // A cancellation is the rider changing their mind — close quietly,
-            // never as an error. On success the sheet closes and entitlement
-            // arrives from the server on the next profile sync.
-            if (outcome.kind === 'purchased' || outcome.kind === 'cancelled') {
+            // never as an error.
+            if (outcome.kind === 'cancelled') {
               setPaywallVisible(false);
+              return;
+            }
+            if (outcome.kind === 'purchased') {
+              setPaywallVisible(false);
+              // The store returns as soon as Google takes payment, but our
+              // entitlement arrives via RevenueCat's webhook a moment later.
+              // Without this poll the rider pays and sees no change until the
+              // next cold start.
+              void awaitPremiumActivation();
             }
           });
         }}
         onRestore={() => {
           void paywallOffer.restore().then((outcome) => {
-            if (outcome.kind === 'restored') setPaywallVisible(false);
+            if (outcome.kind === 'restored') {
+              setPaywallVisible(false);
+              void refreshPremiumEntitlement();
+            }
           });
         }}
       />
