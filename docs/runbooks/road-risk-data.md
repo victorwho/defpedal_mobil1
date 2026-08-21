@@ -63,6 +63,19 @@ boundaries are defined in `services/mobile-api/src/lib/risk.ts:33-42`:
 Score exactly `0` is reserved for "No data" — loader scripts MUST floor
 real values to `0.5`. Scores above 100 are valid (Extreme tier).
 
+> ⚠️ **The 0.5 floor is a hard DB-contract invariant that the b36v1 export
+> violated** (error-log #83). The v31 model's shifted score is
+> `raw_risk + 50.0`, and the −50 dedicated-infrastructure bonus puts
+> cycleways at exactly 0 — so the 2026-08-01 EU swap stored every cycleway
+> as the "No data" sentinel and the app painted the safest infrastructure
+> blue, worst on safe routes (59% of Unirii→Herăstrău). Repaired in place
+> 2026-08-21 (`risk_score ≤ 0 AND raw_risk IS NOT NULL` → 0.5; migration
+> `202608210001`; affected ids kept in `road_risk_zero_repair_20260821`
+> for rollback — drop that table after ~2026-09-21). The export now floors
+> at the source (`export_risk_eu.py` in OSRM_Server). When validating any
+> future generation, check `count(*) WHERE risk_score <= 0` in a city bbox
+> BEFORE the swap — it must be 0.
+
 The API does `displayScore = 100 - avg_score` before returning to the
 client, so on the phone "higher = safer". Do NOT mistake the client-visible
 number for the DB scale.

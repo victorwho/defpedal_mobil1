@@ -451,15 +451,20 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-08-18)
+## Current State (as of 2026-08-21)
 
 > Entries below are dated and append-only — the newest facts are usually in the
-> most recent bullets, not the top. Latest shipped work: **intersection tie fix
-> in the risk-scoring RPC** (migration `202608170001`, live 2026-08-18, DB-only)
-> on top of **risk scores EU-wide in-app + RO-era remnant cleanup + cool/shade
-> routing** (commit `e0784c6`, preview v0.2.124 build 127 device-tested). The
-> server halves of that batch ARE deployed — Cloud Run `defpedal-api-00129-5n6`,
-> built off merged `main` (verified 2026-08-17).
+> most recent bullets, not the top. Latest shipped work: **cycleway "No data"
+> repair** (2026-08-21, DB-only, migration `202608210001`): the b36v1 export had
+> stored every EU cycleway at the score-0 "no data" sentinel (raw −50 infra
+> bonus + 50 shift, no floor) — repaired in place to 0.5 ('Very safe'), export
+> floor added in OSRM_Server's `export_risk_eu.py`, error-log #83. Before that:
+> **intersection tie fix in the risk-scoring RPC** (migration `202608170001`,
+> live 2026-08-18, DB-only) on top of **risk scores EU-wide in-app + RO-era
+> remnant cleanup + cool/shade routing** (commit `e0784c6`, preview v0.2.124
+> build 127 device-tested). The server halves of that batch ARE deployed —
+> Cloud Run `defpedal-api-00129-5n6`, built off merged `main` (verified
+> 2026-08-17).
 
 ### Working Features
 - **Global availability (sessions 87–88, 2026-07-12/13, MERGED to main + deployed — Cloud Run `defpedal-api-00110-xnc`, migration `202607120001` live):** store listings can open worldwide; new installs run a one-time onboarding gate (`app/onboarding/region-check.tsx`, between location and consent). GPS reverse-geocode → `isAppCountrySupported` in `packages/core/src/appAvailability.ts` (**EU-27 + EEA + CH — UK deliberately excluded**, per the confirmed OSRM coverage list 2026-07-12; module deliberately separate from `countryCoverage.ts` — app availability ≠ OSRM routing coverage, but the two 31-country lists are kept in sync by a test). Supported → silent pass; unknown → searchable country picker (`src/lib/countries.ts`); unsupported → email waitlist (`POST /v1/country-waitlist`, anonymous-allowed via `requireAuthenticatedUser`, `countryWaitlist` rate bucket 3/h, dedupe on (email, country_code)) + **"Continue anyway" soft gate** (Mapbox fallback routing works worldwide). Decision persists in the device-scoped `regionGate` store slice (NOT reset by `resetUserScopedState`). Table `country_waitlist` is RLS deny-all (service-role only; read via SQL editor: `SELECT email, country_code, created_at FROM country_waitlist`). **Routing dispatch rewired the same session** (EU-wide OSRM went live): Safe/Flat serve all 31 countries — see "OSRM Servers" section. Companion pieces on this build: GENERIC quiz pool (never serve RO/ES law outside RO/ES), search country-hint across all 31, fake-GPS dev tool in Diagnostics (inert in production — dual gate `appVariant`/`appEnv`), anonymous risk parity on `/v1/risk-segments`, oversized-geometry defenses on both `/v1/risk-segments` and `/v1/elevation-profile` (8 MiB bodyLimit + 15k server downsample + 12k client cap — error-log #64). **Shipped as v0.2.101** (Android AAB build 104 archived; iOS build 19 VALID on TestFlight 2026-07-13). Keep the `osrm-es.*` Caddy aliases until the fleet is on ≥v0.2.101 — old production clients hardcode them for Spanish routing.
