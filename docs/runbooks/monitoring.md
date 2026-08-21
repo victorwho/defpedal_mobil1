@@ -109,10 +109,21 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
    (`alertPolicies/10278737109769293908`) fires on any `severity>=ERROR` entry in
    `cloudscheduler.googleapis.com/executions`, i.e. ANY job, and emails the
    *"Victor (defpedal ops)"* channel, rate-limited to one notification per hour.
-   ⚠️ **Deliverability of that email channel has not been proven** — it was
-   created via the Monitoring API and GCP reports no explicit verification
-   status. Confirm once with **Send test notification** on the policy page in the
-   Cloud Console; if no mail arrives, verify the channel there.
+   ✅ **Channel VERIFIED 2026-08-21** — delivery proven end-to-end via
+   `notificationChannels:sendVerificationCode` → `:verify`, so
+   `verificationStatus: VERIFIED` is recorded state, not an inference.
+
+   ⚠️ **`monitoring.googleapis.com` must stay ENABLED.** It was *disabled* on
+   this project when these policies were created — and creating them still
+   returned 200 with real resource IDs, which read back as `enabled: True`.
+   Only a service-consuming method (`sendVerificationCode`) surfaced the truth
+   with `403 SERVICE_DISABLED`. So "the policy exists and looks enabled" does
+   NOT prove alerting works. Check with:
+   ```bash
+   gcloud services list --enabled --project gen-lang-client-0895796477      --filter="config.name:monitoring.googleapis.com"
+   ```
+   Blank output means alerting is inert; re-enable with
+   `gcloud services enable monitoring.googleapis.com --project …`.
 
 
 10. **API 5xx** — alert policy *"API 5xx response"*
