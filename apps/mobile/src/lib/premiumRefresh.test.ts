@@ -16,6 +16,7 @@ vi.mock('./api', () => ({ mobileApi: { getProfile } }));
 import { useAppStore } from '../store/appStore';
 import {
   awaitPremiumActivation,
+  PREMIUM_ACTIVATION_DELAYS_MS,
   refreshPremiumEntitlement,
 } from './premiumRefresh';
 
@@ -67,6 +68,15 @@ describe('refreshPremiumEntitlement', () => {
 
 describe('awaitPremiumActivation', () => {
   const noDelays = [0, 0, 0, 0];
+
+  it('polls long enough to outlast a slow webhook', () => {
+    // Measured: a real purchase had the webhook land ~10s after the store
+    // returned. The schedule must comfortably exceed that, or the rider sees
+    // nothing until their next cold start.
+    const total = PREMIUM_ACTIVATION_DELAYS_MS.reduce((a, b) => a + b, 0);
+    expect(total).toBeGreaterThanOrEqual(30_000);
+    expect(PREMIUM_ACTIVATION_DELAYS_MS[0]).toBe(0); // first attempt immediate
+  });
 
   it('succeeds immediately when the webhook already landed', async () => {
     getProfile.mockResolvedValue({ premium: premium('plus') });

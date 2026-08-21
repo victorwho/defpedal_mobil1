@@ -19,11 +19,20 @@ import { mobileApi } from './api';
 import { useAppStore } from '../store/appStore';
 
 /**
- * Backoff for post-purchase polling. Front-loaded because the webhook usually
- * lands within a second or two, and bounded because a rider staring at a
- * spinner is worse than one who sees Plus appear a beat later on their own.
+ * Backoff for post-purchase polling, in delays BETWEEN attempts.
+ *
+ * Sized from a measured production purchase (2026-08-21): the webhook landed
+ * ~10s after the store returned, and the original four-step schedule expired at
+ * 13.5s — it caught it with 3.5s to spare, which is not a margin worth relying
+ * on. This covers ~58s, so a slow webhook still resolves while the rider is
+ * looking at the app rather than on their next cold start.
+ *
+ * Nothing blocks on this: it is fire-and-forget, so a longer tail costs a
+ * handful of cheap profile GETs after a purchase, which is rare by definition.
  */
-export const PREMIUM_ACTIVATION_DELAYS_MS: readonly number[] = [0, 1500, 4000, 8000];
+export const PREMIUM_ACTIVATION_DELAYS_MS: readonly number[] = [
+  0, 1_500, 4_000, 8_000, 15_000, 30_000,
+];
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
