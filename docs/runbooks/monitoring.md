@@ -115,6 +115,33 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
    Cloud Console; if no mail arrives, verify the channel there.
 
 
+10. **API 5xx** — alert policy *"API 5xx response"*
+    (`alertPolicies/4031446777758626143`, added 2026-08-21) fires **per
+    occurrence** on any `httpRequest.status>=500` from `defpedal-api`, emailing
+    the *"Victor (defpedal ops)"* channel, rate-limited to one per hour.
+    ```bash
+    gcloud logging read 'resource.type="cloud_run_revision" AND
+      resource.labels.service_name="defpedal-api" AND httpRequest.status>=500'       --project gen-lang-client-0895796477 --limit 50 --freshness 7d       --format="value(httpRequest.status, httpRequest.requestUrl)" | sort | uniq -c
+    ```
+    **Why per-occurrence and not a rate?** Sentry already captures these (central
+    5xx `HttpError` capture in `app.ts` `setErrorHandler`), but its only alert is
+    the error-**rate** burst rule 733370 — and a 100%-broken *low-traffic*
+    endpoint never spikes. `POST /v1/saved-routes` 500'd on every attempt for a
+    week (~6 requests total) and nothing fired (error-log #83). Volume-based
+    alerting cannot catch that class by construction.
+    **Baseline at creation:** 26 in the prior 7 days — 18 saved-routes
+    (`avoid_heat`, fixed), 4 firstride 504s (cron batching, fixed), 4
+    billing-webhook (Pedal Plus rollout day, resolved; the current revision has
+    23 clean 200s). **Steady state should be ~0, so treat any alert as real.**
+    Check Sentry first for the stack, then Cloud Run logs for that URL.
+
+    ⚠️ **Still not covered: a first-seen Sentry issue that never returns 5xx** —
+    a caught-and-swallowed exception, or a mobile-side crash. Sentry's alert-rule
+    APIs return HTTP 410 ("This API no longer exists"), so that rule cannot be
+    created programmatically with the current token; it needs the Sentry UI:
+    **Alerts → Create Alert → Issues → "A new issue is created" → email**.
+
+
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
 
 - Mobile errors: ≤ ~5/day, dominated by known benign titles (OSRM NoRoute,
