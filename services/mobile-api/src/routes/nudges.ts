@@ -164,6 +164,51 @@ const ACTIONABLE_TRIGGERS: readonly NudgeTrigger[] = [
 // Build routes
 // ---------------------------------------------------------------------------
 
+
+/**
+ * Candidate-query caps (audit SCALE-6).
+ *
+ * These queries used to cap with **no `ORDER BY`**, which is the dangerous half:
+ * Postgres was free to return any N rows, so once a set outgrew its cap the
+ * users who got dropped were arbitrary AND the drop was silent — the cron still
+ * returned 200 having quietly skipped people. `mia-notification-cron` showed how
+ * that plays out: it truncated on wall-clock instead of row count and nobody
+ * noticed for 8 days (error-log #82).
+ *
+ * Each query below now has a deterministic order, so the processed prefix is
+ * stable and reproducible, and `reportIfTruncated` makes hitting a cap loud.
+ *
+ * Headroom at 2026-08-22: streak_state 399/1000, nudge_schedule 251/1000,
+ * trips 1,242/2,000 (62%), notify_streak profiles 2,570/5,000 (51%).
+ */
+const CANDIDATE_LIMITS = {
+  attribution: 1000,
+  ridePattern: 5000,
+  streakState: 1000,
+  citySchedule: 1000,
+  cityTrips: 2000,
+} as const;
+
+/**
+ * Log loudly when a capped query came back full. A full page means "there may be
+ * more that this run will never look at" — for a cron that means users silently
+ * skipped, so this is `error` level rather than `warn`: it should show up in the
+ * standard health check (docs/runbooks/monitoring.md) and be acted on, not
+ * scrolled past.
+ */
+const reportIfTruncated = (
+  log: { error: (obj: unknown, msg: string) => void },
+  query: string,
+  rowCount: number,
+  limit: number,
+): void => {
+  if (rowCount < limit) return;
+  log.error(
+    { event: 'nudge_candidates_truncated', query, returned: rowCount, limit },
+    'candidate query hit its cap — some users were NOT evaluated this run',
+  );
+};
+
 export const buildNudgeRoutes = (
   dependencies: MobileApiDependencies,
 ): FastifyPluginAsync => {
@@ -625,7 +670,8 @@ export const buildNudgeRoutes = (
           .gte('sent_at', lower)
           .lte('sent_at', upper)
           .in('trigger_id', ACTIONABLE_TRIGGERS)
-          .limit(1000);
+          .order('sent_at', { ascending: true })
+          .limit(CANDIDATE_LIMITS.attribution);
 
         if (error) {
           request.log.error(
@@ -638,6 +684,7 @@ export const buildNudgeRoutes = (
             details: [error.message],
           });
         }
+        reportIfTruncated(request.log, 'attribution', (rows ?? []).length, CANDIDATE_LIMITS.attribution);
 
         let attributed = 0;
 
@@ -716,7 +763,8 @@ export const buildNudgeRoutes = (
           .from('profiles')
           .select('id, quiet_hours_timezone')
           .eq('notify_streak', true)
-          .limit(5000);
+          .order('id', { ascending: true })
+          .limit(CANDIDATE_LIMITS.ridePattern);
 
         if (error) {
           request.log.error(
@@ -729,6 +777,7 @@ export const buildNudgeRoutes = (
             details: [error.message],
           });
         }
+        reportIfTruncated(request.log, 'ridePattern', (profileRows ?? []).length, CANDIDATE_LIMITS.ridePattern);
 
         const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
         let updated = 0;
@@ -880,7 +929,8 @@ const buildUserCandidateMap = async (
     .from('streak_state')
     .select('user_id, current_streak, last_qualifying_date')
     .gt('current_streak', 0)
-    .limit(1000);
+    .order('user_id', { ascending: true })
+    .limit(CANDIDATE_LIMITS.streakState);
 
   if (activeErr) {
     log.error(
@@ -888,6 +938,7 @@ const buildUserCandidateMap = async (
       'active-streak query failed',
     );
   }
+  reportIfTruncated(log, 'streakState:active', (activeRows ?? []).length, CANDIDATE_LIMITS.streakState);
 
   const DAY_MS = 24 * 60 * 60 * 1000;
   for (const row of (activeRows ?? []) as Array<{
@@ -943,7 +994,8 @@ const buildUserCandidateMap = async (
     .gte('longest_streak', 3)
     .lte('last_qualifying_date', dateOnly(yesterday))
     .gte('last_qualifying_date', dateOnly(threeDaysAgo))
-    .limit(1000);
+    .order('user_id', { ascending: true })
+    .limit(CANDIDATE_LIMITS.streakState);
 
   if (lostErr) {
     log.warn(
@@ -951,6 +1003,7 @@ const buildUserCandidateMap = async (
       'just-lost-streak query failed',
     );
   }
+  reportIfTruncated(log, 'streakState:justBroke', (lostRows ?? []).length, CANDIDATE_LIMITS.streakState);
 
   for (const row of (lostRows ?? []) as Array<{
     user_id: string;
@@ -987,7 +1040,8 @@ const buildUserCandidateMap = async (
     .eq('current_streak', 0)
     .lte('last_qualifying_date', dateOnly(threeDaysAgo))
     .gte('last_qualifying_date', dateOnly(thirtyDaysAgo))
-    .limit(1000);
+    .order('user_id', { ascending: true })
+    .limit(CANDIDATE_LIMITS.streakState);
 
   if (lapsedErr) {
     log.warn(
@@ -995,6 +1049,7 @@ const buildUserCandidateMap = async (
       'lapsed-reengagement query failed',
     );
   }
+  reportIfTruncated(log, 'streakState:lapsed', (lapsedRows ?? []).length, CANDIDATE_LIMITS.streakState);
 
   for (const row of (lapsedRows ?? []) as Array<{
     user_id: string;
@@ -1028,7 +1083,8 @@ const buildUserCandidateMap = async (
       .select('user_id, next_fire_at, last_sent_at')
       .eq('trigger_id', 'city_riders_pulse')
       .lte('next_fire_at', new Date().toISOString())
-      .limit(1000);
+      .order('next_fire_at', { ascending: true })
+      .limit(CANDIDATE_LIMITS.citySchedule);
 
     if (dueErr) {
       log.warn(
@@ -1036,6 +1092,7 @@ const buildUserCandidateMap = async (
         'city-pulse due-schedule query failed',
       );
     }
+    reportIfTruncated(log, 'citySchedule', (dueRows ?? []).length, CANDIDATE_LIMITS.citySchedule);
 
     for (const row of (dueRows ?? []) as Array<{
       user_id: string;
@@ -1184,10 +1241,12 @@ const seedCityPulseSchedules = async (
       .select('user_id')
       .gte('started_at', since)
       .not('started_at', 'is', null)
-      .limit(2000);
+      .order('started_at', { ascending: false })
+      .limit(CANDIDATE_LIMITS.cityTrips);
     if (tripsErr || !tripRows?.length) return;
 
     const userIds = [...new Set((tripRows as Array<{ user_id: string }>).map((r) => r.user_id))];
+    reportIfTruncated(log, 'cityTrips', (tripRows ?? []).length, CANDIDATE_LIMITS.cityTrips);
 
     const { data: existingRows } = await db
       .from('nudge_schedule')
