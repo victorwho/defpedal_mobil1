@@ -146,11 +146,12 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
     23 clean 200s). **Steady state should be ~0, so treat any alert as real.**
     Check Sentry first for the stack, then Cloud Run logs for that URL.
 
-    ⚠️ **Still not covered: a first-seen Sentry issue that never returns 5xx** —
-    a caught-and-swallowed exception, or a mobile-side crash. Sentry's alert-rule
-    APIs return HTTP 410 ("This API no longer exists"), so that rule cannot be
-    created programmatically with the current token; it needs the Sentry UI:
-    **Alerts → Create Alert → Issues → "A new issue is created" → email**.
+    ✅ **Covered since 2026-08-22:** a Sentry **first-seen issue** rule (created +
+    tested by Victor in the UI — Sentry's alert-rule APIs return HTTP 410, so it
+    cannot be scripted or read back from here). That is the half GCP cannot see:
+    an exception caught and swallowed, or a mobile-side crash, never returns a
+    5xx. Between the two, GCP catches anything that returns a 5xx and Sentry
+    catches anything that throws without one.
 
 
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
