@@ -219,12 +219,27 @@ export const HazardLayers = React.memo(
         const isCluster = Boolean(feature.properties.cluster);
         if (isCluster) {
           if (suppressClusterTaps) return;
-          const clusterId = feature.properties.cluster_id;
           const centerCoords = feature.geometry?.coordinates;
           const source = clusterSourceRef.current as any;
-          if (source?.getClusterExpansionZoom && clusterId != null) {
+          // `getClusterExpansionZoom` takes the cluster FEATURE, not its
+          // numeric `cluster_id`: it JSON.stringify()s whatever it is handed
+          // and the Android native side calls `Feature.fromJson(...)` on the
+          // UI thread with no try/catch. A bare number threw
+          // `JsonSyntaxException: Expected BEGIN_OBJECT but was NUMBER`, which
+          // escapes into RN's queue-thread exception handler on every cluster
+          // tap. (iOS wraps the parse and silently rejects instead, so the
+          // zoom just never happened there.) See error-log #90.
+          const clusterFeature =
+            feature.geometry && feature.properties.cluster_id != null
+              ? {
+                  type: 'Feature' as const,
+                  geometry: feature.geometry,
+                  properties: feature.properties,
+                }
+              : null;
+          if (source?.getClusterExpansionZoom && clusterFeature) {
             source
-              .getClusterExpansionZoom(clusterId)
+              .getClusterExpansionZoom(clusterFeature)
               .then((zoom: number) => {
                 if (
                   Array.isArray(centerCoords) &&
