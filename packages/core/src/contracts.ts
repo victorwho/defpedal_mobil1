@@ -327,6 +327,27 @@ export interface NearbyHazard {
   readonly expiresAt: string;
   readonly lastConfirmedAt: string | null;
   readonly description: string | null;
+  /**
+   * Whether this hazard may raise a proximity alert during navigation.
+   *
+   * Rider-reported hazards are always true. Imported hazards inherit the
+   * `alert_eligible` flag of their source in `hazard_import_sources`: a source
+   * whose coordinates are address-geocoded rather than reporter-pinned ships
+   * false, so a bad geocode cannot fire mid-ride haptics at the wrong place.
+   *
+   * This gates ALERTS ONLY. Map rendering shows every hazard regardless, so
+   * riders can still see and vote on them.
+   *
+   * Optional for back-compat with clients/servers predating migration
+   * 202608270002; treat `undefined` as `true`.
+   */
+  readonly alertEligible?: boolean;
+  /**
+   * Registry id of the external source this hazard was imported from
+   * (e.g. 'open311:koln'), or null when a rider reported it. Drives the
+   * provenance line on the hazard detail sheet.
+   */
+  readonly importSource?: string | null;
   readonly distanceMeters?: number;
 }
 

@@ -857,6 +857,7 @@ export const es: TranslationKeys = {
     communityScore: 'Puntuación de la comunidad',
     reportedAgo: 'Reportado {{time}}',
     lastConfirmedAgo: 'Última confirmación {{time}}',
+    importedFrom: 'Reportado vía {{source}}',
     confirms: 'Confirmaciones',
     dismisses: 'Descartes',
     types: {

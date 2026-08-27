@@ -983,6 +983,12 @@ export const buildV1Routes = (
             expiresAt: row.expires_at as string,
             lastConfirmedAt: (row.last_confirmed_at as string | null) ?? null,
             description: (row.description as string | null) ?? null,
+            // Default true so a row predating migration 202608270002 (or any
+            // future RPC that omits the column) still alerts as before —
+            // failing open here matches rider-report behaviour, and imports
+            // always carry an explicit value.
+            alertEligible: (row.alert_eligible as boolean | null) ?? true,
+            importSource: (row.import_source as string | null) ?? null,
           };
         });
 

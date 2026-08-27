@@ -857,6 +857,7 @@ export const ro: TranslationKeys = {
     communityScore: 'Scor comunitate',
     reportedAgo: 'Raportat {{time}}',
     lastConfirmedAgo: 'Ultima confirmare {{time}}',
+    importedFrom: 'Raportat prin {{source}}',
     confirms: 'Confirmări',
     dismisses: 'Dezacorduri',
     types: {

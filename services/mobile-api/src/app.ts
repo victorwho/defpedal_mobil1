@@ -11,6 +11,7 @@ import { buildActivityFeedRoutes } from './routes/activity-feed';
 import { buildBillingRoutes } from './routes/billing';
 import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
+import { buildImportRoutes } from './routes/imports';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
 import { buildFirstRideNotificationRoutes } from './routes/firstRideNotifications';
 import { buildModerationRoutes } from './routes/moderation';
@@ -283,6 +284,12 @@ export const buildApp = (options: {
     prefix: '/v1',
   });
   void app.register(buildPushReceiptRoutes(dependencies), {
+    prefix: '/v1',
+  });
+  // Hazard import pipeline (docs/plans/hazard-import-pipeline.md). Cron-only,
+  // gated by CRON_SECRET. Registered unconditionally: with no enabled sources
+  // in `hazard_import_sources` it is a no-op, and OPENAI_API_KEY is optional.
+  void app.register(buildImportRoutes(dependencies), {
     prefix: '/v1',
   });
   // Pedal Plus billing webhook. Registered unconditionally: it fails closed on

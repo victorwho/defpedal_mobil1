@@ -223,6 +223,41 @@ export const config = {
       0,
     ),
   },
+  // Hazard import pipeline (docs/plans/hazard-import-pipeline.md).
+  //
+  // DELIBERATELY OPTIONAL — see validateConfig() below. An absent or revoked
+  // OPENAI_API_KEY disables the free-text classification stage (imports fall
+  // back to deterministic service_code mapping only, and anything that would
+  // have needed the model lands in the review queue). It must never be able to
+  // exit(1) the API: required vars do that, and a weekly ingestion job is not
+  // required for the app to serve riders.
+  imports: {
+    openaiApiKey: resolveConfigValue(['OPENAI_API_KEY'], ''),
+    openaiModel: resolveConfigValue(['OPENAI_IMPORT_MODEL'], 'gpt-4o-mini'),
+    openaiBaseUrl: resolveConfigValue(
+      ['OPENAI_BASE_URL'],
+      'https://api.openai.com/v1',
+    ),
+    // Below this the item goes to human review instead of auto-publishing.
+    confidenceThreshold: parsePositiveNumber(
+      resolveConfigValue(['IMPORT_CONFIDENCE_THRESHOLD'], '0.75'),
+      0.75,
+    ),
+    // Wall-clock ceiling for one /v1/imports/run invocation. Cloud Scheduler's
+    // attempt deadline is 300s and a cron that times out is TRUNCATED, not
+    // just slow (error-log #82) — we stop early and cleanly instead, having
+    // persisted the cursor, so the next run resumes rather than re-grinding.
+    runBudgetMs: parsePositiveNumber(
+      resolveConfigValue(['IMPORT_RUN_BUDGET_MS'], '240000'),
+      240000,
+    ),
+    // Max source pages per run, per source. Backstop against a source that
+    // never signals end-of-data.
+    maxPagesPerSource: parsePositiveNumber(
+      resolveConfigValue(['IMPORT_MAX_PAGES_PER_SOURCE'], '25'),
+      25,
+    ),
+  },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),
     keyPrefix: resolveConfigValue(
@@ -272,6 +307,10 @@ export const validateConfig = (): string[] => {
   if (!config.supabaseServiceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
   if (!config.supabaseAnonKey) missing.push('SUPABASE_ANON_KEY');
   if (!config.mapboxAccessToken) missing.push('MAPBOX_ACCESS_TOKEN');
+
+  // NOTE: OPENAI_API_KEY is deliberately absent from this list. It gates the
+  // weekly hazard-import classification stage only; a missing key must degrade
+  // that one job, never exit(1) the whole rider-facing API.
 
   return missing;
 };

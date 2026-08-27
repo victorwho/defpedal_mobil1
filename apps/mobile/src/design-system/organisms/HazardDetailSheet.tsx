@@ -18,12 +18,13 @@
  * react-native on Android).
  */
 import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
-import { HAZARD_TYPE_OPTIONS } from '@defensivepedal/core';
+import { HAZARD_TYPE_OPTIONS, getHazardImportSourceDisplay } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -180,6 +181,8 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
   const nowMs = Date.now();
   const reportedAgo = formatRelativeTime(hazard.createdAt, nowMs);
   const lastConfirmedAgo = formatRelativeTime(hazard.lastConfirmedAt, nowMs);
+  // null for rider-reported hazards, which render no provenance line at all.
+  const importDisplay = getHazardImportSourceDisplay(hazard.importSource);
   const dist = distanceMeters ?? hazard.distanceMeters;
 
   const isPending = voteState === 'pending';
@@ -289,6 +292,30 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
                 {hazard.description}
               </Text>
             </View>
+          ) : null}
+
+          {/* Provenance. Shown only for imported hazards, so riders can tell a
+              municipal report from a cyclist's own sighting — that difference
+              changes how much the pin should be trusted. Cologne's licence
+              (DL-DE-Zero-2.0) does not require attribution; this is for
+              transparency, and as goodwill toward the civic projects. */}
+          {importDisplay ? (
+            <Pressable
+              accessibilityRole={importDisplay.url ? 'link' : 'text'}
+              accessibilityLabel={t('hazard.importedFrom', { source: importDisplay.label })}
+              disabled={!importDisplay.url}
+              onPress={() => {
+                if (importDisplay.url) {
+                  Linking.openURL(importDisplay.url).catch(() => {});
+                }
+              }}
+              style={styles.attributionRow}
+            >
+              <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
+              <Text style={[styles.attributionText, { color: colors.textSecondary }]}>
+                {t('hazard.importedFrom', { source: importDisplay.label })}
+              </Text>
+            </Pressable>
           ) : null}
 
           <View style={[styles.scoreCard, { backgroundColor: colors.bgSecondary }]}>
@@ -449,6 +476,16 @@ const styles = StyleSheet.create({
   descriptionText: {
     ...textSm,
     lineHeight: 20,
+  },
+  attributionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  attributionText: {
+    ...textXs,
+    flexShrink: 1,
   },
   scoreLabel: {
     ...textXs,

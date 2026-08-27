@@ -531,7 +531,32 @@ describe('GET /v1/hazards/nearby', () => {
       expiresAt: '2026-05-01T00:00:00.000Z',
       lastConfirmedAt: '2026-04-20T12:00:00.000Z',
       description: null,
+      // Migration 202608270002. The fixture omits both columns, so this also
+      // pins the handler's back-compat defaults: a row predating the migration
+      // must still alert (fail open) and must not look imported.
+      alertEligible: true,
+      importSource: null,
     });
+    await app.close();
+  });
+
+  it('passes through alert_eligible=false and import_source for imported hazards', async () => {
+    enqueueResult({
+      data: [hazardRow({ alert_eligible: false, import_source: 'open311:koln' })],
+      error: null,
+    });
+
+    const app = buildTestApp({ authenticateUser: vi.fn().mockResolvedValue(null) });
+    await app.ready();
+    const res = await app.inject({
+      method: 'GET', url: '/v1/hazards/nearby?lat=44.4&lon=26.1',
+    });
+    expect(res.statusCode).toBe(200);
+    const h = res.json().hazards[0];
+    // Map rendering is unaffected; only the navigation proximity-alert stack
+    // reads alertEligible, so a mis-geocoded import cannot fire mid-ride.
+    expect(h.alertEligible).toBe(false);
+    expect(h.importSource).toBe('open311:koln');
     await app.close();
   });
 
@@ -627,6 +652,7 @@ describe('GET /v1/hazards/nearby', () => {
     const allowed = new Set([
       'id', 'lat', 'lon', 'hazardType', 'createdAt', 'confirmCount', 'denyCount',
       'score', 'userVote', 'expiresAt', 'lastConfirmedAt', 'description',
+      'alertEligible', 'importSource',
     ]);
     for (const key of Object.keys(body.hazards[0])) {
       expect(allowed.has(key)).toBe(true);

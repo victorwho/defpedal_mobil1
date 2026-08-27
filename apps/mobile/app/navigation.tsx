@@ -862,6 +862,12 @@ function NavigationScreen() {
     // Find closest non-dismissed hazard within alert radius
     for (const hazard of nearbyHazards) {
       if (dismissedHazardIdsRef.current.has(hazard.id)) continue;
+      // Imported hazards from a source whose coordinates are address-geocoded
+      // rather than reporter-pinned are map-only: they render and can be
+      // voted on, but must never raise a mid-ride alert at a location that
+      // may be a street off. `undefined` (older server) means "rider report"
+      // and still alerts. See hazard_import_sources.alert_eligible.
+      if (hazard.alertEligible === false) continue;
       const dist = haversineDistance(
         [userCoord.lat, userCoord.lon],
         [hazard.lat, hazard.lon],

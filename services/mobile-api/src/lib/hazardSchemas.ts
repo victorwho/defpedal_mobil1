@@ -75,6 +75,8 @@ export const nearbyHazardItemSchema = {
     'lastConfirmedAt',
     'createdAt',
     'description',
+    'alertEligible',
+    'importSource',
   ],
   properties: {
     id: { type: 'string', format: 'uuid' },
@@ -89,6 +91,15 @@ export const nearbyHazardItemSchema = {
     lastConfirmedAt: { type: ['string', 'null'], format: 'date-time' },
     createdAt: { type: 'string' },
     description: { type: ['string', 'null'], maxLength: 280 },
+    // Whether this hazard may raise a proximity alert during navigation.
+    // Rider reports are always true; imported hazards inherit their source's
+    // registry flag, so a source with address-geocoded (rather than
+    // reporter-pinned) coordinates cannot fire mid-ride haptics at the wrong
+    // spot. Map rendering ignores this — it only gates alerts.
+    alertEligible: { type: 'boolean' },
+    // Registry id of the external source (e.g. 'open311:koln'), or null for
+    // rider-reported hazards. Drives the provenance line on the detail sheet.
+    importSource: { type: ['string', 'null'] },
   },
 } as const;
 

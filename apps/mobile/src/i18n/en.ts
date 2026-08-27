@@ -865,6 +865,7 @@ export const en = {
     communityScore: 'Community score',
     reportedAgo: 'Reported {{time}}',
     lastConfirmedAgo: 'Last confirmed {{time}}',
+    importedFrom: 'Reported via {{source}}',
     confirms: 'Confirms',
     dismisses: 'Dismisses',
     types: {

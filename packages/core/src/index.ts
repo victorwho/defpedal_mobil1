@@ -23,6 +23,7 @@ export * from './routeRequest';
 export * from './routeAnalysis';
 export * from './reviewEligibility';
 export * from './ridePattern';
+export * from './hazardImportSources';
 export * from './riskDistribution';
 export * from './riskStretch';
 export * from './savedPlaceKeywords';
