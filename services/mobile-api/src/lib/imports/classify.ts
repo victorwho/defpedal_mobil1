@@ -22,10 +22,26 @@ import {
   isImportableHazardType,
   type ClassificationResult,
   type ImportSourceRow,
+  type LlmUsage,
   type LlmVerdict,
   type MappingOutcome,
   type RawReport,
 } from './types';
+
+/** A model call's verdict plus its measured token usage. */
+export type LlmCallResult = LlmVerdict & { readonly usage?: LlmUsage | null };
+
+/**
+ * Turn measured tokens into a USD figure.
+ *
+ * The tokens are measured; this number is an ESTIMATE derived from a price
+ * list in config that goes stale silently. Every log line carries the model
+ * and the rates used alongside the result so a suspicious figure can always
+ * be traced back to its inputs.
+ */
+export const estimateCostUsd = (promptTokens: number, completionTokens: number): number =>
+  (promptTokens / 1_000_000) * config.imports.usdPer1mInputTokens +
+  (completionTokens / 1_000_000) * config.imports.usdPer1mOutputTokens;
 
 const SUMMARY_MAX = 280;
 
@@ -145,7 +161,7 @@ const buildUserPrompt = (report: RawReport): string =>
 export const callLlm = async (
   report: RawReport,
   signal: AbortSignal,
-): Promise<LlmVerdict> => {
+): Promise<LlmCallResult> => {
   const response = await fetch(`${config.imports.openaiBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -178,9 +194,17 @@ export const callLlm = async (
 
   const payload = (await response.json()) as {
     choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenAI returned no content');
+
+  const promptTokens = payload.usage?.prompt_tokens;
+  const completionTokens = payload.usage?.completion_tokens;
+  const usage: LlmUsage | null =
+    typeof promptTokens === 'number' && typeof completionTokens === 'number'
+      ? { promptTokens, completionTokens }
+      : null; // provider omitted usage — report nothing rather than guess
 
   const parsed = JSON.parse(content) as LlmVerdict;
   return {
@@ -189,6 +213,7 @@ export const callLlm = async (
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
     summary_en: typeof parsed.summary_en === 'string' ? parsed.summary_en : '',
     reason: typeof parsed.reason === 'string' ? parsed.reason : '',
+    usage,
   };
 };
 
@@ -197,7 +222,11 @@ export const callLlm = async (
 // ---------------------------------------------------------------------------
 
 export interface ClassifyDeps {
-  readonly llm?: (report: RawReport, signal: AbortSignal) => Promise<LlmVerdict>;
+  /**
+   * `usage` is optional so a test double can return a bare verdict; a missing
+   * block simply means "no measured tokens for this call".
+   */
+  readonly llm?: (report: RawReport, signal: AbortSignal) => Promise<LlmCallResult>;
 }
 
 export const classifyReport = async (
@@ -216,6 +245,7 @@ export const classifyReport = async (
       verdict: null,
       rejectReason: 'category_mapped_irrelevant',
       modelInvoked: false,
+      usage: null,
     };
   }
 
@@ -232,6 +262,7 @@ export const classifyReport = async (
       verdict: null,
       rejectReason: null,
       modelInvoked: false,
+      usage: null,
     };
   }
 
@@ -247,10 +278,11 @@ export const classifyReport = async (
       verdict: null,
       rejectReason: 'llm_unconfigured',
       modelInvoked: false,
+      usage: null,
     };
   }
 
-  let verdict: LlmVerdict;
+  let verdict: LlmCallResult;
   try {
     verdict = await llm(report, signal);
   } catch (error) {
@@ -261,6 +293,9 @@ export const classifyReport = async (
       verdict: null,
       rejectReason: `llm_error: ${error instanceof Error ? error.message : 'unknown'}`.slice(0, 200),
       modelInvoked: true,
+      // A failed call returns no usage block. Tokens may still have been
+      // billed; we report null rather than invent a number.
+      usage: null,
     };
   }
 
@@ -272,6 +307,7 @@ export const classifyReport = async (
       verdict,
       rejectReason: 'llm_not_relevant',
       modelInvoked: true,
+      usage: verdict.usage ?? null,
     };
   }
 
@@ -286,6 +322,7 @@ export const classifyReport = async (
       verdict,
       rejectReason: `llm_invalid_type: ${String(verdict.hazard_type).slice(0, 60)}`,
       modelInvoked: true,
+      usage: verdict.usage ?? null,
     };
   }
 
@@ -301,6 +338,7 @@ export const classifyReport = async (
       verdict,
       rejectReason: 'llm_low_confidence',
       modelInvoked: true,
+      usage: verdict.usage ?? null,
     };
   }
 
@@ -311,5 +349,6 @@ export const classifyReport = async (
     verdict,
     rejectReason: null,
     modelInvoked: true,
+    usage: verdict.usage ?? null,
   };
 };

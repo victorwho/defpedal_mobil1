@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clampSummary,
   classifyReport,
+  estimateCostUsd,
   fallbackSummary,
   resolveMapping,
 } from './classify';
@@ -296,5 +297,87 @@ describe('resolveMapping', () => {
   it('sends an unmapped source entirely to the model rather than guessing', () => {
     const unknown = { ...koln, id: 'open311:somewhere' };
     expect(resolveMapping(unknown, report())).toEqual({ kind: 'llm' });
+  });
+});
+
+
+describe('token usage accounting', () => {
+  const ambiguous = () => report({ categoryKey: '2.4.1' });
+
+  it('propagates measured usage from the model call', async () => {
+    const llm = vi.fn().mockResolvedValue({
+      relevant: true,
+      hazard_type: 'pothole',
+      confidence: 0.95,
+      summary_en: 'Pothole in the cycle lane.',
+      reason: 'x',
+      usage: { promptTokens: 431, completionTokens: 88 },
+    });
+    const result = await classifyReport(koln, ambiguous(), AbortSignal.timeout(1000), { llm });
+    expect(result.usage).toEqual({ promptTokens: 431, completionTokens: 88 });
+  });
+
+  it('reports null usage when no model call was made', async () => {
+    // Deterministic mapping — the whole point is that it costs nothing.
+    const result = await classifyReport(koln, report(), AbortSignal.timeout(1000), {
+      llm: vi.fn(),
+    });
+    expect(result.modelInvoked).toBe(false);
+    expect(result.usage).toBeNull();
+  });
+
+  it('reports null usage rather than inventing one when the provider omits it', async () => {
+    const llm = vi.fn().mockResolvedValue({
+      relevant: true,
+      hazard_type: 'pothole',
+      confidence: 0.95,
+      summary_en: 'Pothole.',
+      reason: 'x',
+      // no usage block
+    });
+    const result = await classifyReport(koln, ambiguous(), AbortSignal.timeout(1000), { llm });
+    expect(result.usage).toBeNull();
+  });
+
+  it('reports null usage on a failed call, and still marks the model as invoked', async () => {
+    // Tokens may well have been billed, but we cannot know them — reporting a
+    // guess would corrupt the spend figure.
+    const llm = vi.fn().mockRejectedValue(new Error('boom'));
+    const result = await classifyReport(koln, ambiguous(), AbortSignal.timeout(1000), { llm });
+    expect(result.modelInvoked).toBe(true);
+    expect(result.usage).toBeNull();
+  });
+
+  it('keeps usage on a rejected verdict, since those tokens were still spent', async () => {
+    const llm = vi.fn().mockResolvedValue({
+      relevant: false,
+      hazard_type: null,
+      confidence: 0.9,
+      summary_en: '',
+      reason: 'litter',
+      usage: { promptTokens: 300, completionTokens: 20 },
+    });
+    const result = await classifyReport(koln, ambiguous(), AbortSignal.timeout(1000), { llm });
+    expect(result.reviewState).toBe('irrelevant');
+    expect(result.usage).toEqual({ promptTokens: 300, completionTokens: 20 });
+  });
+});
+
+describe('estimateCostUsd', () => {
+  it('prices input and output at their separate rates', () => {
+    // Defaults: $0.15/1M input, $0.60/1M output.
+    expect(estimateCostUsd(1_000_000, 0)).toBeCloseTo(0.15, 6);
+    expect(estimateCostUsd(0, 1_000_000)).toBeCloseTo(0.6, 6);
+  });
+
+  it('is zero for a run that made no model calls', () => {
+    expect(estimateCostUsd(0, 0)).toBe(0);
+  });
+
+  it('gives a sane figure for one realistic call', () => {
+    // ~450 in / ~120 out is a typical classification.
+    const cost = estimateCostUsd(450, 120);
+    expect(cost).toBeGreaterThan(0);
+    expect(cost).toBeLessThan(0.001);
   });
 });

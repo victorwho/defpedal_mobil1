@@ -257,6 +257,22 @@ export const config = {
       resolveConfigValue(['IMPORT_MAX_PAGES_PER_SOURCE'], '25'),
       25,
     ),
+    // USD per 1M tokens, used only to turn measured token counts into a
+    // human-readable spend figure in the run log.
+    //
+    // ⚠️ These are a PRICE LIST, not a measurement — they go stale silently
+    // when the model or OpenAI's pricing changes. Defaults are gpt-4o-mini as
+    // of 2026-08. Every log line reports the model and the rates it used
+    // alongside the cost, so a stale figure is always traceable back to its
+    // inputs; the raw token counts stay authoritative.
+    usdPer1mInputTokens: parsePositiveNumber(
+      resolveConfigValue(['IMPORT_USD_PER_1M_INPUT'], '0.15'),
+      0.15,
+    ),
+    usdPer1mOutputTokens: parsePositiveNumber(
+      resolveConfigValue(['IMPORT_USD_PER_1M_OUTPUT'], '0.60'),
+      0.60,
+    ),
   },
   redis: {
     url: resolveConfigValue(['REDIS_URL'], ''),

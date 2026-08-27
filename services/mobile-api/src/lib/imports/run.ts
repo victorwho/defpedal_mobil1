@@ -560,6 +560,7 @@ const processClassified = async (
           verdict: null,
           rejectReason: 'run_budget_exhausted',
           modelInvoked: false,
+          usage: null,
         });
       }
       break;
@@ -584,6 +585,10 @@ const processClassified = async (
   for (const result of classified) {
     const { item } = result;
     if (result.modelInvoked) counters.llmCalled += 1;
+    if (result.usage) {
+      counters.llmPromptTokens += result.usage.promptTokens;
+      counters.llmCompletionTokens += result.usage.completionTokens;
+    }
     if (result.rejectReason?.startsWith('llm_error')) counters.llmError += 1;
     if (result.reviewState === 'irrelevant') counters.irrelevant += 1;
     if (result.reviewState === 'pending') counters.queuedForReview += 1;

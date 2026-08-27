@@ -19,7 +19,7 @@ import { verifyCronAuth } from '../lib/cronAuth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
-import { isLlmConfigured } from '../lib/imports/classify';
+import { estimateCostUsd, isLlmConfigured } from '../lib/imports/classify';
 import { loadEnabledSources, runSource } from '../lib/imports/run';
 import type { ImportSourceRunResult } from '../lib/imports/types';
 import { ensureSupabase } from './feed-helpers';
@@ -28,6 +28,16 @@ interface ImportRunReply {
   runAt: string;
   llmConfigured: boolean;
   durationMs: number;
+  /** Measured token spend across every source in this run. */
+  tokenUsage: {
+    model: string;
+    promptTokens: number;
+    completionTokens: number;
+    /** Derived from config price list — see estimateCostUsd(). */
+    estimatedCostUsd: number;
+    usdPer1mInput: number;
+    usdPer1mOutput: number;
+  };
   sources: {
     sourceId: string;
     ok: boolean;
@@ -58,6 +68,20 @@ const runResultSchema = {
   },
 } as const;
 
+const buildTokenUsage = (
+  promptTokens: number,
+  completionTokens: number,
+): ImportRunReply['tokenUsage'] => ({
+  model: config.imports.openaiModel,
+  promptTokens,
+  completionTokens,
+  // Rounded to micro-dollars: at ~$0.00014/call, cents would round everything
+  // to zero and make the figure useless.
+  estimatedCostUsd: Number(estimateCostUsd(promptTokens, completionTokens).toFixed(6)),
+  usdPer1mInput: config.imports.usdPer1mInputTokens,
+  usdPer1mOutput: config.imports.usdPer1mOutputTokens,
+});
+
 export const buildImportRoutes = (
   _dependencies: MobileApiDependencies,
 ): FastifyPluginAsync => {
@@ -82,11 +106,27 @@ export const buildImportRoutes = (
             200: {
               type: 'object',
               additionalProperties: false,
-              required: ['runAt', 'llmConfigured', 'durationMs', 'sources'],
+              required: ['runAt', 'llmConfigured', 'durationMs', 'tokenUsage', 'sources'],
               properties: {
                 runAt: { type: 'string', format: 'date-time' },
                 llmConfigured: { type: 'boolean' },
                 durationMs: { type: 'integer' },
+                tokenUsage: {
+                  type: 'object',
+                  additionalProperties: false,
+                  required: [
+                    'model', 'promptTokens', 'completionTokens',
+                    'estimatedCostUsd', 'usdPer1mInput', 'usdPer1mOutput',
+                  ],
+                  properties: {
+                    model: { type: 'string' },
+                    promptTokens: { type: 'integer' },
+                    completionTokens: { type: 'integer' },
+                    estimatedCostUsd: { type: 'number' },
+                    usdPer1mInput: { type: 'number' },
+                    usdPer1mOutput: { type: 'number' },
+                  },
+                },
                 sources: { type: 'array', items: runResultSchema },
               },
             },
@@ -124,6 +164,7 @@ export const buildImportRoutes = (
             runAt: new Date().toISOString(),
             llmConfigured: isLlmConfigured(),
             durationMs: Date.now() - startedAt,
+            tokenUsage: buildTokenUsage(0, 0),
             sources: [],
           };
         }
@@ -160,10 +201,26 @@ export const buildImportRoutes = (
           );
         }
 
+        const promptTokens = results.reduce((sum, r) => sum + r.counters.llmPromptTokens, 0);
+        const completionTokens = results.reduce(
+          (sum, r) => sum + r.counters.llmCompletionTokens,
+          0,
+        );
+        const tokenUsage = buildTokenUsage(promptTokens, completionTokens);
+
+        // Spend is logged as its own event so it can be charted independently
+        // of the per-source counters, and carries the model + price list that
+        // produced the estimate so a stale figure is traceable.
+        request.log.info(
+          { event: 'hazard_import_token_usage', ...tokenUsage, calls: results.reduce((s2, r) => s2 + r.counters.llmCalled, 0) },
+          'hazard import model spend',
+        );
+
         const payload: ImportRunReply = {
           runAt: new Date().toISOString(),
           llmConfigured: isLlmConfigured(),
           durationMs: Date.now() - startedAt,
+          tokenUsage,
           sources: results.map((result) => ({
             sourceId: result.sourceId,
             ok: result.ok,

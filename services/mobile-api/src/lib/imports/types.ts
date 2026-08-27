@@ -155,6 +155,17 @@ export type MappingOutcome =
   /** Category is generic/ambiguous — read the free text. */
   | { readonly kind: 'llm' };
 
+/**
+ * Token usage for one model call, straight from the provider's `usage` block.
+ *
+ * Authoritative — unlike any cost figure derived from it, which depends on a
+ * price list that goes stale silently. Null when the provider omitted usage.
+ */
+export interface LlmUsage {
+  readonly promptTokens: number;
+  readonly completionTokens: number;
+}
+
 export interface LlmVerdict {
   readonly relevant: boolean;
   readonly hazard_type: string | null;
@@ -183,6 +194,8 @@ export interface ClassificationResult {
    * exactly the kind of counter that hides a problem.
    */
   readonly modelInvoked: boolean;
+  /** Token usage for this item's model call; null when none was made. */
+  readonly usage: LlmUsage | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +215,9 @@ export interface ImportRunCounters {
   irrelevant: number;
   llmCalled: number;
   llmError: number;
+  /** Measured prompt/completion tokens across every model call this run. */
+  llmPromptTokens: number;
+  llmCompletionTokens: number;
   autoApproved: number;
   queuedForReview: number;
   published: number;
@@ -219,6 +235,8 @@ export const emptyCounters = (): ImportRunCounters => ({
   irrelevant: 0,
   llmCalled: 0,
   llmError: 0,
+  llmPromptTokens: 0,
+  llmCompletionTokens: 0,
   autoApproved: 0,
   queuedForReview: 0,
   published: 0,
