@@ -11,11 +11,13 @@
  * `civia` before the adapter exists fails loudly rather than silently
  * importing nothing.
  */
+import { amsterdamAdapter } from './amsterdam';
 import { open311Adapter } from './open311';
 import type { HazardSourceAdapter } from '../types';
 
 const ADAPTERS: Readonly<Record<string, HazardSourceAdapter>> = {
   open311: open311Adapter,
+  signalen: amsterdamAdapter,
 };
 
 export const getAdapter = (name: string): HazardSourceAdapter | null =>
@@ -23,4 +25,4 @@ export const getAdapter = (name: string): HazardSourceAdapter | null =>
 
 export const registeredAdapterNames = (): string[] => Object.keys(ADAPTERS);
 
-export { open311Adapter };
+export { amsterdamAdapter, open311Adapter };

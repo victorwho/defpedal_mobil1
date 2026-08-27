@@ -43,7 +43,7 @@ export const isImportableHazardType = (
 
 export interface ImportSourceRow {
   readonly id: string;
-  readonly adapter: 'open311' | 'civia';
+  readonly adapter: 'open311' | 'civia' | 'signalen';
   readonly endpoint: string;
   readonly jurisdiction: string | null;
   readonly country_code: string;
@@ -80,6 +80,15 @@ export interface ImportCursor {
   readonly page?: number;
   /** Highest source id observed, for adapters with monotonic ids. */
   readonly lastExternalId?: string;
+  /**
+   * Pending bounding boxes for quadtree adapters (Amsterdam).
+   *
+   * Signalen caps every response at 4,000 features and offers no paging, so
+   * coverage comes from splitting the city until each tile falls under the
+   * cap. Each entry is [minLon, minLat, maxLon, maxLat]. Persisted like any
+   * other cursor so a truncated run resumes mid-sweep instead of restarting.
+   */
+  readonly tiles?: readonly (readonly number[])[];
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +162,17 @@ export type MappingOutcome =
     }
   | { readonly kind: 'irrelevant' }
   /** Category is generic/ambiguous — read the free text. */
-  | { readonly kind: 'llm' };
+  | { readonly kind: 'llm' }
+  /**
+   * Cannot be decided automatically AND there is no text for a model to read.
+   *
+   * Needed for sources like Amsterdam's Signalen feed, whose public payload
+   * carries a category and a timestamp and nothing else. An unrecognised
+   * category there cannot be resolved by the model — there is no prose — so
+   * it goes to a human, who then extends the mapping table. Dropping it
+   * silently would hide every new category the city introduces.
+   */
+  | { readonly kind: 'review'; readonly reason: string };
 
 /**
  * Token usage for one model call, straight from the provider's `usage` block.

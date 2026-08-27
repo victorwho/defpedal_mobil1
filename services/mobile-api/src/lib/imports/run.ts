@@ -212,40 +212,78 @@ const backstopExpiry = (source: ImportSourceRow): string =>
  * `expires_at` is set explicitly, which migration 202608270001 made possible
  * by dropping the column default that used to pre-empt the trigger.
  */
-export const publishImport = async (
+export interface PublishCandidate {
+  external_id: string;
+  lat: number;
+  lon: number;
+  mapped_type: string;
+  summary: string | null;
+  reported_at: string | null;
+}
+
+const PUBLISH_CHUNK = 200;
+
+/**
+ * Write approved imports into `hazards`, in batches.
+ *
+ * Deliberately a direct table write, NOT a loop through POST /v1/hazards with
+ * a service account. Every side effect on that route is gated behind
+ * `if (user?.id)` — award_xp, qualifyStreakAsync, the post_hazard_thanks push,
+ * and autoPublishHazardStandalone to the social feed (v1.ts:843-866). A
+ * service identity would re-enable all four and spam the activity feed with
+ * hazards nobody reported. user_id stays NULL, which suppresses them.
+ *
+ * `expires_at` is set explicitly, which migration 202608270001 made possible
+ * by dropping the column default that used to pre-empt the trigger.
+ *
+ * BATCHED, not per-item: Supabase is us-east-1 and Cloud Run europe-central2,
+ * so every round-trip is ~100 ms. Amsterdam publishes ~2,000 hazards per
+ * sweep; at two round-trips each that is ~400 s against a 240 s budget, i.e.
+ * a run that could never finish. Two chunked statements per 200 rows instead.
+ *
+ * Returns external_id -> hazard id for the rows that were written.
+ */
+export const publishImports = async (
   db: SupabaseClient,
   source: ImportSourceRow,
-  staged: {
-    external_id: string;
-    lat: number;
-    lon: number;
-    mapped_type: string;
-    summary: string | null;
-    reported_at: string | null;
-  },
-): Promise<string | null> => {
-  const { data, error } = await db
-    .from('hazards')
-    .upsert(
-      {
-        user_id: null,
-        location: { latitude: staged.lat, longitude: staged.lon },
-        hazard_type: staged.mapped_type,
-        description: staged.summary,
-        source: 'manual',
-        import_source: source.id,
-        import_external_id: staged.external_id,
-        alert_eligible: source.alert_eligible,
-        reported_at: staged.reported_at ?? new Date().toISOString(),
-        expires_at: backstopExpiry(source),
-      },
-      { onConflict: 'import_source,import_external_id' },
-    )
-    .select('id')
-    .maybeSingle();
+  candidates: readonly PublishCandidate[],
+): Promise<Map<string, string>> => {
+  const idByExternalId = new Map<string, string>();
+  if (candidates.length === 0) return idByExternalId;
 
-  if (error) throw new Error(`Publish failed for ${staged.external_id}: ${error.message}`);
-  return (data as { id?: string } | null)?.id ?? null;
+  const expiresAt = backstopExpiry(source);
+  const nowIso = new Date().toISOString();
+
+  for (let i = 0; i < candidates.length; i += PUBLISH_CHUNK) {
+    const chunk = candidates.slice(i, i + PUBLISH_CHUNK);
+    const rows = chunk.map((c) => ({
+      user_id: null,
+      location: { latitude: c.lat, longitude: c.lon },
+      hazard_type: c.mapped_type,
+      description: c.summary,
+      source: 'manual',
+      import_source: source.id,
+      import_external_id: c.external_id,
+      alert_eligible: source.alert_eligible,
+      reported_at: c.reported_at ?? nowIso,
+      expires_at: expiresAt,
+    }));
+
+    const { data, error } = await db
+      .from('hazards')
+      .upsert(rows, { onConflict: 'import_source,import_external_id' })
+      .select('id, import_external_id');
+
+    if (error) {
+      throw new Error(`Publish batch failed (${chunk.length} rows): ${error.message}`);
+    }
+
+    for (const row of (data ?? []) as { id: string; import_external_id: string }[]) {
+      idByExternalId.set(row.import_external_id, row.id);
+    }
+  }
+
+  return idByExternalId;
 };
 
 // ---------------------------------------------------------------------------
@@ -523,14 +561,7 @@ const processClassified = async (
   if (fresh.length === 0) return;
 
   const rows: StagedRow[] = [];
-  const publishable: {
-    external_id: string;
-    lat: number;
-    lon: number;
-    mapped_type: string;
-    summary: string | null;
-    reported_at: string | null;
-  }[] = [];
+  const publishable: PublishCandidate[] = [];
 
   // Classify with bounded concurrency.
   //
@@ -638,28 +669,37 @@ const processClassified = async (
     if (!restage) counters.staged += chunk.length;
   }
 
-  for (const candidate of publishable) {
-    try {
-      const hazardId = await publishImport(db, source, candidate);
-      counters.published += 1;
-      if (hazardId) {
-        await db
-          .from('hazard_imports')
-          .update({ hazard_id: hazardId })
-          .eq('source_id', source.id)
-          .eq('external_id', candidate.external_id);
-      }
-    } catch (error) {
-      counters.publishFailed += 1;
-      log.warn(
-        {
-          event: 'hazard_import_publish_failed',
-          sourceId: source.id,
-          externalId: candidate.external_id,
-          err: error instanceof Error ? error.message : 'unknown',
-        },
-        'failed to publish imported hazard',
+  try {
+    const idByExternalId = await publishImports(db, source, publishable);
+    counters.published += idByExternalId.size;
+    counters.publishFailed += publishable.length - idByExternalId.size;
+
+    // Link staging rows back to their hazards, also batched. Grouped by
+    // hazard id so this is one statement per row only in the worst case;
+    // in practice the ids differ so we chunk on external_id instead.
+    const linkable = [...idByExternalId.entries()];
+    for (let i = 0; i < linkable.length; i += PUBLISH_CHUNK) {
+      const chunk = linkable.slice(i, i + PUBLISH_CHUNK);
+      await Promise.all(
+        chunk.map(([externalId, hazardId]) =>
+          db
+            .from('hazard_imports')
+            .update({ hazard_id: hazardId })
+            .eq('source_id', source.id)
+            .eq('external_id', externalId),
+        ),
       );
     }
+  } catch (error) {
+    counters.publishFailed += publishable.length;
+    log.warn(
+      {
+        event: 'hazard_import_publish_failed',
+        sourceId: source.id,
+        count: publishable.length,
+        err: error instanceof Error ? error.message : 'unknown',
+      },
+      'failed to publish imported hazard batch',
+    );
   }
 };

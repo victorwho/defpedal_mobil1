@@ -17,6 +17,7 @@
  *   - Any model error routes to review. Never dropped, never auto-published.
  */
 import { config } from '../../config';
+import { resolveAmsterdamMapping } from './mappings/amsterdam';
 import { resolveKolnMapping } from './mappings/koln';
 import {
   isImportableHazardType,
@@ -53,6 +54,14 @@ export const resolveMapping = (
   switch (source.id) {
     case 'open311:koln':
       return resolveKolnMapping(report.categoryKey);
+    case 'signalen:amsterdam': {
+      // categoryKey is "parentSlug/childSlug"; the parent lets an unmapped
+      // child under a wholly non-cycling branch be dropped without a human.
+      const [parentSlug, childSlug] = report.categoryKey.includes('/')
+        ? report.categoryKey.split('/')
+        : [null, report.categoryKey];
+      return resolveAmsterdamMapping(childSlug, parentSlug);
+    }
     default:
       // An Open311 city we have not written a map for yet: let the model read
       // everything rather than silently importing nothing or everything.
@@ -244,6 +253,20 @@ export const classifyReport = async (
       summaryEn: null,
       verdict: null,
       rejectReason: 'category_mapped_irrelevant',
+      modelInvoked: false,
+      usage: null,
+    };
+  }
+
+  if (mapping.kind === 'review') {
+    // No free text exists for this source, so the model cannot help. A human
+    // decides, then extends the mapping table.
+    return {
+      reviewState: 'pending',
+      hazardType: null,
+      summaryEn: null,
+      verdict: null,
+      rejectReason: mapping.reason,
       modelInvoked: false,
       usage: null,
     };

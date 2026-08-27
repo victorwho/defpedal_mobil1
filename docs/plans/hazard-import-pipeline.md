@@ -538,3 +538,206 @@ pre-existing bug affecting rider-reported hazards.
   `resolveConfigValue` checks `process.env` first. There is a stale 51-char
   legacy key set on this machine that returns 401. Run local imports with the
   key exported explicitly, or clear the User-scope variable.
+
+
+---
+
+## 15. Source discovery sweep (2026-08-27)
+
+Closes open item #3. All results are live probes, not directory listings — the
+published Open311 lists proved ~85% stale.
+
+### Verified live and usable
+
+| Source | Country | Endpoint | Licence | Verdict |
+|---|---|---|---|---|
+| **Amsterdam "Signalen"** | NL | `api.meldingen.amsterdam.nl/signals/v1/public/signals/geography?bbox=` | TBC | **Best new candidate** |
+| Cologne (shipped) | DE | `sags-uns.stadt-koeln.de/georeport/v2` | DL-DE-Zero-2.0 | live |
+| FixaMinGata | SE | `www.fixamingata.se/open311/v2/services.json` | TBC | services OK, requests endpoint needs params |
+| Paris "Dans Ma Rue" | FR | `opendata.paris.fr/api/records/1.0/search/?dataset=dans-ma-rue` | **ODbL** | **rejected — 3-month lag** |
+
+### Amsterdam — recommended next adapter
+
+GeoJSON FeatureCollection, `bbox=minLon,minLat,maxLon,maxLat` required.
+Verified live to the minute (newest feature `2026-08-27T11:28`).
+
+Road/traffic categories dominate — of 4,000 features city-wide:
+`Overlast van wegwerkzaamheden` 1,189 (roadworks), `Onduidelijke of gevaarlijke
+verkeerssituatie` 235 (**unclear/dangerous traffic situation**),
+`Straatverlichting` 364, `Onderhoud stoep, rijweg of parkeerplaats` 111,
+`Put of riool is verstopt` 107 (blocked drain), `Parkeeroverlast` 96,
+`Tijdelijk object staat in de weg` 85. Roughly 1,800 of 4,000 are
+road-relevant — a far higher ratio than Cologne's 32%.
+
+**Three constraints that shape the adapter:**
+1. **Properties are `category` + `created_at` ONLY.** No id, no status, no free
+   text. So: dedup key must be synthesised (lat|lon|created_at); the LLM stage
+   adds nothing (pure deterministic mapping); `alert_eligible` can stay true
+   (coordinates are reporter-placed map pins).
+2. **Date filters are ignored.** `created_after`, `created_at_after` and
+   `start_date` all return the identical 4,000 features spanning 2021→now.
+   Incremental fetch is impossible; every run re-reads the same set. Harmless
+   given the dedup key, but it costs ~1.2 MB/run and means no history beyond
+   what the feed holds.
+3. **Hard 4,000-feature cap**, confirmed by comparing a small bbox
+   (1,197,382 B) against the whole city (1,196,180 B) — both truncate at 4,000.
+   Full coverage needs bbox subdivision.
+
+**Hypothesis worth verifying before building:** the feed spans 2021→now yet
+caps at 4,000, which is consistent with it serving *currently-open* signals
+only. If so, a signal disappearing from the feed means "resolved" — an implicit
+status signal that would restore status-sync-driven expiry without any status
+field. Do not assume this; confirm against a known-closed signal first.
+
+### Paris — rejected, and why it looked good
+
+1,474,285 records with coordinates, ODbL, and the best taxonomy found anywhere:
+a dedicated **`Aménagements cyclables : Affaissement, trou, bosse, pavé
+arraché`** (cycle-infrastructure damage) category, plus
+`Chaussées : Affaissement, trou, bosse` 3,610 and
+`Chantier : ... présentant un danger` 397 for 2026 alone.
+
+**Disqualified on latency.** The dataset's `modified` timestamp is current
+(2026-08-21) but the DATA is not: 2026-05 has 56,609 records while 2026-06,
+2026-07 and 2026-08 have **zero**. A ~3-month publication lag makes it useless
+for a transient hazard layer — anything that old is either fixed or belongs in
+`road_risk_data`. Worth re-checking periodically in case the lag is an artefact
+of the current publication cycle.
+
+Note also ODbL's share-alike clause: unlike Cologne's DL-DE-Zero-2.0, deriving
+our hazards table from ODbL data raises a licensing question that needs an
+answer before ingesting, not after.
+
+### Probed and dead / blocked
+
+`fiksgatami.no` (NO) 404 · `fixyourstreet.ie` (IE) unreachable ·
+`asiointi.hel.fi` (FI Helsinki) unreachable · `api.turku.fi` (FI Turku)
+unreachable · `fixmystreet.brussels` (BE) serves an Angular SPA shell at
+`/open311/v2/`, real API not yet located · `api.data.amsterdam.nl/signals/...`
+404 (superseded by `api.meldingen.amsterdam.nl`).
+
+Combined with the earlier German sweep (6 of 7 dead), **the published Open311
+endpoint lists are roughly 85% stale.** Treat any directory as a lead list to
+probe, never as a source of truth.
+
+### DATEX II / National Access Points — PROBED AND REJECTED (2026-08-27)
+
+This was the highest-upside unknown: EU-mandated in all 27 member states under
+the ITS Directive, standardised, free. It does not work for this product, and
+the reason is structural rather than fixable.
+
+Probed via Finland's Digitraffic (`tie.digitraffic.fi/api/traffic-message/v1`),
+the most openly accessible NAP — no key, GeoJSON, well documented. It needs
+`Accept-Encoding: gzip` and a `Digitraffic-User` header; without them it 406s.
+
+Nationwide totals:
+
+| situationType | features |
+|---|---|
+| ROAD_WORK | 702 |
+| TRAFFIC_ANNOUNCEMENT | **10** |
+| WEIGHT_RESTRICTION | 0 |
+
+Of the 702 roadworks, only **63 (9.0%)** fall inside the bounding boxes of
+Finland's four largest cities — and every urban sample is a numbered trunk
+road that cyclists are barred from or would never choose:
+
+    Tie 101, eli Kehä I, Espoo        (Helsinki's motorway ring road)
+    Tie 3, Tampereen Läntinen Kehätie (Tampere western ring road)
+    Tie 40, eli Turun kehätie         (Turku ring road)
+    Tie 4, eli Pohjantie, Oulu        (national trunk road)
+
+**Why this is structural.** National Access Points are fed by national and
+regional ROAD AUTHORITIES, whose remit is the strategic motor-traffic network.
+The streets people actually cycle on are municipal, and municipalities are not
+NAP contributors. Delegated Regulation 886/2013 makes the intent explicit — its
+scope is "road safety-related minimum universal traffic information" for
+drivers: wrong-way drivers, unprotected accident sites, temporary slippery
+road. None of it is cycling infrastructure.
+
+Two secondary problems, both moot given the above: geometry is 88%
+MultiLineString (road segments, not the points the hazard model uses), and
+10 nationwide traffic announcements is not a usable signal at any latency.
+
+**Conclusion:** civic-report platforms (Open311, Signalen, and their kin) are
+the right family of source, because they are municipal. DATEX II is the wrong
+family — it describes the motor network, not the street. Do not revisit unless
+a member state starts publishing municipal cycle-network data through its NAP.
+
+### Still unprobed
+
+- Brussels' real API; Vienna (`Sag's Wien`); Copenhagen (`Giv et praj`);
+  Italian/Spanish/Polish municipal platforms; the wider German Mängelmelder
+  estate beyond the 7 already checked. All are municipal platforms, i.e. the
+  family that does work.
+
+
+---
+
+## 16. Amsterdam adapter — built 2026-08-27 (source DISABLED)
+
+`adapter='signalen'` (named for the open-source platform, not the city, so a
+second Dutch municipality is a registry row rather than new code).
+Migration `202608270005` applied; source seeded **disabled**.
+
+**Dry run against live Amsterdam** (adapter + classifier called directly, so
+nothing was published while the licence is unconfirmed):
+
+| | |
+|---|---|
+| Tiles swept / elapsed | 33 / ~11 s |
+| Unique signals in the 30-day window | 10,096 |
+| Would publish | **2,060** |
+| Dropped as irrelevant | 8,034 |
+| Pending human review | **2** |
+
+By type: `poor_surface` 1,216 · `illegally_parked_car` 236 ·
+`dangerous_intersection` 234 · `narrow_street` 209 · `blocked_bike_lane` 150 ·
+`aggressive_traffic` 15. That is ~13x the Cologne count.
+
+### Design consequences of the three verified constraints
+
+1. **4,000-cap, no paging** -> quadtree. `fetchPage` treats one tile as one
+   page; a tile at the cap is split into four and the children are queued in
+   `cursor.tiles`, so a truncated run resumes mid-sweep. `MIN_TILE_SPAN_DEG`
+   (~500 m) stops infinite recursion on a hotspot.
+2. **Date filters ignored** -> client-side `isRecent()` 30-day filter. Without
+   it every run would re-offer signals back to 2021.
+3. **No id / status / text** ->
+   - external id is synthesised as `lon:lat:created_at` (7dp rounding so a
+     change in float formatting cannot mint duplicates);
+   - expiry is TTL-only, `backstop_ttl_days = 21` (shorter than Cologne's 30,
+     which does get status-sync);
+   - **the model is never invoked** — verified by a test that fails if it is.
+     Amsterdam costs nothing to classify.
+
+### Mapping: parent allowlist, not blocklist
+
+An unknown child slug is reviewed only if its parent is one of the three that
+can bear a hazard (`wegen-verkeer-straatmeubilair`, `civiele-constructies`,
+`overlast-in-de-openbare-ruimte`); under the other eleven parents it drops.
+A blocklist would silently start queueing every new slug under a parent nobody
+had thought to exclude.
+
+Two dry-run passes drove the review queue 775 -> 88 -> 2 by deciding the
+observed tail in the table. `verkeersoverlast` (traffic nuisance) was the one
+tail slug worth mapping to a real type — `aggressive_traffic`.
+
+### BLOCKER: licence unconfirmed
+
+The endpoint is namespaced `/public/` and carries no personal data (category +
+timestamp + point only), and Amsterdam publishes most of its catalogue as
+CC0 / Publiek Domein. But **the meldingen feed itself returns 0 hits on
+data.overheid.nl**, so there is no registered licence grant for it.
+Publicly reachable is not licensed.
+
+Enable only after confirming terms with the city:
+
+    UPDATE hazard_import_sources
+       SET enabled = true, licence = '<confirmed>'
+     WHERE id = 'signalen:amsterdam';
+
+If the first published batch looks misplaced, demote to map-only:
+
+    UPDATE hazard_import_sources SET alert_eligible = false
+     WHERE id = 'signalen:amsterdam';
