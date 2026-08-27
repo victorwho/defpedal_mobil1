@@ -2,7 +2,7 @@
 /**
  * installReferrer — Unit Tests
  *
- * Verifies the NativeModules guard (error-log #23), flavor skipping,
+ * Verifies the NativeModules guard (error-log #23b), flavor skipping,
  * and share-param parsing.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -133,7 +133,7 @@ describe('readInstallReferrer', () => {
     expect(await readInstallReferrer()).toBeNull();
   });
 
-  it('returns null when the native module is not linked (error-log #23 guard)', async () => {
+  it('returns null when the native module is not linked (error-log #23b guard)', async () => {
     mockNativeModuleAvailable = false;
     expect(await readInstallReferrer()).toBeNull();
   });

@@ -7,7 +7,7 @@
  *
  * Repo notification checklist (CLAUDE.md → Notifications):
  * - (a) gated on `hasNotificationsNativeModule()`, lazy `require()` in
- *   try/catch. NEVER `NativeModules.*` (error-log #21/#2b — undefined on
+ *   try/catch. NEVER `NativeModules.*` (error-log #21b/#2b — undefined on
  *   bridgeless preview/production builds).
  * - (b) NO permission prompt here — `DailyWeatherScheduler` owns the single
  *   `ensureNotificationPermissionAsync()` ask. This module only reads

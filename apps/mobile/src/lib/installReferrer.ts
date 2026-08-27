@@ -8,7 +8,7 @@
  * so the Habit Engine onboarding can auto-claim the share after account
  * creation (slice 2 of the route-share PRD).
  *
- * Safety rails per error-log #23:
+ * Safety rails per error-log #23b:
  *   - `react-native-play-install-referrer`'s top-level code invokes
  *     `new NativeEventEmitter(NativeModules.PlayInstallReferrer)` which
  *     throws an invariant if the native module isn't in the APK. That
@@ -48,7 +48,7 @@ type PlayInstallReferrerModule = {
 };
 
 // ---------------------------------------------------------------------------
-// Lazy module loader with native-module guard (error-log #23)
+// Lazy module loader with native-module guard (error-log #23b)
 // ---------------------------------------------------------------------------
 
 const loadModule = async (): Promise<PlayInstallReferrerModule | null> => {

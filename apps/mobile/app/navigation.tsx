@@ -91,7 +91,7 @@ function NavigationScreen() {
       // Native module not bound, or activation rejected. Log so the dev
       // overlay shows it; the screen will fall back to OS timeout settings.
       // This is the same defensive pattern we use for other native modules
-      // (error-log #21, #23) — we surface the failure rather than fail soft.
+      // (error-log #21b, #23b) — we surface the failure rather than fail soft.
       console.warn('[navigation] activateKeepAwake failed', error);
       active = false;
     });

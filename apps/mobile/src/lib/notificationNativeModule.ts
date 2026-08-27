@@ -7,7 +7,7 @@ import { hasExpoNativeModule } from './expoNativeModule';
  * NEVER guard notifications on `NativeModules.ExpoPushTokenManager` — it's
  * `undefined` on bridgeless preview/production builds and silently disables
  * every notification path (no permission prompt, no scheduled pings) while
- * still working on the dev variant. See error-log #21 + #2b.
+ * still working on the dev variant. See error-log #21b + #2b.
  */
 export const hasNotificationsNativeModule = (): boolean =>
   hasExpoNativeModule('ExpoPushTokenManager') ||

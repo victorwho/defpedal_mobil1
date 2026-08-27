@@ -74,7 +74,7 @@ const OFFSCREEN_OFFSET = -10000;
 /**
  * react-native-view-shot ships both a legacy bridge module and a TurboModule
  * (new arch). We probe both — either is sufficient evidence that the native
- * binary is linked. See error-log #23 — the module's invariant throws on
+ * binary is linked. See error-log #23b — the module's invariant throws on
  * import in builds where neither is available, so the check MUST come first.
  */
 const hasViewShotNative = (): boolean => {

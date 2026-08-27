@@ -5,7 +5,7 @@
  * provider is a rewrite of one file, and every other surface stays testable
  * without a native module.
  *
- * NATIVE-MODULE GUARDING (error-log #23 + #45). `react-native-purchases` is a
+ * NATIVE-MODULE GUARDING (error-log #23b + #45). `react-native-purchases` is a
  * community module, not an Expo one:
  *
  *   - Its invariant throw ESCAPES a try/catch around `require()`, so presence

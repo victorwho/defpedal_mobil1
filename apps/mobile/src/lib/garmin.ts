@@ -20,7 +20,7 @@
  * substitute a mock (vi.mock does not intercept runtime `require()`).
  *
  * Requires:
- *   - `expo-intent-launcher` (native module — guard per error-log #21/#23)
+ *   - `expo-intent-launcher` (native module — guard per error-log #21b/#23b)
  *   - a `<queries><package .../></queries>` entry for the Garmin package in
  *     AndroidManifest.xml (Android 11+ package visibility)
  */

@@ -11,7 +11,7 @@ import { NativeModules } from 'react-native';
  * module is compiled in. A `NativeModules`-based guard therefore passes on the
  * dev variant (old-arch bridge) and silently disables the feature on every
  * release build. Probe via `requireOptionalNativeModule` from
- * `expo-modules-core` (arch-independent). See error-log #21.
+ * `expo-modules-core` (arch-independent). See error-log #21b.
  *
  * @param name The *registered* Expo module name, which often differs from the
  *   npm package name — e.g. `ExpoPushTokenManager`, `ExpoHaptics`,

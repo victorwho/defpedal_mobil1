@@ -15,7 +15,7 @@
  * underlying Expo native module (`ExpoStoreReview`) may be absent on tests,
  * old development builds that haven't been rebuilt since the module was added,
  * or any other host that doesn't autolink it. We follow the Expo Modules API
- * probe pattern from `expoNativeModule.ts` (error-log #21): probe with
+ * probe pattern from `expoNativeModule.ts` (error-log #21b): probe with
  * `hasExpoNativeModule('ExpoStoreReview')`, then lazy `require('expo-store-review')`
  * only if the probe passes.
  *

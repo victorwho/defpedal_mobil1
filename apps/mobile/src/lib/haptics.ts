@@ -18,7 +18,7 @@ let _haptics: typeof import('expo-haptics') | null | undefined;
 function getHaptics(): typeof import('expo-haptics') | null {
   if (_haptics !== undefined) return _haptics;
   // Detect via the Expo Modules API, not NativeModules.ExpoHaptics — the
-  // latter is undefined on bridgeless release builds (error-log #21).
+  // latter is undefined on bridgeless release builds (error-log #21b).
   if (!hasExpoNativeModule('ExpoHaptics')) {
     _haptics = null;
     return _haptics;
