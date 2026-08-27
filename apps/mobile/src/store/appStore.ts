@@ -2,6 +2,7 @@ import type {
   CityHeartbeat,
   Coordinate,
   CyclingGoal,
+  HazardType,
   HazardVoteDirection,
   OfflineRegion,
   NavigationLocationSample,
@@ -19,6 +20,7 @@ import {
   advanceNavigationStep,
   completeNavigationSession,
   createNavigationSession,
+  DEFAULT_CIVIA_BASE_URL,
   DEFAULT_REVIEW_PROMPT_STATE,
   ensureInstalledAt,
   isPlausibleStep,
@@ -160,6 +162,36 @@ type AppStore = QueueSlice & PremiumSlice & {
   setRegionGate: (gate: {
     status: 'passed' | 'waitlisted';
     countryCode: string | null;
+  }) => void;
+  /**
+   * Sesizări (civic-complaint handoff) remote config, hydrated from
+   * GET /v1/profile at session bootstrap. Device-scoped server config, NOT a
+   * user preference — never write it from a settings screen.
+   *
+   * Fails OPEN: the defaults keep the feature live so a profile read failure
+   * or an older server does not silently dark it. The kill switch is only
+   * effective once the server has actually answered.
+   */
+  sesizariConfig: { enabled: boolean; baseUrl: string };
+  setSesizariConfig: (config: { enabled: boolean; baseUrl: string }) => void;
+  /**
+   * Hazards this rider reported during the CURRENT ride, so the post-ride
+   * screen can offer to escalate them. Persisted because AWAITING_FEEDBACK
+   * survives an app kill and the feedback screen is reached after it.
+   * Cleared by `resetFlow` (leaving feedback) and by `startNavigation`.
+   *
+   * Deliberately NOT sourced from the offline queue: those entries drain and
+   * disappear, and a queued hazard has no server id yet anyway.
+   */
+  sessionHazardReports: {
+    hazardType: HazardType;
+    coordinate: Coordinate;
+    reportedAt: string;
+  }[];
+  appendSessionHazardReport: (report: {
+    hazardType: HazardType;
+    coordinate: Coordinate;
+    reportedAt: string;
   }) => void;
   // Analytics consent — captured during onboarding, surfaceable post-onboarding
   // via Profile → Privacy & Analytics. Device-scoped (not reset on signOut)
@@ -678,6 +710,8 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ notifyActivationLadder: enabled })),
       onboardingCompleted: false,
       regionGate: { status: 'unchecked', countryCode: null },
+      sesizariConfig: { enabled: true, baseUrl: DEFAULT_CIVIA_BASE_URL },
+      sessionHazardReports: [],
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
       //   Art 6(1)(f) / ANSPDCP Law 506/2004 equivalent for service-stability
@@ -937,6 +971,19 @@ export const useAppStore = create<AppStore>()(
         set(() => ({
           regionGate: { status: gate.status, countryCode: gate.countryCode },
         })),
+      appendSessionHazardReport: (report) =>
+        set((state) => ({
+          // Cap defensively: a rider spamming reports on one ride must not
+          // grow the persisted blob without bound.
+          sessionHazardReports: [...state.sessionHazardReports, report].slice(-20),
+        })),
+      setSesizariConfig: (nextConfig) =>
+        set(() => ({
+          sesizariConfig: {
+            enabled: nextConfig.enabled,
+            baseUrl: nextConfig.baseUrl.trim() || DEFAULT_CIVIA_BASE_URL,
+          },
+        })),
       setAnalyticsConsent: (consent) =>
         set(() => ({
           analyticsConsent: {
@@ -1161,6 +1208,7 @@ export const useAppStore = create<AppStore>()(
             ),
             selectedRouteId: route.id,
             appState: 'NAVIGATING',
+            sessionHazardReports: [],
           };
         }),
       advanceNavigation: (totalSteps) =>
@@ -1322,6 +1370,7 @@ export const useAppStore = create<AppStore>()(
             routeRequest: DEFAULT_ROUTE_REQUEST,
             activeTripClientId: null,
             tripServerIds: prunedIds,
+            sessionHazardReports: [],
           };
         });
         // Recovery-critical (re-audit 2026-07-15): a debounced-but-unflushed
@@ -1502,6 +1551,10 @@ export const useAppStore = create<AppStore>()(
         avoidHeat: state.avoidHeat,
         onboardingCompleted: state.onboardingCompleted,
         regionGate: state.regionGate,
+        // Persisted so a cold start that cannot reach the API still honours
+        // the last known kill-switch state and civia.ro URL.
+        sesizariConfig: state.sesizariConfig,
+        sessionHazardReports: state.sessionHazardReports,
         analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,
         cachedStreak: state.cachedStreak,

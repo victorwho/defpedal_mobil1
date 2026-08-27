@@ -824,6 +824,28 @@ export const es: TranslationKeys = {
   },
 
   // ── Hazard Reporting ──
+  // ── Sesizări (traspaso a civia.ro, solo Rumanía) ──
+  // Solo texto de interfaz. La petición se compone en
+  // packages/core/src/sesizare.ts y siempre está en rumano.
+  sesizare: {
+    cta: 'Reclamar al ayuntamiento',
+    ctaShort: 'Reclamación',
+    subtitle: 'Envía el problema a la autoridad responsable, a través de Civia',
+    alreadyEscalated: 'Ya enviaste esta reclamación',
+    othersEscalated_one: 'Un ciclista ya lo ha reclamado al ayuntamiento',
+    othersEscalated_other: '{{count}} ciclistas ya lo han reclamado al ayuntamiento',
+    copiedTitle: 'Texto de la reclamación copiado',
+    copiedBody:
+      'Pégalo en el campo "Descriere" de Civia. Añadir una foto allí aumenta mucho las opciones de que lo arreglen.',
+    openCivia: 'Abrir Civia',
+    clipboardFailedTitle: 'No se pudo copiar el texto',
+    clipboardFailedBody: 'Inténtalo de nuevo en un momento.',
+    postRideTitle: '¿Lo llevas más lejos?',
+    postRideBody:
+      'Has reportado peligros en esta ruta. Algunos pueden enviarse a la autoridad responsable.',
+    dashboardLabel: 'Reclamaciones al ayuntamiento',
+    dashboardSub: 'Enviadas a la autoridad responsable, a través de Civia',
+  },
   hazard: {
     title: 'Reportar peligro',
     parkedCar: 'Coche aparcado',

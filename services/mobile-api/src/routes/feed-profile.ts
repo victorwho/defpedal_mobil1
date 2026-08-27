@@ -1,7 +1,9 @@
 import type { CyclingGoal, ErrorResponse, ProfileResponse } from '@defensivepedal/core';
 import type { FastifyPluginAsync } from 'fastify';
 
+import { config } from '../config';
 import { requireFullUser } from '../lib/auth';
+import { isSesizariEnabled } from '../lib/sesizariKillSwitch';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { loadPremiumProfileFields } from '../lib/entitlements';
 import {
@@ -145,6 +147,8 @@ export const buildFeedProfileRoutes = (
           notifyCommunity: data.notify_community !== false,
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
+          sesizariEnabled: isSesizariEnabled(),
+          sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };
       },
@@ -217,6 +221,8 @@ export const buildFeedProfileRoutes = (
             notifyCommunity: created.notify_community !== false,
             quietHoursStart: (created.quiet_hours_start as string) ?? null,
             quietHoursEnd: (created.quiet_hours_end as string) ?? null,
+            sesizariEnabled: isSesizariEnabled(),
+            sesizariBaseUrl: config.sesizari.baseUrl,
             premium,
           };
         }
@@ -248,6 +254,8 @@ export const buildFeedProfileRoutes = (
           notifyCommunity: data.notify_community !== false,
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
+          sesizariEnabled: isSesizariEnabled(),
+          sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };
       },

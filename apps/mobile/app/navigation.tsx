@@ -623,6 +623,7 @@ function NavigationScreen() {
       return;
     }
 
+    const reportedAt = new Date().toISOString();
     const trimmed = description?.trim().slice(0, 280);
     // Non-safety haptic — suppressed during NAVIGATING (see docs/haptic-map.md).
     // The visual "Hazard reported" banner provides confirmation during a ride.
@@ -632,13 +633,21 @@ function NavigationScreen() {
     setHazardDescription('');
     enqueueMutation('hazard', {
       coordinate: mapUserCoordinate,
-      reportedAt: new Date().toISOString(),
+      reportedAt,
       source: 'in_ride',
       hazardType,
       ...(trimmed && trimmed.length > 0 ? { description: trimmed } : {}),
     });
     // Analytics opt-in prompt 2 trigger evidence (first hazard report).
     useAppStore.getState().markHazardReported();
+    // Remembered for the post-ride sesizare offer. Recorded here rather than
+    // read back off the offline queue: queued hazards drain and disappear,
+    // and they have no server id while queued anyway.
+    useAppStore.getState().appendSessionHazardReport({
+      hazardType,
+      coordinate: mapUserCoordinate,
+      reportedAt,
+    });
     telemetry.capture('hazard_report_queued', {
       source: 'manual',
       hazard_type: hazardType,

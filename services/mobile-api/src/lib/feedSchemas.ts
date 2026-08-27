@@ -230,6 +230,10 @@ export const profileResponseSchema = {
     notifyCommunity: { type: 'boolean' },
     quietHoursStart: { type: ['string', 'null'] },
     quietHoursEnd: { type: ['string', 'null'] },
+    // Sesizări remote config (server-owned, not a user pref). Not in
+    // `required` so the field set stays backwards compatible.
+    sesizariEnabled: { type: 'boolean' },
+    sesizariBaseUrl: { type: 'string' },
     // Fastify strips anything not declared here (gotcha #9) — every premium
     // field must be listed or it silently vanishes from the response.
     premium: {

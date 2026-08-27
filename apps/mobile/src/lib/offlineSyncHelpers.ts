@@ -57,6 +57,7 @@ export const MUTATION_SYNC_TIMEOUT_MS_BY_TYPE: Record<QueuedMutation['type'], nu
   hazard_vote: 10_000,
   feedback: 10_000,
   city_suggestion: 10_000,
+  sesizare: 10_000,
 };
 
 const DEFAULT_MUTATION_SYNC_TIMEOUT_MS = 10_000;

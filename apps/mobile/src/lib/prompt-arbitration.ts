@@ -1,9 +1,8 @@
 /**
- * Session-scoped arbitration between the three attention-asking card
- * surfaces. Spec (docs/plans/analytics-optin-prompts.md): the analytics
+ * Session-scoped arbitration between the attention-asking card surfaces. Spec (docs/plans/analytics-optin-prompts.md): the analytics
  * opt-in card must NEVER appear in the same session as the SaveRideCard or
  * ReviewPromptCard; when eligible simultaneously the priority order is
- * SaveRideCard > ReviewPromptCard > AnalyticsOptInCard.
+ * SaveRideCard > ReviewPromptCard > SesizareCard > AnalyticsOptInCard.
  *
  * Implementation: every surface CLAIMS its slot through this module before
  * rendering, in the order the flows naturally evaluate them (SaveRideCard on
@@ -18,7 +17,7 @@
  * restart, which is the session boundary every other prompt latch uses).
  */
 
-export type PromptSurface = 'save_ride' | 'review' | 'analytics';
+export type PromptSurface = 'save_ride' | 'review' | 'sesizare' | 'analytics';
 
 let shownThisSession = new Set<PromptSurface>();
 
@@ -28,7 +27,24 @@ let shownThisSession = new Set<PromptSurface>();
  */
 export const claimPromptSlot = (surface: PromptSurface): boolean => {
   if (surface === 'analytics') {
-    if (shownThisSession.has('save_ride') || shownThisSession.has('review')) {
+    if (
+      shownThisSession.has('save_ride') ||
+      shownThisSession.has('review') ||
+      shownThisSession.has('sesizare')
+    ) {
+      return false;
+    }
+  } else if (surface === 'sesizare') {
+    // Sesizări sit BELOW the review card: the Play review funnel is
+    // quota-limited and revenue-adjacent, so it wins when both are eligible.
+    // Ordering is enforced structurally too — the sesizare card lives on the
+    // post-submit "thank you" view, which renders after the review card has
+    // already claimed or declined its slot.
+    if (
+      shownThisSession.has('save_ride') ||
+      shownThisSession.has('review') ||
+      shownThisSession.has('analytics')
+    ) {
       return false;
     }
   } else if (shownThisSession.has('analytics')) {
@@ -42,7 +58,18 @@ export const claimPromptSlot = (surface: PromptSurface): boolean => {
 /** Read-only check (no claim) — for eligibility previews. */
 export const isPromptSlotAvailable = (surface: PromptSurface): boolean => {
   if (surface === 'analytics') {
-    return !shownThisSession.has('save_ride') && !shownThisSession.has('review');
+    return (
+      !shownThisSession.has('save_ride') &&
+      !shownThisSession.has('review') &&
+      !shownThisSession.has('sesizare')
+    );
+  }
+  if (surface === 'sesizare') {
+    return (
+      !shownThisSession.has('save_ride') &&
+      !shownThisSession.has('review') &&
+      !shownThisSession.has('analytics')
+    );
   }
   return !shownThisSession.has('analytics');
 };

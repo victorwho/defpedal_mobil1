@@ -5,6 +5,7 @@ import type {
   HazardVoteQueuePayload,
   NavigationFeedbackRequest,
   QueuedMutation,
+  SesizareRequest,
   QueuedMutationType,
   ShareTripRequest,
   TripEndRequest,
@@ -29,6 +30,7 @@ export type QueuedMutationPayloadByType = {
   trip_share: ShareTripRequest;
   feedback: NavigationFeedbackRequest;
   city_suggestion: CitySuggestionRequest;
+  sesizare: SesizareRequest;
 };
 
 const createId = (prefix: string) => {

@@ -44,6 +44,13 @@ vi.mock('../../molecules/ReportSheet', () => ({
   ReportSheet: () => null,
 }));
 
+// Same reasoning for <SesizareRow>: it calls useQuery (reverse-geocode
+// eligibility) and would need a QueryClientProvider. Its own gating is
+// covered by molecules/__tests__/SesizareRow.test.tsx.
+vi.mock('../../molecules/SesizareRow', () => ({
+  SesizareRow: () => null,
+}));
+
 vi.mock('../../hooks/useReducedMotion', () => ({
   useReducedMotion: () => true,
 }));

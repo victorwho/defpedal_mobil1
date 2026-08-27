@@ -6,6 +6,8 @@ import type {
   HazardReportRequest,
   HazardReportResponse,
   NavigationFeedbackRequest,
+  SesizareRequest,
+  SesizareResponse,
   TripEndRequest,
   TripEndResponse,
   TripHistoryItem,
@@ -17,8 +19,10 @@ import type {
   WriteAckResponse,
 } from '@defensivepedal/core';
 import {
+  CIVIA_CATEGORY_BY_HAZARD_TYPE,
   calculateCo2SavedKg,
   calculateTrailDistanceMeters,
+  isSesizareEligible,
   sanitizeBreadcrumbs,
 } from '@defensivepedal/core';
 
@@ -706,4 +710,116 @@ export const submitCountryWaitlist = async (
 
   memoryCountryWaitlist.set(`${request.email}:${request.countryCode}`, { ...request, userId });
   return { status: 'joined' };
+};
+
+// ---------------------------------------------------------------------------
+// Sesizări — civic-complaint escalations (Romania)
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a rider tries to escalate the same hazard twice. Distinguished
+ * from generic upstream failures so the route can answer 409 rather than a
+ * misleading 502 — the client treats it as "already escalated", not an error.
+ */
+export class SesizareDuplicateError extends Error {
+  constructor() {
+    super('This hazard has already been escalated by this rider.');
+    this.name = 'SesizareDuplicateError';
+  }
+}
+
+const memorySesizari = new Map<string, SesizareRequest & { userId: string }>();
+
+/**
+ * Records a hand-off to civia.ro.
+ *
+ * The row means "the rider opened Civia with a composed petition", NOT "a
+ * sesizare was filed" — civia.ro's submit requires a legal identity we never
+ * hold. Every count derived from this table inherits that meaning.
+ */
+export const submitSesizare = async (
+  request: SesizareRequest,
+  userId: string,
+): Promise<SesizareResponse> => {
+  // Defence in depth: the route's JSON Schema enums the same list, but this
+  // keeps the invariant if the endpoint is ever called from elsewhere.
+  if (!isSesizareEligible(request.hazardType)) {
+    throw new Error(`Hazard type ${request.hazardType} is not eligible for a sesizare.`);
+  }
+  const civiaCategory = CIVIA_CATEGORY_BY_HAZARD_TYPE[request.hazardType];
+  const address = request.address?.trim().slice(0, 300) || null;
+
+  if (!supabaseAdmin) {
+    const id = createId('sesizare');
+    memorySesizari.set(id, { ...request, userId });
+    return {
+      id,
+      createdAt: new Date().toISOString(),
+      hazardSesizareCount: 1,
+      awardedBadges: [],
+    };
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('sesizari')
+    .insert({
+      user_id: userId,
+      hazard_id: request.hazardId ?? null,
+      hazard_type: request.hazardType,
+      civia_category: civiaCategory,
+      lat: request.coordinate.lat,
+      lon: request.coordinate.lon,
+      location: `SRID=4326;${toPointWkt(request.coordinate.lat, request.coordinate.lon)}`,
+      address,
+    })
+    .select('id, created_at')
+    .single();
+
+  if (error || !data) {
+    // 23505 = unique_violation on sesizari_user_hazard_uniq.
+    if (error?.code === '23505') throw new SesizareDuplicateError();
+    throw new Error(error?.message ?? 'Insert failed');
+  }
+
+  // Badge evaluation is additive and best-effort: a failure here must not
+  // cost the rider the escalation they already made.
+  let awardedBadges: unknown[] = [];
+  try {
+    const { data: badges } = await supabaseAdmin.rpc('award_sesizare_badges', {
+      p_user_id: userId,
+    });
+    if (Array.isArray(badges)) awardedBadges = badges;
+  } catch {
+    awardedBadges = [];
+  }
+
+  let hazardSesizareCount = 1;
+  if (request.hazardId) {
+    const { count } = await supabaseAdmin
+      .from('sesizari')
+      .select('id', { count: 'exact', head: true })
+      .eq('hazard_id', request.hazardId);
+    if (typeof count === 'number' && count > 0) hazardSesizareCount = count;
+  }
+
+  return {
+    id: data.id as string,
+    createdAt: data.created_at as string,
+    hazardSesizareCount,
+    awardedBadges,
+  };
+};
+
+/**
+ * Lifetime escalation count for a rider — powers the impact-dashboard row.
+ */
+export const countSesizariForUser = async (userId: string): Promise<number> => {
+  if (!supabaseAdmin) {
+    return [...memorySesizari.values()].filter((entry) => entry.userId === userId).length;
+  }
+  const { count } = await supabaseAdmin
+    .from('sesizari')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+  return typeof count === 'number' ? count : 0;
 };

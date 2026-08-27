@@ -26,6 +26,8 @@ import type {
   QuizQuestion,
   QuizAnswer,
   SavedRoute,
+  SesizareRequest,
+  SesizareResponse,
   XpBreakdownItem,
   XpAwardResult,
   TiersResponse,
@@ -97,6 +99,12 @@ import {
   countryWaitlistRequestSchema,
   countryWaitlistResponseSchema,
 } from '../lib/countryWaitlistSchemas';
+import {
+  sesizareRequestSchema,
+  sesizareResponseSchema,
+} from '../lib/sesizareSchemas';
+import { isSesizariEnabled } from '../lib/sesizariKillSwitch';
+import { SesizareDuplicateError } from '../lib/submissions';
 
 type NormalizedRouteRequest = RoutePreviewRequest | RerouteRequest;
 type RateLimitPolicyKey = keyof MobileApiDependencies['rateLimitPolicies'];
@@ -967,6 +975,27 @@ export const buildV1Routes = (
           }
         }
 
+        // Civic escalation counts ("2 riders already escalated this").
+        // Best-effort: a failure here must never cost the caller the hazard
+        // list itself, so the map degrades to no counts rather than a 502.
+        const sesizareCountById = new Map<string, number>();
+        const sesizareByMeIds = new Set<string>();
+        if (rows.length > 0) {
+          try {
+            const { data: countRows } = await supabaseAdmin.rpc('get_sesizare_counts', {
+              p_hazard_ids: rows.map((row) => row.id as string),
+              p_user_id: caller?.id ?? null,
+            });
+            for (const row of (countRows ?? []) as Record<string, unknown>[]) {
+              const hazardId = row.hazard_id as string;
+              sesizareCountById.set(hazardId, Number(row.total) || 0);
+              if (row.escalated_by_caller === true) sesizareByMeIds.add(hazardId);
+            }
+          } catch {
+            // Leave both empty — the client treats a missing count as zero.
+          }
+        }
+
         const hazards = rows.map((row) => {
           const loc = row.location as { latitude: number; longitude: number };
           const id = row.id as string;
@@ -989,6 +1018,8 @@ export const buildV1Routes = (
             // always carry an explicit value.
             alertEligible: (row.alert_eligible as boolean | null) ?? true,
             importSource: (row.import_source as string | null) ?? null,
+            sesizareCount: sesizareCountById.get(id) ?? 0,
+            sesizareByMe: sesizareByMeIds.has(id),
           };
         });
 
@@ -1279,6 +1310,73 @@ export const buildV1Routes = (
       await applyRateLimit(request, reply, dependencies, 'routePreview');
       const stub: NearbyCitySuggestion[] = [];
       return stub;
+    });
+
+    // ── Sesizări (civic-complaint escalation, Romania) ──
+    // Records a hand-off to civia.ro. The row means "the rider opened Civia
+    // with a composed petition", NOT "a sesizare was filed" — Civia's submit
+    // requires a legal identity (OG 27/2002 art. 7) we never hold.
+    //
+    // ANONYMOUS ALLOWED (unlike /city-suggestions): Civia collects the
+    // identity itself, so gating this behind our signup would restrict a
+    // civic right for no safety gain. Uses the generic `write` bucket —
+    // there is deliberately no sesizare-specific throttle
+    // (docs/plans/sesizari-civia.md §9.1).
+
+    app.post<{ Body: SesizareRequest }>('/sesizari', {
+      schema: {
+        body: sesizareRequestSchema,
+        response: {
+          200: sesizareResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          403: errorResponseSchema,
+          409: errorResponseSchema,
+          429: errorResponseSchema,
+          500: errorResponseSchema,
+          502: errorResponseSchema,
+        },
+      },
+    }, async (request, reply) => {
+      const user = await requireAuthenticatedUser(request, dependencies.authenticateUser);
+
+      if (!isSesizariEnabled()) {
+        throw new HttpError('Sesizări are currently disabled.', {
+          statusCode: 403,
+          code: 'FEATURE_DISABLED',
+          details: ['The civic-complaint handoff is turned off server-side.'],
+        });
+      }
+
+      await applyRateLimit(request, reply, dependencies, 'write', { userId: user.id });
+
+      try {
+        const result = await dependencies.submitSesizare(
+          {
+            hazardId: request.body.hazardId,
+            hazardType: request.body.hazardType,
+            coordinate: request.body.coordinate,
+            address: request.body.address,
+          },
+          user.id,
+        );
+        const response: SesizareResponse = result;
+        return response;
+      } catch (error) {
+        if (error instanceof SesizareDuplicateError) {
+          throw new HttpError(error.message, {
+            statusCode: 409,
+            code: 'CONFLICT',
+            details: ['A rider may escalate a given hazard only once.'],
+          });
+        }
+        if (error instanceof HttpError) throw error;
+        throw new HttpError('Sesizare submission failed.', {
+          statusCode: 502,
+          code: 'UPSTREAM_ERROR',
+          details: [error instanceof Error ? error.message : 'Unknown upstream error.'],
+        });
+      }
     });
 
     // ── Country waitlist (region gate) ──
@@ -3252,6 +3350,9 @@ export const buildV1Routes = (
                 totalXp: { type: 'integer' },
                 riderTier: { type: 'string' },
                 totalCaloriesBurned: { type: 'number' },
+                // Civic escalations. Not in `required` — an omitted value
+                // means "unknown", which the client renders as no row at all.
+                totalSesizari: { type: 'integer' },
                 thisWeek: {
                   type: 'object',
                   additionalProperties: false,
@@ -3347,6 +3448,15 @@ export const buildV1Routes = (
           } catch { /* fallback is optional */ }
         }
 
+        // Civic escalations. Best-effort: a failure here must not cost the
+        // rider their whole dashboard, so it degrades to 0.
+        let totalSesizari = 0;
+        try {
+          totalSesizari = await dependencies.countSesizariForUser(user.id);
+        } catch {
+          totalSesizari = 0;
+        }
+
         return {
           streak: {
             currentStreak: Number(streak?.currentStreak ?? 0),
@@ -3375,6 +3485,7 @@ export const buildV1Routes = (
           totalXp: Number(d.totalXp ?? 0),
           riderTier: String(d.riderTier ?? 'kickstand') as import('@defensivepedal/core').RiderTierName,
           totalCaloriesBurned: Number(d.totalCaloriesBurned ?? 0),
+          totalSesizari,
         };
       },
     );

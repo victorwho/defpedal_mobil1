@@ -832,6 +832,29 @@ export const en = {
   },
 
   // ── Hazard Reporting ──
+  // ── Sesizări (civic-complaint handoff to civia.ro, Romania only) ──
+  // UI chrome only. The petition text itself is composed in
+  // packages/core/src/sesizare.ts and is ALWAYS Romanian — it is addressed to
+  // a Romanian public authority, never to the rider.
+  sesizare: {
+    cta: 'Report to the city hall',
+    ctaShort: 'Sesizare',
+    subtitle: 'Send this to the authority responsible, via Civia',
+    alreadyEscalated: 'You already sent this one',
+    othersEscalated_one: '1 cyclist has already reported this to the city hall',
+    othersEscalated_other: '{{count}} cyclists have already reported this to the city hall',
+    copiedTitle: 'Complaint text copied',
+    copiedBody:
+      'Paste it into the "Descriere" field on Civia. Adding a photo there makes it much more likely to get fixed.',
+    openCivia: 'Open Civia',
+    clipboardFailedTitle: 'Could not copy the text',
+    clipboardFailedBody: 'Try again in a moment.',
+    postRideTitle: 'Take it further?',
+    postRideBody:
+      'You reported hazards on this ride. Some of them can be sent to the authority responsible.',
+    dashboardLabel: 'Sent to the city hall',
+    dashboardSub: 'Handed to the responsible authority via Civia',
+  },
   hazard: {
     title: 'Report hazard',
     parkedCar: 'Parked car',

@@ -675,6 +675,60 @@ export const reverseGeocodeAddress = async (
 };
 
 // ---------------------------------------------------------------------------
+// Reverse Geocode — address + country (sesizări gating)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves a coordinate to a street address AND the country that owns it.
+ *
+ * Exists as its own call because the sesizări feature needs both at once and
+ * must NOT gate on `resolveCountryFromCoord` from core: the RO bounding box
+ * there deliberately over-includes Belgrade and Chișinău (see CLAUDE.md), so
+ * a bbox gate would offer Romanian city-hall complaints to riders in Serbia
+ * and Moldova. Mapbox's answer is authoritative.
+ *
+ * Returns `null` when the lookup fails or the feature carries no country —
+ * callers treat that as "not eligible" rather than guessing.
+ */
+export const reverseGeocodeAddressWithCountry = async (
+  lat: number,
+  lon: number,
+): Promise<{ address: string; countryCode: string } | null> => {
+  const token = ensureMapboxToken();
+  const params = new URLSearchParams({
+    longitude: String(lon),
+    latitude: String(lat),
+    access_token: token,
+    types: 'address,street,place',
+    limit: '1',
+  });
+
+  try {
+    const response = await fetchWithTimeout(
+      `${MAPBOX_GEOCODING_BASE}/reverse?${params.toString()}`,
+    );
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const feature = data.features?.[0];
+    if (!feature) return null;
+
+    const countryCode = feature.properties.context?.country?.country_code;
+    if (!countryCode) return null;
+
+    const address =
+      feature.properties.full_address ??
+      feature.properties.place_formatted ??
+      feature.properties.name ??
+      '';
+
+    return { address: address.trim(), countryCode: countryCode.toUpperCase() };
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Coverage Check
 // ---------------------------------------------------------------------------
 

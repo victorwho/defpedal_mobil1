@@ -73,6 +73,19 @@ vi.mock('expo-clipboard', () => ({
   setString: vi.fn(),
 }));
 
+// expo-web-browser resolves its native module at import time and throws
+// "Cannot find native module 'ExpoWebBrowser'" under vitest. It is imported
+// top-level by AuthSessionProvider and by the sesizare hand-off hook, which
+// the hazard detail sheet renders — so stub it globally rather than in every
+// component test that happens to reach it.
+vi.mock('expo-web-browser', () => ({
+  openBrowserAsync: vi.fn().mockResolvedValue({ type: 'dismiss' }),
+  dismissBrowser: vi.fn(),
+  maybeCompleteAuthSession: vi.fn(),
+  warmUpAsync: vi.fn().mockResolvedValue(undefined),
+  coolDownAsync: vi.fn().mockResolvedValue(undefined),
+}));
+
 // @sentry/react-native + posthog-react-native are imported top-level by
 // `lib/telemetry.ts`, which is reached by almost anything that touches the
 // API client (`schemas/responseValidation` → telemetry) or the app store.

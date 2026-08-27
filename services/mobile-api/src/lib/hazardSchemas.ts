@@ -100,6 +100,11 @@ export const nearbyHazardItemSchema = {
     // Registry id of the external source (e.g. 'open311:koln'), or null for
     // rider-reported hazards. Drives the provenance line on the detail sheet.
     importSource: { type: ['string', 'null'] },
+    // Civic escalations (RO). Optional so the field can be omitted entirely
+    // when the sesizari lookup fails — the map must never lose hazards
+    // because a secondary count query broke.
+    sesizareCount: { type: 'integer' },
+    sesizareByMe: { type: 'boolean' },
   },
 } as const;
 

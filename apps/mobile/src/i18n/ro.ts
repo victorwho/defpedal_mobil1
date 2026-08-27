@@ -824,6 +824,28 @@ export const ro: TranslationKeys = {
   },
 
   // ── Hazard Reporting ──
+  // ── Sesizări (predare către civia.ro) ──
+  // Doar textul de interfață. Petiția propriu-zisă se compune în
+  // packages/core/src/sesizare.ts și este întotdeauna în română.
+  sesizare: {
+    cta: 'Fă o sesizare la primărie',
+    ctaShort: 'Sesizare',
+    subtitle: 'Trimite problema autorității responsabile, prin Civia',
+    alreadyEscalated: 'Ai trimis deja o sesizare pentru asta',
+    othersEscalated_one: 'Un biciclist a dus deja această problemă la primărie',
+    othersEscalated_other: '{{count}} bicicliști au dus deja această problemă la primărie',
+    copiedTitle: 'Textul sesizării e copiat',
+    copiedBody:
+      'Lipește-l în câmpul „Descriere" pe Civia. Adaugă și o poză acolo — crește mult șansa să fie rezolvată.',
+    openCivia: 'Deschide Civia',
+    clipboardFailedTitle: 'Nu am putut copia textul',
+    clipboardFailedBody: 'Încearcă din nou peste câteva momente.',
+    postRideTitle: 'Duci problema mai departe?',
+    postRideBody:
+      'Ai raportat pericole în această tură. Unele pot fi trimise autorității responsabile.',
+    dashboardLabel: 'Sesizări la primărie',
+    dashboardSub: 'Duse către autoritatea responsabilă, prin Civia',
+  },
   hazard: {
     title: 'Raportează pericol',
     parkedCar: 'Mașină parcată',

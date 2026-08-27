@@ -37,6 +37,7 @@ import { Modal } from '../src/design-system/organisms/Modal';
 import { AnalyticsOptInCard } from '../src/design-system/organisms/AnalyticsOptInCard';
 import { ReviewPromptCard } from '../src/design-system/organisms/ReviewPromptCard';
 import { SaveRideCard } from '../src/design-system/organisms/SaveRideCard';
+import { SesizarePostRideCard } from '../src/design-system/organisms/SesizarePostRideCard';
 import { useCelebrationStage } from '../src/design-system/hooks/useCelebrationStage';
 import { mascotPoses } from '../src/design-system/tokens/mascotPoses';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -219,6 +220,10 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
   const completedRideCount = useAppStore((s) => s.completedRideCount);
   const { isOnline } = useConnectivity();
   const [showReviewCard, setShowReviewCard] = useState(false);
+  const [showSesizareCard, setShowSesizareCard] = useState(false);
+  // Hazards reported during the ride that just ended. Cleared by resetFlow
+  // when the rider leaves this screen.
+  const sessionHazardReports = useAppStore((state) => state.sessionHazardReports);
 
   const selectedRoute =
     routePreview?.routes.find((r) => r.id === selectedRouteId) ??
@@ -291,6 +296,12 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
     // in one session. SaveRide + review coexisting is unchanged behavior.
     if (decision !== null && claimPromptSlot('review')) {
       setShowReviewCard(true);
+    } else if (sessionHazardReports.length > 0 && claimPromptSlot('sesizare')) {
+      // Only when the review card didn't take the slot. The card itself still
+      // renders nothing unless a reported hazard actually qualifies (Romania,
+      // actionable type, kill switch on) — this only decides whether it may
+      // ask at all this session.
+      setShowSesizareCard(true);
     }
   };
 
@@ -312,6 +323,15 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
                 }}
                 onDismiss={() => setShowReviewCard(false)}
               />
+            </View>
+          ) : null}
+          {/* Sesizări sit BELOW the review card, structurally: this renders
+              only after `onSubmit` has already claimed (or declined) the
+              review slot, so the higher-priority ask always wins. Renders
+              nothing outside Romania or when no reported hazard qualifies. */}
+          {showSesizareCard ? (
+            <View style={styles.reviewPromptSlot}>
+              <SesizarePostRideCard reports={sessionHazardReports} />
             </View>
           ) : null}
           <Pressable

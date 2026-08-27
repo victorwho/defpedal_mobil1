@@ -30,3 +30,4 @@ export type { SuggestedUserCardProps } from './SuggestedUserCard';
 
 export { FollowRequestItem } from './FollowRequestItem';
 export type { FollowRequestItemProps } from './FollowRequestItem';
+export * from './SesizareRow';

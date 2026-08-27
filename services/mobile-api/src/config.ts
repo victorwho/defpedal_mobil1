@@ -209,6 +209,16 @@ export const config = {
       ),
     },
   },
+  // Sesizări — civic-complaint handoff to civia.ro (Romania).
+  //
+  // Served to the client through GET /v1/profile. Remote-controlled on
+  // purpose: the entire feature is a link into a third-party site that
+  // launched in April 2026, so a path change there is fixable in ~30s instead
+  // of a store release. The on/off flag lives in lib/sesizariKillSwitch.ts —
+  // it is read at call time, not at module load.
+  sesizari: {
+    baseUrl: resolveConfigValue(['SESIZARI_BASE_URL'], 'https://civia.ro/sesizari'),
+  },
   // Sentry error tracking (review 2026-06-12 P2 observability). Entirely
   // inert until SENTRY_DSN is set — without it, init is skipped and every
   // captureException is a no-op, so this is safe to ship before the secret is

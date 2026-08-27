@@ -38,6 +38,7 @@ import { useTheme } from '../ThemeContext';
 import { useHaptics } from '../hooks/useHaptics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { ReportSheet } from '../molecules/ReportSheet';
+import { SesizareRow } from '../molecules/SesizareRow';
 import { getHazardIcon } from '../tokens/hazardIcons';
 import { radii } from '../tokens/radii';
 import { safetyColors, gray } from '../tokens/colors';
@@ -386,6 +387,21 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
               </Text>
             </Pressable>
           </View>
+
+          {/* Civic escalation — renders nothing outside Romania, for
+              hazard types no authority handles, or once this rider has
+              already escalated this hazard. */}
+          <View style={styles.sesizareWrap}>
+            <SesizareRow
+              hazardId={hazard.id}
+              hazardType={hazard.hazardType}
+              coordinate={{ lat: hazard.lat, lon: hazard.lon }}
+              observedAt={hazard.createdAt}
+              sesizareCount={hazard.sesizareCount ?? 0}
+              sesizareByMe={hazard.sesizareByMe ?? false}
+              surface="hazard_detail"
+            />
+          </View>
         </Animated.View>
       </View>
       <ReportSheet
@@ -504,6 +520,9 @@ const styles = StyleSheet.create({
   },
   scoreBreakdownText: {
     ...textXs,
+  },
+  sesizareWrap: {
+    marginTop: space[3],
   },
   voteRow: {
     flexDirection: 'row',

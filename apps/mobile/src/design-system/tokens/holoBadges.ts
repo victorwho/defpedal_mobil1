@@ -84,6 +84,13 @@ export const holoBadgeAssets: Record<string, ImageSourcePropType> = {
   round_trip: require('../../../assets/holo_badges/round_trip.png'),
   saddle_time: require('../../../assets/holo_badges/saddle_time.png'),
   same_origin_dest_7: require('../../../assets/holo_badges/same_origin_dest_7.png'),
+  // Per-tier art (exception to the one-artwork-per-family convention used
+  // by road_warrior et al.): each tier has its own illustration —
+  // clipboard -> ledger -> filing cabinet. Registered per badge_key so
+  // getHoloBadgeAsset resolves them directly, never via tier_family.
+  sesizare_1: require('../../../assets/holo_badges/sesizare_1.png'),
+  sesizare_5: require('../../../assets/holo_badges/sesizare_5.png'),
+  sesizare_25: require('../../../assets/holo_badges/sesizare_25.png'),
   shield_bearer: require('../../../assets/holo_badges/shield_bearer.png'),
   skyward: require('../../../assets/holo_badges/skyward.png'),
   social_cyclist: require('../../../assets/holo_badges/social_cyclist.png'),

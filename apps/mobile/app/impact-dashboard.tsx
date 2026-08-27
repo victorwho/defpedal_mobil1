@@ -316,6 +316,24 @@ export default function ImpactDashboardScreen() {
               </Text>
             </View>
 
+            {/* Civic escalations. Hidden at zero: the offer only exists in
+                Romania, so a hard 0 would read as "you never bothered" to
+                every rider who is never shown the option. The label says
+                "handed to the authority" — we only ever observe the
+                hand-off, never a confirmed filing. */}
+            {(data.totalSesizari ?? 0) > 0 && (
+              <View style={styles.counterBlock}>
+                <AnimatedCounter
+                  targetValue={data.totalSesizari ?? 0}
+                  decimals={0}
+                  duration={1500}
+                  style={{ ...textDataLg, fontFamily: fontFamily.mono.bold, color: colors.accent }}
+                />
+                <Text style={styles.counterLabel}>{t('sesizare.dashboardLabel')}</Text>
+                <Text style={styles.counterSubtext}>{t('sesizare.dashboardSub')}</Text>
+              </View>
+            )}
+
             {data.totalCaloriesBurned > 0 && (
               <View style={styles.counterBlock}>
                 <AnimatedCounter

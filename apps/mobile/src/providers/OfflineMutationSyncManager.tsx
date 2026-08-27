@@ -122,6 +122,10 @@ const submitQueuedMutation = async (
       const payload = mutation.payload as QueuedMutationPayloadByType['city_suggestion'];
       return mobileApi.submitCitySuggestion(payload);
     }
+    case 'sesizare': {
+      const payload = mutation.payload as QueuedMutationPayloadByType['sesizare'];
+      return mobileApi.submitSesizare(payload);
+    }
     default:
       return null;
   }

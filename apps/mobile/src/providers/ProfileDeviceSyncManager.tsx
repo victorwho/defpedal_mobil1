@@ -16,7 +16,8 @@
  * Profile screen's own sync remains and stays authoritative for explicit
  * preference edits.
  *
- * It also hydrates Pedal Plus entitlement from the SAME response, at zero
+ * It also hydrates Pedal Plus entitlement and the sesizări remote config
+ * (kill switch + civia.ro base URL) from the SAME response, at zero
  * extra network cost: PATCH /v1/profile returns the full profile including the
  * premium block, and this already runs at every session bootstrap. A failed
  * sync simply leaves the previously cached snapshot in place, which is exactly
@@ -48,6 +49,16 @@ export const ProfileDeviceSyncManager = () => {
           useAppStore
             .getState()
             .setPremiumFromProfile(profile.premium, new Date().toISOString());
+        }
+
+        // Sesizări remote config, hydrated from the same response. Server
+        // config, not a preference — this is the ONLY writer. Undefined means
+        // an older server, so the previously cached values stay (fail open).
+        if (profile?.sesizariEnabled !== undefined) {
+          useAppStore.getState().setSesizariConfig({
+            enabled: profile.sesizariEnabled,
+            baseUrl: profile.sesizariBaseUrl ?? '',
+          });
         }
 
         // Flat rides taken since the last successful sync. Piggy-backed here

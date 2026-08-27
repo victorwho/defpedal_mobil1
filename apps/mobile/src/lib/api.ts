@@ -40,6 +40,8 @@ import type {
   RideImpact,
   RideRecentDestination,
   SavedRoute,
+  SesizareRequest,
+  SesizareResponse,
   SavedRouteCreateRequest,
   ShareTripRequest,
   SuggestedUser,
@@ -202,6 +204,14 @@ export const mobileApi = {
     mobileApiFetch<NearbyCitySuggestion[]>(
       `/v1/city-suggestions/nearby?lat=${lat}&lon=${lon}&radius=${radiusMeters}`,
     ),
+
+  // ── Sesizări (civic-complaint escalation, Romania) ──
+
+  submitSesizare: (payload: SesizareRequest) =>
+    mobileApiFetch<SesizareResponse>('/v1/sesizari', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // ── Country Waitlist (region gate) ──
 

@@ -536,6 +536,10 @@ describe('GET /v1/hazards/nearby', () => {
       // must still alert (fail open) and must not look imported.
       alertEligible: true,
       importSource: null,
+      // Civic escalations (sesizări). The get_sesizare_counts RPC returns
+      // nothing in this fixture, so both degrade to "nobody has escalated".
+      sesizareCount: 0,
+      sesizareByMe: false,
     });
     await app.close();
   });
@@ -653,6 +657,7 @@ describe('GET /v1/hazards/nearby', () => {
       'id', 'lat', 'lon', 'hazardType', 'createdAt', 'confirmCount', 'denyCount',
       'score', 'userVote', 'expiresAt', 'lastConfirmedAt', 'description',
       'alertEligible', 'importSource',
+      'sesizareCount', 'sesizareByMe',
     ]);
     for (const key of Object.keys(body.hazards[0])) {
       expect(allowed.has(key)).toBe(true);

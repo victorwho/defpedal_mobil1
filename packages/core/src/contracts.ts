@@ -186,7 +186,13 @@ export interface ErrorResponse {
      * a slot or subscribe. Clients switch on it to show the matching limit
      * card rather than a generic failure.
      */
-    | 'PREMIUM_LIMIT_REACHED';
+    | 'PREMIUM_LIMIT_REACHED'
+    /**
+     * The server has this feature switched off (HTTP 403). Not an auth or
+     * input problem — retrying never clears it and the client should simply
+     * hide the surface. Used by the sesizări kill switch (SESIZARI_ENABLED).
+     */
+    | 'FEATURE_DISABLED';
   details?: string[];
 }
 
@@ -349,6 +355,34 @@ export interface NearbyHazard {
    */
   readonly importSource?: string | null;
   readonly distanceMeters?: number;
+  /** How many riders have escalated this hazard to the authorities. */
+  readonly sesizareCount?: number;
+  /** Whether the calling rider already escalated it (blocks a repeat). */
+  readonly sesizareByMe?: boolean;
+}
+
+/**
+ * Civic-complaint escalation (Romania only).
+ *
+ * `hazardId` is optional because hazards are written through the mobile
+ * offline queue and may not have a server id yet when the rider escalates —
+ * see docs/plans/sesizari-civia.md §6.1. The coordinate/type/address snapshot
+ * is what makes the row meaningful without it.
+ */
+export interface SesizareRequest {
+  readonly hazardId?: string;
+  readonly hazardType: HazardType;
+  readonly coordinate: Coordinate;
+  readonly address?: string;
+}
+
+export interface SesizareResponse {
+  readonly id: string;
+  readonly createdAt: string;
+  /** Total escalations on this hazard, including this one. 1 when unlinked. */
+  readonly hazardSesizareCount: number;
+  /** Newly awarded `civic_sesizari` badges, same shape as the badge RPC. */
+  readonly awardedBadges: readonly unknown[];
 }
 
 export type HazardValidationResponse = 'confirm' | 'deny' | 'pass';
@@ -554,7 +588,7 @@ export interface OfflineRegion {
   error?: string | null;
 }
 
-export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote' | 'city_suggestion';
+export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote' | 'city_suggestion' | 'sesizare';
 export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed' | 'dead';
 
 export interface QueuedMutation {
@@ -1030,6 +1064,15 @@ export interface ProfileResponse {
   notifyCommunity: boolean;
   quietHoursStart: string | null;
   quietHoursEnd: string | null;
+  /**
+   * Sesizări (civic-complaint handoff) remote config. Pure server config, not
+   * a per-user preference — delivered here because /v1/profile is already
+   * fetched at bootstrap by every session including anonymous ones. Optional
+   * so an older server (or a failed read) leaves the client on its fail-open
+   * defaults rather than dark. See docs/plans/sesizari-civia.md §6.3.
+   */
+  sesizariEnabled?: boolean;
+  sesizariBaseUrl?: string;
   /** Pedal Plus entitlement + paywall visibility. Server-owned. */
   premium: ProfilePremium;
 }
@@ -1088,6 +1131,12 @@ export interface ImpactDashboard {
   readonly totalXp: number;
   readonly riderTier: RiderTierName;
   readonly totalCaloriesBurned: number;
+  /**
+   * Lifetime civic escalations (sesizări handed off to civia.ro). Optional so
+   * an older server leaves the row hidden rather than showing a false zero.
+   * Counts ESCALATIONS STARTED — we never observe the actual filing.
+   */
+  readonly totalSesizari?: number;
 }
 
 export interface QuizQuestion {

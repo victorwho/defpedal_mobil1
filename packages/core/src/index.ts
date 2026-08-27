@@ -27,6 +27,7 @@ export * from './hazardImportSources';
 export * from './riskDistribution';
 export * from './riskStretch';
 export * from './savedPlaceKeywords';
+export * from './sesizare';
 export * from './shareCaption';
 export * from './shareCodeGenerator';
 export * from './shareDeepLinkBuilder';
