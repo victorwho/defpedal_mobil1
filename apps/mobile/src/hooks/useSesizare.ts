@@ -41,7 +41,7 @@ export interface StartSesizareInput {
   /** When the rider observed it. Defaults to now (armchair reports). */
   readonly observedAt?: string;
   /** Analytics label for where the CTA was tapped. */
-  readonly surface: 'hazard_detail' | 'post_ride';
+  readonly surface: 'hazard_detail' | 'post_ride' | 'report';
 }
 
 export interface UseSesizareResult {

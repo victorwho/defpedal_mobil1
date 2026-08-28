@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
+import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,6 +43,7 @@ import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
+import { SesizareRow } from '../src/design-system/molecules/SesizareRow';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -295,6 +296,13 @@ export default function RoutePlanningScreen() {
   const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
   const [hazardDescription, setHazardDescription] = useState('');
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
+  // A sesizare CTA rides inside the success toast, and 5s is not long enough
+  // to read it and decide. Type-eligibility is a cheap synchronous check (the
+  // Romania gate is async and resolves inside SesizareRow), so a rider outside
+  // Romania just gets a slightly longer toast — harmless.
+  const hazardToastMs = (hazardType?: string) =>
+    hazardType && isSesizareEligible(hazardType as HazardType) ? 15000 : 5000;
+
   const [hazardToast, setHazardToast] = useState<{ type: 'success' | 'error'; message: string; coordinate?: Coordinate; hazardType?: string } | null>(null);
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
   const [nearbySheetOpen, setNearbySheetOpen] = useState(false);
@@ -461,7 +469,7 @@ export default function RoutePlanningScreen() {
     useAppStore.getState().markHazardReported();
     setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate, hazardType: 'other' });
     if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
-    hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+    hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), hazardToastMs('other'));
   };
 
   const handleHazardTypeSelect = (hazardType: HazardType) => {
@@ -485,7 +493,7 @@ export default function RoutePlanningScreen() {
       setHazardPickerOpen(false);
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: pendingHazardCoordinate, hazardType });
       if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
-      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), hazardToastMs(hazardType));
       return;
     }
 
@@ -531,7 +539,7 @@ export default function RoutePlanningScreen() {
       useAppStore.getState().markHazardReported();
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: mapCenterCoordinate, hazardType: selectedHazardType });
       if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
-      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), 5000);
+      hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), hazardToastMs(selectedHazardType ?? undefined));
     }
 
     setHazardPlacementMode(false);
@@ -1716,6 +1724,25 @@ export default function RoutePlanningScreen() {
           variant={hazardToast.type === 'success' ? 'success' : 'error'}
           onDismiss={() => setHazardToast(null)}
         />
+        {hazardToast.type === 'success' && hazardToast.coordinate && hazardToast.hazardType ? (
+          // Offer the civia.ro hand-off at the moment of reporting, not only
+          // post-ride. Armchair reporting is the high-intent moment — a rider
+          // at home reporting the pothole outside their block is exactly who
+          // files a petition — and a non-navigation report never reaches the
+          // feedback screen where the post-ride card lives.
+          //
+          // Deliberately does NOT claim a prompt slot. Like the hazard-detail
+          // row (and unlike the post-ride card), this is a consequence of an
+          // action the rider just took, not an unsolicited ask; claiming would
+          // starve the analytics prompt for the whole session over a
+          // contextual follow-up. SesizareRow renders null when the type is
+          // ineligible, the rider is outside Romania, or the kill switch is off.
+          <SesizareRow
+            hazardType={hazardToast.hazardType as HazardType}
+            coordinate={hazardToast.coordinate}
+            surface="report"
+          />
+        ) : null}
         {hazardToast.type === 'success' && hazardToast.coordinate ? (
           <Pressable
             style={styles.shareHazardButton}

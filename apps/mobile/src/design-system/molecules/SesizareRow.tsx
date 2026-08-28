@@ -34,7 +34,7 @@ export interface SesizareRowProps {
   sesizareCount?: number;
   /** True when this rider already escalated it — the row hides itself. */
   sesizareByMe?: boolean;
-  surface: 'hazard_detail' | 'post_ride';
+  surface: 'hazard_detail' | 'post_ride' | 'report';
 }
 
 export const SesizareRow: React.FC<SesizareRowProps> = ({

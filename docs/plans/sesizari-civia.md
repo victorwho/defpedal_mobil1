@@ -40,7 +40,7 @@ observation, not contract.**
 | 2 | Prefill mechanism | **Clipboard + plain link** — no Civia API coupling |
 | 3 | Clipboard payload | **One rich Romanian paragraph** (address + problem + date + GPS + request) |
 | 4 | Handoff target | `civia.ro/sesizari` in the **in-app browser** (`expo-web-browser`) |
-| 5 | Trigger surfaces | **Post-ride batched card** (feedback screen) **+ HazardDetailSheet row** |
+| 5 | Trigger surfaces | **Post-ride batched card** (feedback screen) **+ HazardDetailSheet row** **+ at-report CTA on route-planning** (added 2026-08-28 — see §5a) |
 | 6 | Eligible hazard types | `pothole`, `poor_surface`, `dangerous_intersection`, `illegally_parked_car`, `blocked_bike_lane`, `aggro_dogs` |
 | 7 | Romania gating | **Reverse-geocode the hazard coordinate**, gate on `RO` |
 | 8 | Persistence | **Server record** in a new `sesizari` table |
@@ -331,3 +331,51 @@ always Romanian.
 rows exist **in the live DB** (`information_schema`) before the client that reads
 them ships. A migration file in `supabase/migrations/` proves nothing — this repo
 applies them by hand.
+
+---
+
+## 5a. Amendment (2026-08-28) — at-report CTA on route-planning
+
+Decision #5 originally locked two trigger surfaces. Preview testing of
+v0.2.129 found a gap it had not anticipated: **reporting a hazard outside
+navigation offered no sesizare path at all.**
+
+`appendSessionHazardReport` is called from exactly one place —
+`app/navigation.tsx:646`. Route-planning's own report paths
+(`handleHazardTypeSelect` for a long-press, `handleHazardPlacementConfirm` for
+the crosshair FAB, and `submitHazardOther` for free-text) record nothing, so an
+armchair report never lands in `sessionHazardReports`, never reaches the
+feedback screen (there was no ride), and the only way back was spotting your
+own pin on the map and tapping it.
+
+Decision #5 assumed every hazard report happens during a ride. It does not —
+and the non-ride case is arguably the **higher-intent** one. Armchair reporting
+is deliberate, stationary and two-handed; a rider at home reporting the pothole
+outside their block is precisely the person who files a petition. Post-ride is
+the batched, low-attention moment.
+
+**Implementation.** `SesizareRow` is rendered inside the existing success toast
+on `route-planning.tsx`, above the share button. The row already self-hides on
+ineligible type / outside Romania / kill switch off, so no new gating was
+needed — it is a drop-in. `surface` gains a third value, `'report'`, used only
+for the `sesizare_started` telemetry label (it never reaches the server).
+
+**Two decisions worth not undoing:**
+
+1. **It does NOT claim a prompt slot.** Like the HazardDetailSheet row — and
+   unlike the post-ride card — this is a consequence of an action the rider
+   just took, not an unsolicited ask. Claiming would block the analytics
+   prompt for the whole session over a contextual follow-up, inverting the
+   intent of the arbitration rule. Precedent: neither `SesizareRow` nor
+   `HazardDetailSheet` calls `claimPromptSlot`; only `feedback.tsx`,
+   `impact-dashboard.tsx` and `AnalyticsOptInCard` do.
+2. **The toast lives 15s instead of 5s for eligible types.** Five seconds is
+   not enough to notice a CTA and decide. The Romania gate is async (a reverse
+   geocode inside the row), so the duration keys off the cheap synchronous
+   `isSesizareEligible` check — a rider outside Romania simply gets a slightly
+   longer toast, which is harmless.
+
+Both are pinned by `apps/mobile/src/lib/__tests__/sesizare-report-surface.test.ts`.
+
+Note `submitHazardOther` always submits `hazardType: 'other'`, which is not
+sesizare-eligible, so the free-text path correctly shows no CTA.
