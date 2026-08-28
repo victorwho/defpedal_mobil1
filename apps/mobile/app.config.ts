@@ -241,7 +241,7 @@ export default () => ({
     name: appNameByVariant[appVariant],
     slug: 'defensive-pedal-mobile',
     scheme: appSchemeByVariant[appVariant],
-    version: '0.2.123',
+    version: '0.2.129',
     icon: './assets/icon.png',
     // Global default is unlocked so non-map screens (history, community,
     // profile, settings, trophy case, onboarding) follow the OS auto-rotate
@@ -253,9 +253,22 @@ export default () => ({
     // Disable new architecture for development — bridgeless mode fails to load
     // the Metro JS bundle over USB on Windows. Preview/production use new arch.
     newArchEnabled: appVariant !== 'development',
-    // EAS Update OTA. runtimeVersion=appVersion ties OTA bundles to versionName,
-    // so a versionName bump (this file's `version`) forces a new native build.
-    // Channels in eas.json (preview / production) route OTAs to the right cohort.
+    // `version` MUST be kept in step with android/app/build.gradle's
+    // versionName. Android never runs `expo prebuild`, so build.gradle — not
+    // this file — drives the Android versionName, and the two silently drifted
+    // to 0.2.123 vs 0.2.128 (iOS, which EAS generates from this file, was
+    // stuck at 0.2.123 while Android shipped 0.2.126/127/128).
+    //
+    // EAS Update OTA. Channels in eas.json (preview / production) route OTAs
+    // to the right cohort.
+    //
+    // ⚠️ `policy: 'appVersion'` is only true for iOS. On ANDROID the runtime
+    // version is hand-managed in android/app/src/main/res/values/strings.xml
+    // (`expo_runtime_version`) and has been **0.2.25 in every published AAB**
+    // from v0.2.31 to v0.2.128 — verified by extracting resources.pb from all
+    // 20 archived bundles. So an OTA published under this policy is tagged
+    // with the appVersion and reaches ZERO Android devices. Publishing to
+    // Android requires temporarily pinning runtimeVersion to '0.2.25'.
     runtimeVersion: { policy: 'appVersion' },
     updates: {
       url: 'https://u.expo.dev/f8bcd740-c785-47a3-beed-26891c89425a',
