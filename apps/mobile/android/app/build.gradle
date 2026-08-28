@@ -101,8 +101,8 @@ packagingOptions {
         applicationId 'com.defensivepedal.mobile.dev'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 132
-        versionName "0.2.129"
+        versionCode 133
+        versionName "0.2.130"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
