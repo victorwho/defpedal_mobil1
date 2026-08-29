@@ -473,11 +473,23 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-08-21)
+## Current State (as of 2026-08-29)
 
 > Entries below are dated and append-only — the newest facts are usually in the
-> most recent bullets, not the top. Latest shipped work: **cycleway "No data"
-> repair** (2026-08-21, DB-only, migration `202608210001`): the b36v1 export had
+> most recent bullets, not the top. Latest work: **hazard import pipeline**
+> (2026-08-27/29) — the hazard map went from 0 active hazards to **2,280**,
+> imported from Cologne Open311 and Amsterdam Signalen; see the "Hazard
+> Imports" section above and `docs/plans/hazard-import-pipeline.md`. Shipped
+> alongside it: a per-type hazard-TTL fix (`expires_at` had a column DEFAULT
+> pre-empting the trigger, so every hazard lived 24 h regardless of type since
+> the schema was created), the Sesizari civia hand-off with an at-report CTA,
+> and **Cool mode hidden in production**. **v0.2.130 (versionCode 133) is cut
+> for both stores but NEITHER IS SHIPPED** — the Android AAB is archived
+> locally and unuploaded, iOS build 26 is VALID on TestFlight but not
+> submitted for review, and neither binary has been device-tested. The open
+> question gating both rollouts is **alert density in Amsterdam** (2,051
+> alert-eligible imported hazards in one city, never ridden). Before that:
+> **cycleway "No data" repair** (2026-08-21, DB-only, migration `202608210001`): the b36v1 export had
 > stored every EU cycleway at the score-0 "no data" sentinel (raw −50 infra
 > bonus + 50 shift, no floor) — repaired in place to 0.5 ('Very safe'), export
 > floor added in OSRM_Server's `export_risk_eu.py`, error-log #83. Before that:
@@ -588,7 +600,9 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - **Play Console default listing language unverified** — repo now specifies `en-US` with ro-RO/es-ES as translations. If the live console still has ro-RO as default, locales without a dedicated translation (~28 countries) are served the Romanian store page. Paste the corrected `apps/mobile/store-listing/` texts while checking.
 - **Counsel wording** — privacy + deletion pages name only ANSPDCP as supervisory authority (GDPR Art 77(1) also allows the rider's home authority); terms cite only OUG 34/2014 for the withdrawal waiver. Both flagged, deliberately not self-edited. See `docs/reviews/geo-remnants-review-2026-08-13.md` G-28/G-29.
 - Money/impact figures are EUR everywhere including the 11 non-euro supported countries (incl. Romania) and a hardcoded €0.35/km in `StatsDashboard`. Needs an FX/product decision (review P3).
-- iPhone validation (no macOS hardware available)
+- iPhone validation (no macOS hardware available) — iOS still ships blind: **build 26 (v0.2.130) is VALID on TestFlight but has never run on a device**, like every build before it. The release preflight hard-requires `--native-validation-ref` for iOS precisely because of this.
+- **v0.2.130 (vc 133) is built for both stores and shipped to neither** (2026-08-29). Android AAB archived at `apkreleases/DefensivePedal-Production-v0.2.130.aab`, signer-verified, **not uploaded**; iOS build 26 VALID on TestFlight, **not submitted for review** (needs a 1.17 ASC version record). Both from commit `74beab8`. **Blocking question: alert density in Amsterdam** — 2,051 alert-eligible imported hazards in one city, never ridden. If it is too noisy the fix is one statement (`UPDATE hazard_import_sources SET alert_eligible=false WHERE id='signalen:amsterdam'`), far cheaper to find before a rollout than after an Apple review cycle.
+- **Amsterdam import licence is an owner override, not a grant** — `hazard_import_sources.licence` reads `UNCONFIRMED-OWNER-OVERRIDE-2026-08-27`; the feed returns zero hits on data.overheid.nl. An email to Amsterdam's open-data team would settle it. civia.ro consent is still outstanding too (its adapter is deliberately unwritten).
 - Redis activation: code complete (`redisStore.ts`), needs GCP Memorystore + REDIS_URL on Cloud Run
 - Habit Engine Phase 7 deferred: neighborhood challenges, Safety Wrapped, mentorship, city reports
 - Offline navigation: real NetInfo requires dev APK rebuild (`./gradlew installDevelopmentDebug`); currently falls back to `isOnline: true`
