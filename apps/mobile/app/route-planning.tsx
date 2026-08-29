@@ -43,6 +43,7 @@ import { Surface } from '../src/design-system/atoms/Card';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { SesizareRow } from '../src/design-system/molecules/SesizareRow';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -180,7 +181,12 @@ export default function RoutePlanningScreen() {
   // the Cool pill, and heals a stale avoidHeat preference when the route
   // lands in a supported-but-not-cool country so the pill row and the
   // dispatcher (which ignores avoidHeat outside coverage) agree.
+  // isCoolModeEnabled() hides the mode entirely in production (product
+  // decision, see src/lib/coolMode.ts). Folded into the SAME predicate as the
+  // coverage gate so the existing heal-effect below also clears a stale
+  // avoidHeat preference, rather than needing a second one.
   const coolAvailable =
+    isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
     isHeatRoutingAvailable(resolvedCountry.destinationCountry);
   useEffect(() => {

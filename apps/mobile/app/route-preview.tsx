@@ -28,6 +28,7 @@ import { BrandLogo } from '../src/components/BrandLogo';
 import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import {
   buildOfflineRegionFromRoute,
@@ -636,7 +637,11 @@ function RoutePreviewScreen() {
   // previewQuery key (`effectiveRequest`), which triggers an automatic
   // refetch. Cool is skipped outside the shade-graph countries (RO at
   // launch) — same gate as the Cool pill on route-planning.
+  // Same gate as route-planning: hidden in production (src/lib/coolMode.ts).
+  // This drops 'cool' out of the tap-to-cycle rotation, so the pill cycles
+  // Safe -> Fast -> Flat -> Safe rather than offering a mode with no control.
   const coolAvailable =
+    isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
     isHeatRoutingAvailable(resolvedCountry.destinationCountry);
 

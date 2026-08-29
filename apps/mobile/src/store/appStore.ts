@@ -59,6 +59,7 @@ import {
   type PremiumSlice,
 } from './premiumSlice';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
+import { resolveAvoidHeat } from '../lib/coolMode';
 
 const MAX_RECENT_DESTINATIONS = 3;
 const MAX_RECENT_CITY_SUGGESTIONS = 5;
@@ -1072,8 +1073,12 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ avoidUnpaved: enabled })),
       setAvoidHills: (enabled) =>
         set(() => ({ avoidHills: enabled })),
+      // Cool mode is hidden in production (src/lib/coolMode.ts). Guarding the
+      // SETTER rather than only the pill closes all five paths that can turn
+      // avoidHeat on — pill, preview cycle-pill, shared-route claim, saved
+      // route, and persisted state.
       setAvoidHeat: (enabled) =>
-        set(() => ({ avoidHeat: enabled })),
+        set(() => ({ avoidHeat: resolveAvoidHeat(enabled) })),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -1505,6 +1510,15 @@ export const useAppStore = create<AppStore>()(
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
       version: 6,
       migrate: (persistedState, version) => migratePersistedAppState(persistedState, version),
+      // A rider who enabled Cool before it was hidden would otherwise rehydrate
+      // into an invisible mode with no control to leave it. Coerce on the way
+      // in; no version bump needed, because this must re-apply on EVERY launch
+      // rather than once.
+      onRehydrateStorage: () => (state) => {
+        if (state && state.avoidHeat) {
+          state.avoidHeat = resolveAvoidHeat(state.avoidHeat);
+        }
+      },
       partialize: (state) => ({
         appState: state.appState,
         voiceGuidanceEnabled: state.voiceGuidanceEnabled,
