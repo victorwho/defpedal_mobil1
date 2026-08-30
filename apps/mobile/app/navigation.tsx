@@ -305,6 +305,39 @@ function NavigationScreen() {
     );
   }, [selectedRoute, navigationSession?.remainingDistanceMeters, navigationSession?.offRouteSince]);
 
+  // ── Elevation chart source of truth ────────────────────────────────────
+  //
+  // The chart must show the WHOLE route with a marker for where the rider is,
+  // and must NOT shrink as they move. `selectedRoute` is replaced wholesale by
+  // a successful reroute (setRoutePreview in the reroute mutation), and the
+  // replacement runs from the rider's CURRENT position to the destination — so
+  // reading the profile straight off `selectedRoute` makes the chart collapse
+  // toward "what's left" every time a reroute lands.
+  //
+  // Snapshot it per route id instead. Between reroutes the profile is frozen,
+  // so the marker sweeps a stable chart. When a reroute genuinely produces a
+  // new route the id changes and the snapshot follows it — which is the
+  // requested behaviour: "when reroute happens, change the chart to the new
+  // route".
+  const elevationSnapshotRef = useRef<{
+    routeId: string | null;
+    profile: readonly number[];
+    distanceMeters: number;
+  }>({ routeId: null, profile: [], distanceMeters: 0 });
+
+  const elevationChartSource = useMemo(() => {
+    const profile = selectedRoute?.elevationProfile;
+    const id = selectedRoute?.id ?? null;
+    if (profile?.length && selectedRoute && id !== elevationSnapshotRef.current.routeId) {
+      elevationSnapshotRef.current = {
+        routeId: id,
+        profile,
+        distanceMeters: selectedRoute.distanceMeters,
+      };
+    }
+    return elevationSnapshotRef.current;
+  }, [selectedRoute]);
+
   const currentGrade = useMemo(() => {
     if (navigationSession?.offRouteSince != null) return null;
     const profile = selectedRoute?.elevationProfile;
@@ -1322,8 +1355,8 @@ function NavigationScreen() {
         <View style={styles.bottomCluster} pointerEvents="box-none">
           {showElevationProgress && selectedRoute?.elevationProfile?.length ? (
             <ElevationProgressCard
-              elevationProfile={selectedRoute.elevationProfile}
-              totalDistanceMeters={selectedRoute.distanceMeters}
+              elevationProfile={elevationChartSource.profile}
+              totalDistanceMeters={elevationChartSource.distanceMeters}
               remainingDistanceMeters={
                 navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
               }

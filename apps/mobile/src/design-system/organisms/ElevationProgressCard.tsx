@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Path, Line } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Stop, Path, Line, Rect } from 'react-native-svg';
 
 import { brandColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textXs } from '../tokens/typography';
 
-const CHART_WIDTH = 280;
+export const CHART_WIDTH = 280;
 const CHART_HEIGHT = 50;
 const PADDING_TOP = 4;
 const PADDING_BOTTOM = 2;
@@ -23,7 +23,7 @@ type ElevationProgressCardProps = {
   isOffRoute: boolean;
 };
 
-const buildPath = (
+export const buildPath = (
   profile: readonly number[],
   width: number,
   height: number,
@@ -44,6 +44,22 @@ const buildPath = (
   return `M0,${height} L${points.join(' L')} L${width},${height} Z`;
 };
 
+/** Half the marker stroke width — the clamp margin. */
+const HALF_STROKE = 1.5;
+
+/**
+ * X position of the "you are here" marker, clamped so the line is never half
+ * outside the viewBox.
+ *
+ * At 0% (ride just started, or a reroute just reset progress) an unclamped
+ * marker sits at x=0 and reads as a chart border rather than a position —
+ * which is why it looked like there was no marker at all.
+ */
+export const computeMarkerX = (progressRatio: number): number => {
+  const safe = Number.isFinite(progressRatio) ? Math.max(0, Math.min(1, progressRatio)) : 0;
+  return Math.min(CHART_WIDTH - HALF_STROKE, Math.max(HALF_STROKE, safe * CHART_WIDTH));
+};
+
 export const ElevationProgressCard = ({
   elevationProfile,
   totalDistanceMeters,
@@ -60,7 +76,11 @@ export const ElevationProgressCard = ({
     [elevationProfile],
   );
 
-  const markerX = progressRatio * CHART_WIDTH;
+  // Clamp so the 2px line is never half-outside the viewBox. At 0% (ride just
+  // started, or a reroute just reset progress) an unclamped marker sits at
+  // x=0 and reads as a chart border rather than "you are here" — which is how
+  // it looked absent entirely.
+  const markerX = computeMarkerX(progressRatio);
 
   const minElev = Math.min(...elevationProfile);
   const maxElev = Math.max(...elevationProfile);
@@ -93,6 +113,20 @@ export const ElevationProgressCard = ({
           </LinearGradient>
         </Defs>
         <Path d={areaPath} fill={`url(#${gradientId})`} />
+        {/* Travelled portion, dimmed behind the marker. The full-route profile
+            never changes shape as the rider moves — only this overlay and the
+            marker do — so the chart reads as "the whole ride, and you are
+            here" rather than a shrinking view of what is left. */}
+        {markerX > HALF_STROKE ? (
+          <Rect
+            x={0}
+            y={0}
+            width={markerX}
+            height={CHART_HEIGHT}
+            fill="#000000"
+            opacity={0.28}
+          />
+        ) : null}
         {/* Progress marker line */}
         <Line
           x1={markerX}
@@ -100,7 +134,14 @@ export const ElevationProgressCard = ({
           x2={markerX}
           y2={CHART_HEIGHT}
           stroke={isOffRoute ? '#EF4444' : '#FACC15'}
-          strokeWidth={2}
+          strokeWidth={3}
+        />
+        {/* Cap so the position is legible against a busy profile. */}
+        <Circle
+          cx={markerX}
+          cy={PADDING_TOP}
+          r={3.5}
+          fill={isOffRoute ? '#EF4444' : '#FACC15'}
         />
       </Svg>
       <View style={styles.footer}>
