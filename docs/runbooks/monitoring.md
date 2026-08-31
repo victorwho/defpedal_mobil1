@@ -9,7 +9,7 @@ health check; keep the "healthy baseline" numbers updated as the fleet grows.
 
 | System | Auth | Where |
 |---|---|---|
-| Sentry (org `defensive-pedal`, region `https://de.sentry.io`, project `defensive-pedal-mobile`) | Claude Code Sentry MCP plugin (interactive sessions) OR `SENTRY_AUTH_TOKEN` (`sntryu_` user token, has alert-write scope) | token in `apps/mobile/.env` (gitignored) |
+| Sentry (org `defensive-pedal`, region `https://de.sentry.io`, project `defensive-pedal-mobile`) | Claude Code Sentry MCP plugin (interactive sessions) OR `SENTRY_AUTH_TOKEN` (`sntryu_` user token "Defensive Pedal (build + monitoring)", created 2026-08-31 — scopes `alerts:read, event:read, org:read, org:write, project:read, project:releases, project:write`) | token in `apps/mobile/.env` (gitignored) |
 | PostHog (EU, project id `162527`) | Personal API key "Claude Code" (`phx_…`) | `C:\dev\adminInfo\posthog\personal-api-key.txt` (outside repo) |
 | Cloud Run (`defpedal-api`, `europe-central2`) | gcloud (already authed) | always pass `--project gen-lang-client-0895796477` |
 | Supabase live DB | `supabase db query --linked` (CLI authed, project `pedal1`) | run from repo root |
@@ -21,8 +21,40 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
 
 ## Standard health check (run each of these)
 
-1. **New Sentry issues** (last few days):
-   `search_issues(org='defensive-pedal', query='is:unresolved firstSeen:-5d', sort='user')`
+1. **New Sentry issues** (last few days) — `npm run monitor:sentry:new-issues`
+   (add `-- --days 14 --json` to widen the window or machine-read it; from a
+   worktree without `apps/mobile/.env`, add `-- --token-file <main checkout>/apps/mobile/.env`).
+
+   The script prints which mode it ran in. **`native issue search` is the good
+   state** — the token has `event:read`, so `firstSeen` is Sentry-authoritative.
+   If it ever prints `Discover fallback`, the token has lost that scope: read the
+   reason it prints and fix the token, don't ignore the line.
+
+   **History (error-log #97).** Until 2026-08-31 the token carried
+   `alerts:read, org:read, org:write, project:read, project:releases,
+   project:write` and **no `event:read`**, so every issue query answered
+   `403 "You do not have permission to perform this action."` while every other
+   check here — Discover `/events/`, releases, project keys — returned 200. The
+   403 body is indistinguishable from an expired token; the only tell is the
+   `www-authenticate: Bearer error="insufficient_scope", scope="event:admin
+   event:read event:write"` header, which `curl` hides unless you pass `-i`.
+   New-issue triage was silently blind for as long as that token was in use.
+   Fixed by creating a replacement personal token with the **same scopes plus
+   `event:read`** (scopes are immutable on an existing Sentry token — the edit
+   screen says so, you must create a new one).
+
+   The Discover fallback is kept as the safety net: it needs only `org:read` and
+   computes "new" as *issues with events in the last `--days`, minus issues with
+   events in the preceding `--baseline` days* (default 90). That is not Sentry
+   `firstSeen` — an issue dormant longer than the baseline reads as new, a
+   deliberate false-positive bias — so it reports a slightly wider set than the
+   native path.
+
+   If you rotate this token, update **both** `apps/mobile/.env` and the cloud
+   health-check routine's embedded copy (see "Periodic checks" in memory
+   `reference_monitoring-access`), and check whether the EAS `SENTRY_AUTH_TOKEN`
+   secret should follow. In an interactive session the Sentry MCP plugin (OAuth,
+   separate scopes) is also a working read path.
 2. **Error counts by release** — catches API bursts and bad mobile releases:
    `search_events(dataset='errors', fields=['release','app_variant','count()'], sort='-count()', period='5d')`
 3. **Unhandled mobile crashes for the current release** (the rollout-gate proxy):
