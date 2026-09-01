@@ -176,3 +176,62 @@ describe('isSourceStale', () => {
       .toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Field-type variance across cities (Zaragoza, 2026-09-01)
+// ---------------------------------------------------------------------------
+
+describe('mapOpen311Request — numeric ids and codes', () => {
+  /**
+   * Zaragoza returns service_request_id and service_code as JSON NUMBERS;
+   * Cologne returns both as strings. The adapter used to require a string, so
+   * every Zaragoza row mapped to null and the run reported a clean zero
+   * import — the exact silent failure this pipeline exists to prevent.
+   */
+  const zaragozaRow = {
+    service_request_id: 946212,
+    status: 'open',
+    service_code: 1000007,
+    service_name: 'Movilidad Urbana: Señalización',
+    title: 'Señal prohibido aparcar',
+    description: 'Aparcan constantemente vehículos en zona peatonal.',
+    requested_datetime: '2026-09-01T11:14:27Z',
+    updated_datetime: '2026-09-01T11:15:29Z',
+    lat: 41.647860628714234,
+    long: -0.8911971936438581,
+    address_string: 'CALLE ANTONIO CÁNOVAS, 7',
+  };
+
+  it('maps a row whose id and code are numbers', () => {
+    const mapped = mapOpen311Request(zaragozaRow);
+    expect(mapped).not.toBeNull();
+    expect(mapped?.externalId).toBe('946212');
+    expect(mapped?.categoryKey).toBe('1000007');
+    // Passed through unchanged — no rounding anywhere in the mapper.
+    expect(mapped?.lat).toBe(41.647860628714234);
+    expect(mapped?.lon).toBe(-0.8911971936438581);
+    expect(mapped?.address).toBe('CALLE ANTONIO CÁNOVAS, 7');
+  });
+
+  it('still maps Cologne-style string ids', () => {
+    const mapped = mapOpen311Request({
+      ...zaragozaRow,
+      service_request_id: '19078-2026',
+      service_code: '2.4.4',
+    });
+    expect(mapped?.externalId).toBe('19078-2026');
+    expect(mapped?.categoryKey).toBe('2.4.4');
+  });
+
+  it('drops a row with no coordinates — 54% of Zaragoza requests have none', () => {
+    // The "only import requests with coordinates" rule, enforced at the
+    // adapter. The runner's badCoords gate is the second line of defence.
+    expect(mapOpen311Request({ ...zaragozaRow, lat: null, long: null })).toBeNull();
+    expect(mapOpen311Request({ ...zaragozaRow, lat: undefined, long: undefined })).toBeNull();
+  });
+
+  it('drops a row with no id, whatever its type', () => {
+    expect(mapOpen311Request({ ...zaragozaRow, service_request_id: undefined })).toBeNull();
+    expect(mapOpen311Request({ ...zaragozaRow, service_request_id: '' })).toBeNull();
+  });
+});

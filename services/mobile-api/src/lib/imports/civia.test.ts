@@ -351,3 +351,76 @@ describe('suppressRoundTrips', () => {
     expect(kept).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Zaragoza mapping (added 2026-09-01 alongside the Spain sweep)
+// ---------------------------------------------------------------------------
+
+import { ZARAGOZA_SERVICE_MAP, resolveZaragozaMapping } from './mappings/zaragoza';
+
+describe('zaragoza — category mapping', () => {
+  it('maps holes in the riding surface to pothole', () => {
+    // 11 = Bache under Acera, 61 = Bache under Calzada, 81/93 = missing
+    // manhole / chamber lid — the same thing to a wheel, and worse.
+    for (const code of ['11', '61', '81', '93', '83']) {
+      const outcome = resolveZaragozaMapping(code);
+      expect(outcome.kind, code).toBe('type');
+      if (outcome.kind === 'type') expect(outcome.hazardType, code).toBe('pothole');
+    }
+  });
+
+  it('maps degraded surfaces, ice and oil spills to poor_surface', () => {
+    for (const code of ['12', '22', '51', '62', '63', '262', '1000023']) {
+      const outcome = resolveZaragozaMapping(code);
+      expect(outcome.kind, code).toBe('type');
+      if (outcome.kind === 'type') expect(outcome.hazardType, code).toBe('poor_surface');
+    }
+  });
+
+  it('maps the traffic-signal category to dangerous_intersection', () => {
+    const outcome = resolveZaragozaMapping('103677952');
+    expect(outcome.kind).toBe('type');
+    if (outcome.kind === 'type') expect(outcome.hazardType).toBe('dangerous_intersection');
+  });
+
+  it('sends generic parents to the model rather than guessing a defect', () => {
+    // The reporter picked an object but no defect.
+    for (const code of ['10', '60', '80', '7733248']) {
+      expect(resolveZaragozaMapping(code), code).toEqual({ kind: 'llm' });
+    }
+  });
+
+  it('sends Bicicletas to the model — it is policy suggestions, not a jackpot', () => {
+    // The sampled report was prose about network planning with a null
+    // location. A dedicated cycling category is tempting precisely because it
+    // looks like a win; the model filters the suggestions out.
+    expect(resolveZaragozaMapping('9043969')).toEqual({ kind: 'llm' });
+  });
+
+  it('drops the non-cycling categories', () => {
+    for (const code of ['234', '254', '90', '97550336', '5144576']) {
+      expect(resolveZaragozaMapping(code), code).toEqual({ kind: 'irrelevant' });
+    }
+  });
+
+  it('sends an unknown code to review — the codes are flat, nothing to inherit', () => {
+    const outcome = resolveZaragozaMapping('99999999');
+    expect(outcome.kind).toBe('review');
+    if (outcome.kind === 'review') expect(outcome.reason).toContain('99999999');
+  });
+
+  it('only ever names hazard types the DB will accept', () => {
+    for (const entry of Object.values(ZARAGOZA_SERVICE_MAP)) {
+      if (typeof entry === 'object') expect(IMPORTABLE_HAZARD_TYPES).toContain(entry.type);
+    }
+  });
+
+  it('gives every mapped entry a rider-facing English summary', () => {
+    for (const entry of Object.values(ZARAGOZA_SERVICE_MAP)) {
+      if (typeof entry === 'object') {
+        expect(entry.summary.length).toBeGreaterThan(10);
+        expect(entry.summary).not.toMatch(/[áéíóúñ]/i);
+      }
+    }
+  });
+});

@@ -36,6 +36,10 @@ export const HAZARD_IMPORT_SOURCE_DISPLAY: Readonly<
     label: 'Civia.ro',
     url: 'https://civia.ro',
   },
+  'open311:zaragoza': {
+    label: 'Ayuntamiento de Zaragoza',
+    url: 'https://www.zaragoza.es/sede/portal/datos-abiertos/',
+  },
 };
 
 /** Neutral label for a source we have display metadata for. */

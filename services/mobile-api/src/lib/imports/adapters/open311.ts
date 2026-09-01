@@ -34,20 +34,34 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const USER_AGENT =
   'DefensivePedalBot/1.0 (+https://defensivepedal.com; cycling-safety hazard import)';
 
+/**
+ * Field types vary by city even within GeoReport v2. Cologne returns
+ * `service_request_id` and `service_code` as STRINGS; Zaragoza returns both as
+ * JSON NUMBERS (verified live 2026-09-01). Typed as the union and coerced
+ * below — the previous string-only handling silently dropped every Zaragoza
+ * row and reported a clean run.
+ */
 interface Open311Request {
-  service_request_id?: string;
+  service_request_id?: string | number;
   title?: string;
   description?: string;
   lat?: number | string;
   long?: number | string;
   address_string?: string;
   service_name?: string;
-  service_code?: string;
+  service_code?: string | number;
   requested_datetime?: string;
   updated_datetime?: string;
   status?: string;
   media_url?: string;
 }
+
+/** Coerce a string|number|null field to a trimmed string. */
+const toTrimmedString = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return '';
+};
 
 const toNumber = (value: unknown): number | null => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -81,7 +95,7 @@ const toIsoOrNull = (value: unknown): string | null => {
 };
 
 export const mapOpen311Request = (row: Open311Request): RawReport | null => {
-  const externalId = typeof row.service_request_id === 'string' ? row.service_request_id.trim() : '';
+  const externalId = toTrimmedString(row.service_request_id);
   if (!externalId) return null;
 
   const lat = toNumber(row.lat);
@@ -92,11 +106,11 @@ export const mapOpen311Request = (row: Open311Request): RawReport | null => {
     externalId,
     lat,
     lon,
-    categoryKey: (row.service_code ?? '').trim(),
-    categoryLabel: (row.service_name ?? '').trim(),
-    title: row.title?.trim() || null,
-    description: row.description?.trim() || null,
-    address: row.address_string?.trim() || null,
+    categoryKey: toTrimmedString(row.service_code),
+    categoryLabel: toTrimmedString(row.service_name),
+    title: toTrimmedString(row.title) || null,
+    description: toTrimmedString(row.description) || null,
+    address: toTrimmedString(row.address_string) || null,
     status: normaliseStatus(row.status),
     reportedAt: toIsoOrNull(row.requested_datetime),
     updatedAt: toIsoOrNull(row.updated_datetime),
@@ -212,8 +226,7 @@ export const open311Adapter: HazardSourceAdapter = {
           const payload = await fetchJson(url, signal);
           const rows = Array.isArray(payload) ? payload : [payload];
           const row = rows[0] as Open311Request | undefined;
-          const returnedId =
-            typeof row?.service_request_id === 'string' ? row.service_request_id.trim() : '';
+          const returnedId = toTrimmedString(row?.service_request_id);
           // Guard against an endpoint that ignores the path segment too:
           // only trust a row that identifies itself as the one we asked for.
           if (returnedId !== externalId) return null;

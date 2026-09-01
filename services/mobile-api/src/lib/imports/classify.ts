@@ -20,6 +20,7 @@ import { config } from '../../config';
 import { resolveAmsterdamMapping } from './mappings/amsterdam';
 import { resolveCiviaMapping } from './mappings/civia';
 import { resolveKolnMapping } from './mappings/koln';
+import { resolveZaragozaMapping } from './mappings/zaragoza';
 import {
   isImportableHazardType,
   type ClassificationResult,
@@ -57,6 +58,8 @@ export const resolveMapping = (
       return resolveKolnMapping(report.categoryKey);
     case 'civia':
       return resolveCiviaMapping(report.categoryKey);
+    case 'open311:zaragoza':
+      return resolveZaragozaMapping(report.categoryKey);
     case 'signalen:amsterdam': {
       // categoryKey is "parentSlug/childSlug"; the parent lets an unmapped
       // child under a wholly non-cycling branch be dropped without a human.
