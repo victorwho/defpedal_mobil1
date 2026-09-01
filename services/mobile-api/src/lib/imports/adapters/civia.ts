@@ -50,6 +50,19 @@ const DETAIL_BATCH = 25;
 const DETAIL_CONCURRENCY = 4;
 
 /**
+ * Pause between detail batches.
+ *
+ * Not decoration: the first production backfill fired ~250 detail fetches
+ * back-to-back and hit a wall on the eleventh page. A two-person civic project
+ * does not owe us a firehose, and the runner's own budget/cursor machinery is
+ * designed to spread a backfill across runs — so slow down and let it.
+ */
+const DETAIL_PAUSE_MS = 400;
+
+/** One retry for a transient rejection before a batch is written off. */
+const RETRY_DELAY_MS = 1_500;
+
+/**
  * Identify honestly. A civic partner should be able to see who we are and
  * reach us, rather than discovering an anonymous scraper in their logs.
  */
@@ -243,7 +256,9 @@ export const parseDetailStatus = (html: string): SourceStatus | null => {
 // HTTP
 // ---------------------------------------------------------------------------
 
-const fetchText = async (url: string, signal: AbortSignal): Promise<string> => {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchOnce = async (url: string, signal: AbortSignal): Promise<string> => {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const combined = AbortSignal.any([signal, timeout]);
   const response = await fetch(url, {
@@ -251,9 +266,26 @@ const fetchText = async (url: string, signal: AbortSignal): Promise<string> => {
     signal: combined,
   });
   if (!response.ok) {
-    throw new Error(`Civia request failed: HTTP ${response.status} for ${url}`);
+    throw new Error(`HTTP ${response.status} for ${url}`);
   }
   return response.text();
+};
+
+/**
+ * One retry on a transient rejection (429/5xx/network). A single throttled
+ * response should cost a pause, not a whole batch.
+ */
+const fetchText = async (url: string, signal: AbortSignal): Promise<string> => {
+  try {
+    return await fetchOnce(url, signal);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    const transient = /HTTP (429|5\d\d)/.test(message) || !message.startsWith('HTTP ');
+    if (!transient) throw error;
+    await sleep(RETRY_DELAY_MS);
+    return fetchOnce(url, signal);
+  }
 };
 
 const baseOf = (source: ImportSourceRow): string => source.endpoint.replace(/\/+$/, '');
@@ -265,9 +297,21 @@ const mapConcurrently = async <T, R>(
 ): Promise<PromiseSettledResult<R>[]> => {
   const out: PromiseSettledResult<R>[] = [];
   for (let i = 0; i < values.length; i += limit) {
+    if (i > 0) await sleep(DETAIL_PAUSE_MS);
     out.push(...(await Promise.allSettled(values.slice(i, i + limit).map(fn))));
   }
   return out;
+};
+
+/** First underlying rejection reason, for error messages that diagnose. */
+const firstRejection = (settled: readonly PromiseSettledResult<unknown>[]): string => {
+  for (const result of settled) {
+    if (result.status === 'rejected') {
+      const reason = result.reason;
+      return reason instanceof Error ? reason.message : String(reason);
+    }
+  }
+  return 'unknown';
 };
 
 // ---------------------------------------------------------------------------
@@ -410,7 +454,12 @@ const fetchDetailReports = async (
   // Fail loudly rather than reporting a clean run that imported nothing.
   const failures = settled.filter((r) => r.status === 'rejected').length;
   if (reports.length === 0 && failures === ids.length && ids.length > 0) {
-    throw new Error(`Civia: all ${ids.length} detail fetches failed — site or shape changed?`);
+    // Report the ACTUAL reason. "site or shape changed?" was a guess dressed
+    // as a diagnosis; the first production failure was a throttle, and the
+    // message sent the reader hunting for a redesign that had not happened.
+    throw new Error(
+      `Civia: all ${ids.length} detail fetches failed. First reason: ${firstRejection(settled)}`,
+    );
   }
 
   return reports;
@@ -459,8 +508,11 @@ const attachCoords = async (
   }
 
   if (reports.length === 0 && feedItems.length > 0) {
+    const failed = settled.some((r) => r.status === 'rejected');
     throw new Error(
-      `Civia: no coordinates parsed from ${Math.min(feedItems.length, DETAIL_BATCH)} detail pages — RSC payload shape changed?`,
+      failed
+        ? `Civia: no coordinates from ${Math.min(feedItems.length, DETAIL_BATCH)} detail pages. First reason: ${firstRejection(settled)}`
+        : `Civia: ${Math.min(feedItems.length, DETAIL_BATCH)} detail pages fetched OK but none yielded coords — RSC payload shape changed?`,
     );
   }
 
