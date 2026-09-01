@@ -146,6 +146,68 @@ export const ZARAGOZA_SERVICE_MAP: Readonly<Record<string, MapEntry>> = {
   '1000015': 'irrelevant',
   '1000016': 'irrelevant',
   '1000024': 'irrelevant',
+
+  // ── Codes seen in live REQUESTS but absent from services.json ───────────
+  // services.json lists 100 services; the request feed uses many codes it
+  // does not contain (verified against 497 real requests, 2026-09-01). The
+  // `review` fallback surfaced them rather than dropping them silently —
+  // which is exactly what it is for — and this block is the follow-up.
+  //
+  // Relevant:
+  '1604': { type: 'poor_surface', summary: 'Damaged pavement surface' },
+  '511': { type: 'poor_surface', summary: 'Loose gravel on the road surface' },
+  '1403': { type: 'poor_surface', summary: 'Pavement lifted by tree roots' },
+  '1000008': {
+    type: 'dangerous_intersection',
+    summary: 'Traffic lights out at this junction',
+  },
+  '4849669': 'llm', // Aceras y calzadas — parent, defect unspecified
+  //
+  // Not riding hazards. Grouped by theme so the next person can see the
+  // shape of Zaragoza's queue rather than a wall of integers.
+  '170': 'irrelevant', // Arbolado (trees)
+  '1301': 'irrelevant', // Poda (pruning)
+  '1302': 'irrelevant', // Apeo
+  '1401': 'irrelevant', // Plagas y enfermedades
+  '1402': 'irrelevant', // Alcorques (tree pits)
+  '1404': 'irrelevant', // Riesgo de arbolado
+  '1405': 'irrelevant', // Tutores
+  '1704': 'irrelevant', // Plantación de arbolado
+  '110': 'irrelevant', // Fuentes ornamentales
+  '1203': 'irrelevant', // Fuente de agua potable
+  '150': 'irrelevant', // Riegos
+  '1506': 'irrelevant', // Avería sistema de riego
+  '1801': 'irrelevant', // Falta de riego
+  '1807': 'irrelevant', // Escarda macizos
+  '18014': 'irrelevant', // Siega (mowing)
+  '18016': 'irrelevant', // Desbroce
+  '18018': 'irrelevant', // Resiembra
+  '18019': 'irrelevant', // Siembra
+  '18021': 'irrelevant', // Reparación zonas terrizas
+  '18023': 'irrelevant', // Limpieza zona verde
+  '18024': 'irrelevant', // Limpieza papeleras
+  '18025': 'irrelevant', // Limpieza zonas de pavimento — a cleaning request
+  '250': 'irrelevant', // Limpieza viaria
+  '220': 'irrelevant', // Contenedores
+  '503': 'irrelevant', // Basura alrededor de contenedores
+  '507': 'irrelevant', // Reubicación de contenedores
+  '1000031': 'irrelevant', // Contenedor lleno
+  '1201': 'irrelevant', // Bancos (benches)
+  '1202': 'irrelevant', // Papeleras
+  '1204': 'irrelevant', // Vallas y barandillas
+  '1210': 'irrelevant', // Parques caninos
+  '12010': 'irrelevant', // Elementos de juego (playground)
+  '1601': 'irrelevant', // Bordillos — kerbs, same call as code 30/32
+  '1602': 'irrelevant', // Muros
+  '280': 'irrelevant', // Solares, riberas y caminos
+  '713': 'irrelevant', // Queja ciudadanía personas sin hogar
+  '1000000': 'irrelevant', // Saneamiento
+  '4849666': 'irrelevant', // Policía Local
+  '4849671': 'irrelevant', // Parques y Jardines
+  '5144579': 'irrelevant', // Instituto Mpal. Salud Pública
+  '5144587': 'irrelevant', // Urbanismo
+  '184647680': 'irrelevant', // Gestión Web
+  '97550337': 'irrelevant', // Permisos de obras — a permit record, not a hazard
 };
 
 const toOutcome = (entry: MapEntry): MappingOutcome => {
