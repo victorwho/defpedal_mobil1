@@ -89,6 +89,16 @@ export interface ImportCursor {
    * other cursor so a truncated run resumes mid-sweep instead of restarting.
    */
   readonly tiles?: readonly (readonly number[])[];
+  /**
+   * Remaining source ids for a one-off backfill sweep (Civia).
+   *
+   * Civia publishes only the 50 most recent sesizări in its feed, so first
+   * contact enumerates sitemap.xml and works the back catalogue down in
+   * batches. `undefined` (never set) means the sweep has not started;
+   * an empty/absent list alongside `since` means it is finished and the
+   * adapter has switched to polling the feed.
+   */
+  readonly pendingIds?: readonly string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +239,12 @@ export interface ImportRunCounters {
   fetched: number;
   staged: number;
   duplicate: number;
+  /**
+   * Imports skipped because WE produced them: a rider used the in-app
+   * sesizare hand-off, so the hazard already exists on our map and the
+   * platform copy would be a second pin beside it. See suppressRoundTrips().
+   */
+  roundTrip: number;
   badCoords: number;
   outOfBbox: number;
   irrelevant: number;
@@ -249,6 +265,7 @@ export const emptyCounters = (): ImportRunCounters => ({
   fetched: 0,
   staged: 0,
   duplicate: 0,
+  roundTrip: 0,
   badCoords: 0,
   outOfBbox: 0,
   irrelevant: 0,

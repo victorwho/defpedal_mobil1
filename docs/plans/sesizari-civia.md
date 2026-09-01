@@ -315,6 +315,27 @@ always Romanian.
 
 ---
 
+## 9b. The other direction — importing Civia sesizări as hazards (2026-09-01)
+
+This plan covers the OUTBOUND hand-off. The inbound half — pulling Civia's
+public sesizări onto the map as hazards — is built on the hazard-import
+pipeline and documented in
+[`hazard-import-pipeline.md` §17](./hazard-import-pipeline.md).
+
+Two things there are load-bearing for *this* feature:
+
+1. **Round-trip suppression.** Because we feed Civia, an imported sesizare can
+   be one of our own riders' hand-offs coming home. `suppressRoundTrips()`
+   matches incoming imports against the `sesizari` ledger (same hazard type,
+   ≤120 m, ≤30 days) and drops them, so a rider never sees a second pin beside
+   their own report.
+2. **One definition of "cycling-relevant".** The import mapping deliberately
+   reuses `SESIZARE_ELIGIBLE_HAZARD_TYPES` from this feature. If you change the
+   eligible set here, change the import mapping with it — otherwise the two
+   halves disagree about what a cycling hazard is.
+
+---
+
 ## 10. Phasing
 
 | Phase | Work | Gate |

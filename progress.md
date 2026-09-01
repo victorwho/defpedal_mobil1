@@ -1909,3 +1909,27 @@ Added `apps/mobile/src/lib/netInfoModule.test.ts` (2 specs: native-module-absent
 ⚠️ **The deployed revision does not correspond to a commit** — it was built from this worktree with the sesizări work still uncommitted. Commit before anything else lands, or `00142-2rh` is not reproducible from git.
 
 **Open before ship:** (1) **Commit** — the live revision is currently unreproducible from git (see warning above). (2) **Device test on a preview build** — the dev variant's old-arch bridge hides bridgeless-only failures, and the holo stickers + `expo-web-browser` hand-off are exactly what differs there. Confirm in particular that `GET /v1/profile` delivers `sesizariEnabled`/`sesizariBaseUrl` to the client (the kill-switch delivery path — verified by analogy with the hazard fields, not directly).
+
+### Session 110 — Civia import: sesizări onto the map as hazards (2026-09-01)
+
+**Built, verified against the live site, NOT yet enabled in production.** Plan: `docs/plans/hazard-import-pipeline.md` §17.
+
+**Context.** The hazard-import pipeline that landed 2026-08-27 had already pre-registered `civia` as a DISABLED source (`licence='PENDING-CONSENT'`) with display metadata in core, and left the adapter unbuilt with the reason recorded: civia.ro's robots.txt carries an EU DSM Art. 4 TDM reservation and `Disallow: /api/`. Victor has now obtained consent, **for the public pages only** — `/api/` remains out of scope and the adapter must never touch it.
+
+**Public surface** (all robots-allowed, re-verified 2026-09-01): `feed.xml` (50 most recent — id, category slug, `[STATUS]` prefix, prose, address, pubDate; **no coordinates**), `/sesizari/<id>` (coordinates in the Next.js RSC payload as `{"coords":[lat,lon],"zoom":16,"strada":null}`), `sitemap.xml` (291 URLs, `00001`–`00296`).
+
+**Built:** `adapters/civia.ts` (two-phase cursor: sitemap backfill of *still-open* sesizări 25 at a time, then feed polling; `fetchStatuses` re-polls detail pages so expiry is "the platform says it's resolved" rather than a guessed TTL), `mappings/civia.ts` (the review gate), `ImportCursor.pendingIds` for the backfill sweep, registration in `adapters/index.ts` + `classify.ts`, and migration `202609010001` to flip `enabled`/`licence`.
+
+**`alert_eligible` STAYS false.** `zoom:16, strada:null` means the coords are address-geocoded, not reporter-pinned — fine as a map marker, wrong as a mid-ride proximity alert. Flip only after spot-checking geocodes.
+
+**Round-trip suppression (new, and specific to us).** We *feed* Civia, so an import can be one of our own riders' hand-offs coming home — a second pin beside their own hazard, with our outbound volume masquerading as independent corroboration. `suppressRoundTrips()` in `run.ts` drops an import when the `sesizari` ledger holds the **same hazard type** within **120 m** in the last **30 days**. Narrow on all three axes on purpose: a false positive silently hides a real report. Ambiguous categories are always kept. New `roundTrip` run counter.
+
+**Mapping discipline.** Cycling-relevant is deliberately the same set as `SESIZARE_ELIGIBLE_HAZARD_TYPES` — the types we let a rider file a sesizare *about*, so the outbound and inbound halves agree. Unknown slugs go to `review`, not `irrelevant` (Civia still adds categories). **`stalpisori` is dropped despite being 36% of the feed**: it is a *request* for bollards, not a present hazard.
+
+**Live probe** (adapter run against civia.ro, no DB writes): backfill seed enumerated **291 ids**; first batch returned **25 open reports** with real coordinates (266 remaining); feed page returned 25 → **12 concrete hazard types** (4 illegally_parked_car, 4 dangerous_intersection, 3 pothole, 1 blocked_bike_lane), 12 irrelevant, 1 llm.
+
+**Expectations:** ~300 sesizări nationwide since April at ~48% relevance = **low tens of pins across all of Romania** initially. Worth it as the only RO source in the home market, not as a volume play.
+
+**Verification:** 29 new tests (`civia.test.ts`, fixtures captured verbatim from the live site + round-trip suppression cases). Full suite **3568 pass**; one `route-shares.test.ts` flake (5.2s on a 401 assertion under parallel load, file untouched, clean on re-run). Typecheck clean, lint ratchet clean.
+
+**Not done — needs an explicit go:** applying `202609010001` and deploying. Enabling starts a real scrape against a small partner's servers and writes hazards to the live map.

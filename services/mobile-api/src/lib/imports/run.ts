@@ -26,7 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { config } from '../../config';
 import { getAdapter } from './adapters';
-import { classifyReport, type ClassifyDeps } from './classify';
+import { classifyReport, resolveMapping, type ClassifyDeps } from './classify';
 import {
   emptyCounters,
   type ClassificationResult,
@@ -504,6 +504,95 @@ export const runSource = async (
   }
 };
 
+/**
+ * Drop imports that came from our own riders.
+ *
+ * Defensive Pedal pushes riders TO civia.ro: report a pothole in the app, tap
+ * "Fa o sesizare", and the same pothole becomes a public sesizare. Importing
+ * that back would put a second pin beside the rider's own hazard and — worse —
+ * make our own outbound volume look like independent corroboration.
+ *
+ * `sesizari` records exactly what we sent (coordinate, hazard type, the moment
+ * of the hand-off), so the match is: same hazard type, within
+ * ROUND_TRIP_RADIUS_METERS, handed off within ROUND_TRIP_WINDOW_DAYS before
+ * the platform published it. Deliberately narrow — a false positive silently
+ * hides a real report, which is worse than the duplicate it prevents.
+ *
+ * Only meaningful for Romanian sources; everywhere else the query returns
+ * nothing and the whole step is skipped.
+ */
+const ROUND_TRIP_RADIUS_METERS = 120;
+const ROUND_TRIP_WINDOW_DAYS = 30;
+
+export const suppressRoundTrips = async (
+  db: SupabaseClient,
+  source: ImportSourceRow,
+  items: readonly RawReport[],
+): Promise<{ kept: RawReport[]; suppressed: number }> => {
+  if (source.country_code !== 'RO' || items.length === 0) {
+    return { kept: [...items], suppressed: 0 };
+  }
+
+  const since = new Date(
+    Date.now() - ROUND_TRIP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const { data, error } = await db
+    .from('sesizari')
+    .select('hazard_type, lat, lon, created_at')
+    .gte('created_at', since);
+
+  // Best-effort: a failed lookup must not stop the import. The cost of missing
+  // it is a duplicate pin, not a lost hazard.
+  if (error || !data) return { kept: [...items], suppressed: 0 };
+
+  const ours = data as { hazard_type: string; lat: number; lon: number }[];
+  if (ours.length === 0) return { kept: [...items], suppressed: 0 };
+
+  const kept: RawReport[] = [];
+  let suppressed = 0;
+  for (const item of items) {
+    // The report is not classified yet, so use the deterministic map to learn
+    // what it WOULD become. When the category is ambiguous ('llm'/'review')
+    // the type is unknowable here, so we keep the item: a duplicate pin is a
+    // cheaper mistake than silently hiding a genuine report.
+    const outcome = resolveMapping(source, item);
+    if (outcome.kind !== 'type') {
+      kept.push(item);
+      continue;
+    }
+
+    const mine = ours.some(
+      (row) =>
+        row.hazard_type === outcome.hazardType &&
+        distanceMeters(item.lat, item.lon, row.lat, row.lon) <= ROUND_TRIP_RADIUS_METERS,
+    );
+    if (mine) {
+      suppressed += 1;
+      continue;
+    }
+    kept.push(item);
+  }
+  return { kept, suppressed };
+};
+
+/** Haversine, metres. */
+const distanceMeters = (
+  latA: number,
+  lonA: number,
+  latB: number,
+  lonB: number,
+): number => {
+  const R = 6_371_000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(latB - latA);
+  const dLon = toRad(lonB - lonA);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(latA)) * Math.cos(toRad(latB)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+};
+
 const processBatch = async (
   db: SupabaseClient,
   source: ImportSourceRow,
@@ -539,7 +628,12 @@ const processBatch = async (
 
   if (fresh.length === 0) return;
 
-  await processClassified(db, source, fresh, counters, options, log, { restage: false });
+  // Our own riders' sesizări must not come back as a second pin.
+  const { kept, suppressed } = await suppressRoundTrips(db, source, fresh);
+  counters.roundTrip += suppressed;
+  if (kept.length === 0) return;
+
+  await processClassified(db, source, kept, counters, options, log, { restage: false });
 };
 
 /**

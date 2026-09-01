@@ -741,3 +741,103 @@ If the first published batch looks misplaced, demote to map-only:
 
     UPDATE hazard_import_sources SET alert_eligible = false
      WHERE id = 'signalen:amsterdam';
+
+---
+
+## 17. Civia adapter — built 2026-09-01 (consent granted)
+
+Civia.ro is the Romanian civic-complaint platform Defensive Pedal already
+hands riders off TO (`docs/plans/sesizari-civia.md`). This section covers the
+opposite direction: importing their public sesizări as hazards.
+
+### Consent and its boundary
+
+The source row was seeded **disabled** by `202608270002` with
+`licence='PENDING-CONSENT'`, because civia.ro's robots.txt carries an EU DSM
+Art. 4 TDM reservation and `Disallow: /api/`. Consent has now been granted —
+**for the public pages only**.
+
+`Disallow: /api/` still stands (re-verified 2026-09-01). The adapter therefore
+reads `feed.xml`, `sitemap.xml` and `/sesizari/<id>` and must never touch
+`/api/*`, even though those endpoints exist and return cleaner JSON. If Civia
+later grants API access, **replace** the parsing — do not widen the scrape.
+
+### What the public surface gives us
+
+| Surface | Carries | Missing |
+|---|---|---|
+| `GET /feed.xml` | 50 most recent: id (in `<link>`), `<category>` slug, `<title>`, `<pubDate>`, and `<description>` = `"[STATUS] <prose> — <address>"` | coordinates |
+| `GET /sesizari/<id>` | coordinates, in the Next.js RSC payload as `{"coords":[lat,lon],"zoom":16,"strada":null}` | — |
+| `GET /sitemap.xml` | every `/sesizari/<id>` URL (291 on 2026-09-01, ids `00001`–`00296`) | — |
+
+**Coordinates are address-geocoded, not reporter-pinned** — that is exactly
+what `zoom:16, strada:null` means, and it is why the row is seeded
+`coordinate_precision='geocoded'` and **`alert_eligible=false`**. A pin that
+may sit a street away is fine as a map marker and wrong as a mid-ride
+proximity alert. Flip only after spot-checking geocodes against reality.
+
+### Fragility, stated plainly
+
+`coords` comes out of a **Next.js RSC flight payload** — an internal
+serialization format that changes shape whenever Civia redeploys. This is the
+one genuinely brittle part of the pipeline. Mitigation: if no item in a page
+yields coordinates, `fetchPage` **throws**. A silent drift to "0 imported, all
+green" is the failure mode this pipeline exists to prevent (error-log #82).
+`civia.test.ts` pins the parser against verbatim fixtures captured from the
+live site.
+
+### Two-phase cursor
+
+1. **Backfill** (first run). `pendingIds` unset → enumerate `sitemap.xml`,
+   newest-first, and work through it 25 detail pages at a time, emitting only
+   sesizări the page still shows as **open**. A resolved April pothole is not
+   worth a pin. `ImportCursor.pendingIds` was added for this; the runner
+   persists the cursor after every page, so a truncated cron resumes mid-sweep.
+2. **Feed** (steady state). Once drained, poll `feed.xml` and attach
+   coordinates from the detail pages.
+
+### Category mapping
+
+`mappings/civia.ts`. Cycling-relevant is deliberately **the same set as
+`SESIZARE_ELIGIBLE_HAZARD_TYPES`** in `packages/core/src/sesizare.ts` — the
+types we let a rider file a sesizare *about*. Importing a category we would
+not let a rider report means the outbound and inbound halves of the same
+feature disagree about what a cycling hazard is.
+
+- `groapa`→pothole, `trotuar`→poor_surface, `parcare`/`parcare_trasata`/
+  `masina_abandonata`→illegally_parked_car, `ocupare_domeniu`→blocked_bike_lane,
+  `semafor`/`trecere_pietoni`→dangerous_intersection, `caini`→aggro_dogs
+- `altele` → `llm` (low volume; it is where a real hazard hides)
+- unknown slug → **`review`**, not `irrelevant`: Civia is young and still adding
+  categories, and silently dropping a new one would hide it forever
+- **`stalpisori` → irrelevant, and it is 36% of the feed.** It is a *request*
+  to install anti-parking bollards, not a present hazard; a pin would claim
+  something is there that is not. The underlying complaint reaches us as
+  `parcare` when someone reports it as a hazard instead.
+
+Measured on the live feed 2026-09-01: 25 fetched → 12 concrete hazard types
+(4 illegally_parked_car, 4 dangerous_intersection, 3 pothole, 1
+blocked_bike_lane), 12 irrelevant, 1 llm.
+
+### Round-trip suppression — specific to this source
+
+We **feed** Civia. A rider reports a pothole in the app, taps "Fă o sesizare",
+and the same pothole becomes a public sesizare. Importing it back would put a
+second pin beside the rider's own hazard and make our own outbound volume look
+like independent corroboration.
+
+`suppressRoundTrips()` in `run.ts` drops an import when `sesizari` (our own
+hand-off ledger) holds a row with **the same hazard type**, within **120 m**,
+handed off within the last **30 days**. Deliberately narrow on all three axes:
+a false positive silently hides a real report, which is worse than the
+duplicate it prevents. Ambiguous categories (`llm`/`review`) are always kept,
+since the type is unknowable at that point. Counted as `roundTrip` in the run
+counters. Skipped entirely for non-RO sources.
+
+### Expected volume — set expectations
+
+Civia had ~300 sesizări nationwide since April 2026. At the measured ~48%
+cycling-relevant rate this is **low tens of pins across all of Romania** at
+first, not a data flood. It is worth doing because it is the only Romanian
+source and Romania is the home market, and because volume grows with the
+platform — not because it will fill the map on day one.
