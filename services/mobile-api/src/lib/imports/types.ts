@@ -50,6 +50,13 @@ export interface ImportSourceRow {
   readonly enabled: boolean;
   readonly alert_eligible: boolean;
   readonly coordinate_precision: 'pin' | 'geocoded';
+  /**
+   * How this Open311 implementation pages. GeoReport v2 does not standardise
+   * it: Cologne honours `page=N`, Zaragoza IGNORES `page` and honours a Solr
+   * -style `start=` row offset (verified live 2026-09-01). Sending the wrong
+   * one is not an error — it silently returns page 1 forever.
+   */
+  readonly pagination_style: 'page' | 'offset';
   readonly licence: string;
   readonly attribution_text: string;
   readonly attribution_url: string;

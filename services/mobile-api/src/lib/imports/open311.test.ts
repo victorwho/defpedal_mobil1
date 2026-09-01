@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultLookbackIso, mapOpen311Request, normaliseStatus } from './adapters/open311';
+import {
+  defaultLookbackIso,
+  mapOpen311Request,
+  normaliseStatus,
+  toSecondPrecisionIso,
+} from './adapters/open311';
 import { isCoordinateAcceptable, isSourceStale } from './run';
 import type { ImportSourceRow } from './types';
 
@@ -233,5 +238,34 @@ describe('mapOpen311Request — numeric ids and codes', () => {
   it('drops a row with no id, whatever its type', () => {
     expect(mapOpen311Request({ ...zaragozaRow, service_request_id: undefined })).toBeNull();
     expect(mapOpen311Request({ ...zaragozaRow, service_request_id: '' })).toBeNull();
+  });
+});
+
+describe('toSecondPrecisionIso', () => {
+  /**
+   * Zaragoza's date parser rejects fractional seconds with HTTP 400 —
+   * verified live: `...T19:22:14.741Z` 400, `...T19:22:14Z` 200. That is what
+   * made the very first Zaragoza run fail. Cologne accepts both.
+   */
+  it('strips milliseconds', () => {
+    expect(toSecondPrecisionIso('2026-08-02T19:22:14.741Z')).toBe('2026-08-02T19:22:14Z');
+  });
+
+  it('strips microseconds too', () => {
+    expect(toSecondPrecisionIso('2026-08-02T19:22:14.123456Z')).toBe('2026-08-02T19:22:14Z');
+  });
+
+  it('leaves an already second-precision timestamp alone', () => {
+    expect(toSecondPrecisionIso('2026-08-02T19:22:14Z')).toBe('2026-08-02T19:22:14Z');
+  });
+
+  it('handles a numeric offset rather than Z', () => {
+    expect(toSecondPrecisionIso('2026-08-02T19:22:14.741+02:00')).toBe(
+      '2026-08-02T19:22:14+02:00',
+    );
+  });
+
+  it('does not eat a fractional value elsewhere in the string', () => {
+    expect(toSecondPrecisionIso('2026-08-02T19:22:14Z')).not.toContain('..');
   });
 });

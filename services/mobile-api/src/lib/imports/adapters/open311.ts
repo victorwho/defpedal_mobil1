@@ -88,6 +88,16 @@ export const normaliseStatus = (value: unknown): SourceStatus | null => {
   return 'open';
 };
 
+/**
+ * ISO8601 WITHOUT fractional seconds.
+ *
+ * Zaragoza's date parser rejects milliseconds with HTTP 400 — verified:
+ * `2026-08-02T19:22:14.741Z` 400, `2026-08-02T19:22:14Z` 200. Cologne accepts
+ * both, so second precision is safe for every source.
+ */
+export const toSecondPrecisionIso = (iso: string): string =>
+  iso.replace(/\.\d{1,6}(?=Z|[+-]\d{2}:?\d{2}$)/, '');
+
 const toIsoOrNull = (value: unknown): string | null => {
   if (typeof value !== 'string' || !value.trim()) return null;
   const parsed = new Date(value);
@@ -165,10 +175,18 @@ export const open311Adapter: HazardSourceAdapter = {
     const page = cursor.page && cursor.page > 0 ? cursor.page : 1;
     const since = cursor.since ?? defaultLookbackIso();
 
+    // GeoReport v2 leaves paging undefined; implementations differ. `page`
+    // works for Cologne and is silently IGNORED by Zaragoza, which would mean
+    // re-reading page 1 until the page cap. See ImportSourceRow.pagination_style.
+    const paging: Record<string, string> =
+      source.pagination_style === 'offset'
+        ? { rows: String(PAGE_SIZE), start: String((page - 1) * PAGE_SIZE) }
+        : { page: String(page) };
+
     const url = buildRequestsUrl(source, {
-      start_date: since,
-      end_date: new Date().toISOString(),
-      page: String(page),
+      start_date: toSecondPrecisionIso(since),
+      end_date: toSecondPrecisionIso(new Date().toISOString()),
+      ...paging,
     });
 
     const payload = await fetchJson(url, signal);
