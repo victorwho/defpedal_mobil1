@@ -667,9 +667,9 @@ a member state starts publishing municipal cycle-network data through its NAP.
 ### Still unprobed
 
 - Brussels' real API; Vienna (`Sag's Wien`); Copenhagen (`Giv et praj`);
-  Italian/Spanish/Polish municipal platforms; the wider German Mängelmelder
-  estate beyond the 7 already checked. All are municipal platforms, i.e. the
-  family that does work.
+  Italian/Polish municipal platforms; the wider German Mängelmelder estate
+  beyond the 7 already checked. All are municipal platforms, i.e. the family
+  that does work. **Spain was swept 2026-09-01 — see §18.**
 
 
 ---
@@ -841,3 +841,79 @@ cycling-relevant rate this is **low tens of pins across all of Romania** at
 first, not a data flood. It is worth doing because it is the only Romanian
 source and Romania is the home market, and because volume grows with the
 platform — not because it will fill the map on day one.
+
+---
+
+## 18. Spain source sweep (2026-09-01)
+
+Closes the "Spanish municipal platforms" item from §15. All results are live
+probes on the day, not directory listings.
+
+### Verified live and usable
+
+| Source | Endpoint | Format | Latency | Verdict |
+|---|---|---|---|---|
+| **Zaragoza** | `www.zaragoza.es/api/recurso/open311/requests.json` | Open311 GeoReport v2 | **none** (newest request minutes old) | **usable — zero code** |
+
+**Zero code.** It is GeoReport v2, so the existing config-driven `open311`
+adapter serves it: adding Zaragoza is a `hazard_import_sources` row, exactly
+the property §6 was designed for.
+
+**Better than Cologne in two ways:**
+- **`service_code` filter is HONOURED.** Verified: `?service_code=9043969`
+  returned 20 rows, all `Bicicletas`. Cologne accepts its filter and silently
+  ignores it (§6) — the trap that made status-sync a no-op there. Zaragoza's
+  working filter means we can fetch only relevant categories and skip the
+  irrelevant ~89% before it ever reaches the classifier.
+- **Real `status`** (`open`/`closed`, 43/7 in a 50-row sample), so expiry is
+  status-driven rather than a guessed TTL.
+
+**Taxonomy: 100 services, ~11 road-relevant**, and unusually well aimed:
+
+    9043969    Bicicletas                              <- dedicated cycling category
+    11 / 61    Bache                                   <- pothole (two codes)
+    10         Acera                                   <- pavement
+    60         Calzada                                 <- roadway
+    1000007    Movilidad Urbana: Señalización
+    103677952  Movilidad Urbana: Regulación Semáforos
+    97779712   Movilidad Urbana: Estacionamiento Regulado
+    5144577    Alumbrado Público
+
+**Volume:** ~30–50 requests/day city-wide (200 rows spanned 5 days).
+
+**Two caveats, both to settle before enabling:**
+1. **Only 46% of requests carry coordinates** (93/200). The rest have an
+   `address_string` or nothing. The pipeline drops them via `badCoords`, so it
+   degrades gracefully — but the usable yield is roughly half the raw volume.
+2. **`Bicicletas` may be policy suggestions, not hazards.** The sampled row was
+   a long prose *suggestion* with `lat: null`. Sample the category properly
+   before mapping it to a hazard type — a dedicated cycling category is
+   tempting precisely because it looks like a jackpot.
+
+**Endpoint gotcha:** bare `/requests` returns **HTML documentation with HTTP
+200**. Only `/requests.json` returns JSON. This is the same "dead endpoints do
+not 404, they 200 with HTML" trap the Open311 adapter already guards against —
+its non-JSON check catches it, but the URL must carry the `.json` suffix.
+
+### Probed and rejected
+
+| Source | Why |
+|---|---|
+| **Barcelona IRIS** | CC-BY-4.0 and a good taxonomy, but published as **annual** CSV/XML dumps (2026 file last modified 2026-06-12). Same disqualification as Paris in §15: a batch archive is not a transient hazard layer. |
+| **Madrid "Avisos ciudadanos"** | **Monthly** batch, accumulated-since-January files. Better than annual, still far too laggy; coordinates unverified (the datos.gob.es mirror returns an empty result set). Madrid is the biggest prize in Spain, so worth re-checking if they ever publish incrementally. |
+| **Málaga** | "Incidencias resueltas en la vía pública" last modified **2023-05-05** — stale by three years. |
+| **Valencia** | Portal has moved; neither the OpenDataSoft v1 (`/api/records/1.0/`) nor v2.1 (`/api/explore/v2.1/`) paths resolve on `opendata.vlci.valencia.es`. Real API not located. |
+| Gijón · Bilbao · Santander | 404 · 403 · unreachable. |
+
+Consistent with §15's finding that published endpoint directories are ~85%
+stale, and with its conclusion that **municipal civic-report platforms are the
+right family** — the one Spanish source that works is the one running Open311.
+
+### What this means for Spanish coverage
+
+Spain already has routing and `road_risk_data`; hazards were the gap. This
+closes it for **one mid-size city (Zaragoza, ~675k)**, not for Madrid or
+Barcelona. Both of those have the data and publish it too slowly to use. If
+Spanish hazard coverage matters strategically, the lever is not another sweep —
+it is asking Madrid or Barcelona for an incremental feed, the same conversation
+that unlocked civia.ro.
