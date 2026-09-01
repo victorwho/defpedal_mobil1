@@ -853,11 +853,28 @@ probes on the day, not directory listings.
 
 | Source | Endpoint | Format | Latency | Verdict |
 |---|---|---|---|---|
-| **Zaragoza** | `www.zaragoza.es/api/recurso/open311/requests.json` | Open311 GeoReport v2 | **none** (newest request minutes old) | **usable — zero code** |
+| **Zaragoza** | `www.zaragoza.es/api/recurso/open311/requests.json` | Open311 GeoReport v2 | **none** (newest request minutes old) | **ENABLED 2026-09-01 — 62 hazards live** |
 
-**Zero code.** It is GeoReport v2, so the existing config-driven `open311`
-adapter serves it: adding Zaragoza is a `hazard_import_sources` row, exactly
-the property §6 was designed for.
+**"Zero code" turned out to be wrong three times.** It is GeoReport v2 and the
+config-driven adapter does serve it, but the assumption that two Open311
+implementations agree does not survive contact:
+
+1. **Numeric ids.** Zaragoza returns `service_request_id` and `service_code` as
+   JSON NUMBERS; Cologne returns strings and `mapOpen311Request` required a
+   string. Every row would have mapped to null and the run would have reported
+   a clean zero-import. Fixed generically with `toTrimmedString`.
+2. **Fractional seconds.** Zaragoza's date parser rejects them — verified,
+   `...T19:22:14.741Z` 400 vs `...T19:22:14Z` 200. This was the actual HTTP 400
+   on the first run. `start_date`/`end_date` are now second-precision for all
+   sources (Cologne accepts both; re-verified before changing shared code).
+3. **Paging dialect.** GeoReport v2 does not standardise it. Cologne honours
+   `page=N`; Zaragoza IGNORES it and honours a Solr-style `start=` row offset.
+   Sending the wrong one is not an error — it returns page 1 forever, so the
+   run looks healthy while importing nothing new. Added
+   `hazard_import_sources.pagination_style` rather than branching on city id.
+
+The adapter seam is still right. What was wrong was believing the standard is
+one. Each divergence is now config or coercion, so city four is cheaper.
 
 **Better than Cologne in two ways:**
 - **`service_code` filter is HONOURED.** Verified: `?service_code=9043969`
@@ -917,3 +934,36 @@ Barcelona. Both of those have the data and publish it too slowly to use. If
 Spanish hazard coverage matters strategically, the lever is not another sweep —
 it is asking Madrid or Barcelona for an incremental feed, the same conversation
 that unlocked civia.ro.
+
+### Zaragoza — enabled 2026-09-01, live result
+
+Migrations `202609010002` (source row) and `202609010003` (pagination dialect).
+Cloud Run `defpedal-api-00150-dnc`.
+
+**62 hazards live**: 40 poor_surface, 15 pothole, 4 dangerous_intersection,
+2 blocked_bike_lane, 1 other. `alert_eligible = 0` across all of them.
+Confirmed through `GET /v1/hazards/nearby` — 57 Zaragoza pins in a 5 km radius
+of the city centre, with street-level descriptions (Avenida Goya, Plaza
+Gallur).
+
+**Only requests with coordinates are imported**, as required. This needed no
+configuration: `mapOpen311Request` returns null without lat/long and the runner
+has a second `badCoords` gate. It costs about half the raw volume — 46% of
+Zaragoza requests carry coordinates.
+
+**The review fallback earned its keep.** The first successful run put **273 of
+497** items into human review, all `Unmapped Zaragoza service_code`. The cause:
+`services.json` advertises 100 services and the request feed uses codes it does
+not contain. Had unmapped codes defaulted to `irrelevant`, those 273 would have
+vanished silently and nobody would have known the taxonomy was incomplete.
+
+Of the 273, only ~14 items across 5 codes were genuinely relevant —
+`PAVIMENTOS`, gravel on the road, pavement lifted by tree roots, traffic lights
+out, and the `Aceras y calzadas` parent. The rest were trees, benches, bins,
+playgrounds, mowing and irrigation. After mapping all ~45 observed codes and
+re-running: **0 queued for review**, 261 correctly dropped as irrelevant, and
+LLM calls fell from 74 to 7 (spend $0.0074 → $0.0007 per run).
+
+**Follow-ups:** the licence is still UNVERIFIED (see the migration header), and
+`alert_eligible` should stay false until someone spot-checks a few geocodes
+against reality.

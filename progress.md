@@ -1943,3 +1943,17 @@ Added `apps/mobile/src/lib/netInfoModule.test.ts` (2 specs: native-module-absent
 ⚠️ **Caveat on the "same set as SESIZARE_ELIGIBLE_HAZARD_TYPES" claim:** true of the deterministic map, but the `altele` → LLM path can assign any importable type, and did — the lone `aggressive_traffic` and `missing_bike_lane` pins came from there, both types the outbound feature deliberately excludes. Harmless as map markers; tighten the LLM's allowed set if the inbound/outbound symmetry is meant to be strict.
 
 **Follow-ups:** (1) the 1 pending review item; (2) spot-check a few geocodes against reality before considering `alert_eligible=true`; (3) expect the RSC parser to break on a Civia redeploy — it now fails loudly with the real HTTP reason.
+
+### Session 110 part 2 — Spain sweep, and Zaragoza live (2026-09-01)
+
+**Swept Spanish hazard sources; one usable, now enabled.** Plan: `docs/plans/hazard-import-pipeline.md` §18.
+
+**Found:** **Zaragoza** — Open311 GeoReport v2, zero latency, real open/closed status, ~30–50 requests/day, and a taxonomy with `Bache`/`Acera`/`Calzada`, traffic-signal codes and a dedicated `Bicicletas`. **Rejected:** Barcelona IRIS (annual dumps — same disqualification as Paris), Madrid Avisos (monthly batch), Málaga (stale since 2023), Valencia (portal moved, API not located), Gijón/Bilbao/Santander (404/403/unreachable).
+
+**"Adding an Open311 city is a registry row" was wrong three times**, all against one city, all silent-or-misleading: (1) Zaragoza returns `service_request_id`/`service_code` as JSON **numbers**, and the adapter required strings — every row would have mapped to null with a clean green run; (2) its date parser rejects **fractional seconds** (`.741Z` → 400), which was the actual first-run failure; (3) it **ignores `page=`** and honours a Solr-style `start=` offset — sending the wrong one returns page 1 forever while looking healthy. Fixed as generic coercion, second-precision timestamps for all sources, and a new `hazard_import_sources.pagination_style` column. Cologne re-verified against both date formats before shared code changed.
+
+**The `review` fallback earned its keep.** First successful run: 273 of 497 items to human review, all unmapped codes — `services.json` lists 100 services and the request feed uses codes it does not contain. Had unmapped defaulted to `irrelevant`, all 273 would have vanished silently. Only ~14 across 5 codes were genuinely relevant; the rest were trees, benches, bins and mowing. After mapping ~45 observed codes: **0 in review**, 261 correctly dropped, LLM calls 74 → 7 ($0.0074 → $0.0007/run).
+
+**Live: 62 Zaragoza hazards** (40 poor_surface, 15 pothole, 4 dangerous_intersection, 2 blocked_bike_lane, 1 other), `alert_eligible=0`, verified through `/v1/hazards/nearby` (57 pins in a 5 km radius, Avenida Goya / Plaza Gallur). Only requests **with coordinates** are imported — no config needed, and it costs ~half the raw volume since 46% carry coordinates.
+
+**Open:** licence UNVERIFIED (portal legal page 404s, datos.gob.es reports null for publisher L01502973) — settle before public redistribution; keep `alert_eligible=false` until geocodes are spot-checked. Live hazard totals now: Amsterdam 2,729 · Cologne 182 · **Zaragoza 62** · Civia 47 · rider-reported 1.
