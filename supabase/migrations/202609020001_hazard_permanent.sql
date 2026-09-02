@@ -42,8 +42,11 @@
 --
 -- Rollback:
 --   ALTER TABLE public.hazards DROP COLUMN is_permanent;
---   -- then re-apply 202604210001 (extend_hazard_on_confirm + set_hazard_expiry)
---   -- and 202605040001 (get_nearby_hazards).
+--   -- then restore the pre-change bodies. Do NOT re-apply 202604210001 /
+--   -- 202605040001 blind: both had drifted from live (45-day guard, and
+--   -- get_nearby_hazards was last redefined by 202608270002). The live
+--   -- definitions as of 2026-09-02 are recorded in the session scratchpad;
+--   -- re-read with pg_get_functiondef before rolling back.
 -- ---------------------------------------------------------------------------
 
 -- ── 1. The flag ─────────────────────────────────────────────────────────────
@@ -100,12 +103,17 @@ $$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 -- ── 4. Vote trigger ─────────────────────────────────────────────────────────
 --
--- Everything below the permanent branch is byte-identical to 202604210001.
+-- Base body captured from the LIVE function via pg_get_functiondef, NOT from
+-- 202604210001 — the two had drifted: live runs the flip-reversal BEFORE the
+-- SELECT, and its resurrection guard is 45 days (widened by 202604210002),
+-- where the repo file still says 7. Rewriting from the repo copy would have
+-- silently reverted that window. See memory `supabase-rpc-drift`.
+--
 -- The permanent branch RE-DERIVES expires_at from the current deny_count on
 -- every vote rather than mutating it incrementally, which buys three things:
 --   * a withdrawn downvote (flip down→up drops deny_count back to 9) brings the
 --     hazard back — the rule is a live predicate, not a one-way latch;
---   * it is inherently resurrection-safe, so the >7d stale-vote guard below is
+--   * it is inherently resurrection-safe, so the 45d stale-vote guard below is
 --     not needed here: a stale upvote draining late cannot revive a hazard that
 --     is still sitting at 10 downvotes;
 --   * LEAST(expires_at, now()) stamps the FIRST crossing and keeps it stable,
@@ -121,22 +129,22 @@ DECLARE
   v_is_permanent boolean;
   v_deny_count   integer;
 BEGIN
-  SELECT hazard_type, expires_at, is_permanent
-    INTO v_type, v_expires_at, v_is_permanent
-    FROM hazards
-   WHERE id = NEW.hazard_id;
-
   -- Vote-flip reversal: on UPDATE where the response changed, undo the old
   -- one first so the new branch below applies a net delta-1 change.
   IF TG_OP = 'UPDATE' AND OLD.response IS DISTINCT FROM NEW.response THEN
     IF OLD.response = 'confirm' THEN
       UPDATE hazards SET confirm_count = GREATEST(confirm_count - 1, 0) WHERE id = NEW.hazard_id;
     ELSIF OLD.response = 'deny' THEN
-      UPDATE hazards SET deny_count    = GREATEST(deny_count    - 1, 0) WHERE id = NEW.hazard_id;
+      UPDATE hazards SET deny_count = GREATEST(deny_count - 1, 0) WHERE id = NEW.hazard_id;
     ELSIF OLD.response = 'pass' THEN
-      UPDATE hazards SET pass_count    = GREATEST(pass_count    - 1, 0) WHERE id = NEW.hazard_id;
+      UPDATE hazards SET pass_count = GREATEST(pass_count - 1, 0) WHERE id = NEW.hazard_id;
     END IF;
   END IF;
+
+  SELECT hazard_type, expires_at, is_permanent
+    INTO v_type, v_expires_at, v_is_permanent
+    FROM hazards
+   WHERE id = NEW.hazard_id;
 
   -- Permanent hazards: no TTL arithmetic at all.
   IF coalesce(v_is_permanent, false) THEN
@@ -169,10 +177,11 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Resurrection guard: a vote queued offline >7d ago that drains now must
+  -- Resurrection guard: a vote queued offline long ago that drains now must
   -- not rewind expires_at into the future for an effectively dead hazard.
   -- Counts still update (for audit); only the TTL extension is skipped.
-  IF v_expires_at < now() - interval '7 days' THEN
+  -- 45 days, aligned with the /v1/hazards/expire cron (202604210002).
+  IF v_expires_at < now() - interval '45 days' THEN
     IF NEW.response = 'confirm' THEN
       UPDATE hazards SET confirm_count = confirm_count + 1 WHERE id = NEW.hazard_id;
     ELSIF NEW.response = 'deny' THEN
