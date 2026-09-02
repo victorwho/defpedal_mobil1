@@ -86,6 +86,17 @@ Plan + full implementation record: **`docs/plans/hazard-import-pipeline.md`**.
 - **Publishing is BATCHED, never per-item.** Supabase is `us-east-1`, Cloud Run `europe-central2` (~100 ms/round-trip). Amsterdam publishes ~2,000 hazards per sweep; at two round-trips each that is ~400 s against a 240 s budget — a run that could never finish. `publishImports()` chunks 200 rows per statement. Do not reintroduce a per-item publish loop.
 - **Rollback is two statements:** `UPDATE hazard_import_sources SET enabled=false;` then `DELETE FROM hazards WHERE import_source IS NOT NULL;`. Do NOT roll back `202608270001` with them — it fixes a pre-existing rider-facing bug.
 
+## Permanent Hazards (opt-in at report time)
+
+Migration `202609020001`. A reporter may tick "This hazard is permanent" in the hazard quick-report card (both `route-planning.tsx` and in-ride `navigation.tsx`; shared `PermanentHazardCheckbox` molecule). A permanent hazard has **no TTL** — the only thing that expires it is reaching **10 downvotes** (`hazard_permanent_deny_threshold()`, mirrored in core as `PERMANENT_HAZARD_DENY_THRESHOLD`; change both together).
+
+- **`hazards.is_permanent` is the source of truth, NOT `expires_at`.** Permanent rows carry a far-future *real* timestamp (`hazard_permanent_expiry()` = `now() + 100 years`), never NULL and never `'infinity'`. Reason: `expiresAt` is required + non-nullable in `nearbyHazardItemSchema`, and `useNearbyHazards.ts` drops any hazard whose `expiresAt` fails `Date.parse` — so a null/infinite value would make every permanent hazard **invisible on the fielded app** while looking perfect server-side. `'infinity'::timestamptz` is the sharpest form of this trap: valid SQL, satisfies `expires_at > now()`, serialises as the string `"infinity"`, `Date.parse` → `NaN`. See error-log #101.
+- **`expires_at` is re-derived from `deny_count` on every vote**, not mutated incrementally, so the flag and the timestamp cannot drift. Three consequences worth keeping: a withdrawn downvote (flip down→up back to 9) brings the hazard back — the rule is a live predicate, not a one-way latch; the >7d stale-offline-vote resurrection guard is unnecessary in this branch because a late upvote cannot revive a row still sitting at 10 downvotes; and `LEAST(expires_at, now())` stamps the FIRST crossing so later votes cannot push the row out of the cron's 45-day hard-delete window.
+- **Two things deliberately still apply to permanent hazards.** (a) The `score > -3` gate in `get_nearby_hazards` still HIDES them — that is reversible display moderation, not expiry, and a recovering score brings the pin straight back. (b) The 45-day post-expiry grace DELETE still reaps them once the downvote threshold has actually expired them.
+- **One thing deliberately does NOT apply:** the daily cron's hard-purge of `score <= -3` skips permanent rows (`.eq('is_permanent', false)` on both purge branches in `/v1/hazards/expire`). That DELETE is irreversible, so at score −3 it would be expiry by another name, at a third of the threshold the feature promises.
+- **Ordering constraint:** the migration MUST be live before the API deploys. The cron purge filters on `is_permanent`, and PostgREST 400s on an unknown column — an unmigrated DB turns the daily hazard-expiry cron into a 502 (it would page via the *Cloud Scheduler job failed* policy, but expiry stops meanwhile). The hazard INSERT path degrades gracefully on its own (`submissions.ts` retries without the column, stripping `is_permanent` before `hazard_type` so the category is never the thing that gets lost), and `/hazards/nearby` defaults `isPermanent` to `false`.
+- **Imports never set it.** `is_permanent` defaults false and the import pipeline supplies its own explicit `expires_at`, which still wins in `set_hazard_expiry`.
+
 ## App Variants
 
 | Variant | Package | Name | How it gets JS | New Arch |
@@ -529,7 +540,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Hazard proximity alerts during navigation with upvote/downvote (community trust signal)
 - Hazard detail sheet (tap any marker) with vote buttons, score, age, distance, auto-expiry countdown
 - Hazard marker clustering at zoom < 14 (dense areas collapse to count bubbles colored by worst severity)
-- Auto-expiry: hazards fade based on type TTL (`poor_surface`/`aggressive_traffic` 4h → `narrow_street`/`missing_bike_lane`/`dangerous_intersection` 30d; `aggro_dogs` 21d; `pothole` 14d); upvotes extend, downvotes halve; `score <= -3` hides; daily 3 AM cron hard-deletes stale + score-dropped entries
+- Auto-expiry: hazards fade based on type TTL (`poor_surface`/`aggressive_traffic` 4h → `narrow_street`/`missing_bike_lane`/`dangerous_intersection` 30d; `aggro_dogs` 21d; `pothole` 14d); upvotes extend, downvotes halve; `score <= -3` hides; daily 3 AM cron hard-deletes stale + score-dropped entries. **Permanent hazards opt out of the TTL entirely — see the Permanent Hazards section below.**
 - Striped red/black hazard zones on route
 - Community feed with trip sharing, single-heart reactions, comments (like/love consolidated 2026-06-14; `/love` endpoints aliased to likes for old-client compat)
 - Trip history with GPS trail + planned route map replay

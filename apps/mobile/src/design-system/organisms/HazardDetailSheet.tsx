@@ -18,7 +18,11 @@
  * react-native on Android).
  */
 import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
-import { HAZARD_TYPE_OPTIONS, getHazardImportSourceDisplay } from '@defensivepedal/core';
+import {
+  HAZARD_TYPE_OPTIONS,
+  getHazardImportSourceDisplay,
+  PERMANENT_HAZARD_DENY_THRESHOLD,
+} from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -185,6 +189,9 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
   // null for rider-reported hazards, which render no provenance line at all.
   const importDisplay = getHazardImportSourceDisplay(hazard.importSource);
   const dist = distanceMeters ?? hazard.distanceMeters;
+  // Servers predating migration 202609020001 omit the field entirely; treat
+  // that as "ordinary TTL hazard" so a stale server never claims permanence.
+  const isPermanent = hazard.isPermanent === true;
 
   const isPending = voteState === 'pending';
   const upActive = hazard.userVote === 'up';
@@ -285,6 +292,19 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
                 {t('hazard.lastConfirmedAgo', { time: lastConfirmedAgo })}
               </Text>
             ) : null}
+            {isPermanent ? (
+              <View
+                style={[
+                  styles.permanentChip,
+                  { backgroundColor: colors.bgSecondary, borderColor: colors.accent },
+                ]}
+              >
+                <Ionicons name="infinite" size={12} color={colors.accent} />
+                <Text style={[styles.permanentChipText, { color: colors.accent }]}>
+                  {t('hazard.permanentBadge')}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {hazard.description ? (
@@ -334,6 +354,17 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
                 {`${t('hazard.dismisses')}: ${hazard.denyCount}`}
               </Text>
             </View>
+            {/* Permanent hazards have no countdown to show, so spell out the
+                only rule that removes them — otherwise "no expiry" reads as
+                "nobody can ever take this down". */}
+            {isPermanent ? (
+              <Text style={[styles.permanentExplainer, { color: colors.textSecondary }]}>
+                {t('hazard.permanentExplainer', {
+                  count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                  count_current: hazard.denyCount,
+                })}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.voteRow}>
@@ -478,6 +509,24 @@ const styles = StyleSheet.create({
   },
   metaText: {
     ...textXs,
+  },
+  permanentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: space[2],
+    paddingVertical: 2,
+    borderRadius: radii.full,
+    borderWidth: 1,
+  },
+  permanentChipText: {
+    ...textXs,
+    fontFamily: fontFamily.body.semiBold,
+  },
+  permanentExplainer: {
+    ...textXs,
+    marginTop: space[2],
+    textAlign: 'center',
   },
   scoreCard: {
     alignItems: 'center',

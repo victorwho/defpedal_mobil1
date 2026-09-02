@@ -661,6 +661,7 @@ describe('mobile-api v1 routes', () => {
         reportedAt: '2026-03-14T11:00:00.000Z',
         source: 'manual',
         hazardType: 'blocked_bike_lane',
+        isPermanent: false,
       }, 'user-123');
 
       const feedbackResponse = await app.inject({
@@ -731,7 +732,52 @@ describe('mobile-api v1 routes', () => {
         reportedAt: '2026-03-14T11:00:00.000Z',
         source: 'manual',
         hazardType: undefined,
+        isPermanent: false,
       }, null);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('forwards the permanence opt-in from the reporter to the submission layer', async () => {
+    // Migration 202609020001. A permanent hazard has no TTL, so this flag is
+    // the difference between a pin that outlives the ride and one that is
+    // gone in hours — it must survive normalization, not be dropped as an
+    // unknown body field (Fastify strips those silently).
+    const submitHazardReport = vi.fn().mockResolvedValue({
+      reportId: 'hazard-1',
+      acceptedAt: '2026-03-14T11:00:00.000Z',
+    });
+    const app = createApp({
+      authenticateUser: vi.fn().mockResolvedValue({
+        id: 'user-123',
+        email: 'rider@example.com',
+      }),
+      submitHazardReport,
+    });
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/hazards',
+        headers: authHeader,
+        payload: {
+          coordinate: { lat: 44.447, lon: 26.097 },
+          reportedAt: '2026-03-14T11:00:00.000Z',
+          source: 'manual',
+          hazardType: 'dangerous_intersection',
+          isPermanent: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(submitHazardReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hazardType: 'dangerous_intersection',
+          isPermanent: true,
+        }),
+        'user-123',
+      );
     } finally {
       await app.close();
     }

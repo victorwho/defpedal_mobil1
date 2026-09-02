@@ -230,6 +230,43 @@ describe('HazardDetailSheet', () => {
     expect(onVote).not.toHaveBeenCalled();
   });
 
+  // ── Permanent hazards (migration 202609020001) ───────────────────────────
+
+  it('renders no permanence badge for an ordinary TTL hazard', () => {
+    render(
+      <HazardDetailSheet hazard={hazard} visible onDismiss={vi.fn()} onVote={vi.fn()} />,
+    );
+    expect(screen.queryByText('hazard.permanentBadge')).toBeNull();
+  });
+
+  it('treats a missing isPermanent (older server) as not permanent', () => {
+    // The field is optional in the contract; a server predating the migration
+    // omits it entirely, and claiming permanence there would hide a real
+    // expiry countdown from the rider.
+    expect(hazard.isPermanent).toBeUndefined();
+    render(
+      <HazardDetailSheet hazard={hazard} visible onDismiss={vi.fn()} onVote={vi.fn()} />,
+    );
+    expect(screen.queryByText('hazard.permanentBadge')).toBeNull();
+  });
+
+  it('badges a permanent hazard and spells out the downvote rule that removes it', () => {
+    render(
+      <HazardDetailSheet
+        hazard={{ ...hazard, isPermanent: true, denyCount: 3 }}
+        visible
+        onDismiss={vi.fn()}
+        onVote={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('hazard.permanentBadge')).toBeTruthy();
+    // "No expiry" must never read as "nobody can take this down": the
+    // explainer carries the threshold AND how far the community has got.
+    expect(
+      screen.getByText('hazard.permanentExplainer:{"count":10,"count_current":3}'),
+    ).toBeTruthy();
+  });
+
   it('fires onDismiss when the close button is tapped', () => {
     const onDismiss = vi.fn();
     render(

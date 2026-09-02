@@ -880,6 +880,12 @@ export const es: TranslationKeys = {
     reportedAgo: 'Reportado {{time}}',
     lastConfirmedAgo: 'Última confirmación {{time}}',
     importedFrom: 'Reportado vía {{source}}',
+    // Peligros permanentes (migración 202609020001). Se marcan al reportar; sin
+    // TTL, solo desaparecen cuando {{count}} ciclistas los descartan.
+    permanentLabel: 'Este peligro es permanente',
+    permanentHint: 'No caduca por sí solo — solo desaparece si {{count}} ciclistas dicen que ya no está.',
+    permanentBadge: 'Permanente',
+    permanentExplainer: 'Sin fecha de caducidad. Permanece en el mapa hasta que {{count}} ciclistas lo descarten — {{count_current}} hasta ahora.',
     confirms: 'Confirmaciones',
     dismisses: 'Descartes',
     types: {

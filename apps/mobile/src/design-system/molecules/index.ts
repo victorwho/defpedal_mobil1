@@ -31,3 +31,6 @@ export type { SuggestedUserCardProps } from './SuggestedUserCard';
 export { FollowRequestItem } from './FollowRequestItem';
 export type { FollowRequestItemProps } from './FollowRequestItem';
 export * from './SesizareRow';
+export { PermanentHazardCheckbox } from './PermanentHazardCheckbox';
+export type { PermanentHazardCheckboxProps } from './PermanentHazardCheckbox';
+

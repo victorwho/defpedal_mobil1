@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PLAY_STORE_URL } from '@defensivepedal/core';
+import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -44,6 +44,7 @@ import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { PermanentHazardCheckbox } from '../src/design-system/molecules/PermanentHazardCheckbox';
 import { SesizareRow } from '../src/design-system/molecules/SesizareRow';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
@@ -301,6 +302,11 @@ export default function RoutePlanningScreen() {
   const [pendingHazardCoordinate, setPendingHazardCoordinate] = useState<Coordinate | null>(null);
   const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
   const [hazardDescription, setHazardDescription] = useState('');
+  // Optional per-report permanence opt-in. Survives the picker → placement
+  // hand-off (the FAB flow files the report a screen later), so it is cleared
+  // by every terminal path — submit, cancel, and backdrop dismiss — rather
+  // than on picker close alone.
+  const [hazardIsPermanent, setHazardIsPermanent] = useState(false);
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   // A sesizare CTA rides inside the success toast, and 5s is not long enough
   // to read it and decide. Type-eligibility is a cheap synchronous check (the
@@ -470,6 +476,7 @@ export default function RoutePlanningScreen() {
       source,
       hazardType: 'other',
       ...(trimmed.length > 0 ? { description: trimmed } : {}),
+      ...(hazardIsPermanent ? { isPermanent: true } : {}),
     });
     // Analytics opt-in prompt 2 trigger evidence (first hazard report).
     useAppStore.getState().markHazardReported();
@@ -492,11 +499,13 @@ export default function RoutePlanningScreen() {
         reportedAt: new Date().toISOString(),
         source: 'armchair',
         hazardType,
+        ...(hazardIsPermanent ? { isPermanent: true } : {}),
       });
       // Analytics opt-in prompt 2 trigger evidence (first hazard report).
       useAppStore.getState().markHazardReported();
       setPendingHazardCoordinate(null);
       setHazardPickerOpen(false);
+      setHazardIsPermanent(false);
       setHazardToast({ type: 'success', message: t('hazard.reported'), coordinate: pendingHazardCoordinate, hazardType });
       if (hazardToastTimerRef.current) clearTimeout(hazardToastTimerRef.current);
       hazardToastTimerRef.current = setTimeout(() => setHazardToast(null), hazardToastMs(hazardType));
@@ -517,6 +526,7 @@ export default function RoutePlanningScreen() {
       setHazardPickerOpen(false);
       setHazardDescribeMode(false);
       setHazardDescription('');
+      setHazardIsPermanent(false);
       return;
     }
 
@@ -540,6 +550,7 @@ export default function RoutePlanningScreen() {
         reportedAt: new Date().toISOString(),
         source: 'manual',
         hazardType: selectedHazardType,
+        ...(hazardIsPermanent ? { isPermanent: true } : {}),
       });
       // Analytics opt-in prompt 2 trigger evidence (first hazard report).
       useAppStore.getState().markHazardReported();
@@ -551,12 +562,14 @@ export default function RoutePlanningScreen() {
     setHazardPlacementMode(false);
     setSelectedHazardType(null);
     setHazardDescription('');
+    setHazardIsPermanent(false);
   };
 
   const toggleHazardMode = () => {
     if (hazardPlacementMode) {
       setHazardPlacementMode(false);
       setSelectedHazardType(null);
+      setHazardIsPermanent(false);
     } else {
       // Mutex: opening hazard mode cancels any active suggestion placement.
       if (suggestionPlacementMode) {
@@ -589,6 +602,7 @@ export default function RoutePlanningScreen() {
         if (hazardPickerOpen) {
           setHazardPickerOpen(false);
         }
+        setHazardIsPermanent(false);
       }
       return next;
     });
@@ -1589,6 +1603,7 @@ export default function RoutePlanningScreen() {
           setHazardPickerOpen(false);
           setHazardDescribeMode(false);
           setHazardDescription('');
+          setHazardIsPermanent(false);
         }}
         accessible={true}
         accessibilityRole="button"
@@ -1619,6 +1634,16 @@ export default function RoutePlanningScreen() {
                 accessibilityHint="Type a short description of the hazard, or leave blank"
               />
               <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
+              <View style={styles.hazardPermanentWrap}>
+                <PermanentHazardCheckbox
+                  checked={hazardIsPermanent}
+                  onChange={setHazardIsPermanent}
+                  label={t('hazard.permanentLabel')}
+                  hint={t('hazard.permanentHint', {
+                    count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                  })}
+                />
+              </View>
               <Pressable
                 style={({ pressed }) => [
                   styles.hazardDescribeSubmit,
@@ -1670,9 +1695,22 @@ export default function RoutePlanningScreen() {
                   </Pressable>
                 ))}
               </View>
+              <View style={styles.hazardPermanentWrap}>
+                <PermanentHazardCheckbox
+                  checked={hazardIsPermanent}
+                  onChange={setHazardIsPermanent}
+                  label={t('hazard.permanentLabel')}
+                  hint={t('hazard.permanentHint', {
+                    count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                  })}
+                />
+              </View>
               <Pressable
                 style={styles.hazardGridCancel}
-                onPress={() => setHazardPickerOpen(false)}
+                onPress={() => {
+                  setHazardPickerOpen(false);
+                  setHazardIsPermanent(false);
+                }}
                 accessible={true}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel hazard report"
@@ -2029,6 +2067,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontSize: 11,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    hazardPermanentWrap: {
+      marginBottom: space[2],
     },
     hazardGridCancel: {
       alignItems: 'center',

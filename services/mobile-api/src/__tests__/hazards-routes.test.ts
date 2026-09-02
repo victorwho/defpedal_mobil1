@@ -49,6 +49,7 @@ import { createMemoryRouteResponseCache } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { createMemoryRateLimiter, type RateLimiter, type RateLimitPolicies } from '../lib/rateLimit';
 import { qualifyStreakAsync } from '../lib/streaks';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 const CRON_SECRET = 'test-cron-secret-xyz';
 process.env.CRON_SECRET = CRON_SECRET;
@@ -422,6 +423,37 @@ describe('POST /v1/hazards/expire', () => {
     await app.close();
   });
 
+  it('exempts permanent hazards from the score<=-3 hard purge', async () => {
+    // That DELETE is irreversible, so applying it to permanent hazards would
+    // be expiry by another name at a threshold far below the 10 downvotes the
+    // feature promises. They stay HIDDEN at score<=-3 (reversible, in
+    // get_nearby_hazards) and hard-delete only through the 45-day grace window
+    // below, once the downvote threshold has actually expired them.
+    enqueueResult({ data: [], error: null });   // purge branch A
+    enqueueResult({ data: [], error: null });   // purge branch B
+    enqueueResult({ data: [], error: null });   // grace DELETE
+    enqueueResult({ data: 0, error: null });    // anon push-token prune
+    enqueueResult({ data: [], error: null });   // stale-trip reaper
+
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST', url: '/v1/hazards/expire', headers: cronHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+
+    const eq = (supabaseAdmin as unknown as { eq: ReturnType<typeof vi.fn> }).eq;
+    const permanenceFilters = eq.mock.calls.filter(
+      ([column]) => column === 'is_permanent',
+    );
+    // Once per purge branch — the grace DELETE is intentionally unfiltered.
+    expect(permanenceFilters).toEqual([
+      ['is_permanent', false],
+      ['is_permanent', false],
+    ]);
+    await app.close();
+  });
+
   it('a stale-trip reap failure is best-effort — cron still succeeds with reapedStaleTrips=-1', async () => {
     enqueueResult({ data: [], error: null });
     enqueueResult({ data: [], error: null });
@@ -536,6 +568,10 @@ describe('GET /v1/hazards/nearby', () => {
       // must still alert (fail open) and must not look imported.
       alertEligible: true,
       importSource: null,
+      // Migration 202609020001. The fixture omits is_permanent too, pinning
+      // the conservative default: an unmigrated row reads as an ordinary TTL
+      // hazard rather than claiming a permanence the DB is not enforcing.
+      isPermanent: false,
       // Civic escalations (sesizări). The get_sesizare_counts RPC returns
       // nothing in this fixture, so both degrade to "nobody has escalated".
       sesizareCount: 0,
@@ -561,6 +597,28 @@ describe('GET /v1/hazards/nearby', () => {
     // reads alertEligible, so a mis-geocoded import cannot fire mid-ride.
     expect(h.alertEligible).toBe(false);
     expect(h.importSource).toBe('open311:koln');
+    await app.close();
+  });
+
+  it('passes is_permanent=true through to the client', async () => {
+    // A permanent hazard still carries a real far-future expires_at — the
+    // wire contract requires a parseable date-time and every fielded client
+    // drops a hazard it cannot parse (useNearbyHazards filters client-side).
+    // isPermanent, not the timestamp, is what marks it permanent.
+    enqueueResult({
+      data: [hazardRow({ is_permanent: true, expires_at: '2126-05-01T00:00:00.000Z' })],
+      error: null,
+    });
+
+    const app = buildTestApp({ authenticateUser: vi.fn().mockResolvedValue(null) });
+    await app.ready();
+    const res = await app.inject({
+      method: 'GET', url: '/v1/hazards/nearby?lat=44.4&lon=26.1',
+    });
+    expect(res.statusCode).toBe(200);
+    const h = res.json().hazards[0];
+    expect(h.isPermanent).toBe(true);
+    expect(Number.isFinite(Date.parse(h.expiresAt))).toBe(true);
     await app.close();
   });
 
@@ -656,7 +714,7 @@ describe('GET /v1/hazards/nearby', () => {
     const allowed = new Set([
       'id', 'lat', 'lon', 'hazardType', 'createdAt', 'confirmCount', 'denyCount',
       'score', 'userVote', 'expiresAt', 'lastConfirmedAt', 'description',
-      'alertEligible', 'importSource',
+      'alertEligible', 'importSource', 'isPermanent',
       'sesizareCount', 'sesizareByMe',
     ]);
     for (const key of Object.keys(body.hazards[0])) {

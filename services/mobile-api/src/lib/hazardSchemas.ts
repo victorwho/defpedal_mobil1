@@ -77,6 +77,7 @@ export const nearbyHazardItemSchema = {
     'description',
     'alertEligible',
     'importSource',
+    'isPermanent',
   ],
   properties: {
     id: { type: 'string', format: 'uuid' },
@@ -100,6 +101,12 @@ export const nearbyHazardItemSchema = {
     // Registry id of the external source (e.g. 'open311:koln'), or null for
     // rider-reported hazards. Drives the provenance line on the detail sheet.
     importSource: { type: ['string', 'null'] },
+    // Reporter marked this hazard permanent: no TTL, expires only at
+    // PERMANENT_HAZARD_DENY_THRESHOLD downvotes. `expiresAt` still carries a
+    // real far-future timestamp for these rows (the contract requires a
+    // parseable date-time and fielded clients drop anything else), so THIS
+    // flag — never the timestamp — is what tells a client it is permanent.
+    isPermanent: { type: 'boolean' },
     // Civic escalations (RO). Optional so the field can be omitted entirely
     // when the sesizari lookup fails — the map must never lose hazards
     // because a secondary count query broke.

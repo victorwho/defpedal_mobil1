@@ -1018,6 +1018,11 @@ export const buildV1Routes = (
             // always carry an explicit value.
             alertEligible: (row.alert_eligible as boolean | null) ?? true,
             importSource: (row.import_source as string | null) ?? null,
+            // Default false so a row predating migration 202609020001 (or an
+            // RPC that omits the column) reads as an ordinary TTL hazard —
+            // the conservative direction, since claiming permanence would
+            // hide a real expiry countdown from the rider.
+            isPermanent: (row.is_permanent as boolean | null) ?? false,
             sesizareCount: sesizareCountById.get(id) ?? 0,
             sesizareByMe: sesizareByMeIds.has(id),
           };
@@ -1478,10 +1483,19 @@ export const buildV1Routes = (
       // >=24h. Split the OR-condition into two separate DELETEs because
       // supabase-js's `.or()` filter-string doesn't escape ISO timestamps
       // (colons + dots) reliably and returns a 400 from PostgREST.
+      //
+      // Permanent hazards are exempt (migration 202609020001). This DELETE is
+      // irreversible, so applying it at score<=-3 would be expiry by another
+      // name — at a threshold well below the 10 downvotes the permanence
+      // feature promises. They are still HIDDEN at score<=-3 by
+      // get_nearby_hazards (reversible), and they still hard-delete through
+      // the 45-day post-expiry grace window below once the downvote threshold
+      // has actually expired them.
       const { data: purgedNullRows, error: purgeNullError } = await supabaseAdmin
         .from('hazards')
         .delete()
         .lte('score', -3)
+        .eq('is_permanent', false)
         .is('last_confirmed_at', null)
         .select('id');
 
@@ -1497,6 +1511,7 @@ export const buildV1Routes = (
         .from('hazards')
         .delete()
         .lte('score', -3)
+        .eq('is_permanent', false)
         .lt('last_confirmed_at', dwellCutoff)
         .select('id');
 

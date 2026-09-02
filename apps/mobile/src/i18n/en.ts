@@ -889,6 +889,12 @@ export const en = {
     reportedAgo: 'Reported {{time}}',
     lastConfirmedAgo: 'Last confirmed {{time}}',
     importedFrom: 'Reported via {{source}}',
+    // Permanent hazards (migration 202609020001). Marked at report time; no
+    // TTL, removed only once {{count}} riders dismiss it.
+    permanentLabel: 'This hazard is permanent',
+    permanentHint: "Won't expire on its own — removed only if {{count}} riders say it's gone.",
+    permanentBadge: 'Permanent',
+    permanentExplainer: "No expiry date. It stays on the map until {{count}} riders dismiss it — {{count_current}} so far.",
     confirms: 'Confirms',
     dismisses: 'Dismisses',
     types: {

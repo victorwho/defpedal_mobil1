@@ -11,6 +11,7 @@ import {
   computeCurrentGrade,
   decodePolyline,
   haversineDistance,
+  PERMANENT_HAZARD_DENY_THRESHOLD,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -53,6 +54,7 @@ import { ManeuverCard, FooterCard, SteepGradeIndicator, type FooterNextStop } fr
 import { ElevationProgressCard } from '../src/design-system/organisms/ElevationProgressCard';
 import { withErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { HazardAlert } from '../src/design-system/molecules/HazardAlert';
+import { PermanentHazardCheckbox } from '../src/design-system/molecules/PermanentHazardCheckbox';
 import { RouteFeatureAlertStack } from '../src/design-system/organisms/RouteFeatureAlertStack';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Modal } from '../src/design-system/organisms/Modal';
@@ -416,6 +418,9 @@ function NavigationScreen() {
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
   const [hazardDescription, setHazardDescription] = useState('');
+  // Optional per-report permanence opt-in. In-ride the report still files in
+  // two taps — the checkbox adds a step only for riders who want it.
+  const [hazardIsPermanent, setHazardIsPermanent] = useState(false);
   const [showElevationProgress, setShowElevationProgress] = useState(false);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
   // Open when the rider chose "Save" from the End Ride dialog while ending the
@@ -664,12 +669,14 @@ function NavigationScreen() {
     setHazardPickerOpen(false);
     setHazardDescribeMode(false);
     setHazardDescription('');
+    setHazardIsPermanent(false);
     enqueueMutation('hazard', {
       coordinate: mapUserCoordinate,
       reportedAt,
       source: 'in_ride',
       hazardType,
       ...(trimmed && trimmed.length > 0 ? { description: trimmed } : {}),
+      ...(hazardIsPermanent ? { isPermanent: true } : {}),
     });
     // Analytics opt-in prompt 2 trigger evidence (first hazard report).
     useAppStore.getState().markHazardReported();
@@ -685,6 +692,7 @@ function NavigationScreen() {
       source: 'manual',
       hazard_type: hazardType,
       has_description: Boolean(trimmed && trimmed.length > 0),
+      is_permanent: hazardIsPermanent,
       signed_in: Boolean(user),
     });
     const hazardLabel = t(`hazard.types.${hazardType}`);
@@ -1436,6 +1444,7 @@ function NavigationScreen() {
             setHazardPickerOpen(false);
             setHazardDescribeMode(false);
             setHazardDescription('');
+            setHazardIsPermanent(false);
           }}
           accessible={true}
           accessibilityRole="button"
@@ -1466,6 +1475,16 @@ function NavigationScreen() {
                   accessibilityHint={t('hazard.describeA11yHint')}
                 />
                 <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
+                <View style={styles.hazardPermanentWrap}>
+                  <PermanentHazardCheckbox
+                    checked={hazardIsPermanent}
+                    onChange={setHazardIsPermanent}
+                    label={t('hazard.permanentLabel')}
+                    hint={t('hazard.permanentHint', {
+                      count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                    })}
+                  />
+                </View>
                 <Pressable
                   style={({ pressed }) => [
                     styles.hazardDescribeSubmit,
@@ -1517,9 +1536,22 @@ function NavigationScreen() {
                     </Pressable>
                   ))}
                 </View>
+                <View style={styles.hazardPermanentWrap}>
+                  <PermanentHazardCheckbox
+                    checked={hazardIsPermanent}
+                    onChange={setHazardIsPermanent}
+                    label={t('hazard.permanentLabel')}
+                    hint={t('hazard.permanentHint', {
+                      count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                    })}
+                  />
+                </View>
                 <Pressable
                   style={styles.hazardGridCancel}
-                  onPress={() => setHazardPickerOpen(false)}
+                  onPress={() => {
+                    setHazardPickerOpen(false);
+                    setHazardIsPermanent(false);
+                  }}
                   accessible={true}
                   accessibilityRole="button"
                   accessibilityLabel={t('hazard.cancelReportA11y')}
@@ -1642,6 +1674,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    hazardPermanentWrap: {
+      marginBottom: space[2],
     },
     hazardGridCancel: {
       alignItems: 'center',

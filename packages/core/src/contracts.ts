@@ -302,6 +302,14 @@ export const HAZARD_TYPE_OPTIONS = [
 
 export type HazardType = (typeof HAZARD_TYPE_OPTIONS)[number]['value'];
 
+/**
+ * Downvotes required to expire a hazard the reporter marked permanent.
+ *
+ * Mirrors the Postgres `hazard_permanent_deny_threshold()` function
+ * (migration 202609020001), which is the enforcing side. Change both together.
+ */
+export const PERMANENT_HAZARD_DENY_THRESHOLD = 10;
+
 export interface HazardReportRequest {
   coordinate: Coordinate;
   reportedAt: string;
@@ -313,6 +321,15 @@ export interface HazardReportRequest {
    * chars (enforced by the `hazards_description_length_check` constraint).
    */
   description?: string;
+  /**
+   * Reporter marked this as a permanent hazard (a missing bike lane, a
+   * dangerous intersection — something that will not clear on its own).
+   *
+   * Permanent hazards carry NO time-to-live: the only thing that expires one
+   * is the community reaching `PERMANENT_HAZARD_DENY_THRESHOLD` downvotes.
+   * Omitted / false means the ordinary per-type TTL applies.
+   */
+  isPermanent?: boolean;
 }
 
 export interface HazardReportResponse {
@@ -354,6 +371,20 @@ export interface NearbyHazard {
    * provenance line on the hazard detail sheet.
    */
   readonly importSource?: string | null;
+  /**
+   * Reporter marked this hazard as permanent, so it has no TTL — the only
+   * thing that expires it is reaching `PERMANENT_HAZARD_DENY_THRESHOLD`
+   * downvotes.
+   *
+   * `expiresAt` still carries a real (far-future) timestamp for these rows
+   * rather than null, because the wire contract requires a parseable
+   * date-time and every fielded client drops a hazard it cannot parse. Read
+   * THIS flag, never the timestamp, to decide whether a hazard is permanent.
+   *
+   * Optional for back-compat with servers predating migration 202609020001;
+   * treat `undefined` as `false`.
+   */
+  readonly isPermanent?: boolean;
   readonly distanceMeters?: number;
   /** How many riders have escalated this hazard to the authorities. */
   readonly sesizareCount?: number;

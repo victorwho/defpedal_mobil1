@@ -880,6 +880,12 @@ export const ro: TranslationKeys = {
     reportedAgo: 'Raportat {{time}}',
     lastConfirmedAgo: 'Ultima confirmare {{time}}',
     importedFrom: 'Raportat prin {{source}}',
+    // Pericole permanente (migrarea 202609020001). Marcate la raportare; fără
+    // TTL, dispar doar după ce {{count}} bicicliști le resping.
+    permanentLabel: 'Acest pericol este permanent',
+    permanentHint: 'Nu expiră de la sine — dispare doar dacă {{count}} bicicliști spun că nu mai există.',
+    permanentBadge: 'Permanent',
+    permanentExplainer: 'Fără dată de expirare. Rămâne pe hartă până când {{count}} bicicliști îl resping — {{count_current}} până acum.',
     confirms: 'Confirmări',
     dismisses: 'Dezacorduri',
     types: {

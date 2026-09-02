@@ -86,27 +86,28 @@ export const submitHazardReport = async (
       ...(descriptionOrNull !== null ? { description: descriptionOrNull } : {}),
     };
 
+    // Progressive degradation: this repo applies migrations by hand, so the
+    // server can legitimately be running ahead of the schema (error-log #83b).
+    // Each candidate drops the newest optional column, so an unmigrated DB
+    // still records the hazard rather than 502-ing the rider. `is_permanent`
+    // is stripped BEFORE `hazard_type` so a missing permanence column cannot
+    // also silently discard the hazard's category.
+    const withType = request.hazardType
+      ? { ...baseInsert, hazard_type: request.hazardType }
+      : baseInsert;
+    const candidates = [
+      ...(request.isPermanent === true ? [{ ...withType, is_permanent: true }] : []),
+      withType,
+      ...(withType === baseInsert ? [] : [baseInsert]),
+    ];
+
     let error: { message: string } | null = null;
 
-    if (request.hazardType) {
-      const extendedInsert = {
-        ...baseInsert,
-        hazard_type: request.hazardType,
-      };
-
-      const extendedResult = await supabaseAdmin.from('hazards').insert([extendedInsert]);
-      error = extendedResult.error;
-
-      if (
-        error &&
-        /hazard_type|schema cache|column/i.test(error.message)
-      ) {
-        const fallbackResult = await supabaseAdmin.from('hazards').insert([baseInsert]);
-        error = fallbackResult.error;
-      }
-    } else {
-      const baseResult = await supabaseAdmin.from('hazards').insert([baseInsert]);
-      error = baseResult.error;
+    for (const candidate of candidates) {
+      const result = await supabaseAdmin.from('hazards').insert([candidate]);
+      error = result.error;
+      if (!error) break;
+      if (!/is_permanent|hazard_type|schema cache|column/i.test(error.message)) break;
     }
 
     if (error) {

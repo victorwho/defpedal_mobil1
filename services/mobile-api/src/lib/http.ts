@@ -598,6 +598,11 @@ export const hazardReportRequestSchema = {
       type: 'string',
       maxLength: 280,
     },
+    // Reporter marked this as permanent: no TTL, expires only once the
+    // community reaches PERMANENT_HAZARD_DENY_THRESHOLD downvotes.
+    isPermanent: {
+      type: 'boolean',
+    },
   },
 } as const;
 
@@ -993,6 +998,7 @@ export const normalizeHazardReportRequest = (
   source: body.source ?? 'manual',
   hazardType: body.hazardType,
   description: body.description,
+  isPermanent: body.isPermanent === true,
 });
 
 export const normalizeTripStartRequest = (body: TripStartBody): TripStartRequest => ({
