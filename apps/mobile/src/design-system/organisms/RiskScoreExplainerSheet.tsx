@@ -198,15 +198,29 @@ export const RiskScoreExplainerSheet: React.FC<RiskScoreExplainerSheetProps> = (
             <View style={styles.legendList}>
               {RISK_LEGEND_BANDS.map((band) => (
                 <View key={band.key} style={styles.legendRow}>
+                  {/*
+                    A ramp, not a swatch: the map paints several shades inside
+                    each tier, and a single chip made the legend look like it
+                    disagreed with the map. Shades are shown but never
+                    labelled — the tier is the only level at which risk may be
+                    named or compared (BAND_REANCHOR_B46V1.md).
+                  */}
                   <View
-                    style={[
-                      styles.legendChip,
-                      {
-                        backgroundColor: band.color,
-                        borderColor: colors.borderDefault,
-                      },
-                    ]}
-                  />
+                    style={[styles.legendRamp, { borderColor: colors.borderDefault }]}
+                    accessible
+                    accessibilityRole="image"
+                    accessibilityLabel={t('risk.bands.rampA11y', {
+                      band: t(`risk.bands.${band.key}.label`),
+                      count: band.shades.length,
+                    })}
+                  >
+                    {band.shades.map((shade) => (
+                      <View
+                        key={shade}
+                        style={[styles.legendRampShade, { backgroundColor: shade }]}
+                      />
+                    ))}
+                  </View>
                   <View style={styles.legendTextColumn}>
                     <Text style={[styles.legendLabel, { color: colors.textPrimary }]}>
                       {t(`risk.bands.${band.key}.label`)}
@@ -340,6 +354,21 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: StyleSheet.hairlineWidth,
     marginTop: 2,
+  },
+  // Fixed width so every tier's ramp is the same length and the label column
+  // stays aligned — the number of shades per tier differs (2 / 4 / 4 / 1).
+  legendRamp: {
+    width: 40,
+    height: 16,
+    borderRadius: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  legendRampShade: {
+    flex: 1,
+    height: '100%',
   },
   legendTextColumn: {
     flex: 1,

@@ -48,20 +48,41 @@ the OSRM weights is a separate workflow on the OSRM server box — see
 ## Polarity & scale — read this before changing anything
 
 `risk_score` is a RISK number. **Higher = more dangerous.** The bucket
-boundaries are defined in `services/mobile-api/src/lib/risk.ts:33-42`:
+boundaries are defined in `services/mobile-api/src/lib/risk.ts` — that file is
+the ONLY place they may live (2026-04-13 risk-IP hardening; never mirror them
+into the client).
+
+**Re-anchored 2026-09-04 for the b46v1 generation** (rationale and the
+accident validation behind it: `BAND_REANCHOR_B46V1.md` in the OSRM_Server
+repo). b46v1 scores roughly 13 points higher and wider than the previous cuts
+assumed, and the validation supports exactly **three** nameable levels — so
+the scheme is now 3 claim tiers over 10 display shades. Hue changes only at a
+tier boundary; lightness varies within a tier:
 
 ```
- 0.0  ≤ score ≤ 33.0   → "Very safe"     (green)
-33.0  < score ≤ 43.5   → "Safe"
-43.5  < score ≤ 51.8   → "Average"
-51.8  < score ≤ 57.6   → "Elevated"
-57.6  < score ≤ 69.0   → "Risky"
-69.0  < score ≤ 101.8  → "Very risky"
-101.8 < score          → "Extreme"
+Safer      (score < 42)     #2E9E43  #79BC4E
+Typical    (42 – 80)        #EFD124  #EDB320  #E8921B  #E17114
+High risk  (> 80)           #D5482D  #BB2B20  #851D16  #000000
+No data    (score = 0)      #3b82f6
 ```
+
+The per-shade cuts are in `risk.ts`; they are intentionally not repeated here,
+because a second copy is a second thing to forget to update.
+
+**Claim discipline.** The tier is the only level at which risk may be named or
+compared. Never label or rank an individual shade, in code, copy or a chart
+axis. The one validated claim is about severity, not frequency: a crash on a
+**High risk** road is more likely to be SERIOUS. Do not write copy implying a
+high-risk road is where crashes are more *likely*.
+
+The pre-b46v1 scheme (`Very safe` / `Safe` / `Average` / `Elevated` / `Risky` /
+`Very risky` / `Extreme`) is retired. Old app builds degrade gracefully: they
+paint the server-sent colours and fall back to rendering the raw English tier
+label, because `riskBandKeyForServerLabel` returns null for a label it does not
+know rather than guessing.
 
 Score exactly `0` is reserved for "No data" — loader scripts MUST floor
-real values to `0.5`. Scores above 100 are valid (Extreme tier).
+real values to `0.5`. Scores above 100 are valid (they land in the High risk tier).
 
 > ⚠️ **The 0.5 floor is a hard DB-contract invariant that the b36v1 export
 > violated** (error-log #83). The v31 model's shifted score is

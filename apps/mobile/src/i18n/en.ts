@@ -206,13 +206,14 @@ export const en = {
       attribution: 'Built on OpenStreetMap data, elevation models and traffic modeling.',
     },
     bands: {
+      rampA11y: '{{band}} band, shown on the map as {{count}} shades.',
       safer: {
         label: 'Safer',
         desc: 'Protected cycle tracks, greenways and genuinely calm streets — the most comfortable riding around.',
       },
       typical: {
         label: 'Typical',
-        desc: 'Ordinary streets with everyday mixed traffic. Most of the road network is here; darker shades lean busier.',
+        desc: 'Ordinary streets with everyday mixed traffic. Most of the road network is here.',
       },
       highRisk: {
         label: 'High risk',

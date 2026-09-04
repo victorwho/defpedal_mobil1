@@ -206,13 +206,14 @@ export const es: TranslationKeys = {
       attribution: 'Basado en datos de OpenStreetMap, modelos de elevación y modelado de tráfico.',
     },
     bands: {
+      rampA11y: 'Categoría {{band}}, mostrada en el mapa con {{count}} tonos.',
       safer: {
         label: 'Más segura',
         desc: 'Carriles protegidos, vías verdes y calles realmente tranquilas — lo más cómodo para pedalear de la zona.',
       },
       typical: {
         label: 'Normal',
-        desc: 'Calles corrientes con tráfico mixto de todos los días. Aquí está la mayor parte de la red; los tonos más oscuros indican más tráfico.',
+        desc: 'Calles corrientes con tráfico mixto de todos los días. Aquí está la mayor parte de la red.',
       },
       highRisk: {
         label: 'Riesgo alto',

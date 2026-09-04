@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { darkTheme } from '../tokens/colors';
 import { radii } from '../tokens/radii';
-import { riskBandKeyForServerLabel } from '../tokens/riskLegend';
+import { RISK_LEGEND_BANDS, riskBandKeyForServerLabel } from '../tokens/riskLegend';
 import { shadows } from '../tokens/shadows';
 import { space } from '../tokens/spacing';
 import { fontFamily, textSm, textXs, textDataSm } from '../tokens/typography';
@@ -113,12 +113,37 @@ export const RiskDistributionCard = ({
       <View style={styles.legendContainer}>
         {distribution.map((entry) => (
           <View key={entry.category.label} style={styles.legendRow}>
-            <View
-              style={[
-                styles.legendDot,
-                { backgroundColor: entry.category.color },
-              ]}
-            />
+            {/*
+              A ramp of the tier's own shades, not the segment colour that
+              happened to appear first on this route. `computeRiskDistribution`
+              keeps the first colour it sees per category, so a single dot gave
+              the SAME tier a different colour from one route to the next.
+              Unknown labels (an older or newer server) keep the flat
+              server-sent colour — never guess a band we do not recognise.
+            */}
+            {(() => {
+              const shades = RISK_LEGEND_BANDS.find(
+                (b) => b.serverLabel === entry.category.label,
+              )?.shades;
+
+              return shades ? (
+                <View style={styles.legendRamp}>
+                  {shades.map((shade) => (
+                    <View
+                      key={shade}
+                      style={[styles.legendRampShade, { backgroundColor: shade }]}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.legendDot,
+                    { backgroundColor: entry.category.color },
+                  ]}
+                />
+              );
+            })()}
             <Text style={styles.legendLabel}>{bandLabel(entry.category.label)}</Text>
             <Text style={styles.legendValue}>{entry.percentage}%</Text>
           </View>
@@ -180,6 +205,19 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  // Same footprint as legendDot so rows with a ramp and rows with the
+  // unknown-label fallback dot still line up.
+  legendRamp: {
+    width: 20,
+    height: 10,
+    borderRadius: 5,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  legendRampShade: {
+    flex: 1,
+    height: '100%',
   },
   legendLabel: {
     ...textXs,

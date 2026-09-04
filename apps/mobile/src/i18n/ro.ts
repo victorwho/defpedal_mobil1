@@ -206,13 +206,14 @@ export const ro: TranslationKeys = {
       attribution: 'Construit pe date OpenStreetMap, modele de elevație și modelare de trafic.',
     },
     bands: {
+      rampA11y: 'Categoria {{band}}, afișată pe hartă cu {{count}} nuanțe.',
       safer: {
         label: 'Mai sigură',
         desc: 'Piste protejate, alei verzi și străzi cu adevărat liniștite — cel mai confortabil pedalat din zonă.',
       },
       typical: {
         label: 'Obișnuită',
-        desc: 'Străzi obișnuite, cu trafic mixt de zi cu zi. Aici se află cea mai mare parte a rețelei; nuanțele mai închise indică trafic mai intens.',
+        desc: 'Străzi obișnuite, cu trafic mixt de zi cu zi. Aici se află cea mai mare parte a rețelei.',
       },
       highRisk: {
         label: 'Risc ridicat',

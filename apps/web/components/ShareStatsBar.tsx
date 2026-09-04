@@ -5,6 +5,7 @@ import {
   formatDurationMin,
   formatDurationUnit,
   initials,
+  safetyLabel,
 } from '../lib/format';
 
 interface ShareStatsBarProps {
@@ -26,15 +27,15 @@ const ROUTING_MODE_LABEL: Record<string, string> = {
   flat: 'Flat route',
 };
 
+// Delegates to lib/format's safetyLabel rather than keeping a second copy:
+// the two had already drifted (different cuts at the 60/65 boundary, and
+// different words), and this one labelled a low score "High risk" — which is
+// now a road-risk TIER name, a different scale entirely.
 function formatSafetyScore(score: number | null): { value: string; label: string } | null {
   if (score === null) return null;
   const rounded = Math.round(score);
-  let label = 'Moderate';
-  if (rounded >= 80) label = 'Very safe';
-  else if (rounded >= 65) label = 'Safe';
-  else if (rounded >= 40) label = 'Moderate';
-  else if (rounded >= 20) label = 'Risky';
-  else label = 'High risk';
+  const label = safetyLabel(rounded);
+  if (label === null) return null;
   return { value: String(rounded), label };
 }
 

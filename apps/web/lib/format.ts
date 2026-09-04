@@ -21,11 +21,26 @@ export function initials(name: string | null): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || 'DP';
 }
 
+/**
+ * Word for a shared route's 0-100 SAFETY score (higher = better).
+ *
+ * This is NOT the road-risk band scale. Road risk is a per-segment score
+ * (higher = worse) rendered as three tiers — Safer / Typical / High risk —
+ * whose thresholds live server-side only. The two must not borrow each
+ * other's vocabulary: labelling a route "High risk" here would read as the
+ * road-risk tier and make a severity claim this number does not support.
+ * Hence deliberately neutral quality words.
+ *
+ * ⚠️ The cuts below predate the b46v1 risk re-anchoring (2026-09-04) and have
+ * not been re-validated against it. In practice nothing renders them today —
+ * the app never sends `safetyScore` when sharing a route, so the value is
+ * always null — but re-derive them before relying on this.
+ */
 export function safetyLabel(score: number | null | undefined): string | null {
   if (score == null) return null;
-  if (score >= 80) return 'Very safe';
-  if (score >= 60) return 'Safe';
-  if (score >= 40) return 'Moderate';
-  if (score >= 20) return 'Caution';
-  return 'Dangerous';
+  if (score >= 80) return 'Excellent';
+  if (score >= 65) return 'Good';
+  if (score >= 40) return 'Fair';
+  if (score >= 20) return 'Poor';
+  return 'Very poor';
 }
