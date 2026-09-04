@@ -8,17 +8,14 @@
  *
  * Order: safest → most hostile, with the "No data" state last (it is a data
  * state, not a risk level — legends read better with it as a footnote row).
+ *
+ * Re-anchored 2026-09-04 (b46v1 scale, BAND_REANCHOR_B46V1.md): THREE claim
+ * tiers. The server paints the map with finer per-shade colors inside each
+ * tier; this legend lists one representative color per tier — the tier is
+ * the only level at which risk levels may be named or compared.
  */
 
-export type RiskBandKey =
-  | 'verySafe'
-  | 'safe'
-  | 'average'
-  | 'elevated'
-  | 'risky'
-  | 'veryRisky'
-  | 'extreme'
-  | 'noData';
+export type RiskBandKey = 'safer' | 'typical' | 'highRisk' | 'noData';
 
 export interface RiskLegendBand {
   /** The `riskCategory` label the server sends per segment. */
@@ -30,13 +27,9 @@ export interface RiskLegendBand {
 }
 
 export const RISK_LEGEND_BANDS: readonly RiskLegendBand[] = [
-  { serverLabel: 'Very safe', key: 'verySafe', color: '#4CAF50' },
-  { serverLabel: 'Safe', key: 'safe', color: '#8BC34A' },
-  { serverLabel: 'Average', key: 'average', color: '#FFEB3B' },
-  { serverLabel: 'Elevated', key: 'elevated', color: '#FF9800' },
-  { serverLabel: 'Risky', key: 'risky', color: '#FF5722' },
-  { serverLabel: 'Very risky', key: 'veryRisky', color: '#F44336' },
-  { serverLabel: 'Extreme', key: 'extreme', color: '#000000' },
+  { serverLabel: 'Safer', key: 'safer', color: '#2E9E43' },
+  { serverLabel: 'Typical', key: 'typical', color: '#E8921B' },
+  { serverLabel: 'High risk', key: 'highRisk', color: '#BB2B20' },
   { serverLabel: 'No data', key: 'noData', color: '#3b82f6' },
 ];
 

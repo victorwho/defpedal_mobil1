@@ -129,6 +129,45 @@ export const en = {
     },
   },
 
+  // ── Imported GPX courses ──
+  course: {
+    importCta: 'Import GPX',
+    importCtaA11y: 'Import a route from a GPX file',
+    tabSaved: 'Saved',
+    tabCourses: 'Imported',
+    badge: 'Course',
+    reviewTitle: 'Imported course',
+    namePlaceholder: 'Course name',
+    nameFallback: 'Imported course',
+    startRide: 'Start ride',
+    reading: 'Reading file…',
+    scoring: 'Scoring this course…',
+    distance: 'Distance',
+    climb: 'Climb',
+    estTime: 'Est. time',
+    // The feature's whole pitch: we did not pick these roads, so instead of
+    // routing around danger we show exactly where it is.
+    notOurRoute: 'You chose this route — we didn’t pick these roads. Here’s where it gets busy.',
+    turnsOnly: 'Turn directions only — an imported course carries no street names.',
+    busyTitle: 'Busy stretches',
+    busyNone: 'No high-risk stretches on this course.',
+    busyHint: 'Tap a stretch to find it on the map.',
+    busyFound_one: '{{count}} busy stretch',
+    busyFound_other: '{{count}} busy stretches',
+    busyRowLabel: '{{distance}} on {{category}}',
+    atKm: 'at {{distance}}',
+    multipleTracks_one: 'This file held 1 other route — imported the longest.',
+    multipleTracks_other: 'This file held {{count}} routes — imported the longest.',
+    droppedPoints_one: 'Skipped 1 corrupt point.',
+    droppedPoints_other: 'Skipped {{count}} corrupt points.',
+    downsampled: 'Simplified a very detailed track to keep the map smooth.',
+    errorNotGpx: 'This file isn’t a valid GPX.',
+    errorNoTrack: 'This file has no route line in it — only waypoints.',
+    errorTooFewPoints: 'This course has too few points to follow.',
+    errorRead: 'Couldn’t read that file. Try again.',
+    errorBuild: 'Couldn’t build a route from this course.',
+  },
+
   // ── Risk Score ──
   risk: {
     cardTitle: 'Route risk',
@@ -160,33 +199,17 @@ export const en = {
       attribution: 'Built on OpenStreetMap data, elevation models and traffic modeling.',
     },
     bands: {
-      verySafe: {
-        label: 'Very safe',
-        desc: 'Away from cars entirely — protected cycle tracks, greenways, car-free zones. Comfortable for nearly everyone.',
+      safer: {
+        label: 'Safer',
+        desc: 'Protected cycle tracks, greenways and genuinely calm streets — the most comfortable riding around.',
       },
-      safe: {
-        label: 'Safe',
-        desc: 'Calm streets and good bike infrastructure. Cars are present but slow and few.',
+      typical: {
+        label: 'Typical',
+        desc: 'Ordinary streets with everyday mixed traffic. Most of the road network is here; darker shades lean busier.',
       },
-      average: {
-        label: 'Average',
-        desc: 'A typical quiet residential street. Mixed traffic, but light and slow.',
-      },
-      elevated: {
-        label: 'Elevated',
-        desc: 'Busier than a home street — more traffic, higher speeds, or no bike lane. Stay alert.',
-      },
-      risky: {
-        label: 'Risky',
-        desc: 'Demanding for most riders. Heavier, faster traffic with little protection.',
-      },
-      veryRisky: {
-        label: 'Very risky',
-        desc: 'Main roads with fast, dense traffic and no separation. Your route avoids these whenever possible.',
-      },
-      extreme: {
-        label: 'Extreme',
-        desc: 'Not meant for bicycles — high-speed corridors, tunnels, heavy-vehicle routes. Routing will not send you here.',
+      highRisk: {
+        label: 'High risk',
+        desc: 'Busy, fast roads. A crash here is more likely to be serious, so your route avoids them whenever there is a calmer alternative.',
       },
       noData: {
         label: 'No data',

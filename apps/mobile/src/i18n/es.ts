@@ -131,6 +131,43 @@ export const es: TranslationKeys = {
     },
   },
 
+  // ── Rutas GPX importadas ──
+  course: {
+    importCta: 'Importar GPX',
+    importCtaA11y: 'Importar una ruta desde un archivo GPX',
+    tabSaved: 'Guardadas',
+    tabCourses: 'Importadas',
+    badge: 'Ruta',
+    reviewTitle: 'Ruta importada',
+    namePlaceholder: 'Nombre de la ruta',
+    nameFallback: 'Ruta importada',
+    startRide: 'Empezar ruta',
+    reading: 'Leyendo el archivo…',
+    scoring: 'Analizando la ruta…',
+    distance: 'Distancia',
+    climb: 'Desnivel',
+    estTime: 'Tiempo est.',
+    notOurRoute: 'Tú elegiste esta ruta — no hemos elegido nosotros estas calles. Aquí es donde se complica.',
+    turnsOnly: 'Solo direcciones — una ruta importada no incluye nombres de calles.',
+    busyTitle: 'Tramos con tráfico',
+    busyNone: 'Ningún tramo de riesgo alto en esta ruta.',
+    busyHint: 'Toca un tramo para verlo en el mapa.',
+    busyFound_one: '{{count}} tramo con tráfico',
+    busyFound_other: '{{count}} tramos con tráfico',
+    busyRowLabel: '{{distance}} en {{category}}',
+    atKm: 'en el km {{distance}}',
+    multipleTracks_one: 'El archivo tenía 1 ruta más — hemos importado la más larga.',
+    multipleTracks_other: 'El archivo tenía {{count}} rutas — hemos importado la más larga.',
+    droppedPoints_one: 'Se ha omitido 1 punto corrupto.',
+    droppedPoints_other: 'Se han omitido {{count}} puntos corruptos.',
+    downsampled: 'Hemos simplificado un trazado muy detallado para que el mapa siga fluido.',
+    errorNotGpx: 'Este archivo no es un GPX válido.',
+    errorNoTrack: 'Este archivo no contiene ninguna ruta — solo waypoints.',
+    errorTooFewPoints: 'Esta ruta tiene muy pocos puntos para seguirla.',
+    errorRead: 'No se ha podido leer el archivo. Inténtalo de nuevo.',
+    errorBuild: 'No se ha podido crear una ruta con este archivo.',
+  },
+
   // ── Risk Score ──
   risk: {
     cardTitle: 'Riesgo de la ruta',
@@ -162,33 +199,17 @@ export const es: TranslationKeys = {
       attribution: 'Basado en datos de OpenStreetMap, modelos de elevación y modelado de tráfico.',
     },
     bands: {
-      verySafe: {
-        label: 'Muy segura',
-        desc: 'Totalmente apartada de los coches — carriles protegidos, vías verdes, zonas sin coches. Cómoda para casi cualquiera.',
+      safer: {
+        label: 'Más segura',
+        desc: 'Carriles protegidos, vías verdes y calles realmente tranquilas — lo más cómodo para pedalear de la zona.',
       },
-      safe: {
-        label: 'Segura',
-        desc: 'Calles tranquilas y buena infraestructura ciclista. Hay coches, pero pocos y lentos.',
+      typical: {
+        label: 'Normal',
+        desc: 'Calles corrientes con tráfico mixto de todos los días. Aquí está la mayor parte de la red; los tonos más oscuros indican más tráfico.',
       },
-      average: {
-        label: 'Media',
-        desc: 'Una calle residencial tranquila típica. Tráfico mixto, pero ligero y lento.',
-      },
-      elevated: {
-        label: 'Elevado',
-        desc: 'Más transitada que una calle de barrio — más tráfico, más velocidad o sin carril bici. Mantente alerta.',
-      },
-      risky: {
-        label: 'Arriesgada',
-        desc: 'Exigente para la mayoría. Tráfico más denso y rápido, con poca protección.',
-      },
-      veryRisky: {
-        label: 'Muy arriesgada',
-        desc: 'Vías principales con tráfico rápido y denso, sin separación. Tu ruta las evita siempre que puede.',
-      },
-      extreme: {
-        label: 'Extrema',
-        desc: 'No pensada para bicicletas — corredores de alta velocidad, túneles, rutas de vehículos pesados. La ruta nunca te enviará por aquí.',
+      highRisk: {
+        label: 'Riesgo alto',
+        desc: 'Carreteras con mucho tráfico y velocidad. Un accidente aquí tiene más probabilidades de ser grave, por eso tu ruta las evita siempre que hay una alternativa más tranquila.',
       },
       noData: {
         label: 'Sin datos',

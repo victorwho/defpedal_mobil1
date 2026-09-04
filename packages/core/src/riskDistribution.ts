@@ -18,13 +18,9 @@ export interface RiskDistributionEntry {
  */
 export const RISK_CATEGORY_ORDER: readonly string[] = [
   'No data',
-  'Very safe',
-  'Safe',
-  'Average',
-  'Elevated',
-  'Risky',
-  'Very risky',
-  'Extreme',
+  'Safer',
+  'Typical',
+  'High risk',
 ] as const;
 
 const DEG_TO_RAD = Math.PI / 180;

@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-09-04 — Risk levels re-anchored to the b46v1 score generation: three named tiers, finer map shading
+
+The risk model generation that went live on 2026-09-01 (b46v1) scores the same roads ~13 points higher and wider than the generation the display bands were built for, so the old seven buckets painted far too much of the network as "Very risky"/"Extreme" — and the accident validation showed the old middle bands never measured distinct risk levels anyway. Bands are now anchored to the validated tier scheme (OSRM_Server `BAND_REANCHOR_B46V1.md`).
+
+### Behavior
+- **Three named risk levels instead of seven.** Segments are labelled `Safer` (<42), `Typical` (42–80) or `High risk` (>80) — the three levels the injury validation can actually tell apart. The `High risk` tier carries the one validated claim (crashes there are more likely to be serious).
+- **Ten map shades for granularity.** The server now paints per-shade colors (hue changes only at tier boundaries, lightness within a tier), so the in-app map keeps visual texture without implying ten validated levels. Never compare two shades of the same tier in copy or UI — only tiers.
+- **Route risk breakdown, busy-road callout and legend** all group by the three tiers. The busy-road stretch callout fires on exactly the `High risk` tier.
+- **Neighborhood safety score** buckets re-cut in the DB RPC (migration `202609040001`, applied out-of-band): safe <42 / average 42–80 / risky 80–130 / very risky >130; API contract unchanged.
+- **Old app builds degrade gracefully:** they render the new server colors immediately and show the raw English tier labels via the existing unknown-label fallback until updated; the bundled explainer/legend still lists the old seven bands until the next release.
+
+### Files
+- `services/mobile-api/src/lib/risk.ts` — RISK_BUCKETS re-anchored (10 shades, 3 tier labels, new quantized midpoints).
+- `packages/core` — `RISK_CATEGORY_ORDER` (4 entries), busy-road tier in `riskStretch.ts`.
+- `apps/mobile` — riskLegend tokens, RiskDistributionCard green-band set, i18n bands (en/ro/es) rewritten to tier labels with validation-honest descriptions.
+
+
 ## 2026-08-11 — Signup confirmation emails no longer error — server-side fix, live for all app versions
 
 Some users' confirmation emails threw an error when clicked or pasted ("Email link is invalid or has expired"), leaving them unable to finish registration — a hard wall since registration became mandatory in v0.2.120.

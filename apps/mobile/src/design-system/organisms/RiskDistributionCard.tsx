@@ -13,7 +13,7 @@ import { fontFamily, textSm, textXs, textDataSm } from '../tokens/typography';
 import { useT } from '../../hooks/useTranslation';
 
 /** Bands that count as "green" for the takeaway line. */
-const GREEN_BANDS: ReadonlySet<string> = new Set(['Very safe', 'Safe']);
+const GREEN_BANDS: ReadonlySet<string> = new Set(['Safer']);
 
 /** Below this green share the takeaway is the neutral variant. */
 const MOSTLY_GREEN_THRESHOLD = 60;

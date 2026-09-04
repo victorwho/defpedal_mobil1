@@ -131,6 +131,43 @@ export const ro: TranslationKeys = {
     },
   },
 
+  // ── Trasee GPX importate ──
+  course: {
+    importCta: 'Importă GPX',
+    importCtaA11y: 'Importă un traseu dintr-un fişier GPX',
+    tabSaved: 'Salvate',
+    tabCourses: 'Importate',
+    badge: 'Traseu',
+    reviewTitle: 'Traseu importat',
+    namePlaceholder: 'Numele traseului',
+    nameFallback: 'Traseu importat',
+    startRide: 'Începe tura',
+    reading: 'Se citeşte fişierul…',
+    scoring: 'Se analizează traseul…',
+    distance: 'Distanţă',
+    climb: 'Urcare',
+    estTime: 'Timp estimat',
+    notOurRoute: 'Tu ai ales traseul — nu noi am ales aceste străzi. Uite unde devine aglomerat.',
+    turnsOnly: 'Doar direcţii — un traseu importat nu conţine numele străzilor.',
+    busyTitle: 'Porţiuni aglomerate',
+    busyNone: 'Nicio porţiune cu risc ridicat pe acest traseu.',
+    busyHint: 'Atinge o porţiune ca să o vezi pe hartă.',
+    busyFound_one: '{{count}} porţiune aglomerată',
+    busyFound_other: '{{count}} porţiuni aglomerate',
+    busyRowLabel: '{{distance}} pe {{category}}',
+    atKm: 'la {{distance}}',
+    multipleTracks_one: 'Fişierul mai conţinea 1 traseu — l-am importat pe cel mai lung.',
+    multipleTracks_other: 'Fişierul conţinea {{count}} trasee — l-am importat pe cel mai lung.',
+    droppedPoints_one: 'Am ignorat 1 punct corupt.',
+    droppedPoints_other: 'Am ignorat {{count}} puncte corupte.',
+    downsampled: 'Am simplificat un traseu foarte detaliat ca harta să rămână fluidă.',
+    errorNotGpx: 'Acest fişier nu este un GPX valid.',
+    errorNoTrack: 'Acest fişier nu conţine un traseu — doar puncte de interes.',
+    errorTooFewPoints: 'Acest traseu are prea puţine puncte pentru a fi urmat.',
+    errorRead: 'Nu am putut citi fişierul. Încearcă din nou.',
+    errorBuild: 'Nu am putut construi un traseu din acest fişier.',
+  },
+
   // ── Risk Score ──
   risk: {
     cardTitle: 'Riscul rutei',
@@ -162,33 +199,17 @@ export const ro: TranslationKeys = {
       attribution: 'Construit pe date OpenStreetMap, modele de elevație și modelare de trafic.',
     },
     bands: {
-      verySafe: {
-        label: 'Foarte sigură',
-        desc: 'Complet departe de mașini — piste protejate, alei verzi, zone fără mașini. Confortabilă pentru aproape oricine.',
+      safer: {
+        label: 'Mai sigură',
+        desc: 'Piste protejate, alei verzi și străzi cu adevărat liniștite — cel mai confortabil pedalat din zonă.',
       },
-      safe: {
-        label: 'Sigură',
-        desc: 'Străzi liniștite și infrastructură bună pentru biciclete. Mașinile există, dar sunt puține și lente.',
+      typical: {
+        label: 'Obișnuită',
+        desc: 'Străzi obișnuite, cu trafic mixt de zi cu zi. Aici se află cea mai mare parte a rețelei; nuanțele mai închise indică trafic mai intens.',
       },
-      average: {
-        label: 'Medie',
-        desc: 'O stradă rezidențială liniștită, tipică. Trafic mixt, dar redus și lent.',
-      },
-      elevated: {
-        label: 'Ridicat',
-        desc: 'Mai aglomerată decât o stradă de cartier — mai mult trafic, viteze mai mari sau fără bandă de biciclete. Fii atent.',
-      },
-      risky: {
-        label: 'Riscantă',
-        desc: 'Solicitantă pentru majoritatea bicicliștilor. Trafic mai intens și mai rapid, cu protecție redusă.',
-      },
-      veryRisky: {
-        label: 'Foarte riscantă',
-        desc: 'Drumuri principale cu trafic rapid și dens, fără separare. Ruta ta le evită ori de câte ori se poate.',
-      },
-      extreme: {
-        label: 'Extremă',
-        desc: 'Nu e făcută pentru biciclete — coridoare de mare viteză, tuneluri, rute de vehicule grele. Rutarea nu te va trimite aici.',
+      highRisk: {
+        label: 'Risc ridicat',
+        desc: 'Drumuri aglomerate și rapide. Un accident aici are șanse mai mari să fie grav, așa că ruta ta le evită ori de câte ori există o alternativă mai calmă.',
       },
       noData: {
         label: 'Fără date',

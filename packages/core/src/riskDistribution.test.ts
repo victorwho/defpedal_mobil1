@@ -49,25 +49,21 @@ const makeMultiSegment = (
 // ---------------------------------------------------------------------------
 
 describe('RISK_CATEGORY_ORDER', () => {
-  it('has exactly 8 categories (including No data)', () => {
-    expect(RISK_CATEGORY_ORDER).toHaveLength(8);
+  it('has exactly 4 categories (three claim tiers plus No data)', () => {
+    expect(RISK_CATEGORY_ORDER).toHaveLength(4);
   });
 
-  it('starts with "No data" and ends with "Extreme"', () => {
+  it('starts with "No data" and ends with "High risk"', () => {
     expect(RISK_CATEGORY_ORDER[0]).toBe('No data');
-    expect(RISK_CATEGORY_ORDER[RISK_CATEGORY_ORDER.length - 1]).toBe('Extreme');
+    expect(RISK_CATEGORY_ORDER[RISK_CATEGORY_ORDER.length - 1]).toBe('High risk');
   });
 
   it('contains all expected labels in safest-to-most-dangerous order', () => {
     expect(RISK_CATEGORY_ORDER).toEqual([
       'No data',
-      'Very safe',
-      'Safe',
-      'Average',
-      'Elevated',
-      'Risky',
-      'Very risky',
-      'Extreme',
+      'Safer',
+      'Typical',
+      'High risk',
     ]);
   });
 });
@@ -82,7 +78,7 @@ describe('computeRiskDistribution — empty inputs', () => {
   });
 
   it('returns an empty array when a segment has zero-length geometry', () => {
-    const seg = makeSegment('Very safe', [[26.1025, 44.4268]]);
+    const seg = makeSegment('Safer', [[26.1025, 44.4268]]);
     expect(computeRiskDistribution([seg])).toEqual([]);
   });
 });
@@ -93,16 +89,16 @@ describe('computeRiskDistribution — empty inputs', () => {
 
 describe('computeRiskDistribution — classification', () => {
   it('uses the riskCategory field from the segment', () => {
-    const seg = makeSegment('Risky', [[0, 0], [0, 0.001]]);
+    const seg = makeSegment('Typical', [[0, 0], [0, 0.001]]);
     const result = computeRiskDistribution([seg]);
     expect(result.length).toBeGreaterThan(0);
-    expect(result[0].category.label).toBe('Risky');
+    expect(result[0].category.label).toBe('Typical');
   });
 
   it('preserves the color from the segment', () => {
-    const seg = makeSegment('Safe', [[0, 0], [0, 0.001]], 'seg', '#8BC34A');
+    const seg = makeSegment('Typical', [[0, 0], [0, 0.001]], 'seg', '#EDB320');
     const result = computeRiskDistribution([seg]);
-    expect(result[0].category.color).toBe('#8BC34A');
+    expect(result[0].category.color).toBe('#EDB320');
   });
 
   it('falls back to "No data" when riskCategory is missing', () => {
@@ -118,8 +114,8 @@ describe('computeRiskDistribution — classification', () => {
     expect(result[0].category.label).toBe('No data');
   });
 
-  it('handles all 7 standard categories', () => {
-    const categories = ['Very safe', 'Safe', 'Average', 'Elevated', 'Risky', 'Very risky', 'Extreme'];
+  it('handles all 3 standard tiers', () => {
+    const categories = ['Safer', 'Typical', 'High risk'];
     for (const cat of categories) {
       const seg = makeSegment(cat, [[0, 0], [0, 0.001]]);
       const result = computeRiskDistribution([seg]);
@@ -134,7 +130,7 @@ describe('computeRiskDistribution — classification', () => {
 
 describe('computeRiskDistribution — percentage and distance', () => {
   it('returns 100% for a single-category route', () => {
-    const seg = makeSegment('Very safe', [[0, 0], [0, 1]]);
+    const seg = makeSegment('Safer', [[0, 0], [0, 1]]);
     const result = computeRiskDistribution([seg]);
     expect(result).toHaveLength(1);
     expect(result[0].percentage).toBe(100);
@@ -142,8 +138,8 @@ describe('computeRiskDistribution — percentage and distance', () => {
 
   it('percentages of all returned entries sum to approximately 100', () => {
     const segments = [
-      makeSegment('Very safe', [[0, 0], [0, 1]], 'safe'),
-      makeSegment('Risky', [[0, 1], [1, 1]], 'risky'),
+      makeSegment('Safer', [[0, 0], [0, 1]], 'safe'),
+      makeSegment('Typical', [[0, 1], [1, 1]], 'risky'),
     ];
     const result = computeRiskDistribution(segments);
     const total = result.reduce((sum, e) => sum + e.percentage, 0);
@@ -152,7 +148,7 @@ describe('computeRiskDistribution — percentage and distance', () => {
   });
 
   it('returns only categories with non-zero distance', () => {
-    const seg = makeSegment('Very safe', [[0, 0], [0, 1]]);
+    const seg = makeSegment('Safer', [[0, 0], [0, 1]]);
     const result = computeRiskDistribution([seg]);
     for (const entry of result) {
       expect(entry.distanceMeters).toBeGreaterThan(0);
@@ -160,31 +156,31 @@ describe('computeRiskDistribution — percentage and distance', () => {
   });
 
   it('distanceMeters is positive for each returned entry', () => {
-    const seg = makeSegment('Average', [[26.1025, 44.4268], [26.11, 44.43]]);
+    const seg = makeSegment('Typical', [[26.1025, 44.4268], [26.11, 44.43]]);
     const result = computeRiskDistribution([seg]);
     expect(result[0].distanceMeters).toBeGreaterThan(0);
   });
 
   it('merges two segments of the same category into one entry', () => {
     const segments = [
-      makeSegment('Very safe', [[0, 0], [0, 0.01]], 'a'),
-      makeSegment('Very safe', [[0, 0.01], [0, 0.02]], 'b'),
+      makeSegment('Safer', [[0, 0], [0, 0.01]], 'a'),
+      makeSegment('Safer', [[0, 0.01], [0, 0.02]], 'b'),
     ];
     const result = computeRiskDistribution(segments);
-    expect(result.filter((e) => e.category.label === 'Very safe')).toHaveLength(1);
+    expect(result.filter((e) => e.category.label === 'Safer')).toHaveLength(1);
   });
 
   it('handles three distinct categories and returns one entry per category', () => {
     const segments = [
-      makeSegment('Very safe', [[0, 0], [0, 1]], 'a'),
-      makeSegment('Safe', [[1, 0], [1, 1]], 'b'),
-      makeSegment('Very risky', [[2, 0], [2, 1]], 'c'),
+      makeSegment('Safer', [[0, 0], [0, 1]], 'a'),
+      makeSegment('Typical', [[1, 0], [1, 1]], 'b'),
+      makeSegment('High risk', [[2, 0], [2, 1]], 'c'),
     ];
     const result = computeRiskDistribution(segments);
     const labels = result.map((e) => e.category.label);
-    expect(labels).toContain('Very safe');
-    expect(labels).toContain('Safe');
-    expect(labels).toContain('Very risky');
+    expect(labels).toContain('Safer');
+    expect(labels).toContain('Typical');
+    expect(labels).toContain('High risk');
     expect(result).toHaveLength(3);
   });
 });
@@ -196,8 +192,8 @@ describe('computeRiskDistribution — percentage and distance', () => {
 describe('computeRiskDistribution — ordering', () => {
   it('returns entries ordered from safest to most dangerous', () => {
     const segments = [
-      makeSegment('Very risky', [[0, 0], [0, 1]], 'risky'),
-      makeSegment('Very safe', [[1, 0], [1, 1]], 'safe'),
+      makeSegment('High risk', [[0, 0], [0, 1]], 'risky'),
+      makeSegment('Safer', [[1, 0], [1, 1]], 'safe'),
     ];
     const result = computeRiskDistribution(segments);
     const indices = result.map((e) =>
@@ -215,19 +211,19 @@ describe('computeRiskDistribution — ordering', () => {
 
 describe('computeRiskDistribution — MultiLineString support', () => {
   it('computes distance correctly for MultiLineString segments', () => {
-    const seg = makeMultiSegment('Very safe', [
+    const seg = makeMultiSegment('Safer', [
       [[0, 0], [0, 0.5]],
       [[1, 0], [1, 0.5]],
     ]);
     const result = computeRiskDistribution([seg]);
     expect(result).toHaveLength(1);
     expect(result[0].distanceMeters).toBeGreaterThan(0);
-    expect(result[0].category.label).toBe('Very safe');
+    expect(result[0].category.label).toBe('Safer');
   });
 
   it('mixes LineString and MultiLineString in the same distribution', () => {
-    const lineSegment = makeSegment('Very safe', [[0, 0], [0, 1]], 'line');
-    const multiSegment = makeMultiSegment('Risky', [[[1, 0], [1, 1]]], 'multi');
+    const lineSegment = makeSegment('Safer', [[0, 0], [0, 1]], 'line');
+    const multiSegment = makeMultiSegment('Typical', [[[1, 0], [1, 1]]], 'multi');
     const result = computeRiskDistribution([lineSegment, multiSegment]);
     expect(result).toHaveLength(2);
     const total = result.reduce((sum, e) => sum + e.percentage, 0);
@@ -243,8 +239,8 @@ describe('computeRiskDistribution — MultiLineString support', () => {
 describe('computeRiskDistribution — immutability', () => {
   it('does not mutate the input segments array', () => {
     const segments: RiskSegment[] = [
-      makeSegment('Very safe', [[0, 0], [0, 1]], 'a'),
-      makeSegment('Risky', [[1, 0], [1, 1]], 'b'),
+      makeSegment('Safer', [[0, 0], [0, 1]], 'a'),
+      makeSegment('Typical', [[1, 0], [1, 1]], 'b'),
     ];
     const originalLength = segments.length;
     const originalIds = segments.map((s) => s.id);

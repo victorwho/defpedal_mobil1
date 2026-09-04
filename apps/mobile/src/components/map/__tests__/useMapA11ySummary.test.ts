@@ -139,11 +139,11 @@ describe('useMapA11ySummary — label', () => {
   it('includes a risk-mix phrase when riskSegments exist', () => {
     const route = makeRoute({
       riskSegments: [
-        makeRiskSegment('s1', 'Safe', [
+        makeRiskSegment('s1', 'Safer', [
           [0, 0],
           [0, 0.01],
         ]),
-        makeRiskSegment('s2', 'Risky', [
+        makeRiskSegment('s2', 'High risk', [
           [0, 0.01],
           [0, 0.011],
         ]),

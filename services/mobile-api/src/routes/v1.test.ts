@@ -146,9 +146,9 @@ describe('mobile-api v1 routes', () => {
     const fetchRiskSegments = vi.fn().mockResolvedValue([
       {
         id: 'risk-1',
-        riskScore: 18,
-        riskCategory: 'Very safe',
-        color: '#4CAF50',
+        riskScore: 16,
+        riskCategory: 'Safer',
+        color: '#2E9E43',
         geometry: {
           type: 'LineString',
           coordinates: [

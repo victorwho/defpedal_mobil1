@@ -43,34 +43,34 @@ describe('longestHighRiskStretchMeters', () => {
     expect(longestHighRiskStretchMeters([])).toBe(0);
   });
 
-  it('returns 0 when no segment is in a busy-road band', () => {
+  it('returns 0 when no segment is in the High risk tier', () => {
     const segments = [
-      makeSegment('Very safe', 0.001),
-      makeSegment('Safe', 0.002),
-      makeSegment('Average', 0.001),
-      makeSegment('Elevated', 0.003),
-      makeSegment('Risky', 0.002),
+      makeSegment('Safer', 0.001),
+      makeSegment('Typical', 0.002),
+      makeSegment('Safer', 0.001),
+      makeSegment('Typical', 0.003),
+      makeSegment('Typical', 0.002),
       makeSegment('No data', 0.001),
     ];
     expect(longestHighRiskStretchMeters(segments)).toBe(0);
   });
 
-  it('measures a single Very risky segment', () => {
+  it('measures a single High risk segment', () => {
     const segments = [
-      makeSegment('Safe', 0.002),
-      makeSegment('Very risky', 0.002),
-      makeSegment('Safe', 0.001),
+      makeSegment('Typical', 0.002),
+      makeSegment('High risk', 0.002),
+      makeSegment('Typical', 0.001),
     ];
     const result = longestHighRiskStretchMeters(segments);
     expect(result).toBeGreaterThan(2 * METERS_PER_MILLIDEG_LAT * 0.95);
     expect(result).toBeLessThan(2 * METERS_PER_MILLIDEG_LAT * 1.05);
   });
 
-  it('sums contiguous Very risky + Extreme runs', () => {
+  it('sums contiguous High risk runs', () => {
     const segments = [
-      makeSegment('Very risky', 0.002),
-      makeSegment('Extreme', 0.003),
-      makeSegment('Safe', 0.001),
+      makeSegment('High risk', 0.002),
+      makeSegment('High risk', 0.003),
+      makeSegment('Typical', 0.001),
     ];
     const result = longestHighRiskStretchMeters(segments);
     expect(result).toBeGreaterThan(5 * METERS_PER_MILLIDEG_LAT * 0.95);
@@ -79,12 +79,12 @@ describe('longestHighRiskStretchMeters', () => {
 
   it('resets the run when a calm segment interrupts, keeping the longest', () => {
     const segments = [
-      makeSegment('Very risky', 0.001),
-      makeSegment('Safe', 0.001),
-      makeSegment('Very risky', 0.002),
-      makeSegment('Extreme', 0.002),
-      makeSegment('Average', 0.001),
-      makeSegment('Very risky', 0.001),
+      makeSegment('High risk', 0.001),
+      makeSegment('Typical', 0.001),
+      makeSegment('High risk', 0.002),
+      makeSegment('High risk', 0.002),
+      makeSegment('Typical', 0.001),
+      makeSegment('High risk', 0.001),
     ];
     // Longest run is the middle one: 0.004° ≈ 444.8 m
     const result = longestHighRiskStretchMeters(segments);
@@ -92,13 +92,13 @@ describe('longestHighRiskStretchMeters', () => {
     expect(result).toBeLessThan(4 * METERS_PER_MILLIDEG_LAT * 1.05);
   });
 
-  it('does not count the Risky band as a busy-road stretch', () => {
+  it('does not count the Typical tier as a busy-road stretch', () => {
     const segments = [
-      makeSegment('Very risky', 0.001),
-      makeSegment('Risky', 0.005),
-      makeSegment('Very risky', 0.001),
+      makeSegment('High risk', 0.001),
+      makeSegment('Typical', 0.005),
+      makeSegment('High risk', 0.001),
     ];
-    // Risky breaks contiguity — each Very risky run is ~111 m on its own.
+    // Typical breaks contiguity — each High risk run is ~111 m on its own.
     const result = longestHighRiskStretchMeters(segments);
     expect(result).toBeLessThan(2 * METERS_PER_MILLIDEG_LAT);
   });

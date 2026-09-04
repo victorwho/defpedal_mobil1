@@ -29,16 +29,29 @@ interface RiskBucket {
 /**
  * Risk buckets — the ONLY place score thresholds are defined.
  * These are server-side only; the client receives category labels + colors.
+ *
+ * Re-anchored 2026-09-04 for the b46v1 score generation (OSRM_Server repo,
+ * BAND_REANCHOR_B46V1.md): the validated claim structure is THREE tiers
+ * (Safer <42 / Typical 42-80 / High risk >80); the extra buckets within a
+ * tier are display shades only (hue changes at tier cuts, lightness within).
+ * All user-facing language groups by `label` (the tier); never present two
+ * shades of the same tier as different risk levels.
  */
 const RISK_BUCKETS: readonly RiskBucket[] = [
-  { maxScore: 0,     color: '#3b82f6', label: 'No data',    midpoint: 0 },
-  { maxScore: 33,    color: '#4CAF50', label: 'Very safe',   midpoint: 16 },
-  { maxScore: 43.5,  color: '#8BC34A', label: 'Safe',        midpoint: 38 },
-  { maxScore: 51.8,  color: '#FFEB3B', label: 'Average',     midpoint: 48 },
-  { maxScore: 57.6,  color: '#FF9800', label: 'Elevated',    midpoint: 55 },
-  { maxScore: 69,    color: '#FF5722', label: 'Risky',       midpoint: 63 },
-  { maxScore: 101.8, color: '#F44336', label: 'Very risky',  midpoint: 85 },
-  { maxScore: Infinity, color: '#000000', label: 'Extreme',  midpoint: 110 },
+  { maxScore: 0,     color: '#3b82f6', label: 'No data',   midpoint: 0 },
+  // Safer tier (<42)
+  { maxScore: 32,    color: '#2E9E43', label: 'Safer',     midpoint: 16 },
+  { maxScore: 42,    color: '#79BC4E', label: 'Safer',     midpoint: 37 },
+  // Typical tier (42-80)
+  { maxScore: 50,    color: '#EFD124', label: 'Typical',   midpoint: 46 },
+  { maxScore: 60,    color: '#EDB320', label: 'Typical',   midpoint: 55 },
+  { maxScore: 70,    color: '#E8921B', label: 'Typical',   midpoint: 65 },
+  { maxScore: 80,    color: '#E17114', label: 'Typical',   midpoint: 75 },
+  // High-risk tier (>80)
+  { maxScore: 90,    color: '#D5482D', label: 'High risk', midpoint: 85 },
+  { maxScore: 105,   color: '#BB2B20', label: 'High risk', midpoint: 97 },
+  { maxScore: 130,   color: '#851D16', label: 'High risk', midpoint: 117 },
+  { maxScore: Infinity, color: '#000000', label: 'High risk', midpoint: 150 },
 ];
 
 const classifyRiskScore = (score: number): RiskBucket => {

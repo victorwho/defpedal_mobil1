@@ -53,9 +53,9 @@ const mockRouteOption = {
   riskSegments: [
     {
       id: 'risk-0',
-      riskScore: 16, // quantized midpoint for "very safe" bucket
-      riskCategory: 'Very safe',
-      color: '#4CAF50',
+      riskScore: 16, // quantized midpoint for the deepest "Safer" shade
+      riskCategory: 'Safer',
+      color: '#2E9E43',
       geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] },
     },
   ],
@@ -402,9 +402,9 @@ describe('Risk score quantization', () => {
     // Mock fetchRiskSegments to return segments with quantized scores
     // (as it now does after the fix)
     const quantizedSegments = [
-      { id: 'risk-0', riskScore: 16, riskCategory: 'Very safe', color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.15, 44.45]] } },
-      { id: 'risk-1', riskScore: 55, riskCategory: 'Elevated', color: '#FF9800', geometry: { type: 'LineString' as const, coordinates: [[26.15, 44.45], [26.2, 44.5]] } },
-      { id: 'risk-2', riskScore: 85, riskCategory: 'Very risky', color: '#F44336', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.25, 44.55]] } },
+      { id: 'risk-0', riskScore: 16, riskCategory: 'Safer', color: '#2E9E43', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.15, 44.45]] } },
+      { id: 'risk-1', riskScore: 55, riskCategory: 'Typical', color: '#EDB320', geometry: { type: 'LineString' as const, coordinates: [[26.15, 44.45], [26.2, 44.5]] } },
+      { id: 'risk-2', riskScore: 85, riskCategory: 'High risk', color: '#D5482D', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.25, 44.55]] } },
     ];
 
     const routeWithRisk = {
@@ -438,7 +438,7 @@ describe('Risk score quantization', () => {
     const riskSegments = body.routes?.[0]?.riskSegments ?? [];
 
     // All riskScore values must be one of the 8 allowed bucket midpoints
-    const allowedMidpoints = [0, 16, 38, 48, 55, 63, 85, 110];
+    const allowedMidpoints = [0, 16, 37, 46, 55, 65, 75, 85, 97, 117, 150];
     for (const seg of riskSegments) {
       expect(allowedMidpoints).toContain(seg.riskScore);
     }
@@ -448,8 +448,8 @@ describe('Risk score quantization', () => {
 
   it('riskScore values are integers (not decimals)', async () => {
     const segments = [
-      { id: 'risk-0', riskScore: 16, riskCategory: 'Very safe', color: '#4CAF50', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] } },
-      { id: 'risk-1', riskScore: 63, riskCategory: 'Risky', color: '#FF5722', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.3, 44.6]] } },
+      { id: 'risk-0', riskScore: 16, riskCategory: 'Safer', color: '#2E9E43', geometry: { type: 'LineString' as const, coordinates: [[26.1, 44.4], [26.2, 44.5]] } },
+      { id: 'risk-1', riskScore: 65, riskCategory: 'Typical', color: '#E8921B', geometry: { type: 'LineString' as const, coordinates: [[26.2, 44.5], [26.3, 44.6]] } },
     ];
 
     const app = buildTestApp({
@@ -699,7 +699,7 @@ describe('quantizeRiskScore bucket mapping', () => {
   // We verify by checking that the risk.ts module produces only allowed midpoints.
 
   // Direct testing of the quantization thresholds via the allowed midpoints constant.
-  const allowedMidpoints = new Set([0, 16, 38, 48, 55, 63, 85, 110]);
+  const allowedMidpoints = new Set([0, 16, 37, 46, 55, 65, 75, 85, 97, 117, 150]);
 
   it('all allowed midpoints are integers', () => {
     for (const midpoint of allowedMidpoints) {
@@ -718,12 +718,15 @@ describe('quantizeRiskScore bucket mapping', () => {
     // Verify that each midpoint falls into the expected RISK_CATEGORIES bucket
     // from packages/core/src/riskDistribution.ts
     const categoryBounds = [
-      { minScore: -Infinity, maxScore: 33, midpoint: 16 },
-      { minScore: 33, maxScore: 43.5, midpoint: 38 },
-      { minScore: 43.5, maxScore: 51.8, midpoint: 48 },
-      { minScore: 51.8, maxScore: 57.6, midpoint: 55 },
-      { minScore: 57.6, maxScore: 69, midpoint: 63 },
-      { minScore: 69, maxScore: 101.8, midpoint: 85 },
+      { minScore: -Infinity, maxScore: 32, midpoint: 16 },
+      { minScore: 32, maxScore: 42, midpoint: 37 },
+      { minScore: 42, maxScore: 50, midpoint: 46 },
+      { minScore: 50, maxScore: 60, midpoint: 55 },
+      { minScore: 60, maxScore: 70, midpoint: 65 },
+      { minScore: 70, maxScore: 80, midpoint: 75 },
+      { minScore: 80, maxScore: 90, midpoint: 85 },
+      { minScore: 90, maxScore: 105, midpoint: 97 },
+      { minScore: 105, maxScore: 130, midpoint: 117 },
     ];
 
     for (const { minScore, maxScore, midpoint } of categoryBounds) {
@@ -737,8 +740,8 @@ describe('quantizeRiskScore bucket mapping', () => {
     expect(allowedMidpoints.has(0)).toBe(true);
   });
 
-  it('extreme score (>101.8) maps to midpoint 110', () => {
-    expect(allowedMidpoints.has(110)).toBe(true);
+  it('top-shade score (>130) maps to midpoint 150', () => {
+    expect(allowedMidpoints.has(150)).toBe(true);
   });
 });
 
