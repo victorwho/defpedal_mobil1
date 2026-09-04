@@ -1,34 +1,38 @@
 # GPX Course Import — plan
 
-**Status:** Phases 1 + 2 implemented (2026-09-04), not yet device-tested. Phase 3 open.
+**Status:** Phases 1 + 2 shipped and device-confirmed (commit ead20c3). Phase 3 OS "Open with" implemented 2026-09-04, not yet device-verified.
 **Created:** 2026-09-04
 
-> **Phases 1 and 2 are in-tree, uncommitted.** A GPX file can be imported,
-> scored, saved to the device, reopened and ridden turn-by-turn, with
-> auto-reroute suppressed. Green on typecheck, the lint ratchet, all three test
-> suites, and a bundle that was verified to actually contain the new code.
+> **Phases 1 and 2 are shipped and device-confirmed** (commit `ead20c3`, preview
+> v0.2.132 / build 135). A GPX file can be imported, scored, saved to the device,
+> reopened and ridden turn-by-turn, with auto-reroute suppressed.
 >
-> **Not yet run on a phone.** The picker pulls in `expo-document-picker`, a new
-> native module, so a rebuild is required before any of it works on a device
-> (see §9).
+> **Phase 3's OS "Open with" is implemented but NOT device-verified.** Intent
+> resolution is a device behaviour — the manifest XML parses and the JS is unit
+> tested, but whether Drive actually offers this app for a given .gpx can only be
+> answered on a phone, and it needs a rebuild because the Android manifest is
+> native. The iOS half has never run at all (no macOS hardware — the standing
+> caveat for every iOS change in this repo).
 >
-> New files: `packages/core/src/courseSteps.ts`,
+> Files: `packages/core/src/courseSteps.ts`,
 > `apps/mobile/src/lib/{gpx-parse,gpx-import,course-route,courseStorage}.ts`,
-> `apps/mobile/app/course-import.tsx` (+ 5 test files).
-> Touched: `contracts.ts` (`source` union), `riskStretch.ts`
+> `apps/mobile/app/course-import.tsx`, `GpxOpenHandler` in `app/_layout.tsx`
+> (+ 6 test files). Touched: `contracts.ts` (`source` union), `riskStretch.ts`
 > (`findHighRiskStretches`), `premiumCatalog.ts` + `entitlement.ts`
 > (`importedCourses` limit + `canImportAnotherCourse`), `mapbox-routing.ts`
 > (exported the two enrichers), `components/map/*` (`focusCoordinate`),
 > `navigation.tsx` (the reroute gate), `route-planning.tsx` (entry point +
-> course list), `appStore.ts` (`importedCourses` slice), `usePremium.ts`,
-> `PremiumLimitCard.tsx`, `i18n/{en,ro,es}.ts`.
+> course list), `appStore.ts` (`importedCourses` + transient
+> `pendingCourseImport`), `usePremium.ts`, `PremiumLimitCard.tsx`,
+> `AndroidManifest.xml` (intent filters), `app.config.ts` (iOS document types),
+> `i18n/{en,ro,es}.ts`.
 >
 > ⚠️ **Verifying the bundle on this machine needs care.** The Metro on :8081 is
 > served from `C:\Users\Victor\orca\workspaces\defpedal\Sesizari`, a different
 > workspace — bundling against it returns HTTP 200 for a bundle that contains
 > none of this repo's code. Start Metro from `C:\dev\defpedal\apps\mobile` on a
 > free port and **grep the bundle for a symbol you just added** rather than
-> trusting the status code.
+> trusting the status code. See error-log #103.
 
 Import a `.gpx` file, follow it turn-by-turn, and render our risk scoring on
 top of it.
@@ -381,10 +385,59 @@ What landed:
   which keeps one screen for both paths — and is the same single-input shape
   the OS "Open with" intent will use in Phase 3.
 
-**Phase 3 — reach and polish.**
-OS "Open with" intent filters (Android manifest and iOS UTI), risk-segment
-proximity alerts, EN/RO/ES copy pass, optional map-matched street names as an
-opt-in "snap to roads" toggle.
+**Phase 3 — reach. ✅ OS "Open with" IMPLEMENTED 2026-09-04.**
+Android intent filters + iOS document types, and the handler that receives
+them. Risk-segment proximity alerts and opt-in map-matched street names are
+still open (both were always "optional / scope separately").
+
+What landed:
+
+- **The two platforms are exact opposites here, and getting it backwards
+  produces silence.** Android's manifest is hand-maintained — `intentFilters`
+  in `app.config.ts` would never land, because this project does not run
+  `expo prebuild` (error-log #27). iOS is the reverse: `infoPlist` entries in
+  `app.config.ts` DO apply, because iOS builds go through EAS, which prebuilds
+  on the build server.
+- **GPX is not a system UTI on iOS.** `LSItemContentTypes: ['com.topografix.gpx']`
+  alone names an identifier iOS has never heard of, and the app simply never
+  appears — so `UTImportedTypeDeclarations` declares it (conforming to
+  `public.xml`, tagged with the extension and MIME type). `LSHandlerRank` is
+  `Alternate`: we are a legitimate handler but should not outrank a dedicated
+  GPS app the rider deliberately installed.
+- ⚠️ **Never widen the Android filter to `android:mimeType="*/*"`.** That is
+  the lazy way to catch every provider and it offers this app as a handler for
+  every file on the device. Two filters instead: correct MIME types
+  (`application/gpx+xml`, `application/xml`, `text/xml`) with **no** path
+  constraint — cloud content URIs carry no extension, so a `pathPattern` would
+  never match them and the MIME type is the only usable signal; plus
+  `application/octet-stream` (what Drive and several mail clients report for
+  .gpx) **narrowed** by a `.gpx` `pathPattern`.
+- **Stage the file immediately, then decide where to go.** Android grants read
+  access to a `content://` URI only for the life of the receiving task, so
+  `GpxOpenHandler` copies it into our cache the moment it arrives and drops the
+  borrowed handle. Deferring the read until after onboarding — which is exactly
+  what the suppression rule below does — would otherwise hand `/course-import`
+  a permission that has lapsed.
+- **Navigation is suppressed during `NAVIGATING` and during onboarding**, the
+  same rule `ShareClaimProcessor` uses (review 2026-06-12 P1). A fresh install
+  opening a shared .gpx must not be yanked past the signup wall that has been
+  mandatory since 2026-07-26. The staged path waits in the **transient,
+  non-persisted** `pendingCourseImport` slot; persisting it would re-navigate on
+  every cold start, at a cache path that may no longer exist.
+- **`/course-import` needed no change** — it already took a bare file `uri`,
+  which was the point of giving it that input contract in Phase 1.
+
+**Deliberately NOT shipped: ACTION_SEND** ("share to Defensive Pedal"). Android
+puts that URI in `EXTRA_STREAM` rather than the intent data, so
+`Linking.getInitialURL()` returns null for it. Supporting it needs native code
+or `expo-share-intent` — it is not another manifest entry, and pretending
+otherwise would ship a filter that silently does nothing.
+
+⚠️ **Neither platform's filter is verifiable from this environment.** Intent
+resolution is a device behaviour; the manifest XML parses and the JS is unit
+tested, but "does Drive actually offer us for this .gpx" can only be answered on
+a phone, and the iOS half has never run at all (no macOS hardware — the standing
+caveat for every iOS change in this repo).
 
 Each phase is independently shippable and each ends with a user-visible win,
 per design-context D2.

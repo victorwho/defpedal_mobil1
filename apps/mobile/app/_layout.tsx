@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState as RNAppState, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { isOpenableFileUri, stageIncomingGpx } from '../src/lib/gpx-import';
 import { mobileEnv } from '../src/lib/env';
 import { mobileApi } from '../src/lib/api';
 import { cleanupOfflinePacks } from '../src/lib/offlinePackCleanup';
@@ -211,6 +212,96 @@ const RouteShareDeepLinkHandler = () => {
   return null;
 };
 
+/**
+ * GpxOpenHandler — "Open with Defensive Pedal" for .gpx courses.
+ *
+ * Sibling of `RouteShareDeepLinkHandler` above, and the surface that actually
+ * matters for GPX: riders receive courses as attachments in Gmail, Drive and
+ * Files, not by hunting for an in-app picker.
+ *
+ * Two responsibilities, deliberately separated:
+ *
+ *  1. **Capture and stage.** Any `content://` / `file://` URL reaching us came
+ *     through the GPX intent filters (our own links are https or
+ *     `defensivepedal*://`). The file is copied into our cache immediately —
+ *     Android's read grant on a content URI lasts only as long as the
+ *     receiving task, so holding the borrowed URI while the rider finishes
+ *     onboarding can leave us with a lapsed permission.
+ *  2. **Navigate when it is safe to.** Suppressed during NAVIGATING (never
+ *     hijack a ride in progress) and during onboarding — a fresh install
+ *     opening a shared .gpx must not be yanked past the signup wall, which
+ *     has been mandatory since 2026-07-26. The staged file waits in a
+ *     transient store slot until the rider lands somewhere it makes sense.
+ *
+ * Mirrors the suppression rule ShareClaimProcessor already uses, for the same
+ * reasons (review 2026-06-12 P1).
+ */
+const GpxOpenHandler = () => {
+  const pendingCourseImport = useAppStore((s) => s.pendingCourseImport);
+  const setPendingCourseImport = useAppStore((s) => s.setPendingCourseImport);
+  const appState = useAppStore((s) => s.appState);
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const pathname = usePathname();
+  const handledUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const handleUrl = async (url: string): Promise<void> => {
+      if (handledUrlsRef.current.has(url)) return;
+      if (!isOpenableFileUri(url)) return;
+
+      handledUrlsRef.current.add(url);
+
+      const staged = await stageIncomingGpx(url);
+      if (staged) {
+        setPendingCourseImport(staged);
+      } else {
+        telemetry.capture('gpx_open_failed', { reason: 'unreadable' });
+      }
+    };
+
+    void Linking.getInitialURL().then((url) => {
+      if (url) void handleUrl(url);
+    });
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      void handleUrl(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+      handledUrlsRef.current.clear();
+    };
+  }, [setPendingCourseImport]);
+
+  useEffect(() => {
+    if (!pendingCourseImport) return;
+
+    const isOnboarding =
+      onboardingCompleted === false || pathname.startsWith('/onboarding');
+    if (appState === 'NAVIGATING' || isOnboarding) return;
+
+    // Already showing it — clear the slot without a second push, which would
+    // stack a duplicate screen on the back stack.
+    if (pathname === '/course-import') {
+      setPendingCourseImport(null);
+      return;
+    }
+
+    const { uri, fileName } = pendingCourseImport;
+    setPendingCourseImport(null);
+    telemetry.capture('gpx_open_received', {});
+    router.push({ pathname: '/course-import', params: { uri, fileName } });
+  }, [
+    pendingCourseImport,
+    appState,
+    onboardingCompleted,
+    pathname,
+    setPendingCourseImport,
+  ]);
+
+  return null;
+};
+
 const RootLayoutInner = () => {
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
@@ -313,6 +404,7 @@ const RootLayoutInner = () => {
       <MeetPedalCardManager />
       <RideLossBannerManager />
       <RouteShareDeepLinkHandler />
+      <GpxOpenHandler />
     </>
   );
 };

@@ -119,3 +119,70 @@ export const courseNameFromFileName = (fileName: string): string => {
   const tidied = withoutExtension.replace(/[_-]+/g, ' ').trim();
   return tidied.length > 0 ? tidied : fileName;
 };
+
+// ---------------------------------------------------------------------------
+// "Open with Defensive Pedal" — files handed to us by another app
+// ---------------------------------------------------------------------------
+
+/**
+ * Does this URL look like a file another app asked us to open, rather than one
+ * of our own deep links?
+ *
+ * Scheme is the whole test on purpose. A content URI from Drive or Gmail
+ * carries no file extension to match on, and our own links are always
+ * `https://routes.defensivepedal.com/...` or `defensivepedal*://...`, so
+ * anything arriving as `content://` or `file://` reached us through the GPX
+ * intent filters. If it turns out not to be GPX, `parseGpx` says so with a
+ * clear message — a slightly generous match degrades to an honest error.
+ */
+export const isOpenableFileUri = (url: string): boolean =>
+  /^(content|file):\/\//i.test(url.trim());
+
+/** Best-effort display name from a URI; falls back to a generic course name. */
+const fileNameFromUri = (url: string): string => {
+  try {
+    const withoutQuery = url.split('?')[0] ?? url;
+    const segment = decodeURIComponent(withoutQuery.split('/').pop() ?? '');
+    return /\.gpx$/i.test(segment) ? segment : 'course.gpx';
+  } catch {
+    return 'course.gpx';
+  }
+};
+
+/**
+ * Copy an incoming file into our own cache and return a stable path.
+ *
+ * Staging immediately is the point. Android grants read access to a
+ * `content://` URI for the life of the receiving activity's task, so holding
+ * the original URI while the rider finishes onboarding — or just backgrounds
+ * the app — can leave us with a permission that has lapsed. Copying costs
+ * milliseconds for a file this size and turns a borrowed handle into
+ * something we own.
+ *
+ * Returns `null` when the file cannot be read at all, which the caller
+ * surfaces as a normal import error.
+ */
+export const stageIncomingGpx = async (
+  url: string,
+): Promise<PickedGpxFile | null> => {
+  const cacheDir = FileSystem.cacheDirectory;
+  if (!cacheDir) return null;
+
+  const fileName = fileNameFromUri(url);
+  const target = `${cacheDir}incoming-course-${Date.now()}.gpx`;
+
+  try {
+    await FileSystem.copyAsync({ from: url, to: target });
+    return { uri: target, fileName };
+  } catch {
+    // Some providers refuse copyAsync on a content URI but allow a direct
+    // read. Worth the second attempt before declaring the file unreadable.
+    try {
+      const text = await FileSystem.readAsStringAsync(url);
+      await FileSystem.writeAsStringAsync(target, text);
+      return { uri: target, fileName };
+    } catch {
+      return null;
+    }
+  }
+};

@@ -365,6 +365,42 @@ export default () => ({
         // Export compliance: the app uses only standard HTTPS/TLS (exempt
         // encryption). Declaring this skips the per-upload encryption interview.
         ITSAppUsesNonExemptEncryption: false,
+        // "Open with Defensive Pedal" for .gpx courses (Files, Mail, Drive,
+        // AirDrop). iOS copies the file into the app's Inbox and delivers a
+        // file:// URL through Linking, which `GpxOpenHandler` in
+        // app/_layout.tsx stages and routes to /course-import.
+        //
+        // GPX is NOT a system-declared UTI, so it has to be imported here —
+        // without UTImportedTypeDeclarations, LSItemContentTypes references
+        // an identifier iOS has never heard of and the app simply never
+        // appears in the share sheet.
+        //
+        // LSHandlerRank 'Alternate' on purpose: we are a legitimate handler
+        // for .gpx but should not outrank a dedicated GPS app the rider has
+        // deliberately installed.
+        //
+        // Unlike the Android manifest (hand-maintained, error-log #27), this
+        // DOES take effect: iOS builds go through EAS, which runs prebuild on
+        // the build server.
+        UTImportedTypeDeclarations: [
+          {
+            UTTypeIdentifier: 'com.topografix.gpx',
+            UTTypeDescription: 'GPS Exchange Format',
+            UTTypeConformsTo: ['public.xml'],
+            UTTypeTagSpecification: {
+              'public.filename-extension': ['gpx'],
+              'public.mime-type': ['application/gpx+xml'],
+            },
+          },
+        ],
+        CFBundleDocumentTypes: [
+          {
+            CFBundleTypeName: 'GPX Course',
+            CFBundleTypeRole: 'Viewer',
+            LSHandlerRank: 'Alternate',
+            LSItemContentTypes: ['com.topografix.gpx'],
+          },
+        ],
         // Native Google Sign-In keys (GIDClientID + reversed-client-id URL
         // scheme), present only once the iOS OAuth client id is configured.
         ...iosGoogleSignInInfoPlist,

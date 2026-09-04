@@ -248,6 +248,16 @@ type AppStore = QueueSlice & PremiumSlice & {
   // this handset, so signing out must not orphan them by clearing the
   // index that points at them. Intentionally NOT in resetUserScopedState.
   importedCourses: ImportedCourseMeta[];
+  /**
+   * A .gpx handed to us by another app ("Open with"), staged into our
+   * cache and waiting to be opened.
+   *
+   * TRANSIENT - deliberately not persisted. It points at a cache path
+   * from this process; a persisted copy would survive into a cold start
+   * whose file may be gone, and would re-navigate to /course-import on
+   * every launch. Same reasoning as the notification tap slot.
+   */
+  pendingCourseImport: { uri: string; fileName: string } | null;
   // ── Save-ride signup prompt (post-ride impact screen, anonymous only) ──
   // USER-scoped (unlike reviewPromptState): cleared by resetUserScopedState —
   // a new account on this device is a new relationship and may be asked again.
@@ -426,6 +436,9 @@ type AppStore = QueueSlice & PremiumSlice & {
   setSelectedRouteId: (routeId: string | null) => void;
   startNavigation: (route: RouteOption, sessionId?: string) => void;
   addImportedCourse: (course: ImportedCourseMeta) => void;
+  setPendingCourseImport: (
+    pending: { uri: string; fileName: string } | null,
+  ) => void;
   removeImportedCourse: (id: string) => void;
   advanceNavigation: (totalSteps: number) => void;
   updateNavigationProgress: (
@@ -754,6 +767,7 @@ export const useAppStore = create<AppStore>()(
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
       completedRideCount: 0,
       importedCourses: [],
+      pendingCourseImport: null,
       saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
       analyticsPrompt: DEFAULT_ANALYTICS_PROMPT_STATE,
       markAnalyticsPromptShown: (promptId) =>
@@ -1225,6 +1239,8 @@ export const useAppStore = create<AppStore>()(
             sessionHazardReports: [],
           };
         }),
+      setPendingCourseImport: (pending) =>
+        set(() => ({ pendingCourseImport: pending })),
       addImportedCourse: (course) =>
         set((state) => ({
           importedCourses: [

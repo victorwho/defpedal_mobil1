@@ -90,6 +90,55 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="https" android:host="routes.defensivepedal.com" android:pathPrefix="/r/"/>
       </intent-filter>
+      <!--
+        Open a .gpx course from a file manager, Drive, Gmail, etc.
+        ("Open with Defensive Pedal"). This is how riders actually receive
+        GPX files, so it matters more than the in-app picker.
+
+        Two filters on purpose, because providers disagree about what a
+        `.gpx` is:
+
+        1. Correct/near-correct MIME types, no path constraint. Content URIs
+           from cloud providers usually carry no file extension in the path,
+           so a pathPattern would never match them - the MIME type is the
+           only usable signal there.
+        2. `application/octet-stream` - what Drive and several mail clients
+           report for .gpx - NARROWED by a `.gpx` path pattern. Without that
+           narrowing this app would offer itself as a handler for every
+           unknown binary on the device.
+
+        Deliberately NOT `android:mimeType="*/*"`: it would claim every file
+        type in the system chooser, which is hostile and gets uninstalled.
+
+        The receiving side is `GpxOpenHandler` in app/_layout.tsx, which
+        stages the URI into the cache and routes to /course-import. Anything
+        that is not really GPX fails there with a clear message, so a
+        slightly over-broad match degrades to an honest error, not a crash.
+
+        Hand-maintained: this project never runs `expo prebuild` (error-log
+        #27), so intentFilters in app.config.ts would NOT land here.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="content"/>
+        <data android:scheme="file"/>
+        <data android:mimeType="application/gpx+xml"/>
+        <data android:mimeType="application/xml"/>
+        <data android:mimeType="text/xml"/>
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="content"/>
+        <data android:scheme="file"/>
+        <data android:host="*"/>
+        <data android:mimeType="application/octet-stream"/>
+        <data android:pathPattern=".*\.gpx"/>
+        <data android:pathPattern=".*\..*\.gpx"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>
