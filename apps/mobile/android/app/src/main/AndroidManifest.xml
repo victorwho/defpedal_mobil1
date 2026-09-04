@@ -117,6 +117,20 @@
 
         Hand-maintained: this project never runs `expo prebuild` (error-log
         #27), so intentFilters in app.config.ts would NOT land here.
+
+        ON THE pathPattern BELOW - do not "fix" the escaping without testing
+        on a device. Written here as `.*\.gpx`, aapt consumes the backslash
+        and the COMPILED manifest carries `.*.gpx` (verified with
+        `aapt2 dump xmltree` on the built APK). That is the form we want:
+        under PATTERN_SIMPLE_GLOB a bare `.` matches any character, so it
+        matches every real `.gpx` path. Writing `.*\\.gpx` instead compiles
+        to `.*\.gpx`, and SIMPLE_GLOB does not treat `\` as an escape - it
+        would look for a literal backslash in the path and never fire.
+
+        The looseness (`.gpx` also matching e.g. `fooXgpx`) is acceptable:
+        this pattern only NARROWS an application/octet-stream filter, and
+        anything that is not really GPX still ends at our own parser, which
+        refuses it with a clear message.
       -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW"/>
