@@ -268,6 +268,22 @@ export const canSaveAnotherRoute = (
   return currentCount < limit;
 };
 
+/**
+ * Can the rider import one more GPX course?
+ *
+ * Same shape and same promise as saved routes: courses already on the
+ * device stay usable above the cap — nothing is deleted — but adding
+ * another needs a deletion or a subscription.
+ */
+export const canImportAnotherCourse = (
+  entitlement: ResolvedEntitlement,
+  currentCount: number,
+): boolean => {
+  const limit = limitsFor(entitlement).importedCourses;
+  if (limit === null) return true;
+  return currentCount < limit;
+};
+
 /** Same shape and same reasoning as saved routes. */
 export const canDownloadAnotherPack = (
   entitlement: ResolvedEntitlement,

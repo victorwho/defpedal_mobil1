@@ -9,6 +9,7 @@ export * from './microlives';
 export * from './contracts';
 export * from './contrast';
 export * from './countryCoverage';
+export * from './courseSteps';
 export * from './distance';
 export * from './entitlement';
 export * from './flatRouteMeter';

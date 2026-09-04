@@ -324,7 +324,7 @@ interface ElevationResponse {
  * and adjustedDurationSeconds. Fails gracefully — returns unchanged route
  * if elevation fetch fails.
  */
-const enrichRouteWithElevation = async (
+export const enrichRouteWithElevation = async (
   route: RouteOption,
   coordinates: [number, number][],
 ): Promise<RouteOption> => {
@@ -407,7 +407,7 @@ const fetchRouteRiskSegments = async (
 // chart needs.
 const MAX_RISK_GEOMETRY_POINTS = 12_000;
 
-const enrichRouteWithRisk = async (
+export const enrichRouteWithRisk = async (
   route: RouteOption,
   coordinates: [number, number][],
 ): Promise<RouteOption> => {

@@ -95,6 +95,20 @@ export type RouteMapProps = {
   historyTrails?: readonly { coordinates: readonly [number, number][]; mode: 'safe' | 'fast' | 'flat' }[];
   /** GeoJSON FeatureCollection of road risk segments to render as colored overlay */
   riskOverlay?: GeoJSON.FeatureCollection | null;
+  /**
+   * Pans the camera to a specific point, overriding the default
+   * route-midpoint framing. Used to fly to a busy stretch when the rider taps
+   * one in the imported-course review list.
+   */
+  focusCoordinate?: Coordinate | null;
+  /** Zoom to use while `focusCoordinate` is set. */
+  focusZoomLevel?: number;
+  /**
+   * Bump to re-fly to the SAME `focusCoordinate`. The camera is keyed on its
+   * center, so without this a second tap on an already-focused stretch would
+   * be a no-op.
+   */
+  focusKey?: number;
   containerStyle?: StyleProp<ViewStyle>;
   /**
    * Per-surface accessibility context. Drives the hidden

@@ -44,6 +44,8 @@ import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { pickGpxFile } from '../src/lib/gpx-import';
+import { deleteCourseGeometry, pruneOrphanedCourses } from '../src/lib/courseStorage';
 import { PermanentHazardCheckbox } from '../src/design-system/molecules/PermanentHazardCheckbox';
 import { SesizareRow } from '../src/design-system/molecules/SesizareRow';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -416,6 +418,63 @@ export default function RoutePlanningScreen() {
     consumeToast: consumeGpxToast,
   } = useExportSavedRouteGpx();
   const { chooseGpxDestination } = useGpxDestinationChooser();
+
+  // ── GPX course import ──
+  // Picking happens here; parsing, scoring and review happen on
+  // /course-import, whose input contract is just a file URI — the same shape
+  // an OS "Open with" intent will hand it once that ships.
+  const [importToast, setImportToast] = useState<string | null>(null);
+
+  const importedCourses = useAppStore((s) => s.importedCourses);
+  const removeImportedCourse = useAppStore((s) => s.removeImportedCourse);
+
+  // Course geometry lives on disk while its metadata lives in the store, so
+  // the two can drift: a delete whose file removal failed leaves a file no
+  // row points at, invisible and permanent. Sweep once per session, when
+  // the rider is actually looking at their courses.
+  const prunedRef = useRef(false);
+  useEffect(() => {
+    if (!savedRoutesOpen || prunedRef.current) return;
+    prunedRef.current = true;
+    void pruneOrphanedCourses(importedCourses.map((course) => course.id));
+  }, [savedRoutesOpen, importedCourses]);
+
+  const handleOpenCourse = useCallback(
+    (course: { id: string; name: string }) => {
+      router.push({
+        pathname: '/course-import',
+        params: { courseId: course.id, courseName: course.name },
+      });
+    },
+    [],
+  );
+
+  const handleDeleteCourse = useCallback(
+    (id: string) => {
+      // Metadata first: a file we fail to delete is an orphan the storage
+      // sweep reclaims, whereas a row pointing at deleted geometry is a
+      // course the rider can tap and never open.
+      removeImportedCourse(id);
+      void deleteCourseGeometry(id);
+    },
+    [removeImportedCourse],
+  );
+
+  const handleImportGpx = useCallback(async () => {
+    const picked = await pickGpxFile();
+
+    if (!picked.ok) {
+      // A cancelled picker is the rider changing their mind, not a failure.
+      if (picked.reason === 'cancelled') return;
+      setImportToast(t('course.errorRead'));
+      return;
+    }
+
+    router.push({
+      pathname: '/course-import',
+      params: { uri: picked.file.uri, fileName: picked.file.fileName },
+    });
+  }, [t]);
 
   const handleMapTap = useCallback(() => {
     // Don't toggle UI while in any crosshair placement mode
@@ -1510,7 +1569,13 @@ export default function RoutePlanningScreen() {
           >
             <Ionicons name="layers-outline" size={22} color={gray[700]} />
           </PressableScale>
-          {user && (savedRoutesQuery.data?.length ?? 0) > 0 ? (
+          {/*
+            Shown for any signed-in rider, not only those who already have a
+            saved route: this sheet is now also the entry point for importing
+            a GPX course, and gating it on existing saved routes would make
+            import unreachable for exactly the riders most likely to want it.
+          */}
+          {user ? (
             <PressableScale
               style={styles.fabButton}
               onPress={() => setSavedRoutesOpen(true)}
@@ -1760,6 +1825,17 @@ export default function RoutePlanningScreen() {
       </View>
     ) : null}
 
+    {/* GPX import toast (picker unavailable / read failure) */}
+    {importToast ? (
+      <View style={styles.hazardToastContainer}>
+        <Toast
+          message={importToast}
+          variant="error"
+          onDismiss={() => setImportToast(null)}
+        />
+      </View>
+    ) : null}
+
     {/* Hazard toast */}
     {hazardToast ? (
       <View style={styles.hazardToastContainer}>
@@ -1818,7 +1894,68 @@ export default function RoutePlanningScreen() {
         accessibilityLabel="Dismiss saved routes"
       >
         <Pressable style={styles.savedRoutesModal} onPress={(e) => e.stopPropagation()} accessible={false}>
-          <Text style={styles.savedRoutesTitle}>Saved Routes</Text>
+          <Text style={styles.savedRoutesTitle}>{t('planning.savedRoutes')}</Text>
+
+          <Pressable
+            style={styles.savedRouteRow}
+            onPress={() => {
+              setSavedRoutesOpen(false);
+              void handleImportGpx();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('course.importCtaA11y')}
+          >
+            <Ionicons name="download-outline" size={16} color={colors.accent} />
+            <View style={styles.savedRouteTextWrap}>
+              <Text style={styles.savedRouteName} numberOfLines={1}>
+                {t('course.importCta')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={gray[500]} />
+          </Pressable>
+
+          {importedCourses.map((course) => (
+            <Pressable
+              key={course.id}
+              style={styles.savedRouteRow}
+              onPress={() => {
+                setSavedRoutesOpen(false);
+                handleOpenCourse(course);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={course.name}
+            >
+              <Ionicons name="map-outline" size={16} color={colors.accent} />
+              <View style={styles.savedRouteTextWrap}>
+                <Text style={styles.savedRouteName} numberOfLines={1}>
+                  {course.name}
+                </Text>
+                <Text style={styles.savedRouteMode}>
+                  {t('course.badge')}
+                  {` · ${(course.distanceMeters / 1000).toFixed(1)} km`}
+                  {course.busyStretchCount > 0
+                    ? ` · ${t(
+                        course.busyStretchCount === 1
+                          ? 'course.busyFound_one'
+                          : 'course.busyFound_other',
+                        { count: course.busyStretchCount },
+                      )}`
+                    : ''}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.savedRouteExportButton}
+                hitSlop={8}
+                onPress={() => handleDeleteCourse(course.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('course.deleteCourse')}: ${course.name}`}
+              >
+                <Ionicons name="trash-outline" size={18} color={gray[500]} />
+              </Pressable>
+              <Ionicons name="chevron-forward" size={16} color={gray[500]} />
+            </Pressable>
+          ))}
+
           {(savedRoutesQuery.data ?? []).map((route) => (
             <Pressable
               key={route.id}

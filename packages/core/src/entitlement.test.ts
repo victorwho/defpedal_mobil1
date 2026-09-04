@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canDownloadAnotherPack,
+  canImportAnotherCourse,
   canSaveAnotherRoute,
   canStartFlatRoute,
   daysSince,
@@ -360,5 +361,32 @@ describe('canStartFlatRoute', () => {
     });
     // Already September for this rider, so September's spent quota applies.
     expect(decision.allowed).toBe(false);
+  });
+});
+
+describe('canImportAnotherCourse', () => {
+  const free = resolved();
+  const plus = resolved({ tier: 'plus' });
+
+  it('allows a free rider up to the free ceiling', () => {
+    expect(canImportAnotherCourse(free, 0)).toBe(true);
+    expect(canImportAnotherCourse(free, 1)).toBe(true);
+  });
+
+  it('refuses a free rider at the ceiling', () => {
+    expect(canImportAnotherCourse(free, 2)).toBe(false);
+    expect(canImportAnotherCourse(free, 9)).toBe(false);
+  });
+
+  it('never limits Plus', () => {
+    expect(canImportAnotherCourse(plus, 0)).toBe(true);
+    expect(canImportAnotherCourse(plus, 500)).toBe(true);
+  });
+
+  it('reads its ceiling from the catalog, not a literal', () => {
+    const limit = FREE_LIMITS.importedCourses;
+    expect(limit).not.toBeNull();
+    expect(canImportAnotherCourse(free, limit! - 1)).toBe(true);
+    expect(canImportAnotherCourse(free, limit!)).toBe(false);
   });
 });

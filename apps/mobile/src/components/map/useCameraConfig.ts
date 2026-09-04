@@ -12,6 +12,7 @@ type UseCameraConfigParams = {
   selectedRoute: DecodedRoute | null;
   trailCoordinates?: readonly [number, number][];
   destination?: Coordinate;
+  focusCoordinate?: Coordinate | null;
 };
 
 /**
@@ -25,6 +26,7 @@ export const useCameraConfig = ({
   selectedRoute,
   trailCoordinates,
   destination,
+  focusCoordinate,
 }: UseCameraConfigParams): [number, number] => {
   const trailMidpoint = useMemo<[number, number] | null>(() => {
     if (!trailCoordinates || trailCoordinates.length < 2) return null;
@@ -48,8 +50,12 @@ export const useCameraConfig = ({
     return [center.lon, center.lat];
   }, [gateCountryCode]);
 
+  // An explicit focus request outranks everything except live follow: the
+  // rider asked to look at a specific place, so route framing must yield.
   const cameraCoordinate =
-    recenterKey > 0 && userLocation
+    focusCoordinate && !(followUser && userLocation)
+      ? ([focusCoordinate.lon, focusCoordinate.lat] as [number, number])
+      : recenterKey > 0 && userLocation
       ? ([userLocation.lon, userLocation.lat] as [number, number])
       : followUser && userLocation
         ? ([userLocation.lon, userLocation.lat] as [number, number])

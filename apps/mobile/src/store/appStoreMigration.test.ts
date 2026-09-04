@@ -127,3 +127,37 @@ describe('migratePersistedAppState — telemetry choice preservation', () => {
     expect(result).toEqual(persisted);
   });
 });
+
+describe('importedCourses hydration safety', () => {
+  it('leaves a pre-existing blob without importedCourses untouched', () => {
+    // Every rider upgrading into this feature has a persisted blob with no
+    // `importedCourses` key. The migration must not invent one — zustand's
+    // shallow merge keeps the store's `[]` default for absent keys, and the
+    // routes modal maps over it on open. A `null` written here would be
+    // indistinguishable from `[]` until `.map` threw on a real device.
+    const legacy = { appState: 'IDLE', voiceGuidanceEnabled: true };
+
+    const migrated = migratePersistedAppState(legacy, 0) as Record<string, unknown>;
+
+    expect('importedCourses' in migrated).toBe(false);
+  });
+
+  it('preserves saved courses across a migration', () => {
+    const course = {
+      id: 'course-1',
+      name: 'Sunday loop',
+      distanceMeters: 12000,
+      climbMeters: 140,
+      busyStretchCount: 2,
+      pointCount: 900,
+      createdAt: '2026-09-04T08:00:00.000Z',
+    };
+
+    const migrated = migratePersistedAppState(
+      { appState: 'IDLE', importedCourses: [course] },
+      0,
+    ) as Record<string, unknown>;
+
+    expect(migrated.importedCourses).toEqual([course]);
+  });
+});

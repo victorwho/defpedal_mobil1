@@ -47,6 +47,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
 
 import { getDeviceLocale, type Locale } from '../i18n';
+import type { ImportedCourseMeta } from '../lib/courseStorage';
 import { DEFAULT_ANALYTICS_PROMPT_STATE } from '../lib/analytics-optin';
 import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
@@ -242,6 +243,11 @@ type AppStore = QueueSlice & PremiumSlice & {
   // out and back in on the same handset should not reopen the prompt window.
   reviewPromptState: ReviewPromptState;
   completedRideCount: number;
+  // ── Imported GPX courses (metadata only; geometry lives on disk) ──
+  // DEVICE-scoped, like reviewPromptState: the geometry files belong to
+  // this handset, so signing out must not orphan them by clearing the
+  // index that points at them. Intentionally NOT in resetUserScopedState.
+  importedCourses: ImportedCourseMeta[];
   // ── Save-ride signup prompt (post-ride impact screen, anonymous only) ──
   // USER-scoped (unlike reviewPromptState): cleared by resetUserScopedState —
   // a new account on this device is a new relationship and may be asked again.
@@ -419,6 +425,8 @@ type AppStore = QueueSlice & PremiumSlice & {
   ) => void;
   setSelectedRouteId: (routeId: string | null) => void;
   startNavigation: (route: RouteOption, sessionId?: string) => void;
+  addImportedCourse: (course: ImportedCourseMeta) => void;
+  removeImportedCourse: (id: string) => void;
   advanceNavigation: (totalSteps: number) => void;
   updateNavigationProgress: (
     sample: NavigationLocationSample,
@@ -745,6 +753,7 @@ export const useAppStore = create<AppStore>()(
       ratingSkipCount: 0,
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
       completedRideCount: 0,
+      importedCourses: [],
       saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
       analyticsPrompt: DEFAULT_ANALYTICS_PROMPT_STATE,
       markAnalyticsPromptShown: (promptId) =>
@@ -1216,6 +1225,17 @@ export const useAppStore = create<AppStore>()(
             sessionHazardReports: [],
           };
         }),
+      addImportedCourse: (course) =>
+        set((state) => ({
+          importedCourses: [
+            course,
+            ...state.importedCourses.filter((entry) => entry.id !== course.id),
+          ],
+        })),
+      removeImportedCourse: (id) =>
+        set((state) => ({
+          importedCourses: state.importedCourses.filter((entry) => entry.id !== id),
+        })),
       advanceNavigation: (totalSteps) =>
         set((state) => ({
           navigationSession: state.navigationSession
@@ -1577,6 +1597,7 @@ export const useAppStore = create<AppStore>()(
         notificationPermissionAsked: state.notificationPermissionAsked,
         ratingSkipCount: state.ratingSkipCount,
         reviewPromptState: state.reviewPromptState,
+        importedCourses: state.importedCourses,
         completedRideCount: state.completedRideCount,
         saveRidePrompt: state.saveRidePrompt,
         analyticsPrompt: state.analyticsPrompt,

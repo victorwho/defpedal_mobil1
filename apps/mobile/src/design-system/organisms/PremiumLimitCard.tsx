@@ -25,10 +25,16 @@ import { fontFamily, textSm, textXs } from '../tokens/typography';
 import { useT } from '../../hooks/useTranslation';
 
 /** Which ceiling was hit. Drives the icon and the copy keys. */
-export type PremiumLimitKind = 'savedRoutes' | 'offlinePacks' | 'flatRoutes' | 'history';
+export type PremiumLimitKind =
+  | 'savedRoutes'
+  | 'importedCourses'
+  | 'offlinePacks'
+  | 'flatRoutes'
+  | 'history';
 
 const ICONS: Record<PremiumLimitKind, string> = {
   savedRoutes: 'bookmark-outline',
+  importedCourses: 'download-outline',
   offlinePacks: 'cloud-download-outline',
   flatRoutes: 'trending-up-outline',
   history: 'time-outline',
@@ -36,6 +42,10 @@ const ICONS: Record<PremiumLimitKind, string> = {
 
 const COPY: Record<PremiumLimitKind, { title: string; body: string }> = {
   savedRoutes: { title: 'premium.limitRoutesTitle', body: 'premium.limitRoutesBody' },
+  importedCourses: {
+    title: 'premium.limitCoursesTitle',
+    body: 'premium.limitCoursesBody',
+  },
   offlinePacks: { title: 'premium.limitPacksTitle', body: 'premium.limitPacksBody' },
   flatRoutes: { title: 'premium.limitFlatTitle', body: 'premium.limitFlatBody' },
   history: { title: 'premium.limitHistoryTitle', body: 'premium.limitHistoryBody' },

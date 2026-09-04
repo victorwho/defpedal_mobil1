@@ -10,7 +10,9 @@ import {
   computeRemainingDescent,
   computeCurrentGrade,
   decodePolyline,
+  formatDistance,
   haversineDistance,
+  isCourseRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
@@ -785,8 +787,26 @@ function NavigationScreen() {
     };
   }, [routeRequest, avoidHills, avoidHeat, avoidUnpaved]);
 
+  /**
+   * An imported GPX course is a fixed line the rider brought with them, and
+   * rerouting replaces it with one we computed — mid-ride, silently, with no
+   * undo. That is the single thing this feature must never do, so the gate
+   * lives on the route object (`isCourseRoute`) rather than on a screen, and
+   * is enforced at the mutation itself so all three reroute entry points
+   * (auto after 60 s off-route, the manual "Reroute now" action, and the
+   * skip-stop flow) inherit it.
+   */
+  const isCourse = isCourseRoute(selectedRoute);
+
   const rerouteMutation = useMutation({
     mutationFn: (origin: Coordinate) => {
+      // Defence in depth: every caller is already gated, but a future one
+      // would otherwise silently destroy the rider's course.
+      if (isCourse) {
+        return Promise.reject(
+          new Error('reroute is not available for an imported course'),
+        );
+      }
       // Read fresh store state at execution time so a just-skipped waypoint
       // (removeWaypoint runs synchronously, but this component's memoized
       // effectiveRouteRequest hasn't re-rendered yet) is excluded from the
@@ -1002,7 +1022,11 @@ function NavigationScreen() {
     if (progress.isOffRoute && !offRouteAnnouncedRef.current) {
       offRouteAnnouncedRef.current = true;
       void Speech.stop();
-      speak(t('nav.offRoute'), { allowWhenOffRoute: true });
+      // "Off route" implies we will fix it; on a course nothing will be
+      // recalculated, so the rider is told to return to the line instead.
+      speak(t(isCourse ? 'nav.offCourse' : 'nav.offRoute'), {
+        allowWhenOffRoute: true,
+      });
     } else if (!progress.isOffRoute) {
       offRouteAnnouncedRef.current = false;
     }
@@ -1088,13 +1112,22 @@ function NavigationScreen() {
       !locationState.sample ||
       isReroutePending ||
       !isOnline ||
+      // Never auto-reroute an imported course — see `isCourse` above.
+      isCourse ||
       !shouldTriggerAutomaticReroute(navigationSession)
     ) {
       return;
     }
 
     rerouteMutateRef.current(locationState.sample.coordinate);
-  }, [locationState.sample, navigationSession, isReroutePending, selectedRoute, isOnline]);
+  }, [
+    locationState.sample,
+    navigationSession,
+    isReroutePending,
+    selectedRoute,
+    isOnline,
+    isCourse,
+  ]);
 
   // Reset offline banner dismissed state when coming back online
   useEffect(() => {
@@ -1143,21 +1176,38 @@ function NavigationScreen() {
 
   // Diagnostic chip labels removed from user UI — available in diagnostics.tsx
 
+  // Off-COURSE, not off-route: an imported course cannot be recalculated, so
+  // the honest thing is to say how far back the line is and let the rider
+  // return to it. Riders leave a course all the time — coffee, a closed road —
+  // and expect to rejoin it, not to have it replaced.
+  const offCourseMessage =
+    isCourse && navigationSession.offRouteSince != null
+      ? navigationSession.distanceToRouteMeters != null
+        ? t('nav.offCourseDistance', {
+            distance: formatDistance(navigationSession.distanceToRouteMeters),
+          })
+        : t('nav.offCourse')
+      : null;
+
   const warningMessage = locationState.error
     ? locationState.error
-    : rerouteMutation.isError
-      ? t('nav.rerouteFailed')
-      : navigationSession.rerouteEligible
-        ? rerouteMutation.isPending
-          ? t('nav.rerouting')
-          : offRouteCountdownSeconds !== null && offRouteCountdownSeconds > 0
-            ? t('nav.offRouteCountdown', { seconds: offRouteCountdownSeconds })
-            : t('nav.offRouteReady')
-        : null;
+    : offCourseMessage
+      ? offCourseMessage
+      : rerouteMutation.isError
+        ? t('nav.rerouteFailed')
+        : navigationSession.rerouteEligible
+          ? rerouteMutation.isPending
+            ? t('nav.rerouting')
+            : offRouteCountdownSeconds !== null && offRouteCountdownSeconds > 0
+              ? t('nav.offRouteCountdown', { seconds: offRouteCountdownSeconds })
+              : t('nav.offRouteReady')
+          : null;
 
   const warningAction = locationState.error
     ? { label: t('nav.retryGps'), handler: () => void locationState.refreshLocation() }
-    : navigationSession.rerouteEligible &&
+    : // No "Reroute now" on a course — the action does not exist for it.
+      !isCourse &&
+        navigationSession.rerouteEligible &&
         !rerouteMutation.isPending &&
         isOnline &&
         mobileEnv.mobileApiUrl &&

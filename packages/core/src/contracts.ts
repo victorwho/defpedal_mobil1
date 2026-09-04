@@ -90,7 +90,17 @@ export interface RouteFeature {
 
 export interface RouteOption {
   id: string;
-  source: 'custom_osrm' | 'mapbox';
+  /**
+   * Where the geometry came from.
+   *
+   * `gpx_course` marks a route the rider IMPORTED rather than one we
+   * computed. It is the single marker for course behaviour — most importantly
+   * the auto-reroute suppression in navigation, which would otherwise replace
+   * the rider's imported line with an OSRM route mid-ride. Keep the flag on
+   * the route object rather than on a screen so every reroute entry point
+   * inherits the protection.
+   */
+  source: 'custom_osrm' | 'mapbox' | 'gpx_course';
   routingEngineVersion: string;
   routingProfileVersion: string;
   mapDataVersion: string;

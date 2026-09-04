@@ -99,6 +99,9 @@ export const RouteMap = ({
   onCenterChange,
   historyTrails,
   riskOverlay,
+  focusCoordinate = null,
+  focusZoomLevel,
+  focusKey,
   containerStyle,
   a11yContext,
 }: RouteMapProps) => {
@@ -156,6 +159,7 @@ export const RouteMap = ({
     selectedRoute,
     trailCoordinates,
     destination,
+    focusCoordinate,
   });
 
   const handlePoiPress = usePoiCardHandler(mapViewRef, selectedPoi, setSelectedPoi);
@@ -291,8 +295,8 @@ export const RouteMap = ({
         ) : (
           <Mapbox.Camera
             ref={cameraRef as any}
-            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}-${recenterKey}`}
-            zoomLevel={12.5}
+            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}-${recenterKey}-${focusKey ?? 0}`}
+            zoomLevel={focusCoordinate ? (focusZoomLevel ?? 15.5) : 12.5}
             centerCoordinate={cameraCoordinate}
             pitch={0}
             animationMode="easeTo"

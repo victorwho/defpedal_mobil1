@@ -15,6 +15,7 @@ import { useMemo } from 'react';
 import type { SupportedCountry } from '@defensivepedal/core';
 import {
   canDownloadAnotherPack,
+  canImportAnotherCourse,
   canSaveAnotherRoute,
   canStartFlatRoute,
   flatRoutePeriodKey,
@@ -90,11 +91,13 @@ export interface UsePremiumResult {
    * start refusing saves that work today.
    */
   readonly blockSaveRoute: (currentCount: number) => boolean;
+  readonly blockImportCourse: (currentCount: number) => boolean;
   readonly blockDownloadPack: (currentCount: number) => boolean;
   /** Period key to charge a starting flat ride against, or null to charge nothing. */
   readonly flatRideToCharge: () => string | null;
 
   readonly canSaveRoute: (currentCount: number) => boolean;
+  readonly canImportCourse: (currentCount: number) => boolean;
   readonly canDownloadPack: (currentCount: number) => boolean;
   readonly coolRouting: (country: SupportedCountry | null | undefined) => CoolRoutingAvailability;
   readonly flatRoute: () => FlatRouteDecision;
@@ -142,6 +145,8 @@ export const usePremium = (): UsePremiumResult => {
         snapshot?.uiEnabled === true && !canSaveAnotherRoute(entitlement, currentCount),
       blockDownloadPack: (currentCount: number) =>
         snapshot?.uiEnabled === true && !canDownloadAnotherPack(entitlement, currentCount),
+      blockImportCourse: (currentCount: number) =>
+        snapshot?.uiEnabled === true && !canImportAnotherCourse(entitlement, currentCount),
       flatRideToCharge: () => {
         if (snapshot?.uiEnabled !== true) return null;
         const decision = canStartFlatRoute({ entitlement, meter, nowIso, timeZone });
@@ -154,6 +159,7 @@ export const usePremium = (): UsePremiumResult => {
 
       canSaveRoute: (currentCount: number) => canSaveAnotherRoute(entitlement, currentCount),
       canDownloadPack: (currentCount: number) => canDownloadAnotherPack(entitlement, currentCount),
+      canImportCourse: (currentCount: number) => canImportAnotherCourse(entitlement, currentCount),
       coolRouting: (country) => resolveCoolRoutingAvailability(entitlement, country),
       flatRoute: () => canStartFlatRoute({ entitlement, meter, nowIso, timeZone }),
       flatRoutesLeft: () =>

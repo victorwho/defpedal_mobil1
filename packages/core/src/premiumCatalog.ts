@@ -53,6 +53,15 @@ export const PLUS_PRODUCT_IDS: readonly string[] = [
 export interface TierLimits {
   /** Max saved routes. */
   readonly savedRoutes: number | null;
+  /**
+   * Max imported GPX courses kept on the device.
+   *
+   * Lower than the saved-route ceiling on purpose: a course is bulkier
+   * (full geometry on disk, not an endpoint pair) and importing one is a
+   * deliberate power-user act, so a small free allowance still lets every
+   * rider feel the risk X-ray before the wall.
+   */
+  readonly importedCourses: number | null;
   /** Max offline map packs held at once. */
   readonly offlinePacks: number | null;
   /**
@@ -78,6 +87,7 @@ export interface TierLimits {
  */
 export const FREE_LIMITS: TierLimits = {
   savedRoutes: 5,
+  importedCourses: 2,
   offlinePacks: 1,
   offlinePackExpiryDays: 5,
   offlinePackStorageBudgetBytes: 200 * 1024 * 1024,
@@ -91,6 +101,7 @@ export const FREE_LIMITS: TierLimits = {
  */
 export const PLUS_LIMITS: TierLimits = {
   savedRoutes: null,
+  importedCourses: null,
   offlinePacks: null,
   offlinePackExpiryDays: null,
   offlinePackStorageBudgetBytes: 2 * 1024 * 1024 * 1024,
