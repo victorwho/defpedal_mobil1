@@ -14,6 +14,8 @@ npm run check:bundle
 
 **Never skip this step.** Blank screens on the phone are almost always caused by a bundle build error that this check catches.
 
+⚠️ **And never trust it on the status code alone — a port is not an identity.** Other checkouts on this machine (worktrees, `C:\dpb`, other workspaces) start their own Metro. On 2026-09-04 the server holding :8081 was running from `C:\Users\Victor\orca\workspaces\defpedal\Sesizari`, so the check returned a healthy HTTP 200 for a bundle containing none of this repo's code — three times, byte-identical, across ninety minutes of edits. Confirm the serving directory (`Get-CimInstance Win32_Process -Filter "Name='node.exe'"` and read the command line) and **grep the bundle for a symbol you just added**. Same for a built APK: unzip `assets/index.android.bundle` and grep it, plus `grep classes*.dex` for any newly autolinked native module. See error-log #103.
+
 ## Project Paths
 
 - **Main repo:** `C:\dev\defpedal` (short path, use this for all builds)
@@ -96,6 +98,24 @@ Migration `202609020001`. A reporter may tick "This hazard is permanent" in the 
 - **One thing deliberately does NOT apply:** the daily cron's hard-purge of `score <= -3` skips permanent rows (`.eq('is_permanent', false)` on both purge branches in `/v1/hazards/expire`). That DELETE is irreversible, so at score −3 it would be expiry by another name, at a third of the threshold the feature promises.
 - **Ordering constraint:** the migration MUST be live before the API deploys. The cron purge filters on `is_permanent`, and PostgREST 400s on an unknown column — an unmigrated DB turns the daily hazard-expiry cron into a 502 (it would page via the *Cloud Scheduler job failed* policy, but expiry stops meanwhile). The hazard INSERT path degrades gracefully on its own (`submissions.ts` retries without the column, stripping `is_permanent` before `hazard_type` so the category is never the thing that gets lost), and `/hazards/nearby` defaults `isPermanent` to `false`.
 - **Imports never set it.** `is_permanent` defaults false and the import pipeline supplies its own explicit `expires_at`, which still wins in `set_hazard_expiry`.
+
+## GPX Course Import (imported courses you follow)
+
+Plan + full implementation record: **`docs/plans/gpx-course-import.md`**. Shipped 2026-09-04, device-confirmed on preview v0.2.132.
+
+- **The value proposition inverts, and the UI says so.** Every other route is one we *computed*, so our job is picking safer roads. An imported course is a fixed line the rider brought from Komoot/Strava/RideWithGPS, and re-routing it destroys the only reason they imported it. So we X-ray it instead: the **Busy stretches** list on `app/course-import.tsx` names every high-risk run and flies the map to it. That list is the feature.
+- ⚠️ **`source: 'gpx_course'` is the marker, and `isCourseRoute` (core) is the only predicate.** It suppresses auto-reroute in `navigation.tsx`. Losing it silently replaces the rider's imported line with an OSRM route **mid-ride, with no undo** — data loss of the thing they came to follow. The gate is enforced inside `rerouteMutation`'s `mutationFn`, not only at its callers, because navigation has **three** reroute entry points (auto-after-60s, manual "Reroute now", skip-stop) and a per-caller check is one the next path walks around. It fails safe: a missing route returns `false`, since suppressing reroute on a *normal* route is the worse failure. Off-route becomes an off-**course** banner with the distance back to the line, and the spoken cue changes too ("off route" implies we will fix it).
+- **`saved_routes` cannot host a course.** `SavedRoute` stores origin/destination/waypoints and **re-routes on open** — it never stores geometry. Courses get their own device-local storage.
+- **Storage is split on purpose.** Geometry is one JSON file per course under **`documentDirectory`, never `cacheDirectory`** — the cache is OS-evictable and a course vanishing between planning and setting off is the one failure this feature cannot have (`gpx-share.ts` uses the cache for the opposite reason: an export is transient). Metadata lives in the device-scoped `importedCourses` Zustand slice so lists render without disk reads, and is **NOT** cleared by `resetUserScopedState` (the files belong to the handset). Geometry is re-validated on read — a truncated write would otherwise reach the router as malformed geometry. **Metadata is deleted before the file**: an orphaned file is reclaimed by `pruneOrphanedCourses` (swept once per session when the Routes sheet opens), whereas a row pointing at deleted geometry is a course the rider can tap and never open.
+- **Turn-by-turn is synthesized from geometry** (`packages/core/src/courseSteps.ts`), deliberately NOT map-matched: matching buys street names at the cost of silently moving the rider off the line they chose. The load-bearing constant is the **15 m bearing window**, not the 35° threshold — heading between adjacent points is dominated by GPS jitter baked into the source trace, so a turn only counts when the change is *sustained*. Two traps already paid for: a window that clamps near either end of the course grows phantom turns there (vertices without a full window on both sides are skipped), and clustering must key off the gap between **consecutive candidates**, not distance from the cluster start, or a corner taken on a wide radius splits into two cues.
+- **Zero new turn-instruction i18n keys.** Synthesized maneuvers use OSRM's own `type`/`modifier` vocabulary, and `nav.maneuverShort.*` already had the full set. `buildManeuverInstruction` is deliberately NOT reused — it renders "Turn {{direction}} onto {{street}}", which on a street-less course becomes "onto the road" on every cue.
+- **Risk and elevation needed no server change.** `/v1/risk-segments` and `/v1/elevation-profile` take a bare coordinate array, so `enrichRouteWithRisk`/`enrichRouteWithElevation` (now exported from `mapbox-routing.ts`) work on imported geometry unchanged. The same 12k-point cap applies — a 4-hour ride recorded at 1 Hz is ~14,000 points before anything is done with it.
+- **Busy-stretch detection shares ONE definition of "busy"** with the existing route-preview callout: `findHighRiskStretches` and `longestHighRiskStretchMeters` both read `BUSY_ROAD_CATEGORIES` in `riskStretch.ts` (currently the `High risk` tier). Never re-declare that list at a call site — error-log #20.
+- **Coverage honesty.** `isRiskDataAvailable` gates risk by country, so a course from outside the 31 covered countries shows the "risk scores aren't available here" notice and **no safety score** — never a fabricated number (the mistake the deleted `safety-score.tsx` made).
+- **Free tier keeps 2 courses** (`TierLimits.importedCourses`, `canImportAnotherCourse`, `usePremium().blockImportCourse` which folds in the dark-launch gate). Same "grandfather content, cap new additions" promise as saved routes — existing courses stay usable above the cap.
+- **`expo-document-picker` is a native dep** in `apps/mobile/package.json` (autolinking only reads the workspace — error-log #22b). Guarded by `hasExpoNativeModule('ExpoDocumentPicker')` + lazy `require()`, never a top-level import: it resolves its native module with `requireNativeModule` at import time, which throws uncatchably on Android when absent. The picker requests a **wildcard** MIME filter on purpose — providers disagree wildly about what a `.gpx` is (Drive says `application/octet-stream`), and filtering greys out real GPX files; content is the gate, via `parseGpx`.
+- **The parser is permissive where the exporter is strict**: GPX 1.0 and 1.1, `<trk>` **and `<rte>`**, namespace prefixes, either attribute order, self-closing points, multi-`<trkseg>` concatenation, longest-track-by-real-distance. Elevations are kept only when 1:1 with the points — the same invariant `buildRouteGpx` enforces outbound. Coordinate order is the classic bug: GPX attributes are `lat`/`lon`, our geometry is `[lon, lat]`.
+- **`/course-import` takes EITHER a file `uri` or a saved `courseId`** — one screen for both paths, and the same single-input shape an OS "Open with" intent will use. That intent filter (Android manifest + iOS UTI) is **not shipped**; it is the Phase 3 item and is how people actually receive GPX files.
 
 ## App Variants
 
@@ -488,10 +508,14 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-08-29)
+## Current State (as of 2026-09-04)
 
 > Entries below are dated and append-only — the newest facts are usually in the
-> most recent bullets, not the top. Latest work: **hazard import pipeline**
+> most recent bullets, not the top. Latest work: **GPX course import**
+> (2026-09-04) — a rider can import a .gpx course, see exactly where it gets
+> dangerous, and follow it turn-by-turn without it being silently re-routed;
+> see the "GPX Course Import" section above and
+> `docs/plans/gpx-course-import.md`. Before that: **hazard import pipeline**
 > (2026-08-27/29) — the hazard map went from 0 active hazards to **2,280**,
 > imported from Cologne Open311 and Amsterdam Signalen; see the "Hazard
 > Imports" section above and `docs/plans/hazard-import-pipeline.md`. Shipped
@@ -536,6 +560,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Turn-by-turn navigation with 3D follow camera
 - Remaining climb tracker (always shows ascent remaining, decreasing during navigation)
 - Elevation progress card (toggleable during navigation)
+- **GPX course import** — import a .gpx, see its busy stretches, save it to the device (2 free / unlimited on Plus), and ride it turn-by-turn with auto-reroute suppressed. See the "GPX Course Import" section above.
 - Waze-style hazard reporting (from both planning and navigation screens)
 - Hazard proximity alerts during navigation with upvote/downvote (community trust signal)
 - Hazard detail sheet (tap any marker) with vote buttons, score, age, distance, auto-expiry countdown
