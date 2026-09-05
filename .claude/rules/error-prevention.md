@@ -46,6 +46,19 @@ Before making any code changes, consult `.claude/error-log.md` for known pitfall
 
 34. **Running `npm run check:bundle`, or about to report "bundle green"?** A port is not an identity. The Metro on :8081 may have been started from a different checkout on this machine — it answers `packager-status:running`, returns HTTP 200, and serves a multi-megabyte bundle of real app code that contains none of your changes. Confirm which directory is serving the port (`Get-CimInstance Win32_Process -Filter "Name='node.exe'"`, read the command line), and verify by **content, not status code**: grep the bundle for a symbol you added this session. An artifact whose byte size is unchanged across substantive edits is a staleness alarm. Same rule for a built APK — unzip `assets/index.android.bundle` and grep it, and `grep classes*.dex` for any newly autolinked native module, rather than trusting `BUILD SUCCESSFUL` (Error #103, and #96 for the server-side sibling)
 
+35. **Writing risk copy, or touching the risk palette?** The palette is three
+    claim tiers over ten shades. Copy may name or compare a **TIER** only —
+    never two shades of the same tier (a shipped band description read "darker
+    shades lean busier" in all three locales before it was caught). The one
+    validated claim is **severity, not frequency**: a crash on a High-risk road
+    is more likely to be *serious*, NOT more likely to happen. Score thresholds
+    stay in `services/mobile-api/src/lib/risk.ts` only — colours may be bundled,
+    cuts may not. And colour a legend from the category TOKEN
+    (`tokens/riskLegend.ts`), never from a sampled data row: once a category
+    spans several shades, "first colour wins" makes the same tier render
+    differently on different routes (Error #104; background in `.claude/CLAUDE.md`
+    § "Risk Display Bands")
+
 ## After every code change
 
 Run `npm run check:bundle` to verify the bundle builds before testing on phone.

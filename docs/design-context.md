@@ -161,6 +161,16 @@ Haptics are tokenised, not ad-hoc. All live in `design-system/tokens/haptics.ts`
 - **First-person plural where it fits:** "We're tracking your ride", "We've lost GPS — move to an open area".
 - **Error messages: cause + recovery path.** "No internet — tap to retry" not "Network error".
 - **No apologies for technical states** (GPS, network, server); reassure instead of blame.
+- ⚠️ **Risk copy may name a TIER, never a shade.** The risk palette is three
+  claim tiers (`Safer` / `Typical` / `High risk`) rendered as ten shades — hue
+  changes at a tier boundary, lightness varies inside one. Only the tier is a
+  validated level, so no label, ranking, chart axis or sentence may compare two
+  shades of the same tier. This has been violated once already: a shipped band
+  description read "darker shades lean busier" in all three locales.
+- ⚠️ **The one validated risk claim is about severity, not frequency.** A crash
+  on a High-risk road is more likely to be *serious*. Never write copy implying
+  it is where crashes are more *likely* — different claim, not validated.
+  Background: `.claude/CLAUDE.md` § "Risk Display Bands".
 
 ---
 
@@ -169,6 +179,10 @@ Haptics are tokenised, not ad-hoc. All live in `design-system/tokens/haptics.ts`
 - **Yellow (`#FACC15`) is punctuation, not paragraphs.**
 - One primary CTA per viewport carries yellow. Every other yellow on the screen demotes to `accentDimmed` (`tints.accent` at 0.35 opacity) or `textSecondary` for icons.
 - Safety colours (red/amber/green) are reserved for safety semantics — never decorative. Enforced by `useSafetyColor()` (Phase 3, R8).
+- The risk-band ramp is the one place safety hues legitimately appear as a
+  gradient rather than a single semantic colour. Its shades come from
+  `tokens/riskLegend.ts`, which mirrors the server palette — never hand-pick a
+  risk colour, and never put a score threshold in the client.
 
 ---
 
