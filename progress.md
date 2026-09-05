@@ -1990,3 +1990,35 @@ Added `apps/mobile/src/lib/netInfoModule.test.ts` (2 specs: native-module-absent
 **Process note (error-log #103 in practice):** the Metro holding :8081 was serving a different checkout (`orca/workspaces/defpedal/Sesizari`). Ran this repo's Metro on :8099, forwarded `adb reverse tcp:8081 tcp:8099`, and verified every bundle by **grepping it for symbols added this session** rather than trusting HTTP 200.
 
 **Verification:** typecheck clean, lint ratchet clean, 1730 mobile tests pass (141 files), bundle HTTP 200 with the new symbols present and no diagnostics left behind. Error-log #105 + prevention rule 36 record the edge-to-edge trap.
+
+### Session 116 — Bike type at onboarding, and the localized-label bug behind it (2026-09-05)
+
+**Asked for:** a simple onboarding screen where the rider picks their bike type, with `Avoid unpaved roads` following the choice the way it already does in Profile.
+
+**The behaviour being mirrored was broken outside English.** `setBikeType` compared against the literals `'Road bike'` / `'City bike'` / `'Mountain bike'` / `'Recumbent'`, but `profile.tsx` stored `t('profile.bikeRoad')` — the LOCALIZED label. A Romanian rider stored `'Bicicletă de cursă'`, matched nothing, and silently got no auto-toggle at all. Same for Spanish. The shipped tests passed because they hardcoded the English strings too.
+
+**The same root cause had two more victims**, both of which corrupt data rather than just a setting:
+- `mapBikeTypeToVehicle` (core) matched `'e-bike'` / `'ebike'` / `'electric'` — every RO/ES e-bike rider was scored as **acoustic**, so wrong microlives multipliers (vUser 1.0 instead of 0.6, vCom 1.0 instead of 0.85).
+- `v1.ts` twice (`:2683`, `:3163`) ran the same English lowercase compare on `trip_tracks.bike_type` — **wrong calories on every RO/ES e-bike ride**.
+
+Root cause in one line: a localized DISPLAY string was being used as a semantic IDENTIFIER. It also meant switching app language stranded a stale foreign-language value in the store.
+
+**Shipped.** New `packages/core/src/bikeTypes.ts` owns the contract — `BikeTypeId`, `BIKE_TYPE_IDS`, and one exported predicate per rule (`prefersPavedRouting`, `prefersUnpavedCapable`, `avoidUnpavedForBikeType`, `isEbikeBikeTypeValue`) per prevention rule #20. `legacyBikeTypeToId` maps every label all three locales have ever shipped, with an explicit diacritic-fold map rather than `String.prototype.normalize` (Hermes support has varied by build). Store field is now `bikeTypeId`; persist **v6 → v7** migrates the stored label and drops the old key.
+
+- `avoidUnpavedForBikeType` returns **`null`, not `false`**, for E-bike and Other. The distinction is load-bearing: `null` means "keep the rider's choice", `false` would mean "turn it off" — collapsing them would silently reset a preference.
+- The migration deliberately does **NOT** retro-change `avoidUnpaved`. The rider's current value is an existing choice; flipping a routing setting during an app update is not ours to do.
+- The server keeps its legacy-string branch on purpose — the fielded fleet is v0.2.123 and will send display labels for months (error-log #100).
+
+**New screen: `app/onboarding/bike-type.tsx`.** Six selectable cards rather than a dropdown (one decision per screen, 60dp rows), Ionicons never emoji, selection carried by a **checkmark as well as colour**. The piece worth keeping: a **live consequence line** naming the setting being changed and where to change it back — the screen mutates a routing default the rider never asked about, and saying so is the difference between helpful and spooky. It distinguishes "we'll leave your setting as it is" from claiming a change. 13 new i18n keys x 3 locales.
+
+⚠️ **Placement could not be anchored to `navigateAfterOnboarding()`.** `auth.tsx` performs **no navigation on success** — email signups reach the app purely by the signup gate going quiet once `hasRealAccount` flips, so they never touch `choose-username` or that helper. Only Google/Apple do. Anchoring there would have silently skipped every email signup. New pure `computePostSignupStepTarget` keys off STORE STATE instead, wired at both convergence points (`navigateAfterOnboarding` and `app/index.tsx`).
+
+**A second bug the tests caught, in the new wiring.** `app/index.tsx` always evaluates at `pathname: '/'`, so the protected-path rule could not see an active ride — it would have hijacked ride recovery into the preference screen and **lost the ride**. Ride protection now lives inside the predicate keyed on `appState` (NAVIGATING / AWAITING_FEEDBACK), so the rule sits in one place instead of depending on redirect ordering in index.tsx.
+
+Existing riders are not interrupted: the migration stamps `bikeTypePromptSeen` from `onboardingCompleted`.
+
+**Verification.** Typecheck clean across all three workspaces, lint ratchet clean, **mobile 1749/1749** and **core 1012/1012**. 31 new tests, every locale asserted explicitly — an English-only suite is exactly what let this through the first time. mobile-api shows 11 failures that are **pre-existing**: stashing the whole change produced a byte-identical failure set on a clean tree (each is the first test in its file at a 10s timeout under parallel load; every file passes in isolation).
+
+**Process note — error-log #103 caught a live near-miss.** `npm run check:bundle` returned a healthy HTTP 200 for a bundle containing **none of this work**: :8081 was held by a different checkout (`orca/workspaces/defpedal/Sesizari`) while this repo's Metro ran on :8099. Verified by pulling the bundle from :8099 and grepping it for the seven symbols added this session, and confirming the old `pavedPreferred` comparison is gone (0 occurrences). **The `check:bundle` script's hardcoded :8081 will mislead the next session too** — worth parameterising.
+
+**Device-verified** (S23 Ultra, dev variant over Metro, app data cleared for a clean onboarding run).

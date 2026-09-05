@@ -79,11 +79,58 @@ beforeEach(() => {
   lastRedirectHref = null;
   // Default to real-account gate state — most cases don't care about the gate.
   setGate({});
+  // These cases model an ESTABLISHED account. A rider who has never answered
+  // the bike-type step is intercepted before any of this routing runs (see
+  // the post-signup step block below), which is the correct behaviour but not
+  // what the baseline cases are about.
+  useAppStore.setState({ bikeTypePromptSeen: true, bikeTypeId: 'city' });
 });
 
 afterEach(() => {
   useAppStore.getState().resetFlow();
   useAppStore.persist.clearStorage();
+});
+
+describe('Index route — post-signup steps', () => {
+  it('sends a rider who has never answered the bike-type step there first', () => {
+    // This is the EMAIL signup path. `auth.tsx` performs no navigation on
+    // success, so an email rider arrives here with an account and would
+    // otherwise skip the step entirely — it is only wired into the
+    // Google/Apple path's navigateAfterOnboarding().
+    useAppStore.setState({
+      appState: 'IDLE',
+      bikeTypeId: null,
+      bikeTypePromptSeen: false,
+    });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/onboarding/bike-type');
+  });
+
+  it('does not interrupt an active ride to ask', () => {
+    useAppStore.setState({
+      appState: 'NAVIGATING',
+      bikeTypeId: null,
+      bikeTypePromptSeen: false,
+    });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).not.toBe('/onboarding/bike-type');
+  });
+
+  it('stops asking once the rider has answered', () => {
+    useAppStore.setState({
+      appState: 'IDLE',
+      bikeTypeId: 'road',
+      bikeTypePromptSeen: true,
+    });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/route-planning');
+  });
 });
 
 describe('Index route — baseline routing (real account, gate silent)', () => {

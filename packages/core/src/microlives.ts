@@ -9,17 +9,22 @@
  * Used identically on client (instant local estimates) and server (authoritative).
  */
 
+import { isEbikeBikeTypeValue } from './bikeTypes';
+
 // ── Vehicle types ──
 
 export type VehicleType = 'acoustic' | 'ebike';
 
-/** Map user-facing bike type string to vehicle category. */
-export const mapBikeTypeToVehicle = (bikeType: string | null | undefined): VehicleType => {
-  if (!bikeType) return 'acoustic';
-  const lower = bikeType.toLowerCase();
-  if (lower.includes('e-bike') || lower.includes('ebike') || lower === 'electric') return 'ebike';
-  return 'acoustic';
-};
+/**
+ * Map a stored bike type to a vehicle category.
+ *
+ * Accepts a stable `BikeTypeId` ('ebike') or any legacy localized label
+ * ('E-bike', 'Bicicleta electrica', 'Bicicleta electrica'). The old
+ * implementation matched English substrings only, so every RO/ES e-bike
+ * rider was silently scored as acoustic.
+ */
+export const mapBikeTypeToVehicle = (bikeType: string | null | undefined): VehicleType =>
+  isEbikeBikeTypeValue(bikeType) ? 'ebike' : 'acoustic';
 
 // ── Multipliers ──
 

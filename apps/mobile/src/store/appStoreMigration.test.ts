@@ -113,7 +113,7 @@ describe('migratePersistedAppState — telemetry choice preservation', () => {
     expect(result.analyticsConsent?.capturedAt).toBeNull();
   });
 
-  it('a current-version (v6) state passes through untouched — no migration step runs', () => {
+  it('a current-version (v7) state passes through untouched — no migration step runs', () => {
     const persisted = {
       analyticsConsent: {
         sentry: false,
@@ -122,7 +122,7 @@ describe('migratePersistedAppState — telemetry choice preservation', () => {
       },
     };
 
-    const result = migratePersistedAppState(persisted, 6) as MigratedConsent;
+    const result = migratePersistedAppState(persisted, 7) as MigratedConsent;
 
     expect(result).toEqual(persisted);
   });
@@ -159,5 +159,65 @@ describe('importedCourses hydration safety', () => {
     ) as Record<string, unknown>;
 
     expect(migrated.importedCourses).toEqual([course]);
+  });
+  // ── v6 → v7: bike type becomes a stable id ────────────────────────────
+  describe('v6 -> v7 bike type id migration', () => {
+    it('maps a localized label to its stable id in every locale', () => {
+      const cases: ReadonlyArray<readonly [string, string]> = [
+        ['Road bike', 'road'],
+        ['Bicicletă de cursă', 'road'],
+        ['Bicicleta de carretera', 'road'],
+        ['Mountain bike', 'mountain'],
+        ['Bicicletă de munte', 'mountain'],
+        ['Bicicleta de montaña', 'mountain'],
+        ['E-bike', 'ebike'],
+        ['Bicicletă electrică', 'ebike'],
+        ['Bicicleta eléctrica', 'ebike'],
+      ];
+
+      for (const [label, id] of cases) {
+        const migrated = migratePersistedAppState(
+          { appState: 'IDLE', bikeType: label },
+          6,
+        ) as Record<string, unknown>;
+        expect(migrated.bikeTypeId, `${label} -> ${id}`).toBe(id);
+        expect('bikeType' in migrated).toBe(false);
+      }
+    });
+
+    it('does NOT retroactively change avoidUnpaved', () => {
+      // The rider's current value is an existing choice (or an existing
+      // default). Flipping a routing setting during an app update is not
+      // ours to do — the new default only applies to new selections.
+      const migrated = migratePersistedAppState(
+        { appState: 'IDLE', bikeType: 'Road bike', avoidUnpaved: false },
+        6,
+      ) as Record<string, unknown>;
+
+      expect(migrated.bikeTypeId).toBe('road');
+      expect(migrated.avoidUnpaved).toBe(false);
+    });
+
+    it('marks the onboarding prompt seen only for devices that already onboarded', () => {
+      const done = migratePersistedAppState(
+        { appState: 'IDLE', onboardingCompleted: true },
+        6,
+      ) as Record<string, unknown>;
+      expect(done.bikeTypePromptSeen).toBe(true);
+
+      const midFlow = migratePersistedAppState(
+        { appState: 'IDLE', onboardingCompleted: false },
+        6,
+      ) as Record<string, unknown>;
+      expect(midFlow.bikeTypePromptSeen).toBe(false);
+    });
+
+    it('leaves bikeTypeId null when no bike type was ever stored', () => {
+      const migrated = migratePersistedAppState(
+        { appState: 'IDLE', onboardingCompleted: true },
+        6,
+      ) as Record<string, unknown>;
+      expect(migrated.bikeTypeId).toBeNull();
+    });
   });
 });

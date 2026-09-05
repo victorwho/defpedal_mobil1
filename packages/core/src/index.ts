@@ -5,6 +5,7 @@ export * from './cityPulse';
 export * from './co2';
 export * from './communityVisibility';
 export * from './cyclingWeather';
+export * from './bikeTypes';
 export * from './microlives';
 export * from './contracts';
 export * from './contrast';

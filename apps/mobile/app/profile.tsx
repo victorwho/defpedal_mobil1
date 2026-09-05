@@ -26,7 +26,7 @@ import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { PLAY_STORE_URL, resolveQuizCountry, type QuizCountryPreference } from '@defensivepedal/core';
+import { PLAY_STORE_URL, resolveQuizCountry, BIKE_TYPE_IDS, type QuizCountryPreference } from '@defensivepedal/core';
 import { getDeviceRegion } from '../src/i18n';
 import { mobileApi } from '../src/lib/api';
 import {
@@ -49,6 +49,11 @@ import { useTiers } from '../src/hooks/useTiers';
 import { TierRankCard } from '../src/design-system/organisms/TierRankCard';
 import { brandTints, safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 
+/**
+ * Picker rows, in `BIKE_TYPE_IDS` order. The label is localized for display;
+ * the ID is what gets stored and compared. Keep these two in step — the
+ * mapping is positional.
+ */
 const BIKE_TYPE_KEYS = [
   'profile.bikeRoad', 'profile.bikeCity', 'profile.bikeMountain',
   'profile.bikeEbike', 'profile.bikeRecumbent', 'profile.bikeOther',
@@ -152,7 +157,7 @@ export default function ProfileScreen() {
 
   // State values - grouped by section with shallow comparison
   const {
-    locale, bikeType, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
+    locale, bikeTypeId, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
     shareTripsPublicly, themePreference, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
@@ -160,7 +165,7 @@ export default function ProfileScreen() {
     notifyActivationLadder, notifyRidingTips,
   } = useAppStore(useShallow((state) => ({
     locale: state.locale,
-    bikeType: state.bikeType,
+    bikeTypeId: state.bikeTypeId,
     cyclingFrequency: state.cyclingFrequency,
     avoidUnpaved: state.avoidUnpaved,
     avoidHills: state.avoidHills,
@@ -651,9 +656,15 @@ export default function ProfileScreen() {
 
             <DropdownPicker
               label={t('profile.bikeType')}
-              value={bikeType}
+              value={bikeTypeId ? t(BIKE_TYPE_KEYS[BIKE_TYPE_IDS.indexOf(bikeTypeId)]) : null}
               options={BIKE_TYPE_KEYS.map((k) => t(k))}
-              onSelect={setBikeType}
+              onSelect={(label) => {
+                // Positional: the options array is built from BIKE_TYPE_KEYS,
+                // which is ordered to match BIKE_TYPE_IDS. Resolving by index
+                // keeps the stored value locale-independent.
+                const index = BIKE_TYPE_KEYS.findIndex((k) => t(k) === label);
+                if (index >= 0) setBikeType(BIKE_TYPE_IDS[index]);
+              }}
               placeholder={t('profile.selectBikeType')}
             />
 

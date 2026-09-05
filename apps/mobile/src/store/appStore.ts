@@ -42,6 +42,9 @@ import {
   type NavigationSession,
   type NavigationProgressSnapshot,
   updateNavigationSessionProgress,
+  avoidUnpavedForBikeType,
+  legacyBikeTypeToId,
+  type BikeTypeId,
 } from '@defensivepedal/core';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
@@ -113,7 +116,12 @@ type AppStore = QueueSlice & PremiumSlice & {
   // Default true. When false, a successful claim still awards XP + badges,
   // but no feed entry is published to the sharer's followers.
   shareConversionFeedOptin: boolean;
-  bikeType: string | null;
+  /**
+   * Stable bike-type id. Was a localized display string until 2026-09-05,
+   * which broke the avoid-unpaved default, microlives and calories for every
+   * non-English rider (see packages/core/src/bikeTypes.ts).
+   */
+  bikeTypeId: BikeTypeId | null;
   cyclingFrequency: string | null;
   weightKg: number;
   avoidUnpaved: boolean;
@@ -414,7 +422,14 @@ type AppStore = QueueSlice & PremiumSlice & {
   setShowRouteComparison: (enabled: boolean) => void;
   setShareTripsPublicly: (enabled: boolean) => void;
   setShareConversionFeedOptin: (enabled: boolean) => void;
-  setBikeType: (type: string | null) => void;
+  setBikeType: (id: BikeTypeId | null) => void;
+  /**
+   * True once the rider has answered (or skipped) the onboarding bike-type
+   * step. Device-scoped like `bikeTypeId` itself — NOT cleared by
+   * `resetUserScopedState`, so switching accounts doesn't re-ask.
+   */
+  bikeTypePromptSeen: boolean;
+  markBikeTypePromptSeen: () => void;
   setCyclingFrequency: (frequency: string | null) => void;
   setWeightKg: (kg: number) => void;
   setAvoidUnpaved: (enabled: boolean) => void;
@@ -510,7 +525,7 @@ type AppStore = QueueSlice & PremiumSlice & {
 };
 
 /**
- * Persist migration chain (v0 → v6). Extracted from the persist config and
+ * Persist migration chain (v0 → v7). Extracted from the persist config and
  * exported so upgrade-path behavior is unit-testable — preserving existing
  * users' explicit telemetry choices is a hard requirement (2026-07-16, the
  * consent screen was removed from onboarding; the migration + rehydration
@@ -648,6 +663,33 @@ export const migratePersistedAppState = (
     }
   }
 
+  // v6 -> v7: bike type becomes a stable id (2026-09-05). It was persisted
+  // as the LOCALIZED picker label, but every consumer compared it against
+  // English strings — so a Romanian or Spanish rider got no avoid-unpaved
+  // default, acoustic microlives on an e-bike, and wrong calories. Map the
+  // stored label to its id and drop the old field.
+  //
+  // Deliberately does NOT touch `avoidUnpaved`: the rider's current value is
+  // an existing choice (or an existing default), and retroactively flipping a
+  // routing setting during an app update is not ours to do. New selections
+  // apply the default from here on.
+  if (version < 7) {
+    const state = next as { bikeType?: unknown; bikeTypeId?: unknown } | undefined;
+    if (state) {
+      const rest = { ...(state as Record<string, unknown>) };
+      const legacy = typeof rest.bikeType === 'string' ? rest.bikeType : null;
+      delete rest.bikeType;
+      next = {
+        ...rest,
+        bikeTypeId: rest.bikeTypeId ?? legacyBikeTypeToId(legacy),
+        // Devices that already finished onboarding must not be dropped into
+        // the new step on an app update — they only reach it if they never
+        // got through onboarding in the first place.
+        bikeTypePromptSeen: rest.onboardingCompleted === true,
+      };
+    }
+  }
+
   return next;
 };
 
@@ -666,7 +708,8 @@ export const useAppStore = create<AppStore>()(
       ...createPremiumSlice(set),
       shareTripsPublicly: true,
       shareConversionFeedOptin: true,
-      bikeType: null,
+      bikeTypeId: null,
+      bikeTypePromptSeen: false,
       cyclingFrequency: null,
       weightKg: 70,
       avoidUnpaved: false,
@@ -1080,14 +1123,18 @@ export const useAppStore = create<AppStore>()(
 
       setShareConversionFeedOptin: (enabled) =>
         set(() => ({ shareConversionFeedOptin: enabled })),
-      setBikeType: (type) => {
-        const pavedPreferred = type === 'Road bike' || type === 'City bike' || type === 'Recumbent';
-        const unpavedPreferred = type === 'Mountain bike';
+      setBikeType: (id) => {
+        // `avoidUnpavedForBikeType` returns null for bike types that imply
+        // nothing about surface (E-bike, Other) — those must preserve the
+        // rider's existing choice rather than reset it.
+        const implied = id ? avoidUnpavedForBikeType(id) : null;
         set((state) => ({
-          bikeType: type,
-          avoidUnpaved: pavedPreferred ? true : unpavedPreferred ? false : state.avoidUnpaved,
+          bikeTypeId: id,
+          avoidUnpaved: implied ?? state.avoidUnpaved,
+          bikeTypePromptSeen: true,
         }));
       },
+      markBikeTypePromptSeen: () => set(() => ({ bikeTypePromptSeen: true })),
       setCyclingFrequency: (frequency) =>
         set(() => ({ cyclingFrequency: frequency })),
       setWeightKg: (kg) =>
@@ -1544,7 +1591,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 6,
+      version: 7,
       migrate: (persistedState, version) => migratePersistedAppState(persistedState, version),
       // A rider who enabled Cool before it was hidden would otherwise rehydrate
       // into an invisible mode with no control to leave it. Coerce on the way
@@ -1593,7 +1640,8 @@ export const useAppStore = create<AppStore>()(
         // resetUserScopedState (sign-out must not restart the ladder).
         activationLadder: state.activationLadder,
         notifyActivationLadder: state.notifyActivationLadder,
-        bikeType: state.bikeType,
+        bikeTypeId: state.bikeTypeId,
+        bikeTypePromptSeen: state.bikeTypePromptSeen,
         cyclingFrequency: state.cyclingFrequency,
         weightKg: state.weightKg,
         avoidUnpaved: state.avoidUnpaved,

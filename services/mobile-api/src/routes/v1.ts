@@ -33,7 +33,7 @@ import type {
   TiersResponse,
 } from '@defensivepedal/core';
 import { XP_VALUES, badgeTierToXpAction, calculateRideMultiplier, XP_ACTION_LABELS, normalizeXpAwardResult } from '../lib/xp';
-import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned, decodePolyline, encodePolyline } from '@defensivepedal/core';
+import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned, decodePolyline, encodePolyline, isEbikeBikeTypeValue } from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
@@ -2680,8 +2680,10 @@ export const buildV1Routes = (
             .select('bike_type, started_at, ended_at')
             .eq('trip_id', tripId)
             .single();
-          const bt = String(trackMeta?.bike_type ?? '').toLowerCase();
-          if (bt === 'ebike' || bt === 'electric' || bt.includes('e-bike')) {
+          // Handles the stable id ('ebike') sent by current clients AND every
+          // legacy localized label already stored in trip_tracks. The previous
+          // English-only compare scored every RO/ES e-bike ride as acoustic.
+          if (isEbikeBikeTypeValue(trackMeta?.bike_type as string | null)) {
             vehicleType = 'ebike';
           }
           if (durationSeconds <= 0) {
@@ -3160,9 +3162,8 @@ export const buildV1Routes = (
           }
 
           const distMeters = Number(track.actual_distance_meters ?? track.planned_route_distance_meters ?? 0);
-          const autoBt = String(track.bike_type ?? '').toLowerCase();
           const autoVehicle: 'acoustic' | 'ebike' =
-            (autoBt === 'ebike' || autoBt === 'electric' || autoBt.includes('e-bike')) ? 'ebike' : 'acoustic';
+            isEbikeBikeTypeValue(track.bike_type as string | null) ? 'ebike' : 'acoustic';
           // Derive real ride duration from the track timestamps. calories =
           // MET x weight x hours, so a 0 duration always yields 0 kcal and the
           // client hides the calorie block — auto-computed impacts therefore

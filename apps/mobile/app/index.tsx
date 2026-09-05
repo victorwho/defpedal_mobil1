@@ -5,6 +5,7 @@ import {
   computeOnboardingGateTarget,
   useOnboardingGate,
 } from '../src/hooks/useOnboardingGate';
+import { computePostSignupStepTarget } from '../src/hooks/computePostSignupStepTarget';
 import { mobileEnv } from '../src/lib/env';
 import { useAppStore } from '../src/store/appStore';
 
@@ -13,6 +14,8 @@ export default function Index() {
   const navigationSession = useAppStore((state) => state.navigationSession);
   const routePreview = useAppStore((state) => state.routePreview);
   const resetFlow = useAppStore((state) => state.resetFlow);
+  const bikeTypeId = useAppStore((state) => state.bikeTypeId);
+  const bikeTypePromptSeen = useAppStore((state) => state.bikeTypePromptSeen);
   const gate = useOnboardingGate();
   const hasClearedPreviewRef = useRef(false);
 
@@ -23,6 +26,17 @@ export default function Index() {
   // attempt to render `<Redirect>` at root-layout level silently dropped the
   // navigation because no screen was focused.
   const gateTarget = computeOnboardingGateTarget(gate);
+  const postSignupStepTarget = computePostSignupStepTarget({
+    // Always '/' here — the appState field below is what actually protects
+    // an in-progress ride at this call site.
+    pathname: '/',
+    appState,
+    storeHydrated: gate.storeHydrated,
+    isLoading: gate.isLoading,
+    hasRealAccount: gate.hasRealAccount,
+    bikeTypeId,
+    bikeTypePromptSeen,
+  });
 
   // Real-account cold starts always land on a clean route-planning screen.
   // Drop any persisted ROUTE_PREVIEW / AWAITING_FEEDBACK so the user picks
@@ -62,6 +76,16 @@ export default function Index() {
 
   if (gateTarget) {
     return <Redirect href={gateTarget as never} />;
+  }
+
+  // Post-signup steps that still owe an answer. This is the convergence point
+  // for EMAIL signups: `auth.tsx` performs no navigation on success, so an
+  // email rider reaches the app through here and would otherwise never see a
+  // step anchored to `navigateAfterOnboarding()` (the Google/Apple path).
+  // Skipped during an active ride / post-ride summary by the same
+  // protected-path rule the signup gate uses.
+  if (postSignupStepTarget) {
+    return <Redirect href={postSignupStepTarget as never} />;
   }
 
   if (appState === 'NAVIGATING' && navigationSession && routePreview?.routes.length) {

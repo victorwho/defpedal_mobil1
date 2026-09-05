@@ -725,22 +725,58 @@ describe('useAppStore', () => {
   // =========================================================================
 
   describe('preferences', () => {
-    it('setBikeType sets bike type and auto-enables avoidUnpaved for road bikes', () => {
-      useAppStore.getState().setBikeType('Road bike');
-      expect(useAppStore.getState().bikeType).toBe('Road bike');
+    // These used to pass localized DISPLAY labels ('Road bike'), which is
+    // exactly how the locale bug survived: the store compared against English
+    // strings, so the tests only ever exercised the English path while RO/ES
+    // riders got no auto-toggle at all. The contract is a stable id now.
+    it('setBikeType auto-enables avoidUnpaved for road bikes', () => {
+      useAppStore.getState().setBikeType('road');
+      expect(useAppStore.getState().bikeTypeId).toBe('road');
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+    });
+
+    it('setBikeType auto-enables avoidUnpaved for city bikes and recumbents', () => {
+      useAppStore.getState().setAvoidUnpaved(false);
+      useAppStore.getState().setBikeType('city');
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+
+      useAppStore.getState().setAvoidUnpaved(false);
+      useAppStore.getState().setBikeType('recumbent');
       expect(useAppStore.getState().avoidUnpaved).toBe(true);
     });
 
     it('setBikeType auto-disables avoidUnpaved for mountain bikes', () => {
-      useAppStore.getState().setBikeType('Mountain bike');
-      expect(useAppStore.getState().bikeType).toBe('Mountain bike');
+      useAppStore.getState().setBikeType('mountain');
+      expect(useAppStore.getState().bikeTypeId).toBe('mountain');
       expect(useAppStore.getState().avoidUnpaved).toBe(false);
     });
 
-    it('setBikeType preserves avoidUnpaved for other bike types', () => {
+    it('setBikeType preserves avoidUnpaved for bike types that imply nothing', () => {
       useAppStore.getState().setAvoidUnpaved(true);
-      useAppStore.getState().setBikeType('E-bike');
-      expect(useAppStore.getState().bikeType).toBe('E-bike');
+      useAppStore.getState().setBikeType('ebike');
+      expect(useAppStore.getState().bikeTypeId).toBe('ebike');
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+
+      useAppStore.getState().setAvoidUnpaved(false);
+      useAppStore.getState().setBikeType('other');
+      expect(useAppStore.getState().avoidUnpaved).toBe(false);
+    });
+
+    // This suite shares one store instance across tests, so both cases seed
+    // their own starting point rather than assuming a pristine default.
+    it('setBikeType stamps the onboarding prompt as answered', () => {
+      useAppStore.setState({ bikeTypeId: null, bikeTypePromptSeen: false });
+      useAppStore.getState().setBikeType('city');
+      expect(useAppStore.getState().bikeTypePromptSeen).toBe(true);
+    });
+
+    it('markBikeTypePromptSeen records a skip without touching avoidUnpaved', () => {
+      useAppStore.setState({ bikeTypeId: null, bikeTypePromptSeen: false });
+      useAppStore.getState().setAvoidUnpaved(true);
+      useAppStore.getState().markBikeTypePromptSeen();
+      expect(useAppStore.getState().bikeTypePromptSeen).toBe(true);
+      // A skip must not invent a bike type on the rider's behalf.
+      expect(useAppStore.getState().bikeTypeId).toBeNull();
       expect(useAppStore.getState().avoidUnpaved).toBe(true);
     });
 

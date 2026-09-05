@@ -554,7 +554,7 @@ function NavigationScreen() {
         endReason: reason,
         startedAt: currentSession.startedAt,
         endedAt,
-        bikeType: store.bikeType ?? undefined,
+        bikeType: store.bikeTypeId ?? undefined,
         aqiAtStart: null, // TODO: capture AQI at navigation start
         earlyEndReason,
         earlyEndReasonNote,

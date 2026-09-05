@@ -446,7 +446,7 @@ export default function FeedbackScreen() {
     const distKm = distMeters / 1000;
     const co2 = distKm * 0.12;
     const money = distKm * 0.35;
-    const vehicle = mapBikeTypeToVehicle(store.bikeType);
+    const vehicle = mapBikeTypeToVehicle(store.bikeTypeId);
     const weightKg = store.weightKg;
     const durationSeconds = session?.startedAt
       ? Math.max(0, Math.round((Date.now() - new Date(session.startedAt).getTime()) / 1000))

@@ -1140,6 +1140,24 @@ export const en = {
     welcome: 'Welcome to Defensive Pedal',
     createAccount: 'Create account',
     skip: 'Skip for now',
+    // Bike-type step (post-signup).
+    // The consequence lines are load-bearing: this screen changes the
+    // 'Avoid unpaved roads' routing setting, so it must say so plainly and
+    // name where the rider can change it back.
+    bikeTypeTitle: 'What do you ride?',
+    bikeTypeSubtitle: 'We’ll tune your routes to suit your bike.',
+    bikeTypeContinue: 'Continue',
+    bikeRoadDesc: 'Thin tyres, happiest on smooth tarmac',
+    bikeCityDesc: 'Everyday commuting and errands',
+    bikeMountainDesc: 'Built for trails, gravel and rough ground',
+    bikeEbikeDesc: 'Pedal-assist or electric',
+    bikeRecumbentDesc: 'Laid-back seating, low to the ground',
+    bikeOtherDesc: 'Something else — folding, cargo, trike',
+    bikeConsequenceNone: 'Pick one and we’ll set your surface preference to match. You can change it anytime in Profile.',
+    bikeConsequencePaved: 'We’ll turn on “Avoid unpaved roads” so your routes stay on tarmac. Change it anytime in Profile.',
+    bikeConsequenceUnpaved: 'We’ll turn off “Avoid unpaved roads” so trails and gravel stay available. Change it anytime in Profile.',
+    bikeConsequenceNeutral: 'We’ll leave your “Avoid unpaved roads” setting as it is. Change it anytime in Profile.',
+
     getStarted: 'Get started',
     oneMoreThing: 'One more thing',
     chooseUsername: 'Choose a username',
