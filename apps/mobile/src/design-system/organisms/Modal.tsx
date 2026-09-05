@@ -25,6 +25,7 @@ import { safetyColors } from '../tokens/colors';
 import { duration, easing } from '../tokens/motion';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useHaptics } from '../hooks/useHaptics';
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,6 +57,12 @@ export const Modal: React.FC<ModalProps> = ({
   const { colors } = useTheme();
   const reducedMotion = useReducedMotion();
   const haptics = useHaptics();
+  // The card is centred in a full-screen overlay, and RN's Modal window does
+  // not resize for the keyboard under edge-to-edge any more than the main one
+  // does — so without this the lower half of a tall modal (and any TextInput
+  // in it) sits behind the keyboard. Shrinking the overlay by the keyboard's
+  // height re-centres the card in the space that is actually visible.
+  const keyboardHeight = useKeyboardHeight();
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   // Backdrop dim ramps in instead of snapping — gives the modal a sense of
@@ -124,7 +131,12 @@ export const Modal: React.FC<ModalProps> = ({
       onRequestClose={dismissable ? onClose : undefined}
     >
       {/* Overlay — animated backdrop, with absolute-fill Pressable for tap-to-dismiss */}
-      <Animated.View style={[styles.overlay, { backgroundColor: backdropBg }]}>
+      <Animated.View
+        style={[
+          styles.overlay,
+          { backgroundColor: backdropBg, paddingBottom: space[6] + keyboardHeight },
+        ]}
+      >
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={dismissable ? onClose : undefined}
@@ -145,7 +157,7 @@ export const Modal: React.FC<ModalProps> = ({
             { transform: [{ scale }], opacity },
           ]}
         >
-          <Pressable>
+          <Pressable style={styles.cardInner}>
             {/* Header */}
             <View style={styles.header}>
               <Text
@@ -194,9 +206,17 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 380,
+    // Lets a tall card be bounded by the space left above the keyboard rather
+    // than overflowing it. Consumers whose body can outgrow that space put a
+    // ScrollView in it; the shrink has to be declared at every level down to
+    // that ScrollView or it never takes effect.
+    flexShrink: 1,
     borderRadius: radii.xl,
     borderCurve: 'continuous', // Smooth squircle corners on iOS
     overflow: 'hidden',
+  },
+  cardInner: {
+    flexShrink: 1,
   },
   header: {
     padding: space[6],
@@ -205,6 +225,8 @@ const styles = StyleSheet.create({
   body: {
     paddingHorizontal: space[6],
     paddingBottom: space[4],
+    // Header and footer keep their natural height; the body absorbs the squeeze.
+    flexShrink: 1,
   },
   footer: {
     flexDirection: 'row',

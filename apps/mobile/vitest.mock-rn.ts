@@ -241,6 +241,36 @@ export const Dimensions = {
   get: () => ({ width: 375, height: 812 }),
 };
 
+export const useWindowDimensions = () => ({ width: 375, height: 812, scale: 2, fontScale: 1 });
+
+/**
+ * Minimal `Keyboard` stand-in. Tests drive it by calling `Keyboard.emit(...)`,
+ * which is NOT part of the real RN surface — it stands in for the native
+ * keyboard raising/lowering.
+ */
+type KeyboardListener = (event: { endCoordinates?: { height: number } }) => void;
+const keyboardListeners = new Map<string, Set<KeyboardListener>>();
+
+export const Keyboard = {
+  addListener: (event: string, listener: KeyboardListener) => {
+    const set = keyboardListeners.get(event) ?? new Set<KeyboardListener>();
+    set.add(listener);
+    keyboardListeners.set(event, set);
+    return {
+      remove: () => {
+        set.delete(listener);
+      },
+    };
+  },
+  dismiss: () => {},
+  /** Test-only: fire a keyboard event at every registered listener. */
+  emit: (event: string, payload: { endCoordinates?: { height: number } } = {}) => {
+    keyboardListeners.get(event)?.forEach((listener) => listener(payload));
+  },
+  /** Test-only: how many listeners are currently attached (leak assertions). */
+  listenerCount: (event: string) => keyboardListeners.get(event)?.size ?? 0,
+};
+
 // `RNCNetInfo` is populated by default so ConnectivityProvider (and its tests)
 // proceed past its native-module guard. The actual NetInfo behaviour is
 // supplied by `vi.mock('@react-native-community/netinfo', ...)` per test.

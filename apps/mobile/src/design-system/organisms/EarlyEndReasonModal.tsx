@@ -9,7 +9,7 @@
  */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { EarlyEndReason } from '@defensivepedal/core';
 
@@ -98,7 +98,14 @@ export const EarlyEndReasonModal: React.FC<EarlyEndReasonModalProps> = ({
         </View>
       }
     >
-      <View style={styles.optionList}>
+      <ScrollView
+        style={styles.optionScroll}
+        contentContainerStyle={styles.optionList}
+        // "always", not "handled": with "handled" the ScrollView spends the first
+        // touch dismissing the keyboard, so neither a drag nor a radio option
+        // responds while the "Other" note field has focus.
+        keyboardShouldPersistTaps="always"
+      >
         {options.map((option) => {
           const isSelected = selected === option.value;
           return (
@@ -139,13 +146,16 @@ export const EarlyEndReasonModal: React.FC<EarlyEndReasonModalProps> = ({
             </View>
           );
         })}
-      </View>
+      </ScrollView>
     </Modal>
   );
 };
 
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    optionScroll: {
+      flexShrink: 1,
+    },
     optionList: {
       gap: space[2],
     },

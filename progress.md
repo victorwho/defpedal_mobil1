@@ -1967,3 +1967,26 @@ Added `apps/mobile/src/lib/netInfoModule.test.ts` (2 specs: native-module-absent
 **Live: 62 Zaragoza hazards** (40 poor_surface, 15 pothole, 4 dangerous_intersection, 2 blocked_bike_lane, 1 other), `alert_eligible=0`, verified through `/v1/hazards/nearby` (57 pins in a 5 km radius, Avenida Goya / Plaza Gallur). Only requests **with coordinates** are imported — no config needed, and it costs ~half the raw volume since 46% carry coordinates.
 
 **Open:** licence UNVERIFIED (portal legal page 404s, datos.gob.es reports null for publisher L01502973) — settle before public redistribution; keep `alert_eligible=false` until geocodes are spot-checked. Live hazard totals now: Amsterdam 2,729 · Cologne 182 · **Zaragoza 62** · Civia 47 · rider-reported 1.
+
+### Session 115 — Keyboard covering text fields: hazard "Other", and the shared Modal (2026-09-05)
+
+**Reported:** reporting a hazard, choosing **Other**, then typing — the on-screen keyboard covered the text field, so the rider could not see what they were writing.
+
+**Root cause, and it is not where it looks.** The describe card is an `absoluteFillObject` overlay pinned to `flex-end`, rendered as a SIBLING of the screen body, with no keyboard handling at all — and it never needed any, because `AndroidManifest.xml` sets `windowSoftInputMode="adjustResize"`, which used to shrink the RN root view and lift bottom-anchored content for free. **`edgeToEdgeEnabled=true` makes that a no-op**: the window keeps its full height (measured on device: overlay laid out at 772dp on a 772dp screen), so the keyboard simply covers the card. Nothing regressed; the manifest and the layout code are unchanged and look correct.
+
+**Two further causes only hardware revealed.** The first fix lifted the card but still hid the Report button: **RN reports the IME inset EXCLUDING the navigation bar** — `keyboardHeight: 294` against a keyboard occupying ~344dp, the missing 50dp being exactly `insets.bottom: 48`, which a full-bleed sibling of the inset-padded root must add itself. The second fix clamped the card and it overflowed off the TOP instead: `<Surface onPress=...>` renders `PressableScale`, whose outer `Animated.View` carries no `flexShrink`, so the shrink chain never reached the ScrollView.
+
+**Shipped.** New `useKeyboardHeight()` hook (`src/hooks/useKeyboardHeight.ts`; iOS `keyboardWillShow` so the panel travels with the keyboard, Android `keyboardDidShow`), 5 tests, plus `Keyboard`/`useWindowDimensions` added to `vitest.mock-rn.ts`.
+- **`route-planning.tsx` + `navigation.tsx` hazard panels:** lift by `keyboardHeight + insets.bottom`, `paddingTop` so the card cannot reach the status bar, body scrolls with **Report/Back pinned outside the ScrollView** so the primary action is never below the fold, dismiss backdrop moved to a **sibling behind** the card (a pressable ancestor competes with the ScrollView for the drag), plain `Pressable` wrapper on the card because on Android an unhandled touch DOES fall through to that sibling. Also killed a stray `confirm` haptic the card fired for a non-action.
+- **`Modal` organism (15 consumers):** overlay shrinks by the keyboard height so the centred card re-centres in the visible space, plus a `flexShrink` chain card → inner → body. Deliberately **no ScrollView added inside `Modal`** — `BadgeDetailModal`, `PaywallSheet` and `RiskScoreExplainerSheet` already have one in the body and it would have nested them; those three instead gain a shrink chain that lets their existing scroll views actually bound and scroll.
+- **`ReportSheet` + `EarlyEndReasonModal`:** bodies wrapped in a `ScrollView`; their footers already live in `Modal`'s footer slot, so they stay pinned.
+
+**`keyboardShouldPersistTaps="always"`, not `"handled"`** everywhere here: with `"handled"` the ScrollView spends the first touch dismissing the keyboard, so a drag never scrolls and the fields below the fold are unreachable while typing. Confirmed both ways on device.
+
+**Device-verified (S23 Ultra, dev variant over Metro).** Hazard flow: typed text visible, counter live, permanent checkbox reachable by scrolling with the keyboard up, Report/Back always visible, card tap keeps the sheet open, backdrop tap dismisses. ReportSheet: details field visible with cursor, typed text visible, Cancel/Submit pinned, body scrolls with the keyboard open, chip selects and enables Submit. `BadgeDetailModal` checked as a regression case — renders correctly.
+
+⚠️ **`EarlyEndReasonModal` is NOT device-verified** — reaching it needs a ride ended early, which writes a real `trips` row. Its change is a 3-line `ScrollView` wrap identical to ReportSheet's, on top of the verified `Modal` layer. Worth a look next time someone is mid-ride.
+
+**Process note (error-log #103 in practice):** the Metro holding :8081 was serving a different checkout (`orca/workspaces/defpedal/Sesizari`). Ran this repo's Metro on :8099, forwarded `adb reverse tcp:8081 tcp:8099`, and verified every bundle by **grepping it for symbols added this session** rather than trusting HTTP 200.
+
+**Verification:** typecheck clean, lint ratchet clean, 1730 mobile tests pass (141 files), bundle HTTP 200 with the new symbols present and no diagnostics left behind. Error-log #105 + prevention rule 36 record the edge-to-edge trap.

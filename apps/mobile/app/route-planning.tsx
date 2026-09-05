@@ -3,7 +3,18 @@ import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesiza
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Keyboard, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Animated,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -22,6 +33,7 @@ import { usePoiSearch } from '../src/hooks/usePoiSearch';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useExportSavedRouteGpx } from '../src/hooks/useExportSavedRouteGpx';
 import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
+import { useKeyboardHeight } from '../src/hooks/useKeyboardHeight';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useResolvedCountry } from '../src/hooks/useResolvedCountry';
 import { useWeather } from '../src/hooks/useWeather';
@@ -309,6 +321,14 @@ export default function RoutePlanningScreen() {
   // by every terminal path — submit, cancel, and backdrop dismiss — rather
   // than on picker close alone.
   const [hazardIsPermanent, setHazardIsPermanent] = useState(false);
+  // The hazard panel is a bottom-anchored full-bleed overlay, so nothing lifts
+  // it off the keyboard for free (see useKeyboardHeight for why adjustResize
+  // no longer does under edge-to-edge). Note the overlay is a SIBLING of the
+  // inset-padded screen root, so it must apply `insets.bottom` itself — RN
+  // reports the IME inset EXCLUDING the navigation bar, and on a gesture-nav
+  // device that 48dp is exactly what hid the Report button.
+  const keyboardHeight = useKeyboardHeight();
+  const safeAreaInsets = useSafeAreaInsets();
   const [mapCenterCoordinate, setMapCenterCoordinate] = useState<Coordinate | null>(null);
   // A sesizare CTA rides inside the success toast, and 5s is not long enough
   // to read it and decide. Type-eligibility is a cheap synchronous check (the
@@ -1662,8 +1682,14 @@ export default function RoutePlanningScreen() {
 
     {/* Hazard quick-pick grid overlay (same style as navigation) */}
     {hazardPickerOpen ? (
+      <>
+      {/* Backdrop is a SIBLING BEHIND the card, never its ancestor: a pressable
+          ancestor competes with the ScrollView inside the card for the drag, so
+          the rider could not scroll to the fields the keyboard pushed out of
+          view. The card still needs its own tap-swallowing Pressable below — on
+          Android an unhandled touch does fall through to the sibling. */}
       <Pressable
-        style={styles.hazardGridOverlay}
+        style={styles.hazardGridBackdrop}
         onPress={() => {
           setHazardPickerOpen(false);
           setHazardDescribeMode(false);
@@ -1673,119 +1699,148 @@ export default function RoutePlanningScreen() {
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel="Dismiss hazard picker"
+      />
+      <View
+        style={[
+          styles.hazardGridOverlay,
+          {
+            paddingTop: safeAreaInsets.top + space[4],
+            paddingBottom: space[6] + safeAreaInsets.bottom + keyboardHeight,
+          },
+        ]}
+        pointerEvents="box-none"
       >
-        <Surface
-          variant="panel"
-          radius="2xl"
-          elevation="lg"
-          onPress={(e) => e.stopPropagation()}
-          accessible={false}
-          style={styles.hazardGridCard}
-        >
-          {hazardDescribeMode ? (
-            <>
-              <Text style={styles.hazardGridTitle}>{t('planning.hazardDescribeTitle')}</Text>
-              <Text style={styles.hazardGridSubtitle}>{t('planning.hazardDescribeSubtitle')}</Text>
-              <TextInput
-                style={styles.hazardDescribeInput}
-                value={hazardDescription}
-                onChangeText={setHazardDescription}
-                placeholder={t('planning.hazardDescribePlaceholder')}
-                placeholderTextColor={colors.textMuted}
-                multiline
-                maxLength={280}
-                autoFocus
-                accessibilityLabel="Hazard description, optional"
-                accessibilityHint="Type a short description of the hazard, or leave blank"
-              />
-              <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
-              <View style={styles.hazardPermanentWrap}>
-                <PermanentHazardCheckbox
-                  checked={hazardIsPermanent}
-                  onChange={setHazardIsPermanent}
-                  label={t('hazard.permanentLabel')}
-                  hint={t('hazard.permanentHint', {
-                    count: PERMANENT_HAZARD_DENY_THRESHOLD,
-                  })}
-                />
-              </View>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.hazardDescribeSubmit,
-                  pressed && styles.hazardDescribeSubmitPressed,
-                ]}
-                onPress={handleHazardDescribeSubmit}
-                accessibilityRole="button"
-                accessibilityLabel="Report hazard"
-              >
-                <Text style={styles.hazardDescribeSubmitText}>Report</Text>
-              </Pressable>
-              <Pressable
-                style={styles.hazardGridCancel}
-                onPress={() => {
-                  setHazardDescribeMode(false);
-                  setHazardDescription('');
-                }}
-                accessible
-                accessibilityRole="button"
-                accessibilityLabel="Back to hazard types"
-              >
-                <Text style={styles.hazardGridCancelText}>Back</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
-              <View style={styles.hazardGrid}>
-                {([
-                  { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
-                  { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
-                  { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
-                  { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
-                  { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
-                  { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
-                ]).map((item) => (
-                  <Pressable
-                    key={item.value}
-                    style={({ pressed }) => [
-                      styles.hazardGridItem,
-                      pressed && styles.hazardGridItemPressed,
-                    ]}
-                    onPress={() => handleHazardTypeSelect(item.value)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Report ${item.label}`}
-                  >
-                    <Ionicons name={item.icon} size={24} color={colors.accent} />
-                    <Text style={styles.hazardGridLabel}>{item.label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={styles.hazardPermanentWrap}>
-                <PermanentHazardCheckbox
-                  checked={hazardIsPermanent}
-                  onChange={setHazardIsPermanent}
-                  label={t('hazard.permanentLabel')}
-                  hint={t('hazard.permanentHint', {
-                    count: PERMANENT_HAZARD_DENY_THRESHOLD,
-                  })}
-                />
-              </View>
-              <Pressable
-                style={styles.hazardGridCancel}
-                onPress={() => {
-                  setHazardPickerOpen(false);
-                  setHazardIsPermanent(false);
-                }}
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Cancel hazard report"
-              >
-                <Text style={styles.hazardGridCancelText}>Cancel</Text>
-              </Pressable>
-            </>
-          )}
-        </Surface>
-      </Pressable>
+        {/* Consumes taps so they don't fall through to the backdrop sibling and
+            discard a half-typed note — on Android a plain View does NOT consume
+            them. A plain Pressable, never a pressable <Surface>: that renders a
+            PressableScale whose outer Animated.View carries no flexShrink, which
+            breaks the shrink chain the card needs to stay clear of the keyboard. */}
+        <Pressable style={styles.hazardGridCardWrap} onPress={() => {}} accessible={false}>
+          <Surface
+            variant="panel"
+            radius="2xl"
+            elevation="lg"
+            accessible={false}
+            style={styles.hazardGridCard}
+          >
+            {hazardDescribeMode ? (
+              <>
+                <ScrollView
+                  style={styles.hazardDescribeScrollView}
+                  contentContainerStyle={styles.hazardDescribeScroll}
+                  // "always", not "handled": with "handled" the ScrollView spends
+                  // the first touch dismissing the keyboard, so a drag never
+                  // scrolls and the fields below the fold are unreachable while
+                  // typing. Report/Back sit outside this ScrollView, so they are
+                  // unaffected either way.
+                  keyboardShouldPersistTaps="always"
+                  bounces={false}
+                >
+                  <Text style={styles.hazardGridTitle}>{t('planning.hazardDescribeTitle')}</Text>
+                  <Text style={styles.hazardGridSubtitle}>{t('planning.hazardDescribeSubtitle')}</Text>
+                  <TextInput
+                    style={styles.hazardDescribeInput}
+                    value={hazardDescription}
+                    onChangeText={setHazardDescription}
+                    placeholder={t('planning.hazardDescribePlaceholder')}
+                    placeholderTextColor={colors.textMuted}
+                    multiline
+                    maxLength={280}
+                    autoFocus
+                    accessibilityLabel="Hazard description, optional"
+                    accessibilityHint="Type a short description of the hazard, or leave blank"
+                  />
+                  <Text style={styles.hazardDescribeCounter}>{hazardDescription.length}/280</Text>
+                  <View style={styles.hazardPermanentWrap}>
+                    <PermanentHazardCheckbox
+                      checked={hazardIsPermanent}
+                      onChange={setHazardIsPermanent}
+                      label={t('hazard.permanentLabel')}
+                      hint={t('hazard.permanentHint', {
+                        count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                      })}
+                    />
+                  </View>
+                </ScrollView>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.hazardDescribeSubmit,
+                    pressed && styles.hazardDescribeSubmitPressed,
+                  ]}
+                  onPress={handleHazardDescribeSubmit}
+                  accessibilityRole="button"
+                  accessibilityLabel="Report hazard"
+                >
+                  <Text style={styles.hazardDescribeSubmitText}>Report</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.hazardGridCancel}
+                  onPress={() => {
+                    setHazardDescribeMode(false);
+                    setHazardDescription('');
+                  }}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to hazard types"
+                >
+                  <Text style={styles.hazardGridCancelText}>Back</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Text style={styles.hazardGridTitle}>{t('hazard.title')}</Text>
+                <View style={styles.hazardGrid}>
+                  {([
+                    { value: 'illegally_parked_car' as HazardType, label: 'Parked car', icon: 'car-outline' as const },
+                    { value: 'blocked_bike_lane' as HazardType, label: 'Blocked lane', icon: 'remove-circle-outline' as const },
+                    { value: 'pothole' as HazardType, label: 'Pothole', icon: 'alert-circle-outline' as const },
+                    { value: 'aggro_dogs' as HazardType, label: 'Aggro dogs', icon: 'paw-outline' as const },
+                    { value: 'aggressive_traffic' as HazardType, label: 'Aggro traffic', icon: 'speedometer-outline' as const },
+                    { value: 'other' as HazardType, label: 'Other', icon: 'ellipsis-horizontal' as const },
+                  ]).map((item) => (
+                    <Pressable
+                      key={item.value}
+                      style={({ pressed }) => [
+                        styles.hazardGridItem,
+                        pressed && styles.hazardGridItemPressed,
+                      ]}
+                      onPress={() => handleHazardTypeSelect(item.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Report ${item.label}`}
+                    >
+                      <Ionicons name={item.icon} size={24} color={colors.accent} />
+                      <Text style={styles.hazardGridLabel}>{item.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <View style={styles.hazardPermanentWrap}>
+                  <PermanentHazardCheckbox
+                    checked={hazardIsPermanent}
+                    onChange={setHazardIsPermanent}
+                    label={t('hazard.permanentLabel')}
+                    hint={t('hazard.permanentHint', {
+                      count: PERMANENT_HAZARD_DENY_THRESHOLD,
+                    })}
+                  />
+                </View>
+                <Pressable
+                  style={styles.hazardGridCancel}
+                  onPress={() => {
+                    setHazardPickerOpen(false);
+                    setHazardIsPermanent(false);
+                  }}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel hazard report"
+                >
+                  <Text style={styles.hazardGridCancelText}>Cancel</Text>
+                </Pressable>
+              </>
+            )}
+          </Surface>
+        </Pressable>
+      </View>
+      </>
     ) : null}
 
     {/* City suggestion dialog */}
@@ -2163,17 +2218,28 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.body.bold,
       color: colors.accent,
     },
-    hazardGridOverlay: {
+    hazardGridBackdrop: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: surfaceTints.overlaySubtle,
+      zIndex: zIndex.modal,
+    },
+    hazardGridOverlay: {
+      ...StyleSheet.absoluteFillObject,
       justifyContent: 'flex-end',
       paddingHorizontal: space[4],
       paddingBottom: space[6],
       zIndex: zIndex.modal,
     },
+    hazardGridCardWrap: {
+      flexShrink: 1,
+    },
     hazardGridCard: {
       padding: space[4],
       gap: space[3],
+      // The overlay is `flex-end` with a definite height, so letting the card
+      // shrink is what guarantees it can never extend under the keyboard —
+      // no height arithmetic to get wrong. The ScrollView inside then scrolls.
+      flexShrink: 1,
     },
     hazardGridTitle: {
       fontFamily: fontFamily.heading.semiBold,
@@ -2224,6 +2290,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       textAlign: 'center',
       marginTop: -space[1],
       marginBottom: space[2],
+    },
+    // Describe-mode children live inside a ScrollView, so they no longer
+    // inherit the Surface's `gap` — restate it on the content container.
+    hazardDescribeScrollView: {
+      flexShrink: 1,
+    },
+    hazardDescribeScroll: {
+      gap: space[3],
     },
     hazardDescribeInput: {
       backgroundColor: colors.bgSecondary,

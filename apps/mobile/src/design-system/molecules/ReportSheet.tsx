@@ -9,7 +9,7 @@
  * Fires haptics.warning() on submit, success() on completion.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useTheme, type ThemeColors } from '../ThemeContext';
 import { useHaptics } from '../hooks/useHaptics';
@@ -135,7 +135,14 @@ export const ReportSheet: React.FC<ReportSheetProps> = ({
         </View>
       }
     >
-      <View style={styles.body}>
+      <ScrollView
+        style={styles.bodyScroll}
+        contentContainerStyle={styles.body}
+        // "always", not "handled": with "handled" the ScrollView spends the first
+        // touch dismissing the keyboard, so neither a drag nor a reason chip
+        // responds while the details field has focus.
+        keyboardShouldPersistTaps="always"
+      >
         <Text style={styles.sectionLabel}>{t('report.reasonLabel')}</Text>
         <View style={styles.reasonChips}>
           {REASON_KEYS.map(({ reason, labelKey }) => {
@@ -173,13 +180,16 @@ export const ReportSheet: React.FC<ReportSheetProps> = ({
           accessibilityLabel={t('report.detailsLabel')}
         />
         <Text style={styles.charCount}>{details.length} / 500</Text>
-      </View>
+      </ScrollView>
     </Modal>
   );
 };
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    bodyScroll: {
+      flexShrink: 1,
+    },
     body: {
       gap: space[3],
       paddingVertical: space[2],
