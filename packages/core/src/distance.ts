@@ -1,3 +1,7 @@
+import type { Coordinate } from './contracts';
+
+const EARTH_RADIUS_METERS = 6371e3;
+
 /**
  * Calculates the distance between two points in meters using the Haversine formula.
  */
@@ -111,6 +115,33 @@ export interface PolylineSnapResult {
 export const closestPointOnPolyline = (
   targetCoord: [number, number],
   points: readonly [number, number][],
+): PolylineSnapResult | null =>
+  closestPointOnPolylineWithin(targetCoord, points, 0, Number.MAX_SAFE_INTEGER);
+
+/**
+ * `closestPointOnPolyline`, restricted to the segments in `[fromIndex, toIndex]`.
+ *
+ * Exists for routes the rider committed to following — a generated loop or an
+ * imported GPX course — which can legitimately cross themselves. Searching the
+ * whole polyline at a crossing snaps to whichever branch happens to be nearer,
+ * so progress can jump backwards by kilometres and `remainingDistanceMeters`
+ * with it. Restricting the search to a window that starts at the furthest
+ * vertex already reached makes progress monotonic.
+ *
+ * The window is a half-open guard, not a hard gate: the caller is responsible
+ * for sizing `toIndex` generously enough that a rider moving fast between
+ * fixes is never stranded behind it, and for falling back to the unrestricted
+ * search when the windowed snap comes back implausibly far away.
+ *
+ * Bounds are clamped rather than validated — an out-of-range window degrades
+ * to the full polyline instead of returning null, because a navigation path
+ * that silently loses its snap is worse than one that briefly widens it.
+ */
+export const closestPointOnPolylineWithin = (
+  targetCoord: [number, number],
+  points: readonly [number, number][],
+  fromIndex: number,
+  toIndex: number,
 ): PolylineSnapResult | null => {
   if (!points || points.length === 0) return null;
 
@@ -123,11 +154,15 @@ export const closestPointOnPolyline = (
     };
   }
 
-  let bestSegment = 0;
-  let bestProjected: [number, number] = [points[0][1], points[0][0]];
+  const lastSegment = points.length - 2;
+  const start = Math.min(Math.max(0, Math.floor(fromIndex)), lastSegment);
+  const end = Math.min(Math.max(start, Math.floor(toIndex)), lastSegment);
+
+  let bestSegment = start;
+  let bestProjected: [number, number] = [points[start][1], points[start][0]];
   let bestDist = Infinity;
 
-  for (let i = 0; i < points.length - 1; i++) {
+  for (let i = start; i <= end; i++) {
     const projected = projectOntoSegment(
       targetCoord,
       [points[i][1], points[i][0]],
@@ -183,4 +218,50 @@ const projectOntoSegment = (
     segStart[0] + t * dy,
     segStart[1] + t * (segEnd[1] - segStart[1]),
   ];
+};
+
+/**
+ * The point `distanceMeters` away from `origin` along `bearingDegrees`.
+ *
+ * Forward geodesic on a sphere — the inverse of `haversineDistance`, and the
+ * primitive the loop generator's ring synthesis is built on. Bearing is
+ * measured clockwise from true north, matching the compass vocabulary the
+ * heading control uses.
+ *
+ * Spherical rather than ellipsoidal on purpose: at the radii a loop ring uses
+ * (hundreds of metres to ~16 km) the WGS84 correction is well under the
+ * distance tolerance the generator already accepts, and the ring is only a
+ * hint to the router anyway — the road network decides where the loop
+ * actually goes.
+ */
+export const destinationPoint = (
+  origin: Coordinate,
+  bearingDegrees: number,
+  distanceMeters: number,
+): Coordinate => {
+  const angular = distanceMeters / EARTH_RADIUS_METERS;
+  const bearing = (bearingDegrees * Math.PI) / 180;
+  const lat1 = (origin.lat * Math.PI) / 180;
+  const lon1 = (origin.lon * Math.PI) / 180;
+
+  const sinLat1 = Math.sin(lat1);
+  const cosLat1 = Math.cos(lat1);
+  const sinAngular = Math.sin(angular);
+  const cosAngular = Math.cos(angular);
+
+  const sinLat2 = sinLat1 * cosAngular + cosLat1 * sinAngular * Math.cos(bearing);
+  const lat2 = Math.asin(Math.min(1, Math.max(-1, sinLat2)));
+
+  const lon2 =
+    lon1 +
+    Math.atan2(
+      Math.sin(bearing) * sinAngular * cosLat1,
+      cosAngular - sinLat1 * sinLat2,
+    );
+
+  // Normalise longitude into [-180, 180] so a ring thrown across the
+  // antimeridian still produces coordinates OSRM will accept.
+  const lonDegrees = (((lon2 * 180) / Math.PI + 540) % 360) - 180;
+
+  return { lat: (lat2 * 180) / Math.PI, lon: lonDegrees };
 };

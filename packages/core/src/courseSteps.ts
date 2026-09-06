@@ -407,6 +407,38 @@ export const isCourseRoute = (
   route: { readonly source?: string } | null | undefined,
 ): boolean => route?.source === 'gpx_course';
 
+/**
+ * Is this a route the rider committed to following, rather than one we may
+ * recompute at will?
+ *
+ * Two kinds qualify, for the same underlying reason — the geometry itself is
+ * the thing the rider chose:
+ *
+ *   - `gpx_course` — a line they brought from Komoot or Strava. Rerouting
+ *     replaces it with one we computed, mid-ride, with no undo.
+ *   - `generated_loop` — a loop from the generator. Here it is worse: on a
+ *     loop `destination === origin`, so an ordinary reroute is a request for
+ *     the shortest way home. A rider 12 km into a 30 km loop silently loses
+ *     the remaining 18, and every screen still looks correct.
+ *
+ * This is the predicate every reroute path and the forward-only snap window
+ * must test. It fails safe: an unknown or missing source returns false,
+ * because wrongly suppressing reroute on a *destination* route is the worse
+ * error — that rider genuinely needs a new way to where they are going.
+ *
+ * Do not test `source === 'gpx_course'` at a call site. That is how the second
+ * kind gets missed (error-log #20).
+ */
+export const isFixedLineRoute = (
+  route: { readonly source?: string } | null | undefined,
+): boolean =>
+  route?.source === 'gpx_course' || route?.source === 'generated_loop';
+
+/** Is this specifically a loop the generator produced? */
+export const isGeneratedLoop = (
+  route: { readonly source?: string } | null | undefined,
+): boolean => route?.source === 'generated_loop';
+
 /** Total along-line length of a course in meters. */
 export const courseDistanceMeters = (
   coordinates: readonly (readonly [number, number])[],

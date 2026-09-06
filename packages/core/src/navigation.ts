@@ -4,8 +4,10 @@ import type {
   NavigationSession,
   RouteOption,
 } from './contracts';
+import { isFixedLineRoute } from './courseSteps';
 import {
   closestPointOnPolyline,
+  closestPointOnPolylineWithin,
   findClosestPointIndex,
   haversineDistance,
   polylineSegmentDistance,
@@ -19,6 +21,28 @@ export const OFF_ROUTE_THRESHOLD_METERS = 50;
 export const PRE_ANNOUNCEMENT_METERS = 200;
 export const APPROACH_ANNOUNCEMENT_METERS = 50;
 export const ARRIVAL_THRESHOLD_METERS = 25;
+
+/**
+ * How far behind the high-water mark the forward snap window still looks.
+ *
+ * GPS jitter can place a fix a few metres behind where the rider actually got
+ * to, and a window that starts exactly at the high-water mark would then snap
+ * forward past them. Small, because its only job is absorbing noise.
+ */
+const SNAP_WINDOW_BACK_VERTICES = 20;
+
+/**
+ * How far ahead the forward snap window looks.
+ *
+ * Sized for the worst realistic gap between fixes rather than for tightness:
+ * OSRM emits vertices every 10-50 m, so 400 covers roughly 4-20 km of route —
+ * far more than a rider can cover through a tunnel or a signal blackout, and
+ * still short enough to exclude the far side of a loop that crosses itself.
+ * Being too generous costs a little accuracy at a crossing; being too tight
+ * strands a rider mid-navigation, which is much worse.
+ */
+const SNAP_WINDOW_FORWARD_VERTICES = 400;
+
 export const AUTO_REROUTE_DELAY_MS = 60000;
 export const REROUTE_COOLDOWN_MS = 60000;
 export const ETA_ANNOUNCEMENT_INTERVAL_MS = 5 * 60 * 1000;
@@ -35,6 +59,13 @@ export interface NavigationProgressSnapshot {
   shouldAdvanceStep: boolean;
   shouldCompleteNavigation: boolean;
   isOffRoute: boolean;
+  /**
+   * New high-water mark for the forward snap window, on fixed-line routes.
+   *
+   * `undefined` on destination routes, which do not use the window and should
+   * not accumulate the state. Persisted by `updateNavigationSessionProgress`.
+   */
+  furthestVertexIndex?: number;
 }
 
 const generateSessionId = () => {
@@ -159,6 +190,8 @@ export const updateNavigationSessionProgress = (
   remainingDurationSeconds: snapshot.remainingDurationSeconds,
   rerouteEligible: snapshot.isOffRoute,
   offRouteSince: snapshot.isOffRoute ? session.offRouteSince ?? observedAt : null,
+  furthestVertexIndex:
+    snapshot.furthestVertexIndex ?? session.furthestVertexIndex,
 });
 
 export const advanceNavigationStep = (
@@ -319,10 +352,45 @@ export const getNavigationProgress = (
   // instead of snapping to the nearest vertex. This gives the true perpendicular
   // distance to the route and prevents false off-route triggers on straight roads
   // where vertices can be 50-200m apart.
-  const snapResult = closestPointOnPolyline(
-    [location.lat, location.lon],
-    routeCoordinates,
-  );
+  //
+  // On a route the rider committed to following (a generated loop, an imported
+  // course) the search is additionally restricted to a forward window, because
+  // that geometry may cross itself and an unrestricted search would snap to
+  // whichever branch happens to be nearer — jumping progress by kilometres.
+  // Destination routes keep the unrestricted search they have always had.
+  const usesForwardWindow = isFixedLineRoute(route);
+  const furthest = Math.max(0, session.furthestVertexIndex ?? 0);
+
+  let snapResult = usesForwardWindow
+    ? closestPointOnPolylineWithin(
+        [location.lat, location.lon],
+        routeCoordinates,
+        furthest - SNAP_WINDOW_BACK_VERTICES,
+        furthest + SNAP_WINDOW_FORWARD_VERTICES,
+      )
+    : closestPointOnPolyline([location.lat, location.lon], routeCoordinates);
+
+  // Escape hatch. If the windowed snap puts the rider off-route, the window
+  // may simply be stale — they doubled back deliberately, or a long signal gap
+  // moved them past its far edge. Re-search the whole polyline and keep the
+  // better answer. This can only improve accuracy: when the rider is genuinely
+  // on the route the windowed distance is a few metres and this never fires,
+  // and when they are genuinely off-route both searches agree.
+  let windowEscaped = false;
+  if (
+    usesForwardWindow &&
+    snapResult &&
+    snapResult.distanceMeters > OFF_ROUTE_THRESHOLD_METERS
+  ) {
+    const unrestricted = closestPointOnPolyline(
+      [location.lat, location.lon],
+      routeCoordinates,
+    );
+    if (unrestricted && unrestricted.distanceMeters < snapResult.distanceMeters) {
+      snapResult = unrestricted;
+      windowEscaped = true;
+    }
+  }
 
   // Vertex index needed for step tracking and along-route distance calculations.
   // Pick the closer of the two segment endpoints to the user's position.
@@ -332,6 +400,17 @@ export const getNavigationProgress = (
   const closestPointIndex = snapResult
     ? pickCloserVertex(snapResult.segmentIndex, routeCoordinates, [location.lat, location.lon])
     : findClosestPointIndex([location.lat, location.lon], routeCoordinates);
+
+  // New high-water mark. Normally monotonic — progress along a line the rider
+  // committed to following only ever moves forward. The one exception is the
+  // escape hatch above: if the window was stale and the unrestricted search
+  // found the rider genuinely further back, the mark must be allowed to move
+  // back with them, or they stay stranded behind a window they can never reach.
+  const nextFurthestVertexIndex = usesForwardWindow
+    ? windowEscaped
+      ? Math.max(0, closestPointIndex)
+      : Math.max(furthest, closestPointIndex)
+    : undefined;
 
   const snappedCoordinate = snapResult
     ? { lat: snapResult.projectedPoint[0], lon: snapResult.projectedPoint[1] }
@@ -387,6 +466,7 @@ export const getNavigationProgress = (
       shouldAdvanceStep: false,
       shouldCompleteNavigation: false,
       isOffRoute: offRoute,
+      furthestVertexIndex: nextFurthestVertexIndex,
     };
   }
 
@@ -463,6 +543,7 @@ export const getNavigationProgress = (
     ),
     shouldAdvanceStep: arrivedAtManeuver && !onLastStep,
     shouldCompleteNavigation: completeNavigation,
+    furthestVertexIndex: nextFurthestVertexIndex,
     isOffRoute: offRoute,
   };
 };

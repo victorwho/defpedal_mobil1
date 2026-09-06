@@ -1,0 +1,46 @@
+Defensive Pedal — Preview v0.2.138 (build 141)
+
+NEW: "Prefer offroad"
+
+Surface now has three settings:
+
+  Paved only      never routes onto unpaved
+  Allow offroad   unpaved is permitted, not sought
+  Prefer offroad  picks the loop with the most unpaved
+
+Be aware of what the third one can and cannot do. The router can be told to
+AVOID unpaved; there is no opposite instruction, so we cannot ask it to go
+looking for gravel. What "Prefer offroad" actually does is generate the loops
+without the restriction, measure how much of each one is unpaved, and show you
+the one with the most. If the area has no gravel, it will honestly return
+tarmac rather than inventing something.
+
+So that you can check it rather than take our word for it, every result now
+shows its unpaved share — "23% unpaved" next to the climb and time. That
+number is measured from the actual roads in the route, not estimated. Loops
+with no unpaved at all simply omit it.
+
+One deliberate limit: safety still comes first. If the grittiest loop spends a
+long way on genuinely dangerous roads and a tarmac one does not, you get the
+tarmac one. A recreational preference does not get to override the thing the
+app exists for. In practice they rarely fight — unpaved tracks are usually
+car-free, so they already score well.
+
+Also note this means unpaved, not difficult. We have no data on how technical
+a track is, so a smooth gravel path and a rooty singletrack look identical to
+us. Nothing in the app claims otherwise.
+
+What to try
+- Set Prefer offroad and compare the percentages against Allow offroad on the
+  same distance and direction. Does the number actually go up?
+- Look at a high-percentage loop on the map. Does it match what you know is
+  gravel around there?
+- Somewhere with no gravel at all, confirm it degrades quietly to 0% rather
+  than doing something odd.
+
+Unchanged from build 140
+- "Start ride" confirms in place; it does not launch navigation yet.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you.
+
+Only works in the 31 countries our safety road data covers.

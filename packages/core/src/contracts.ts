@@ -99,8 +99,16 @@ export interface RouteOption {
    * the rider's imported line with an OSRM route mid-ride. Keep the flag on
    * the route object rather than on a screen so every reroute entry point
    * inherits the protection.
+   *
+   * `generated_loop` marks a loop from the loop generator. It needs the same
+   * protection for a sharper reason: on a loop `destination === origin`, so an
+   * ordinary reroute asks for the shortest way *home* and silently deletes the
+   * rest of the ride — a rider 12 km into a 30 km loop loses the remaining 18,
+   * and it looks like it worked. Both kinds are covered by `isFixedLineRoute`;
+   * never test `source === 'gpx_course'` directly for reroute or snap
+   * behaviour.
    */
-  source: 'custom_osrm' | 'mapbox' | 'gpx_course';
+  source: 'custom_osrm' | 'mapbox' | 'gpx_course' | 'generated_loop';
   routingEngineVersion: string;
   routingProfileVersion: string;
   mapDataVersion: string;
@@ -610,6 +618,21 @@ export interface NavigationSession {
   rerouteEligible?: boolean;
   offRouteSince?: string | null;
   lastRerouteAt?: string | null;
+  /**
+   * Furthest polyline vertex the rider has reached, as a high-water mark.
+   *
+   * Progress is otherwise recomputed from the nearest snap on every tick, with
+   * no memory — which is fine on a route that never touches itself and wrong
+   * on one that does. A loop or a figure-eight course crossing its own path
+   * can snap to the wrong branch, jumping `remainingDistanceMeters` by
+   * kilometres in either direction.
+   *
+   * Used for two things on fixed-line routes only (`isFixedLineRoute`): it
+   * bounds the forward-only snap search, and it is what "ahead" means when a
+   * reroute has to pick a point on the remaining loop to rejoin at. Optional
+   * because it is absent on every session persisted before it existed.
+   */
+  furthestVertexIndex?: number;
   gpsBreadcrumbs: GpsBreadcrumb[];
 }
 

@@ -341,6 +341,14 @@ export default function RoutePlanningScreen() {
   const [savedRoutesOpen, setSavedRoutesOpen] = useState(false);
   const [nearbySheetOpen, setNearbySheetOpen] = useState(false);
 
+  /**
+   * Loops are structurally OSRM-only, so availability tracks routing coverage
+   * exactly. Read through the same `resolvedCountry` the mode pills use rather
+   * than re-deriving it — a second private coverage check at a call site is
+   * error-log #20.
+   */
+  const loopsAvailable = resolvedCountry.routeSupported;
+
   // City suggestion state. Mutually exclusive with hazardPlacementMode (the
   // toggle handlers below force-off the other mode). Shares mapCenterCoordinate
   // since both crosshair modes track the same camera center.
@@ -1590,6 +1598,30 @@ export default function RoutePlanningScreen() {
             <Ionicons name="layers-outline" size={22} color={gray[700]} />
           </PressableScale>
           {/*
+            Loops need `exclude=unpaved`, `annotation.classes` AND the safety
+            profile — all three OSRM-only, and Mapbox Directions populates none
+            of them. So there is no degraded mode outside the 31 covered
+            countries. The FAB stays visible but dimmed rather than hidden: a
+            rider who later crosses a border should already know the feature
+            exists, and the screen itself explains why it cannot run here.
+          */}
+          <PressableScale
+            style={[
+              styles.fabButton,
+              !loopsAvailable && styles.fabButtonDisabled,
+            ]}
+            onPress={() => router.push('/loop-planner')}
+            accessibilityLabel={t('loop.fabLabel')}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !loopsAvailable }}
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={22}
+              color={loopsAvailable ? gray[700] : gray[400]}
+            />
+          </PressableScale>
+          {/*
             Shown for any signed-in rider, not only those who already have a
             saved route: this sheet is now also the entry point for importing
             a GPX course, and gating it on existing saved routes would make
@@ -2171,6 +2203,9 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     fabColumn: {
       gap: space[2],
+    },
+    fabButtonDisabled: {
+      opacity: 0.38,
     },
     fabButton: {
       width: 42,

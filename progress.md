@@ -2022,3 +2022,60 @@ Existing riders are not interrupted: the migration stamps `bikeTypePromptSeen` f
 **Process note — error-log #103 caught a live near-miss.** `npm run check:bundle` returned a healthy HTTP 200 for a bundle containing **none of this work**: :8081 was held by a different checkout (`orca/workspaces/defpedal/Sesizari`) while this repo's Metro ran on :8099. Verified by pulling the bundle from :8099 and grepping it for the seven symbols added this session, and confirming the old `pavedPreferred` comparison is gone (0 occurrences). **The `check:bundle` script's hardcoded :8081 will mislead the next session too** — worth parameterising.
 
 **Device-verified** (S23 Ultra, dev variant over Metro, app data cleared for a clean onboarding run).
+
+---
+
+## Session 116 — Loop generator (2026-09-06)
+
+**Shipped, five preview builds deep (v0.2.135 → v0.2.139, vc 138 → 142), all device-tested by the product owner between rounds.** A rider picks a distance, a terrain, a surface and a direction and gets loops that start and finish where they are standing. Design + full record: `docs/plans/loop-generator.md`.
+
+### The three constraints that decided the whole shape
+
+Found by reading the routing stack before designing anything, and each one killed a feature the brief implied.
+
+- **OSRM cannot make loops.** `/route` and `/trip` do not do round trips — that is GraphHopper. A loop is a waypoint ring we synthesize, route, measure and correct. `loopPlan.ts` owns that controller: proportional radius correction damped to 70% (a raw correction oscillates when a slightly bigger ring crosses a river and jumps 4 km) and clamped to 2x per step.
+- **Climb can be measured, never requested.** There is no hill-seeking profile, only `bicycle36-flat`. So **Flat is a real routing constraint** (route the rings through the flat instance) while **Hilly is only a ranking** — an asymmetry stated once in `usesFlatProfile` rather than rediscovered per call site. Terrain is a three-way preference with an honest miss, never a numeric target: in Bucharest "600 m" is unsatisfiable at any distance and every result would be an apology.
+- **Offroad difficulty has no data path at all.** `bicycle36.lua:1165` declares `excludable = Sequence { Set{'unpaved'} }` — one binary class. `tracktype` and `mtb:scale` feed the risk score only. A technicality dial needs new excludable classes, i.e. a full EU extract/partition/customize plus gate and swap: an OSRM_Server project, not a mobile feature. Surface therefore means unpaved, never "difficult", and the release notes say so outright.
+
+**No Mapbox fallback exists.** Loops need `exclude=unpaved`, `annotation.classes` AND the safety profile; `routeFeatures.ts:253` records that Mapbox populates no `classes` on the cycling profile. The feature is OSRM-only — 31 countries or nothing — so the FAB renders dimmed outside coverage and explains itself.
+
+### The trap that mattered most
+
+⚠️ **Auto-reroute would have silently deleted the ride.** On a loop `destination === origin`, and `buildRerouteRequest` reads destination straight from the store — so the unattended 60-second auto-reroute asks OSRM for the shortest way **home**. A rider 12 km into a 30 km loop loses the remaining 18 while every screen still looks correct. `isCourseRoute` was widened to **`isFixedLineRoute`** (gpx_course | generated_loop) and `navigation.tsx` now gates on it. Never narrow that back.
+
+The same work added a persisted **`furthestVertexIndex`** and a forward-only snap window for all fixed-line routes, which also repairs figure-eight GPX imports. It has an escape hatch: if the windowed snap reads off-route, re-search unrestricted and let the mark move back, so a rider who doubles back deliberately is never stranded behind a window they cannot reach. Worth keeping in mind — on a route that retraces itself a position is **ambiguous by construction** (the west end of a figure-eight is genuinely both vertex 2 and vertex 117) and the high-water mark is the only thing that disambiguates it. That is correct behaviour, not a bug; a test says so.
+
+### Budget, and why it is shaped that way
+
+`/elevation-profile` and `/risk-segments` share the **`routePreview` bucket at 30 req/60 s**. Measuring every candidate would let a rider rate-limit their own app in three attempts and take the risk overlay down with it. So: distance comes free with every OSRM response, only three finalists are measured (climb + risk), and only three more if the terrain ask went unmet. Of the four relaxation rungs **only two cost network** — `distance` and `terrain` re-filter loops already paid for — which caps an attempt at 10 OSRM calls after the candidate count was cut 8 → 5 on owner feedback.
+
+The ladder is fixed and every rung is **named on the result card**; a relaxation the rider is not told about is indistinguishable from the generator ignoring them. `relaxation === 'terrain'` IS the honest miss — the tests showed a separate `terrain_miss` status was a second way to say the same thing, and the two would have drifted.
+
+### Two features added on owner feedback, both made auditable
+
+- **Prefer offroad.** `exclude` has no inverse, so this is a ranking, not an enforcement: generate without the exclusion, measure, prefer the most unpaved. The measurement is free — the profile sets `forward_classes['unpaved']`, so the class rides along in `annotation.classes` on requests we already make. Because a preference we cannot enforce is unfalsifiable, every result shows its **measured** share ("23% unpaved").
+- **Prefer not doubling back.** Measured exactly from `annotation.nodes`: an edge is retraced when the same OSM node pair appears twice, in either direction, and both passes count. Deliberately NOT geometric — a towpath beside a road, or the two halves of a dual carriageway, would read as retracing to a proximity test when they are the opposite. Shown only past 10%, with an 8-point ranking deadband so a shared starting junction reorders nothing.
+
+**Safety leads the sort in both cases**, ahead of every recreational preference and pinned by tests. Retracing sits directly under it, above distance and surface, because coming back a different way is what makes a loop a loop.
+
+### Bugs this session shipped and then fixed
+
+**Build 138 reached testers with no controls at all** — `/loop-planner` passed `children` to `MapStageScreen` without `useBottomSheet`, which discards them. Typecheck, lint AND the #103 content check all passed, because the code was genuinely in the bundle; it simply never rendered. **Content verification proves shipped, not reachable.** Fixed with the flag plus a new `initiallyExpanded` (default false, so no other screen moves) and a `MapStageScreen` render test that pins both halves. See error-log #106.
+
+**The map heading dial was removed**, reversing a design decision made during the grill. It was pinned to screen centre on the assumption the start pin sits there — true only with the sheet collapsed, and fixing the above requires it open, which puts screen centre behind the sheet. Heading is a pill row now. The camera was separately wrong: `origin` is not in `useCameraConfig`'s fallback chain at all, so before GPS resolved it landed on a region centroid and never re-asserted, and once a loop existed the chain framed `coordinates[length / 2]` — on a loop, the point diametrically opposite the start. Now pinned via `focusCoordinate` + a bumped `focusKey`, with zoom derived from the target distance.
+
+**A double-encoded Romanian string** (`Se Ã®ntoarce pe acelaÈi drum`) was caught before shipping, from the one i18n edit made with an inline `python -c` where the shell ate a backslash layer and `unicode_escape` decoded twice.
+
+### Verification, and a correction to how it was being done
+
+Typecheck clean across all three workspaces, lint ratchet clean, **core 1140/1140** and **mobile 1774/1774** — 122 new tests. mobile-api's 11 failures are pre-existing and parallelism-only (`--no-file-parallelism` passes 1004/1004), matching what session 115 already established by stashing.
+
+⚠️ **The #103 bundle-content check has a blind spot that produced two wrong readings before it was understood.** The bundle is Hermes bytecode, and Hermes moves a string to the UTF-16 table the moment one character is non-ASCII — so an ASCII-substring grep can never find `din traseu` inside a string that also contains `î`, while a pure-ASCII Romanian string matches normally. This reads as "the Romanian block did not ship" and was twice hand-waved as a grep artifact, which was the right verdict for the wrong reason and stopped the investigation. It matters because a check that always returns "absent" for a locale cannot distinguish shipped copy from corrupted copy — and there was corrupted copy. Non-ASCII is now verified by counting both UTF-8 and UTF-16LE, asserting the mojibake form absent as well as the correct form present. Error-log #107.
+
+**Three preview builds were killed in seconds** by commit exhaustion (0.33 GB free, 81.6 GB committed of an 86.2 GB limit), self-reinforcing because a killed build orphans its `expo export:embed` bundler, Gradle daemon and `hermesc` — each retry starting with less headroom. Cleared ~11 GB of own orphans; left WSL, Docker and both Metro servers alone. Error-log #108.
+
+### Not built
+
+- **Rejoin splice.** The safety floor is in (reroute suppressed, off-course banner). The upgrade chosen during the grill — retarget onto the nearest point ahead and splice `rejoinLeg ⊕ loop[i..n]` — is not. It is the largest single piece and runs at the worst moment (rider lost, poor signal).
+- **`saved_routes` migration** (`is_loop`, `saved_distance`, `saved_climb`), the Save button, the drift notice, and the LOOPS section in the Routes sheet. ⚠️ `is_loop` is not optional when this lands: `origin == destination` is not a safe marker (a route home *from* home matches), and reopening must restore `source: 'generated_loop'` or the reroute suppression is silently lost on a route the rider trusts.
+- **Hand-off to route-preview** — "Start ride" confirms in place rather than launching navigation. Now the most conspicuous gap.

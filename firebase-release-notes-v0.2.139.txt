@@ -1,0 +1,49 @@
+Defensive Pedal — Preview v0.2.139 (build 142)
+
+NEW: loops now prefer to come back a different way
+
+Riding up a hill and back down the same road is not much of a loop. The
+generator now measures how much of each candidate is ridden twice and prefers
+the one that doubles back least.
+
+The measurement is exact rather than a guess. Every route comes back with the
+list of map nodes it passes through, so a stretch counts as doubled back when
+the same pair of nodes is traversed twice — in either direction, since going
+up a road and coming down it is exactly the case worth catching. Both passes
+count: an out-and-back spur contributes its whole length twice, which is what
+you would say if asked.
+
+This deliberately does not use "how close are these two lines on the map". A
+canal towpath running beside a road, or the two halves of a dual carriageway,
+would look like doubling back to that test when they are the opposite — a
+genuine different way home.
+
+There is no new setting. Nobody sets out wanting to ride the same hill twice,
+so this is always on rather than a fifth control to configure.
+
+Where it sits: below safety, above everything else. A loop that doubles back
+but stays off dangerous roads still beats a clean loop that does not. Above
+distance accuracy and above the offroad preference though — a 16 km loop that
+comes back a different way beats a 15 km one that retraces, because coming
+back a different way is what makes it a loop at all.
+
+Small overlaps are ignored. Loops routinely share a few metres through the
+junction you started from, and that is not doubling back.
+
+When a loop does retrace meaningfully, the result says so — "Doubles back on
+34% of itself" under the distance. Clean loops say nothing, which should be
+most of them.
+
+What to try
+- Somewhere with plenty of roads, results should mostly show no note at all.
+- Try a dead-end valley or a peninsula, where a clean loop may be impossible.
+  You should still get a loop, honestly labelled, rather than nothing.
+- If you see a note on a loop that looks clean on the map, that is worth
+  reporting — it would mean the node measurement is disagreeing with reality.
+
+Unchanged from build 141
+- "Start ride" confirms in place; it does not launch navigation yet.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you.
+
+Only works in the 31 countries our safety road data covers.

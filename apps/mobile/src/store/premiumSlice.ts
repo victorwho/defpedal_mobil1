@@ -15,13 +15,18 @@
  */
 import type {
   FlatRouteMeterState,
+  LoopSessionMeterState,
   PremiumTier,
   ProfilePremium,
 } from '@defensivepedal/core';
 import {
+  acknowledgeLoopSessions,
+  beginLoopSession,
   consumeFlatRoute,
   DEFAULT_FLAT_ROUTE_METER,
+  DEFAULT_LOOP_SESSION_METER,
   mergeFlatRouteMeters,
+  mergeLoopSessionMeters,
   acknowledgeFlatRoutes,
 } from '@defensivepedal/core';
 
@@ -51,6 +56,14 @@ export interface PremiumSnapshot {
 export type PremiumSliceState = {
   premiumSnapshot: PremiumSnapshot | null;
   flatRouteMeter: FlatRouteMeterState;
+  /**
+   * Loop-finding sessions used this month, plus the open window.
+   *
+   * Persisted for the same reason the flat meter is, and for one more: the
+   * 30-minute window has to survive leaving the screen and even killing the
+   * app, or a back-swipe silently costs a third of the month.
+   */
+  loopSessionMeter: LoopSessionMeterState;
 };
 
 export type PremiumSliceActions = {
@@ -62,6 +75,17 @@ export type PremiumSliceActions = {
   mergeFlatRouteMeterFromServer: (remote: FlatRouteMeterState) => void;
   /** Move acknowledged pending rides into the synced count. */
   acknowledgeFlatRoutesLocally: (acknowledged: number) => void;
+  /**
+   * Open a loop-finding session, charging one if none is already open.
+   *
+   * Idempotent inside the window, so the caller may fire it on every drawn
+   * loop without tracking whether it has already charged.
+   */
+  beginLoopSessionLocally: (periodKey: string, nowIso: string) => void;
+  /** Fold a server loop-meter snapshot into local state. */
+  mergeLoopSessionMeterFromServer: (remote: LoopSessionMeterState) => void;
+  /** Move acknowledged pending sessions into the synced count. */
+  acknowledgeLoopSessionsLocally: (acknowledged: number) => void;
   /** Clear everything. Used by the user-scoped reset. */
   clearPremiumState: () => void;
 };
@@ -71,6 +95,7 @@ export type PremiumSlice = PremiumSliceState & PremiumSliceActions;
 export const DEFAULT_PREMIUM_SLICE_STATE: PremiumSliceState = {
   premiumSnapshot: null,
   flatRouteMeter: DEFAULT_FLAT_ROUTE_METER,
+  loopSessionMeter: DEFAULT_LOOP_SESSION_METER,
 };
 
 // ---------------------------------------------------------------------------
@@ -120,6 +145,29 @@ export const createPremiumSlice = (
   acknowledgeFlatRoutesLocally: (acknowledged) => {
     set((state) => ({
       flatRouteMeter: acknowledgeFlatRoutes(state.flatRouteMeter, acknowledged),
+    }));
+    flushPersistedWrites();
+  },
+
+  beginLoopSessionLocally: (periodKey, nowIso) => {
+    set((state) => ({
+      loopSessionMeter: beginLoopSession(state.loopSessionMeter, periodKey, nowIso),
+    }));
+    // Same reasoning as the flat meter, plus the window: an unflushed session
+    // stamp lost to an OS kill charges the rider twice for one sitting.
+    flushPersistedWrites();
+  },
+
+  mergeLoopSessionMeterFromServer: (remote) => {
+    set((state) => ({
+      loopSessionMeter: mergeLoopSessionMeters(state.loopSessionMeter, remote),
+    }));
+    flushPersistedWrites();
+  },
+
+  acknowledgeLoopSessionsLocally: (acknowledged) => {
+    set((state) => ({
+      loopSessionMeter: acknowledgeLoopSessions(state.loopSessionMeter, acknowledged),
     }));
     flushPersistedWrites();
   },

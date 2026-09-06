@@ -28,6 +28,12 @@ import {
   type FlatRouteMeterState,
 } from './flatRouteMeter';
 import {
+  isLoopSessionActive,
+  loopSessionPeriodKey,
+  loopSessionsRemaining,
+  type LoopSessionMeterState,
+} from './loopSessionMeter';
+import {
   limitsForTier,
   PLUS_LAUNCH_AT_ISO,
   PLUS_OFFLINE_GRACE_DAYS,
@@ -439,4 +445,106 @@ export const canStartFlatRoute = (input: FlatRouteGateInput): FlatRouteDecision 
   return remaining > 0
     ? { allowed: true, reason: 'within_quota', remaining, periodKey }
     : { allowed: false, reason: 'quota_exhausted', remaining: 0, periodKey };
+};
+
+// ---------------------------------------------------------------------------
+// Loop generator
+// ---------------------------------------------------------------------------
+
+export type LoopSessionAllowReason =
+  | 'entitled'
+  | 'grandfathered'
+  | 'active_session'
+  | 'within_quota'
+  | 'quota_exhausted';
+
+export interface LoopSessionDecision {
+  readonly allowed: boolean;
+  readonly reason: LoopSessionAllowReason;
+  /** Sessions left this month. `Infinity` when unmetered. */
+  readonly remaining: number;
+  /** True when the rider is inside a window they have already paid for. */
+  readonly withinActiveSession: boolean;
+  /** The period this decision was made against, for the caller to persist. */
+  readonly periodKey: string;
+}
+
+export interface LoopSessionGateInput {
+  readonly entitlement: ResolvedEntitlement;
+  readonly meter: LoopSessionMeterState;
+  readonly nowIso: string;
+  /** Rider's IANA timezone. Unknown zones fall back to UTC downstream. */
+  readonly timeZone: string;
+}
+
+/**
+ * May the rider search for loops right now?
+ *
+ * Order matters, and differs from `canStartFlatRoute` in one important way:
+ * the open-session check sits ahead of the quota. A rider who has already paid
+ * for the current 30-minute window must never be told they are out — that
+ * would charge them twice for one sitting, which is exactly the injustice the
+ * session model exists to prevent.
+ *
+ * `withinActiveSession` is what the caller reads to decide whether to charge.
+ * `allowed` alone is not enough: a Plus rider is always allowed and never
+ * charged, while a free rider mid-window is allowed and also not charged.
+ *
+ * Grandfathering applies for the same reason it applies to flat routing —
+ * an account that predates Plus keeps what it has always had.
+ */
+export const canFindLoops = (input: LoopSessionGateInput): LoopSessionDecision => {
+  const { entitlement, meter, nowIso, timeZone } = input;
+  const periodKey = loopSessionPeriodKey(nowIso, timeZone);
+  const withinActiveSession = isLoopSessionActive(meter, nowIso, periodKey);
+
+  if (entitlement.tier === 'plus') {
+    return {
+      allowed: true,
+      reason: 'entitled',
+      remaining: Number.POSITIVE_INFINITY,
+      withinActiveSession,
+      periodKey,
+    };
+  }
+
+  if (entitlement.isGrandfathered) {
+    return {
+      allowed: true,
+      reason: 'grandfathered',
+      remaining: Number.POSITIVE_INFINITY,
+      withinActiveSession,
+      periodKey,
+    };
+  }
+
+  const limit = limitsFor(entitlement).loopSessionsPerMonth;
+  const remaining = loopSessionsRemaining(meter, periodKey, limit);
+
+  // An open window is already paid for — never re-charge, never refuse.
+  if (withinActiveSession) {
+    return {
+      allowed: true,
+      reason: 'active_session',
+      remaining,
+      withinActiveSession: true,
+      periodKey,
+    };
+  }
+
+  return remaining > 0
+    ? {
+        allowed: true,
+        reason: 'within_quota',
+        remaining,
+        withinActiveSession: false,
+        periodKey,
+      }
+    : {
+        allowed: false,
+        reason: 'quota_exhausted',
+        remaining: 0,
+        withinActiveSession: false,
+        periodKey,
+      };
 };

@@ -12,7 +12,7 @@ import {
   decodePolyline,
   formatDistance,
   haversineDistance,
-  isCourseRoute,
+  isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
   shouldTriggerAutomaticReroute,
 } from '@defensivepedal/core';
@@ -809,12 +809,19 @@ function NavigationScreen() {
    * An imported GPX course is a fixed line the rider brought with them, and
    * rerouting replaces it with one we computed — mid-ride, silently, with no
    * undo. That is the single thing this feature must never do, so the gate
-   * lives on the route object (`isCourseRoute`) rather than on a screen, and
-   * is enforced at the mutation itself so all three reroute entry points
+   * lives on the route object (`isFixedLineRoute`) rather than on a screen,
+   * and is enforced at the mutation itself so all three reroute entry points
    * (auto after 60 s off-route, the manual "Reroute now" action, and the
    * skip-stop flow) inherit it.
+   *
+   * A GENERATED LOOP needs the same gate for a sharper reason. On a loop
+   * `destination === origin`, so `buildRerouteRequest` — which reads the
+   * destination straight from the store — asks OSRM for the shortest way
+   * *home*. A rider 12 km into a 30 km loop would silently lose the remaining
+   * 18 while every screen still looked correct. Hence the predicate covers
+   * both kinds; never narrow it back to `isCourseRoute`.
    */
-  const isCourse = isCourseRoute(selectedRoute);
+  const isCourse = isFixedLineRoute(selectedRoute);
 
   const rerouteMutation = useMutation({
     mutationFn: (origin: Coordinate) => {

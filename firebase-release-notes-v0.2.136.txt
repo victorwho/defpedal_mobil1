@@ -1,0 +1,47 @@
+Defensive Pedal — Preview v0.2.136 (build 139)
+
+Fixes both issues from build 138.
+
+1. The controls are actually there now
+   Build 138 showed only the title and one button. The screen was passing all
+   four controls, the results list and every message to the bottom sheet
+   WITHOUT switching the sheet on, so the component silently discarded them —
+   a valid render, which is why nothing caught it before your phone did. The
+   sheet is now switched on and opens already expanded, because on this screen
+   the sheet IS the content: you cannot search for a loop before choosing how
+   far, what terrain, what surface and which way.
+
+2. The circle no longer floats over a random place
+   Two separate causes. The map camera never centred on the loop's start — the
+   start point is not part of its fallback chain, so before GPS resolved it
+   landed on the middle of the country and never corrected. And once a loop
+   existed the camera framed the route's midpoint, which on a loop is the
+   point on the far side, opposite where you are standing. The camera is now
+   told explicitly to sit on the start, and to zoom so the whole loop fits.
+
+   The draggable ring on the map is gone. It was pinned to the centre of the
+   screen on the assumption the start pin was there — which was only true with
+   the sheet closed. With the sheet open (see fix 1) the centre of the screen
+   is behind the sheet, so the ring was both in the wrong place and hidden.
+   Direction is now a row of buttons in the sheet: Any / N / NE / E / SE / S /
+   SW / W / NW. Less pretty, actually usable.
+
+What to try
+- Open Find a loop. You should land with the sheet already open, all four
+  controls visible, and the map centred on you at a zoom that would fit the
+  loop you are asking for.
+- Change the distance and watch the map zoom to match.
+- Set a direction, search, and check the loops actually head that way.
+- Tap "Start somewhere else", tap the map, and confirm the camera follows the
+  new start.
+- Scroll the sheet down to the results after searching — distance, climb and
+  estimated time per loop, and every loop found this session.
+
+Still not in this build (unchanged from 138)
+- "Start ride" confirms in place; it does not hand off to navigation yet.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you.
+  That is deliberate: on a loop your destination is where you started, so an
+  ordinary reroute would cut the ride short.
+
+Only works in the 31 countries our safety road data covers.

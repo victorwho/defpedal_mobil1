@@ -41,6 +41,17 @@ type MapStageScreenProps = PropsWithChildren<{
    * Height is fixed at PEEK_CONTENT_HEIGHT (60px).
    */
   peekContent?: ReactNode;
+  /**
+   * Open the sheet on mount instead of starting collapsed.
+   *
+   * The default (collapsed, map-first) is right for screens where the map IS
+   * the content and the sheet holds detail — route preview, an imported
+   * course. It is wrong for a screen whose sheet holds the CONTROLS: the loop
+   * planner has nothing to show on the map until the rider has configured a
+   * search, so opening collapsed hides the entire purpose of the screen behind
+   * a drag handle.
+   */
+  initiallyExpanded?: boolean;
 }>;
 
 const CollapsibleSheet = ({
@@ -48,6 +59,7 @@ const CollapsibleSheet = ({
   footer,
   bottomInset,
   peekContent,
+  initiallyExpanded = false,
   sheetBg,
   handleColor,
   borderColor,
@@ -59,19 +71,24 @@ const CollapsibleSheet = ({
   sheetBg: string;
   handleColor: string;
   borderColor: string;
+  initiallyExpanded?: boolean;
 }) => {
   const reducedMotion = useReducedMotion();
   const t = useT();
   // Collapsed by default — map-first: the peek strip carries the one-line
   // summary and the rider drags/taps up for full details.
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
   // Use a ref so panResponder closures always read the current collapsed height,
   // even if peekContent changes after the first render (e.g. route loads async).
   const effectiveCollapsedRef = useRef(HANDLE_HEIGHT);
   effectiveCollapsedRef.current = peekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT;
-  const sheetHeight = useRef(new Animated.Value(effectiveCollapsedRef.current)).current;
-  const expandedRef = useRef(false);
+  const sheetHeight = useRef(
+    new Animated.Value(
+      initiallyExpanded ? EXPANDED_HEIGHT - bottomInset : effectiveCollapsedRef.current,
+    ),
+  ).current;
+  const expandedRef = useRef(initiallyExpanded);
 
   // The sheet now starts collapsed, so the collapsed height can change after
   // mount: the peek row only exists once the route has loaded. Re-snap the
@@ -199,6 +216,7 @@ export const MapStageScreen = ({
   footer,
   children,
   useBottomSheet = false,
+  initiallyExpanded = false,
   peekContent,
 }: MapStageScreenProps) => {
   const insets = useSafeAreaInsets();
@@ -220,7 +238,7 @@ export const MapStageScreen = ({
         <View style={styles.flexSpacer} pointerEvents="box-none" />
 
         {useBottomSheet ? (
-          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent} sheetBg={sheetBg} handleColor={handleColor} borderColor={colors.borderDefault}>{children}</CollapsibleSheet>
+          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent} sheetBg={sheetBg} handleColor={handleColor} borderColor={colors.borderDefault} initiallyExpanded={initiallyExpanded}>{children}</CollapsibleSheet>
         ) : footer ? (
           <View style={[styles.bottomFooter, { paddingBottom: space[2] }]} pointerEvents="box-none">
             {footer}

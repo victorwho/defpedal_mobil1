@@ -17,6 +17,8 @@ export * from './flatRouteMeter';
 export * from './formatters';
 export * from './geometrySampling';
 export * from './mapboxStaticImageUrl';
+export * from './loopPlan';
+export * from './loopSessionMeter';
 export * from './navigation';
 export * from './polyline';
 export * from './premiumCatalog';

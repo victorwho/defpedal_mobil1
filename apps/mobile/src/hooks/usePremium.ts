@@ -17,9 +17,12 @@ import {
   canDownloadAnotherPack,
   canImportAnotherCourse,
   canSaveAnotherRoute,
+  canFindLoops,
   canStartFlatRoute,
   flatRoutePeriodKey,
   flatRoutesRemaining,
+  loopSessionPeriodKey,
+  loopSessionsRemaining,
   FREE_ENTITLEMENT,
   historyRetentionCutoff,
   limitsFor,
@@ -30,6 +33,7 @@ import {
   type CoolRoutingAvailability,
   type EntitlementSnapshot,
   type FlatRouteDecision,
+  type LoopSessionDecision,
   type ResolvedEntitlement,
   type TierLimits,
 } from '@defensivepedal/core';
@@ -102,6 +106,16 @@ export interface UsePremiumResult {
   readonly coolRouting: (country: SupportedCountry | null | undefined) => CoolRoutingAvailability;
   readonly flatRoute: () => FlatRouteDecision;
   readonly flatRoutesLeft: () => number;
+  /** May the rider search for loops right now? */
+  readonly loopSearch: () => LoopSessionDecision;
+  /** Loop-finding sessions left this month. `Infinity` when unmetered. */
+  readonly loopSessionsLeft: () => number;
+  /**
+   * The period key to charge a loop session against, or null when this search
+   * must not be charged — Plus, grandfathered, paywall off, or a window the
+   * rider has already paid for.
+   */
+  readonly loopSessionToCharge: () => string | null;
   readonly historyCutoff: () => string | null;
   readonly packPolicy: ReturnType<typeof offlinePackPolicy>;
 }
@@ -109,6 +123,7 @@ export interface UsePremiumResult {
 export const usePremium = (): UsePremiumResult => {
   const snapshot = useAppStore((s) => s.premiumSnapshot);
   const meter = useAppStore((s) => s.flatRouteMeter);
+  const loopMeter = useAppStore((s) => s.loopSessionMeter);
 
   return useMemo(() => {
     const now = Date.now();
@@ -164,10 +179,34 @@ export const usePremium = (): UsePremiumResult => {
       flatRoute: () => canStartFlatRoute({ entitlement, meter, nowIso, timeZone }),
       flatRoutesLeft: () =>
         flatRoutesRemaining(meter, flatRoutePeriodKey(nowIso, timeZone), limits.flatRidesPerMonth),
+
+      loopSearch: () =>
+        canFindLoops({ entitlement, meter: loopMeter, nowIso, timeZone }),
+      loopSessionsLeft: () =>
+        loopSessionsRemaining(
+          loopMeter,
+          loopSessionPeriodKey(nowIso, timeZone),
+          limits.loopSessionsPerMonth,
+        ),
+      loopSessionToCharge: () => {
+        if (snapshot?.uiEnabled !== true) return null;
+        const decision = canFindLoops({
+          entitlement,
+          meter: loopMeter,
+          nowIso,
+          timeZone,
+        });
+        // Only a metered search opens a chargeable session. A rider already
+        // inside a paid window must never be charged twice for one sitting,
+        // and charging an unlimited tier corrupts a counter nobody reads.
+        return decision.allowed && decision.reason === 'within_quota'
+          ? decision.periodKey
+          : null;
+      },
       historyCutoff: () => historyRetentionCutoff(entitlement, nowIso),
       packPolicy: offlinePackPolicy(entitlement),
     };
-  }, [snapshot, meter]);
+  }, [snapshot, meter, loopMeter]);
 };
 
 /**

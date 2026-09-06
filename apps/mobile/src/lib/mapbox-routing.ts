@@ -8,6 +8,8 @@
 import type {
   Coordinate,
   CoverageRegion,
+  LoopSurface,
+  LoopTerrain,
   GeoJsonLineString,
   NavigationStep,
   RerouteRequest,
@@ -17,7 +19,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -67,20 +69,31 @@ const MAPBOX_MAX_STRAIGHT_LINE_M = 400_000;
 const fetchWithTimeout = async (
   url: string,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
+  callerSignal?: AbortSignal,
 ): Promise<Response> => {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Loop generation fans out eight of these and lets the rider cancel; without
+  // forwarding the caller's signal, a cancelled search keeps every in-flight
+  // request running to completion against OSRM.
+  const onCallerAbort = () => controller.abort();
+  callerSignal?.addEventListener('abort', onCallerAbort);
 
   try {
     const response = await fetch(url, { signal: controller.signal });
     return response;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
+      // Distinguish "the rider cancelled" from "the network was too slow" —
+      // only the latter is worth surfacing or reporting.
+      if (callerSignal?.aborted) throw error;
       throw new Error(`Route request timed out after ${timeoutMs / 1000}s.`);
     }
     throw error;
   } finally {
     clearTimeout(timeoutHandle);
+    callerSignal?.removeEventListener('abort', onCallerAbort);
   }
 };
 
@@ -670,4 +683,119 @@ export const directReroute = async (
 ): Promise<RoutePreviewResponse> => {
   // Reroute uses the same logic as preview
   return directPreviewRoute(request);
+};
+
+// ---------------------------------------------------------------------------
+// Loop generation
+// ---------------------------------------------------------------------------
+
+/**
+ * One generated loop, straight from OSRM.
+ *
+ * Returns the decoded coordinates alongside the route because every downstream
+ * step needs them — risk and elevation enrichment take a bare coordinate array,
+ * and the shape checks (`isOutAndBack`) measure the geometry directly. Decoding
+ * the polyline again at each call site would be pure waste.
+ */
+export interface LoopRouteResult {
+  readonly route: RouteOption;
+  readonly coordinates: [number, number][];
+  /**
+   * Fraction of the loop on unpaved ways, in [0, 1].
+   *
+   * Read straight off `annotation.classes`, which the request already asks for
+   * — no extra call and no rate-limit cost.
+   */
+  readonly unpavedShare: number;
+  /**
+   * Fraction of the loop ridden twice, in [0, 1]. Measured exactly from
+   * `annotation.nodes` — also already requested, so also free.
+   */
+  readonly retracedShare: number;
+}
+
+/**
+ * Route one candidate ring: `start → w1 → w2 → w3 → start`.
+ *
+ * OSRM has no round-trip service, so a loop is a waypoint ring we synthesize
+ * and then measure. Three things about this request are load-bearing:
+ *
+ *  - `alternatives=false`, because OSRM refuses alternatives with 3+ waypoints
+ *    anyway, and because we want the ring we asked for rather than a variation.
+ *  - `annotations=true`, which is what makes `leg.annotation.classes` available
+ *    downstream — the same array `routeFeatures` reads for tunnels and bridges.
+ *  - `terrain === 'flat'` selects the flat instance. That is the only terrain we
+ *    can actually *request*: `bicycle36-flat` carries a 7× uphill penalty, while
+ *    there is no hill-seeking counterpart, so Rolling and Hilly can only be
+ *    ranked after measurement.
+ *
+ * The route comes back stamped `source: 'generated_loop'`, which is what
+ * suppresses ordinary reroute and enables the forward-only snap window. Losing
+ * that stamp means an off-route rider gets routed to `destination` — which on a
+ * loop is where they started.
+ *
+ * Throws `OsrmOutOfCoverageError` when every route is degenerate, matching
+ * `fetchOsrmRoutes`: OSRM answers out-of-data requests with `Ok` and a
+ * distance-0 route rather than an error.
+ */
+export const fetchLoopRoute = async (
+  start: Coordinate,
+  waypoints: readonly Coordinate[],
+  options: {
+    readonly terrain: LoopTerrain;
+    readonly surface: LoopSurface;
+    readonly locale: Locale;
+    readonly signal?: AbortSignal;
+  },
+): Promise<LoopRouteResult> => {
+  const points = [start, ...waypoints, start];
+  const coords = points.map((p) => `${p.lon},${p.lat}`).join(';');
+  const base = usesFlatProfile(options.terrain) ? OSRM_BASE.flat : OSRM_BASE.safe;
+
+  let url =
+    `${base}/${coords}?overview=full&geometries=geojson&steps=true` +
+    `&alternatives=false&annotations=true&continue_straight=false`;
+
+  if (excludesUnpaved(options.surface)) {
+    url += '&exclude=unpaved';
+  }
+
+  const response = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS, options.signal);
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(
+      `OSRM loop routing failed (${response.status}): ${errorText || 'Unknown error'}`,
+    );
+  }
+
+  const data = (await response.json()) as RouteResponse;
+
+  if (data.code !== 'Ok' || !data.routes?.length) {
+    throw new Error(`OSRM returned no loop (code: ${data.code})`);
+  }
+
+  const routable = data.routes.filter((route) => route.distance > 0);
+  if (routable.length === 0) {
+    throw new OsrmOutOfCoverageError(
+      'OSRM returned only zero-distance loops (outside data coverage).',
+    );
+  }
+
+  const raw = routable[0]!;
+  const mapped = mapRoute(raw, 'custom_osrm', 0, options.locale);
+
+  return {
+    route: {
+      ...mapped,
+      id: `loop-${Math.round(raw.distance)}-${points.length}-${mapped.id}`,
+      source: 'generated_loop',
+      routingProfileVersion: usesFlatProfile(options.terrain)
+        ? 'flat-profile-v1'
+        : 'safety-profile-v1',
+    },
+    coordinates: raw.geometry.coordinates as [number, number][],
+    unpavedShare: unpavedShare(raw.legs),
+    retracedShare: retracedShare(raw.legs),
+  };
 };

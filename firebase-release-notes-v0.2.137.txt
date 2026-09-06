@@ -1,0 +1,39 @@
+Defensive Pedal — Preview v0.2.137 (build 140)
+
+Three changes to the loop finder, all from your build 139 feedback.
+
+1. Start ride is now the persistent button
+   Once loops are on screen, the always-visible button at the bottom is
+   "Start ride" and it acts on whichever loop you have selected. Before you
+   have searched, it is still "Find loops".
+
+2. Try another moved under the loops
+   It is a secondary button at the end of the list it would replace, so
+   searching again is a deliberate act rather than the thing your thumb lands
+   on. The remaining-sessions counter moved with it — it now sits next to the
+   button that actually spends it, wherever that button is.
+
+3. Five loops per search instead of eight
+   Every candidate is a network round trip you wait through, and once the
+   direction arc narrowed them the last few bearings were producing near
+   copies of their neighbours — more waiting, no more choice. Five still
+   samples both edges of the arc and its middle. The wait should be roughly a
+   third shorter.
+
+What to check
+- After a search, is "Start ride" where your thumb expects it?
+- Does "Try another" still feel findable at the bottom of the list?
+- Does the shorter search feel better, or do five loops feel too few? This is
+  a judgement call and I would rather have your read on it than guess.
+- The counter should say the same thing in both places and never disagree
+  with itself.
+
+Unchanged from build 139
+- "Start ride" confirms in place; it does not hand off to navigation yet, so
+  the button is testable but does not launch a ride.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you,
+  deliberately: on a loop your destination is where you started, so a normal
+  reroute would cut the ride short.
+
+Only works in the 31 countries our safety road data covers.

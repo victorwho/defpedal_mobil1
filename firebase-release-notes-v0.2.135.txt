@@ -1,0 +1,46 @@
+Defensive Pedal — Preview v0.2.135 (build 138)
+
+NEW: Find a loop
+
+A ride that brings you back where you started. No destination to type — you
+pick how far, what terrain, whether offroad is allowed, and which way to head
+out, and the app finds loops that finish at your feet.
+
+Where to find it: route planning screen → the circular-arrow button in the
+right-hand column, under the Nearby (layers) button.
+
+What to try
+- Pick a distance, tap "Find loops", and watch the map. Each loop draws as it
+  is found, so you can see it searching rather than staring at a spinner.
+- Drag the ring on the map to steer which way the loop heads out. There is
+  also a "Which way" row in the sheet that does the same thing from a list.
+- Try a terrain the area cannot deliver (ask for Hilly in a flat city). It
+  should tell you honestly what it checked, not silently give you something
+  else. Every result that had to bend one of your choices says so.
+- Try "Try another" a few times. Loops accumulate rather than replacing each
+  other, so nothing you liked disappears.
+- Tap Cancel mid-search. Nothing should be charged and nothing should keep
+  running in the background.
+
+What I most want to know
+1. Do the loops feel like rides you would actually do, or do they wander
+   somewhere pointless?
+2. Is the wait (roughly 3–8 seconds) tolerable, and does watching the loops
+   appear make it feel shorter?
+3. Does dragging the direction ring fight with panning the map? This is the
+   one interaction that cannot be tested off a real phone, so it is the most
+   likely thing to be wrong.
+4. Is the distance you asked for close enough to the distance you got?
+
+Known gaps in this build
+- "Start ride" on a loop confirms in place; it does not yet hand off to the
+  route preview screen or start navigation. Reviewing the loop is the thing
+  to test, not riding it.
+- You cannot save a loop yet.
+- Going off-route on a loop shows the off-course banner. It will not reroute
+  you — that is deliberate, because on a loop your destination is where you
+  started, so an ordinary reroute would end the ride early. Guiding you back
+  onto the line is a later build.
+
+Only works in the 31 countries our safety road data covers. Outside them the
+button is visible but dimmed and explains why.

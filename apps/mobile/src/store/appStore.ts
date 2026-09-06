@@ -1684,6 +1684,7 @@ export const useAppStore = create<AppStore>()(
         // keep Plus for the grace window. User-scoped.
         premiumSnapshot: state.premiumSnapshot,
         flatRouteMeter: state.flatRouteMeter,
+        loopSessionMeter: state.loopSessionMeter,
         // pendingShareClaim persisted — survives redirect-to-onboarding
         // that can drop in-memory state before auth finishes. Attempts
         // are intentionally NOT persisted (reset on cold start).

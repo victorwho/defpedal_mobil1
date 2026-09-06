@@ -79,6 +79,20 @@ export interface TierLimits {
   readonly historyWindowDays: number | null;
   /** Flat-profile rides that may be *started* per calendar month. */
   readonly flatRidesPerMonth: number | null;
+  /**
+   * Loop-finding *sessions* per calendar month.
+   *
+   * A session, not a search: the first loop drawn opens a 30-minute window in
+   * which trying another, changing the distance and re-spinning the heading
+   * are all free (`loopSessionMeter`). Metering individual presses at a limit
+   * this small would meter the exploration that sells the feature.
+   *
+   * Note this is a *second* meter a flat loop touches: Flat terrain routes
+   * through the flat OSRM instance, so starting one also charges
+   * `flatRidesPerMonth`. Surface both counts before generating, never at the
+   * Start button.
+   */
+  readonly loopSessionsPerMonth: number | null;
 }
 
 /**
@@ -93,6 +107,7 @@ export const FREE_LIMITS: TierLimits = {
   offlinePackStorageBudgetBytes: 200 * 1024 * 1024,
   historyWindowDays: 90,
   flatRidesPerMonth: 3,
+  loopSessionsPerMonth: 3,
 };
 
 /**
@@ -107,6 +122,7 @@ export const PLUS_LIMITS: TierLimits = {
   offlinePackStorageBudgetBytes: 2 * 1024 * 1024 * 1024,
   historyWindowDays: null,
   flatRidesPerMonth: null,
+  loopSessionsPerMonth: null,
 };
 
 export const limitsForTier = (tier: PremiumTier): TierLimits =>
