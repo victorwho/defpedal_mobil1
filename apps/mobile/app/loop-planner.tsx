@@ -15,7 +15,7 @@
 import {
   isRouteSupported,
   LOOP_CANDIDATE_COUNT,
-  NOTABLE_RETRACE_SHARE,
+  MAX_RETRACE_SHARE,
   LOOP_DISTANCE_STEPS_METERS,
   loopSessionPeriodKey,
   loopSessionRemainingMs,
@@ -662,7 +662,13 @@ export default function LoopPlannerScreen() {
       */}
       {relaxation && relaxation !== 'none' && sessionLoops.length > 0 ? (
         <Text style={styles.relaxNote}>
-          {relaxation === 'terrain'
+          {relaxation === 'retrace'
+            ? t('loop.relaxedRetrace', {
+                percent: String(
+                  Math.round((selected?.retracedShare ?? 0) * 100),
+                ),
+              })
+            : relaxation === 'terrain'
             ? t('loop.relaxedTerrain', {
                 asked: t(
                   `loop.terrain${terrain.charAt(0).toUpperCase()}${terrain.slice(1)}`,
@@ -722,7 +728,7 @@ export default function LoopPlannerScreen() {
                     A note only when it genuinely doubles back — a few shared
                     metres through the starting junction is not worth saying.
                   */}
-                  {loop.retracedShare >= NOTABLE_RETRACE_SHARE ? (
+                  {loop.retracedShare >= MAX_RETRACE_SHARE ? (
                     <Text style={styles.loopWarn}>
                       {t('loop.retraced', {
                         percent: String(Math.round(loop.retracedShare * 100)),

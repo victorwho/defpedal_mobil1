@@ -19,11 +19,13 @@ import {
 const fetchLoopRoute = vi.fn();
 const enrichRouteWithElevation = vi.fn();
 const enrichRouteWithRisk = vi.fn();
+const fetchRouteScenicScore = vi.fn();
 
 vi.mock('./mapbox-routing', () => ({
   fetchLoopRoute: (...args: unknown[]) => fetchLoopRoute(...args),
   enrichRouteWithElevation: (...args: unknown[]) => enrichRouteWithElevation(...args),
   enrichRouteWithRisk: (...args: unknown[]) => enrichRouteWithRisk(...args),
+  fetchRouteScenicScore: (...args: unknown[]) => fetchRouteScenicScore(...args),
 }));
 
 const { searchLoops } = await import('./loop-generator');
@@ -56,6 +58,22 @@ const routeOf = (id: string, distanceMeters: number): RouteOption => ({
   routeFeatures: [],
   warnings: [],
 });
+
+/** Every ring resolves at the target length, with a given retrace share. */
+const alwaysRetracing = (share: number, distanceMeters = 15_000) => {
+  let n = 0;
+  fetchLoopRoute.mockImplementation(async () => {
+    n += 1;
+    return {
+      route: routeOf(`loop-${n}`, distanceMeters),
+      coordinates: circleFor(distanceMeters),
+      unpavedShare: 0,
+      retracedShare: share,
+      ringRetracedShare: share,
+      stemMeters: 0,
+    };
+  });
+};
 
 /** Every ring resolves at exactly the target length. */
 const alwaysOnTarget = (distanceMeters: number) => {
@@ -108,6 +126,8 @@ beforeEach(() => {
     ...route,
     riskSegments: [],
   }));
+  // Unscored area: neutral, so scenic must not move any existing ordering.
+  fetchRouteScenicScore.mockResolvedValue(0);
 });
 
 describe('a straightforward search', () => {
@@ -328,5 +348,127 @@ describe('ranking', () => {
     const outcome = await searchLoops(request);
     if (outcome.status !== 'ok') throw new Error('expected loops');
     expect(outcome.loops[0]!.route.id).not.toBe('loop-1');
+  });
+});
+
+describe('the doubling-back cap', () => {
+  it('offers a loop that stays under the cap without relaxing anything', async () => {
+    alwaysRetracing(0.04);
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    expect(outcome.relaxation).toBe('none');
+    expect(outcome.loops.every((l) => l.retracedShare <= 0.1)).toBe(true);
+  });
+
+  it('falls all the way to the retrace rung when nothing clean exists', async () => {
+    // A dead-end valley: every candidate repeats a third of itself.
+    alwaysRetracing(0.35);
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    expect(outcome.relaxation).toBe('retrace');
+  });
+
+  it('still returns a rideable loop rather than nothing', async () => {
+    // The whole reason the cap is a ladder rung and not a hard reject.
+    alwaysRetracing(0.35);
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    expect(outcome.loops.length).toBeGreaterThan(0);
+  });
+
+  it('spends an extra sweep before bending the cap', async () => {
+    // Distance and terrain re-filter loops already paid for, but the retrace
+    // cap is the one limit the rider set explicitly — so it earns one more
+    // batch of bearings and shapes before we give it up. Measured against live
+    // OSRM, compliant loops exist but the first batch can miss them entirely.
+    alwaysRetracing(0.35);
+    await searchLoops(request);
+    expect(fetchLoopRoute.mock.calls.length).toBeGreaterThan(
+      LOOP_CANDIDATE_COUNT * 2,
+    );
+  });
+
+  it('prefers a capped loop over a cleaner one that breaks the cap', async () => {
+    let n = 0;
+    fetchLoopRoute.mockImplementation(async () => {
+      n += 1;
+      return {
+        route: routeOf(`loop-${n}`, 15_000),
+        coordinates: circleFor(15_000),
+        unpavedShare: 0,
+        retracedShare: 0,
+        ringRetracedShare: 0,
+        stemMeters: 0,
+        // Only the first candidate is under the cap.
+        retracedShare: n === 1 ? 0.08 : 0.4,
+        ringRetracedShare: n === 1 ? 0.08 : 0.4,
+        stemMeters: 0,
+      };
+    });
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    expect(outcome.relaxation).toBe('none');
+    expect(outcome.loops).toHaveLength(1);
+    expect(outcome.loops[0]!.retracedShare).toBeCloseTo(0.08);
+  });
+});
+
+describe('the cap-rescue sweep', () => {
+  it('finds a compliant loop with extra bearings rather than bending the cap', async () => {
+    // Mirrors what the live probe found: compliant loops exist but are
+    // bearing- and shape-dependent, so the first batch can miss them entirely.
+    let n = 0;
+    fetchLoopRoute.mockImplementation(async () => {
+      n += 1;
+      return {
+        route: routeOf(`loop-${n}`, 15_000),
+        coordinates: circleFor(15_000),
+        unpavedShare: 0,
+        // Nothing compliant until the rescue sweep is well under way.
+        retracedShare: n > 12 ? 0.05 : 0.4,
+        ringRetracedShare: n > 12 ? 0.05 : 0.4,
+        stemMeters: 0,
+      };
+    });
+
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    // The cap HELD — the reported relaxation is never 'retrace'.
+    expect(outcome.relaxation).not.toBe('retrace');
+    expect(outcome.loops.every((l) => l.retracedShare <= 0.1)).toBe(true);
+  });
+
+  it('spends more requests than a normal search to do it', async () => {
+    let n = 0;
+    fetchLoopRoute.mockImplementation(async () => {
+      n += 1;
+      return {
+        route: routeOf(`loop-${n}`, 15_000),
+        coordinates: circleFor(15_000),
+        unpavedShare: 0,
+        retracedShare: n > 12 ? 0.05 : 0.4,
+        ringRetracedShare: n > 12 ? 0.05 : 0.4,
+        stemMeters: 0,
+      };
+    });
+    await searchLoops(request);
+    // Two normal rungs plus the rescue sweep.
+    expect(fetchLoopRoute.mock.calls.length).toBeGreaterThan(
+      LOOP_CANDIDATE_COUNT * 2,
+    );
+  });
+
+  it('bends the cap only when the sweep also finds nothing', async () => {
+    alwaysRetracing(0.35);
+    const outcome = await searchLoops(request);
+    if (outcome.status !== 'ok') throw new Error('expected loops');
+    expect(outcome.relaxation).toBe('retrace');
+    expect(outcome.loops.length).toBeGreaterThan(0);
+  });
+
+  it('does not sweep at all when the first batch already complies', async () => {
+    alwaysRetracing(0.04);
+    await searchLoops(request);
+    expect(fetchLoopRoute).toHaveBeenCalledTimes(LOOP_CANDIDATE_COUNT);
   });
 });

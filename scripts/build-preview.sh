@@ -288,7 +288,18 @@ rm -rf "$DST/apps/mobile/android/app/build/outputs/"
 
 echo "── Step 3: Build $FLAVOR release (${GRADLE_TASKS[*]}) ──"
 cd "$DST/apps/mobile/android"
-./gradlew "${GRADLE_TASKS[@]}"
+# Preview is a single sideloaded APK, so every ABI it carries is dead weight
+# on every tester install: x86/x86_64 exist for emulators and cost 83 MB of a
+# 214 MB file nobody can run. A tester install failed outright for lack of
+# space on 2026-09-07. armeabi-v7a is kept so an older handset can still
+# install. Production is untouched — it ships as an AAB and Play splits native
+# libs per device, so its ABIs cost a real user nothing.
+GRADLE_ARGS=()
+if [ "$FLAVOR" = "preview" ]; then
+  GRADLE_ARGS+=("-PreactNativeArchitectures=arm64-v8a,armeabi-v7a")
+fi
+
+./gradlew "${GRADLE_TASKS[@]}" "${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"}"
 
 # ── Step 4: Verify output artifacts ──
 if [ "$DO_APK" = true ] && [ ! -f "$APK_PATH" ]; then

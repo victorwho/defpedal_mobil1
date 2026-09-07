@@ -134,13 +134,36 @@ export interface LoopRequest {
 export const RING_WAYPOINT_COUNT = 3;
 
 /**
- * Perimeter of the ideal triangle inscribed in a circle of radius 1.
+ * Ring shapes to sample across a batch of candidates.
  *
- * Three points at 120° spacing on a unit circle form an equilateral triangle
- * with side √3, so the perimeter is 3√3 ≈ 5.196. This is the *floor* on how
- * long a ring can be; real roads never achieve it, which is what
- * `DEFAULT_DETOUR_FACTOR` accounts for.
+ * Shape matters as much as bearing, and NEITHER value wins everywhere —
+ * measured against live OSRM at the converged radius, a triangle found three
+ * compliant loops in eight around Brasov and none at all around Bucharest,
+ * while a hexagon did the exact opposite. Rather than pick a loser, alternate:
+ * a batch spans both, which doubles the shape diversity for no extra requests.
  */
+export const RING_WAYPOINT_CHOICES: readonly number[] = [3, 6];
+
+/** Ring shape for the nth candidate in a batch. */
+export const ringWaypointCountFor = (index: number): number =>
+  RING_WAYPOINT_CHOICES[
+    Math.abs(Math.floor(index)) % RING_WAYPOINT_CHOICES.length
+  ]!;
+
+/**
+ * Perimeter of a regular n-gon inscribed in a unit circle: `2n·sin(π/n)`.
+ *
+ * Three points give 3√3 ≈ 5.196; six give 6.0; the limit is 2π. This is the
+ * *floor* on how long a ring can be — real roads never achieve it, which is
+ * what `DEFAULT_DETOUR_FACTOR` accounts for. It has to vary with the shape or
+ * a hexagonal ring is sized as though it were a triangle and comes back long.
+ */
+export const ringPerimeterFactor = (waypointCount: number): number => {
+  const n = Math.max(2, Math.floor(waypointCount));
+  return 2 * n * Math.sin(Math.PI / n);
+};
+
+/** Perimeter factor for the default triangular ring. */
 export const RING_PERIMETER_FACTOR = 3 * Math.sqrt(3);
 
 /**
@@ -154,14 +177,20 @@ export const RING_PERIMETER_FACTOR = 3 * Math.sqrt(3);
  */
 export const DEFAULT_DETOUR_FACTOR = 1.25;
 
-/** Radius for a first attempt at `targetDistanceMeters`. */
+/**
+ * Radius for a first attempt at `targetDistanceMeters` with a given ring shape.
+ *
+ * `waypointCount` comes before `detourFactor` because the shape varies per
+ * candidate while the detour factor almost never does.
+ */
 export const initialRingRadiusMeters = (
   targetDistanceMeters: number,
+  waypointCount: number = RING_WAYPOINT_COUNT,
   detourFactor: number = DEFAULT_DETOUR_FACTOR,
 ): number => {
   const safeTarget = Math.max(0, targetDistanceMeters);
   const safeDetour = detourFactor > 0 ? detourFactor : DEFAULT_DETOUR_FACTOR;
-  return safeTarget / (RING_PERIMETER_FACTOR * safeDetour);
+  return safeTarget / (ringPerimeterFactor(waypointCount) * safeDetour);
 };
 
 /**
@@ -226,6 +255,55 @@ export const ringWaypoints = (
   return Array.from({ length: count }, (_, index) =>
     destinationPoint(start, bearingDegrees + spacing * index, radiusMeters),
   );
+};
+
+/**
+ * Fraction of a lollipop route spent on the stem, out and back.
+ *
+ * A third: enough to clear a town and reach whatever is worth riding around,
+ * while still leaving two thirds of the ride as actual loop. Much more and the
+ * ride is mostly commute; much less and the ring is still in the suburbs.
+ */
+export const DEFAULT_STEM_FRACTION = 1 / 3;
+
+/**
+ * Waypoints for a lollipop: ride out, loop somewhere else, ride home.
+ *
+ * The ring is centred half the stem budget away along `bearingDegrees`, so the
+ * router naturally goes out, goes round, and comes back the way it came. This
+ * is the shape a rider wants when the interesting riding is not where they
+ * live — a town beside mountains gets a loop in the foothills instead of a
+ * ring through its own suburbs.
+ *
+ * The stem is retraced by construction, which is exactly why the doubling-back
+ * cap measures `ringRetracedShare` rather than the whole route. Without that
+ * exemption this shape could never be offered at all.
+ *
+ * The ring is thrown at `bearing + 180` so its first waypoint faces back
+ * towards the start: the router reaches the near side of the ring first and
+ * goes round, instead of overshooting to the far side and doubling back.
+ */
+export const lollipopWaypoints = (
+  start: Coordinate,
+  bearingDegrees: number,
+  targetDistanceMeters: number,
+  waypointCount: number = RING_WAYPOINT_COUNT,
+  stemFraction: number = DEFAULT_STEM_FRACTION,
+  detourFactor: number = DEFAULT_DETOUR_FACTOR,
+): Coordinate[] => {
+  const fraction = Math.min(0.8, Math.max(0, stemFraction));
+  const target = Math.max(0, targetDistanceMeters);
+  const detour = detourFactor > 0 ? detourFactor : DEFAULT_DETOUR_FACTOR;
+
+  // Out AND back, so the centre sits at half the stem budget.
+  const stemLength = (target * fraction) / 2;
+  const centre = destinationPoint(start, bearingDegrees, stemLength);
+
+  // Whatever is left of the budget becomes the ring.
+  const ringBudget = target * (1 - fraction);
+  const radius = ringBudget / (ringPerimeterFactor(waypointCount) * detour);
+
+  return ringWaypoints(centre, radius, bearingDegrees + 180, waypointCount);
 };
 
 // ---------------------------------------------------------------------------
@@ -361,13 +439,22 @@ export const terrainDistance = (
  * the landfill again") rather than a requirement; terrain goes last because
  * it is the one they are most likely to have opened the screen for.
  */
-export type LoopRelaxation = 'none' | 'heading' | 'distance' | 'terrain';
+export type LoopRelaxation =
+  | 'none'
+  | 'heading'
+  | 'distance'
+  | 'terrain'
+  | 'retrace';
 
 export const LOOP_RELAXATION_LADDER: readonly LoopRelaxation[] = [
   'none',
   'heading',
   'distance',
   'terrain',
+  // Last, and only ever reached when nothing else worked. Giving the rider a
+  // loop that repeats a third of itself is worse than giving them the wrong
+  // terrain, so the cap outlives every other preference.
+  'retrace',
 ];
 
 /** Fraction of the target a result may miss by, per relaxation level. */
@@ -375,7 +462,9 @@ export const DISTANCE_TOLERANCE_STRICT = 0.12;
 export const DISTANCE_TOLERANCE_RELAXED = 0.25;
 
 export const distanceToleranceFor = (relaxation: LoopRelaxation): number =>
-  relaxation === 'distance' || relaxation === 'terrain'
+  relaxation === 'distance' ||
+  relaxation === 'terrain' ||
+  relaxation === 'retrace'
     ? DISTANCE_TOLERANCE_RELAXED
     : DISTANCE_TOLERANCE_STRICT;
 
@@ -390,7 +479,30 @@ export const headingAppliesAt = (relaxation: LoopRelaxation): boolean =>
 
 /** Is the terrain preference still a filter at this rung? */
 export const terrainAppliesAt = (relaxation: LoopRelaxation): boolean =>
-  relaxation !== 'terrain';
+  relaxation !== 'terrain' && relaxation !== 'retrace';
+
+/** Is the doubling-back cap still enforced at this rung? */
+export const retraceAppliesAt = (relaxation: LoopRelaxation): boolean =>
+  relaxation !== 'retrace';
+
+/**
+ * Does a candidate satisfy the doubling-back cap at this rung?
+ *
+ * A route whose retracing could not be measured (no `annotation.nodes`) reads
+ * as 0 and therefore passes — an unmeasurable loop must not be rejected on a
+ * guess, the same rule `retracedShare` follows.
+ */
+export const withinRetraceCap = (
+  candidate: Pick<LoopCandidate, 'ringRetracedShare'>,
+  relaxation: LoopRelaxation,
+): boolean => {
+  if (!retraceAppliesAt(relaxation)) return true;
+  // A missing or non-finite share means we could not measure this loop, not
+  // that it is bad. Rejecting on that would discard a perfectly good loop, and
+  // `<= ` against undefined is false — silently failing every candidate.
+  if (!Number.isFinite(candidate.ringRetracedShare)) return true;
+  return candidate.ringRetracedShare <= MAX_RETRACE_SHARE;
+};
 
 export const nextRelaxation = (
   current: LoopRelaxation,
@@ -555,12 +667,126 @@ export const retracedShare = (legs: readonly AnnotatedLeg[]): number => {
 };
 
 /**
- * Retracing worth telling the rider about.
- *
- * Below this a loop reads as clean — a few shared metres through a junction or
- * a one-way pair is normal and not what anyone means by doubling back.
+ * One route, split into the part ridden out and back to reach the riding, and
+ * the part that is actually a loop.
  */
-export const NOTABLE_RETRACE_SHARE = 0.1;
+export interface StemAndRing {
+  /** Metres of the out-and-back approach, counting BOTH passes. */
+  readonly stemMeters: number;
+  /** Metres of the loop at the far end. */
+  readonly ringMeters: number;
+  /** Metres inside the ring that are ridden twice. */
+  readonly ringRetracedMeters: number;
+}
+
+/** An edge key that ignores direction: the same stretch, ridden either way. */
+const edgeKey = (a: number, b: number): string =>
+  a < b ? `${a}:${b}` : `${b}:${a}`;
+
+/** Flatten a route's legs into one ordered list of (edge, length). */
+const routeEdges = (
+  legs: readonly AnnotatedLeg[],
+): { key: string; meters: number }[] => {
+  const edges: { key: string; meters: number }[] = [];
+  for (const leg of legs) {
+    const nodes = leg.annotation?.nodes;
+    const distances = leg.annotation?.distance;
+    if (!nodes || !distances) continue;
+    const count = Math.min(nodes.length - 1, distances.length);
+    for (let i = 0; i < count; i += 1) {
+      const meters = distances[i] ?? 0;
+      if (meters <= 0) continue;
+      edges.push({ key: edgeKey(nodes[i]!, nodes[i + 1]!), meters });
+    }
+  }
+  return edges;
+};
+
+/**
+ * Split a route into its out-and-back stem and the loop at the far end.
+ *
+ * A lollipop rides out along a stem, loops, and comes home the same way — so
+ * its edge sequence is a PALINDROME at both ends: the first edge equals the
+ * last, the second equals the second-to-last, and so on until the ring begins.
+ * Matching that mirrored prefix is exact and needs no geometry or thresholds.
+ *
+ * This matters because the doubling-back cap exists to catch *accidental*
+ * backtracking. A stem the rider asked for — ride out to the foothills, loop
+ * there, ride home — is the shape working as intended, and counting it against
+ * the cap would forbid the very thing they requested.
+ *
+ * A pure out-and-back has no ring: every edge is mirrored, `ringMeters` is 0,
+ * and `ringRetracedShare` therefore reports 1 rather than dividing by zero —
+ * so it fails the cap, which is correct. It is not a loop.
+ */
+export const splitStemAndRing = (
+  legs: readonly AnnotatedLeg[],
+): StemAndRing => {
+  const edges = routeEdges(legs);
+  const n = edges.length;
+
+  // Longest mirrored prefix: edges[i] === edges[n-1-i].
+  let stemEdges = 0;
+  while (
+    stemEdges < Math.floor(n / 2) &&
+    edges[stemEdges]!.key === edges[n - 1 - stemEdges]!.key
+  ) {
+    stemEdges += 1;
+  }
+
+  let stemMeters = 0;
+  for (let i = 0; i < stemEdges; i += 1) {
+    stemMeters += edges[i]!.meters + edges[n - 1 - i]!.meters;
+  }
+
+  // Whatever is left in the middle is the ring.
+  const ring = edges.slice(stemEdges, n - stemEdges);
+  const lengthByEdge = new Map<string, number>();
+  const countByEdge = new Map<string, number>();
+  let ringMeters = 0;
+  for (const edge of ring) {
+    ringMeters += edge.meters;
+    countByEdge.set(edge.key, (countByEdge.get(edge.key) ?? 0) + 1);
+    lengthByEdge.set(edge.key, (lengthByEdge.get(edge.key) ?? 0) + edge.meters);
+  }
+
+  let ringRetracedMeters = 0;
+  for (const [key, count] of countByEdge) {
+    if (count > 1) ringRetracedMeters += lengthByEdge.get(key) ?? 0;
+  }
+
+  return { stemMeters, ringMeters, ringRetracedMeters };
+};
+
+/**
+ * Doubling back WITHIN the loop, ignoring a deliberate out-and-back stem.
+ *
+ * This is what the cap is measured against. `retracedShare` remains the honest
+ * whole-route figure and is what the rider is shown.
+ */
+export const ringRetracedShare = (legs: readonly AnnotatedLeg[]): number => {
+  const { ringMeters, ringRetracedMeters } = splitStemAndRing(legs);
+  // No ring at all means an out-and-back, not a loop. Fail it.
+  if (ringMeters <= 0) return 1;
+  return Math.min(1, Math.max(0, ringRetracedMeters / ringMeters));
+};
+
+/**
+ * The most of itself a loop may repeat and still be offered.
+ *
+ * A hard cap, not a preference: above a tenth, "loop" stops being an honest
+ * description of the ride. Enforced as a filter at every rung of the ladder
+ * except the last, so a rider in a dead-end valley — where no clean loop
+ * exists at any length — still gets something rideable rather than nothing,
+ * clearly labelled.
+ *
+ * Deliberately doubles as the threshold for MENTIONING retracing on a result.
+ * The two being one number is what makes the UI self-consistent: a note can
+ * only ever appear on a loop that broke the cap, which is exactly when the
+ * rider needs telling. Splitting them would let a loop quietly sit at 9% with
+ * no note and no way to know.
+ */
+export const MAX_RETRACE_SHARE = 0.1;
 
 // ---------------------------------------------------------------------------
 // Candidates
@@ -590,6 +816,20 @@ export interface LoopCandidate {
    * Fraction of the loop ridden twice, in [0, 1]. Free, like `unpavedShare`.
    */
   readonly retracedShare: number;
+  /**
+   * Doubling back inside the loop only, with any deliberate out-and-back stem
+   * excluded. THIS is what the cap tests — see `splitStemAndRing`.
+   */
+  readonly ringRetracedShare: number;
+  /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
+  readonly stemMeters: number;
+  /**
+   * Length-weighted mean scenic score of the loop, in [-1, 1].
+   *
+   * 0 for an unscored area — indistinguishable from "scored and unremarkable"
+   * by design, because both should leave the ranking exactly as it was.
+   */
+  readonly scenicScore: number;
   /** Which rung of the ladder produced it. */
   readonly relaxation: LoopRelaxation;
 }
@@ -655,11 +895,48 @@ export const scoredMeters = (riskSegments: readonly RiskSegment[]): number =>
 /**
  * Retrace difference below which two loops rank as equally clean.
  *
- * Eight points, deliberately wide. Loops routinely share a few percent through
- * the junction they start from, and letting that decide would scramble the
- * distance and surface ordering for a difference no rider would notice.
+ * Three points. It was eight while retracing was unbounded, but the hard cap
+ * compresses every offered loop into 0-10%, and an eight-point deadband over a
+ * ten-point range would swallow almost every real difference and silently turn
+ * the ranking off. Still wide enough that a shared starting junction does not
+ * reorder anything.
  */
-export const RETRACE_RANKING_DEADBAND = 0.08;
+export const RETRACE_RANKING_DEADBAND = 0.03;
+
+/**
+ * How much scenic may move a candidate's rank (the "lambda" of the spec).
+ *
+ * Scenic is a TIE-BREAKER, never an override, and it is bounded twice over:
+ *   - it is consulted only between candidates already within
+ *     `SCENIC_SAFETY_TOLERANCE_METERS` of each other on safety exposure, so a
+ *     prettier loop can never beat a materially safer one;
+ *   - it is added to a DISTANCE-ERROR term measured in fractions of target, so
+ *     lambda has to be small relative to the +-12% strict tolerance.
+ *
+ * 0.08 is MEASURED, not guessed: a lambda sweep over 24 real loops around
+ * Râșnov (validate_scenic_loops.py, 2026-09-07) found it the smallest value
+ * that reorders anything at all — 0.05 and below changed zero routes. It moved
+ * 1 of 3 targets, mean scenic gain +0.159, worst base-weight +4.35% (PASS vs
+ * the 5% cap).
+ *
+ * Two earlier values were wrong in opposite directions and both were caught
+ * rather than reasoned away: 0.35 let a 24 km loop beat a 15 km one on a 15 km
+ * request (an override, not a tie-breaker); 0.03 was provably inert.
+ *
+ * Worth knowing before tuning: the worst-case weight increase plateaued at
+ * +4.35% across the whole sweep, up to lambda 0.30. The SAFETY GATE bounds
+ * what scenic can cost; lambda only controls how often it gets to speak.
+ */
+export const SCENIC_LAMBDA = 0.08;
+
+/**
+ * Safety exposure difference below which two candidates count as equally safe.
+ *
+ * Above this gap, safety decides outright and scenic is not consulted at all.
+ * This is what bounds scenic's influence: it cannot trade away busy-road metres
+ * for scenery, only choose between loops that already cost the same in safety.
+ */
+export const SCENIC_SAFETY_TOLERANCE_METERS = 250;
 
 export const rankCandidates = <T extends LoopCandidate>(
   candidates: readonly T[],
@@ -667,9 +944,10 @@ export const rankCandidates = <T extends LoopCandidate>(
     Partial<Pick<LoopRequest, 'surface'>>,
 ): T[] =>
   [...candidates].sort((a, b) => {
-    if (a.highRiskMeters !== b.highRiskMeters) {
-      return a.highRiskMeters - b.highRiskMeters;
-    }
+    // Safety first, and outright: a gap wider than the tolerance is decided
+    // here and scenic never gets a vote.
+    const safetyGap = a.highRiskMeters - b.highRiskMeters;
+    if (Math.abs(safetyGap) > SCENIC_SAFETY_TOLERANCE_METERS) return safetyGap;
 
     // Coming back a different way is not a taste, it is what makes a loop a
     // loop — so this outranks the optional preferences and sits directly under
@@ -692,7 +970,14 @@ export const rankCandidates = <T extends LoopCandidate>(
 
     const aDistance = distanceError(a, request.targetDistanceMeters);
     const bDistance = distanceError(b, request.targetDistanceMeters);
-    if (aDistance !== bDistance) return aDistance - bDistance;
+
+    // Scenic enters here, as a weighted nudge on the distance ordering, and
+    // only among candidates already judged equally safe above. Comparing the
+    // COMBINED figure rather than scenic alone is what keeps it a tie-breaker:
+    // a large distance error still beats a prettier road.
+    const aRank = aDistance - SCENIC_LAMBDA * a.scenicScore;
+    const bRank = bDistance - SCENIC_LAMBDA * b.scenicScore;
+    if (aRank !== bRank) return aRank - bRank;
 
     const aTerrain =
       a.climbMeters === null

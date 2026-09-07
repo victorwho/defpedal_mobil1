@@ -1,0 +1,51 @@
+Defensive Pedal — Preview v0.2.142 (build 145)
+
+Two things: loops can now ride OUT to somewhere better and loop there, and the
+download is 40% smaller.
+
+1. Ride out, loop there, ride home
+
+Some places have the good riding somewhere other than where you live. A town
+beside mountains gets a better ride by heading to the foothills and looping in
+the hills than by circling its own suburbs.
+
+Every third candidate now centres its loop away from the start, spending about
+a third of the distance on getting there and back. There is no new setting —
+the Terrain preference already steers toward these where it matters, because a
+loop in the foothills measures hillier than one round the town. Ask for Hilly
+near mountains and you should see the difference.
+
+The doubling-back cap had to learn about this. A route that rides out and back
+to reach its loop repeats that approach by definition, and the 10% cap would
+have rejected the exact shape you asked for. So the cap now measures doubling
+back INSIDE the loop only, and ignores a deliberate approach. Backtracking
+within the loop is still capped exactly as before, and a pure out-and-back with
+no loop at the end is still rejected outright — that is not a loop.
+
+Honest note on what this does and does not do: it puts the loop somewhere
+else, which is the shape asked for. It does not make loops easier to find. In
+testing around Brasov, these pass the doubling-back cap about as often as
+ordinary loops do, not more. And in practice the router usually finds a
+different way home rather than retracing the approach, so the "stem" is often
+not a stem at all — you just get a loop that starts and ends further out.
+
+2. The download is much smaller
+
+214 MB down to 127 MB. The old build carried native code for processor
+architectures no phone in this test group can run — x86 and x86_64 exist for
+emulators and were 83 MB of dead weight on every install. A tester install
+failed for lack of space because of it.
+
+What to try
+- Somewhere with hills or mountains nearby: ask for Hilly at 25-40 km and see
+  whether any result heads out of town before looping.
+- Compare against Flat at the same distance — you should get more local rings.
+- If a result rides out and back on the same road for a long stretch, that is
+  worth reporting; the approach is meant to be a means to an end, not the ride.
+
+Unchanged
+- "Start ride" confirms in place; it does not launch navigation yet.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you.
+
+Only works in the 31 countries our safety road data covers.

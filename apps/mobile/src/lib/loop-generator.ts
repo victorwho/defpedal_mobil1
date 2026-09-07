@@ -43,8 +43,11 @@ import {
   matchesTerrain,
   nextRingRadiusMeters,
   rankCandidates,
+  lollipopWaypoints,
   ringWaypoints,
+  ringWaypointCountFor,
   terrainAppliesAt,
+  withinRetraceCap,
   withinDistanceTolerance,
   type Coordinate,
   type LoopHeading,
@@ -58,6 +61,7 @@ import {
   enrichRouteWithElevation,
   enrichRouteWithRisk,
   fetchLoopRoute,
+  fetchRouteScenicScore,
 } from './mapbox-routing';
 import type { Locale } from '../i18n';
 
@@ -123,6 +127,15 @@ export interface GeneratedLoop {
   readonly unpavedShare: number;
   /** Fraction of the loop ridden twice, in [0, 1]. Free, like unpavedShare. */
   readonly retracedShare: number;
+  /** Doubling back inside the loop only — what the cap tests. */
+  readonly ringRetracedShare: number;
+  /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
+  readonly stemMeters: number;
+  /**
+   * Length-weighted mean scenic score in [-1, 1]; 0 until measured, and 0
+   * forever in an unscored area — both mean "do not move the ranking".
+   */
+  readonly scenicScore: number;
   /** Which rung of the ladder produced it. */
   readonly relaxation: LoopRelaxation;
   /** Measured terrain, or null when climb was never looked up. */
@@ -191,15 +204,41 @@ const routeOneRing = async (
   request: LoopSearchRequest,
   bearingDegrees: number,
   relaxation: LoopRelaxation,
+  waypointCount: number,
+  /**
+   * Ride out to somewhere else and loop THERE, rather than ringing the start.
+   *
+   * The shape a rider wants when the good riding is not where they live. Its
+   * stem is retraced by construction, which the cap exempts via
+   * `ringRetracedShare`.
+   */
+  lollipop: boolean,
   signal?: AbortSignal,
 ): Promise<PooledLoop | null> => {
-  let radius = initialRingRadiusMeters(request.targetDistanceMeters);
+  let radius = initialRingRadiusMeters(
+    request.targetDistanceMeters,
+    waypointCount,
+  );
+  /** A lollipop's size knob: the notional total the shape is built for. */
+  let shapeBudget = request.targetDistanceMeters;
   let best: PooledLoop | null = null;
 
   for (let attempt = 0; attempt < MAX_RADIUS_ITERATIONS; attempt += 1) {
     if (aborted(signal)) return null;
 
-    const waypoints = ringWaypoints(request.start, radius, bearingDegrees);
+    // Both shapes converge, they just have different size knobs: a plain ring
+    // scales its radius, a lollipop scales the whole stem+ring budget. Skipping
+    // convergence for lollipops was a real bug — measured against live OSRM,
+    // an unconverged 30 km request came back at 53 km, so every lollipop was
+    // then thrown out by the distance filter and none was ever offered.
+    const waypoints = lollipop
+      ? lollipopWaypoints(
+          request.start,
+          bearingDegrees,
+          shapeBudget,
+          waypointCount,
+        )
+      : ringWaypoints(request.start, radius, bearingDegrees, waypointCount);
 
     let result;
     try {
@@ -235,6 +274,9 @@ const routeOneRing = async (
       highRiskMeters: 0,
       unpavedShare: result.unpavedShare,
       retracedShare: result.retracedShare,
+      scenicScore: 0,
+      ringRetracedShare: result.ringRetracedShare,
+      stemMeters: result.stemMeters,
       relaxation,
       terrain: null,
       measured: false,
@@ -251,11 +293,21 @@ const routeOneRing = async (
       return candidate;
     }
 
-    radius = nextRingRadiusMeters(
-      radius,
-      distanceMeters,
-      request.targetDistanceMeters,
-    );
+    if (lollipop) {
+      // Same proportional controller, applied to the budget rather than a
+      // radius — it scales the stem and the ring together, keeping the shape.
+      shapeBudget = nextRingRadiusMeters(
+        shapeBudget,
+        distanceMeters,
+        request.targetDistanceMeters,
+      );
+    } else {
+      radius = nextRingRadiusMeters(
+        radius,
+        distanceMeters,
+        request.targetDistanceMeters,
+      );
+    }
   }
 
   return best;
@@ -301,9 +353,13 @@ const runPooled = async <T>(
  * refuses to claim a terrain it never measured.
  */
 const measureLoop = async (loop: PooledLoop): Promise<PooledLoop> => {
-  const [withElevation, withRisk] = await Promise.all([
+  // Three calls, all on the shared routePreview bucket. Scenic joins climb and
+  // risk here rather than being fetched for every candidate, for exactly the
+  // same reason: the bucket is 30/60s and only finalists are worth measuring.
+  const [withElevation, withRisk, scenicScore] = await Promise.all([
     enrichRouteWithElevation(loop.route, loop.coordinates),
     enrichRouteWithRisk(loop.route, loop.coordinates),
+    fetchRouteScenicScore(loop.coordinates),
   ]);
 
   const climbMeters = withElevation.totalClimbMeters;
@@ -320,6 +376,7 @@ const measureLoop = async (loop: PooledLoop): Promise<PooledLoop> => {
     },
     climbMeters,
     highRiskMeters: highRiskMeters(riskSegments),
+    scenicScore,
     terrain:
       climbMeters === null
         ? null
@@ -354,9 +411,13 @@ export const searchLoops = async (
   const pool: PooledLoop[] = [];
   const measured = new Map<string, PooledLoop>();
   let attempted = 0;
+  let capRescueDone = false;
 
   /** Throw a rung's worth of rings into the pool. */
-  const generateRung = async (relaxation: LoopRelaxation): Promise<void> => {
+  const generateRung = async (
+    relaxation: LoopRelaxation,
+    shapeOffset = 0,
+  ): Promise<void> => {
     const heading = headingAppliesAt(relaxation) ? request.heading : 'any';
     const bearings = loopBearings(
       heading,
@@ -364,8 +425,22 @@ export const searchLoops = async (
       headingArcFor(relaxation),
     );
 
-    const tasks = bearings.map((bearing) => async () => {
-      const loop = await routeOneRing(request, bearing, relaxation, signal);
+    // Alternate the ring shape across the batch. Shape is as decisive as
+    // bearing for how much a loop repeats itself, and neither 3 nor 6 wins
+    // everywhere, so a batch samples both rather than betting on one.
+    const tasks = bearings.map((bearing, index) => async () => {
+      const loop = await routeOneRing(
+        request,
+        bearing,
+        relaxation,
+        ringWaypointCountFor(index + shapeOffset),
+        // Every third candidate rides out somewhere before looping. Mixed into
+        // the same pool rather than hidden behind a control: the terrain
+        // preference already steers towards them where it matters, because a
+        // ring in the foothills measures hillier than one round the town.
+        (index + shapeOffset) % 3 === 2,
+        signal,
+      );
       attempted += 1;
       if (loop) {
         pool.push(loop);
@@ -403,7 +478,13 @@ export const searchLoops = async (
   const currentPool = (): PooledLoop[] =>
     pool.map((loop) => measured.get(loop.id) ?? loop);
 
-  const ladder: LoopRelaxation[] = ['none', 'heading', 'distance', 'terrain'];
+  const ladder: LoopRelaxation[] = [
+    'none',
+    'heading',
+    'distance',
+    'terrain',
+    'retrace',
+  ];
 
   for (const relaxation of ladder) {
     if (aborted(signal)) return { status: 'cancelled' };
@@ -411,12 +492,54 @@ export const searchLoops = async (
     // Only the first two rungs cost network. `distance` and `terrain` are
     // filter relaxations over loops we have already paid for.
     if (relaxation === 'none' || relaxation === 'heading') {
-      await generateRung(relaxation);
+      await generateRung(relaxation, relaxation === 'heading' ? 1 : 0);
       if (aborted(signal)) return { status: 'cancelled' };
     }
 
-    const viable = currentPool().filter((loop) =>
-      withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation),
+    // Before bending the doubling-back cap — the one constraint the rider set
+    // as a hard limit — spend one more sweep hunting a loop that satisfies it.
+    // Compliant loops exist in every network measured; they are just bearing-
+    // and shape-dependent, so the fix for "the cap always bends" is to look
+    // harder, not to lower the bar. OSRM is our own box, so this costs latency
+    // and nothing else.
+    if (relaxation === 'retrace' && !capRescueDone) {
+      capRescueDone = true;
+      await generateRung('heading', 1);
+      await generateRung('heading', 0);
+      if (aborted(signal)) return { status: 'cancelled' };
+
+      const rescued = currentPool().filter(
+        (loop) =>
+          withinDistanceTolerance(
+            loop,
+            request.targetDistanceMeters,
+            'distance',
+          ) && withinRetraceCap(loop, 'distance'),
+      );
+      if (rescued.length > 0) {
+        const finalists = rankCandidates(rescued, request).slice(
+          0,
+          LOOPS_PER_ATTEMPT,
+        );
+        await measureSome(finalists, LOOPS_PER_ATTEMPT);
+        if (aborted(signal)) return { status: 'cancelled' };
+        return {
+          status: 'ok',
+          loops: rankCandidates(
+            finalists.map((l) => measured.get(l.id) ?? l),
+            request,
+          ).map(strip),
+          // The cap held; only distance was widened to get there.
+          relaxation: 'distance',
+          checked: measured.size,
+        };
+      }
+    }
+
+    const viable = currentPool().filter(
+      (loop) =>
+        withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
+        withinRetraceCap(loop, relaxation),
     );
     if (viable.length === 0) continue;
 
@@ -447,6 +570,7 @@ export const searchLoops = async (
     let matching = currentPool().filter(
       (loop) =>
         withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
+        withinRetraceCap(loop, relaxation) &&
         matchesTerrain(loop, request.terrain),
     );
 

@@ -37,6 +37,7 @@ import { downsampleCoordinates, getPreviewOrigin, calculateCaloriesBurned, decod
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { config } from '../config';
+import type { ScenicSegment, ScenicVia } from '../lib/scenic';
 import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullUser } from '../lib/auth';
 import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
@@ -1793,6 +1794,163 @@ export const buildV1Routes = (
           return { riskSegments };
         } catch (error) {
           throw new HttpError('Risk segment fetch failed.', {
+            statusCode: 500,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown error.'],
+          });
+        }
+      },
+    );
+
+    // ── Scenic ──
+    // Same guards as /risk-segments: authenticated (anonymous sessions allowed,
+    // like risk), per-user rate limited on the SAME `routePreview` bucket, and
+    // the geometry is downsampled and body-limited identically.
+    //
+    // Unlike risk there is nothing to quantize — scenic is derived wholly from
+    // public OSM tags, so the raw score is not IP. The auth and rate limit are
+    // here because it is a spatial DB query, not because the number is secret.
+    //
+    // NOTE the bucket sharing is a real cost: loop generation already spends
+    // elevation + risk per measured candidate, and scenic makes it three.
+    app.post<{
+      Body: { geometry: { type: string; coordinates: number[][] } };
+      Reply: { scenicSegments: ScenicSegment[] } | ErrorResponse;
+    }>(
+      '/scenic-segments',
+      {
+        bodyLimit: ROUTE_GEOMETRY_BODY_LIMIT_BYTES,
+        schema: {
+          response: {
+            // Fastify STRIPS response fields absent from the schema, so every
+            // field the client reads must be declared here (gotcha #9).
+            200: {
+              type: 'object' as const,
+              properties: {
+                scenicSegments: {
+                  type: 'array' as const,
+                  items: {
+                    type: 'object' as const,
+                    properties: {
+                      id: { type: 'string' as const },
+                      scenicScore: { type: 'number' as const },
+                      geometry: { type: 'object' as const, additionalProperties: true },
+                    },
+                  },
+                },
+              },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', {
+          userId: user.id,
+        });
+
+        const geometry = request.body?.geometry;
+        if (
+          !geometry ||
+          geometry.type !== 'LineString' ||
+          !Array.isArray(geometry.coordinates)
+        ) {
+          throw new HttpError('Invalid geometry.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['Body must contain a GeoJSON LineString geometry.'],
+          });
+        }
+
+        const boundedGeometry: GeoJsonLineString = {
+          type: 'LineString',
+          coordinates: downsampleCoordinates(
+            geometry.coordinates,
+            MAX_ROUTE_GEOMETRY_POINTS,
+          ) as [number, number][],
+        };
+
+        try {
+          const scenicSegments =
+            await dependencies.fetchScenicSegments(boundedGeometry);
+          return { scenicSegments };
+        } catch (error) {
+          throw new HttpError('Scenic segment fetch failed.', {
+            statusCode: 500,
+            code: 'UPSTREAM_ERROR',
+            details: [error instanceof Error ? error.message : 'Unknown error.'],
+          });
+        }
+      },
+    );
+
+    // Scenic via-point candidates on a ring around a start, for loop generation.
+    app.get<{
+      Querystring: { lat?: string; lon?: string; radius?: string };
+      Reply: { vias: ScenicVia[] } | ErrorResponse;
+    }>(
+      '/scenic-vias',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object' as const,
+              properties: {
+                vias: {
+                  type: 'array' as const,
+                  items: {
+                    type: 'object' as const,
+                    properties: {
+                      wayId: { type: 'number' as const },
+                      scenicScore: { type: 'number' as const },
+                      name: { type: ['string', 'null'] as const },
+                      lat: { type: 'number' as const },
+                      lon: { type: 'number' as const },
+                      sector: { type: 'number' as const },
+                      distanceMeters: { type: 'number' as const },
+                    },
+                  },
+                },
+              },
+            },
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            429: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routePreview', {
+          userId: user.id,
+        });
+
+        const lat = Number(request.query.lat);
+        const lon = Number(request.query.lon);
+        const radius = Number(request.query.radius);
+        if (
+          !Number.isFinite(lat) || Math.abs(lat) > 90 ||
+          !Number.isFinite(lon) || Math.abs(lon) > 180 ||
+          !Number.isFinite(radius) || radius <= 0 || radius > 60_000
+        ) {
+          throw new HttpError('Invalid ring.', {
+            statusCode: 400,
+            code: 'VALIDATION_ERROR',
+            details: ['lat, lon and radius (0 < r <= 60000 m) are required.'],
+          });
+        }
+
+        try {
+          const vias = await dependencies.fetchScenicVias({ lat, lon }, radius);
+          return { vias };
+        } catch (error) {
+          throw new HttpError('Scenic via fetch failed.', {
             statusCode: 500,
             code: 'UPSTREAM_ERROR',
             details: [error instanceof Error ? error.message : 'Unknown error.'],

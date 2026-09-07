@@ -236,6 +236,7 @@ export const en = {
 
     relaxedHeading: 'Heads {{actual}} — nothing {{terrain}} {{asked}} of here.',
     relaxedDistance: '{{km}} km — no {{asked}} km loop matched exactly.',
+    relaxedRetrace: 'Every loop around here repeats part of itself. This one doubles back on {{percent}}% — the least we could find.',
     relaxedTerrain: 'Nothing {{asked}} near here. We checked {{checked}} loops; this is the closest.',
 
     emptyTitle: 'No {{km}} km loop from here',

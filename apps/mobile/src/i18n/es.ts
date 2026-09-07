@@ -236,6 +236,7 @@ export const es: TranslationKeys = {
 
     relaxedHeading: 'Va hacia {{actual}} — no hay nada {{terrain}} al {{asked}}.',
     relaxedDistance: '{{km}} km — ninguna ruta de {{asked}} km exactos.',
+    relaxedRetrace: 'Toda ruta por aquí repite parte de sí misma. Esta repite el {{percent}}% — lo menos que encontramos.',
     relaxedTerrain: 'Nada {{asked}} por aquí. Revisamos {{checked}} rutas; esta es la más cercana.',
 
     emptyTitle: 'Ninguna ruta de {{km}} km desde aquí',

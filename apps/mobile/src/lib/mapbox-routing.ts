@@ -19,7 +19,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -712,6 +712,10 @@ export interface LoopRouteResult {
    * `annotation.nodes` — also already requested, so also free.
    */
   readonly retracedShare: number;
+  /** Doubling back inside the loop only, ignoring a deliberate stem. */
+  readonly ringRetracedShare: number;
+  /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
+  readonly stemMeters: number;
 }
 
 /**
@@ -797,5 +801,94 @@ export const fetchLoopRoute = async (
     coordinates: raw.geometry.coordinates as [number, number][],
     unpavedShare: unpavedShare(raw.legs),
     retracedShare: retracedShare(raw.legs),
+    ringRetracedShare: ringRetracedShare(raw.legs),
+    stemMeters: splitStemAndRing(raw.legs).stemMeters,
   };
+};
+
+
+/**
+ * Length-weighted mean scenic score for a route, from `/v1/scenic-segments`.
+ *
+ * Returns 0 on any failure or in an unscored area. That is deliberate and it
+ * matters: 0 is the neutral value in the ranking, so a region with no scenic
+ * coverage — or a server hiccup — ranks exactly as it did before scenic
+ * existed, rather than pushing every candidate around on missing data.
+ */
+export const fetchRouteScenicScore = async (
+  coordinates: [number, number][],
+): Promise<number> => {
+  if (!mobileEnv.mobileApiUrl) return 0;
+
+  const geometry: GeoJsonLineString = {
+    type: 'LineString',
+    coordinates: downsampleCoordinates(
+      coordinates,
+      MAX_RISK_GEOMETRY_POINTS,
+    ) as [number, number][],
+  };
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const token = await getAccessToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/scenic-segments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ geometry }),
+    });
+    if (!response.ok) return 0;
+    const data = (await response.json()) as {
+      scenicSegments?: { scenicScore: number; geometry: GeoJsonLineString }[];
+    };
+    const segments = data.scenicSegments ?? [];
+    if (segments.length === 0) return 0;
+
+    let weighted = 0;
+    let total = 0;
+    for (const segment of segments) {
+      const coords = segment.geometry?.coordinates;
+      if (!Array.isArray(coords) || coords.length < 2) continue;
+      let length = 0;
+      for (let i = 1; i < coords.length; i += 1) {
+        const [x0, y0] = coords[i - 1] as [number, number];
+        const [x1, y1] = coords[i] as [number, number];
+        length += Math.hypot(x1 - x0, y1 - y0);
+      }
+      if (length <= 0) continue;
+      weighted += segment.scenicScore * length;
+      total += length;
+    }
+    return total > 0 ? weighted / total : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/** Scenic via-point candidates on a ring, for loop generation. */
+export const fetchScenicVias = async (
+  start: Coordinate,
+  ringRadiusMeters: number,
+): Promise<{ lat: number; lon: number; scenicScore: number; sector: number }[]> => {
+  if (!mobileEnv.mobileApiUrl) return [];
+  try {
+    const headers: Record<string, string> = {};
+    const token = await getAccessToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const url =
+      `${mobileEnv.mobileApiUrl}/v1/scenic-vias` +
+      `?lat=${start.lat}&lon=${start.lon}&radius=${Math.round(ringRadiusMeters)}`;
+    const response = await fetch(url, { headers });
+    if (!response.ok) return [];
+    const data = (await response.json()) as {
+      vias?: { lat: number; lon: number; scenicScore: number; sector: number }[];
+    };
+    return data.vias ?? [];
+  } catch {
+    return [];
+  }
 };

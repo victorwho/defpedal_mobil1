@@ -236,6 +236,7 @@ export const ro: TranslationKeys = {
 
     relaxedHeading: 'Merge spre {{actual}} — nimic {{terrain}} spre {{asked}}.',
     relaxedDistance: '{{km}} km — niciun tur de exact {{asked}} km.',
+    relaxedRetrace: 'Orice tur din zonă repetă o parte din traseu. Acesta se întoarce pe {{percent}}% — cel mai puțin pe care l-am găsit.',
     relaxedTerrain: 'Nimic {{asked}} pe aproape. Am verificat {{checked}} tururi; acesta e cel mai apropiat.',
 
     emptyTitle: 'Niciun tur de {{km}} km de aici',

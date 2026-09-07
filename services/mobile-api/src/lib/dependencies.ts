@@ -13,6 +13,7 @@ import {
 } from './rateLimit';
 import { createRedisSharedStore } from './redisStore';
 import { enrichRiskGeoJson, fetchRiskSegments } from './risk';
+import { fetchScenicSegments, fetchScenicVias } from './scenic';
 import {
   deleteTripTrack,
   finishTripRecord,
@@ -41,6 +42,8 @@ export type MobileApiDependencies = {
   getElevationProfile: typeof getElevationProfile;
   getElevationGain: typeof getElevationGain;
   fetchRiskSegments: typeof fetchRiskSegments;
+  fetchScenicSegments: typeof fetchScenicSegments;
+  fetchScenicVias: typeof fetchScenicVias;
   enrichRiskGeoJson: typeof enrichRiskGeoJson;
   normalizeRoutePreviewResponse: typeof normalizeRoutePreviewResponse;
   submitHazardReport: typeof submitHazardReport;
@@ -95,6 +98,8 @@ const buildDefaultDependencies = (): MobileApiDependencies => {
     getElevationProfile,
     getElevationGain,
     fetchRiskSegments,
+    fetchScenicSegments,
+    fetchScenicVias,
     enrichRiskGeoJson,
     normalizeRoutePreviewResponse,
     submitHazardReport,

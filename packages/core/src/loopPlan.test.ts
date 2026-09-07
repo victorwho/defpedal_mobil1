@@ -28,15 +28,27 @@ import {
   normalizeBearing,
   rankCandidates,
   RING_PERIMETER_FACTOR,
+  SCENIC_LAMBDA,
+  SCENIC_SAFETY_TOLERANCE_METERS,
+  RING_WAYPOINT_CHOICES,
+  RING_WAYPOINT_COUNT,
+  ringPerimeterFactor,
+  ringWaypointCountFor,
   ringWaypoints,
   scoredMeters,
   terrainAppliesAt,
   terrainDistance,
   excludesUnpaved,
-  NOTABLE_RETRACE_SHARE,
+  MAX_RETRACE_SHARE,
+  retraceAppliesAt,
+  withinRetraceCap,
   prefersUnpaved,
   retracedMeters,
   retracedShare,
+  ringRetracedShare,
+  splitStemAndRing,
+  lollipopWaypoints,
+  DEFAULT_STEM_FRACTION,
   RETRACE_RANKING_DEADBAND,
   unpavedMeters,
   unpavedShare,
@@ -55,6 +67,9 @@ const candidate = (over: Partial<LoopCandidate> = {}): LoopCandidate => ({
   highRiskMeters: 0,
   unpavedShare: 0,
   retracedShare: 0,
+  ringRetracedShare: 0,
+  stemMeters: 0,
+  scenicScore: 0,
   relaxation: 'none',
   ...over,
 });
@@ -73,7 +88,7 @@ describe('ring radius', () => {
   });
 
   it('falls back to the default when handed a zero detour factor', () => {
-    expect(initialRingRadiusMeters(15_000, 0)).toBe(
+    expect(initialRingRadiusMeters(15_000, RING_WAYPOINT_COUNT, 0)).toBe(
       initialRingRadiusMeters(15_000),
     );
   });
@@ -257,12 +272,15 @@ describe('terrain', () => {
 });
 
 describe('relaxation ladder', () => {
-  it('gives up heading, then distance, then terrain', () => {
+  it('gives up heading, then distance, then terrain, then the retrace cap', () => {
+    // The cap is last on purpose: a loop that repeats a third of itself is a
+    // worse answer than the wrong terrain.
     expect(LOOP_RELAXATION_LADDER).toEqual([
       'none',
       'heading',
       'distance',
       'terrain',
+      'retrace',
     ]);
   });
 
@@ -270,7 +288,8 @@ describe('relaxation ladder', () => {
     expect(nextRelaxation('none')).toBe('heading');
     expect(nextRelaxation('heading')).toBe('distance');
     expect(nextRelaxation('distance')).toBe('terrain');
-    expect(nextRelaxation('terrain')).toBeNull();
+    expect(nextRelaxation('terrain')).toBe('retrace');
+    expect(nextRelaxation('retrace')).toBeNull();
   });
 
   it('widens the distance tolerance only once distance is the rung being given up', () => {
@@ -697,8 +716,8 @@ describe('doubling back', () => {
     expect(result.totalMeters).toBe(0);
   });
 
-  it('treats a tenth of the loop as the point worth mentioning', () => {
-    expect(NOTABLE_RETRACE_SHARE).toBe(0.1);
+  it('caps a loop at a tenth of itself repeated', () => {
+    expect(MAX_RETRACE_SHARE).toBe(0.1);
   });
 });
 
@@ -758,12 +777,308 @@ describe('ranking by doubling back', () => {
     // Sharing the starting junction is normal and must not reorder anything.
     const ranked = rankCandidates(
       [
-        candidate({ id: 'near', retracedShare: 0.05, distanceMeters: 15_100 }),
+        candidate({ id: 'near', retracedShare: 0.02, distanceMeters: 15_100 }),
         candidate({ id: 'far', retracedShare: 0.0, distanceMeters: 17_000 }),
       ],
       req,
     );
     expect(ranked[0]!.id).toBe('near');
-    expect(RETRACE_RANKING_DEADBAND).toBeGreaterThan(0.05);
+    expect(RETRACE_RANKING_DEADBAND).toBeGreaterThan(0.02);
+  });
+});
+
+describe('the doubling-back cap', () => {
+  // The cap tests the RING figure, with any deliberate stem excluded.
+  const at = (share: number) =>
+    candidate({ retracedShare: share, ringRetracedShare: share });
+
+  it('accepts a loop at or under a tenth', () => {
+    expect(withinRetraceCap(at(0), 'none')).toBe(true);
+    expect(withinRetraceCap(at(0.1), 'none')).toBe(true);
+  });
+
+  it('rejects a loop over a tenth', () => {
+    expect(withinRetraceCap(at(0.11), 'none')).toBe(false);
+    expect(withinRetraceCap(at(0.5), 'none')).toBe(false);
+  });
+
+  it('keeps enforcing through every earlier rung', () => {
+    // The cap outlives heading, distance AND terrain — a loop that repeats a
+    // third of itself is worse than the wrong terrain.
+    for (const rung of ['none', 'heading', 'distance', 'terrain'] as const) {
+      expect(retraceAppliesAt(rung)).toBe(true);
+      expect(withinRetraceCap(at(0.4), rung)).toBe(false);
+    }
+  });
+
+  it('gives up only at the last rung', () => {
+    expect(retraceAppliesAt('retrace')).toBe(false);
+    expect(withinRetraceCap(at(0.4), 'retrace')).toBe(true);
+  });
+
+  it('passes a loop whose retracing could not be measured', () => {
+    // retracedShare reads 0 when nodes are absent; rejecting on a guess would
+    // discard a perfectly good loop.
+    expect(withinRetraceCap(at(0), 'none')).toBe(true);
+  });
+
+  it('is the last rung of the ladder', () => {
+    expect(LOOP_RELAXATION_LADDER[LOOP_RELAXATION_LADDER.length - 1]).toBe('retrace');
+    expect(nextRelaxation('terrain')).toBe('retrace');
+    expect(nextRelaxation('retrace')).toBeNull();
+  });
+
+  it('keeps the widened distance tolerance once past the distance rung', () => {
+    expect(distanceToleranceFor('retrace')).toBe(DISTANCE_TOLERANCE_RELAXED);
+  });
+
+  it('stops filtering on terrain at the retrace rung too', () => {
+    // By then terrain has already been given up; re-applying it would make the
+    // last resort unreachable.
+    expect(terrainAppliesAt('retrace')).toBe(false);
+  });
+
+  it('uses a deadband narrow enough to still rank inside the cap', () => {
+    // With everything compressed into 0-10%, an 8-point deadband would have
+    // swallowed nearly every real difference.
+    expect(RETRACE_RANKING_DEADBAND).toBeLessThan(MAX_RETRACE_SHARE / 2);
+  });
+
+  it('still prefers the cleaner of two capped loops', () => {
+    const ranked = rankCandidates(
+      [at(0.09), { ...at(0.01), id: 'cleanest' }],
+      { targetDistanceMeters: 15_000, terrain: 'rolling', surface: 'any' },
+    );
+    expect(ranked[0]!.id).toBe('cleanest');
+  });
+});
+
+describe('the cap is defensive about unmeasurable loops', () => {
+  it('passes a candidate whose share is missing entirely', () => {
+    // `undefined <= 0.1` is false, which would silently fail EVERY candidate
+    // and drive the ladder to its last resort on every search.
+    const noShare = { ringRetracedShare: undefined as unknown as number };
+    expect(withinRetraceCap(noShare, 'none')).toBe(true);
+  });
+
+  it('passes a candidate whose share is NaN', () => {
+    expect(withinRetraceCap({ ringRetracedShare: Number.NaN }, 'none')).toBe(true);
+  });
+
+  it('still rejects a real measurement over the cap', () => {
+    expect(withinRetraceCap({ ringRetracedShare: 0.2 }, 'none')).toBe(false);
+  });
+});
+
+describe('ring shape sampling', () => {
+  it('sizes a hexagon differently from a triangle', () => {
+    // 2n*sin(pi/n): 5.196 for three points, 6.0 for six. Using the triangle
+    // factor for a hexagon would size the ring wrong and come back long.
+    expect(ringPerimeterFactor(3)).toBeCloseTo(3 * Math.sqrt(3), 6);
+    expect(ringPerimeterFactor(6)).toBeCloseTo(6, 6);
+    expect(ringPerimeterFactor(3)).toBeLessThan(ringPerimeterFactor(6));
+  });
+
+  it('approaches a circle as the ring gains points', () => {
+    expect(ringPerimeterFactor(360)).toBeCloseTo(2 * Math.PI, 3);
+  });
+
+  it('never divides by a degenerate shape', () => {
+    expect(ringPerimeterFactor(0)).toBeGreaterThan(0);
+    expect(ringPerimeterFactor(1)).toBeGreaterThan(0);
+    expect(ringPerimeterFactor(-5)).toBeGreaterThan(0);
+  });
+
+  it('gives a smaller radius for a rounder ring at the same target', () => {
+    // A hexagon encloses more perimeter per unit radius, so it needs less.
+    expect(initialRingRadiusMeters(15_000, 6)).toBeLessThan(
+      initialRingRadiusMeters(15_000, 3),
+    );
+  });
+
+  it('alternates shape across a batch', () => {
+    // Neither 3 nor 6 wins everywhere — measured against live OSRM, a triangle
+    // found three compliant loops in eight around Brasov and none around
+    // Bucharest, while a hexagon did the opposite.
+    expect(ringWaypointCountFor(0)).toBe(RING_WAYPOINT_CHOICES[0]);
+    expect(ringWaypointCountFor(1)).toBe(RING_WAYPOINT_CHOICES[1]);
+    expect(ringWaypointCountFor(2)).toBe(RING_WAYPOINT_CHOICES[0]);
+  });
+
+  it('handles a negative or fractional index without throwing', () => {
+    expect(RING_WAYPOINT_CHOICES).toContain(ringWaypointCountFor(-1));
+    expect(RING_WAYPOINT_CHOICES).toContain(ringWaypointCountFor(2.7));
+  });
+
+  it('builds the requested number of waypoints', () => {
+    expect(ringWaypoints(BUCHAREST, 2_000, 0, 6)).toHaveLength(6);
+    expect(ringWaypoints(BUCHAREST, 2_000, 0)).toHaveLength(RING_WAYPOINT_COUNT);
+  });
+});
+
+describe('stem and ring', () => {
+  const leg = (nodes: number[], m = 100) => ({
+    annotation: { nodes, distance: new Array(Math.max(0, nodes.length - 1)).fill(m) },
+  });
+
+  it('finds no stem on a plain loop', () => {
+    const r = splitStemAndRing([leg([1, 2, 3, 4, 1])]);
+    expect(r.stemMeters).toBe(0);
+    expect(r.ringMeters).toBe(400);
+  });
+
+  it('separates an out-and-back stem from the loop at the end', () => {
+    // 1-2 out, ring 2-3-4-2, then 2-1 home: one stem edge each way.
+    const r = splitStemAndRing([leg([1, 2, 3, 4, 2, 1])]);
+    expect(r.stemMeters).toBe(200);
+    expect(r.ringMeters).toBe(300);
+  });
+
+  it('exempts the stem so a lollipop can pass the cap', () => {
+    // Without the exemption this reads 2/5 = 40% and is rejected outright.
+    const legs = [leg([1, 2, 3, 4, 2, 1])];
+    expect(retracedShare(legs)).toBeCloseTo(0.4, 5);
+    expect(ringRetracedShare(legs)).toBe(0);
+    expect(withinRetraceCap({ ringRetracedShare: ringRetracedShare(legs) }, 'none')).toBe(true);
+  });
+
+  it('still catches doubling back INSIDE the ring', () => {
+    // Stem 1-2, then a spur 3-9-3 within the ring.
+    const legs = [leg([1, 2, 3, 9, 3, 4, 2, 1])];
+    const r = splitStemAndRing(legs);
+    expect(r.stemMeters).toBe(200);
+    expect(ringRetracedShare(legs)).toBeGreaterThan(0);
+  });
+
+  it('fails a pure out-and-back, which has no ring at all', () => {
+    const legs = [leg([1, 2, 3, 2, 1])];
+    expect(ringRetracedShare(legs)).toBe(1);
+    expect(withinRetraceCap({ ringRetracedShare: 1 }, 'none')).toBe(false);
+  });
+
+  it('does not divide by zero on an empty route', () => {
+    expect(splitStemAndRing([])).toEqual({
+      stemMeters: 0,
+      ringMeters: 0,
+      ringRetracedMeters: 0,
+    });
+    expect(ringRetracedShare([])).toBe(1);
+  });
+});
+
+describe('lollipopWaypoints', () => {
+  it('centres the ring away from the start', () => {
+    const wps = lollipopWaypoints(BUCHAREST, 90, 30_000);
+    const distances = wps.map((w) =>
+      haversineDistance([BUCHAREST.lat, BUCHAREST.lon], [w.lat, w.lon]),
+    );
+    // Every ring point is out along the bearing, not around the start.
+    expect(Math.min(...distances)).toBeGreaterThan(0);
+    const east = wps.filter((w) => w.lon > BUCHAREST.lon);
+    expect(east.length).toBeGreaterThan(0);
+  });
+
+  it('spends the stem budget getting there, out and back', () => {
+    const target = 30_000;
+    const wps = lollipopWaypoints(BUCHAREST, 0, target, 3, 0.4);
+    // Centre sits at half the stem budget; ring points straddle it.
+    const mean =
+      wps.reduce(
+        (sum, w) => sum + haversineDistance([BUCHAREST.lat, BUCHAREST.lon], [w.lat, w.lon]),
+        0,
+      ) / wps.length;
+    expect(mean).toBeGreaterThan(1_000);
+    expect(mean).toBeLessThan(target);
+  });
+
+  it('builds the requested ring shape', () => {
+    expect(lollipopWaypoints(BUCHAREST, 0, 30_000, 6)).toHaveLength(6);
+  });
+
+  it('clamps an absurd stem fraction rather than inverting the ring', () => {
+    expect(() => lollipopWaypoints(BUCHAREST, 0, 30_000, 3, 5)).not.toThrow();
+    expect(() => lollipopWaypoints(BUCHAREST, 0, 30_000, 3, -1)).not.toThrow();
+  });
+
+  it('leaves most of the ride as actual loop by default', () => {
+    expect(DEFAULT_STEM_FRACTION).toBeLessThan(0.5);
+  });
+});
+
+describe('scenic ranking', () => {
+  const req = {
+    targetDistanceMeters: 15_000,
+    terrain: 'rolling' as const,
+    surface: 'any' as const,
+  };
+
+  it('prefers the more scenic of two equally safe, equally long loops', () => {
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'dull', scenicScore: -0.2 }),
+        candidate({ id: 'pretty', scenicScore: 0.8 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('pretty');
+  });
+
+  it('NEVER prefers a prettier loop over a materially safer one', () => {
+    // The whole safety argument. A gap wider than the tolerance is decided on
+    // safety alone and scenic is not consulted at all.
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'pretty-but-busy', scenicScore: 1, highRiskMeters: 2_000 }),
+        candidate({ id: 'dull-but-quiet', scenicScore: -1, highRiskMeters: 0 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('dull-but-quiet');
+  });
+
+  it('only breaks ties inside the safety tolerance', () => {
+    const withinTolerance = SCENIC_SAFETY_TOLERANCE_METERS - 1;
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'slightly-busier-but-pretty', scenicScore: 1, highRiskMeters: withinTolerance }),
+        candidate({ id: 'quieter-but-dull', scenicScore: -1, highRiskMeters: 0 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('slightly-busier-but-pretty');
+  });
+
+  it('does not let scenery outrank a large distance error', () => {
+    // lambda * full scenic swing must be smaller than a gross length miss.
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'pretty-but-wrong-length', scenicScore: 1, distanceMeters: 30_000 }),
+        candidate({ id: 'right-length', scenicScore: -1, distanceMeters: 15_000 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('right-length');
+  });
+
+  it('leaves ordering untouched in an unscored area', () => {
+    // Every candidate scores 0, so the result must match the pre-scenic order.
+    const withScenic = rankCandidates(
+      [
+        candidate({ id: 'far', distanceMeters: 17_000 }),
+        candidate({ id: 'near', distanceMeters: 15_100 }),
+      ],
+      req,
+    );
+    expect(withScenic[0]!.id).toBe('near');
+  });
+
+  it('keeps lambda small enough to stay a tie-breaker', () => {
+    // A full -1..+1 scenic swing is worth 2*lambda of distance error, which
+    // must stay under the RELAXED tolerance so scenery can never rescue a
+    // grossly wrong length. It deliberately exceeds the STRICT tolerance:
+    // a measured sweep showed anything smaller reorders nothing at all.
+    expect(2 * SCENIC_LAMBDA).toBeLessThan(DISTANCE_TOLERANCE_RELAXED);
+    expect(2 * SCENIC_LAMBDA).toBeGreaterThan(DISTANCE_TOLERANCE_STRICT);
+    expect(SCENIC_SAFETY_TOLERANCE_METERS).toBeGreaterThan(0);
   });
 });

@@ -1,0 +1,44 @@
+Defensive Pedal — Preview v0.2.140 (build 143)
+
+Doubling back is now capped at 10%, not just preferred.
+
+A loop that repeats more than a tenth of itself is no longer offered. Above
+that, "loop" stops being an honest description of the ride.
+
+The one place it bends, and why
+
+Some places have no clean loop at any length — a dead-end valley, a peninsula,
+a village with one road in. A strict cap there would return "no loop found"
+when a perfectly rideable, if imperfect, loop exists. So the cap is the LAST
+thing given up, after the direction you asked for, after the distance, after
+the terrain. If it ever has to bend, the result says so outright:
+
+  "Every loop around here repeats part of itself. This one doubles back
+   on 34% — the least we could find."
+
+That ordering is deliberate: a loop that repeats a third of itself is a worse
+answer than the wrong terrain, so the cap outlives every other preference.
+
+Two smaller consequences
+
+- Among loops that pass the cap, the cleanest still wins. The threshold for
+  ranking one loop above another dropped from 8 points to 3, because with
+  everything now compressed into 0-10% an 8-point margin would have swallowed
+  almost every real difference and quietly switched the ranking off.
+- The percentage note and the cap are now the same number, so a note can only
+  ever appear on a loop that broke the cap. If you see one, the cap bent; if
+  you do not, it held.
+
+What to try
+- Normal riding: you should never see a doubling-back note at all.
+- Somewhere genuinely constrained — a valley, a coast road, a peninsula — you
+  should still get a loop, with the note explaining why it exceeds the cap.
+- If you get "No loop from here" somewhere that clearly has road options, that
+  is worth reporting: the cap should bend before the search gives up.
+
+Unchanged from build 142
+- "Start ride" confirms in place; it does not launch navigation yet.
+- You cannot save a loop.
+- Off-route on a loop shows the off-course banner and will not reroute you.
+
+Only works in the 31 countries our safety road data covers.
