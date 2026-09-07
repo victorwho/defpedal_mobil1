@@ -39,6 +39,8 @@ import type {
   ReverseGeocodeResponse,
   RideImpact,
   RideRecentDestination,
+  SavedLoop,
+  SavedLoopCreateRequest,
   SavedRoute,
   SesizareRequest,
   SesizareResponse,
@@ -526,6 +528,20 @@ export const mobileApi = {
       '/v1/premium/usage/flat-route',
       { method: 'POST', body: JSON.stringify(payload) },
     ),
+
+  getSavedLoops: () =>
+    mobileApiFetch<{ loops: SavedLoop[] }>('/v1/saved-loops').then((res) => res.loops),
+
+  saveLoop: (payload: SavedLoopCreateRequest) =>
+    mobileApiFetch<SavedLoop>('/v1/saved-loops', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteSavedLoop: (id: string) =>
+    mobileApiFetch<{ acceptedAt: string }>(`/v1/saved-loops/${id}`, {
+      method: 'DELETE',
+    }),
 
   saveRoute: (payload: SavedRouteCreateRequest) =>
     mobileApiFetch<SavedRoute>('/v1/saved-routes', {

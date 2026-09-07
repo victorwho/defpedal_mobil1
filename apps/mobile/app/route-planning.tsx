@@ -405,6 +405,61 @@ export default function RoutePlanningScreen() {
     staleTime: 60_000,
   });
 
+  const savedLoops = useAppStore((state) => state.savedLoops);
+  const removeSavedLoop = useAppStore((state) => state.removeSavedLoop);
+  const replaceSavedLoops = useAppStore((state) => state.replaceSavedLoops);
+
+  /**
+   * Saved loops live on the account. The device-scoped `savedLoops` slice is
+   * a cache of the same rows, so the sheet still lists them with no signal —
+   * the server list wins whenever it has loaded.
+   */
+  const savedLoopsQuery = useQuery({
+    queryKey: ['saved-loops'],
+    queryFn: () => mobileApi.getSavedLoops(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const rows = savedLoopsQuery.data;
+    if (!rows) return;
+    replaceSavedLoops(
+      rows.map((loop) => ({
+        id: loop.id,
+        name: loop.name,
+        distanceMeters: loop.distanceMeters,
+        climbMeters: loop.climbMeters,
+        unpavedShare: loop.unpavedShare,
+        createdAt: loop.createdAt,
+      })),
+    );
+  }, [savedLoopsQuery.data, replaceSavedLoops]);
+
+  const loopRows = savedLoopsQuery.data
+    ? savedLoopsQuery.data.map((loop) => ({
+        id: loop.id,
+        name: loop.name,
+        distanceMeters: loop.distanceMeters,
+        climbMeters: loop.climbMeters,
+      }))
+    : savedLoops;
+
+  const handleDeleteLoop = useCallback(
+    (id: string) => {
+      // Optimistic: the row disappears now, the account catches up. A failed
+      // delete resurfaces on the next list refresh rather than leaving the
+      // rider tapping a row that will not go away.
+      removeSavedLoop(id);
+      void deleteSavedLoop(id);
+      void mobileApi
+        .deleteSavedLoop(id)
+        .then(() => savedLoopsQuery.refetch())
+        .catch(() => savedLoopsQuery.refetch());
+    },
+    [removeSavedLoop, savedLoopsQuery],
+  );
+
   const handleLoadSavedRoute = useCallback((route: SavedRoute) => {
     setRouteRequest({
       destination: route.destination,
@@ -455,8 +510,6 @@ export default function RoutePlanningScreen() {
   const [importToast, setImportToast] = useState<string | null>(null);
 
   const importedCourses = useAppStore((s) => s.importedCourses);
-  const savedLoops = useAppStore((state) => state.savedLoops);
-  const removeSavedLoop = useAppStore((state) => state.removeSavedLoop);
   const removeImportedCourse = useAppStore((s) => s.removeImportedCourse);
 
   // Course geometry lives on disk while its metadata lives in the store, so
@@ -2047,7 +2100,7 @@ export default function RoutePlanningScreen() {
             </Pressable>
           ))}
 
-          {savedLoops.map((loop) => (
+          {loopRows.map((loop) => (
             <Pressable
               key={loop.id}
               style={styles.savedRouteRow}
@@ -2077,13 +2130,7 @@ export default function RoutePlanningScreen() {
               <Pressable
                 style={styles.savedRouteExportButton}
                 hitSlop={8}
-                onPress={() => {
-                  // Metadata first, file second — same ordering as courses: an
-                  // orphaned file is swept, a row pointing at a deleted file is
-                  // a loop the rider can tap and never open.
-                  removeSavedLoop(loop.id);
-                  void deleteSavedLoop(loop.id);
-                }}
+                onPress={() => handleDeleteLoop(loop.id)}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('loop.deleteLoop')}: ${loop.name}`}
               >

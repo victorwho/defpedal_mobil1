@@ -890,6 +890,70 @@ export const savedRouteCreateRequestSchema = {
   },
 } as const;
 
+/**
+ * A stored loop's route.
+ *
+ * `additionalProperties: true` on the route object is deliberate: Fastify
+ * strips unknown response fields (gotcha #9), and a RouteOption gains fields
+ * over time. Listing them exhaustively here would silently drop whatever was
+ * added since — on a fixed line, a dropped field is a downgraded ride rather
+ * than a cosmetic loss.
+ */
+const savedLoopRouteSchema = {
+  type: 'object',
+  additionalProperties: true,
+  required: ['id', 'source', 'geometryPolyline6', 'distanceMeters', 'steps'],
+  properties: {
+    id: { type: 'string' },
+    // The marker that suppresses auto-reroute. Refuse anything else at the
+    // door rather than storing a loop that would be re-routed home mid-ride.
+    source: { type: 'string', enum: ['generated_loop'] },
+    geometryPolyline6: { type: 'string', minLength: 1 },
+    distanceMeters: { type: 'number', exclusiveMinimum: 0 },
+    durationSeconds: { type: 'number' },
+    adjustedDurationSeconds: { type: 'number' },
+    totalClimbMeters: { type: ['number', 'null'] },
+    steps: { type: 'array' },
+    warnings: { type: 'array' },
+  },
+} as const;
+
+export const savedLoopCreateRequestSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'start', 'route', 'distanceMeters'],
+  properties: {
+    name: { type: 'string', minLength: 1, maxLength: 100 },
+    start: coordinateSchema,
+    route: savedLoopRouteSchema,
+    distanceMeters: { type: 'number', exclusiveMinimum: 0 },
+    climbMeters: { type: ['number', 'null'] },
+    unpavedShare: { type: 'number', minimum: 0, maximum: 1 },
+  },
+} as const;
+
+export const savedLoopResponseSchema = {
+  type: 'object',
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    start: coordinateSchema,
+    route: savedLoopRouteSchema,
+    distanceMeters: { type: 'number' },
+    climbMeters: { type: ['number', 'null'] },
+    unpavedShare: { type: 'number' },
+    createdAt: { type: 'string' },
+    lastUsedAt: { type: 'string' },
+  },
+} as const;
+
+export const savedLoopListResponseSchema = {
+  type: 'object',
+  properties: {
+    loops: { type: 'array', items: savedLoopResponseSchema },
+  },
+} as const;
+
 export const savedRouteResponseSchema = {
   type: 'object',
   properties: {

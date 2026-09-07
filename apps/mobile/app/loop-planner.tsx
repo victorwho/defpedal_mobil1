@@ -52,12 +52,9 @@ import { usePremium } from '../src/hooks/usePremium';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
+import { mobileApi } from '../src/lib/api';
 import { beginLoopRide } from '../src/lib/loop-ride';
-import {
-  createSavedLoopId,
-  readSavedLoop,
-  writeSavedLoop,
-} from '../src/lib/loopStorage';
+import { readSavedLoop, writeSavedLoop } from '../src/lib/loopStorage';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import { telemetry } from '../src/lib/telemetry';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -162,10 +159,31 @@ export default function LoopPlannerScreen() {
     openedRef.current = id;
 
     void (async () => {
-      const stored = await readSavedLoop(id);
+      // Local cache first: instant, works with no signal, and keeps the risk
+      // colouring and elevation profile the loop was saved with. The account
+      // copy drops both to stay small, so falling back to it is a slight
+      // downgrade rather than an equal path — worth trying the file first even
+      // when online.
+      let stored = await readSavedLoop(id);
+
       if (!stored) {
-        // Validation failed or the file is gone. Say so rather than opening an
-        // empty planner the rider has to guess about.
+        try {
+          const remote = (await mobileApi.getSavedLoops()).find(
+            (loop) => loop.id === id,
+          );
+          if (remote) {
+            stored = { route: remote.route, start: remote.start };
+            // Re-cache so the next open is offline-capable.
+            void writeSavedLoop(id, stored);
+          }
+        } catch {
+          // Offline, or the account copy is gone. Handled below.
+        }
+      }
+
+      if (!stored) {
+        // Say so rather than opening an empty planner the rider has to guess
+        // about.
         setToast(t('loop.errorSave'));
         return;
       }
@@ -386,36 +404,48 @@ export default function LoopPlannerScreen() {
       return;
     }
 
-    const id = createSavedLoopId();
     const name = t('loop.nameFallback', { km: km(selected.distanceMeters) });
 
     void (async () => {
-      // File first, metadata second: a row pointing at a file that was never
-      // written is a loop the rider can tap and never open, whereas an
-      // orphaned file is reclaimed by the storage sweep.
-      const written = await writeSavedLoop(id, {
-        route: selected.route,
-        start,
-      });
-      if (!written) {
-        setToast(t('loop.errorSave'));
+      // The account is the source of truth, so it goes first and its id is
+      // the one everything else is keyed by. A local file written before the
+      // POST would be orphaned by a failed save; one written after is simply
+      // a cache we can rebuild.
+      let saved;
+      try {
+        saved = await mobileApi.saveLoop({
+          name,
+          start,
+          route: selected.route,
+          distanceMeters: selected.distanceMeters,
+          climbMeters: selected.climbMeters,
+          unpavedShare: selected.unpavedShare,
+        });
+      } catch {
+        setToast(isOnline ? t('loop.errorSave') : t('loop.offline'));
         return;
       }
+
+      // Cache the FULL route — including the risk segments and elevation the
+      // account copy drops — so reopening on this handset is exact and works
+      // with no signal. A failure here costs the offline path, not the save.
+      void writeSavedLoop(saved.id, { route: selected.route, start });
+
       addSavedLoop({
-        id,
-        name,
-        distanceMeters: selected.distanceMeters,
-        climbMeters: selected.climbMeters,
-        unpavedShare: selected.unpavedShare,
-        createdAt: new Date().toISOString(),
+        id: saved.id,
+        name: saved.name,
+        distanceMeters: saved.distanceMeters,
+        climbMeters: saved.climbMeters,
+        unpavedShare: saved.unpavedShare,
+        createdAt: saved.createdAt,
       });
-      setSavedIds((prev) => ({ ...prev, [selected.id]: id }));
+      setSavedIds((prev) => ({ ...prev, [selected.id]: saved.id }));
       setToast(t('loop.saved'));
       telemetry.capture('loop_saved', {
         km: Math.round(selected.distanceMeters / 1000),
       });
     })();
-  }, [selected, start, savedIds, savedLoops.length, premium, addSavedLoop, t]);
+  }, [selected, start, savedIds, savedLoops.length, premium, addSavedLoop, isOnline, t]);
 
   const handleShare = useCallback(() => {
     if (!selected || !start) return;
@@ -629,7 +659,7 @@ export default function LoopPlannerScreen() {
                     <Button
                       variant="secondary"
                       onPress={handleSave}
-                      disabled={!selected}
+                      disabled={!selected || !isOnline}
                     >
                       {selected && savedIds[selected.id]
                         ? t('loop.savedAlready')

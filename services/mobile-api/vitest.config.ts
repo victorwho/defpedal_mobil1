@@ -4,6 +4,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // The FIRST test in a file pays the whole cost of building a Fastify app
+    // — route registration, schema compilation, the core package graph — and
+    // on a loaded machine that exceeds vitest's 5s default. The symptom is
+    // brutal to read: eleven suites failed only in a full run and passed
+    // individually, always on their first test, which looks like cross-file
+    // pollution rather than a clock. Raising the ceiling cannot mask a logic
+    // error, because those fail on an assertion rather than a timeout.
+    testTimeout: 30_000,
     // Suppress Fastify JSON log output during test runs
     env: {
       LOG_LEVEL: 'silent',

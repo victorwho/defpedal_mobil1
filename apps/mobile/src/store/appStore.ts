@@ -461,6 +461,8 @@ export type AppStore = QueueSlice & PremiumSlice & {
   addImportedCourse: (course: ImportedCourseMeta) => void;
   addSavedLoop: (loop: SavedLoopMeta) => void;
   removeSavedLoop: (id: string) => void;
+  /** Replace the cache wholesale with what the account returned. */
+  replaceSavedLoops: (loops: SavedLoopMeta[]) => void;
   setPendingCourseImport: (
     pending: { uri: string; fileName: string } | null,
   ) => void;
@@ -1321,6 +1323,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           savedLoops: state.savedLoops.filter((entry) => entry.id !== id),
         })),
+      replaceSavedLoops: (loops) => set(() => ({ savedLoops: loops })),
       advanceNavigation: (totalSteps) =>
         set((state) => ({
           navigationSession: state.navigationSession

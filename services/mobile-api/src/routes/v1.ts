@@ -25,6 +25,8 @@ import type {
   QuizCountry,
   QuizQuestion,
   QuizAnswer,
+  SavedLoop,
+  SavedLoopCreateRequest,
   SavedRoute,
   SesizareRequest,
   SesizareResponse,
@@ -74,6 +76,9 @@ import {
   type TripEndBody,
   type TripStartBody,
   normalizeSavedRouteCreateRequest,
+  savedLoopCreateRequestSchema,
+  savedLoopListResponseSchema,
+  savedLoopResponseSchema,
   savedRouteCreateRequestSchema,
   savedRouteListResponseSchema,
   savedRouteResponseSchema,
@@ -4132,6 +4137,126 @@ export const buildV1Routes = (
         if (error) {
           request.log.error({ event: 'saved_route_use_error', error: error.message }, 'failed to update saved route');
           throw new HttpError('Failed to update saved route.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        return { acceptedAt: new Date().toISOString() };
+      },
+    );
+
+    // ── Saved Loops ──
+    //
+    // Separate from saved routes because a loop cannot be stored as endpoints:
+    // a saved route re-routes on open, and a loop's destination is its origin,
+    // so that re-route asks for the shortest way from a point to itself. These
+    // rows carry the line itself.
+
+    const mapSavedLoop = (row: Record<string, unknown>): SavedLoop => ({
+      id: row.id as string,
+      name: row.name as string,
+      start: row.start_point as SavedLoop['start'],
+      route: row.route as SavedLoop['route'],
+      distanceMeters: Number(row.distance_meters ?? 0),
+      climbMeters:
+        row.climb_meters === null || row.climb_meters === undefined
+          ? null
+          : Number(row.climb_meters),
+      unpavedShare: Number(row.unpaved_share ?? 0),
+      createdAt: row.created_at as string,
+      lastUsedAt: row.last_used_at as string,
+    });
+
+    app.get<{ Reply: { loops: SavedLoop[] } }>(
+      '/saved-loops',
+      { schema: { response: { 200: savedLoopListResponseSchema } } },
+      async (request) => {
+        const user = await requireWriteUser(request, dependencies);
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const { data, error } = await supabaseAdmin
+          .from('saved_loops')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('last_used_at', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          request.log.error({ event: 'saved_loops_list_error', error: error.message }, 'failed to list saved loops');
+          throw new HttpError('Failed to load saved loops.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        return { loops: (data ?? []).map((row) => mapSavedLoop(row as Record<string, unknown>)) };
+      },
+    );
+
+    app.post<{ Body: SavedLoopCreateRequest; Reply: SavedLoop }>(
+      '/saved-loops',
+      {
+        // A loop carries its geometry and turn steps, so the body is far
+        // larger than a saved route's. Well under Fastify's 1 MiB default for
+        // any real ride, but stated rather than assumed.
+        bodyLimit: 2 * 1024 * 1024,
+        schema: { body: savedLoopCreateRequestSchema, response: { 200: savedLoopResponseSchema } },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const body = request.body;
+
+        // Risk segments and the elevation profile are re-derived on open from
+        // the geometry, so they are never stored — dropped here rather than
+        // trusted from the client, which keeps a row to roughly a hundred
+        // kilobytes however generous the caller was.
+        const { riskSegments: _risk, elevationProfile: _elevation, ...route } =
+          body.route as SavedLoop['route'] & Record<string, unknown>;
+
+        const { data, error } = await supabaseAdmin
+          .from('saved_loops')
+          .insert({
+            user_id: user.id,
+            name: body.name,
+            start_point: body.start,
+            route: { ...route, riskSegments: [], routeFeatures: route.routeFeatures ?? [] },
+            distance_meters: Math.round(body.distanceMeters),
+            climb_meters:
+              body.climbMeters === null || body.climbMeters === undefined
+                ? null
+                : Math.round(body.climbMeters),
+            unpaved_share: body.unpavedShare ?? 0,
+          })
+          .select('*')
+          .single();
+
+        if (error || !data) {
+          request.log.error({ event: 'saved_loop_create_error', error: error?.message }, 'failed to save loop');
+          throw new HttpError('Failed to save loop.', { statusCode: 500, code: 'INTERNAL_ERROR' });
+        }
+
+        return mapSavedLoop(data as Record<string, unknown>);
+      },
+    );
+
+    app.delete<{ Params: { id: string } }>(
+      '/saved-loops/:id',
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'write', {
+          userId: user.id,
+        });
+        if (!supabaseAdmin) throw new HttpError('Database unavailable.', { statusCode: 503, code: 'INTERNAL_ERROR' });
+
+        const { error } = await supabaseAdmin
+          .from('saved_loops')
+          .delete()
+          .eq('id', request.params.id)
+          .eq('user_id', user.id);
+
+        if (error) {
+          request.log.error({ event: 'saved_loop_delete_error', error: error.message }, 'failed to delete saved loop');
+          throw new HttpError('Failed to delete saved loop.', { statusCode: 500, code: 'INTERNAL_ERROR' });
         }
 
         return { acceptedAt: new Date().toISOString() };

@@ -1475,6 +1475,42 @@ export interface SavedRoute {
   readonly lastUsedAt: string;
 }
 
+/**
+ * A generated loop kept on the rider's account.
+ *
+ * Separate from `SavedRoute` because a loop cannot be stored as endpoints: a
+ * saved route re-routes on open, and a loop's destination is its origin, so
+ * that re-route asks for the shortest way from a point to itself. A loop has
+ * to carry its line.
+ */
+export interface SavedLoop {
+  readonly id: string;
+  readonly name: string;
+  /** Both ends of the ride. */
+  readonly start: Coordinate;
+  /**
+   * The route itself. `riskSegments` and `elevationProfile` arrive empty —
+   * both are re-derived on open from the geometry, the same way an imported
+   * course is enriched, which keeps a stored loop small without downgrading
+   * the turn instructions OSRM produced.
+   */
+  readonly route: RouteOption;
+  readonly distanceMeters: number;
+  readonly climbMeters: number | null;
+  readonly unpavedShare: number;
+  readonly createdAt: string;
+  readonly lastUsedAt: string;
+}
+
+export interface SavedLoopCreateRequest {
+  readonly name: string;
+  readonly start: Coordinate;
+  readonly route: RouteOption;
+  readonly distanceMeters: number;
+  readonly climbMeters?: number | null;
+  readonly unpavedShare?: number;
+}
+
 export interface SavedRouteCreateRequest {
   readonly name: string;
   readonly origin: Coordinate;
