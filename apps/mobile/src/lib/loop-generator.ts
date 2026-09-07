@@ -39,6 +39,7 @@ import {
   isDegenerateLoop,
   isOutAndBack,
   LOOP_CANDIDATE_COUNT,
+  LOOP_RESULTS_SHOWN,
   loopBearings,
   matchesTerrain,
   nextRingRadiusMeters,
@@ -93,11 +94,17 @@ const RINGS_PER_RUNG = LOOP_CANDIDATE_COUNT;
  */
 const RING_CONCURRENCY = 4;
 
-/** Finalists measured for climb and risk on the first pass. */
-const MEASURED_FINALISTS = 3;
+/**
+ * Finalists measured for climb and risk on the first pass.
+ *
+ * Matches what the rider is shown: a row without a climb figure is a row they
+ * cannot choose between, and showing more rows than we measure produced
+ * exactly that.
+ */
+const MEASURED_FINALISTS = LOOP_RESULTS_SHOWN;
 
 /** Loops shown at once. */
-export const LOOPS_PER_ATTEMPT = 3;
+export const LOOPS_PER_ATTEMPT = LOOP_RESULTS_SHOWN;
 
 // ---------------------------------------------------------------------------
 // Types

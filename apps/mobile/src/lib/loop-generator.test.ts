@@ -11,6 +11,7 @@ import {
   destinationPoint,
   encodePolyline,
   LOOP_CANDIDATE_COUNT,
+  LOOP_RESULTS_SHOWN,
   type Coordinate,
   type RiskSegment,
   type RouteOption,
@@ -28,7 +29,7 @@ vi.mock('./mapbox-routing', () => ({
   fetchRouteScenicScore: (...args: unknown[]) => fetchRouteScenicScore(...args),
 }));
 
-const { searchLoops } = await import('./loop-generator');
+const { searchLoops, LOOPS_PER_ATTEMPT } = await import('./loop-generator');
 
 const START: Coordinate = { lat: 44.4268, lon: 26.1025 };
 
@@ -131,13 +132,13 @@ beforeEach(() => {
 });
 
 describe('a straightforward search', () => {
-  it('returns three loops with nothing given up', async () => {
+  it('returns a full set of loops with nothing given up', async () => {
     alwaysOnTarget(15_000);
     const outcome = await searchLoops(request);
 
     expect(outcome.status).toBe('ok');
     if (outcome.status !== 'ok') return;
-    expect(outcome.loops).toHaveLength(3);
+    expect(outcome.loops).toHaveLength(LOOP_RESULTS_SHOWN);
     expect(outcome.relaxation).toBe('none');
   });
 
@@ -148,13 +149,13 @@ describe('a straightforward search', () => {
     expect(fetchLoopRoute).toHaveBeenCalledTimes(LOOP_CANDIDATE_COUNT);
   });
 
-  it('measures three finalists, not every candidate', async () => {
+  it('measures every offered loop, not every candidate', async () => {
     // The rate-limit budget is the point: /elevation-profile and
     // /risk-segments share a 30-per-60s bucket with the risk overlay.
     alwaysOnTarget(15_000);
     await searchLoops(request);
-    expect(enrichRouteWithElevation).toHaveBeenCalledTimes(3);
-    expect(enrichRouteWithRisk).toHaveBeenCalledTimes(3);
+    expect(enrichRouteWithElevation).toHaveBeenCalledTimes(LOOP_RESULTS_SHOWN);
+    expect(enrichRouteWithRisk).toHaveBeenCalledTimes(LOOP_RESULTS_SHOWN);
   });
 
   it('reports each loop as it lands so the map can draw it', async () => {
@@ -470,5 +471,23 @@ describe('the cap-rescue sweep', () => {
     alwaysRetracing(0.04);
     await searchLoops(request);
     expect(fetchLoopRoute).toHaveBeenCalledTimes(LOOP_CANDIDATE_COUNT);
+  });
+});
+
+describe('how many loops the rider is offered', () => {
+  it('offers exactly LOOP_RESULTS_SHOWN, not one per generated candidate', () => {
+    // The list used to be capped at 12 while two network rungs generated five
+    // rings each, so a search showed ten rows — and only the measured
+    // finalists carried a climb figure, the rest reading as a dash. The cap
+    // and the finalist count are now the same number by construction.
+    expect(LOOPS_PER_ATTEMPT).toBe(LOOP_RESULTS_SHOWN);
+    expect(LOOP_RESULTS_SHOWN).toBe(5);
+  });
+
+  it('keeps generation wider than the list on purpose', () => {
+    // Breadth is what makes a loop clear the doubling-back cap at all, so the
+    // search still throws two rungs of rings and offers the best of them.
+    // Narrowing generation to match the list would mean worse loops.
+    expect(LOOP_CANDIDATE_COUNT * 2).toBeGreaterThan(LOOP_RESULTS_SHOWN);
   });
 });

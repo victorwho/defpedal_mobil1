@@ -376,6 +376,23 @@ export const LOLLIPOP_STEM_LEGS = 1;
 export const LOOP_CANDIDATE_COUNT = 5;
 
 /**
+ * How many loops the rider is actually offered.
+ *
+ * Five, and this is the number that governs the list — not
+ * `LOOP_CANDIDATE_COUNT`, which is how many rings ONE rung of the ladder
+ * throws. Two rungs cost network, so a search generates ten candidates and
+ * the rider was being shown all of them: ten rows, of which only the measured
+ * finalists carried a climb figure and the rest read as a dash.
+ *
+ * Generation is deliberately NOT halved to match. Breadth is what makes a loop
+ * clear the doubling-back cap at all — measured around Rasnov and Bucharest,
+ * whether any candidate passes is decided by bearing and ring shape, so
+ * throwing half as many rings would mean worse loops rather than a shorter
+ * list. Ten are found, the best five are offered, and all five are measured.
+ */
+export const LOOP_RESULTS_SHOWN = 5;
+
+/**
  * Half-width of the arc a named heading is allowed to search, per relaxation
  * level. Index 0 is the strict interpretation of "east"; index 1 is the first
  * rung of the ladder.

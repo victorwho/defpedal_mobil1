@@ -15,6 +15,7 @@
 import {
   isRouteSupported,
   LOOP_CANDIDATE_COUNT,
+  LOOP_RESULTS_SHOWN,
   MAX_RETRACE_SHARE,
   LOOP_DISTANCE_STEPS_METERS,
   loopSessionPeriodKey,
@@ -302,9 +303,9 @@ export default function LoopPlannerScreen() {
           chargeOnce();
           setSessionLoops((prev) => {
             const next = prev.filter((existing) => existing.id !== loop.id);
-            // Newest first, capped — nothing found is lost to one more tap,
-            // but the map and the list both stay bounded.
-            return [loop, ...next].slice(0, 12);
+            // Newest first while the search runs, so arrivals are visible;
+            // the completed search replaces this with the ranked best five.
+            return [loop, ...next].slice(0, LOOP_RESULTS_SHOWN);
           });
         },
         onProgress: (found, total) =>
@@ -344,7 +345,7 @@ export default function LoopPlannerScreen() {
       for (const loop of outcome.loops) byId.set(loop.id, loop);
       return [...outcome.loops, ...prev.filter((l) => !outcome.loops.some((o) => o.id === l.id))]
         .map((loop) => byId.get(loop.id) ?? loop)
-        .slice(0, 12);
+        .slice(0, LOOP_RESULTS_SHOWN);
     });
 
     telemetry.capture('loop_results_shown', {
