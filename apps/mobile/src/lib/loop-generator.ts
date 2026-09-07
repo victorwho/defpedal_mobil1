@@ -43,6 +43,7 @@ import {
   matchesTerrain,
   nextRingRadiusMeters,
   rankCandidates,
+  LOLLIPOP_STEM_LEGS,
   lollipopWaypoints,
   ringWaypoints,
   ringWaypointCountFor,
@@ -246,6 +247,10 @@ const routeOneRing = async (
         terrain: request.terrain,
         surface: request.surface,
         locale: request.locale,
+        // The measurement has to agree with the shape we just built, or the
+        // stem exemption silently does nothing — which is exactly how the
+        // previous detector failed.
+        stemLegs: lollipop ? LOLLIPOP_STEM_LEGS : 0,
         signal,
       });
     } catch {
@@ -434,11 +439,19 @@ export const searchLoops = async (
         bearing,
         relaxation,
         ringWaypointCountFor(index + shapeOffset),
-        // Every third candidate rides out somewhere before looping. Mixed into
-        // the same pool rather than hidden behind a control: the terrain
-        // preference already steers towards them where it matters, because a
-        // ring in the foothills measures hillier than one round the town.
-        (index + shapeOffset) % 3 === 2,
+        // Every OTHER candidate rides out somewhere before looping, rather
+        // than every third. Measured against live OSRM around Rasnov and
+        // Bucharest, a lollipop clears the doubling-back cap noticeably less
+        // often than a plain ring — it has to close a loop out where the road
+        // network is thinner — so sampling them at the same rate as rings is
+        // what gives the rider a real chance of being offered one. They still
+        // compete on merit; this only decides how many get to try.
+        //
+        // Mixed into the same pool rather than hidden behind a control: the
+        // terrain preference already steers towards them where it matters,
+        // because a ring in the foothills measures hillier than one round the
+        // town.
+        (index + shapeOffset) % 2 === 1,
         signal,
       );
       attempted += 1;

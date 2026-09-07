@@ -749,6 +749,15 @@ export const fetchLoopRoute = async (
     readonly terrain: LoopTerrain;
     readonly surface: LoopSurface;
     readonly locale: Locale;
+    /**
+     * Legs at each end that are approach rather than loop — 1 for a lollipop,
+     * whose anchor sits in `waypoints` before and after the ring, 0 otherwise.
+     *
+     * Taken from the caller because only the caller knows the shape it built.
+     * Inferring it from the route was tried and does not work: see the note on
+     * `splitStemAndRing`.
+     */
+    readonly stemLegs?: number;
     readonly signal?: AbortSignal;
   },
 ): Promise<LoopRouteResult> => {
@@ -801,8 +810,8 @@ export const fetchLoopRoute = async (
     coordinates: raw.geometry.coordinates as [number, number][],
     unpavedShare: unpavedShare(raw.legs),
     retracedShare: retracedShare(raw.legs),
-    ringRetracedShare: ringRetracedShare(raw.legs),
-    stemMeters: splitStemAndRing(raw.legs).stemMeters,
+    ringRetracedShare: ringRetracedShare(raw.legs, options.stemLegs ?? 0),
+    stemMeters: splitStemAndRing(raw.legs, options.stemLegs ?? 0).stemMeters,
   };
 };
 

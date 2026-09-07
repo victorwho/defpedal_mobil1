@@ -45,10 +45,13 @@ import {
   prefersUnpaved,
   retracedMeters,
   retracedShare,
+  ringClearanceMeters,
   ringRetracedShare,
   splitStemAndRing,
   lollipopWaypoints,
-  DEFAULT_STEM_FRACTION,
+  LOLLIPOP_STEM_LEGS,
+  MAX_RING_CLEARANCE_METERS,
+  MIN_RING_CLEARANCE_METERS,
   RETRACE_RANKING_DEADBAND,
   unpavedMeters,
   unpavedShare,
@@ -731,8 +734,8 @@ describe('ranking by doubling back', () => {
   it('prefers the loop that comes back a different way', () => {
     const ranked = rankCandidates(
       [
-        candidate({ id: 'there-and-back', retracedShare: 0.5 }),
-        candidate({ id: 'clean', retracedShare: 0.0 }),
+        candidate({ id: 'there-and-back', retracedShare: 0.5, ringRetracedShare: 0.5 }),
+        candidate({ id: 'clean', retracedShare: 0.0, ringRetracedShare: 0.0 }),
       ],
       req,
     );
@@ -743,8 +746,8 @@ describe('ranking by doubling back', () => {
     // Coming back a different way is what makes a loop a loop.
     const ranked = rankCandidates(
       [
-        candidate({ id: 'exact-but-doubles', distanceMeters: 15_000, retracedShare: 0.4 }),
-        candidate({ id: 'loose-but-clean', distanceMeters: 16_400, retracedShare: 0 }),
+        candidate({ id: 'exact-but-doubles', distanceMeters: 15_000, retracedShare: 0.4, ringRetracedShare: 0.4 }),
+        candidate({ id: 'loose-but-clean', distanceMeters: 16_400, retracedShare: 0, ringRetracedShare: 0 }),
       ],
       req,
     );
@@ -754,8 +757,8 @@ describe('ranking by doubling back', () => {
   it('still ranks below safety', () => {
     const ranked = rankCandidates(
       [
-        candidate({ id: 'clean-but-busy', retracedShare: 0, highRiskMeters: 3_000 }),
-        candidate({ id: 'quiet-but-doubles', retracedShare: 0.5, highRiskMeters: 0 }),
+        candidate({ id: 'clean-but-busy', retracedShare: 0, ringRetracedShare: 0, highRiskMeters: 3_000 }),
+        candidate({ id: 'quiet-but-doubles', retracedShare: 0.5, ringRetracedShare: 0.5, highRiskMeters: 0 }),
       ],
       req,
     );
@@ -765,8 +768,8 @@ describe('ranking by doubling back', () => {
   it('outranks the offroad preference', () => {
     const ranked = rankCandidates(
       [
-        candidate({ id: 'gravel-but-doubles', unpavedShare: 0.9, retracedShare: 0.5 }),
-        candidate({ id: 'tarmac-but-clean', unpavedShare: 0, retracedShare: 0 }),
+        candidate({ id: 'gravel-but-doubles', unpavedShare: 0.9, retracedShare: 0.5, ringRetracedShare: 0.5 }),
+        candidate({ id: 'tarmac-but-clean', unpavedShare: 0, retracedShare: 0, ringRetracedShare: 0 }),
       ],
       { ...req, surface: 'offroad' },
     );
@@ -777,13 +780,36 @@ describe('ranking by doubling back', () => {
     // Sharing the starting junction is normal and must not reorder anything.
     const ranked = rankCandidates(
       [
-        candidate({ id: 'near', retracedShare: 0.02, distanceMeters: 15_100 }),
-        candidate({ id: 'far', retracedShare: 0.0, distanceMeters: 17_000 }),
+        candidate({ id: 'near', retracedShare: 0.02, ringRetracedShare: 0.02, distanceMeters: 15_100 }),
+        candidate({ id: 'far', retracedShare: 0.0, ringRetracedShare: 0.0, distanceMeters: 17_000 }),
       ],
       req,
     );
     expect(ranked[0]!.id).toBe('near');
     expect(RETRACE_RANKING_DEADBAND).toBeGreaterThan(0.02);
+  });
+
+  it('does not bury a lollipop under every plain ring', () => {
+    // The whole point of the stem exemption. A lollipop retraces its approach
+    // by construction, so on the whole-route figure it loses this comparison
+    // outright — which is what shipped, and why riders asking to ride out of
+    // town and loop there kept being handed a ring around their own street.
+    const ranked = rankCandidates(
+      [
+        candidate({
+          id: 'ring-round-the-houses',
+          retracedShare: 0.05,
+          ringRetracedShare: 0.05,
+        }),
+        candidate({
+          id: 'lollipop-out-of-town',
+          retracedShare: 0.45,
+          ringRetracedShare: 0.01,
+        }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('lollipop-out-of-town');
   });
 });
 
@@ -921,39 +947,68 @@ describe('stem and ring', () => {
     annotation: { nodes, distance: new Array(Math.max(0, nodes.length - 1)).fill(m) },
   });
 
+  // A lollipop is built with the anchor as a waypoint before and after the
+  // ring, so it arrives as three legs: out, round, home.
+  const lollipop = () => [leg([1, 2, 3]), leg([3, 4, 5, 3]), leg([3, 2, 1])];
+
   it('finds no stem on a plain loop', () => {
     const r = splitStemAndRing([leg([1, 2, 3, 4, 1])]);
     expect(r.stemMeters).toBe(0);
     expect(r.ringMeters).toBe(400);
   });
 
-  it('separates an out-and-back stem from the loop at the end', () => {
-    // 1-2 out, ring 2-3-4-2, then 2-1 home: one stem edge each way.
-    const r = splitStemAndRing([leg([1, 2, 3, 4, 2, 1])]);
-    expect(r.stemMeters).toBe(200);
+  it('takes the stem from the legs we asked for, not from the shape', () => {
+    const r = splitStemAndRing(lollipop(), LOLLIPOP_STEM_LEGS);
+    expect(r.stemMeters).toBe(400);
     expect(r.ringMeters).toBe(300);
   });
 
   it('exempts the stem so a lollipop can pass the cap', () => {
-    // Without the exemption this reads 2/5 = 40% and is rejected outright.
-    const legs = [leg([1, 2, 3, 4, 2, 1])];
-    expect(retracedShare(legs)).toBeCloseTo(0.4, 5);
-    expect(ringRetracedShare(legs)).toBe(0);
-    expect(withinRetraceCap({ ringRetracedShare: ringRetracedShare(legs) }, 'none')).toBe(true);
+    const legs = lollipop();
+    // The honest whole-route figure still shows the approach.
+    expect(retracedShare(legs)).toBeCloseTo(0.571, 2);
+    expect(ringRetracedShare(legs, LOLLIPOP_STEM_LEGS)).toBe(0);
+    expect(
+      withinRetraceCap(
+        { ringRetracedShare: ringRetracedShare(legs, LOLLIPOP_STEM_LEGS) },
+        'none',
+      ),
+    ).toBe(true);
+  });
+
+  it('REGRESSION: an approach on a different road home is still a stem', () => {
+    // The detector this replaced matched a mirrored prefix of edges, which
+    // assumed the way home reuses the way out. Live OSRM shares only about
+    // half its edges between the two directions of a literal out-and-back, so
+    // the mirror broke on the first edge and every lollipop measured a 0 m
+    // stem — the exemption shipped, passed its tests, and never once fired.
+    const asymmetric = [leg([1, 2, 3]), leg([3, 4, 5, 3]), leg([3, 7, 1])];
+    const r = splitStemAndRing(asymmetric, LOLLIPOP_STEM_LEGS);
+    expect(r.stemMeters).toBe(400);
+    expect(r.ringMeters).toBe(300);
+    expect(ringRetracedShare(asymmetric, LOLLIPOP_STEM_LEGS)).toBe(0);
   });
 
   it('still catches doubling back INSIDE the ring', () => {
-    // Stem 1-2, then a spur 3-9-3 within the ring.
-    const legs = [leg([1, 2, 3, 9, 3, 4, 2, 1])];
-    const r = splitStemAndRing(legs);
-    expect(r.stemMeters).toBe(200);
-    expect(ringRetracedShare(legs)).toBeGreaterThan(0);
+    // A spur 4-9-4 within the ring: not the approach, so not exempt.
+    const legs = [leg([1, 2, 3]), leg([3, 4, 9, 4, 5, 3]), leg([3, 2, 1])];
+    const r = splitStemAndRing(legs, LOLLIPOP_STEM_LEGS);
+    expect(r.stemMeters).toBe(400);
+    expect(ringRetracedShare(legs, LOLLIPOP_STEM_LEGS)).toBeGreaterThan(0);
   });
 
   it('fails a pure out-and-back, which has no ring at all', () => {
-    const legs = [leg([1, 2, 3, 2, 1])];
-    expect(ringRetracedShare(legs)).toBe(1);
+    const legs = [leg([1, 2, 3]), leg([3, 2, 1])];
+    // Two legs and a stem of one at each end leaves no middle: judged whole.
+    expect(ringRetracedShare(legs, LOLLIPOP_STEM_LEGS)).toBe(1);
     expect(withinRetraceCap({ ringRetracedShare: 1 }, 'none')).toBe(false);
+  });
+
+  it('judges an unexpected shape whole rather than waving it through', () => {
+    // Too few legs to hold a stem AND a ring: no silent exemption.
+    const legs = [leg([1, 2, 3, 2, 1])];
+    expect(splitStemAndRing(legs, LOLLIPOP_STEM_LEGS).stemMeters).toBe(0);
+    expect(ringRetracedShare(legs, LOLLIPOP_STEM_LEGS)).toBe(1);
   });
 
   it('does not divide by zero on an empty route', () => {
@@ -967,43 +1022,61 @@ describe('stem and ring', () => {
 });
 
 describe('lollipopWaypoints', () => {
-  it('centres the ring away from the start', () => {
+  it('anchors the ring so the router has to ride out to it', () => {
+    const wps = lollipopWaypoints(BUCHAREST, 90, 30_000, 3);
+    // First and last waypoint are the same anchor: that is what makes the
+    // approach a leg boundary, and therefore exactly measurable.
+    expect(wps[0]).toEqual(wps[wps.length - 1]);
+    expect(wps).toHaveLength(3 + 2);
+  });
+
+  it('puts the ring out along the bearing, not around the start', () => {
     const wps = lollipopWaypoints(BUCHAREST, 90, 30_000);
-    const distances = wps.map((w) =>
+    const away = wps.map((w) =>
       haversineDistance([BUCHAREST.lat, BUCHAREST.lon], [w.lat, w.lon]),
     );
-    // Every ring point is out along the bearing, not around the start.
-    expect(Math.min(...distances)).toBeGreaterThan(0);
-    const east = wps.filter((w) => w.lon > BUCHAREST.lon);
-    expect(east.length).toBeGreaterThan(0);
+    expect(Math.min(...away)).toBeGreaterThan(0);
+    expect(wps.filter((w) => w.lon > BUCHAREST.lon).length).toBeGreaterThan(0);
   });
 
-  it('spends the stem budget getting there, out and back', () => {
-    const target = 30_000;
-    const wps = lollipopWaypoints(BUCHAREST, 0, target, 3, 0.4);
-    // Centre sits at half the stem budget; ring points straddle it.
-    const mean =
-      wps.reduce(
-        (sum, w) => sum + haversineDistance([BUCHAREST.lat, BUCHAREST.lon], [w.lat, w.lon]),
-        0,
-      ) / wps.length;
-    expect(mean).toBeGreaterThan(1_000);
-    expect(mean).toBeLessThan(target);
+  it('clears the start by the clearance asked for', () => {
+    // The near edge of the ring is what decides whether the loop happens out
+    // of town or round the rider's own streets — the complaint that a fixed
+    // stem fraction produced, because at a third of a 20 km ride the ring came
+    // back to within 1.3 km of the start.
+    const clearance = 3_000;
+    const wps = lollipopWaypoints(BUCHAREST, 0, 30_000, 6, clearance);
+    const ring = wps.slice(1, -1);
+    const nearest = Math.min(
+      ...ring.map((w) =>
+        haversineDistance([BUCHAREST.lat, BUCHAREST.lon], [w.lat, w.lon]),
+      ),
+    );
+    expect(nearest).toBeGreaterThan(clearance * 0.8);
   });
 
-  it('builds the requested ring shape', () => {
-    expect(lollipopWaypoints(BUCHAREST, 0, 30_000, 6)).toHaveLength(6);
+  it('builds the requested ring shape, plus the anchor at each end', () => {
+    expect(lollipopWaypoints(BUCHAREST, 0, 30_000, 6)).toHaveLength(8);
   });
 
-  it('clamps an absurd stem fraction rather than inverting the ring', () => {
-    expect(() => lollipopWaypoints(BUCHAREST, 0, 30_000, 3, 5)).not.toThrow();
+  it('clamps an absurd clearance rather than inverting the ring', () => {
+    expect(() => lollipopWaypoints(BUCHAREST, 0, 30_000, 3, 500_000)).not.toThrow();
     expect(() => lollipopWaypoints(BUCHAREST, 0, 30_000, 3, -1)).not.toThrow();
+    const wps = lollipopWaypoints(BUCHAREST, 0, 30_000, 3, 500_000);
+    for (const w of wps) {
+      expect(Number.isFinite(w.lat)).toBe(true);
+      expect(Number.isFinite(w.lon)).toBe(true);
+    }
   });
 
-  it('leaves most of the ride as actual loop by default', () => {
-    expect(DEFAULT_STEM_FRACTION).toBeLessThan(0.5);
+  it('scales clearance with the ride, within sane bounds', () => {
+    expect(ringClearanceMeters(5_000)).toBe(MIN_RING_CLEARANCE_METERS);
+    expect(ringClearanceMeters(500_000)).toBe(MAX_RING_CLEARANCE_METERS);
+    expect(ringClearanceMeters(40_000)).toBeGreaterThan(MIN_RING_CLEARANCE_METERS);
+    expect(ringClearanceMeters(40_000)).toBeLessThan(MAX_RING_CLEARANCE_METERS);
   });
 });
+
 
 describe('scenic ranking', () => {
   const req = {

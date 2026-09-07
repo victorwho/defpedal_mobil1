@@ -230,9 +230,52 @@ Metro :8099 — see the port warning below.
 | OSRM loop fetch | `apps/mobile/src/lib/mapbox-routing.ts` — `fetchLoopRoute` |
 | Orchestration | `apps/mobile/src/lib/loop-generator.ts` (+20 tests) |
 | Screen | `apps/mobile/app/loop-planner.tsx` |
-| Heading dial | `apps/mobile/src/design-system/molecules/LoopHeadingDial.tsx` |
 | Store + gates | `store/premiumSlice.ts`, `hooks/usePremium.ts` |
 | Copy | `src/i18n/{en,ro,es}.ts` — `loop.*` |
+
+## The lollipop shape, and the three bugs that kept it off the screen
+
+A lollipop rides out of town, loops out there, and comes home — the shape a
+rider wants when the good riding is not where they live. It shipped broken in
+three independent ways, all fixed 2026-09-07 (error-log #109):
+
+1. **It was not a lollipop.** `lollipopWaypoints` offset the ring from the
+   start but gave the router no waypoint out there, so OSRM entered and left
+   that ring wherever was cheapest. Measured on the live router, the loop came
+   back within **40 m of the start** on every candidate. The anchor is now a
+   waypoint before and after the ring, so the route has to reach it.
+2. **The stem exemption never fired.** It found the approach by matching a
+   mirrored prefix of edges, assuming the way home reuses the way out. It does
+   not: a literal `start -> X -> start` around Rasnov shares only 78 of 138
+   edges. Every lollipop measured a 0 m stem. The stem is now taken from
+   construction — the anchor is a leg boundary, so the approach is exactly the
+   first and last leg.
+3. **The ranking vetoed it anyway.** `rankCandidates` sorted on whole-route
+   `retracedShare`, which a lollipop is guaranteed to score badly on. That put
+   every lollipop below every plain ring before any preference was read. It now
+   compares `ringRetracedShare`, the same figure the cap uses.
+
+**Sizing is by clearance, not stem fraction.** The rider cares how far from
+home the loop happens; a fixed third-of-the-budget stem put the ring's near
+edge 1.3 km out on a 20 km ride, still inside a small town. Solving
+`2·S·d + P·r·d = budget` with `S − r = clearance` targets the thing that
+matters directly.
+
+**Known limit, stated plainly.** A lollipop clears the doubling-back cap less
+often than a plain ring, because it has to close a loop where the network is
+thinner — at Rasnov the budget below ~40 km simply cannot hold both a real
+clearance and a ring big enough to find roads. Candidates are sampled 1-in-2
+rather than 1-in-3 to compensate. Where the terrain has nothing to offer the
+rider correctly gets a plain ring instead.
+
+**The cap is measured on the ring, and that is not a technicality.** A genuine
+road loop out of Rasnov through two neighbouring towns measures **0.379**
+whole-route — the one road out of the valley is also the one road back — so a
+10% whole-route cap rejects every real loop the terrain can offer. The shipped split does not rescue that
+case — a plain loop has no stem legs to exempt, so valley plain-rings still
+fail the cap. What it rescues is the lollipop: a hand-checked one out of
+Rasnov (out to Bran, loop Moieciu-Simon, home; 58.0 km) reads 0.515
+whole-route but **0.063 on its ring**.
 
 ## Five things the build changed from the design
 

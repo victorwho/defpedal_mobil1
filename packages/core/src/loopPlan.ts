@@ -258,26 +258,59 @@ export const ringWaypoints = (
 };
 
 /**
- * Fraction of a lollipop route spent on the stem, out and back.
+ * How far the ring's NEAR EDGE should sit from the start, as a fraction of the
+ * ride, when the rider wants to get out of town before looping.
  *
- * A third: enough to clear a town and reach whatever is worth riding around,
- * while still leaving two thirds of the ride as actual loop. Much more and the
- * ride is mostly commute; much less and the ring is still in the suburbs.
+ * Expressed as clearance rather than as a stem length because clearance is the
+ * thing the rider actually cares about: "the loop happens out there, not round
+ * my house". A stem fraction leaves the ring's near edge wherever the
+ * arithmetic lands — at a third of a 20 km ride it lands 1.3 km from the
+ * start, which is still inside a small town, which is exactly the complaint
+ * this shape exists to answer.
  */
-export const DEFAULT_STEM_FRACTION = 1 / 3;
+export const RING_CLEARANCE_FRACTION = 0.14;
+
+/** Clearance never drops below this, or the ring is still in the suburbs. */
+export const MIN_RING_CLEARANCE_METERS = 2000;
+
+/**
+ * Nor above this: past it the ride is mostly approach, and the ring shrinks
+ * until it has no road network to land on.
+ */
+export const MAX_RING_CLEARANCE_METERS = 8000;
+
+/** How far out to put the loop, for a given ride length. */
+export const ringClearanceMeters = (targetDistanceMeters: number): number =>
+  Math.min(
+    MAX_RING_CLEARANCE_METERS,
+    Math.max(
+      MIN_RING_CLEARANCE_METERS,
+      Math.max(0, targetDistanceMeters) * RING_CLEARANCE_FRACTION,
+    ),
+  );
 
 /**
  * Waypoints for a lollipop: ride out, loop somewhere else, ride home.
  *
- * The ring is centred half the stem budget away along `bearingDegrees`, so the
- * router naturally goes out, goes round, and comes back the way it came. This
- * is the shape a rider wants when the interesting riding is not where they
- * live — a town beside mountains gets a loop in the foothills instead of a
- * ring through its own suburbs.
+ * The anchor — the point the ring is built around — is included as a waypoint
+ * BEFORE and AFTER the ring. That is load-bearing twice over.
  *
- * The stem is retraced by construction, which is exactly why the doubling-back
- * cap measures `ringRetracedShare` rather than the whole route. Without that
- * exemption this shape could never be offered at all.
+ * It makes the shape real. Without it the router is handed a ring that merely
+ * sits off to one side, and it enters and leaves that ring wherever is
+ * cheapest; there is no ride-out, and measured against live OSRM the result is
+ * an offset ring whose near edge comes back within 40 m of the start. With the
+ * anchor the router must reach that point before the loop and again after it,
+ * which is what "go out to the foothills, loop there, come home" means.
+ *
+ * It also makes the stem exactly measurable: the anchor is a leg boundary, so
+ * the approach is the first and last leg and `splitStemAndRing` needs no
+ * inference. See the note there about the mirrored-prefix detector this
+ * replaced, which never fired.
+ *
+ * Sizing solves for the clearance the rider wants rather than a fixed stem
+ * fraction. With approach S, ring radius r, perimeter factor P and detour d:
+ *   2·S·d + P·r·d = budget   and   S − r = clearance
+ * so r = (budget − 2·clearance·d) / (d·(2 + P)).
  *
  * The ring is thrown at `bearing + 180` so its first waypoint faces back
  * towards the start: the router reaches the near side of the ring first and
@@ -288,23 +321,43 @@ export const lollipopWaypoints = (
   bearingDegrees: number,
   targetDistanceMeters: number,
   waypointCount: number = RING_WAYPOINT_COUNT,
-  stemFraction: number = DEFAULT_STEM_FRACTION,
+  clearanceMeters: number = ringClearanceMeters(targetDistanceMeters),
   detourFactor: number = DEFAULT_DETOUR_FACTOR,
 ): Coordinate[] => {
-  const fraction = Math.min(0.8, Math.max(0, stemFraction));
   const target = Math.max(0, targetDistanceMeters);
   const detour = detourFactor > 0 ? detourFactor : DEFAULT_DETOUR_FACTOR;
+  const count = Math.max(1, Math.floor(waypointCount));
+  const perimeter = ringPerimeterFactor(count);
 
-  // Out AND back, so the centre sits at half the stem budget.
-  const stemLength = (target * fraction) / 2;
-  const centre = destinationPoint(start, bearingDegrees, stemLength);
+  // Clamp so the ring never inverts on a budget too small for the clearance
+  // asked of it — a negative radius would put the waypoints behind the rider.
+  const maxClearance = target / (2 * detour);
+  const clearance = Math.min(
+    Math.max(0, clearanceMeters),
+    Math.max(0, maxClearance * 0.8),
+  );
 
-  // Whatever is left of the budget becomes the ring.
-  const ringBudget = target * (1 - fraction);
-  const radius = ringBudget / (ringPerimeterFactor(waypointCount) * detour);
+  const radius = Math.max(
+    0,
+    (target - 2 * clearance * detour) / (detour * (2 + perimeter)),
+  );
+  const anchor = destinationPoint(start, bearingDegrees, radius + clearance);
 
-  return ringWaypoints(centre, radius, bearingDegrees + 180, waypointCount);
+  return [
+    anchor,
+    ...ringWaypoints(anchor, radius, bearingDegrees + 180, count),
+    anchor,
+  ];
 };
+
+/**
+ * Legs at each end of a lollipop that are approach rather than loop.
+ *
+ * One, because `lollipopWaypoints` puts the anchor in the list once before the
+ * ring and once after it. Exported so the caller measuring a route cannot
+ * disagree with the caller building it.
+ */
+export const LOLLIPOP_STEM_LEGS = 1;
 
 // ---------------------------------------------------------------------------
 // Bearings
@@ -703,44 +756,54 @@ const routeEdges = (
 };
 
 /**
- * Split a route into its out-and-back stem and the loop at the far end.
+ * Split a route into the out-and-back stem that reaches the riding, and the
+ * loop at the far end.
  *
- * A lollipop rides out along a stem, loops, and comes home the same way — so
- * its edge sequence is a PALINDROME at both ends: the first edge equals the
- * last, the second equals the second-to-last, and so on until the ring begins.
- * Matching that mirrored prefix is exact and needs no geometry or thresholds.
+ * `stemLegs` is how many legs at EACH end are the approach. It is 1 for a
+ * lollipop, because we build one by putting the ring's anchor in the waypoint
+ * list before and after the ring — so the anchor is a leg boundary and the
+ * stem is exactly the first and last leg. 0 for a plain ring, which has no
+ * stem at all.
  *
- * This matters because the doubling-back cap exists to catch *accidental*
- * backtracking. A stem the rider asked for — ride out to the foothills, loop
- * there, ride home — is the shape working as intended, and counting it against
- * the cap would forbid the very thing they requested.
+ * Taking it from construction is the whole point. This used to INFER the stem
+ * by matching a mirrored prefix of edges, on the assumption that riding out
+ * and back means riding the same edges in reverse. Measured against the live
+ * router, that assumption is false: a literal `start -> X -> start` request
+ * around Rasnov shares only 78 of 138 edges between the two directions, so the
+ * mirror broke on the first edge and the detector reported a 0 m stem for
+ * every lollipop ever generated. The exemption existed, passed its tests, and
+ * never once fired in the field. Legs cannot drift like that — they are what
+ * we asked for.
  *
- * A pure out-and-back has no ring: every edge is mirrored, `ringMeters` is 0,
- * and `ringRetracedShare` therefore reports 1 rather than dividing by zero —
- * so it fails the cap, which is correct. It is not a loop.
+ * A route with no ring — every leg inside the stem — is an out-and-back, not a
+ * loop. `ringMeters` is 0 and `ringRetracedShare` reports 1 rather than
+ * dividing by zero, so it fails the cap. That is correct: it is not a loop.
  */
 export const splitStemAndRing = (
   legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
 ): StemAndRing => {
-  const edges = routeEdges(legs);
-  const n = edges.length;
+  const perLeg = legs.map((leg) => routeEdges([leg]));
+  const stem = Math.max(0, Math.floor(stemLegs));
 
-  // Longest mirrored prefix: edges[i] === edges[n-1-i].
-  let stemEdges = 0;
-  while (
-    stemEdges < Math.floor(n / 2) &&
-    edges[stemEdges]!.key === edges[n - 1 - stemEdges]!.key
-  ) {
-    stemEdges += 1;
-  }
+  // Not enough legs to have both a stem and a ring: treat it all as ring, so
+  // an unexpected shape is judged on its whole self rather than waved through.
+  const splittable = stem > 0 && perLeg.length > 2 * stem;
 
   let stemMeters = 0;
-  for (let i = 0; i < stemEdges; i += 1) {
-    stemMeters += edges[i]!.meters + edges[n - 1 - i]!.meters;
+  if (splittable) {
+    for (const edges of [
+      ...perLeg.slice(0, stem),
+      ...perLeg.slice(perLeg.length - stem),
+    ]) {
+      for (const edge of edges) stemMeters += edge.meters;
+    }
   }
 
-  // Whatever is left in the middle is the ring.
-  const ring = edges.slice(stemEdges, n - stemEdges);
+  const ring = (
+    splittable ? perLeg.slice(stem, perLeg.length - stem) : perLeg
+  ).flat();
+
   const lengthByEdge = new Map<string, number>();
   const countByEdge = new Map<string, number>();
   let ringMeters = 0;
@@ -759,13 +822,22 @@ export const splitStemAndRing = (
 };
 
 /**
- * Doubling back WITHIN the loop, ignoring a deliberate out-and-back stem.
+ * Doubling back WITHIN the loop, ignoring the approach the rider asked for.
  *
  * This is what the cap is measured against. `retracedShare` remains the honest
  * whole-route figure and is what the rider is shown.
+ *
+ * The distinction is not academic. Around Rasnov a genuine road loop through
+ * two neighbouring towns measures 0.379 whole-route, because the one road out
+ * of the valley is also the one road back — so a 10% whole-route cap rejects
+ * every real loop the terrain can offer, and the search falls to its last
+ * rung every time. Measured on the ring alone, the same ride is 0.026.
  */
-export const ringRetracedShare = (legs: readonly AnnotatedLeg[]): number => {
-  const { ringMeters, ringRetracedMeters } = splitStemAndRing(legs);
+export const ringRetracedShare = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): number => {
+  const { ringMeters, ringRetracedMeters } = splitStemAndRing(legs, stemLegs);
   // No ring at all means an out-and-back, not a loop. Fail it.
   if (ringMeters <= 0) return 1;
   return Math.min(1, Math.max(0, ringRetracedMeters / ringMeters));
@@ -953,7 +1025,13 @@ export const rankCandidates = <T extends LoopCandidate>(
     // loop — so this outranks the optional preferences and sits directly under
     // safety. The deadband is wide because small overlaps are unavoidable
     // (a junction, a one-way pair) and should not reorder anything.
-    const retraceGap = a.retracedShare - b.retracedShare;
+    //
+    // Compares the RING figure, not the whole route, for the same reason the
+    // cap does: a lollipop's approach is retraced by construction, and sorting
+    // on the whole route buries every lollipop under every plain ring before
+    // any preference is consulted. That is not a tie-break, it is a veto — and
+    // it was silently vetoing the shape a rider explicitly asked for.
+    const retraceGap = a.ringRetracedShare - b.ringRetracedShare;
     if (Math.abs(retraceGap) > RETRACE_RANKING_DEADBAND) return retraceGap;
 
     // Only when the rider asked for it, and only after safety. Unpaved ways are
