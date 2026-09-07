@@ -258,6 +258,8 @@ export const es: TranslationKeys = {
 
     sectionTitle: 'Rutas circulares',
     emptyLoops: 'Aún no hay rutas guardadas.',
+    share: 'Compartir ruta',
+    saveLimit: 'En el plan gratuito puedes guardar {{count}} rutas. Elimina una para guardar esta.',
     deleteLoop: 'Eliminar ruta',
     driftNotice: 'Esta ruta ha cambiado desde que la guardaste — ahora {{now}} km, antes {{before}} km.',
   },

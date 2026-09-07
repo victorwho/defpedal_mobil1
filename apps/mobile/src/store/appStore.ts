@@ -51,6 +51,7 @@ import { create } from 'zustand';
 
 import { getDeviceLocale, type Locale } from '../i18n';
 import type { ImportedCourseMeta } from '../lib/courseStorage';
+import type { SavedLoopMeta } from '../lib/loopStorage';
 import { DEFAULT_ANALYTICS_PROMPT_STATE } from '../lib/analytics-optin';
 import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
@@ -257,6 +258,13 @@ export type AppStore = QueueSlice & PremiumSlice & {
   // index that points at them. Intentionally NOT in resetUserScopedState.
   importedCourses: ImportedCourseMeta[];
   /**
+   * Loops the rider saved. DEVICE-scoped for the same reason as
+   * `importedCourses`: the route files belong to this handset, so signing
+   * out must not orphan them by clearing the index that points at them.
+   * Intentionally NOT in resetUserScopedState.
+   */
+  savedLoops: SavedLoopMeta[];
+  /**
    * A .gpx handed to us by another app ("Open with"), staged into our
    * cache and waiting to be opened.
    *
@@ -451,6 +459,8 @@ export type AppStore = QueueSlice & PremiumSlice & {
   setSelectedRouteId: (routeId: string | null) => void;
   startNavigation: (route: RouteOption, sessionId?: string) => void;
   addImportedCourse: (course: ImportedCourseMeta) => void;
+  addSavedLoop: (loop: SavedLoopMeta) => void;
+  removeSavedLoop: (id: string) => void;
   setPendingCourseImport: (
     pending: { uri: string; fileName: string } | null,
   ) => void;
@@ -810,6 +820,7 @@ export const useAppStore = create<AppStore>()(
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
       completedRideCount: 0,
       importedCourses: [],
+      savedLoops: [],
       pendingCourseImport: null,
       saveRidePrompt: { lastShownRide: 0, dismissCount: 0 },
       analyticsPrompt: DEFAULT_ANALYTICS_PROMPT_STATE,
@@ -1299,6 +1310,17 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           importedCourses: state.importedCourses.filter((entry) => entry.id !== id),
         })),
+      addSavedLoop: (loop) =>
+        set((state) => ({
+          savedLoops: [
+            loop,
+            ...state.savedLoops.filter((entry) => entry.id !== loop.id),
+          ],
+        })),
+      removeSavedLoop: (id) =>
+        set((state) => ({
+          savedLoops: state.savedLoops.filter((entry) => entry.id !== id),
+        })),
       advanceNavigation: (totalSteps) =>
         set((state) => ({
           navigationSession: state.navigationSession
@@ -1662,6 +1684,7 @@ export const useAppStore = create<AppStore>()(
         ratingSkipCount: state.ratingSkipCount,
         reviewPromptState: state.reviewPromptState,
         importedCourses: state.importedCourses,
+        savedLoops: state.savedLoops,
         completedRideCount: state.completedRideCount,
         saveRidePrompt: state.saveRidePrompt,
         analyticsPrompt: state.analyticsPrompt,

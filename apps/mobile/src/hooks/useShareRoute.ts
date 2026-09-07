@@ -60,6 +60,17 @@ export type ShareRouteInput = {
    * 200m off each end would leave nothing visible).
    */
   readonly hideEndpoints?: boolean;
+  /**
+   * A loop from the loop generator, which has no destination — both ends are
+   * the start. Without this the caption reads "cycling route to 24 km loop",
+   * because `destinationLabel` is the only slot a loop's name would otherwise
+   * fit into.
+   *
+   * Endpoint trimming is deliberately left at the server default: on a loop
+   * the two trimmed ends are the same place, so the rider's start is hidden
+   * once rather than twice, which is exactly what the privacy default is for.
+   */
+  readonly isLoop?: boolean;
 };
 
 export type ShareRouteResult =
@@ -85,6 +96,11 @@ const buildShareCaption = (
   source: 'planned' | 'saved',
 ): string => {
   const km = (input.route.distanceMeters / 1000).toFixed(1);
+  // A loop has no destination to name, and "a route to nowhere" is worse than
+  // saying what it actually is.
+  if (input.isLoop) {
+    return `I found this ${km} km cycling loop — open it in Defensive Pedal.`;
+  }
   // Slice 5a: saved-route shares get their own voice — the sharer is
   // signalling "this is a route I've saved and use", not "I just planned
   // this". Keeps the same Defensive Pedal sign-off for consistency.

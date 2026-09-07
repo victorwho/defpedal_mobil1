@@ -58,6 +58,7 @@ import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { pickGpxFile } from '../src/lib/gpx-import';
 import { deleteCourseGeometry, pruneOrphanedCourses } from '../src/lib/courseStorage';
+import { deleteSavedLoop, pruneOrphanedLoops } from '../src/lib/loopStorage';
 import { PermanentHazardCheckbox } from '../src/design-system/molecules/PermanentHazardCheckbox';
 import { SesizareRow } from '../src/design-system/molecules/SesizareRow';
 import { Toast } from '../src/design-system/molecules/Toast';
@@ -454,6 +455,8 @@ export default function RoutePlanningScreen() {
   const [importToast, setImportToast] = useState<string | null>(null);
 
   const importedCourses = useAppStore((s) => s.importedCourses);
+  const savedLoops = useAppStore((state) => state.savedLoops);
+  const removeSavedLoop = useAppStore((state) => state.removeSavedLoop);
   const removeImportedCourse = useAppStore((s) => s.removeImportedCourse);
 
   // Course geometry lives on disk while its metadata lives in the store, so
@@ -465,7 +468,8 @@ export default function RoutePlanningScreen() {
     if (!savedRoutesOpen || prunedRef.current) return;
     prunedRef.current = true;
     void pruneOrphanedCourses(importedCourses.map((course) => course.id));
-  }, [savedRoutesOpen, importedCourses]);
+    void pruneOrphanedLoops(savedLoops.map((loop) => loop.id));
+  }, [savedRoutesOpen, importedCourses, savedLoops]);
 
   const handleOpenCourse = useCallback(
     (course: { id: string; name: string }) => {
@@ -2036,6 +2040,52 @@ export default function RoutePlanningScreen() {
                 onPress={() => handleDeleteCourse(course.id)}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('course.deleteCourse')}: ${course.name}`}
+              >
+                <Ionicons name="trash-outline" size={18} color={gray[500]} />
+              </Pressable>
+              <Ionicons name="chevron-forward" size={16} color={gray[500]} />
+            </Pressable>
+          ))}
+
+          {savedLoops.map((loop) => (
+            <Pressable
+              key={loop.id}
+              style={styles.savedRouteRow}
+              onPress={() => {
+                setSavedRoutesOpen(false);
+                router.push({
+                  pathname: '/loop-planner',
+                  params: { loopId: loop.id },
+                });
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={loop.name}
+            >
+              <Ionicons name="repeat" size={16} color={colors.accent} />
+              <View style={styles.savedRouteTextWrap}>
+                <Text style={styles.savedRouteName} numberOfLines={1}>
+                  {loop.name}
+                </Text>
+                <Text style={styles.savedRouteMode}>
+                  {t('loop.badge')}
+                  {` · ${(loop.distanceMeters / 1000).toFixed(1)} km`}
+                  {loop.climbMeters === null
+                    ? ''
+                    : ` · ${t('loop.climb', { meters: String(loop.climbMeters) })}`}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.savedRouteExportButton}
+                hitSlop={8}
+                onPress={() => {
+                  // Metadata first, file second — same ordering as courses: an
+                  // orphaned file is swept, a row pointing at a deleted file is
+                  // a loop the rider can tap and never open.
+                  removeSavedLoop(loop.id);
+                  void deleteSavedLoop(loop.id);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('loop.deleteLoop')}: ${loop.name}`}
               >
                 <Ionicons name="trash-outline" size={18} color={gray[500]} />
               </Pressable>

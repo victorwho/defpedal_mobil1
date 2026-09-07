@@ -258,6 +258,8 @@ export const ro: TranslationKeys = {
 
     sectionTitle: 'Tururi',
     emptyLoops: 'Niciun tur salvat încă.',
+    share: 'Distribuie turul',
+    saveLimit: 'Gratuit poți păstra {{count}} trasee și tururi salvate. Șterge unul ca să salvezi acesta.',
     deleteLoop: 'Șterge turul',
     driftNotice: 'Turul s-a schimbat de când l-ai salvat — acum {{now}} km, era {{before}} km.',
   },

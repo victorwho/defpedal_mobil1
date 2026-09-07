@@ -25,7 +25,7 @@ import {
   type LoopTerrain,
 } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -40,6 +40,7 @@ import { RouteMap } from '../src/components/map';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Button } from '../src/design-system/atoms/Button';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
+import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
@@ -48,9 +49,15 @@ import { space } from '../src/design-system/tokens/spacing';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
+import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
 import { beginLoopRide } from '../src/lib/loop-ride';
+import {
+  createSavedLoopId,
+  readSavedLoop,
+  writeSavedLoop,
+} from '../src/lib/loopStorage';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import { telemetry } from '../src/lib/telemetry';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
@@ -136,6 +143,56 @@ export default function LoopPlannerScreen() {
   const [relaxation, setRelaxation] = useState<string | null>(null);
   const [checked, setChecked] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+
+  // ── Save / share ────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<string | null>(null);
+  const [savedIds, setSavedIds] = useState<Record<string, string>>({});
+  const savedLoops = useAppStore((state) => state.savedLoops);
+  const addSavedLoop = useAppStore((state) => state.addSavedLoop);
+  const shareRoute = useShareRoute();
+
+  // Opening a loop the rider saved earlier: it becomes the only result, ready
+  // to ride. Reusing this screen rather than a viewer of its own keeps one
+  // place where a loop is looked at and set off from.
+  const params = useLocalSearchParams<{ loopId?: string }>();
+  const openedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = params.loopId;
+    if (!id || openedRef.current === id) return;
+    openedRef.current = id;
+
+    void (async () => {
+      const stored = await readSavedLoop(id);
+      if (!stored) {
+        // Validation failed or the file is gone. Say so rather than opening an
+        // empty planner the rider has to guess about.
+        setToast(t('loop.errorSave'));
+        return;
+      }
+      setCustomStart(stored.start);
+      setSessionLoops([
+        {
+          id: stored.route.id,
+          route: stored.route,
+          coordinates: [],
+          bearingDegrees: 0,
+          distanceMeters: stored.route.distanceMeters,
+          climbMeters: stored.route.totalClimbMeters,
+          highRiskMeters: 0,
+          unpavedShare: 0,
+          retracedShare: 0,
+          ringRetracedShare: 0,
+          stemMeters: 0,
+          scenicScore: 0,
+          relaxation: 'none',
+          terrain: null,
+          measured: true,
+        },
+      ]);
+      setSelectedId(stored.route.id);
+      setSavedIds((prev) => ({ ...prev, [stored.route.id]: id }));
+    })();
+  }, [params.loopId, t]);
 
   useEffect(
     () => () => {
@@ -308,6 +365,76 @@ export default function LoopPlannerScreen() {
           count: String(sessionsLeft),
           total: String(premium.limits.loopSessionsPerMonth ?? 0),
         });
+
+  const handleSave = useCallback(() => {
+    if (!selected || !start) return;
+    if (savedIds[selected.id]) {
+      setToast(t('loop.savedAlready'));
+      return;
+    }
+
+    // Loops count against the same allowance as saved routes — the rider was
+    // promised "saved like any route", and two separate quotas for two kinds
+    // of saved thing is a distinction only the code cares about.
+    const total = savedLoops.length;
+    if (premium.blockSaveRoute(total)) {
+      setToast(
+        t('loop.saveLimit', {
+          count: String(premium.limits.savedRoutes ?? 0),
+        }),
+      );
+      return;
+    }
+
+    const id = createSavedLoopId();
+    const name = t('loop.nameFallback', { km: km(selected.distanceMeters) });
+
+    void (async () => {
+      // File first, metadata second: a row pointing at a file that was never
+      // written is a loop the rider can tap and never open, whereas an
+      // orphaned file is reclaimed by the storage sweep.
+      const written = await writeSavedLoop(id, {
+        route: selected.route,
+        start,
+      });
+      if (!written) {
+        setToast(t('loop.errorSave'));
+        return;
+      }
+      addSavedLoop({
+        id,
+        name,
+        distanceMeters: selected.distanceMeters,
+        climbMeters: selected.climbMeters,
+        unpavedShare: selected.unpavedShare,
+        createdAt: new Date().toISOString(),
+      });
+      setSavedIds((prev) => ({ ...prev, [selected.id]: id }));
+      setToast(t('loop.saved'));
+      telemetry.capture('loop_saved', {
+        km: Math.round(selected.distanceMeters / 1000),
+      });
+    })();
+  }, [selected, start, savedIds, savedLoops.length, premium, addSavedLoop, t]);
+
+  const handleShare = useCallback(() => {
+    if (!selected || !start) return;
+    void (async () => {
+      // Both ends are the start, because that is what a loop is. The share
+      // service takes the geometry, so the recipient sees the actual line
+      // rather than a route recomputed between two identical points.
+      const result = await shareRoute.share({
+        route: selected.route,
+        origin: start,
+        destination: start,
+        routingMode: terrain === 'flat' ? 'flat' : 'safe',
+        isLoop: true,
+      });
+      if (!result.shared && result.reason !== 'dismissed') {
+        setToast(result.message ?? t('loop.errorSave'));
+      }
+    })();
+  }, [selected, start, terrain, shareRoute, t]);
 
   // ── Start the ride ──────────────────────────────────────────────────────
   // Mirrors `handleStartRide` in /course-import, which mirrors
@@ -488,9 +615,38 @@ export default function LoopPlannerScreen() {
               to the counter it spends.
             */}
             {sessionLoops.length > 0 ? (
-              <Button onPress={openSelected} disabled={!selected}>
-                {t('loop.startRide')}
-              </Button>
+              <>
+                <Button onPress={openSelected} disabled={!selected}>
+                  {t('loop.startRide')}
+                </Button>
+                {/*
+                  Secondary to setting off, but on the same surface: a rider
+                  who likes a loop wants to keep it or send it before they
+                  leave the screen that found it.
+                */}
+                <View style={styles.secondaryRow}>
+                  <View style={styles.secondaryCell}>
+                    <Button
+                      variant="secondary"
+                      onPress={handleSave}
+                      disabled={!selected}
+                    >
+                      {selected && savedIds[selected.id]
+                        ? t('loop.savedAlready')
+                        : t('loop.save')}
+                    </Button>
+                  </View>
+                  <View style={styles.secondaryCell}>
+                    <Button
+                      variant="secondary"
+                      onPress={handleShare}
+                      disabled={!selected || shareRoute.isSharing || !isOnline}
+                    >
+                      {t('loop.share')}
+                    </Button>
+                  </View>
+                </View>
+              </>
             ) : (
               <>
                 <Button
@@ -803,6 +959,8 @@ export default function LoopPlannerScreen() {
       ) : null}
 
 
+
+      {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
     </MapStageScreen>
   );
 }
@@ -923,6 +1081,13 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     footerCol: {
       gap: space[2],
+    },
+    secondaryRow: {
+      flexDirection: 'row',
+      gap: space[2],
+    },
+    secondaryCell: {
+      flex: 1,
     },
     searchRow: {
       flexDirection: 'row',

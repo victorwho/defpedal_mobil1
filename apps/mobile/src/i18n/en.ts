@@ -258,6 +258,8 @@ export const en = {
 
     sectionTitle: 'Loops',
     emptyLoops: 'No saved loops yet.',
+    share: 'Share loop',
+    saveLimit: 'Free riders can keep {{count}} saved routes and loops. Remove one to save this.',
     deleteLoop: 'Delete loop',
     driftNotice: 'This loop has changed since you saved it — now {{now}} km, was {{before}} km.',
   },
