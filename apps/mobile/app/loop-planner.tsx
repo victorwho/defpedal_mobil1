@@ -40,7 +40,6 @@ import { RouteMap } from '../src/components/map';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Button } from '../src/design-system/atoms/Button';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
-import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
@@ -51,6 +50,8 @@ import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
 import { useT } from '../src/hooks/useTranslation';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
+import { beginLoopRide } from '../src/lib/loop-ride';
+import { createClientTripId } from '../src/lib/offlineQueue';
 import { telemetry } from '../src/lib/telemetry';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAppStore } from '../src/store/appStore';
@@ -134,7 +135,6 @@ export default function LoopPlannerScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [relaxation, setRelaxation] = useState<string | null>(null);
   const [checked, setChecked] = useState(0);
-  const [toast, setToast] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(
@@ -309,16 +309,65 @@ export default function LoopPlannerScreen() {
           total: String(premium.limits.loopSessionsPerMonth ?? 0),
         });
 
+  // ── Start the ride ──────────────────────────────────────────────────────
+  // Mirrors `handleStartRide` in /course-import, which mirrors
+  // `beginNavigation` in /route-preview: navigation reads its route from
+  // `routePreview.routes`, so the loop has to be published there before the
+  // session starts.
+  //
+  // A loop's destination IS its origin, which is the one way this differs from
+  // every other route in the app. That is safe because completion is gated on
+  // `onLastStep` as well as physical proximity — being parked on the
+  // destination at kilometre zero is not enough to end the ride. The
+  // remaining-distance floor is likewise last-step-only, so the HUD counts the
+  // whole loop down rather than reading zero from the start.
+  //
+  // Auto-reroute is suppressed downstream by the route's own
+  // `source: 'generated_loop'` marker (see `isFixedLineRoute`). Without it,
+  // drifting off the line for 60 s would silently replace the rider's loop
+  // with an OSRM route home — which for a loop means ending the ride.
+  const rideStartedRef = useRef(false);
+
   const openSelected = useCallback(() => {
-    if (!selected) return;
-    telemetry.capture('loop_ride_started', {
-      km: Math.round(selected.distanceMeters / 1000),
-      climb: selected.climbMeters,
+    if (!selected || !start) return;
+
+    // Double-tap guard: a second tap before re-render would enqueue a
+    // duplicate trip_start with a fresh clientTripId, orphaning the first.
+    // (`beginLoopRide` guards the already-riding case; this guards the race.)
+    if (rideStartedRef.current) return;
+    rideStartedRef.current = true;
+
+    const outcome = beginLoopRide(useAppStore.getState(), {
+      route: selected.route,
+      start,
+      distanceMeters: selected.distanceMeters,
+      loopName: t('loop.nameFallback', { km: km(selected.distanceMeters) }),
+      startedAt: new Date().toISOString(),
+      sessionId:
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `session-${Date.now()}`,
+      clientTripId: createClientTripId(),
     });
-    // TODO(loop-preview): hand off to route-preview once the loop preview
-    // surface lands. Until then the rider reviews it here.
-    setToast(t('loop.savedAlready'));
-  }, [selected, t]);
+
+    if (outcome === 'started') {
+      telemetry.capture('loop_ride_started', {
+        km: Math.round(selected.distanceMeters / 1000),
+        climb: selected.climbMeters,
+      });
+      telemetry.capture('navigation_started', {
+        mode: 'loop',
+        route_id: selected.route.id,
+        route_source: selected.route.source,
+        relaxation: selected.relaxation,
+      });
+    } else {
+      // Already riding — the rider backed out of /navigation onto this screen.
+      rideStartedRef.current = false;
+    }
+
+    router.push('/navigation');
+  }, [selected, start, t]);
 
   // ── Render ──────────────────────────────────────────────────────────────
   const isSearching = search.kind === 'searching';
@@ -754,7 +803,6 @@ export default function LoopPlannerScreen() {
       ) : null}
 
 
-      {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
     </MapStageScreen>
   );
 }

@@ -103,7 +103,7 @@ export type WeatherNotice = {
   tone: 'good' | 'caution';
 };
 
-type AppStore = QueueSlice & PremiumSlice & {
+export type AppStore = QueueSlice & PremiumSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
   routeRequest: RoutePreviewRequest;
