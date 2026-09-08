@@ -1,0 +1,57 @@
+Defensive Pedal — Preview v0.2.151 (build 154)
+
+FIX: loops should stop arriving as "a loop plus detours".
+
+You said loops had out-and-back sections hanging off them — ride up a road, turn
+round, come back. You were right, and my last build caused it.
+
+Why it happened
+
+The app measured "how much of this loop is road you ride twice" as one number.
+Two completely different things landed in that number:
+
+- A DETOUR: up a road, turn round, back down it. This is the thing that makes a
+  loop stop feeling like one ride.
+- THE ROAD OUT OF TOWN: you leave on it and come home on it. Also road ridden
+  twice — but unavoidable in a valley, and it still feels like a loop.
+
+Last build I raised the limit on that single number, because at its old setting
+nothing could pass. That was the right call for the road-out-of-town case and
+the wrong one for detours: raising it let exactly the loops you're describing
+through.
+
+Measured at 30 km: Bucharest loops repeat 15-30% of themselves, but almost none
+of it is detours — it's all the shared way out. Around Rasnov the same range
+hides single detours of 6.0 km, 6.8 km and 4.0 km.
+
+What changed
+
+The app can now tell them apart. A detour ends in a U-turn, so the same stretch
+of road appears twice back-to-back. The road out of town is ridden twice at
+opposite ends of the ride and never back-to-back. That difference is exact.
+
+- Loops with more than 8% detour are rejected.
+- When ranking loops, detours now matter MORE than the total repeated road — so
+  a loop that shares the way out but never doubles back beats one that repeats
+  less overall but has a detour in it.
+- Where a result does contain one, the note now says it in kilometres:
+  "Includes 1.4 km of out-and-back detour". Turns at junctions and one-way pairs
+  under 200 m are ignored — that's just how roads work.
+
+What to check
+
+- Do loops read as ONE ride now? That's the whole point of this build.
+- Bucharest-style grid: should be clean.
+- Around Rasnov: EVERY loop I measured there has a detour above the limit, so
+  the app will still offer you the least bad one and label it. Please check
+  whether the least-detoured one now feels acceptable. If it doesn't, the answer
+  is probably a longer minimum distance rather than a stricter limit — the
+  terrain may simply not hold a detour-free 30 km loop.
+- If you see a loop labelled with a detour, look at it on the map. Does the
+  label match what you see? The detection is new and I want to know if it's
+  calling things wrong.
+
+Unchanged
+- Five results per search, all measured.
+- Saved loops sync to your account.
+- Scenic scoring still covers the Rasnov area only.
