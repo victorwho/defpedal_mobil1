@@ -1,0 +1,75 @@
+Defensive Pedal — Preview v0.2.149 (build 152)
+
+CHANGED: how loops are shown.
+
+1. The map is now the result
+
+Tap Find loops and the panel drops out of the way. The map re-centres on you,
+zoomed out far enough to see a loop of the size you asked for, and the loops
+draw on one at a time as each is found. The strip at the bottom keeps you posted
+("Finding loops… 3 of 10").
+
+The loops were always drawing in like that — it just happened behind a panel
+covering most of the screen, so nobody ever saw it.
+
+When the results are in, the panel rises to a NEW middle height: map on top,
+list below, both usable. Drag it up for the controls, down to get the map back.
+Tapping the handle now cycles through all three heights.
+
+2. The numbers on each loop are readable now
+
+Distance, time and climb were already on every result — squeezed into one small
+grey line, separated by dots, all the same size. Three different kinds of number
+looking identical reads as decoration, so the eye skips it. They are now three
+labelled figures, aligned so you can compare down the column.
+
+3. The time estimate is YOURS
+
+Every rider was being shown distance ÷ 15 km/h. Always. The code had a note
+saying it would use your riding history, but nothing ever did.
+
+It now uses the middle speed of your actual rides. Take a long coffee stop on
+one ride and it will barely move — that is why it uses the middle value rather
+than an average. Hills are counted too, so a climb-heavy loop is not quoted at
+flat-ground speed.
+
+Until you have three rides logged it still says 15 km/h — but now it SAYS so:
+"Est. time at 15 km/h". You should see this switch to your own pace once you
+have a few rides in.
+
+4. Tap a loop for surface and roads
+
+Tapping a result opens it in place (tap again to close) and shows:
+
+- Surface — a bar plus "78% paved / 22% unpaved". Always shown, including at
+  100% paved. Before, a fully-paved loop showed nothing at all, which looked
+  identical to "we didn't measure it".
+- Roads — how much of the loop is on busy roads, which is the thing that should
+  decide between two otherwise-similar loops.
+
+It says "unpaved", not "gravel", on purpose: the map data tells us a road is not
+paved, never what it is instead. Could be gravel, dirt, cobbles or a forest
+track.
+
+What to check
+
+- Run a search and watch the map — do the loops drawing in actually read as
+  something happening, or does it feel like the app went blank?
+- The middle height of the panel: right, too tall, too short?
+- Does the panel moving on its own feel helpful, or like the app grabbing the
+  wheel? This is the one I would most like your opinion on. If it is the latter,
+  I can make the auto-drop optional without unwinding the rest.
+- Your time estimate — does it look like your real pace? If you have fewer than
+  three rides logged it will still say "at 15 km/h".
+- Tap each of the five loops and check the surface split looks plausible for
+  where they go.
+
+Not included
+
+- Tapping a route line on the MAP still does nothing; selection is in the list,
+  as agreed. Two overlapping loops would have had no way to say which you meant.
+
+Unchanged
+- Five results per search, all measured.
+- Saved loops sync to your account.
+- Scenic scoring still covers the Rasnov area only.
