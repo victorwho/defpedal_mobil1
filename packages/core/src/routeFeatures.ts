@@ -247,12 +247,17 @@ const snapTargetToCumulative = (
 };
 
 /**
- * Tunnels and bridges: contiguous runs of `'tunnel'` / `'bridge'` in
- * `leg.annotation.classes`. Each run collapses into one feature whose
- * `lengthMeters` is the sum of per-edge distances in the run.
+ * Tunnels and bridges: contiguous runs of `'tunnel'` / `'bridge'` along the
+ * route, each collapsing into one feature so a tunnel is announced once rather
+ * than once per intersection inside it.
  *
- * Mapbox Directions doesn't populate `classes` on the cycling profile, so
- * this is effectively OSRM-only.
+ * Classes come from `steps[].intersections[].classes` via `routeClasses` — NOT
+ * from `leg.annotation`, which has no `classes` key and never had one. Reading
+ * the annotation is why no tunnel or bridge marker has ever appeared on a
+ * rider's map since this shipped.
+ *
+ * Mapbox Directions doesn't populate classes on the cycling profile, so this is
+ * effectively OSRM-only.
  */
 const extractZoneFeatures = (
   route: Route,

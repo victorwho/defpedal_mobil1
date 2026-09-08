@@ -655,13 +655,12 @@ export type SurfaceAnnotatedLeg = AnnotatedLeg;
 /**
  * Metres of a route on unpaved ways, and the metres we could classify at all.
  *
- * Free: `bicycle36.lua` sets `forward_classes['unpaved']`, so the class rides
- * along in `annotation.classes` on every request we already make with
- * `annotations=true` — the same array `routeFeatures` reads for tunnels and
- * bridges. No extra call, no rate-limit cost.
+ * Free: the profile sets `forward_classes['unpaved']`, so the class rides along
+ * on `steps[].intersections[].classes` — see `routeClasses`, which is the one
+ * reader now. No extra call, no rate-limit cost.
  *
  * `classifiedMeters` is returned rather than assumed equal to the route length
- * because a leg can arrive with no `classes` array at all (Mapbox never sends
+ * because a step can arrive with no intersections at all (Mapbox never sends
  * one). Reporting a share of a length we could not classify would understate
  * it and look like the preference did nothing.
  */

@@ -1,0 +1,68 @@
+Defensive Pedal — Preview v0.2.152 (build 155)
+
+FIX: the paved/unpaved numbers were wrong on every route, always.
+
+You reported loops with obvious offroad sections claiming to be 100% paved. They
+were — and so was every other route the app has ever measured.
+
+What was wrong
+
+The router reports which roads are unpaved. The app was looking for that
+information in the wrong place in the response — a field that does not exist and
+never has. So it found nothing, every time, and "nothing unpaved found" came out
+as "100% paved".
+
+The data was there the whole time. On a Rasnov route, 20 of 65 junctions are
+flagged unpaved.
+
+What the same routes report now
+
+  Rasnov -> Poiana Brasov    was 100% paved   ->  55% unpaved (7.5 km)
+  Rasnov -> Zarnesti         was 100% paved   ->  54% unpaved (12.2 km)
+  Rasnov -> Bran             was 100% paved   ->  45% unpaved (7.4 km)
+
+With "avoid unpaved" on, those same routes come back at 0-2% unpaved.
+
+Two more things this was breaking
+
+TUNNEL AND BRIDGE MARKERS HAVE NEVER WORKED. They read the same wrong field. The
+map markers, the warnings as you approach, and the icon set that ships with them
+have had nothing to draw since they were added. Unprotected left turns were the
+only part of that feature that ever worked. Now fixed too — if you ride through a
+tunnel or over a bridge, you should see it.
+
+The route composition breakdown was permanently empty for the same reason.
+
+And: "avoid unpaved" could be silently ignored
+
+The loop screen read your saved preference once, at the moment it opened. If the
+app hadn't finished loading your settings by then, it kept the default and quietly
+ignored it — the pill would show "Allow offroad" even though your saved setting
+said otherwise. It now follows your setting whenever it loads, and still lets you
+override it per search.
+
+What to check
+
+- Generate loops around Rasnov and look at the surface bar. Do the percentages
+  match what the map shows? THIS is the thing to check — the numbers are new and I
+  want to know if they read wrong.
+- Turn on "avoid unpaved" in Profile, then open the loop planner. The surface pill
+  should already be on "Paved only" without you touching it.
+- Ride or preview a route with a tunnel or a bridge. A marker should appear. It
+  never has before, so this is effectively a new feature.
+- If a loop still puts you on trails with "Paved only" selected, tell me — there's
+  one open question about which trail types the router counts as unpaved, and your
+  answer decides whether it's worth chasing.
+
+Not fixed, and honestly stated
+
+The router marks a way unpaved if it has an unpaved surface tag, or if it's a
+"track". A forest path mapped without any surface information may not be counted —
+so it would be neither excluded nor shown in the percentage. I could not verify
+this against the live routing profile from here. If you see trails on a "Paved
+only" route, that's the likely cause and it's a routing-server change, not an app
+one.
+
+Unchanged
+- Five results per search, detour detection, saved loops syncing to your account.
+- Scenic scoring still covers the Rasnov area only.
