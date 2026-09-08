@@ -19,7 +19,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, routeEdgeKeys, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -716,6 +716,14 @@ export interface LoopRouteResult {
   readonly ringRetracedShare: number;
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
+  /**
+   * The road stretches this loop uses, undirected.
+   *
+   * Carried so candidates can be compared by CONTENT. Route ids are minted
+   * from `Date.now()`, so two identical routes fetched a millisecond apart get
+   * different ids and an id-based comparison can never see they are the same.
+   */
+  readonly edgeKeys: readonly string[];
 }
 
 /**
@@ -812,6 +820,7 @@ export const fetchLoopRoute = async (
     retracedShare: retracedShare(raw.legs),
     ringRetracedShare: ringRetracedShare(raw.legs, options.stemLegs ?? 0),
     stemMeters: splitStemAndRing(raw.legs, options.stemLegs ?? 0).stemMeters,
+    edgeKeys: routeEdgeKeys(raw.legs),
   };
 };
 

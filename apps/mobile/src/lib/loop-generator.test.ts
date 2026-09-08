@@ -72,6 +72,7 @@ const alwaysRetracing = (share: number, distanceMeters = 15_000) => {
       retracedShare: share,
       ringRetracedShare: share,
       stemMeters: 0,
+      edgeKeys: [`e-${n}-a`, `e-${n}-b`],
     };
   });
 };
@@ -400,6 +401,7 @@ describe('the doubling-back cap', () => {
         retracedShare: 0,
         ringRetracedShare: 0,
         stemMeters: 0,
+        edgeKeys: [`e-${n}-a`, `e-${n}-b`],
         // Only the first candidate is under the cap.
         retracedShare: n === 1 ? 0.08 : 0.4,
         ringRetracedShare: n === 1 ? 0.08 : 0.4,
@@ -489,5 +491,79 @@ describe('how many loops the rider is offered', () => {
     // search still throws two rungs of rings and offers the best of them.
     // Narrowing generation to match the list would mean worse loops.
     expect(LOOP_CANDIDATE_COUNT * 2).toBeGreaterThan(LOOP_RESULTS_SHOWN);
+  });
+});
+
+describe('duplicate loops', () => {
+  it('REGRESSION: collapses identical routes that carry different ids', async () => {
+    // The exact field failure. `generateRouteId` mints ids from Date.now(), so
+    // two byte-identical routes fetched a millisecond apart get DIFFERENT ids
+    // — and the dedup filtered on id, so both were offered. A rider saw the
+    // same ride twice in a list of five.
+    let n = 0;
+    fetchLoopRoute.mockImplementation(async () => {
+      n += 1;
+      return {
+        route: routeOf(`custom_osrm-${1000 + n}-0`, 20_000),
+        coordinates: circleFor(20_000),
+        unpavedShare: 0,
+        retracedShare: 0,
+        ringRetracedShare: 0,
+        stemMeters: 0,
+        // Same roads every time — one ride, however many ids it wears.
+        edgeKeys: ['a', 'b', 'c', 'd'],
+      };
+    });
+    enrichRouteWithElevation.mockImplementation(async (r: RouteOption) => r);
+    enrichRouteWithRisk.mockImplementation(async (r: RouteOption) => r);
+    fetchRouteScenicScore.mockResolvedValue(0);
+
+    const outcome = await searchLoops({
+      start: START,
+      targetDistanceMeters: 20_000,
+      terrain: 'rolling',
+      surface: 'any',
+      heading: 'any',
+      locale: 'en',
+    });
+
+    expect(outcome.status).toBe('ok');
+    if (outcome.status !== 'ok') return;
+    expect(outcome.loops).toHaveLength(1);
+  });
+
+  it('keeps loops that merely share the way out of town', async () => {
+    // Two rides down the one road out of a valley are still two rides. The
+    // threshold is overlap, not "touched the same tarmac at all".
+    let n = 0;
+    fetchLoopRoute.mockImplementation(async () => {
+      n += 1;
+      return {
+        route: routeOf(`loop-${n}`, 20_000),
+        coordinates: circleFor(20_000),
+        unpavedShare: 0,
+        retracedShare: 0,
+        ringRetracedShare: 0,
+        stemMeters: 0,
+        // A shared two-edge corridor, then entirely different roads.
+        edgeKeys: ['stem-1', 'stem-2', `own-${n}-a`, `own-${n}-b`, `own-${n}-c`],
+      };
+    });
+    enrichRouteWithElevation.mockImplementation(async (r: RouteOption) => r);
+    enrichRouteWithRisk.mockImplementation(async (r: RouteOption) => r);
+    fetchRouteScenicScore.mockResolvedValue(0);
+
+    const outcome = await searchLoops({
+      start: START,
+      targetDistanceMeters: 20_000,
+      terrain: 'rolling',
+      surface: 'any',
+      heading: 'any',
+      locale: 'en',
+    });
+
+    expect(outcome.status).toBe('ok');
+    if (outcome.status !== 'ok') return;
+    expect(outcome.loops.length).toBeGreaterThan(1);
   });
 });

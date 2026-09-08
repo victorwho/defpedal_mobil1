@@ -39,6 +39,7 @@ import {
   isDegenerateLoop,
   isOutAndBack,
   LOOP_CANDIDATE_COUNT,
+  LOOP_DUPLICATE_OVERLAP,
   LOOP_RESULTS_SHOWN,
   loopBearings,
   matchesTerrain,
@@ -46,6 +47,7 @@ import {
   rankCandidates,
   LOLLIPOP_STEM_LEGS,
   lollipopWaypoints,
+  routeOverlapShare,
   ringWaypoints,
   ringWaypointCountFor,
   terrainAppliesAt,
@@ -194,6 +196,8 @@ export interface LoopSearchCallbacks {
 interface PooledLoop extends GeneratedLoop {
   /** Mutable during the search; frozen into `GeneratedLoop` on the way out. */
   readonly radiusMeters: number;
+  /** Road stretches used, for comparing candidates by content. Internal. */
+  readonly edgeKeys: readonly string[];
 }
 
 const aborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
@@ -286,6 +290,7 @@ const routeOneRing = async (
       highRiskMeters: 0,
       unpavedShare: result.unpavedShare,
       retracedShare: result.retracedShare,
+      edgeKeys: result.edgeKeys,
       scenicScore: 0,
       ringRetracedShare: result.ringRetracedShare,
       stemMeters: result.stemMeters,
@@ -402,7 +407,7 @@ const measureLoop = async (loop: PooledLoop): Promise<PooledLoop> => {
 // ---------------------------------------------------------------------------
 
 const strip = (loop: PooledLoop): GeneratedLoop => {
-  const { radiusMeters: _radiusMeters, ...rest } = loop;
+  const { radiusMeters: _radiusMeters, edgeKeys: _edgeKeys, ...rest } = loop;
   return rest;
 };
 
@@ -463,8 +468,23 @@ export const searchLoops = async (
       );
       attempted += 1;
       if (loop) {
-        pool.push(loop);
-        onCandidate?.(strip(loop));
+        // Reject a candidate that is the ride we already have. Neighbouring
+        // bearings routinely converge onto the same roads, and offering both
+        // spends one of five slots on a choice the rider cannot make.
+        //
+        // Compared by CONTENT, never by id: `generateRouteId` mints ids from
+        // `Date.now()`, so two byte-identical routes fetched a millisecond
+        // apart carry different ids and the id-based filter downstream could
+        // never match them. That is why duplicates reached the list.
+        const duplicate = pool.some(
+          (existing) =>
+            routeOverlapShare(existing.edgeKeys, loop.edgeKeys) >=
+            LOOP_DUPLICATE_OVERLAP,
+        );
+        if (!duplicate) {
+          pool.push(loop);
+          onCandidate?.(strip(loop));
+        }
       }
       onProgress?.(pool.length, attempted);
       return loop;

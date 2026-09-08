@@ -773,6 +773,60 @@ const routeEdges = (
 };
 
 /**
+ * The set of road stretches a route uses, as undirected edge keys.
+ *
+ * Undirected is the point: a loop and the same loop ridden the other way round
+ * share every key, so they compare as identical — which is what a rider means
+ * by "that is the same route".
+ */
+export const routeEdgeKeys = (legs: readonly AnnotatedLeg[]): string[] => [
+  ...new Set(routeEdges(legs).map((edge) => edge.key)),
+];
+
+/**
+ * How much of two routes is the same road, in [0, 1].
+ *
+ * Jaccard over the undirected edge sets: shared stretches over the union, so a
+ * pair that merely leaves town together scores low while a pair that differs
+ * only in a slip road scores high.
+ */
+export const routeOverlapShare = (
+  a: readonly string[] | undefined,
+  b: readonly string[] | undefined,
+): number => {
+  // An unmeasurable route must not be treated as a duplicate of anything: a
+  // route whose annotations are missing would otherwise silently suppress
+  // every candidate after it.
+  if (!Array.isArray(a) || !Array.isArray(b)) return 0;
+  if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
+  let shared = 0;
+  const seen = new Set<string>();
+  for (const key of b) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (setA.has(key)) shared += 1;
+  }
+  const union = setA.size + seen.size - shared;
+  return union <= 0 ? 0 : shared / union;
+};
+
+/**
+ * Above this, two loops are the same ride and only one is worth offering.
+ *
+ * Four fifths rather than exact equality, because two candidates thrown at
+ * neighbouring bearings routinely converge onto the same roads and differ only
+ * in which side street they use to leave. Offering both spends one of five
+ * slots on a choice the rider cannot make.
+ *
+ * Exact equality would not have been enough anyway: route ids are minted from
+ * `Date.now()`, so two byte-identical routes fetched a millisecond apart carry
+ * different ids, and the id-based dedup they were subjected to could never
+ * match. Content is the only honest identity here.
+ */
+export const LOOP_DUPLICATE_OVERLAP = 0.8;
+
+/**
  * Split a route into the out-and-back stem that reaches the riding, and the
  * loop at the far end.
  *

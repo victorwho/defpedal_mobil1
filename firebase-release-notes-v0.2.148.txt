@@ -1,0 +1,40 @@
+Defensive Pedal — Preview v0.2.148 (build 151)
+
+FIX: five loops per search, not ten — and all five measured.
+
+You were getting ten. Three places disagreed about how many to show, and the
+one whose comment said it was in charge wasn't being used: the constant read
+"Loops shown at once = 3", but the list had its own hardcoded cap of 12, and
+results streaming in bypassed the constant entirely. The search runs two rounds
+that each produce five candidates, so ten arrived and ten were shown.
+
+The worse half of that bug: only three of the ten were ever measured. The other
+seven showed a dash where the climb figure should be. Ten rows you can't
+compare isn't ten choices.
+
+Now: five loops, each with real climb and risk.
+
+What did NOT change, on purpose
+
+The search still generates ten candidates behind the scenes and offers you the
+best five. Finding a loop that doesn't double back on itself depends heavily on
+which direction and shape it tries — around Rasnov, whether ANY candidate
+qualifies comes down to that. Generating five instead of ten would give you a
+shorter list of worse loops, not the same loops sooner.
+
+So this is a clutter fix, not a speed fix. Search takes about as long as before.
+If the WAIT was the problem rather than the list length, say so and I'll halve
+the generation too — that's a real trade (fewer, worse loops, roughly half the
+wait) and it should be your call, not mine.
+
+What to try
+
+- Run a search. Count the results: five.
+- Check every row has a climb figure and a time, not a dash.
+- The top one should still be the best pick — ordering is unchanged.
+
+Unchanged from 150
+- Saved loops sync to your account; saving needs a connection, opening a saved
+  loop works offline on the phone that saved it.
+- Loops saved on build 149 were device-only and won't appear.
+- Scenic scoring still covers the Rasnov area only.
