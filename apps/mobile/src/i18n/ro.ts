@@ -266,6 +266,7 @@ export const ro: TranslationKeys = {
     roadsBusy: '{{distance}} km pe drumuri aglomerate',
     roadsNoneBusy: 'Fără drumuri aglomerate',
     surfaceSplit: '{{paved}}% asfalt / {{unpaved}}% neasfaltat',
+    spurNote: 'Include {{km}} km de ocol dus-întors',
     deleteLoop: 'Șterge turul',
     driftNotice: 'Turul s-a schimbat de când l-ai salvat — acum {{now}} km, era {{before}} km.',
   },

@@ -19,7 +19,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, routeEdgeKeys, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -717,6 +717,12 @@ export interface LoopRouteResult {
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
   /**
+   * Fraction of the loop on out-and-back spurs — detours hanging off the ride,
+   * as distinct from the shared corridor out of town. Free: read off the same
+   * annotation nodes the retrace figures use.
+   */
+  readonly spurShare: number;
+  /**
    * The road stretches this loop uses, undirected.
    *
    * Carried so candidates can be compared by CONTENT. Route ids are minted
@@ -821,6 +827,7 @@ export const fetchLoopRoute = async (
     ringRetracedShare: ringRetracedShare(raw.legs, options.stemLegs ?? 0),
     stemMeters: splitStemAndRing(raw.legs, options.stemLegs ?? 0).stemMeters,
     edgeKeys: routeEdgeKeys(raw.legs),
+    spurShare: spurShare(raw.legs, options.stemLegs ?? 0),
   };
 };
 

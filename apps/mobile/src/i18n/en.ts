@@ -266,6 +266,7 @@ export const en = {
     roadsBusy: '{{distance}} km on busy roads',
     roadsNoneBusy: 'No busy roads',
     surfaceSplit: '{{paved}}% paved / {{unpaved}}% unpaved',
+    spurNote: 'Includes {{km}} km of out-and-back detour',
     deleteLoop: 'Delete loop',
     driftNotice: 'This loop has changed since you saved it — now {{now}} km, was {{before}} km.',
   },

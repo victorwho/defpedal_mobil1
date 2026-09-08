@@ -19,6 +19,7 @@ import {
   rideMinutes,
   riderPace,
   MAX_RETRACE_SHARE,
+  SPUR_RANKING_DEADBAND,
   LOOP_DISTANCE_STEPS_METERS,
   loopSessionPeriodKey,
   loopSessionRemainingMs,
@@ -234,6 +235,7 @@ export default function LoopPlannerScreen() {
           unpavedShare: 0,
           retracedShare: 0,
           ringRetracedShare: 0,
+          spurShare: 0,
           stemMeters: 0,
           scenicScore: 0,
           relaxation: 'none',
@@ -1130,7 +1132,20 @@ export default function LoopPlannerScreen() {
                     A note only when it genuinely doubles back — a few shared
                     metres through the starting junction is not worth saying.
                   */}
-                  {loop.retracedShare >= MAX_RETRACE_SHARE ? (
+                  {/*
+                    Two different complaints, and the rider only feels one of
+                    them. A spur is a detour bolted onto the ride and is worth
+                    naming in kilometres; a high aggregate is usually the one
+                    road out of a valley, which reads as a loop and only needs
+                    saying when it is severe.
+                  */}
+                  {loop.spurShare > SPUR_RANKING_DEADBAND ? (
+                    <Text style={styles.loopWarn}>
+                      {t('loop.spurNote', {
+                        km: km(loop.spurShare * loop.distanceMeters),
+                      })}
+                    </Text>
+                  ) : loop.retracedShare >= MAX_RETRACE_SHARE ? (
                     <Text style={styles.loopWarn}>
                       {t('loop.retraced', {
                         percent: String(Math.round(loop.retracedShare * 100)),

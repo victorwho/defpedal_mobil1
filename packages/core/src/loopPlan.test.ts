@@ -42,6 +42,12 @@ import {
   terrainDistance,
   excludesUnpaved,
   MAX_RETRACE_SHARE,
+  MAX_SPUR_SHARE,
+  MIN_SPUR_METERS,
+  spurMeters,
+  spurShare,
+  withinSpurCap,
+  SPUR_RANKING_DEADBAND,
   retraceAppliesAt,
   withinRetraceCap,
   prefersUnpaved,
@@ -73,6 +79,7 @@ const candidate = (over: Partial<LoopCandidate> = {}): LoopCandidate => ({
   unpavedShare: 0,
   retracedShare: 0,
   ringRetracedShare: 0,
+  spurShare: 0,
   stemMeters: 0,
   scenicScore: 0,
   relaxation: 'none',
@@ -1207,5 +1214,109 @@ describe('sizing model', () => {
       expect(Number.isFinite(w.lat)).toBe(true);
       expect(Number.isFinite(w.lon)).toBe(true);
     }
+  });
+});
+
+describe('spurs versus a shared corridor', () => {
+  const leg = (nodes: number[], m = 100) => ({
+    annotation: { nodes, distance: new Array(Math.max(0, nodes.length - 1)).fill(m) },
+  });
+
+  it('finds an out-and-back detour hanging off the loop', () => {
+    // Ride 1-2-3, turn round at 3, back to 2, then on round the loop. The
+    // U-turn makes edge 2-3 appear twice in a row.
+    const legs = [leg([1, 2, 3, 2, 4, 5, 6, 1], 300)];
+    expect(spurMeters(legs)).toBeGreaterThan(0);
+    expect(spurShare(legs)).toBeGreaterThan(0);
+  });
+
+  it('does NOT count the one road out of a valley as a detour', () => {
+    // Leave on 1-2-3, loop round 3-4-5-6-3, come home on 3-2-1. Every edge of
+    // the corridor is ridden twice — but at opposite ends of the ride, never
+    // adjacent, so it is not a detour and still reads as a loop.
+    const legs = [leg([1, 2, 3, 4, 5, 6, 3, 2, 1], 300)];
+    expect(spurMeters(legs)).toBe(0);
+    // The aggregate figure DOES see it, which is the whole point of having
+    // both: they are different complaints.
+    expect(retracedShare(legs)).toBeGreaterThan(0);
+  });
+
+  it('ignores a U-turn too short to be a detour', () => {
+    // 40 m out and back at a junction is how roads work, not an excursion.
+    const legs = [leg([1, 2, 3, 2, 4, 5, 1], 20)];
+    expect(spurMeters(legs)).toBe(0);
+    expect(MIN_SPUR_METERS).toBe(200);
+  });
+
+  it('measures the whole mirrored excursion, not just the turnaround', () => {
+    // Out along 1-2-3-4, turn at 4, back 4-3-2-1: all four edges mirror.
+    const legs = [leg([9, 1, 2, 3, 4, 3, 2, 1, 9], 400)];
+    // Six mirrored edges at 400 m plus the pair either side.
+    expect(spurMeters(legs)).toBeGreaterThan(1_500);
+  });
+
+  it('excludes a lollipop’s approach, like the retrace figures do', () => {
+    const lollipop = [leg([1, 2, 3], 300), leg([3, 4, 5, 3], 300), leg([3, 2, 1], 300)];
+    expect(spurMeters(lollipop, LOLLIPOP_STEM_LEGS)).toBe(0);
+  });
+
+  it('does not divide by zero on an empty route', () => {
+    expect(spurMeters([])).toBe(0);
+    expect(spurShare([])).toBe(0);
+  });
+});
+
+describe('the spur cap', () => {
+  const at = (share: number) => candidate({ spurShare: share });
+
+  it('accepts a loop whose detours are negligible', () => {
+    // Measured: loops that read as one ride cluster at 0.00-0.03.
+    expect(withinSpurCap(at(0), 'none')).toBe(true);
+    expect(withinSpurCap(at(0.03), 'none')).toBe(true);
+    expect(withinSpurCap(at(MAX_SPUR_SHARE), 'none')).toBe(true);
+  });
+
+  it('rejects a loop that is a loop plus errands', () => {
+    // Measured: 0.15-0.34 around Rasnov, with individual spurs of 4-7 km.
+    expect(withinSpurCap(at(0.15), 'none')).toBe(false);
+    expect(withinSpurCap(at(0.34), 'none')).toBe(false);
+  });
+
+  it('bends only at the last rung, like the doubling-back cap', () => {
+    expect(withinSpurCap(at(0.5), 'retrace')).toBe(true);
+    expect(withinSpurCap(at(0.5), 'terrain')).toBe(false);
+  });
+
+  it('passes an unmeasurable loop rather than guessing against it', () => {
+    expect(withinSpurCap({ spurShare: Number.NaN }, 'none')).toBe(true);
+  });
+});
+
+describe('ranking prefers one ride over a ride plus errands', () => {
+  const req = { targetDistanceMeters: 15_000, terrain: 'rolling' as const };
+
+  it('puts a spur-free loop above one with detours, even if it repeats more', () => {
+    // The two are different complaints. A loop that repeats a third of itself
+    // on the one road out of a valley still reads as a loop; one with two
+    // kilometres of spur does not, whatever its aggregate says.
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'detours', spurShare: 0.15, ringRetracedShare: 0.15 }),
+        candidate({ id: 'one-ride', spurShare: 0.0, ringRetracedShare: 0.3 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('one-ride');
+  });
+
+  it('still ranks below safety', () => {
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'clean-but-busy', spurShare: 0, highRiskMeters: 3_000 }),
+        candidate({ id: 'quiet-with-spur', spurShare: 0.2, highRiskMeters: 0 }),
+      ],
+      req,
+    );
+    expect(ranked[0]!.id).toBe('quiet-with-spur');
   });
 });

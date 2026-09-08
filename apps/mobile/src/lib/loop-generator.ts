@@ -52,6 +52,7 @@ import {
   ringWaypointCountFor,
   terrainAppliesAt,
   withinRetraceCap,
+  withinSpurCap,
   withinDistanceTolerance,
   type Coordinate,
   type LoopHeading,
@@ -148,6 +149,12 @@ export interface GeneratedLoop {
   readonly retracedShare: number;
   /** Doubling back inside the loop only — what the cap tests. */
   readonly ringRetracedShare: number;
+  /**
+   * Fraction of the loop on out-and-back spurs. Distinct from the figure
+   * above: this is the detour hanging off the ride, which is what a rider
+   * means by "a loop plus detours".
+   */
+  readonly spurShare: number;
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
   /**
@@ -302,6 +309,7 @@ const routeOneRing = async (
       edgeKeys: result.edgeKeys,
       scenicScore: 0,
       ringRetracedShare: result.ringRetracedShare,
+      spurShare: result.spurShare,
       stemMeters: result.stemMeters,
       relaxation,
       terrain: null,
@@ -571,7 +579,8 @@ export const searchLoops = async (
             loop,
             request.targetDistanceMeters,
             'distance',
-          ) && withinRetraceCap(loop, 'distance'),
+          ) && withinRetraceCap(loop, 'distance') &&
+          withinSpurCap(loop, 'distance'),
       );
       if (rescued.length > 0) {
         const finalists = rankCandidates(rescued, request).slice(
@@ -596,7 +605,8 @@ export const searchLoops = async (
     const viable = currentPool().filter(
       (loop) =>
         withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
-        withinRetraceCap(loop, relaxation),
+        withinRetraceCap(loop, relaxation) &&
+        withinSpurCap(loop, relaxation),
     );
     if (viable.length === 0) continue;
 
@@ -628,6 +638,7 @@ export const searchLoops = async (
       (loop) =>
         withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
         withinRetraceCap(loop, relaxation) &&
+        withinSpurCap(loop, relaxation) &&
         matchesTerrain(loop, request.terrain),
     );
 

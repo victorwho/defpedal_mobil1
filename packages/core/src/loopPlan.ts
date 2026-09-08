@@ -890,15 +890,25 @@ export const LOOP_DUPLICATE_OVERLAP = 0.8;
  * loop. `ringMeters` is 0 and `ringRetracedShare` reports 1 rather than
  * dividing by zero, so it fails the cap. That is correct: it is not a loop.
  */
+/** The edges of the loop proper, with any deliberate approach removed. */
+const ringEdges = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs: number,
+): { key: string; meters: number }[] => {
+  const perLeg = legs.map((leg) => routeEdges([leg]));
+  const stem = Math.max(0, Math.floor(stemLegs));
+  // Not enough legs to have both a stem and a ring: treat it all as ring, so
+  // an unexpected shape is judged on its whole self rather than waved through.
+  const splittable = stem > 0 && perLeg.length > 2 * stem;
+  return (splittable ? perLeg.slice(stem, perLeg.length - stem) : perLeg).flat();
+};
+
 export const splitStemAndRing = (
   legs: readonly AnnotatedLeg[],
   stemLegs = 0,
 ): StemAndRing => {
   const perLeg = legs.map((leg) => routeEdges([leg]));
   const stem = Math.max(0, Math.floor(stemLegs));
-
-  // Not enough legs to have both a stem and a ring: treat it all as ring, so
-  // an unexpected shape is judged on its whole self rather than waved through.
   const splittable = stem > 0 && perLeg.length > 2 * stem;
 
   let stemMeters = 0;
@@ -911,9 +921,7 @@ export const splitStemAndRing = (
     }
   }
 
-  const ring = (
-    splittable ? perLeg.slice(stem, perLeg.length - stem) : perLeg
-  ).flat();
+  const ring = ringEdges(legs, stemLegs);
 
   const lengthByEdge = new Map<string, number>();
   const countByEdge = new Map<string, number>();
@@ -931,6 +939,100 @@ export const splitStemAndRing = (
 
   return { stemMeters, ringMeters, ringRetracedMeters };
 };
+
+/**
+ * The shortest out-and-back worth calling a detour.
+ *
+ * A U-turn at a junction, a one-way pair, a few metres round a bollard — these
+ * are how roads work, not excursions anyone notices. Measured in three cities,
+ * ignoring anything under 200 m takes a dense-grid loop from 0.02-0.04 to
+ * 0.00-0.03 while leaving the multi-kilometre spurs untouched.
+ */
+export const MIN_SPUR_METERS = 200;
+
+/**
+ * Metres spent on out-and-back SPURS: excursions that hang off the loop.
+ *
+ * This is a different complaint from `ringRetracedShare`, and the difference
+ * is what a rider actually feels. Both count road ridden twice, but:
+ *
+ *   A SPUR is "ride up there, turn round, come back" — a detour bolted onto
+ *   the ride. It is what makes a loop feel like a loop plus errands.
+ *
+ *   A shared CORRIDOR is leaving town on the one road out and returning on it
+ *   at the end. Also road ridden twice, structurally unavoidable in a valley,
+ *   and it still feels like a loop.
+ *
+ * The aggregate figure cannot tell them apart, which is why loops with several
+ * kilometres of spur passed a cap set on the aggregate. Measured at 30 km:
+ * Bucharest rings retrace 0.15-0.30 but spur 0.00-0.03 — all corridor. Around
+ * Rasnov the same aggregate range hides spurs of 6.0 km, 6.8 km and 4.0 km.
+ *
+ * A spur has a signature the corridor does not: it ends in a U-TURN, so the
+ * same edge appears twice in a row, with the edges on either side mirroring
+ * outward from that point. A corridor's two passes sit at opposite ends of the
+ * ride and are never adjacent. Matching the mirror is exact and needs no
+ * geometry or threshold.
+ */
+export const spurMeters = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): number => {
+  const edges = ringEdges(legs, stemLegs);
+  const n = edges.length;
+  const covered = new Array<boolean>(n).fill(false);
+  let total = 0;
+  let index = 0;
+
+  while (index < n - 1) {
+    if (edges[index]!.key === edges[index + 1]!.key && !covered[index]) {
+      let lo = index;
+      let hi = index + 1;
+      // Expand outward while the ride keeps mirroring itself.
+      while (lo - 1 >= 0 && hi + 1 < n && edges[lo - 1]!.key === edges[hi + 1]!.key) {
+        lo -= 1;
+        hi += 1;
+      }
+      let meters = 0;
+      for (let i = lo; i <= hi; i += 1) {
+        meters += edges[i]!.meters;
+        covered[i] = true;
+      }
+      if (meters >= MIN_SPUR_METERS) total += meters;
+      index = hi + 1;
+    } else {
+      index += 1;
+    }
+  }
+
+  return total;
+};
+
+/** Fraction of the loop spent on out-and-back spurs, in [0, 1]. */
+export const spurShare = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): number => {
+  const edges = ringEdges(legs, stemLegs);
+  const total = edges.reduce((sum, edge) => sum + edge.meters, 0);
+  if (total <= 0) return 0;
+  return Math.min(1, Math.max(0, spurMeters(legs, stemLegs) / total));
+};
+
+/**
+ * The most of a loop that may be out-and-back spur and still be offered.
+ *
+ * Measured: loops that read as one ride cluster at 0.00-0.03, loops that read
+ * as a loop plus errands at 0.15-0.34, and nothing observed lands between 0.03
+ * and 0.15. 0.08 sits in that gap — comfortably above the clean cluster and
+ * well below the unpleasant one.
+ *
+ * Enforced at every rung of the ladder except the last, exactly like the
+ * doubling-back cap: in terrain where every loop has a spur the rider still
+ * gets something rideable, and the ranking then hands them the least spurry
+ * one rather than an arbitrary one.
+ */
+export const MAX_SPUR_SHARE = 0.08;
 
 /**
  * Doubling back WITHIN the loop, ignoring the approach the rider asked for.
@@ -985,6 +1087,21 @@ export const ringRetracedShare = (
  */
 export const MAX_RETRACE_SHARE = 0.35;
 
+/**
+ * Does this loop keep its out-and-back detours under the cap?
+ *
+ * Same rung semantics as the doubling-back cap, and the same defensive shape:
+ * an unmeasurable loop passes rather than being penalised on a guess.
+ */
+export const withinSpurCap = (
+  candidate: Pick<LoopCandidate, 'spurShare'>,
+  relaxation: LoopRelaxation,
+): boolean => {
+  if (!retraceAppliesAt(relaxation)) return true;
+  if (!Number.isFinite(candidate.spurShare)) return true;
+  return candidate.spurShare <= MAX_SPUR_SHARE;
+};
+
 // ---------------------------------------------------------------------------
 // Candidates
 // ---------------------------------------------------------------------------
@@ -1020,6 +1137,12 @@ export interface LoopCandidate {
   readonly ringRetracedShare: number;
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
+  /**
+   * Fraction of the loop spent on out-and-back SPURS — detours that hang off
+   * the ride, as distinct from the shared corridor out of town. This is the
+   * one a rider feels as "a loop plus errands".
+   */
+  readonly spurShare: number;
   /**
    * Length-weighted mean scenic score of the loop, in [-1, 1].
    *
@@ -1098,6 +1221,13 @@ export const scoredMeters = (riskSegments: readonly RiskSegment[]): number =>
  * the ranking off. Still wide enough that a shared starting junction does not
  * reorder anything.
  */
+/**
+ * Below this, two loops have the same amount of detour and something else
+ * should decide. Tighter than the retrace deadband because a spur is a
+ * discrete thing the rider will see on the map, not a diffuse overlap.
+ */
+export const SPUR_RANKING_DEADBAND = 0.01;
+
 export const RETRACE_RANKING_DEADBAND = 0.03;
 
 /**
@@ -1145,6 +1275,15 @@ export const rankCandidates = <T extends LoopCandidate>(
     // here and scenic never gets a vote.
     const safetyGap = a.highRiskMeters - b.highRiskMeters;
     if (Math.abs(safetyGap) > SCENIC_SAFETY_TOLERANCE_METERS) return safetyGap;
+
+    // An out-and-back detour hanging off the ride is the thing riders name
+    // unprompted — "a loop plus detours" — so it is settled before the
+    // aggregate figure. The two are not the same complaint: a loop can repeat
+    // a third of itself on the one road out of a valley and still read as one
+    // ride, while a loop with two kilometres of spur does not, whatever its
+    // aggregate says.
+    const spurGap = a.spurShare - b.spurShare;
+    if (Math.abs(spurGap) > SPUR_RANKING_DEADBAND) return spurGap;
 
     // Coming back a different way is not a taste, it is what makes a loop a
     // loop — so this outranks the optional preferences and sits directly under
