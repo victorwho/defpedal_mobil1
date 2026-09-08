@@ -137,6 +137,20 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
   ordinary reroute asks for the shortest way *home* and silently deletes the
   rest of the ride. `loopStorage` refuses to load a saved loop whose marker is
   missing rather than ride it unprotected.
+- ⏳ **The `unpaved` class is being WIDENED server-side, and is not live yet.**
+  OSRM_Server `090c226` adds `highway=path` and `bridleway` without a paved
+  surface tag (`footway` deliberately excluded — untagged urban footways are
+  usually paved sidewalks). Classes are baked at graph-extract time, so nothing
+  changes until the next graph rebuild, which has no date. **Detect it with
+  `node scripts/probe-unpaved-widening.mjs`** — Brasov→Rasnov jumps from ~16%
+  to ~66% of metres classed unpaved. Measured 2026-09-08: 15.7%, still old.
+  No parsing change is needed; `routeClasses` is already correct. What DOES
+  change: unpaved percentages jump in trail-heavy regions (the number becoming
+  honest, not routes changing), and `exclude=unpaved` gets much stronger, so
+  `NoRoute` stops being exotic — both routing paths now retry once without the
+  constraint and flag it (`PAVED_FALLBACK_WARNING`, `loop.noPavedLoop`) rather
+  than failing through to Mapbox fast routing, which used to lose the safety
+  profile AND the surface filter silently.
 - **Never derive two behaviours from one expression.** Ring shape and the
   ring/lollipop choice both came off `slot % 2`, so every lollipop was a hexagon
   and half the search space was never built. Shape now steps every second slot;

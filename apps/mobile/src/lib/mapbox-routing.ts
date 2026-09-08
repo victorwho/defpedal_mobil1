@@ -183,6 +183,38 @@ const buildCoordString = (
  */
 class OsrmOutOfCoverageError extends Error {}
 
+/**
+ * OSRM's answer when no route exists under the constraints given.
+ *
+ * Worth naming: with `exclude=unpaved` this is a normal outcome in remote
+ * terrain rather than a fault, and it has to be told apart from the network
+ * and coverage failures around it.
+ */
+const isNoRoute = (code: string | undefined): boolean =>
+  code === 'NoRoute' || code === 'NoSegment';
+
+/**
+ * Marks a route that had to drop the rider's "avoid unpaved" request.
+ *
+ * A warning code rather than a sentence: the string crosses into the UI, which
+ * localises it. Rendering English from here would be the one place in the app
+ * that does.
+ */
+export const PAVED_FALLBACK_WARNING = 'no_paved_route';
+
+export interface OsrmRouteFetch {
+  readonly routes: Route[];
+  /**
+   * True when `exclude=unpaved` was asked for and had to be dropped because
+   * nothing paved connects these points.
+   *
+   * The alternative was worse in both directions: the throw fell through to
+   * Mapbox fast routing, so a rider asking for a SAFE, PAVED route silently
+   * got one that was neither.
+   */
+  readonly pavedFallback: boolean;
+}
+
 const fetchOsrmRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
@@ -190,7 +222,7 @@ const fetchOsrmRoutes = async (
   avoidHills: boolean,
   avoidHeat: boolean,
   waypoints?: readonly Coordinate[],
-): Promise<Route[]> => {
+): Promise<OsrmRouteFetch> => {
   const coords = buildCoordString(origin, destination, waypoints);
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
@@ -215,6 +247,20 @@ const fetchOsrmRoutes = async (
   const data = (await response.json()) as RouteResponse;
 
   if (data.code !== 'Ok' || !data.routes?.length) {
+    // Nothing paved connects these points. Ask again without the constraint
+    // and say so, rather than failing into a route that is neither safe nor
+    // paved. Retried once only — a second NoRoute is a real failure.
+    if (avoidUnpaved && isNoRoute(data.code)) {
+      const relaxed = await fetchOsrmRoutes(
+        origin,
+        destination,
+        false,
+        avoidHills,
+        avoidHeat,
+        waypoints,
+      );
+      return { routes: relaxed.routes, pavedFallback: true };
+    }
     throw new Error(`OSRM returned no routes (code: ${data.code})`);
   }
 
@@ -231,7 +277,7 @@ const fetchOsrmRoutes = async (
     );
   }
 
-  return routable;
+  return { routes: routable, pavedFallback: false };
 };
 
 // ---------------------------------------------------------------------------
@@ -486,9 +532,10 @@ export const directPreviewRoute = async (
     isHeatRoutingAvailable(support.country);
 
   let rawRoutes: Route[];
+  let pavedFallback = false;
   if (effectiveMode === 'safe' && support.supported) {
     try {
-      rawRoutes = await fetchOsrmRoutes(
+      const fetched = await fetchOsrmRoutes(
         origin,
         destination,
         request.avoidUnpaved,
@@ -496,6 +543,8 @@ export const directPreviewRoute = async (
         effectiveAvoidHeat,
         waypoints,
       );
+      rawRoutes = fetched.routes;
+      pavedFallback = fetched.pavedFallback;
     } catch (error) {
       if (!(error instanceof OsrmOutOfCoverageError)) throw error;
       effectiveMode = 'fast';
@@ -511,9 +560,15 @@ export const directPreviewRoute = async (
   const source: 'custom_osrm' | 'mapbox' =
     effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
 
-  const routes: RouteOption[] = rawRoutes.map((route, index) =>
-    mapRoute(route, source, index, locale),
-  );
+  const routes: RouteOption[] = rawRoutes.map((route, index) => {
+    const mapped = mapRoute(route, source, index, locale);
+    // The rider asked to avoid unpaved and we could not honour it. Say so on
+    // the route itself rather than handing back something that quietly is not
+    // what was asked for.
+    return pavedFallback
+      ? { ...mapped, warnings: [...mapped.warnings, PAVED_FALLBACK_WARNING] }
+      : mapped;
+  });
 
   // Enrich all routes with elevation data in parallel (non-blocking)
   const elevationEnriched = await Promise.all(
@@ -579,14 +634,16 @@ export const directPreviewRoute = async (
         }
       } else {
         // Fetch safe route for comparison — guarded by support.supported above
-        const safeRawRoutes = await fetchOsrmRoutes(
-          origin,
-          destination,
-          request.avoidUnpaved,
-          request.avoidHills,
-          effectiveAvoidHeat,
-          waypoints,
-        );
+        const safeRawRoutes = (
+          await fetchOsrmRoutes(
+            origin,
+            destination,
+            request.avoidUnpaved,
+            request.avoidHills,
+            effectiveAvoidHeat,
+            waypoints,
+          )
+        ).routes;
         if (safeRawRoutes.length > 0) {
           const safeRoute = mapRoute(safeRawRoutes[0], 'custom_osrm', 0, locale);
           const safeEnriched = await enrichRouteWithRisk(safeRoute, safeRawRoutes[0].geometry.coordinates);
@@ -714,6 +771,11 @@ export interface LoopRouteResult {
   readonly retracedShare: number;
   /** Doubling back inside the loop only, ignoring a deliberate stem. */
   readonly ringRetracedShare: number;
+  /**
+   * True when the rider asked for paved only and no paved loop exists here, so
+   * the constraint was dropped to return something at all.
+   */
+  readonly pavedFallback: boolean;
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
   /**
@@ -772,6 +834,8 @@ export const fetchLoopRoute = async (
      * `splitStemAndRing`.
      */
     readonly stemLegs?: number;
+    /** Internal: set when this call is the relaxed retry. Not for callers. */
+    readonly pavedFallback?: boolean;
     readonly signal?: AbortSignal;
   },
 ): Promise<LoopRouteResult> => {
@@ -799,6 +863,17 @@ export const fetchLoopRoute = async (
   const data = (await response.json()) as RouteResponse;
 
   if (data.code !== 'Ok' || !data.routes?.length) {
+    // Same fallback as the point-to-point path, and it matters more here: a
+    // failed candidate is silently dropped by `routeOneRing`, so without this
+    // a paved-only search in trail country would report "no loops found" and
+    // blame the search rather than the constraint.
+    if (excludesUnpaved(options.surface) && isNoRoute(data.code)) {
+      return fetchLoopRoute(start, waypoints, {
+        ...options,
+        surface: 'any',
+        pavedFallback: true,
+      });
+    }
     throw new Error(`OSRM returned no loop (code: ${data.code})`);
   }
 
@@ -828,6 +903,7 @@ export const fetchLoopRoute = async (
     stemMeters: splitStemAndRing(raw.legs, options.stemLegs ?? 0).stemMeters,
     edgeKeys: routeEdgeKeys(raw.legs),
     spurShare: spurShare(raw.legs, options.stemLegs ?? 0),
+    pavedFallback: options.pavedFallback ?? false,
   };
 };
 

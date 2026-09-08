@@ -155,6 +155,8 @@ export interface GeneratedLoop {
    * means by "a loop plus detours".
    */
   readonly spurShare: number;
+  /** True when no paved loop exists here and the constraint had to be dropped. */
+  readonly pavedFallback: boolean;
   /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
   readonly stemMeters: number;
   /**
@@ -310,6 +312,7 @@ const routeOneRing = async (
       scenicScore: 0,
       ringRetracedShare: result.ringRetracedShare,
       spurShare: result.spurShare,
+      pavedFallback: result.pavedFallback,
       stemMeters: result.stemMeters,
       relaxation,
       terrain: null,

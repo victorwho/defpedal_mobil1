@@ -883,3 +883,89 @@ describe('directReroute', () => {
     expect(result.selectedMode).toBe('safe');
   });
 });
+
+describe('no paved route exists', () => {
+  /**
+   * OSRM_Server commit 090c226 widens the `unpaved` class to cover
+   * `highway=path` and `bridleway` without a paved surface tag. Measured on
+   * their side, 30.2% of route metres around Rasnov sit on exactly those ways,
+   * so `exclude=unpaved` becomes far stronger and NoRoute stops being exotic.
+   *
+   * The behaviour before this: the throw fell through to Mapbox fast routing,
+   * so a rider asking for a SAFE, PAVED route silently got one that was
+   * neither — no safety profile and no surface filter, with nothing said.
+   */
+  it('retries without the constraint rather than failing', async () => {
+    setupFetchMock([
+      { data: { code: 'NoRoute', message: 'Impossible route' } }, // paved attempt
+      { data: createRouteResponse() }, // relaxed retry
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    });
+
+    // Still the safety profile — the point of retrying rather than throwing.
+    expect(result.routes).toHaveLength(1);
+    expect(result.routes[0].source).toBe('custom_osrm');
+  });
+
+  it('says so on the route rather than handing back a silent downgrade', async () => {
+    setupFetchMock([
+      { data: { code: 'NoRoute', message: 'Impossible route' } },
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    });
+
+    expect(result.routes[0].warnings).toContain('no_paved_route');
+  });
+
+  it('does not warn when the paved route was found normally', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    });
+
+    expect(result.routes[0].warnings).not.toContain('no_paved_route');
+  });
+
+  it('does not retry when the rider never asked for paved', async () => {
+    // A NoRoute without the constraint is a real failure, not a constraint
+    // that can be relaxed — retrying would hide it.
+    setupFetchMock([{ data: { code: 'NoRoute', message: 'Impossible route' } }]);
+
+    await expect(
+      directPreviewRoute({
+        origin: { lat: 44.43, lon: 26.1 },
+        destination: { lat: 44.44, lon: 26.12 },
+        mode: 'safe',
+        avoidUnpaved: false,
+        avoidHills: false,
+      }),
+    ).rejects.toThrow();
+  });
+});

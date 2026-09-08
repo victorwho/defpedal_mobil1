@@ -248,6 +248,7 @@ export default function LoopPlannerScreen() {
           retracedShare: 0,
           ringRetracedShare: 0,
           spurShare: 0,
+          pavedFallback: false,
           stemMeters: 0,
           scenicScore: 0,
           relaxation: 'none',
@@ -1151,6 +1152,14 @@ export default function LoopPlannerScreen() {
                     road out of a valley, which reads as a loop and only needs
                     saying when it is severe.
                   */}
+                  {/*
+                    The rider asked for paved and there was none. Saying so is
+                    the whole point — otherwise this is just an unpaved loop
+                    appearing under a "Paved only" setting.
+                  */}
+                  {loop.pavedFallback ? (
+                    <Text style={styles.loopWarn}>{t('loop.noPavedLoop')}</Text>
+                  ) : null}
                   {loop.spurShare > SPUR_RANKING_DEADBAND ? (
                     <Text style={styles.loopWarn}>
                       {t('loop.spurNote', {

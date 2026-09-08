@@ -267,6 +267,7 @@ export const es: TranslationKeys = {
     roadsNoneBusy: 'Sin vías con tráfico',
     surfaceSplit: '{{paved}}% asfalto / {{unpaved}}% sin asfaltar',
     spurNote: 'Incluye {{km}} km de desvío de ida y vuelta',
+    noPavedLoop: 'Aquí no hay ninguna ruta circular asfaltada — esta tiene tramos sin asfaltar',
     deleteLoop: 'Eliminar ruta',
     driftNotice: 'Esta ruta ha cambiado desde que la guardaste — ahora {{now}} km, antes {{before}} km.',
   },
