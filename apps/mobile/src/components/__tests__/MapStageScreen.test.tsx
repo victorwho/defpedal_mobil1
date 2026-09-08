@@ -107,3 +107,65 @@ describe('MapStageScreen children visibility', () => {
     expect(screen.getByText('map')).toBeTruthy();
   });
 });
+
+describe('sheet detents', () => {
+  it('renders children at the mid detent, not just when fully expanded', () => {
+    // The mid detent is where the loop planner rests once results arrive: the
+    // map stays the subject and the list is still readable. Gating content on
+    // "fully expanded" would make it an empty strip.
+    render(
+      <MapStageScreen
+        map={<div>map</div>}
+        useBottomSheet
+        enableMidDetent
+        detent="mid"
+      >
+        <div>results list</div>
+      </MapStageScreen>,
+    );
+    expect(screen.getByText('results list')).toBeTruthy();
+  });
+
+  it('hides children when driven to collapsed', () => {
+    // What the search does while loops draw onto the map.
+    render(
+      <MapStageScreen
+        map={<div>map</div>}
+        useBottomSheet
+        enableMidDetent
+        detent="collapsed"
+        peekContent={<div>Finding loops</div>}
+      >
+        <div>results list</div>
+      </MapStageScreen>,
+    );
+    expect(screen.queryByText('results list')).toBeNull();
+    expect(screen.getByText('Finding loops')).toBeTruthy();
+  });
+
+  it('follows a controlled detent change', () => {
+    const { rerender } = render(
+      <MapStageScreen map={<div>map</div>} useBottomSheet enableMidDetent detent="collapsed">
+        <div>results list</div>
+      </MapStageScreen>,
+    );
+    expect(screen.queryByText('results list')).toBeNull();
+    rerender(
+      <MapStageScreen map={<div>map</div>} useBottomSheet enableMidDetent detent="mid">
+        <div>results list</div>
+      </MapStageScreen>,
+    );
+    expect(screen.getByText('results list')).toBeTruthy();
+  });
+
+  it('leaves an uncontrolled sheet exactly as it was', () => {
+    // course-import and route-preview pass neither new prop; their sheet must
+    // still open when told to and stay binary.
+    render(
+      <MapStageScreen map={<div>map</div>} useBottomSheet initiallyExpanded>
+        <div>course detail</div>
+      </MapStageScreen>,
+    );
+    expect(screen.getByText('course detail')).toBeTruthy();
+  });
+});

@@ -26,7 +26,20 @@ const HANDLE_HEIGHT = 48; // drag handle row
 const PEEK_CONTENT_HEIGHT = 60; // always-visible summary row when collapsed
 const EXPANDED_RATIO = 0.65; // 65% of screen
 const EXPANDED_HEIGHT = SCREEN_HEIGHT * EXPANDED_RATIO;
+const MID_RATIO = 0.45; // enough for the map to stay the subject
+const MID_HEIGHT = SCREEN_HEIGHT * MID_RATIO;
 const SNAP_THRESHOLD = 80; // drag distance to trigger snap
+
+/**
+ * Where the sheet can rest.
+ *
+ * `mid` is opt-in via `enableMidDetent`, so a screen that has always been
+ * binary stays binary. It exists for the loop planner, where the map is the
+ * result and the sheet is the list: at full height the map the camera just
+ * flew to is covered the moment results land, and collapsed the results are
+ * hidden behind a gesture a first-time rider has no reason to try.
+ */
+export type SheetDetent = 'collapsed' | 'mid' | 'expanded';
 
 type MapStageScreenProps = PropsWithChildren<{
   map: ReactNode;
@@ -52,6 +65,25 @@ type MapStageScreenProps = PropsWithChildren<{
    * a drag handle.
    */
   initiallyExpanded?: boolean;
+  /**
+   * Allow a third resting height between collapsed and expanded.
+   *
+   * Off by default: adding a detent to a sheet a rider already has muscle
+   * memory for is a behaviour change, and only the loop planner wants it.
+   */
+  enableMidDetent?: boolean;
+  /**
+   * Drive the sheet from outside. Supplying this makes the sheet CONTROLLED —
+   * it still animates its own drags, but reports them through
+   * `onDetentChange` and follows whatever comes back.
+   *
+   * Used so a search can drop the sheet out of the way while loops draw onto
+   * the map, and raise it again when there is something to choose between.
+   * Movement the rider did not ask for is the risk here, so every programmatic
+   * change is tied to a tap they made.
+   */
+  detent?: SheetDetent;
+  onDetentChange?: (detent: SheetDetent) => void;
 }>;
 
 const CollapsibleSheet = ({
@@ -60,6 +92,9 @@ const CollapsibleSheet = ({
   bottomInset,
   peekContent,
   initiallyExpanded = false,
+  enableMidDetent = false,
+  detent: controlledDetent,
+  onDetentChange,
   sheetBg,
   handleColor,
   borderColor,
@@ -72,13 +107,20 @@ const CollapsibleSheet = ({
   handleColor: string;
   borderColor: string;
   initiallyExpanded?: boolean;
+  enableMidDetent?: boolean;
+  detent?: SheetDetent;
+  onDetentChange?: (detent: SheetDetent) => void;
 }) => {
   const reducedMotion = useReducedMotion();
   const t = useT();
   // Collapsed by default — map-first: the peek strip carries the one-line
   // summary and the rider drags/taps up for full details.
-  const [expanded, setExpanded] = useState(initiallyExpanded);
+  const [detent, setDetent] = useState<SheetDetent>(
+    controlledDetent ?? (initiallyExpanded ? 'expanded' : 'collapsed'),
+  );
+  const expanded = detent !== 'collapsed';
   const effectiveExpanded = EXPANDED_HEIGHT - bottomInset;
+  const effectiveMid = MID_HEIGHT - bottomInset;
   // Use a ref so panResponder closures always read the current collapsed height,
   // even if peekContent changes after the first render (e.g. route loads async).
   const effectiveCollapsedRef = useRef(HANDLE_HEIGHT);
@@ -88,7 +130,17 @@ const CollapsibleSheet = ({
       initiallyExpanded ? EXPANDED_HEIGHT - bottomInset : effectiveCollapsedRef.current,
     ),
   ).current;
-  const expandedRef = useRef(initiallyExpanded);
+  const detentRef = useRef<SheetDetent>(
+    controlledDetent ?? (initiallyExpanded ? 'expanded' : 'collapsed'),
+  );
+  /** True while a finger is on the sheet — never move it out from under them. */
+  const draggingRef = useRef(false);
+
+  const heightFor = (target: SheetDetent): number => {
+    if (target === 'collapsed') return effectiveCollapsedRef.current;
+    if (target === 'mid' && enableMidDetent) return effectiveMid;
+    return effectiveExpanded;
+  };
 
   // The sheet now starts collapsed, so the collapsed height can change after
   // mount: the peek row only exists once the route has loaded. Re-snap the
@@ -96,7 +148,7 @@ const CollapsibleSheet = ({
   // otherwise the peek row would be clipped at the handle-only height.
   const hasPeekContent = Boolean(peekContent);
   useEffect(() => {
-    if (expandedRef.current) return;
+    if (detentRef.current !== 'collapsed') return;
     Animated.spring(sheetHeight, {
       toValue: hasPeekContent ? HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT : HANDLE_HEIGHT,
       useNativeDriver: false,
@@ -124,23 +176,63 @@ const CollapsibleSheet = ({
     return () => clearTimeout(start);
   }, [reducedMotion, handleOpacity]);
 
-  const snapTo = (expand: boolean) => {
-    expandedRef.current = expand;
-    setExpanded(expand);
+  const snapTo = (target: SheetDetent, notify = true) => {
+    detentRef.current = target;
+    setDetent(target);
+    if (notify) onDetentChange?.(target);
+
+    const toValue = heightFor(target);
+    if (reducedMotion) {
+      // Snap rather than travel. A sheet that repositions itself is motion the
+      // rider did not initiate, which is exactly what reduced-motion is for.
+      sheetHeight.setValue(toValue);
+      return;
+    }
     Animated.spring(sheetHeight, {
-      toValue: expand ? effectiveExpanded : effectiveCollapsedRef.current,
+      toValue,
       useNativeDriver: false,
       tension: 50,
       friction: 10,
     }).start();
   };
 
+  // Follow the controlled value. Skipped mid-drag so the sheet is never yanked
+  // away from a finger that is already moving it.
+  useEffect(() => {
+    if (controlledDetent === undefined) return;
+    if (draggingRef.current) return;
+    if (controlledDetent === detentRef.current) return;
+    snapTo(controlledDetent, false);
+    // eslint-disable-next-line
+  }, [controlledDetent]);
+
+  /** Order the tap-through cycles, and the set a drag can land on. */
+  const ladder: SheetDetent[] = enableMidDetent
+    ? ['collapsed', 'mid', 'expanded']
+    : ['collapsed', 'expanded'];
+
+  const nearestDetent = (height: number): SheetDetent => {
+    let best = ladder[0]!;
+    let bestGap = Number.POSITIVE_INFINITY;
+    for (const candidate of ladder) {
+      const gap = Math.abs(heightFor(candidate) - height);
+      if (gap < bestGap) {
+        bestGap = gap;
+        best = candidate;
+      }
+    }
+    return best;
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 8,
+      onPanResponderGrant: () => {
+        draggingRef.current = true;
+      },
       onPanResponderMove: (_, gesture) => {
-        const startHeight = expandedRef.current ? effectiveExpanded : effectiveCollapsedRef.current;
+        const startHeight = heightFor(detentRef.current);
         const newHeight = Math.max(
           effectiveCollapsedRef.current,
           Math.min(effectiveExpanded, startHeight - gesture.dy),
@@ -148,15 +240,23 @@ const CollapsibleSheet = ({
         sheetHeight.setValue(newHeight);
       },
       onPanResponderRelease: (_, gesture) => {
-        // Simple: drag down > threshold = collapse, drag up > threshold = expand
-        if (gesture.dy > SNAP_THRESHOLD) {
-          snapTo(false);
-        } else if (gesture.dy < -SNAP_THRESHOLD) {
-          snapTo(true);
-        } else {
-          // Snap back to current state
-          snapTo(expandedRef.current);
+        draggingRef.current = false;
+        const startHeight = heightFor(detentRef.current);
+        const released = startHeight - gesture.dy;
+
+        // Below the threshold the drag was not a decision — go back.
+        if (Math.abs(gesture.dy) <= SNAP_THRESHOLD) {
+          snapTo(detentRef.current);
+          return;
         }
+        // Otherwise land on whichever detent the finger actually stopped
+        // nearest. With three heights a fixed up/down rule would skip the
+        // middle one entirely.
+        snapTo(nearestDetent(released));
+      },
+      onPanResponderTerminate: () => {
+        draggingRef.current = false;
+        snapTo(detentRef.current);
       },
     }),
   ).current;
@@ -169,7 +269,12 @@ const CollapsibleSheet = ({
       <Animated.View style={[styles.sheet, { maxHeight: sheetHeight, backgroundColor: sheetBg, borderColor }]}>
         <View {...panResponder.panHandlers}>
           <Pressable
-            onPress={() => snapTo(!expandedRef.current)}
+            onPress={() => {
+              // Tap steps up the ladder and wraps at the top, so every detent
+              // is reachable without a drag — the gesture-alternative rule.
+              const index = ladder.indexOf(detentRef.current);
+              snapTo(ladder[(index + 1) % ladder.length]!);
+            }}
             style={styles.handleTouchArea}
             // The sheet is otherwise driven by a PanResponder, which is
             // invisible to TalkBack/VoiceOver. This tap target is the only
@@ -217,6 +322,9 @@ export const MapStageScreen = ({
   children,
   useBottomSheet = false,
   initiallyExpanded = false,
+  enableMidDetent = false,
+  detent,
+  onDetentChange,
   peekContent,
 }: MapStageScreenProps) => {
   const insets = useSafeAreaInsets();
@@ -238,7 +346,7 @@ export const MapStageScreen = ({
         <View style={styles.flexSpacer} pointerEvents="box-none" />
 
         {useBottomSheet ? (
-          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent} sheetBg={sheetBg} handleColor={handleColor} borderColor={colors.borderDefault} initiallyExpanded={initiallyExpanded}>{children}</CollapsibleSheet>
+          <CollapsibleSheet footer={footer} bottomInset={insets.bottom} peekContent={peekContent} sheetBg={sheetBg} handleColor={handleColor} borderColor={colors.borderDefault} initiallyExpanded={initiallyExpanded} enableMidDetent={enableMidDetent} detent={detent} onDetentChange={onDetentChange}>{children}</CollapsibleSheet>
         ) : footer ? (
           <View style={[styles.bottomFooter, { paddingBottom: space[2] }]} pointerEvents="box-none">
             {footer}

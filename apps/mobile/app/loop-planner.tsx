@@ -16,6 +16,8 @@ import {
   isRouteSupported,
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
+  rideMinutes,
+  riderPace,
   MAX_RETRACE_SHARE,
   LOOP_DISTANCE_STEPS_METERS,
   loopSessionPeriodKey,
@@ -36,7 +38,10 @@ import {
   View,
 } from 'react-native';
 
-import { MapStageScreen } from '../src/components/MapStageScreen';
+import {
+  MapStageScreen,
+  type SheetDetent,
+} from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/map';
 import { Badge } from '../src/design-system/atoms/Badge';
 import { Button } from '../src/design-system/atoms/Button';
@@ -53,6 +58,8 @@ import { usePremium } from '../src/hooks/usePremium';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
+import { useQuery } from '@tanstack/react-query';
+
 import { mobileApi } from '../src/lib/api';
 import { beginLoopRide } from '../src/lib/loop-ride';
 import { readSavedLoop, writeSavedLoop } from '../src/lib/loopStorage';
@@ -69,13 +76,11 @@ const TERRAINS: LoopTerrain[] = ['flat', 'rolling', 'hilly'];
 const SURFACES: LoopSurface[] = ['paved', 'any', 'offroad'];
 const HEADINGS: LoopHeading[] = ['any', 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
-/** Default speed for the time estimate when the rider has no history yet. */
-const FALLBACK_SPEED_KMH = 15;
+
 
 const km = (metres: number): string => (metres / 1000).toFixed(1).replace(/\.0$/, '');
 
-const minutesFor = (metres: number, speedKmh: number): number =>
-  Math.max(1, Math.round((metres / 1000 / speedKmh) * 60));
+
 
 /** Loops are the only surface that needs a session countdown, so it lives here. */
 const minutesLeftIn = (ms: number): number => Math.max(0, Math.ceil(ms / 60_000));
@@ -144,6 +149,34 @@ export default function LoopPlannerScreen() {
 
   // ── Save / share ────────────────────────────────────────────────────────
   const [toast, setToast] = useState<string | null>(null);
+
+  /**
+   * Where the sheet rests, driven by the screen rather than by drags alone.
+   *
+   * Set up expanded (the sheet IS the controls), out of the way while loops
+   * draw onto the map, then mid so the map stays the subject and the list is
+   * still readable. Every move is the direct result of a tap the rider made —
+   * a sheet that repositions itself for its own reasons feels like it is
+   * fighting you.
+   */
+  const [detent, setDetent] = useState<SheetDetent>('expanded');
+
+  /**
+   * The rider's own pace, so the time on each loop is theirs.
+   *
+   * Trip history is already fetched for the History tab, so this shares its
+   * cache rather than adding a request. Riders with fewer than three usable
+   * rides get the default, and the copy says so.
+   */
+  const tripHistoryQuery = useQuery({
+    queryKey: ['trip-history'],
+    queryFn: () => mobileApi.getTripHistory(),
+    staleTime: 5 * 60_000,
+  });
+  const pace = useMemo(
+    () => riderPace(tripHistoryQuery.data ?? []),
+    [tripHistoryQuery.data],
+  );
   const [savedIds, setSavedIds] = useState<Record<string, string>>({});
   const savedLoops = useAppStore((state) => state.savedLoops);
   const addSavedLoop = useAppStore((state) => state.addSavedLoop);
@@ -270,6 +303,11 @@ export default function LoopPlannerScreen() {
 
     setSearch({ kind: 'searching', found: 0, total: LOOP_CANDIDATE_COUNT });
     setRelaxation(null);
+    // Out of the way: the loops draw onto the map one at a time as each is
+    // found, and until now that happened behind a sheet at full height, so
+    // almost nobody ever saw it.
+    setDetent('collapsed');
+    setFocusKey((n) => n + 1);
 
     telemetry.capture('loop_search_started', {
       km: targetDistanceMeters / 1000,
@@ -337,6 +375,10 @@ export default function LoopPlannerScreen() {
     }
 
     setSearch({ kind: 'idle' });
+    // Something to choose between now, so give the list room — but not the
+    // whole screen, or the map the camera just flew to is covered the moment
+    // the results land.
+    setDetent('mid');
     setRelaxation(outcome.relaxation);
     setChecked(outcome.checked);
     setSelectedId(outcome.loops[0]?.id ?? null);
@@ -535,7 +577,6 @@ export default function LoopPlannerScreen() {
     [sessionLoops],
   );
 
-  const speedKmh = FALLBACK_SPEED_KMH;
 
   if (!supported) {
     return (
@@ -562,6 +603,9 @@ export default function LoopPlannerScreen() {
     <MapStageScreen
       useBottomSheet
       initiallyExpanded
+      enableMidDetent
+      detent={detent}
+      onDetentChange={setDetent}
       map={
         <View style={StyleSheet.absoluteFill}>
           <RouteMap
@@ -607,7 +651,25 @@ export default function LoopPlannerScreen() {
         </View>
       }
       peekContent={
-        sessionLoops.length > 0 ? (
+        /*
+          The sheet is down while the search runs, so this strip is the only
+          progress the rider can see. Without it the screen looks idle for the
+          ten seconds the loops take to arrive.
+        */
+        isSearching ? (
+          <View style={styles.peekRow}>
+            <ActivityIndicator color={colors.accent} size="small" />
+            <Text style={styles.peekStat} numberOfLines={1}>
+              {t('loop.searching')}
+              {search.kind === 'searching'
+                ? `  ${t('loop.searchProgress', {
+                    found: String(search.found),
+                    total: String(Math.max(search.total, LOOP_CANDIDATE_COUNT)),
+                  })}`
+                : ''}
+            </Text>
+          </View>
+        ) : sessionLoops.length > 0 ? (
           <View style={styles.peekRow}>
             <Badge variant="accent">{t('loop.badge')}</Badge>
             <Text style={styles.peekStat}>
@@ -742,7 +804,9 @@ export default function LoopPlannerScreen() {
           {t('loop.distanceValue', { km: String(targetDistanceMeters / 1000) })}
           {'  ·  '}
           {t('loop.timeEstimate', {
-            minutes: String(minutesFor(targetDistanceMeters, speedKmh)),
+            minutes: String(
+              rideMinutes(targetDistanceMeters, null, pace.kmh),
+            ),
           })}
         </Text>
       </View>
@@ -937,28 +1001,130 @@ export default function LoopPlannerScreen() {
             return (
               <PressableScale
                 key={loop.id}
-                onPress={() => setSelectedId(loop.id)}
+                onPress={() => {
+                  // Tapping the open card closes it, so the rider can get the
+                  // whole list back without hunting for a close affordance.
+                  setSelectedId(isSelected ? null : loop.id);
+                  if (!isSelected) setDetent('mid');
+                }}
                 style={[styles.loopRow, isSelected && styles.loopRowOn]}
                 accessibilityState={{ selected: isSelected }}
               >
                 <View style={styles.loopMain}>
-                  <Text style={styles.loopDistance}>
-                    {km(loop.distanceMeters)} km
-                  </Text>
-                  <Text style={styles.loopMeta}>
-                    {loop.climbMeters === null
-                      ? '—'
-                      : t('loop.climb', { meters: String(loop.climbMeters) })}
-                    {'  ·  '}
-                    {t('loop.timeEstimate', {
-                      minutes: String(minutesFor(loop.distanceMeters, speedKmh)),
-                    })}
-                    {loop.unpavedShare > 0
-                      ? `  ·  ${t('loop.unpavedShare', {
-                          percent: String(Math.round(loop.unpavedShare * 100)),
-                        })}`
-                      : ''}
-                  </Text>
+                  {/*
+                    Distance and time lead, because they are what a rider
+                    plans around. Each figure gets its own label rather than
+                    joining a run-on of dot-separated greys — four different
+                    KINDS of fact at one weight reads as decoration, which is
+                    why nobody noticed these were already here.
+                  */}
+                  <View style={styles.specRow}>
+                    <View style={styles.spec}>
+                      <Text style={styles.specValue}>
+                        {km(loop.distanceMeters)} km
+                      </Text>
+                      <Text style={styles.specLabel}>
+                        {t('loop.statDistance')}
+                      </Text>
+                    </View>
+                    <View style={styles.spec}>
+                      <Text style={styles.specValue}>
+                        {t('loop.duration', {
+                          minutes: String(
+                            rideMinutes(
+                              loop.distanceMeters,
+                              loop.climbMeters,
+                              pace.kmh,
+                            ),
+                          ),
+                        })}
+                      </Text>
+                      <Text style={styles.specLabel}>
+                        {pace.personal
+                          ? t('loop.statTime')
+                          : t('loop.statTimeAtPace', {
+                              kmh: String(Math.round(pace.kmh)),
+                            })}
+                      </Text>
+                    </View>
+                    <View style={styles.spec}>
+                      <Text style={styles.specValue}>
+                        {loop.climbMeters === null
+                          ? '—'
+                          : `${loop.climbMeters} m`}
+                      </Text>
+                      <Text style={styles.specLabel}>{t('loop.statClimb')}</Text>
+                    </View>
+                  </View>
+
+                  {isSelected ? (
+                    <View style={styles.detail}>
+                      {/*
+                        Always shown, including at 100% paved. Hiding it when
+                        there is no unpaved section made "all paved" and "not
+                        measured" look identical.
+
+                        "Unpaved", not "gravel": the surface classes tell us a
+                        way is not paved, never what it is instead.
+                      */}
+                      <Text style={styles.detailLabel}>
+                        {t('loop.surfaceLabel')}
+                      </Text>
+                      <View
+                        style={styles.bar}
+                        accessibilityLabel={t('loop.surfaceSplit', {
+                          paved: String(
+                            Math.round((1 - loop.unpavedShare) * 100),
+                          ),
+                          unpaved: String(Math.round(loop.unpavedShare * 100)),
+                        })}
+                      >
+                        <View
+                          style={[
+                            styles.barPaved,
+                            { flex: Math.max(0.001, 1 - loop.unpavedShare) },
+                          ]}
+                        />
+                        <View
+                          style={[
+                            styles.barUnpaved,
+                            { flex: Math.max(0.001, loop.unpavedShare) },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.detailValue}>
+                        {t('loop.surfaceSplit', {
+                          paved: String(
+                            Math.round((1 - loop.unpavedShare) * 100),
+                          ),
+                          unpaved: String(Math.round(loop.unpavedShare * 100)),
+                        })}
+                      </Text>
+
+                      {/*
+                        The reason to use this app rather than any other route
+                        planner, so it belongs on the card that decides between
+                        two otherwise-similar loops. Names the tier only — a
+                        crash on a busy road is more likely to be SERIOUS,
+                        which is not the same claim as more likely to happen.
+                      */}
+                      {loop.measured ? (
+                        <>
+                          <Text style={styles.detailLabel}>
+                            {t('loop.roadsLabel')}
+                          </Text>
+                          <Text style={styles.detailValue}>
+                            {loop.highRiskMeters < 50
+                              ? t('loop.roadsNoneBusy')
+                              : t('loop.roadsBusy', {
+                                  distance: km(loop.highRiskMeters),
+                                })}
+                          </Text>
+                        </>
+                      ) : null}
+                    </View>
+                  ) : null}
+
                   {/*
                     Silence when the loop is clean, which is the common case.
                     A note only when it genuinely doubles back — a few shared
@@ -1193,6 +1359,59 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     loopMain: {
       flex: 1,
+    },
+    specRow: {
+      flexDirection: 'row',
+      gap: space[4],
+    },
+    spec: {
+      minWidth: 64,
+    },
+    specValue: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+      // Digits line up between cards so the column can be compared by eye.
+      fontVariant: ['tabular-nums'],
+    },
+    specLabel: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginTop: 2,
+    },
+    detail: {
+      marginTop: space[4],
+      gap: space[1],
+    },
+    detailLabel: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginTop: space[2],
+    },
+    detailValue: {
+      color: colors.textPrimary,
+      fontSize: 14,
+    },
+    bar: {
+      flexDirection: 'row',
+      height: 8,
+      borderRadius: radii.full,
+      overflow: 'hidden',
+      marginTop: space[1],
+    },
+    barPaved: {
+      backgroundColor: colors.textMuted,
+    },
+    barUnpaved: {
+      // Reads as a texture change rather than a warning: unpaved is a
+      // preference, not a hazard, so it must not borrow the safety palette.
+      backgroundColor: colors.accent,
     },
     loopDistance: {
       color: colors.textPrimary,

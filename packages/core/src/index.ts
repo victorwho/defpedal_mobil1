@@ -29,6 +29,7 @@ export * from './reviewEligibility';
 export * from './ridePattern';
 export * from './hazardImportSources';
 export * from './riskDistribution';
+export * from './riderPace';
 export * from './riskStretch';
 export * from './savedPlaceKeywords';
 export * from './sesizare';
