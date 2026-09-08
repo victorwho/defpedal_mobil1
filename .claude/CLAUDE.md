@@ -99,6 +99,61 @@ Migration `202609020001`. A reporter may tick "This hazard is permanent" in the 
 - **Ordering constraint:** the migration MUST be live before the API deploys. The cron purge filters on `is_permanent`, and PostgREST 400s on an unknown column — an unmigrated DB turns the daily hazard-expiry cron into a 502 (it would page via the *Cloud Scheduler job failed* policy, but expiry stops meanwhile). The hazard INSERT path degrades gracefully on its own (`submissions.ts` retries without the column, stripping `is_permanent` before `hazard_type` so the category is never the thing that gets lost), and `/hazards/nearby` defaults `isPermanent` to `false`.
 - **Imports never set it.** `is_permanent` defaults false and the import pipeline supplies its own explicit `expires_at`, which still wins in `set_hazard_expiry`.
 
+## Recreational Loops (generated rides that return to the start)
+
+Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
+`app/loop-planner.tsx`; the brain is `packages/core/src/loopPlan.ts` and
+`apps/mobile/src/lib/loop-generator.ts`.
+
+- **OSRM has no round-trip service**, so a loop is a waypoint ring we synthesize
+  and then measure. Everything below is a consequence of that.
+- ⚠️ **Every sizing constant is MEASURED against the live router, and the
+  measurement is recorded beside it.** They were guesses once and each guess was
+  wrong: `DEFAULT_DETOUR_FACTOR` was 1.25 against a real 2.11–2.54, so every
+  first attempt came back ~86% too long and **zero of ten** Bucharest rings ever
+  passed the distance gate. It did not look broken because the relaxation ladder
+  quietly widened the distance filter on every run. If you change
+  `ringDetourFactor`, `STEM_DETOUR_FACTOR` or `MAX_SPUR_SHARE`, re-measure —
+  do not reason (error-log #111).
+- **A relaxation ladder hides a broken filter.** `none → heading → distance →
+  terrain → retrace`, and the last rung bends the caps. A fallback firing on
+  nearly every run is a defect report, not the feature working.
+- ⚠️ **Two kinds of repeated road, and only one is a complaint.** A **spur** is
+  an out-and-back excursion hanging off the ride ("a loop plus detours"); a
+  **shared corridor** is the one road out of a valley, ridden outbound and
+  inbound. `ringRetracedShare` conflates them — raising its cap for the corridor
+  case admitted exactly the spur-heavy loops the next bug report was about.
+  `spurMeters` separates them exactly: a spur ends in a **U-turn**, so the same
+  edge appears twice IN A ROW with the edges either side mirroring outward,
+  where a corridor's two passes are never adjacent. Ranking settles spurs BEFORE
+  the aggregate (error-log #112).
+- **`MAX_RETRACE_SHARE` is 0.35 and `MAX_SPUR_SHARE` 0.08**, both from measured
+  gaps in the data, not from what sounds strict. At 0.10 the retrace cap was
+  unreachable — one of 40 candidates passed. `MAX_RETRACE_SHARE` deliberately
+  doubles as the threshold for MENTIONING retracing in the UI, so a note can
+  only ever appear on a loop that broke the cap.
+- ⚠️ **`source: 'generated_loop'` is load-bearing.** `isFixedLineRoute` (core)
+  suppresses auto-reroute for it. On a loop `destination === origin`, so an
+  ordinary reroute asks for the shortest way *home* and silently deletes the
+  rest of the ride. `loopStorage` refuses to load a saved loop whose marker is
+  missing rather than ride it unprotected.
+- **Never derive two behaviours from one expression.** Ring shape and the
+  ring/lollipop choice both came off `slot % 2`, so every lollipop was a hexagon
+  and half the search space was never built. Shape now steps every second slot;
+  a test asserts all four combinations appear.
+- **Route ids are minted from `Date.now()`**, so two byte-identical routes get
+  different ids and an id-based dedup can never see they are the same. Loops are
+  deduped by CONTENT (`routeOverlapShare` over undirected edge keys, ≥ 0.8),
+  which also collapses a loop and the same loop ridden backwards.
+- **Saved loops are their own table** (`saved_loops`, migration `202609080001`),
+  NOT `saved_routes` — that one stores endpoints and re-routes on open, and a
+  loop's destination is its origin. Rows store geometry and turn steps; risk
+  segments and elevation are stripped server-side and re-derived on open. The
+  device keeps a full-fidelity copy as an offline cache keyed by the server id.
+- **Time estimates use the rider's own pace** (`riderPace`, median of per-ride
+  speeds from trip history, ≥3 usable rides). Under that the default 15 km/h
+  stands and the label says so — never present a guess as a measurement.
+
 ## GPX Course Import (imported courses you follow)
 
 Plan + full implementation record: **`docs/plans/gpx-course-import.md`**. Shipped 2026-09-04, device-confirmed on preview v0.2.132.

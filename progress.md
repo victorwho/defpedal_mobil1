@@ -2079,3 +2079,55 @@ Typecheck clean across all three workspaces, lint ratchet clean, **core 1140/114
 - **Rejoin splice.** The safety floor is in (reroute suppressed, off-course banner). The upgrade chosen during the grill — retarget onto the nearest point ahead and splice `rejoinLeg ⊕ loop[i..n]` — is not. It is the largest single piece and runs at the worst moment (rider lost, poor signal).
 - **`saved_routes` migration** (`is_loop`, `saved_distance`, `saved_climb`), the Save button, the drift notice, and the LOOPS section in the Routes sheet. ⚠️ `is_loop` is not optional when this lands: `origin == destination` is not a safe marker (a route home *from* home matches), and reopening must restore `source: 'generated_loop'` or the reroute suppression is silently lost on a route the rider trusts.
 - **Hand-off to route-preview** — "Start ride" confirms in place rather than launching navigation. Now the most conspicuous gap.
+
+## Session 117 — Loop generator: measured, not guessed (2026-09-07/08)
+
+Shipped preview builds 151 → 154 (v0.2.148 → v0.2.151), all device-tested by
+the product owner between builds.
+
+**UX pass on how loops are shown** (`faa19c8`). The sheet drops out of the way
+during a search so the candidate-streaming onto the map is visible at all — it
+had always run behind a full-height sheet. `MapStageScreen` gained a third
+detent and an optional controlled mode, both opt-in so course-import and
+route-preview are untouched. Specs became three labelled figures with tabular
+numerals; they had all been present in one dot-separated grey line, which is
+why they read as decoration. Selected loops show a surface bar (always, so "all
+paved" no longer looks like "not measured") and how much is on busy roads.
+
+**Time estimates are the rider's own** (`riderPace`, core). It was distance ÷
+15 km/h for everyone, always — the "use their history" path was never wired.
+Median of per-ride speeds, because one ride paused at a café would drag a
+pooled average down forever; implausible rides dropped first. Under three
+usable rides the default stands and the label says "at 15 km/h".
+
+**Five results, not ten** (`82c4e83`). The screen capped its list at a
+hardcoded 12 while `LOOPS_PER_ATTEMPT` — commented "Loops shown at once" — was
+3, and the streaming callback bypassed it. Only 3 of the 10 shown were ever
+measured, so seven rows had a dash where the climb should be.
+
+**Duplicate results** (`92c647b`). `generateRouteId` mints ids from
+`Date.now()`, so two byte-identical routes get different ids and the id-based
+dedup could never match. Now deduped by content over undirected edge keys,
+which also collapses a loop and its reverse.
+
+**The sizing model was wrong by a factor of two** (`b2f6b0f`) — the big one.
+120 rings measured in five cities: the detour factor is 2.11–2.54, not the
+guessed 1.25. Zero of ten Bucharest rings had been passing the distance gate;
+the relaxation ladder hid it by widening the filter every run. Also: the stem
+detour measured separately (1.86), and ring shape decoupled from the
+ring/lollipop choice — both had come off `slot % 2`, so every lollipop was a
+hexagon.
+
+**Retrace cap 0.10 → 0.35** (`fd1f343`), because one of 40 candidates passed at
+0.10 and a filter nothing satisfies is inert.
+
+**Spurs separated from shared corridor** (`6bc20da`). Raising the cap admitted
+"a loop plus detours", reported from the road. A spur ends in a U-turn so its
+edges mirror around adjacent positions; a corridor's two passes never are.
+Capped at 0.08 and ranked ahead of the aggregate.
+
+Error-log #109 (a guard that inferred its own trigger and never fired), #110
+(`[killed]` does not mean the build died), #111 (guessed constant, correlated
+selectors), #112 (one number for two complaints). Prevention rules 40–44.
+
+4,028 tests pass across the three packages.

@@ -277,6 +277,81 @@ fail the cap. What it rescues is the lollipop: a hand-checked one out of
 Rasnov (out to Bran, loop Moieciu-Simon, home; 58.0 km) reads 0.515
 whole-route but **0.063 on its ring**.
 
+## The sizing model, and how it was wrong for the feature's whole life
+
+Every constant below was MEASURED against the live safety profile, not
+reasoned about. The originals were guesses, and each guess was wrong in a way
+that no test could see because the tests asserted self-consistency rather than
+agreement with the road network.
+
+**Ring detour: 1.25 guessed, 2.11-2.54 measured.** 120 rings in five cities
+(Rasnov, Brasov, Bucharest, Cluj, Timisoara) at 15/30/50 km. Three-point rings
+realise a median 2.11x the ideal polygon perimeter, six-point 2.54x. At 1.25
+every first attempt came back about 86% too long; one damped correction reaches
+only ~26% off; the tolerance is 12%. With a two-attempt budget essentially
+NOTHING landed — at Bucharest 30 km, zero of ten rings passed the distance
+gate. The search therefore relaxed its own distance filter on every run, which
+is why loops came back the wrong length and why so few survived. Fixed: the
+gate went from 0-1 of 5 to 4-5 of 5. `ringDetourFactor(n)` is shape-aware
+because a hexagon detours a fifth more than a triangle.
+
+**Stem detour: 1.86, measured separately.** A lollipop's stem is a
+point-to-point ride that can take the direct road; a ring is dragged through
+waypoints no single road serves. Using the ring's factor for both skewed the
+split between how far out the loop sits and how big it is.
+
+**`MAX_RADIUS_ITERATIONS` is 3, not 2.** With the first guess right most
+candidates return on attempt one or two and never spend the third, so average
+cost is LOWER than the old two, where nearly every candidate used both and
+still missed.
+
+## Two kinds of repeated road, and only one of them is a complaint
+
+`ringRetracedShare` counts every metre ridden twice. That single number hides
+two things a rider experiences completely differently:
+
+- A **spur** is an out-and-back excursion hanging off the ride. It is what
+  makes a loop stop feeling like one ride.
+- A **shared corridor** is leaving town on the one road out and returning on it
+  at the end. Also repeated road, structurally unavoidable in a valley, and it
+  still reads as a loop.
+
+Measured at 30 km: Bucharest rings retrace 0.15-0.30 but spur 0.00-0.03 — all
+corridor. Around Rasnov the same aggregate range hides individual spurs of 6.0,
+6.8 and 4.0 km.
+
+**A spur ends in a U-turn**, so the same edge appears twice IN A ROW with the
+edges either side mirroring outward. A corridor's two passes sit at opposite
+ends of the ride and are never adjacent. `spurMeters` matches that mirror
+exactly — no geometry, no distance threshold. Excursions under
+`MIN_SPUR_METERS` (200) are ignored: a U-turn at a junction is how roads work.
+
+`MAX_SPUR_SHARE` is 0.08, chosen from the gap in the data — loops that read as
+one ride cluster at 0.00-0.03, loops that read as a loop plus errands at
+0.15-0.34, and nothing observed lands between. Ranking settles spurs BEFORE the
+aggregate figure, which is what matters where the cap has to bend: the rider
+gets the least spurry loop rather than an arbitrary one.
+
+## The doubling-back cap was unreachable at 0.10
+
+Exactly ONE of 40 candidates passed it. Typical ring-retrace is 0.14-0.39 in a
+dense grid and 0.27-0.68 out of a valley town. A filter nothing can satisfy is
+not strict, it is inert: the ladder reached its last rung on essentially every
+search and the cap was bent every time, so what reached the rider was decided
+by ranking alone. The note under each result fired on nearly every loop too,
+and a warning that always fires carries no information.
+
+Now 0.35, where it binds. A pure out-and-back still fails outright — it has no
+ring at all, so it scores 1 by construction and cannot pass any threshold below
+that.
+
+## Around Rasnov the spur cap still bends, and that is honest
+
+Every loop measured there at 30 km has a spur above 0.08. The rider gets the
+least spurry one, labelled. The terrain may simply not hold a spur-free 30 km
+loop; if that reads badly on the road the answer is a longer minimum distance,
+not a tighter cap.
+
 ## Five things the build changed from the design
 
 1. **`terrain_miss` was redundant.** The ladder's last rung *is* the honest miss, so
