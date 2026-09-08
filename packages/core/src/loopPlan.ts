@@ -167,15 +167,48 @@ export const ringPerimeterFactor = (waypointCount: number): number => {
 export const RING_PERIMETER_FACTOR = 3 * Math.sqrt(3);
 
 /**
- * First guess at how much longer the road distance is than the ideal triangle.
+ * How much longer the road distance is than the ideal polygon perimeter.
  *
- * A starting point only — `nextRingRadiusMeters` corrects from the measured
- * result within one or two iterations, so being wrong here costs a round trip,
- * not a bad loop. 1.25 is deliberately conservative: overshooting the target
- * and shrinking is cheaper than undershooting, because a too-small ring in a
- * sparse network can collapse onto a single road and return a there-and-back.
+ * MEASURED, not guessed. 120 rings routed against the live safety profile in
+ * five cities (Rasnov, Brasov, Bucharest, Cluj, Timisoara) at 15/30/50 km:
+ *
+ *   3-point rings  median 2.11   (min 1.67, max 2.96)
+ *   6-point rings  median 2.54   (min 1.93, max 3.74)
+ *
+ * The old value was 1.25, and the comment called it "deliberately
+ * conservative". It was not conservative, it was wrong by a factor of two:
+ * every first attempt came back about 86% too long, one damped correction only
+ * reached ~26% off, and the tolerance is 12% — so with a two-attempt budget
+ * almost NO candidate ever landed. The search relaxed its distance filter on
+ * essentially every run, which is why loops came back the wrong length and why
+ * so few survived to be offered.
+ *
+ * It has to vary with the shape: more waypoints means more forced turns, and
+ * the six-point ring realises a fifth more detour than the triangle. Linear
+ * between the two measured points, clamped either side.
  */
-export const DEFAULT_DETOUR_FACTOR = 1.25;
+export const ringDetourFactor = (waypointCount: number): number => {
+  const n = Math.max(2, Math.floor(waypointCount));
+  const factor = 2.11 + ((2.54 - 2.11) / 3) * (n - 3);
+  return Math.min(3, Math.max(1.8, factor));
+};
+
+/**
+ * Detour on the out-and-back stem of a lollipop, measured the same way.
+ *
+ * 1.86 (n=60, min 1.36, max 2.93) — lower than a ring's, because a stem is a
+ * point-to-point ride that can take the direct road, where a ring is dragged
+ * through waypoints that no single road serves. Applying the ring's factor to
+ * the stem, as the first version did, skewed the split between how far out the
+ * loop sits and how big it is.
+ */
+export const STEM_DETOUR_FACTOR = 1.86;
+
+/**
+ * Kept for callers that want one number. Prefer `ringDetourFactor`, which is
+ * shape-aware; this is the three-point value.
+ */
+export const DEFAULT_DETOUR_FACTOR = 2.11;
 
 /**
  * Radius for a first attempt at `targetDistanceMeters` with a given ring shape.
@@ -186,10 +219,11 @@ export const DEFAULT_DETOUR_FACTOR = 1.25;
 export const initialRingRadiusMeters = (
   targetDistanceMeters: number,
   waypointCount: number = RING_WAYPOINT_COUNT,
-  detourFactor: number = DEFAULT_DETOUR_FACTOR,
+  detourFactor: number = ringDetourFactor(waypointCount),
 ): number => {
   const safeTarget = Math.max(0, targetDistanceMeters);
-  const safeDetour = detourFactor > 0 ? detourFactor : DEFAULT_DETOUR_FACTOR;
+  const safeDetour =
+    detourFactor > 0 ? detourFactor : ringDetourFactor(waypointCount);
   return safeTarget / (ringPerimeterFactor(waypointCount) * safeDetour);
 };
 
@@ -322,24 +356,30 @@ export const lollipopWaypoints = (
   targetDistanceMeters: number,
   waypointCount: number = RING_WAYPOINT_COUNT,
   clearanceMeters: number = ringClearanceMeters(targetDistanceMeters),
-  detourFactor: number = DEFAULT_DETOUR_FACTOR,
+  detourFactor: number = ringDetourFactor(waypointCount),
 ): Coordinate[] => {
   const target = Math.max(0, targetDistanceMeters);
-  const detour = detourFactor > 0 ? detourFactor : DEFAULT_DETOUR_FACTOR;
+  const ringDetour =
+    detourFactor > 0 ? detourFactor : ringDetourFactor(waypointCount);
   const count = Math.max(1, Math.floor(waypointCount));
   const perimeter = ringPerimeterFactor(count);
 
   // Clamp so the ring never inverts on a budget too small for the clearance
   // asked of it — a negative radius would put the waypoints behind the rider.
-  const maxClearance = target / (2 * detour);
+  const maxClearance = target / (2 * STEM_DETOUR_FACTOR);
   const clearance = Math.min(
     Math.max(0, clearanceMeters),
     Math.max(0, maxClearance * 0.8),
   );
 
+  // 2·S·stemDetour + P·r·ringDetour = budget, with S = r + clearance.
+  // The stem gets its own factor: it is a point-to-point ride that can take
+  // the direct road, where the ring is dragged through waypoints no single
+  // road serves.
   const radius = Math.max(
     0,
-    (target - 2 * clearance * detour) / (detour * (2 + perimeter)),
+    (target - 2 * clearance * STEM_DETOUR_FACTOR) /
+      (2 * STEM_DETOUR_FACTOR + perimeter * ringDetour),
   );
   const anchor = destinationPoint(start, bearingDegrees, radius + clearance);
 

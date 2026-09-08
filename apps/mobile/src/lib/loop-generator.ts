@@ -82,7 +82,16 @@ import type { Locale } from '../i18n';
  * round trip discovering that costs the rider seconds and buys nothing; there
  * are seven other bearings that might work.
  */
-const MAX_RADIUS_ITERATIONS = 2;
+/**
+ * Attempts to land a ring on the requested length.
+ *
+ * Three, not two. With the sizing model corrected the first attempt is close,
+ * so most candidates return on attempt one or two and never spend the third —
+ * average cost goes DOWN versus the old two, where nearly every candidate used
+ * both and still missed. The third exists for the tail: a first shot 50% long
+ * needs two damped corrections to reach the 12% tolerance.
+ */
+const MAX_RADIUS_ITERATIONS = 3;
 
 /** Rings thrown per rung. */
 const RINGS_PER_RUNG = LOOP_CANDIDATE_COUNT;
@@ -446,11 +455,19 @@ export const searchLoops = async (
     // bearing for how much a loop repeats itself, and neither 3 nor 6 wins
     // everywhere, so a batch samples both rather than betting on one.
     const tasks = bearings.map((bearing, index) => async () => {
+      const slot = index + shapeOffset;
       const loop = await routeOneRing(
         request,
         bearing,
         relaxation,
-        ringWaypointCountFor(index + shapeOffset),
+        // Shape changes every SECOND slot while the ring/lollipop choice
+        // alternates every slot, so a batch covers all four combinations.
+        // Deriving both from the same parity — which is what shipped — made
+        // every lollipop a hexagon and every plain ring a triangle, so half
+        // the search space was never tried. Measured at Bucharest 30 km the
+        // three-point lollipop was offerable where the six-point one was not,
+        // and six-point was the only one the code could build.
+        ringWaypointCountFor(Math.floor(slot / 2)),
         // Every OTHER candidate rides out somewhere before looping, rather
         // than every third. Measured against live OSRM around Rasnov and
         // Bucharest, a lollipop clears the doubling-back cap noticeably less
@@ -463,7 +480,7 @@ export const searchLoops = async (
         // terrain preference already steers towards them where it matters,
         // because a ring in the foothills measures hillier than one round the
         // town.
-        (index + shapeOffset) % 2 === 1,
+        slot % 2 === 1,
         signal,
       );
       attempted += 1;

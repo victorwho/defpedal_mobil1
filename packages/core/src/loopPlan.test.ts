@@ -6,6 +6,8 @@ import {
   classifyTerrain,
   climbPerKilometre,
   DEFAULT_DETOUR_FACTOR,
+  ringDetourFactor,
+  STEM_DETOUR_FACTOR,
   DISTANCE_TOLERANCE_RELAXED,
   DISTANCE_TOLERANCE_STRICT,
   distanceError,
@@ -1153,5 +1155,49 @@ describe('scenic ranking', () => {
     expect(2 * SCENIC_LAMBDA).toBeLessThan(DISTANCE_TOLERANCE_RELAXED);
     expect(2 * SCENIC_LAMBDA).toBeGreaterThan(DISTANCE_TOLERANCE_STRICT);
     expect(SCENIC_SAFETY_TOLERANCE_METERS).toBeGreaterThan(0);
+  });
+});
+
+describe('sizing model', () => {
+  it('is shape-aware: a six-point ring detours more than a triangle', () => {
+    // Measured, not assumed: 120 rings routed in five cities gave a median of
+    // 2.11 for three points and 2.54 for six. More waypoints means more forced
+    // turns, so one constant cannot serve both.
+    expect(ringDetourFactor(3)).toBeCloseTo(2.11, 2);
+    expect(ringDetourFactor(6)).toBeCloseTo(2.54, 2);
+    expect(ringDetourFactor(6)).toBeGreaterThan(ringDetourFactor(3));
+  });
+
+  it('clamps a nonsense waypoint count instead of inverting the ring', () => {
+    expect(ringDetourFactor(0)).toBeGreaterThan(1);
+    expect(ringDetourFactor(100)).toBeLessThanOrEqual(3);
+    expect(Number.isFinite(ringDetourFactor(-5))).toBe(true);
+  });
+
+  it('REGRESSION: predicts a ring close to the length asked for', () => {
+    // The old factor was 1.25 against a measured 2.11, so every first attempt
+    // came back about 86% too long. One damped correction only reached ~26%
+    // off and the tolerance is 12%, so with a two-attempt budget almost no
+    // candidate ever landed — the search relaxed its distance filter on
+    // essentially every run.
+    for (const count of [3, 6]) {
+      const target = 30_000;
+      const radius = initialRingRadiusMeters(target, count);
+      const predicted = ringPerimeterFactor(count) * radius * ringDetourFactor(count);
+      expect(Math.abs(predicted - target) / target).toBeLessThan(0.01);
+    }
+  });
+
+  it('sizes a lollipop with the stem’s own detour, not the ring’s', () => {
+    // A stem is a point-to-point ride that can take the direct road; a ring is
+    // dragged through waypoints no single road serves. Measured 1.86 vs
+    // 2.11/2.54. Using one factor for both skewed how far out the loop sits.
+    expect(STEM_DETOUR_FACTOR).toBeLessThan(ringDetourFactor(3));
+    const wps = lollipopWaypoints(BUCHAREST, 0, 30_000, 3, 3_000);
+    expect(wps[0]).toEqual(wps[wps.length - 1]);
+    for (const w of wps) {
+      expect(Number.isFinite(w.lat)).toBe(true);
+      expect(Number.isFinite(w.lon)).toBe(true);
+    }
   });
 });

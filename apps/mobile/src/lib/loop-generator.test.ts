@@ -567,3 +567,51 @@ describe('duplicate loops', () => {
     expect(outcome.loops.length).toBeGreaterThan(1);
   });
 });
+
+describe('what a batch actually samples', () => {
+  it('REGRESSION: tries every combination of ring shape and lollipop', async () => {
+    // Both used to come off the SAME parity bit — `ringWaypointCountFor(slot)`
+    // indexes [3, 6] by slot % 2, and lollipop was `slot % 2 === 1` — so every
+    // lollipop was a hexagon and every plain ring a triangle. Half the search
+    // space was never tried, and measured at Bucharest 30 km the three-point
+    // lollipop was offerable where the six-point one was not.
+    const shapes: string[] = [];
+    fetchLoopRoute.mockImplementation(
+      async (_start: unknown, waypoints: { lat: number; lon: number }[]) => {
+        const first = waypoints[0]!;
+        const last = waypoints[waypoints.length - 1]!;
+        // A lollipop repeats its anchor before and after the ring.
+        const isLollipop = first.lat === last.lat && first.lon === last.lon;
+        const ringPoints = isLollipop ? waypoints.length - 2 : waypoints.length;
+        shapes.push(`${isLollipop ? 'lollipop' : 'ring'}-${ringPoints}`);
+        return {
+          route: routeOf(`loop-${shapes.length}`, 20_000),
+          coordinates: circleFor(20_000),
+          unpavedShare: 0,
+          retracedShare: 0,
+          ringRetracedShare: 0,
+          stemMeters: 0,
+          edgeKeys: [`e-${shapes.length}`],
+        };
+      },
+    );
+    enrichRouteWithElevation.mockImplementation(async (r: RouteOption) => r);
+    enrichRouteWithRisk.mockImplementation(async (r: RouteOption) => r);
+    fetchRouteScenicScore.mockResolvedValue(0);
+
+    await searchLoops({
+      start: START,
+      targetDistanceMeters: 20_000,
+      terrain: 'rolling',
+      surface: 'any',
+      heading: 'any',
+      locale: 'en',
+    });
+
+    const seen = new Set(shapes);
+    expect(seen.has('ring-3')).toBe(true);
+    expect(seen.has('ring-6')).toBe(true);
+    expect(seen.has('lollipop-3')).toBe(true);
+    expect(seen.has('lollipop-6')).toBe(true);
+  });
+});
