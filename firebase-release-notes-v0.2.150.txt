@@ -1,0 +1,72 @@
+Defensive Pedal — Preview v0.2.150 (build 153)
+
+FIX: loops should come back the right length now — and more of them should
+ride out of town before looping.
+
+You said the ride-out-then-loop shape still wasn't showing up often enough. I
+measured the mechanism against the live router instead of guessing, and found
+three faults. Only one was about that shape.
+
+1. The size model was wrong by a factor of two
+
+The generator guesses how big a ring needs to be, routes it, then corrects. The
+guess assumed real roads are 1.25x longer than the straight-line shape. I routed
+120 rings across five cities: the real figure is 2.11x for a 3-point ring and
+2.54x for a 6-point one.
+
+So every first attempt came back about 86% too long, one correction only got to
+~26% off, and the limit for "close enough" is 12%. With two attempts allowed,
+almost nothing ever landed on the length you asked for. At Bucharest 30 km, ZERO
+of ten rings passed. The search then quietly relaxed its own length filter on
+basically every run — which is why loops came back the wrong distance, and why
+so few survived to be offered at all.
+
+Fixed and re-measured: loops hitting the requested length went from 0-1 in 5 to
+4-5 in 5.
+
+2. Every ride-out loop was built as a hexagon
+
+The code picked the ring shape (3 or 6 points) and the ring-vs-ride-out choice
+from the SAME coin flip, so a 3-point ride-out loop was never once built. Half
+the options never tried. At Bucharest the 3-point one worked where the 6-point
+one didn't — and 6 was the only one it could make. My bug, introduced when I
+made these more common a few builds ago.
+
+3. The doubling-back limit was impossible to meet
+
+It was set at 10%. Across 40 test loops, ONE passed. Real loops out of a valley
+town repeat 27-68% of themselves, because the one road out is also the one road
+back. A limit nothing can meet isn't strict, it's switched off: the search gave
+up on it every single time, and the "this loop doubles back" note appeared on
+nearly every result, which makes it meaningless.
+
+Now 35%. It admits ordinary loops, rejects ones that repeat half of themselves,
+and still rejects a plain there-and-back outright.
+
+What you should notice
+
+- Loops much closer to the distance you asked for.
+- More variety, including more that ride out before looping.
+- The "doubles back" note now appears rarely — when it does, it means it.
+
+What to check
+
+- Ask for 30 km and see what you actually get. Before this, results were
+  routinely well off.
+- Around Rasnov, look for loops that head out toward Bran or Zarnesti and loop
+  there, rather than circling town.
+- If a loop still repeats a lot of itself, does the note appear? It should now
+  only show up on genuinely repetitive ones.
+
+Being straight with you about one thing
+
+Fixing the size model made the doubling-back limit the thing holding results
+back, which is why I raised it. That was your call to make and you made it — but
+it means loops are now allowed to repeat up to a third of themselves. If that
+feels too loose in practice, the number is one line to change; tell me what
+reads right on the road.
+
+Unchanged
+- Five results per search, all measured.
+- Saved loops sync to your account.
+- Scenic scoring still covers the Rasnov area only.
