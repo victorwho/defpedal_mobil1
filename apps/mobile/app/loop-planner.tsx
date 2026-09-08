@@ -138,7 +138,19 @@ export default function LoopPlannerScreen() {
    * e-bike says nothing either way so we leave whatever they last chose.
    */
   const avoidUnpaved = useAppStore((s) => s.avoidUnpaved);
-  const [surface, setSurface] = useState<LoopSurface>(avoidUnpaved ? 'paved' : 'any');
+  /**
+   * Follow the rider's saved preference until they choose on THIS screen.
+   *
+   * `useState(avoidUnpaved ? ...)` read the store once, at mount. Zustand
+   * persist hydrates from AsyncStorage asynchronously, so a screen that
+   * mounted first kept the pre-hydration default and silently ignored an
+   * "avoid unpaved" the rider had set — the exact hydration race the route
+   * guard already locks against. Deriving it instead means the preference
+   * applies whenever it arrives, and an explicit tap still wins.
+   */
+  const [surfaceOverride, setSurfaceOverride] = useState<LoopSurface | null>(null);
+  const surface = surfaceOverride ?? (avoidUnpaved ? 'paved' : 'any');
+  const setSurface = setSurfaceOverride;
 
   // ── Results ─────────────────────────────────────────────────────────────
   const [search, setSearch] = useState<SearchState>({ kind: 'idle' });

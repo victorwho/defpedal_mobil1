@@ -37,7 +37,37 @@ const makeRoute = (overrides: {
     weight_name: 'cyclability',
     legs: [
       {
-        steps: overrides.steps ?? [],
+        // One step per edge, each carrying its class on an intersection —
+        // which is where OSRM actually puts them. These fixtures used to build
+        // `annotation.classes`, and passed while tunnels and bridges were never
+        // extracted from a real route.
+        steps:
+          overrides.steps ??
+          (overrides.classes
+            ? overrides.classes.map((cls, i) => ({
+                distance: (overrides.distances ?? [])[i] ?? 100,
+                duration: 30,
+                weight: 100,
+                name: '',
+                mode: 'cycling',
+                driving_side: 'right',
+                geometry: lineString([coords[i] ?? [0, 0], coords[i + 1] ?? coords[i] ?? [0, 0]]),
+                maneuver: {
+                  bearing_after: 90,
+                  bearing_before: 90,
+                  location: coords[i] ?? [0, 0],
+                  type: 'turn',
+                },
+                intersections: [
+                  {
+                    location: coords[i] ?? [0, 0],
+                    entry: [true],
+                    bearings: [90],
+                    ...(cls ? { classes: [cls] } : {}),
+                  },
+                ],
+              }))
+            : []),
         summary: '',
         weight: 0,
         duration: 0,
@@ -49,7 +79,6 @@ const makeRoute = (overrides: {
           nodes: Array.from({ length: edgeCount + 1 }, (_, i) => i),
           weight: Array.from({ length: edgeCount }, () => 100),
           speed: Array.from({ length: edgeCount }, () => 5),
-          ...(overrides.classes ? { classes: overrides.classes } : {}),
         },
       },
     ],

@@ -5,6 +5,7 @@ import type {
   RouteFeatureType,
 } from './contracts';
 import { haversineDistance } from './distance';
+import { classRuns } from './routeClasses';
 import type { Route } from './types';
 
 /**
@@ -260,54 +261,31 @@ const extractZoneFeatures = (
 ): RouteFeature[] => {
   const features: RouteFeature[] = [];
   const { coords, cumulativeAt } = index;
-
-  let edgeIndex = 0;
   const ordinals: Record<'tunnel' | 'bridge', number> = { tunnel: 0, bridge: 0 };
 
-  for (const leg of route.legs) {
-    const classes = leg.annotation?.classes;
-    if (!classes) {
-      const distances = leg.annotation?.distance;
-      const legEdgeCount =
-        distances?.length ?? Math.max(0, coords.length - 1 - edgeIndex);
-      edgeIndex += legEdgeCount;
-      continue;
+  /** First vertex at or past `meters` along the route. */
+  const vertexAt = (meters: number): number => {
+    for (let i = 0; i < cumulativeAt.length; i += 1) {
+      if ((cumulativeAt[i] ?? 0) >= meters) return i;
     }
+    return Math.max(0, coords.length - 1);
+  };
 
-    let i = 0;
-    while (i < classes.length) {
-      const cls = classes[i];
-      if (cls === 'tunnel' || cls === 'bridge') {
-        const runStartEdge = edgeIndex + i;
-        const runStartCumulative = cumulativeAt[runStartEdge];
-        let runEnd = i;
-        while (runEnd < classes.length && classes[runEnd] === cls) {
-          runEnd++;
-        }
-        const runEndEdge = Math.min(edgeIndex + runEnd, coords.length - 1);
-        const lengthMeters = Math.max(
-          0,
-          cumulativeAt[runEndEdge] - runStartCumulative,
-        );
-        const startCoord = coords[runStartEdge];
-        if (startCoord) {
-          features.push({
-            id: featureId(routeIndex, cls, ordinals[cls]++),
-            type: cls,
-            tier: TIER_BY_TYPE[cls],
-            lon: startCoord[0],
-            lat: startCoord[1],
-            distanceAlongRouteMeters: runStartCumulative,
-            lengthMeters,
-          });
-        }
-        i = runEnd;
-      } else {
-        i++;
-      }
+  for (const kind of ['tunnel', 'bridge'] as const) {
+    for (const run of classRuns(route.legs, kind)) {
+      if (run.lengthMeters <= 0) continue;
+      const startCoord = coords[vertexAt(run.startMeters)];
+      if (!startCoord) continue;
+      features.push({
+        id: featureId(routeIndex, kind, ordinals[kind]++),
+        type: kind,
+        tier: TIER_BY_TYPE[kind],
+        lon: startCoord[0]!,
+        lat: startCoord[1]!,
+        distanceAlongRouteMeters: run.startMeters,
+        lengthMeters: run.lengthMeters,
+      });
     }
-
-    edgeIndex += classes.length;
   }
 
   return features;

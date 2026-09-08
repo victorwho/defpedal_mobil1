@@ -1,3 +1,4 @@
+import { classMeters } from './routeClasses';
 import type { Route } from './types';
 
 export interface RouteComposition {
@@ -143,20 +144,17 @@ export const analyzeRoute = (
 
   const categoryMap = new Map<string, { distance: number; color: string }>();
   const totalDistance = route.distance;
-  const annotation = route.legs[0]?.annotation;
-  const hasClasses = Boolean(annotation?.classes && annotation.classes.length > 0);
+  // Classes live on `steps[].intersections[].classes`, never on the leg
+  // annotation — reading the annotation left this permanently empty.
+  const { byClass } = classMeters(route.legs);
 
-  if (hasClasses && annotation?.distance) {
-    const classes = annotation.classes ?? [];
-    const distances = annotation.distance;
-
-    for (let index = 0; index < Math.min(classes.length, distances.length); index += 1) {
-      const rawTag = classes[index] || 'unclassified';
+  if (byClass.size > 0) {
+    for (const [rawTag, meters] of byClass) {
       const { label, color } = classifyHighway(rawTag);
       const current = categoryMap.get(label) || { distance: 0, color };
 
       categoryMap.set(label, {
-        distance: current.distance + distances[index],
+        distance: current.distance + meters,
         color,
       });
     }

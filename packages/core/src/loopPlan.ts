@@ -26,6 +26,7 @@
  *     exactly one excludable class, `unpaved`. Hence two surface states, not
  *     a technicality dial.
  */
+import { classMeters, type ClassifiedStep } from './routeClasses';
 import { destinationPoint, haversineDistance } from './distance';
 import type { Coordinate, RiskSegment } from './contracts';
 import { findHighRiskStretches } from './riskStretch';
@@ -636,11 +637,16 @@ export interface AnnotatedLeg {
   readonly annotation?: {
     /** Length of each edge, in metres. */
     readonly distance?: number[];
-    /** Class names per edge — `unpaved`, `tunnel`, `bridge`. */
-    readonly classes?: string[];
     /** OSM node ids along the leg: `nodes.length === distance.length + 1`. */
     readonly nodes?: number[];
   };
+  /**
+   * Steps, which is where OSRM puts road classes — on
+   * `steps[].intersections[].classes`, NOT on the annotation. The annotation
+   * carries exactly `[datasources, distance, duration, metadata, nodes,
+   * speed, weight]`; there has never been a `classes` key on it.
+   */
+  readonly steps?: readonly ClassifiedStep[];
 }
 
 /** @deprecated Use {@link AnnotatedLeg}. */
@@ -662,30 +668,11 @@ export type SurfaceAnnotatedLeg = AnnotatedLeg;
 export const unpavedMeters = (
   legs: readonly AnnotatedLeg[],
 ): { unpavedMeters: number; classifiedMeters: number } => {
-  let unpaved = 0;
-  let classified = 0;
-
-  for (const leg of legs) {
-    const classes = leg.annotation?.classes;
-    const distances = leg.annotation?.distance;
-    if (!classes || !distances) continue;
-
-    const edges = Math.min(classes.length, distances.length);
-    for (let i = 0; i < edges; i += 1) {
-      const metres = distances[i] ?? 0;
-      if (metres <= 0) continue;
-      classified += metres;
-      // OSRM may report one class or several per edge; the shipped
-      // tunnel/bridge reader assumes a plain string, so accept both rather
-      // than depending on which.
-      const cls = classes[i];
-      if (cls === 'unpaved' || (typeof cls === 'string' && cls.split(',').includes('unpaved'))) {
-        unpaved += metres;
-      }
-    }
-  }
-
-  return { unpavedMeters: unpaved, classifiedMeters: classified };
+  const { byClass, classifiedMeters } = classMeters(legs);
+  return {
+    unpavedMeters: byClass.get('unpaved') ?? 0,
+    classifiedMeters,
+  };
 };
 
 /**

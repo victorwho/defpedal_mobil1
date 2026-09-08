@@ -574,40 +574,73 @@ describe('surface appetite', () => {
 });
 
 describe('unpaved measurement', () => {
-  const leg = (classes: string[], distance: number[]) => ({
-    annotation: { classes, distance },
+  /**
+   * A leg in the shape OSRM actually returns: classes on
+   * `steps[].intersections[].classes`, never on the annotation.
+   *
+   * The tests this replaces built `annotation.classes` fixtures and asserted
+   * the parse. The parse was right; the ADDRESS was wrong, so they passed
+   * while every route in the app reported 100% paved.
+   */
+  const leg = (steps: { meters: number; classes?: string[] }[]) => ({
+    steps: steps.map((step) => ({
+      distance: step.meters,
+      intersections: [
+        {
+          location: [26, 44] as [number, number],
+          ...(step.classes ? { classes: step.classes } : {}),
+        },
+      ],
+    })),
   });
 
-  it('sums the metres on unpaved edges', () => {
+  it('sums the metres on unpaved steps', () => {
     const result = unpavedMeters([
-      leg(['unpaved', 'tunnel', 'unpaved'], [100, 50, 150]),
+      leg([
+        { meters: 100, classes: ['unpaved'] },
+        { meters: 50, classes: ['tunnel'] },
+        { meters: 150, classes: ['unpaved'] },
+      ]),
     ]);
     expect(result.unpavedMeters).toBe(250);
     expect(result.classifiedMeters).toBe(300);
   });
 
   it('reports the share of what it could classify', () => {
-    expect(unpavedShare([leg(['unpaved', 'x'], [250, 750])])).toBeCloseTo(0.25);
+    expect(
+      unpavedShare([
+        leg([
+          { meters: 250, classes: ['unpaved'] },
+          { meters: 750, classes: ['x'] },
+        ]),
+      ]),
+    ).toBeCloseTo(0.25);
   });
 
-  it('accepts several classes on one edge', () => {
-    // OSRM may report one class or several; the shipped tunnel reader assumes
-    // a plain string, so both shapes have to work.
-    expect(unpavedShare([leg(['unpaved,bridge'], [100])])).toBe(1);
+  it('accepts several classes on one intersection', () => {
+    expect(
+      unpavedShare([leg([{ meters: 100, classes: ['unpaved', 'bridge'] }])]),
+    ).toBe(1);
   });
 
   it('returns zero rather than NaN when nothing can be classified', () => {
     expect(unpavedShare([])).toBe(0);
-    expect(unpavedShare([{ annotation: { distance: [100] } }])).toBe(0);
+    expect(unpavedShare([{ steps: [{ distance: 100 }] }])).toBe(0);
     expect(unpavedShare([{}])).toBe(0);
   });
 
-  it('does not count an edge whose length is missing', () => {
-    expect(unpavedMeters([leg(['unpaved', 'unpaved'], [100])]).unpavedMeters).toBe(100);
+  it('REGRESSION: ignores annotation.classes, which OSRM never sends', () => {
+    // A leg carrying the field the old readers expected, and nothing else.
+    // It must report zero rather than appearing to work, so nobody restores
+    // the wrong address and sees a plausible number.
+    const wrongAddress = {
+      annotation: { distance: [100, 100], nodes: [1, 2, 3] },
+    } as never;
+    expect(unpavedShare([wrongAddress])).toBe(0);
   });
 
   it('never reports a share above 1', () => {
-    expect(unpavedShare([leg(['unpaved'], [500])])).toBe(1);
+    expect(unpavedShare([leg([{ meters: 500, classes: ['unpaved'] }])])).toBe(1);
   });
 });
 

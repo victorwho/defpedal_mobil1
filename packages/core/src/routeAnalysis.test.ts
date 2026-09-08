@@ -142,30 +142,42 @@ describe('analyzeRoute — elevation gain and loss', () => {
 });
 
 // ---------------------------------------------------------------------------
-// analyzeRoute — route composition from annotation classes
+// analyzeRoute — route composition from step intersection classes
 // ---------------------------------------------------------------------------
 
-describe('analyzeRoute — composition from annotation classes', () => {
+describe('analyzeRoute — composition from step intersection classes', () => {
+  /**
+   * OSRM puts classes on `steps[].intersections[].classes`. These tests used
+   * to build `annotation.classes` and passed while the composition breakdown
+   * was permanently empty on every real route.
+   */
+  const classedStep = (meters: number, cls: string) => ({
+    distance: meters,
+    duration: meters / 4,
+    weight: meters / 4,
+    name: '',
+    mode: 'cycling',
+    driving_side: 'right',
+    geometry: { type: 'LineString' as const, coordinates: [[26, 44], [26.01, 44]] },
+    maneuver: {
+      bearing_after: 0, bearing_before: 0,
+      location: [26, 44] as [number, number], type: 'turn',
+    },
+    intersections: [
+      { location: [26, 44] as [number, number], entry: [true], bearings: [0], classes: [cls] },
+    ],
+  });
   it('classifies cycleway annotation segments', () => {
     const route = makeRoute({
       distance: 200,
       duration: 60,
       legs: [
         {
-          steps: [],
+          steps: [classedStep(100, 'cycleway'), classedStep(100, 'cycleway')],
           summary: '',
           weight: 60,
           duration: 60,
           distance: 200,
-          annotation: {
-            distance: [100, 100],
-            duration: [30, 30],
-            datasources: [0, 0],
-            nodes: [1, 2, 3],
-            weight: [30, 30],
-            speed: [3, 3],
-            classes: ['cycleway', 'cycleway'],
-          },
         },
       ],
     });
@@ -180,20 +192,11 @@ describe('analyzeRoute — composition from annotation classes', () => {
       duration: 60,
       legs: [
         {
-          steps: [],
+          steps: [classedStep(200, 'residential')],
           summary: '',
           weight: 60,
           duration: 60,
           distance: 200,
-          annotation: {
-            distance: [200],
-            duration: [60],
-            datasources: [0],
-            nodes: [1, 2],
-            weight: [60],
-            speed: [3],
-            classes: ['residential'],
-          },
         },
       ],
     });
@@ -201,26 +204,21 @@ describe('analyzeRoute — composition from annotation classes', () => {
     expect(result.composition.find((c) => c.label === 'Residential')).toBeDefined();
   });
 
-  it('percentages sum to ~100 when using annotation classes', () => {
+  it('percentages sum to ~100 across the classified steps', () => {
     const route = makeRoute({
       distance: 300,
       duration: 90,
       legs: [
         {
-          steps: [],
+          steps: [
+            classedStep(100, 'cycleway'),
+            classedStep(100, 'residential'),
+            classedStep(100, 'path'),
+          ],
           summary: '',
           weight: 90,
           duration: 90,
           distance: 300,
-          annotation: {
-            distance: [100, 100, 100],
-            duration: [30, 30, 30],
-            datasources: [0, 0, 0],
-            nodes: [1, 2, 3, 4],
-            weight: [30, 30, 30],
-            speed: [3, 3, 3],
-            classes: ['cycleway', 'residential', 'path'],
-          },
         },
       ],
     });

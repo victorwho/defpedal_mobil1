@@ -1,0 +1,594 @@
+{
+ "note": "Captured from the live safety OSRM. Shape assertion, not a snapshot to update casually.",
+ "distance": 13623.6,
+ "legs": [
+  {
+   "steps": [
+    {
+     "distance": 28.5,
+     "intersections": [
+      {
+       "location": [
+        25.460218,
+        45.589683
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 56.5,
+     "intersections": [
+      {
+       "location": [
+        25.460512,
+        45.589832
+       ]
+      },
+      {
+       "location": [
+        25.460381,
+        45.589381
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 271.4,
+     "intersections": [
+      {
+       "location": [
+        25.460367,
+        45.589334
+       ]
+      },
+      {
+       "location": [
+        25.461261,
+        45.589175
+       ]
+      },
+      {
+       "location": [
+        25.461502,
+        45.589056
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 213,
+     "intersections": [
+      {
+       "location": [
+        25.463617,
+        45.588731
+       ]
+      },
+      {
+       "location": [
+        25.464677,
+        45.589838
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 276.4,
+     "intersections": [
+      {
+       "location": [
+        25.465163,
+        45.590303
+       ]
+      },
+      {
+       "location": [
+        25.466085,
+        45.591244
+       ]
+      },
+      {
+       "location": [
+        25.466329,
+        45.591534
+       ]
+      },
+      {
+       "location": [
+        25.466375,
+        45.591593
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 49.8,
+     "intersections": [
+      {
+       "location": [
+        25.467003,
+        45.592424
+       ]
+      },
+      {
+       "location": [
+        25.467101,
+        45.592441
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 1053.3,
+     "intersections": [
+      {
+       "location": [
+        25.467608,
+        45.592428
+       ]
+      },
+      {
+       "location": [
+        25.470057,
+        45.594504
+       ]
+      },
+      {
+       "location": [
+        25.470949,
+        45.595436
+       ]
+      },
+      {
+       "location": [
+        25.471634,
+        45.596464
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 681.8,
+     "intersections": [
+      {
+       "location": [
+        25.474268,
+        45.600495
+       ]
+      },
+      {
+       "location": [
+        25.476947,
+        45.602018
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 2752.5,
+     "intersections": [
+      {
+       "location": [
+        25.481651,
+        45.601875
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.4872,
+        45.597077
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 42.6,
+     "intersections": [
+      {
+       "location": [
+        25.503528,
+        45.595926
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 1256.3,
+     "intersections": [
+      {
+       "location": [
+        25.503925,
+        45.595664
+       ]
+      },
+      {
+       "location": [
+        25.507288,
+        45.593588
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.508982,
+        45.59168
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 1180.5,
+     "intersections": [
+      {
+       "location": [
+        25.514043,
+        45.587142
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 415.7,
+     "intersections": [
+      {
+       "location": [
+        25.524589,
+        45.591457
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.525739,
+        45.593984
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 775.8,
+     "intersections": [
+      {
+       "location": [
+        25.526461,
+        45.594257
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 1544,
+     "intersections": [
+      {
+       "location": [
+        25.530387,
+        45.600298
+       ]
+      },
+      {
+       "location": [
+        25.533908,
+        45.605144
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.539411,
+        45.60949
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.541365,
+        45.609992
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.542075,
+        45.610158
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 202,
+     "intersections": [
+      {
+       "location": [
+        25.542565,
+        45.610278
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.542843,
+        45.610141
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 377.1,
+     "intersections": [
+      {
+       "location": [
+        25.544331,
+        45.608962
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 208.3,
+     "intersections": [
+      {
+       "location": [
+        25.547953,
+        45.606983
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 379.4,
+     "intersections": [
+      {
+       "location": [
+        25.55034,
+        45.607691
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.551018,
+        45.607479
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.554418,
+        45.607602
+       ]
+      },
+      {
+       "location": [
+        25.554621,
+        45.607608
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 1021.6,
+     "intersections": [
+      {
+       "location": [
+        25.554694,
+        45.607598
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.555603,
+        45.603267
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.55646,
+        45.601523
+       ],
+       "classes": [
+        "unpaved"
+       ]
+      },
+      {
+       "location": [
+        25.556371,
+        45.60117
+       ]
+      },
+      {
+       "location": [
+        25.556321,
+        45.600953
+       ]
+      },
+      {
+       "location": [
+        25.556172,
+        45.599394
+       ]
+      },
+      {
+       "location": [
+        25.556081,
+        45.599023
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 334.2,
+     "intersections": [
+      {
+       "location": [
+        25.555969,
+        45.598678
+       ]
+      },
+      {
+       "location": [
+        25.553708,
+        45.598575
+       ]
+      },
+      {
+       "location": [
+        25.552868,
+        45.598183
+       ]
+      },
+      {
+       "location": [
+        25.552651,
+        45.597984
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 180.1,
+     "intersections": [
+      {
+       "location": [
+        25.552375,
+        45.5977
+       ]
+      },
+      {
+       "location": [
+        25.552735,
+        45.596924
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 162,
+     "intersections": [
+      {
+       "location": [
+        25.553077,
+        45.596156
+       ]
+      },
+      {
+       "location": [
+        25.552818,
+        45.595925
+       ]
+      },
+      {
+       "location": [
+        25.552703,
+        45.595832
+       ]
+      },
+      {
+       "location": [
+        25.552619,
+        45.595745
+       ]
+      },
+      {
+       "location": [
+        25.552594,
+        45.595709
+       ]
+      },
+      {
+       "location": [
+        25.552525,
+        45.595441
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 160.8,
+     "intersections": [
+      {
+       "location": [
+        25.552709,
+        45.594896
+       ]
+      },
+      {
+       "location": [
+        25.552455,
+        45.593877
+       ]
+      }
+     ]
+    },
+    {
+     "distance": 0,
+     "intersections": [
+      {
+       "location": [
+        25.552286,
+        45.593507
+       ]
+      }
+     ]
+    }
+   ],
+   "annotationKeys": [
+    "datasources",
+    "distance",
+    "duration",
+    "metadata",
+    "nodes",
+    "speed",
+    "weight"
+   ]
+  }
+ ]
+}
