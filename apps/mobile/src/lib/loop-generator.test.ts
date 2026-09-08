@@ -12,6 +12,7 @@ import {
   encodePolyline,
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
+  MAX_RETRACE_SHARE,
   type Coordinate,
   type RiskSegment,
   type RouteOption,
@@ -359,12 +360,14 @@ describe('the doubling-back cap', () => {
     const outcome = await searchLoops(request);
     if (outcome.status !== 'ok') throw new Error('expected loops');
     expect(outcome.relaxation).toBe('none');
-    expect(outcome.loops.every((l) => l.retracedShare <= 0.1)).toBe(true);
+    expect(
+      outcome.loops.every((l) => l.ringRetracedShare <= MAX_RETRACE_SHARE),
+    ).toBe(true);
   });
 
   it('falls all the way to the retrace rung when nothing clean exists', async () => {
     // A dead-end valley: every candidate repeats a third of itself.
-    alwaysRetracing(0.35);
+    alwaysRetracing(MAX_RETRACE_SHARE * 2);
     const outcome = await searchLoops(request);
     if (outcome.status !== 'ok') throw new Error('expected loops');
     expect(outcome.relaxation).toBe('retrace');
@@ -372,7 +375,7 @@ describe('the doubling-back cap', () => {
 
   it('still returns a rideable loop rather than nothing', async () => {
     // The whole reason the cap is a ladder rung and not a hard reject.
-    alwaysRetracing(0.35);
+    alwaysRetracing(MAX_RETRACE_SHARE * 2);
     const outcome = await searchLoops(request);
     if (outcome.status !== 'ok') throw new Error('expected loops');
     expect(outcome.loops.length).toBeGreaterThan(0);
@@ -383,7 +386,7 @@ describe('the doubling-back cap', () => {
     // cap is the one limit the rider set explicitly — so it earns one more
     // batch of bearings and shapes before we give it up. Measured against live
     // OSRM, compliant loops exist but the first batch can miss them entirely.
-    alwaysRetracing(0.35);
+    alwaysRetracing(MAX_RETRACE_SHARE * 2);
     await searchLoops(request);
     expect(fetchLoopRoute.mock.calls.length).toBeGreaterThan(
       LOOP_CANDIDATE_COUNT * 2,
@@ -404,7 +407,8 @@ describe('the doubling-back cap', () => {
         edgeKeys: [`e-${n}-a`, `e-${n}-b`],
         // Only the first candidate is under the cap.
         retracedShare: n === 1 ? 0.08 : 0.4,
-        ringRetracedShare: n === 1 ? 0.08 : 0.4,
+        ringRetracedShare:
+          n === 1 ? MAX_RETRACE_SHARE / 2 : MAX_RETRACE_SHARE * 2,
         stemMeters: 0,
       };
     });
@@ -429,7 +433,8 @@ describe('the cap-rescue sweep', () => {
         unpavedShare: 0,
         // Nothing compliant until the rescue sweep is well under way.
         retracedShare: n > 12 ? 0.05 : 0.4,
-        ringRetracedShare: n > 12 ? 0.05 : 0.4,
+        ringRetracedShare:
+          n > 12 ? MAX_RETRACE_SHARE / 2 : MAX_RETRACE_SHARE * 2,
         stemMeters: 0,
       };
     });
@@ -450,7 +455,8 @@ describe('the cap-rescue sweep', () => {
         coordinates: circleFor(15_000),
         unpavedShare: 0,
         retracedShare: n > 12 ? 0.05 : 0.4,
-        ringRetracedShare: n > 12 ? 0.05 : 0.4,
+        ringRetracedShare:
+          n > 12 ? MAX_RETRACE_SHARE / 2 : MAX_RETRACE_SHARE * 2,
         stemMeters: 0,
       };
     });
@@ -462,7 +468,7 @@ describe('the cap-rescue sweep', () => {
   });
 
   it('bends the cap only when the sweep also finds nothing', async () => {
-    alwaysRetracing(0.35);
+    alwaysRetracing(MAX_RETRACE_SHARE * 2);
     const outcome = await searchLoops(request);
     if (outcome.status !== 'ok') throw new Error('expected loops');
     expect(outcome.relaxation).toBe('retrace');

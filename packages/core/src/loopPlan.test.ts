@@ -722,7 +722,10 @@ describe('doubling back', () => {
   });
 
   it('caps a loop at a tenth of itself repeated', () => {
-    expect(MAX_RETRACE_SHARE).toBe(0.1);
+    // Measured, not chosen for strictness: at a tenth exactly one of 40
+    // candidates passed against the live router, so the filter never bound
+    // and the note fired on nearly every loop.
+    expect(MAX_RETRACE_SHARE).toBe(0.35);
   });
 });
 
@@ -822,12 +825,17 @@ describe('the doubling-back cap', () => {
 
   it('accepts a loop at or under a tenth', () => {
     expect(withinRetraceCap(at(0), 'none')).toBe(true);
-    expect(withinRetraceCap(at(0.1), 'none')).toBe(true);
+    expect(withinRetraceCap(at(0.35), 'none')).toBe(true);
+    // A typical clean loop out of a dense grid, which used to be rejected.
+    expect(withinRetraceCap(at(0.2), 'none')).toBe(true);
   });
 
   it('rejects a loop over a tenth', () => {
-    expect(withinRetraceCap(at(0.11), 'none')).toBe(false);
+    expect(withinRetraceCap(at(0.36), 'none')).toBe(false);
     expect(withinRetraceCap(at(0.5), 'none')).toBe(false);
+    // A pure out-and-back has no ring at all, so it scores 1 by construction
+    // and cannot pass any threshold below it.
+    expect(withinRetraceCap(at(1), 'none')).toBe(false);
   });
 
   it('keeps enforcing through every earlier rung', () => {
@@ -835,7 +843,7 @@ describe('the doubling-back cap', () => {
     // third of itself is worse than the wrong terrain.
     for (const rung of ['none', 'heading', 'distance', 'terrain'] as const) {
       expect(retraceAppliesAt(rung)).toBe(true);
-      expect(withinRetraceCap(at(0.4), rung)).toBe(false);
+      expect(withinRetraceCap(at(0.6), rung)).toBe(false);
     }
   });
 
@@ -894,7 +902,7 @@ describe('the cap is defensive about unmeasurable loops', () => {
   });
 
   it('still rejects a real measurement over the cap', () => {
-    expect(withinRetraceCap({ ringRetracedShare: 0.2 }, 'none')).toBe(false);
+    expect(withinRetraceCap({ ringRetracedShare: 0.5 }, 'none')).toBe(false);
   });
 });
 

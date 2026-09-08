@@ -957,19 +957,33 @@ export const ringRetracedShare = (
 /**
  * The most of itself a loop may repeat and still be offered.
  *
- * A hard cap, not a preference: above a tenth, "loop" stops being an honest
- * description of the ride. Enforced as a filter at every rung of the ladder
- * except the last, so a rider in a dead-end valley — where no clean loop
- * exists at any length — still gets something rideable rather than nothing,
- * clearly labelled.
+ * A hard cap, not a preference — but set from measurement rather than from
+ * what sounds strict. It was a tenth, chosen because "above a tenth, loop
+ * stops being an honest description". Against the live router that threshold
+ * turned out to be unreachable: across 40 candidates at Bucharest and Rasnov,
+ * exactly ONE passed it. Typical ring-retrace is 0.14-0.39 in a dense grid and
+ * 0.27-0.68 out of a valley town, where the one road out is also the one road
+ * back.
+ *
+ * A filter nothing can satisfy is not strict, it is inert: the ladder reached
+ * its last rung on essentially every search, the cap was bent every time, and
+ * what the rider got was decided by ranking alone. Worse, the note below fired
+ * on nearly every loop, and a warning that always fires carries no
+ * information.
+ *
+ * At 0.35 it binds. In the same measurements it admits most Bucharest rings
+ * and the better Rasnov ones, rejects the loops that repeat half of
+ * themselves, and still fails a pure out-and-back outright — that has no ring
+ * at all, so it scores 1 by construction and cannot sneak through any
+ * threshold below it.
  *
  * Deliberately doubles as the threshold for MENTIONING retracing on a result.
  * The two being one number is what makes the UI self-consistent: a note can
  * only ever appear on a loop that broke the cap, which is exactly when the
- * rider needs telling. Splitting them would let a loop quietly sit at 9% with
- * no note and no way to know.
+ * rider needs telling. Splitting them would let a loop quietly sit just under
+ * the cap with no note and no way to know.
  */
-export const MAX_RETRACE_SHARE = 0.1;
+export const MAX_RETRACE_SHARE = 0.35;
 
 // ---------------------------------------------------------------------------
 // Candidates
