@@ -71,6 +71,8 @@ export const es: TranslationKeys = {
 
   // ── Route Preview ──
   preview: {
+    unpavedNotSupported: 'Las rutas rápidas no pueden evitar el firme sin asfaltar — cambia a Segura.',
+    noPavedRoute: 'Aquí no hay ninguna ruta totalmente asfaltada — esta tiene tramos sin asfaltar.',
     modeCycleA11y: 'Ruta: {{current}}. Toca para cambiar a {{next}}.',
     modeCycleHint: 'Recalcula la ruta con el nuevo perfil',
     recomputingA11y: 'Recalculando la ruta',

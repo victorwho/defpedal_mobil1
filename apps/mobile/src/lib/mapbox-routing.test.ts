@@ -969,3 +969,69 @@ describe('no paved route exists', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('avoid unpaved that cannot be honoured', () => {
+  /**
+   * Reported from the road: "avoid unpaved selected, route uses trails".
+   * Measured, the router was fine — Rasnov -> Poiana Brasov with
+   * `exclude=unpaved` returns a fully paved 10.8 km line, 0 of 41
+   * intersections classed. Three app-side paths ignored the preference in
+   * silence, and this covers the two that cannot honour it at all.
+   */
+  it('says so when Fast mode cannot avoid unpaved', () => {
+    // Mapbox Directions has no unpaved exclusion on the cycling profile, so
+    // the preference is unachievable rather than broken — but the rider had a
+    // toggle on, a route on screen, and no way to connect the two.
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    return directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: true,
+      avoidHills: false,
+    }).then((result) => {
+      expect(result.routes[0].warnings).toContain('unpaved_not_supported');
+    });
+  });
+
+  it('stays quiet in Fast mode when the rider never asked', () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    return directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+    }).then((result) => {
+      expect(result.routes[0].warnings).not.toContain('unpaved_not_supported');
+    });
+  });
+
+  it('stays quiet when Safe routing honoured it', () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    return directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    }).then((result) => {
+      expect(result.routes[0].warnings).toEqual([]);
+    });
+  });
+});

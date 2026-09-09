@@ -202,6 +202,18 @@ const isNoRoute = (code: string | undefined): boolean =>
  */
 export const PAVED_FALLBACK_WARNING = 'no_paved_route';
 
+/**
+ * Marks a route that could not honour "avoid unpaved" because it did not come
+ * from OSRM at all.
+ *
+ * Mapbox Directions has no unpaved exclusion on the cycling profile, so every
+ * Fast route — and every Safe route that degraded to Mapbox on a coverage miss
+ * — silently ignored the preference. The rider had a toggle on, a route on
+ * screen, and no way to know the two were unrelated. That is the shape of the
+ * complaint that found this: "avoid unpaved selected, route uses trails".
+ */
+export const UNPAVED_UNSUPPORTED_WARNING = 'unpaved_not_supported';
+
 export interface OsrmRouteFetch {
   readonly routes: Route[];
   /**
@@ -533,6 +545,8 @@ export const directPreviewRoute = async (
 
   let rawRoutes: Route[];
   let pavedFallback = false;
+  /** True when the rider asked to avoid unpaved and this path cannot. */
+  let unpavedUnsupported = false;
   if (effectiveMode === 'safe' && support.supported) {
     try {
       const fetched = await fetchOsrmRoutes(
@@ -551,10 +565,15 @@ export const directPreviewRoute = async (
       osrmCoverageMiss = true;
       assertWithinMapboxDistance();
       rawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
+      unpavedUnsupported = Boolean(request.avoidUnpaved);
     }
   } else {
     assertWithinMapboxDistance();
     rawRoutes = await fetchMapboxRoutes(origin, destination, waypoints, request.locale);
+    // Fast routing is Mapbox, which has no unpaved exclusion on the cycling
+    // profile. The preference is simply not achievable here, and saying so is
+    // the difference between a limitation and a broken toggle.
+    unpavedUnsupported = Boolean(request.avoidUnpaved);
   }
 
   const source: 'custom_osrm' | 'mapbox' =
@@ -565,9 +584,14 @@ export const directPreviewRoute = async (
     // The rider asked to avoid unpaved and we could not honour it. Say so on
     // the route itself rather than handing back something that quietly is not
     // what was asked for.
-    return pavedFallback
-      ? { ...mapped, warnings: [...mapped.warnings, PAVED_FALLBACK_WARNING] }
-      : mapped;
+    const warnings = [
+      ...mapped.warnings,
+      ...(pavedFallback ? [PAVED_FALLBACK_WARNING] : []),
+      ...(unpavedUnsupported ? [UNPAVED_UNSUPPORTED_WARNING] : []),
+    ];
+    return warnings.length === mapped.warnings.length
+      ? mapped
+      : { ...mapped, warnings };
   });
 
   // Enrich all routes with elevation data in parallel (non-blocking)

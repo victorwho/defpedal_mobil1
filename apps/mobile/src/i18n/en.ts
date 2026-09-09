@@ -69,6 +69,8 @@ export const en = {
 
   // ── Route Preview ──
   preview: {
+    unpavedNotSupported: 'Fast routes can’t avoid unpaved surfaces — switch to Safe for that.',
+    noPavedRoute: 'No fully paved route exists here — this one uses unpaved sections.',
     modeCycleA11y: 'Routing: {{current}}. Tap to switch to {{next}}.',
     modeCycleHint: 'Recomputes the route with the new profile',
     recomputingA11y: 'Recomputing route',

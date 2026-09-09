@@ -958,6 +958,25 @@ function RoutePreviewScreen() {
         </View>
       ) : null}
 
+      {/*
+        The rider asked to avoid unpaved and this route does not. Without this
+        the preference is a toggle with no visible effect: a rider reported
+        "avoid unpaved selected, route uses trails", and all three causes —
+        Fast mode, a coverage degrade to Mapbox, and no paved way existing —
+        were silent. The warning codes are set in `mapbox-routing`.
+      */}
+      {selectedRoute?.warnings?.includes('unpaved_not_supported') ? (
+        <View style={styles.busyStretchRow}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+          <Text style={styles.busyStretchText}>{t('preview.unpavedNotSupported')}</Text>
+        </View>
+      ) : selectedRoute?.warnings?.includes('no_paved_route') ? (
+        <View style={styles.busyStretchRow}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+          <Text style={styles.busyStretchText}>{t('preview.noPavedRoute')}</Text>
+        </View>
+      ) : null}
+
       {comparisonContent ? (
         <View>
           <View style={[

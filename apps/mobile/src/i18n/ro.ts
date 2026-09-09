@@ -71,6 +71,8 @@ export const ro: TranslationKeys = {
 
   // ── Route Preview ──
   preview: {
+    unpavedNotSupported: 'Traseele rapide nu pot evita drumurile neasfaltate — treci pe Sigur.',
+    noPavedRoute: 'Nu există traseu complet asfaltat aici — acesta are porțiuni neasfaltate.',
     modeCycleA11y: 'Rutare: {{current}}. Atinge pentru a comuta la {{next}}.',
     modeCycleHint: 'Recalculează ruta cu noul profil',
     recomputingA11y: 'Se recalculează ruta',
