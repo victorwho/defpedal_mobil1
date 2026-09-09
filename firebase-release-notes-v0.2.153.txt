@@ -1,0 +1,61 @@
+Defensive Pedal — Preview v0.2.153 (build 156)
+
+The unpaved numbers just got a lot bigger, and that is correct.
+
+The routing server changed yesterday (9 Sept). It now recognises forest paths
+and bridleways that carry no surface information in the map data as unpaved.
+Before, those were invisible to it — so "avoid unpaved" could not avoid them and
+the percentages did not count them.
+
+Nothing about your routes changed. The same roads are the same roads. What
+changed is that the app can now see what they are.
+
+Concretely, on Brasov -> Rasnov:
+
+  before      15.7% unpaved
+  now         63.1% unpaved
+
+That is the same ride, described honestly for the first time. Expect the
+percentages you see around Rasnov to roughly quadruple.
+
+"Avoid unpaved" is now genuinely strong
+
+On that same route, asking for paved gets you a fully paved line for an extra
+377 metres. Detours will often be that cheap.
+
+But in remote areas there may be NO paved way through at all. Previously the app
+handled that badly: it fell back to a plain fast route, so if you asked for a
+SAFE and PAVED route you could silently get one that was neither — no safety
+routing and no surface filter, with nothing said.
+
+Now: it asks again without the paved constraint and TELLS you. On loops you will
+see "No paved loop exists here — this one uses unpaved sections" on the result.
+You will never again be handed something quietly different from what you asked
+for.
+
+What to check
+
+- Look at the surface percentages around Rasnov. They should be much higher than
+  last build. Do they now match what you actually ride?
+- Turn on "avoid unpaved" and plan something into the mountains. Either you get a
+  paved route, or you get a clear note that none exists. Both are fine; silence
+  is not.
+- If you see the "no paved loop exists" note somewhere you think a paved loop
+  clearly does exist, tell me.
+
+One judgement call I want to flag
+
+The server team reported the new figures using a coarser way of measuring than
+the app uses: theirs counts a whole section of road as unpaved if any part of it
+is, where the app splits the section proportionally. On one test route that is
+the difference between 47.8% and 25.7% — theirs counts 6.3 km of a partly-paved
+stretch entirely as unpaved.
+
+I kept the app's finer measurement, so numbers you see here will read slightly
+LOWER than any figures quoted from the routing side. That is deliberate, and the
+app's is the more accurate of the two. If the percentages feel understated
+against what you ride, that is worth knowing and I will look again.
+
+Unchanged
+- Five loops per search, detour detection, saved loops syncing to your account.
+- Scenic scoring still covers the Rasnov area only.
