@@ -1,0 +1,45 @@
+Defensive Pedal — Preview v0.2.154 (build 157)
+
+FIX: "avoid unpaved" will never again be ignored without telling you.
+
+You reported Rasnov -> Poiana Brasov with "avoid unpaved" on, still using trails.
+
+First: the routing server was never the problem. That exact route, asked with
+the paved constraint, returns a fully paved line — 10.8 km, zero unpaved,
+SHORTER than the 13.6 km unpaved one. The app just wasn't asking.
+
+Three ways it wasn't asking, all of them silent
+
+1. FAST MODE. Fast routing comes from a different provider that has no ability
+   to avoid unpaved at all. So on Fast, the toggle does nothing. This is the
+   most likely thing you hit.
+2. A coverage gap falling back to that same provider. Same result.
+3. No paved route existing at all, so the constraint gets dropped.
+
+You now get told, in all three cases. On Fast it says what to do about it:
+"Fast routes can't avoid unpaved surfaces — switch to Safe for that."
+
+My mistake, plainly
+
+Case 3 was supposedly handled in the last build, and I told you it "TELLS you".
+It didn't. I wrote the warning into a field that nothing in the app has ever
+displayed. It was there in the code, invisible on screen.
+
+That is the same mistake as the bug that started this whole thread — writing to
+a place that looks right and has no readers. I checked the loop version showed
+up and didn't check the other one.
+
+What to check
+
+- Repeat exactly what you did: Rasnov -> Poiana Brasov with "avoid unpaved" on.
+  If you were on Fast, you should now see the message telling you so. Switch to
+  Safe and you should get a fully paved route, and a SHORTER one.
+- If you were already on Safe and still get trails, tell me straight away —
+  that would be a different problem and I have not found it.
+- Anywhere the app says "no fully paved route exists here", check whether you
+  agree. It should be rare.
+
+Unchanged
+- The honest unpaved percentages from build 156.
+- Five loops per search, detour detection, saved loops syncing to your account.
+- Scenic scoring still covers the Rasnov area only.
