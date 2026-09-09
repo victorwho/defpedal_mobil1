@@ -1,3 +1,16 @@
+> **RESOLVED 2026-09-09 — do not run this.**
+>
+> The answer turned out to be yes, it mattered: OSRM_Server widened the class in
+> `090c226` to cover `highway=path` and `bridleway` without a paved surface tag
+> (`footway` deliberately excluded — untagged urban footways are usually paved
+> sidewalks). It shipped as generation b46v2 on 2026-09-09. Measured after:
+> Brasov -> Rasnov moved 15.7% -> 63.1% unpaved, and `exclude=unpaved` now
+> returns a fully paved route only +377 m longer.
+>
+> Device-confirmed by the product owner on preview v0.2.154. Kept for the
+> reasoning, not as an open task. Regression check:
+> `node scripts/probe-unpaved-widening.mjs`.
+
 # Prompt: does bicycle46 classify unsurfaced paths as `unpaved`?
 
 Paste this into a session in `C:\dev\OSRM_Server`.
