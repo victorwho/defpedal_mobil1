@@ -2131,3 +2131,36 @@ Error-log #109 (a guard that inferred its own trigger and never fired), #110
 selectors), #112 (one number for two complaints). Prevention rules 40–44.
 
 4,028 tests pass across the three packages.
+
+## Session 118 — road classes: right parse, wrong address (2026-09-08/09)
+
+Preview builds 155 → 157 (v0.2.152 → v0.2.154), each device-tested between.
+
+**Every route the app had ever measured reported 100% paved** (`2910b08`). OSRM
+puts road classes on `steps[].intersections[].classes`; three readers looked at
+`leg.annotation.classes`, which does not exist. Silently dead for the whole life
+of each: the loop surface split, tunnel/bridge extraction (so Route Feature
+Awareness v0.2.55 only ever showed unprotected left turns), and the surface
+composition breakdown. One shared reader now, `packages/core/src/routeClasses.ts`,
+with a live-captured fixture asserting the annotation has no `classes` key.
+Same three routes went from 0% to 55.0/53.7/44.6% unpaved. Error-log #113.
+
+**OSRM_Server widened the `unpaved` class** to cover `highway=path` and
+`bridleway` without a surface tag (b46v2, live 2026-09-09). Verified with
+`scripts/probe-unpaved-widening.mjs`: Brasov→Rasnov moved 15.7% → 63.1%
+overnight. Their follow-up notice reported figures from a whole-step
+attribution and attributed that method to this reader; measured side by side,
+proportional gives 63.1/25.7 against whole-step 68.4/47.8, and the flat route
+has 3 mixed steps totalling 6.3 km of 18 km that whole-step charges entirely to
+unpaved. Kept the finer reading and pinned it with tests (`f9d051f`).
+
+**"Avoid unpaved" ignored in silence, three ways** (`07b017a`, `ccfc9e9`).
+Reported from the road on Rasnov→Poiana Brasov. The router was never at fault —
+that pair with the constraint returns a fully paved 10.8 km line, SHORTER than
+the 13.6 km unpaved one. Fast mode and a coverage degrade both use Mapbox, which
+has no unpaved exclusion at all; and where no paved route exists the constraint
+is now dropped and retried rather than falling through to a route that is
+neither safe nor paved. All three now warn, and `route-preview` renders them —
+which it never did, so the first fix was invisible. Error-log #114.
+
+4,048 tests across the three packages.

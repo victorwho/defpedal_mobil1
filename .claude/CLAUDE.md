@@ -99,6 +99,29 @@ Migration `202609020001`. A reporter may tick "This hazard is permanent" in the 
 - **Ordering constraint:** the migration MUST be live before the API deploys. The cron purge filters on `is_permanent`, and PostgREST 400s on an unknown column — an unmigrated DB turns the daily hazard-expiry cron into a 502 (it would page via the *Cloud Scheduler job failed* policy, but expiry stops meanwhile). The hazard INSERT path degrades gracefully on its own (`submissions.ts` retries without the column, stripping `is_permanent` before `hazard_type` so the category is never the thing that gets lost), and `/hazards/nearby` defaults `isPermanent` to `false`.
 - **Imports never set it.** `is_permanent` defaults false and the import pipeline supplies its own explicit `expires_at`, which still wins in `set_hazard_expiry`.
 
+## Road Classes (unpaved / tunnel / bridge)
+
+- ⚠️ **OSRM returns road classes on `steps[].intersections[].classes`, NOT on
+  `leg.annotation`.** The annotation carries exactly `[datasources, distance,
+  duration, metadata, nodes, speed, weight]` — there has never been a `classes`
+  key on it. Three readers assumed the annotation and silently returned nothing
+  for the entire life of each feature: the loop surface split (every route
+  "100% paved"), tunnel and bridge extraction (so Route Feature Awareness
+  v0.2.55 only ever showed unprotected left turns), and the surface composition
+  breakdown. `packages/core/src/routeClasses.ts` is the single reader now
+  (error-log #113).
+- **A live-captured fixture guards it.** `__fixtures__/osrm-classes.json` is a
+  real response, and a test asserts the leg annotation has no `classes` key. A
+  hand-built fixture only proves you can parse your own assumption — which is
+  exactly why every test passed while all three features were dead.
+- **"Avoid unpaved" cannot be honoured on every path, and must never fail in
+  silence.** Fast mode and a coverage degrade both route via Mapbox Directions,
+  which has no unpaved exclusion on the cycling profile; and in remote terrain
+  no paved route may exist. All three set a warning
+  (`UNPAVED_UNSUPPORTED_WARNING`, `PAVED_FALLBACK_WARNING`) and `route-preview`
+  renders them. It did not before, so the first version of that fix was
+  invisible — producer and consumer are two checks (error-log #114).
+
 ## Recreational Loops (generated rides that return to the start)
 
 Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
