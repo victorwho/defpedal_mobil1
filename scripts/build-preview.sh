@@ -152,7 +152,10 @@ fi
 # This prevents dev/release icon and config drift — no more cherry-picking files.
 # Excludes build/ output to avoid syncing gigabytes of cached artifacts.
 robocopy "$SRC/apps/mobile/android/app/src" "$DST/apps/mobile/android/app/src" //MIR //NFL //NDL //NJH //NJS //nc //ns //np || true
-for f in build.gradle google-services.json; do
+# proguard-rules.pro is load-bearing once R8 is on (see gradle.properties):
+# it was absent from this list AND absent from C:\dpb entirely, so the first
+# minified build would have run with no project keep rules at all.
+for f in build.gradle google-services.json proguard-rules.pro; do
   cp -f "$SRC/apps/mobile/android/app/$f" "$DST/apps/mobile/android/app/$f" 2>/dev/null || true
 done
 for f in build.gradle settings.gradle gradle.properties; do
