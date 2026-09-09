@@ -39,7 +39,7 @@ vi.mock('../../design-system/hooks/useReducedMotion', () => ({
   useReducedMotion: () => true,
 }));
 
-import { MapStageScreen } from '../MapStageScreen';
+import { MapStageScreen, resolveDragTarget } from '../MapStageScreen';
 
 const stubMap = () => React.createElement('div', null, 'map');
 const child = () => React.createElement('div', null, 'controls');
@@ -167,5 +167,69 @@ describe('sheet detents', () => {
       </MapStageScreen>,
     );
     expect(screen.getByText('course detail')).toBeTruthy();
+  });
+});
+
+/**
+ * The drag-release rule.
+ *
+ * Reported from preview v0.2.154: route preview's sheet "has become hard to
+ * pull up". It had. faa19c8 replaced a direction rule (80dp either way) with
+ * pure nearest-detent, to reach the loop planner's new middle detent. On a
+ * TWO-detent sheet the nearest boundary is the midpoint between the peek strip
+ * and 65% of the screen, so a pull-up had to travel ~190dp instead of 80dp and
+ * anything shorter sprang back to collapsed.
+ *
+ * Heights below are the real ones for a 800dp window: collapsed is
+ * HANDLE_HEIGHT + PEEK_CONTENT_HEIGHT, expanded is EXPANDED_RATIO * 800.
+ */
+describe('drag release', () => {
+  const HEIGHTS: Record<string, number> = { collapsed: 108, mid: 360, expanded: 520 };
+  const heightFor = (detent: string) => HEIGHTS[detent]!;
+  const twoDetent = ['collapsed', 'expanded'] as const;
+  const threeDetent = ['collapsed', 'mid', 'expanded'] as const;
+
+  const release = (ladder: readonly string[], current: string, dy: number, vy = 0) =>
+    resolveDragTarget({
+      ladder: [...ladder] as never,
+      current: current as never,
+      heightFor: heightFor as never,
+      dy,
+      vy,
+    });
+
+  it('opens a two-detent sheet on a pull-up that clears the threshold', () => {
+    // THE REGRESSION. 100dp up is a deliberate drag but lands nowhere near the
+    // expanded height, so pure proximity sent it back to collapsed.
+    expect(release(twoDetent, 'collapsed', -100)).toBe('expanded');
+  });
+
+  it('stays put when the drag was too small to be a decision', () => {
+    expect(release(twoDetent, 'collapsed', -40)).toBe('collapsed');
+    expect(release(twoDetent, 'expanded', 40)).toBe('expanded');
+  });
+
+  it('treats a fast flick as deliberate even when it barely travelled', () => {
+    expect(release(twoDetent, 'collapsed', -20, -1.4)).toBe('expanded');
+  });
+
+  it('collapses on a deliberate downward drag', () => {
+    expect(release(twoDetent, 'expanded', 120)).toBe('collapsed');
+  });
+
+  it('lands on the middle detent when the finger stopped near it', () => {
+    // 260dp up from 108 releases at 368, next to mid (360).
+    expect(release(threeDetent, 'collapsed', -260)).toBe('mid');
+  });
+
+  it('lets a long drag skip the middle detent', () => {
+    // 420dp up releases at 528, past expanded.
+    expect(release(threeDetent, 'collapsed', -420)).toBe('expanded');
+  });
+
+  it('never moves the wrong way, however the heights fall', () => {
+    // Proximity may carry a gesture further, never backwards past the start.
+    expect(release(threeDetent, 'mid', -90)).toBe('expanded');
+    expect(release(threeDetent, 'mid', 90)).toBe('collapsed');
   });
 });

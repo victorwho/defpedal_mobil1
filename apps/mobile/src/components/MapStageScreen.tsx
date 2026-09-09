@@ -86,6 +86,70 @@ type MapStageScreenProps = PropsWithChildren<{
   onDetentChange?: (detent: SheetDetent) => void;
 }>;
 
+/**
+ * A flick counts as a decision even when it barely travelled.
+ */
+const FLICK_VELOCITY = 0.5;
+
+/**
+ * Where a drag should leave the sheet.
+ *
+ * Nearest-detent ALONE is wrong on a two-detent sheet. Route preview rests at
+ * the peek strip (~108) and opens to 65% of the screen (~496 on a 800dp
+ * window), so the midpoint sits ~190dp above the collapsed height: a
+ * deliberate pull-up that travelled less than that measured "nearest to
+ * collapsed" and sprang straight back. Riders reported the sheet as having
+ * become hard to pull up, which is exactly what it was. Regressed in faa19c8,
+ * which replaced a direction rule with pure proximity in order to reach the
+ * loop planner's new middle detent.
+ *
+ * So the rule is both: a deliberate gesture ALWAYS moves at least one detent
+ * the way the finger went, and proximity is only allowed to carry it FURTHER
+ * than that. The middle detent stays reachable, a long drag can still skip it,
+ * and a short pull-up opens the sheet again.
+ *
+ * Pure and exported because the release rule is the part that broke, and a
+ * PanResponder callback is not something a test can hold.
+ */
+export const resolveDragTarget = ({
+  ladder,
+  current,
+  heightFor,
+  dy,
+  vy,
+}: {
+  ladder: SheetDetent[];
+  current: SheetDetent;
+  heightFor: (detent: SheetDetent) => number;
+  /** Gesture travel. NEGATIVE is upward, matching PanResponder. */
+  dy: number;
+  /** Gesture velocity, used so a fast short flick still counts. */
+  vy: number;
+}): SheetDetent => {
+  const currentIndex = Math.max(0, ladder.indexOf(current));
+  const deliberate = Math.abs(dy) > SNAP_THRESHOLD || Math.abs(vy) > FLICK_VELOCITY;
+  if (!deliberate) return current;
+
+  // Up is negative dy, and up means further along the ladder.
+  const direction = dy < 0 ? 1 : -1;
+  const stepped = Math.min(ladder.length - 1, Math.max(0, currentIndex + direction));
+
+  const released = heightFor(current) - dy;
+  let nearestIndex = 0;
+  let bestGap = Number.POSITIVE_INFINITY;
+  ladder.forEach((candidate, index) => {
+    const gap = Math.abs(heightFor(candidate) - released);
+    if (gap < bestGap) {
+      bestGap = gap;
+      nearestIndex = index;
+    }
+  });
+
+  const targetIndex =
+    direction > 0 ? Math.max(stepped, nearestIndex) : Math.min(stepped, nearestIndex);
+  return ladder[targetIndex]!;
+};
+
 const CollapsibleSheet = ({
   children,
   footer,
@@ -211,19 +275,6 @@ const CollapsibleSheet = ({
     ? ['collapsed', 'mid', 'expanded']
     : ['collapsed', 'expanded'];
 
-  const nearestDetent = (height: number): SheetDetent => {
-    let best = ladder[0]!;
-    let bestGap = Number.POSITIVE_INFINITY;
-    for (const candidate of ladder) {
-      const gap = Math.abs(heightFor(candidate) - height);
-      if (gap < bestGap) {
-        bestGap = gap;
-        best = candidate;
-      }
-    }
-    return best;
-  };
-
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -241,18 +292,15 @@ const CollapsibleSheet = ({
       },
       onPanResponderRelease: (_, gesture) => {
         draggingRef.current = false;
-        const startHeight = heightFor(detentRef.current);
-        const released = startHeight - gesture.dy;
-
-        // Below the threshold the drag was not a decision — go back.
-        if (Math.abs(gesture.dy) <= SNAP_THRESHOLD) {
-          snapTo(detentRef.current);
-          return;
-        }
-        // Otherwise land on whichever detent the finger actually stopped
-        // nearest. With three heights a fixed up/down rule would skip the
-        // middle one entirely.
-        snapTo(nearestDetent(released));
+        snapTo(
+          resolveDragTarget({
+            ladder,
+            current: detentRef.current,
+            heightFor,
+            dy: gesture.dy,
+            vy: gesture.vy,
+          }),
+        );
       },
       onPanResponderTerminate: () => {
         draggingRef.current = false;
@@ -276,6 +324,9 @@ const CollapsibleSheet = ({
               snapTo(ladder[(index + 1) % ladder.length]!);
             }}
             style={styles.handleTouchArea}
+            // The bar plus its padding is only ~30dp tall, under the 44dp
+            // minimum. hitSlop buys the rest without moving anything visually.
+            hitSlop={{ top: 8, bottom: 8, left: 24, right: 24 }}
             // The sheet is otherwise driven by a PanResponder, which is
             // invisible to TalkBack/VoiceOver. This tap target is the only
             // accessible expand/collapse path, so label it (review 2026-06-12).
