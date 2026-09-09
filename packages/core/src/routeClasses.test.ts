@@ -145,3 +145,59 @@ describe('classRuns', () => {
     expect(classRuns(liveLegs, 'unpaved').length).toBeGreaterThan(0);
   });
 });
+
+describe('why attribution is proportional, not whole-step', () => {
+  /**
+   * A server-side notice (2026-09-09) described this reader as "any
+   * intersection in a step => whole step counts" and reported figures from
+   * that method. It is not what ships here, and the difference is large.
+   *
+   * Measured on the same live responses, Brasov -> Rasnov:
+   *   proportional (shipped)  standard 63.1%   flat 25.7%
+   *   whole-step              standard 68.4%   flat 47.8%
+   *
+   * The flat route has 3 steps whose intersections disagree, totalling 6.3 km
+   * on an 18 km ride. Whole-step counts every metre of those as unpaved,
+   * including the paved parts — that gap IS the difference. Proportional is
+   * the finer and more faithful reading, so do not "correct" it upward.
+   */
+  it('does not charge a whole step to one intersection class', () => {
+    const legs: ClassifiedLeg[] = [
+      {
+        steps: [
+          {
+            distance: 1_000,
+            geometry: { coordinates: [[26, 44], [26.02, 44]] },
+            intersections: [
+              { location: [26, 44], classes: ['unpaved'] },
+              { location: [26.01, 44] },
+            ],
+          },
+        ],
+      },
+    ];
+    const { byClass, classifiedMeters } = classMeters(legs);
+    expect(classifiedMeters).toBe(1_000);
+    // Whole-step attribution would report the full 1000 m.
+    expect(byClass.get('unpaved')).toBeLessThan(1_000);
+    expect(byClass.get('unpaved')).toBeGreaterThan(0);
+  });
+
+  it('still reports the whole step when every intersection agrees', () => {
+    const legs: ClassifiedLeg[] = [
+      {
+        steps: [
+          {
+            distance: 800,
+            geometry: { coordinates: [[26, 44], [26.02, 44]] },
+            intersections: [
+              { location: [26, 44], classes: ['unpaved'] },
+              { location: [26.01, 44], classes: ['unpaved'] },
+            ],
+          },
+        ],
+      },
+    ];
+    expect(classMeters(legs).byClass.get('unpaved')).toBeCloseTo(800, 5);
+  });
+});

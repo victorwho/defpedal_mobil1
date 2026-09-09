@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /**
- * Has the widened `unpaved` class gone live?
+ * Is the widened `unpaved` class still live?
  *
- * OSRM_Server commit 090c226 widens the class to cover `highway=path` and
- * `bridleway` without a paved surface tag. Classes are baked at graph-extract
- * time, so nothing changes until the next graph rebuild ships — and there is
- * no date for that. This tells you whether it has landed instead of assuming.
+ * OSRM_Server 090c226 widened the class to cover `highway=path` and
+ * `bridleway` without a paved surface tag. It shipped as generation b46v2 on
+ * 2026-09-09. Classes bake at graph-extract time, so a later graph swap could
+ * silently take it away again — this is the regression check for that.
  *
- * The probe is the one their notice specified: Brasov -> Rasnov on the
- * standard host, where the share of metres carrying `unpaved` jumps from about
- * 16% to about 66% once the new graph is live.
+ * Brasov -> Rasnov on the standard host: the share of metres carrying
+ * `unpaved` moved from 15.7% to 63.1% when the new graph landed.
  *
  *   node scripts/probe-unpaved-widening.mjs
  *
@@ -20,8 +19,12 @@
 const BASE = 'https://osrm.defensivepedal.com/route/v1/bicycle';
 const FROM = '25.6012,45.6580'; // Brasov
 const TO = '25.4600,45.5934'; // Rasnov
-const BEFORE = 0.16;
-const AFTER = 0.66;
+// Measured with THIS reader (proportional attribution), Brasov -> Rasnov.
+// Not the 16%/66% in the original server notice — those were way-level, and
+// not the 59.8%/68.4% in the follow-up either, which were whole-step. See
+// `routeClasses.test.ts` for why the shipped attribution is finer than both.
+const BEFORE = 0.157; // b46v1, measured 2026-09-08
+const AFTER = 0.631; // b46v2, measured 2026-09-09 (widening live)
 
 const R = 6371008.8;
 const haversine = (a, b) => {
@@ -103,8 +106,8 @@ const run = async () => {
   console.log(`expected ~${BEFORE * 100}% before the rebuild, ~${AFTER * 100}% after`);
   console.log(
     live
-      ? 'VERDICT: the widened class appears to be LIVE.'
-      : 'VERDICT: still the OLD graph — widening has not shipped yet.',
+      ? 'VERDICT: widened class is LIVE, as expected.'
+      : 'VERDICT: reads like the OLD graph — the widening may have been rolled back.',
   );
   // Neither state is a failure; the exit code just makes this scriptable.
   // `exitCode` rather than `exit()` — exiting inside the async flow trips a

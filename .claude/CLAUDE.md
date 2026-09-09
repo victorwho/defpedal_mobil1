@@ -137,20 +137,30 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
   ordinary reroute asks for the shortest way *home* and silently deletes the
   rest of the ride. `loopStorage` refuses to load a saved loop whose marker is
   missing rather than ride it unprotected.
-- ⏳ **The `unpaved` class is being WIDENED server-side, and is not live yet.**
-  OSRM_Server `090c226` adds `highway=path` and `bridleway` without a paved
-  surface tag (`footway` deliberately excluded — untagged urban footways are
-  usually paved sidewalks). Classes are baked at graph-extract time, so nothing
-  changes until the next graph rebuild, which has no date. **Detect it with
-  `node scripts/probe-unpaved-widening.mjs`** — Brasov→Rasnov jumps from ~16%
-  to ~66% of metres classed unpaved. Measured 2026-09-08: 15.7%, still old.
-  No parsing change is needed; `routeClasses` is already correct. What DOES
-  change: unpaved percentages jump in trail-heavy regions (the number becoming
-  honest, not routes changing), and `exclude=unpaved` gets much stronger, so
-  `NoRoute` stops being exotic — both routing paths now retry once without the
-  constraint and flag it (`PAVED_FALLBACK_WARNING`, `loop.noPavedLoop`) rather
-  than failing through to Mapbox fast routing, which used to lose the safety
-  profile AND the surface filter silently.
+- ✅ **The widened `unpaved` class is LIVE** (OSRM_Server `090c226`, generation
+  b46v2, deployed 2026-09-09, all hosts including flat). It adds `highway=path`
+  and `bridleway` without a paved surface tag; `footway` was deliberately left
+  out, since untagged urban footways are usually paved sidewalks. Routes
+  themselves did not change. Regression check:
+  `node scripts/probe-unpaved-widening.mjs`.
+- ⚠️ **Unpaved share is attributed PROPORTIONALLY, and that is deliberate — do
+  not "correct" it upward.** An intersection's classes describe the road
+  leaving it, so intersection `i` owns the stretch to `i+1`
+  (`packages/core/src/routeClasses.ts`). A server-side notice described this
+  reader as "any intersection in a step ⇒ the whole step counts" and supplied
+  figures from that method; that is a different, coarser reader. Measured on
+  the same live responses, Brasov→Rasnov: **proportional 63.1% standard /
+  25.7% flat** against **whole-step 68.4% / 47.8%**. The flat route has 3 steps
+  whose intersections disagree, totalling 6.3 km of an 18 km ride — whole-step
+  charges every metre of those to unpaved including the paved parts, which is
+  the entire gap. Pinned by tests in `routeClasses.test.ts`.
+- **`exclude=unpaved` is now fully effective** and cheap: on that probe it
+  returns a paved route only **+377 m** longer, with 0 of 286 intersections
+  still classed. `NoRoute` in remote terrain remains possible, so both routing
+  paths retry once without the constraint and flag it
+  (`PAVED_FALLBACK_WARNING`, `loop.noPavedLoop`) rather than failing through to
+  Mapbox fast routing, which used to lose the safety profile AND the surface
+  filter silently.
 - **Never derive two behaviours from one expression.** Ring shape and the
   ring/lollipop choice both came off `slot % 2`, so every lollipop was a hexagon
   and half the search space was never built. Shape now steps every second slot;
