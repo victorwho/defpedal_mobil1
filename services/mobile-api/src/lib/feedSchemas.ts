@@ -104,6 +104,12 @@ export const profileUpdateRequestSchema = {
     keepFullGpsHistory: { type: 'boolean' },
     pedalVoiceSassy: { type: 'boolean' },
     preferredLocale: { type: 'string', enum: ['en', 'ro', 'es'] },
+    // Build provenance, synced at session bootstrap. Enumerated rather than
+    // free text so a typo cannot mint a fourth environment that then splits
+    // every dashboard silently.
+    appEnvironment: { type: 'string', enum: ['development', 'preview', 'production'] },
+    appVersion: { type: 'string', maxLength: 32 },
+    appPlatform: { type: 'string', enum: ['ios', 'android', 'web'] },
   },
 } as const;
 

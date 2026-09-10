@@ -149,6 +149,17 @@ export const startTripRecord = async (
             distance_meters: request.distanceMeters,
             started_at: request.startedAt,
             end_reason: 'in_progress',
+            // Planned route recorded at START (migration 202609100001). Until
+            // then it lived only on trip_tracks, written at ride END, so any
+            // ride whose track never uploaded lost the route entirely even
+            // though the geometry existed the moment Start was pressed.
+            // `?? null` and not omitted: this is an UPSERT on
+            // (user_id, client_trip_id), so a retry that omitted the key would
+            // leave a stale value while one that sends null is honest about an
+            // old client having sent nothing.
+            planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
+            planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
+            routing_mode: request.routingMode ?? null,
           },
         ],
         { onConflict: 'user_id,client_trip_id' },

@@ -29,6 +29,7 @@ import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { boundRoutePolyline6 } from '../src/lib/routeGeometry';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import {
   buildOfflineRegionFromRoute,
@@ -569,6 +570,14 @@ function RoutePreviewScreen() {
       destinationCoordinate: routeRequest.destination,
       distanceMeters: selectedRoute.distanceMeters,
       startedAt: new Date().toISOString(),
+      // The planned route, recorded NOW rather than only at ride end. Its
+      // other copy rides on `trip_track`, which is enqueued when the ride
+      // finishes — so a ride the rider discards, or churns out of mid-ride,
+      // used to lose the route entirely even though the geometry existed at
+      // this exact moment. Bounded with the same helper the track upload uses.
+      plannedRoutePolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
+      plannedRouteDistanceMeters: selectedRoute.distanceMeters,
+      routingMode: routePreview?.selectedMode ?? routeRequest.mode,
     });
     setActiveTripClientId(clientTripId);
 

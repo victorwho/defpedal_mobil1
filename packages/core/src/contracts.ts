@@ -468,6 +468,21 @@ export interface TripStartRequest {
   destinationCoordinate: Coordinate;
   distanceMeters: number;
   startedAt: string;
+  /**
+   * Planned route geometry, captured at START rather than only at end.
+   *
+   * `trip_tracks.planned_route_polyline6` is written when the ride ENDS, so a
+   * ride whose track never uploads — the rider discards, churns mid-ride, or
+   * the queue dies with the process — loses the route entirely, even though
+   * the geometry existed the moment they pressed Start. Sending it here means
+   * a `trips` row alone can still draw the map.
+   *
+   * Optional: an older client omits it, and `trip_tracks` remains
+   * authoritative whenever it is present.
+   */
+  plannedRoutePolyline6?: string;
+  plannedRouteDistanceMeters?: number;
+  routingMode?: string;
 }
 
 export interface TripStartResponse {
@@ -1079,6 +1094,23 @@ export interface ProfileUpdateRequest {
   // profiles.preferred_locale; absent/null → server falls back to EN
   // (review 2026-08-13 G-11).
   preferredLocale?: 'en' | 'ro' | 'es';
+  /**
+   * Which build this rider is running, synced at session bootstrap.
+   *
+   * Until 2026-09-10 nothing recorded it, so a developer's preview rides were
+   * indistinguishable from a rider's store install in every number on the
+   * analytics dashboard. `push_tokens.platform` was the only provenance of any
+   * kind and it covered 56% of trip users, consent-gated and therefore biased.
+   *
+   * This is the LAST build the user ran, not the build that wrote a given row.
+   * It answers "is this user a tester?", which is what the dashboard needs;
+   * per-row attribution would mean the same fields on `trips`.
+   */
+  appEnvironment?: 'development' | 'preview' | 'production';
+  /** App versionName, e.g. `0.2.159`. Pairs with `appEnvironment`. */
+  appVersion?: string;
+  /** OS the rider is on. Pairs with `appEnvironment`. */
+  appPlatform?: 'ios' | 'android' | 'web';
 }
 
 /**

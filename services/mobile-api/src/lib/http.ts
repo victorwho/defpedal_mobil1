@@ -656,6 +656,12 @@ export const tripStartRequestSchema = {
       minimum: 0,
     },
     startedAt: dateTimeSchema,
+    // Planned route, captured at START so a ride whose trip_tracks upload
+    // never lands still knows where it was meant to go. Same 6 MB ceiling as
+    // /trips/track's copy; the server downsamples above 15k points.
+    plannedRoutePolyline6: { type: 'string', maxLength: 6000000 },
+    plannedRouteDistanceMeters: { type: 'number', minimum: 0 },
+    routingMode: { type: 'string', maxLength: 32 },
   },
 } as const;
 
@@ -1074,6 +1080,9 @@ export const normalizeTripStartRequest = (body: TripStartBody): TripStartRequest
   destinationCoordinate: body.destinationCoordinate,
   distanceMeters: body.distanceMeters,
   startedAt: body.startedAt,
+  plannedRoutePolyline6: body.plannedRoutePolyline6,
+  plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
+  routingMode: body.routingMode,
 });
 
 export const normalizeTripEndRequest = (body: TripEndBody): TripEndRequest => ({

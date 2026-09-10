@@ -603,6 +603,56 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - **Self-heal — `trip_end`/`trip_track` must NEVER depend only on the in-memory/persisted `tripServerIds[clientTripId]` map.** That map is lost on app kill, the `resetFlow` prune, or a debounced persist write that didn't flush — which used to orphan the mutation forever (skipped every flush, never retried/killed/surfaced) and strand the trip `in_progress` with no GPS track (the May–June 2026 `trip_tracks`-loss regression; error-log #60). When the local map misses and no `trip_start` is still queued, the sync loop resolves the id from the **durable** server record via `GET /v1/trips/resolve?clientTripId=` (`resolveTripIdByClientId`, reads `trips.client_trip_id`); a 404 dead-letters the mutation into `RideLossBanner` instead of skipping it. `isMutationReady`/`shouldSkipMutation` are queue-aware: process an orphan when its `trip_start` is gone, keep waiting while one is pending. On a build with this fix, orphaned mutations still in a device's queue self-heal and retroactively create the missing `trip_tracks` on next launch.
 - **Persist debounce is force-flushed for recovery-critical state.** The persist adapter (`lib/storage.ts`) coalesces writes (3s/8s) to spare the JS thread during GPS-breadcrumb churn, but `queueSlice.ts` calls `flushPersistedWrites()` immediately after `enqueueMutation`/`resolveMutation`/`killMutation`/`setTripServerId`/`setActiveTripClientId` so the offline queue + id-map survive a hard kill. Don't add new trip-critical state to the persisted slice without flushing it on change — a debounced-but-unflushed write is lost on an OS kill (this was the June 22 cliff).
 
+### Trip tracking coverage — read this before believing "trips are not being recorded"
+
+⚠️ **This has been raised three times (2026-07-15, 07-29, 09-10) from the same
+number, and twice it was not a bug.** The metric usually quoted — *% of ended
+trips with a `trip_tracks` row* — counts deliberate discards as failures, so it
+can never rise while trial riders exist, and the registration wall grows exactly
+that cohort.
+
+- **Decompose by `trips.end_action` BEFORE concluding anything.** Measured
+  Aug–Sep 2026: `saved` 96/97 tracked (**99%** — the pipeline is healthy),
+  `discarded` 106 with 0 tracked and a **median duration of 1 minute** (trial
+  starts, by design), `prompt_discarded` 25 (zombie rows). The correct
+  denominator is `end_action IN ('saved','prompt_saved','completed')`.
+  `end_action` exists (migration `202607290001`) *specifically* to settle this.
+- **Use the median, not the mean.** The mean discard is 42 minutes and is six
+  outliers; the median is 1 minute. The mean points at a product disaster that
+  is not there.
+- **Coverage by month:** 98% (Apr) → 26% (Jul) → 42% (Aug) → 45% (Sep). The
+  July trough is real and was fixed on 2026-07-29 in v0.2.122. Any report
+  ending in July is describing a state that no longer exists.
+- **There is no per-trip platform column.** Attribution only via
+  `push_tokens.platform`, which covers 56% of trip users and is consent-gated
+  for anonymous riders — partial AND biased. Per-platform claims off that join
+  are not trustworthy.
+- Full working: `docs/reviews/gps-tracking-audit-2026-09-10.md` (plus the two
+  2026-07 predecessors).
+
+### Build provenance + planned route on trips (migration `202609100001`, 2026-09-10)
+
+- **`profiles.app_environment` / `app_version` / `app_platform`** — synced by
+  `ProfileDeviceSyncManager` at session bootstrap. Before this, preview and
+  development installs were indistinguishable from store installs in every
+  analytics number. Resolution lives in `apps/mobile/src/lib/appBuildInfo.ts`
+  and **fails toward non-production** when `appVariant` and `appEnv` disagree:
+  under-counting production is recoverable, polluting it with tester rides is
+  the failure being fixed. ⚠️ It records the LAST build a user ran, not the
+  build that wrote a row — it answers "is this user a tester?". Per-row
+  attribution would mean the same columns on `trips`, deliberately not done.
+- **`trips.planned_route_polyline6` / `planned_route_distance_meters` /
+  `routing_mode`** — written by `startTripRecord` from all three ride-start
+  paths (route preview, GPX course, generated loop). The geometry used to live
+  only on `trip_tracks`, written at ride END, so a ride whose track never
+  uploaded lost the route entirely despite the geometry existing at Start.
+  `trip_tracks` stays authoritative when present.
+- **No deploy ordering needed, and that is verified, not assumed.**
+  `tripStartRequestSchema` is `additionalProperties: false`, but Fastify's ajv
+  defaults to `removeAdditional: true`, so an old server strips the new fields
+  instead of 400-ing the ride. A test in `routes-v1.test.ts` pins it — if it
+  ever fails, the client must NOT ship before the API.
+
 ### Trip Data Flow (Critical for Deletion / Privacy)
 A completed ride writes to **four** Supabase tables, each read by a different surface — the History row is not the source of truth for the community surfaces:
 - `trip_tracks` → History tab, per-period Stats Dashboard (RPC `get_trip_stats_dashboard`)

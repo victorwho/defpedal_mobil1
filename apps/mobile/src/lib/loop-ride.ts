@@ -15,6 +15,7 @@
 import type { Coordinate, RouteOption } from '@defensivepedal/core';
 
 import type { AppStore } from '../store/appStore';
+import { boundRoutePolyline6 } from './routeGeometry';
 
 /**
  * Just the store surface a ride start needs.
@@ -101,6 +102,11 @@ export const beginLoopRide = (
     destinationCoordinate: args.start,
     distanceMeters: args.distanceMeters,
     startedAt: args.startedAt,
+    // Recorded at start: a loop's destination IS its origin, so without the
+    // geometry a trips row alone cannot draw anything at all.
+    plannedRoutePolyline6: boundRoutePolyline6(args.route.geometryPolyline6),
+    plannedRouteDistanceMeters: args.route.distanceMeters,
+    routingMode: 'generated_loop',
   });
   store.setActiveTripClientId(args.clientTripId);
 

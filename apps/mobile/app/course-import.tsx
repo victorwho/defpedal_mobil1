@@ -42,6 +42,7 @@ import { useT } from '../src/hooks/useTranslation';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
 import { buildCourseRoute, enrichCourseRoute } from '../src/lib/course-route';
+import { boundRoutePolyline6 } from '../src/lib/routeGeometry';
 import { courseNameFromFileName, readGpxFile } from '../src/lib/gpx-import';
 import { parseGpx, type ParsedCourse } from '../src/lib/gpx-parse';
 import {
@@ -357,6 +358,11 @@ export default function CourseImportScreen() {
       destinationCoordinate: endpoints.destination,
       distanceMeters: state.route.distanceMeters,
       startedAt,
+      // Recorded at start so a course ride that never uploads its track keeps
+      // the line the rider imported — the whole point of a course.
+      plannedRoutePolyline6: boundRoutePolyline6(state.route.geometryPolyline6),
+      plannedRouteDistanceMeters: state.route.distanceMeters,
+      routingMode: 'gpx_course',
     });
     store.setActiveTripClientId(clientTripId);
 

@@ -370,6 +370,50 @@ const validTripStartBody = {
 };
 
 describe('POST /v1/trips/start', () => {
+  /**
+   * Deployment-ordering guard. `tripStartRequestSchema` is
+   * `additionalProperties: false`, so the question that decides whether a
+   * client can ship before the server is: does an unknown field 400, or is it
+   * stripped? Fastify's ajv defaults to `removeAdditional: true`, which strips
+   * — but "the framework probably defaults to X" is not something to bet ride
+   * recording on, so it is asserted here. If this ever starts failing, a
+   * client carrying new trip-start fields MUST NOT ship before the API.
+   */
+  it('tolerates unknown body fields instead of rejecting the ride', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/start',
+      headers: authHeaders,
+      payload: { ...validTripStartBody, somethingTheServerHasNeverHeardOf: 'x' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('accepts the planned route captured at start', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/start',
+      headers: authHeaders,
+      payload: {
+        ...validTripStartBody,
+        plannedRoutePolyline6: 'abc123',
+        plannedRouteDistanceMeters: 5123,
+        routingMode: 'safe',
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    await app.close();
+  });
+
   it('returns 200 with tripId when authenticated', async () => {
     const app = buildTestApp();
     await app.ready();

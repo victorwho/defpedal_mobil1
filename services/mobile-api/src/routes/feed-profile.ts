@@ -84,6 +84,15 @@ export const buildFeedProfileRoutes = (
           updates.pedal_voice_sassy = request.body.pedalVoiceSassy;
         if (request.body.preferredLocale !== undefined)
           updates.preferred_locale = request.body.preferredLocale;
+        // Build provenance. Last-write-wins is correct here: it records which
+        // build the rider is on NOW, which is what makes the dashboard
+        // filterable. See ProfileUpdateRequest for why it is not per-row.
+        if (request.body.appEnvironment !== undefined)
+          updates.app_environment = request.body.appEnvironment;
+        if (request.body.appVersion !== undefined)
+          updates.app_version = request.body.appVersion;
+        if (request.body.appPlatform !== undefined)
+          updates.app_platform = request.body.appPlatform;
 
         if (Object.keys(updates).length > 0) {
           const { error } = await db

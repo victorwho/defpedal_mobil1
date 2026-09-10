@@ -27,6 +27,7 @@
 import { useEffect, useRef } from 'react';
 
 import { mobileApi } from '../lib/api';
+import { getAppBuildInfo } from '../lib/appBuildInfo';
 import { useAppStore } from '../store/appStore';
 import { useAuthSession } from './AuthSessionProvider';
 
@@ -38,12 +39,22 @@ export const ProfileDeviceSyncManager = () => {
   useEffect(() => {
     if (!user) return;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const key = `${user.id}|${timezone}|${locale}`;
+    // Build provenance rides along at zero extra cost — this request already
+    // runs at every session bootstrap. Without it, preview and development
+    // installs are indistinguishable from store installs in every number on
+    // the analytics dashboard, which is how a developer's own test rides get
+    // counted as riders' (investigation 2026-09-10).
+    const build = getAppBuildInfo();
+    const key = `${user.id}|${timezone}|${locale}|${build.appEnvironment ?? '?'}|${build.appVersion ?? '?'}`;
     if (lastSyncedKey.current === key) return;
     lastSyncedKey.current = key;
 
     mobileApi
-      .updateProfile({ quietHoursTimezone: timezone, preferredLocale: locale })
+      .updateProfile({
+        quietHoursTimezone: timezone,
+        preferredLocale: locale,
+        ...build,
+      })
       .then((profile) => {
         if (profile?.premium) {
           useAppStore
