@@ -351,14 +351,20 @@ export const ringClearanceMeters = (targetDistanceMeters: number): number =>
  * towards the start: the router reaches the near side of the ring first and
  * goes round, instead of overshooting to the far side and doubling back.
  */
-export const lollipopWaypoints = (
-  start: Coordinate,
-  bearingDegrees: number,
+/**
+ * Ring radius and clamped clearance for a lollipop of `targetDistanceMeters`.
+ *
+ * Exported for the same reason `stemLegCount` is: so a caller that MEASURES a
+ * lollipop cannot disagree with the one that builds it. `loopSearchExtentMeters`
+ * reads it to work out how far from the start a candidate can reach, and a
+ * second copy of this algebra there would drift the moment either is tuned.
+ */
+export const lollipopRingSizing = (
   targetDistanceMeters: number,
   waypointCount: number = RING_WAYPOINT_COUNT,
   clearanceMeters: number = ringClearanceMeters(targetDistanceMeters),
   detourFactor: number = ringDetourFactor(waypointCount),
-): Coordinate[] => {
+): { readonly radiusMeters: number; readonly clearanceMeters: number } => {
   const target = Math.max(0, targetDistanceMeters);
   const ringDetour =
     detourFactor > 0 ? detourFactor : ringDetourFactor(waypointCount);
@@ -377,11 +383,31 @@ export const lollipopWaypoints = (
   // The stem gets its own factor: it is a point-to-point ride that can take
   // the direct road, where the ring is dragged through waypoints no single
   // road serves.
-  const radius = Math.max(
+  const radiusMeters = Math.max(
     0,
     (target - 2 * clearance * STEM_DETOUR_FACTOR) /
       (2 * STEM_DETOUR_FACTOR + perimeter * ringDetour),
   );
+
+  return { radiusMeters, clearanceMeters: clearance };
+};
+
+export const lollipopWaypoints = (
+  start: Coordinate,
+  bearingDegrees: number,
+  targetDistanceMeters: number,
+  waypointCount: number = RING_WAYPOINT_COUNT,
+  clearanceMeters: number = ringClearanceMeters(targetDistanceMeters),
+  detourFactor: number = ringDetourFactor(waypointCount),
+): Coordinate[] => {
+  const count = Math.max(1, Math.floor(waypointCount));
+  const { radiusMeters: radius, clearanceMeters: clearance } =
+    lollipopRingSizing(
+      targetDistanceMeters,
+      waypointCount,
+      clearanceMeters,
+      detourFactor,
+    );
   const anchor = destinationPoint(start, bearingDegrees, radius + clearance);
 
   return [
@@ -389,6 +415,46 @@ export const lollipopWaypoints = (
     ...ringWaypoints(anchor, radius, bearingDegrees + 180, count),
     anchor,
   ];
+};
+
+/**
+ * Furthest a candidate for `targetDistanceMeters` can sit from the start,
+ * over every shape the search builds.
+ *
+ * This is what the map has to frame BEFORE a search runs, and it is not the
+ * loop's own radius. Two things make it bigger than it looks:
+ *
+ *   - The binding case is the lollipop, not the ring. A ring is centred ON the
+ *     start and reaches one radius; a lollipop's ring is centred on an anchor
+ *     `radius + clearance` out, so its far side is `2·radius + clearance` away.
+ *     Measured at 10 km: 656 m for a hexagonal ring against 2,270 m for the
+ *     lollipop — 3.5x.
+ *   - The radius is NOT `target / 2π`. Real roads realise 2.11-2.54x the ideal
+ *     ring perimeter (`ringDetourFactor`), so a ring for a given budget is far
+ *     smaller than a circle of that circumference.
+ *
+ * Sizing the viewport off `target / 2π` — as the zoom this replaced did —
+ * happens to land between the two and is wrong in both directions: 1.4-1.5x too
+ * small for a lollipop at the distances riders actually pick, and ~2x too large
+ * for a plain ring. Derived from `lollipopRingSizing` and
+ * `initialRingRadiusMeters` rather than restated, so it tracks any retune.
+ */
+export const loopSearchExtentMeters = (
+  targetDistanceMeters: number,
+): number => {
+  let furthest = 0;
+  for (const count of RING_WAYPOINT_CHOICES) {
+    furthest = Math.max(
+      furthest,
+      initialRingRadiusMeters(targetDistanceMeters, count),
+    );
+    const { radiusMeters, clearanceMeters } = lollipopRingSizing(
+      targetDistanceMeters,
+      count,
+    );
+    furthest = Math.max(furthest, 2 * radiusMeters + clearanceMeters);
+  }
+  return furthest;
 };
 
 /**

@@ -42,6 +42,7 @@ import { RouteInfoOverlay } from './overlays/RouteInfoOverlay';
 import { ScreenReaderMapSummary } from './ScreenReaderMapSummary';
 import type { CrosshairMode, RouteMapProps, SelectedPoiState } from './types';
 import { useCameraConfig } from './useCameraConfig';
+import { cameraStopKey, resolveCameraStop } from './cameraStop';
 import { useFeatureCollections } from './useFeatureCollections';
 import { useMapA11ySummary } from './useMapA11ySummary';
 import { useShieldMode } from './useShieldMode';
@@ -101,6 +102,8 @@ export const RouteMap = ({
   riskOverlay,
   focusCoordinate = null,
   focusZoomLevel,
+  focusBounds = null,
+  focusBoundsPadding,
   focusKey,
   containerStyle,
   a11yContext,
@@ -160,6 +163,19 @@ export const RouteMap = ({
     trailCoordinates,
     destination,
     focusCoordinate,
+  });
+
+  /**
+   * Bounds beat point-and-zoom whenever the caller knows the extent — see
+   * `cameraStop.ts`. Extracted because `@rnmapbox/maps` cannot be imported
+   * under vitest, so a decision left inline here is untestable.
+   */
+  const cameraStop = resolveCameraStop({
+    focusBounds,
+    focusBoundsPadding,
+    focusCoordinate,
+    focusZoomLevel,
+    cameraCoordinate,
   });
 
   const handlePoiPress = usePoiCardHandler(mapViewRef, selectedPoi, setSelectedPoi);
@@ -295,9 +311,19 @@ export const RouteMap = ({
         ) : (
           <Mapbox.Camera
             ref={cameraRef as any}
-            key={`cam-${cameraCoordinate[0].toFixed(4)}-${cameraCoordinate[1].toFixed(4)}-${recenterKey}-${focusKey ?? 0}`}
-            zoomLevel={focusCoordinate ? (focusZoomLevel ?? 15.5) : 12.5}
-            centerCoordinate={cameraCoordinate}
+            /*
+             * The stop goes in the key. `focusKey` covers a deliberate re-fly,
+             * but a framing that changes on its own — the rider picking a
+             * different loop distance — must also re-fit, and the camera is
+             * keyed, not reactive.
+             */
+            key={`cam-${recenterKey}-${focusKey ?? 0}-${cameraStopKey(cameraStop)}`}
+            {...(cameraStop.kind === 'bounds'
+              ? { bounds: cameraStop.bounds, padding: cameraStop.padding }
+              : {
+                  zoomLevel: cameraStop.zoomLevel,
+                  centerCoordinate: cameraStop.centerCoordinate,
+                })}
             pitch={0}
             animationMode="easeTo"
             animationDuration={600}

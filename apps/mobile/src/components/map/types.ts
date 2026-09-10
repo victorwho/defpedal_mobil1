@@ -104,6 +104,32 @@ export type RouteMapProps = {
   /** Zoom to use while `focusCoordinate` is set. */
   focusZoomLevel?: number;
   /**
+   * Fit the camera to a geographic box, instead of a point plus a zoom.
+   *
+   * Preferred over `focusZoomLevel` whenever the thing being framed has a
+   * known extent. Mapbox fits the box to the ACTUAL viewport, so it is correct
+   * on every screen size and at every sheet height; a hand-computed zoom has
+   * to assume a viewport in pixels AND the SDK's tile-size convention, and is
+   * silently wrong on most devices when either is off. The loop planner framed
+   * its search this way and drew loops off the edges of the screen for it.
+   *
+   * Wins over `focusCoordinate` when both are set. Re-fit with `focusKey`.
+   */
+  focusBounds?: {
+    readonly ne: readonly [number, number];
+    readonly sw: readonly [number, number];
+  } | null;
+  /**
+   * Viewport padding in points held clear while `focusBounds` is fitted —
+   * for chrome drawn over the map, such as a top bar or a collapsed sheet.
+   */
+  focusBoundsPadding?: {
+    readonly top?: number;
+    readonly bottom?: number;
+    readonly left?: number;
+    readonly right?: number;
+  };
+  /**
    * Bump to re-fly to the SAME `focusCoordinate`. The camera is keyed on its
    * center, so without this a second tap on an already-focused stretch would
    * be a no-op.

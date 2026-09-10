@@ -13,7 +13,9 @@
  * which suppresses the reroute that would otherwise send the rider home.
  */
 import {
+  destinationPoint,
   isRouteSupported,
+  loopSearchExtentMeters,
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
   rideMinutes,
@@ -91,23 +93,53 @@ const km = (metres: number): string => (metres / 1000).toFixed(1).replace(/\.0$/
 /** Loops are the only surface that needs a session countdown, so it lives here. */
 const minutesLeftIn = (ms: number): number => Math.max(0, Math.ceil(ms / 60_000));
 
+/** Margin so the outermost loop sits inside the viewport, not flush to its edge. */
+const LOOP_FRAME_MARGIN = 1.15;
+
 /**
- * Zoom that fits a loop of `targetDistanceMeters` around its start.
+ * Chrome drawn over the map while a search runs, in points.
+ *
+ * The sheet is dropped to `collapsed` before the search starts, so the bottom
+ * figure is its peek strip; the top is the back/title bar. Held clear so the
+ * loops land in the visible part of the map rather than behind either.
+ */
+const LOOP_FRAME_PADDING = { top: 96, bottom: 168, left: 32, right: 32 };
+
+/**
+ * Box the camera should frame for a search of `targetDistanceMeters`.
  *
  * The camera has to be told explicitly, because the default route framing
  * centres on `coordinates[length / 2]` — which on a loop is the point
- * diametrically opposite the start, i.e. exactly the wrong place. Derived from
- * the Web Mercator metres-per-pixel identity rather than a lookup table so it
- * stays honest across the 5-100 km range the picker offers.
+ * diametrically opposite the start, i.e. exactly the wrong place.
+ *
+ * A box rather than a zoom, and the reach comes from `loopSearchExtentMeters`
+ * rather than from this screen. Both halves of the zoom this replaced were
+ * wrong and partly cancelled, which is why it looked plausible: it framed
+ * `target / 2π` (1.4-1.5x too small for the lollipop that actually binds) and
+ * converted it with a 256-pixel tile constant and a hardcoded 400-pixel half
+ * viewport, neither of which matches the SDK or a real handset. Mapbox fits a
+ * box to the true viewport, so there is nothing left here to get wrong.
+ *
+ * Symmetric about the start even when a heading is set. Loops then occupy one
+ * side of the frame, which is honest — the rider can still see the start, and
+ * biasing the box would mean the map jumped whenever they changed heading.
  */
-const loopZoomLevel = (targetDistanceMeters: number, lat: number): number => {
-  const radiusMeters = targetDistanceMeters / (2 * Math.PI);
-  if (radiusMeters <= 0) return 13;
-  // 1.35 leaves the loop a margin instead of flush against the viewport edge.
-  const halfViewportMeters = radiusMeters * 1.35;
-  const metersPerPixelAtZoom0 = 156543 * Math.cos((lat * Math.PI) / 180);
-  const zoom = Math.log2((metersPerPixelAtZoom0 * 400) / halfViewportMeters);
-  return Math.max(9, Math.min(16, zoom));
+const loopSearchBounds = (
+  start: Coordinate,
+  targetDistanceMeters: number,
+): { ne: readonly [number, number]; sw: readonly [number, number] } => {
+  const reach = Math.max(
+    250,
+    loopSearchExtentMeters(targetDistanceMeters) * LOOP_FRAME_MARGIN,
+  );
+  const north = destinationPoint(start, 0, reach);
+  const east = destinationPoint(start, 90, reach);
+  const south = destinationPoint(start, 180, reach);
+  const west = destinationPoint(start, 270, reach);
+  return {
+    ne: [east.lon, north.lat],
+    sw: [west.lon, south.lat],
+  };
 };
 
 type SearchState =
@@ -689,7 +721,10 @@ export default function LoopPlannerScreen() {
              */
             focusCoordinate={start ?? null}
             focusKey={focusKey}
-            focusZoomLevel={loopZoomLevel(targetDistanceMeters, start?.lat ?? 45)}
+            focusBounds={
+              start ? loopSearchBounds(start, targetDistanceMeters) : null
+            }
+            focusBoundsPadding={LOOP_FRAME_PADDING}
             onMapTap={
               pickingStart
                 ? (coordinate) => {

@@ -206,6 +206,20 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
   loop's destination is its origin. Rows store geometry and turn steps; risk
   segments and elevation are stripped server-side and re-derived on open. The
   device keeps a full-fidelity copy as an offline cache keyed by the server id.
+- ⚠️ **The planner's camera fits a BOX, never a computed zoom** (`focusBounds` on
+  `RouteMap`, box from `loopSearchExtentMeters`). The zoom it replaced was wrong
+  twice in opposite directions and so looked almost right for the feature's whole
+  life: it framed `target / 2π`, which is neither shape the search builds, and
+  converted it assuming a 400-pixel half viewport. **Frame from the LOLLIPOP** —
+  its ring sits on an anchor `radius + clearance` out, so it reaches
+  `2·radius + clearance`, 3.5x further than a plain ring at the same target
+  (10 km: 2,270 m vs 656 m). Anything deriving a zoom from metres needs both a
+  pixel viewport and the SDK's tile convention, neither checkable in a test —
+  use `bounds` (error-log #118).
+- **`cameraStop.ts` exists because `@rnmapbox/maps` cannot be imported under
+  vitest** (Flow syntax breaks collection — every test mocks `RouteMap`
+  wholesale). Any camera decision left inline in `RouteMap.tsx` is untestable;
+  put it in `resolveCameraStop` instead.
 - **Time estimates use the rider's own pace** (`riderPace`, median of per-ride
   speeds from trip history, ≥3 usable rides). Under that the default 15 km/h
   stands and the label says so — never present a guess as a measurement.

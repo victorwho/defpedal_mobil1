@@ -19,6 +19,7 @@ import {
   isOutAndBack,
   isRingOutAndBack,
   LOLLIPOP_STEM_LEGS,
+  lollipopRingSizing,
   lollipopWaypoints,
   LOOP_CANDIDATE_COUNT,
   LOOP_DISTANCE_STEPS_METERS,
@@ -26,6 +27,7 @@ import {
   LOOP_RELAXATION_LADDER,
   loopBearings,
   loopRoundness,
+  loopSearchExtentMeters,
   matchesTerrain,
   MAX_LOOP_ROUNDNESS,
   MAX_RETRACE_SHARE,
@@ -1597,5 +1599,109 @@ describe('the never-relaxed doubling-back ceiling', () => {
     expect(
       withinRetraceCeiling({ ringRetracedShare: undefined as unknown as number }),
     ).toBe(true);
+  });
+});
+
+describe('loopSearchExtentMeters', () => {
+  const START: Coordinate = { lat: 44.4268, lon: 26.1025 };
+
+  const furthestWaypointMeters = (points: readonly Coordinate[]): number =>
+    Math.max(
+      ...points.map((p) =>
+        haversineDistance([START.lat, START.lon], [p.lat, p.lon]),
+      ),
+    );
+
+  /**
+   * The whole point of the function: it must agree with what the search
+   * actually builds. Restating the algebra in the map layer is how the two
+   * drift, so this compares against the real waypoint builders rather than
+   * against a formula.
+   */
+  it('covers every shape the search builds, at every distance offered', () => {
+    for (const target of LOOP_DISTANCE_STEPS_METERS) {
+      const extent = loopSearchExtentMeters(target);
+      for (const count of RING_WAYPOINT_CHOICES) {
+        for (const bearing of [0, 90, 180, 270]) {
+          const ring = ringWaypoints(
+            START,
+            initialRingRadiusMeters(target, count),
+            bearing,
+            count,
+          );
+          const lollipop = lollipopWaypoints(START, bearing, target, count);
+          // A tenth of a percent of slack for the geodesy: the builders walk
+          // great circles, the extent is a plain radius.
+          expect(extent).toBeGreaterThanOrEqual(
+            furthestWaypointMeters(ring) * 0.999,
+          );
+          expect(extent).toBeGreaterThanOrEqual(
+            furthestWaypointMeters(lollipop) * 0.999,
+          );
+        }
+      }
+    }
+  });
+
+  /**
+   * The defect this was written for. The old camera framed `target / 2π`,
+   * which is neither radius — it is 1.4-1.5x too small for the lollipop that
+   * actually binds, so loops drew off the edges of the screen.
+   */
+  it('exceeds the target/2pi the old zoom framed, where riders actually ride', () => {
+    for (const target of [5_000, 10_000, 15_000, 20_000, 30_000]) {
+      expect(loopSearchExtentMeters(target)).toBeGreaterThan(
+        (target / (2 * Math.PI)) * 1.2,
+      );
+    }
+  });
+
+  it('is driven by the lollipop, not the ring', () => {
+    for (const target of LOOP_DISTANCE_STEPS_METERS) {
+      const worstRing = Math.max(
+        ...RING_WAYPOINT_CHOICES.map((n) => initialRingRadiusMeters(target, n)),
+      );
+      expect(loopSearchExtentMeters(target)).toBeGreaterThan(worstRing);
+    }
+  });
+
+  it('grows with the distance asked for, and is finite at the edges', () => {
+    for (let i = 1; i < LOOP_DISTANCE_STEPS_METERS.length; i += 1) {
+      expect(loopSearchExtentMeters(LOOP_DISTANCE_STEPS_METERS[i]!)).toBeGreaterThan(
+        loopSearchExtentMeters(LOOP_DISTANCE_STEPS_METERS[i - 1]!),
+      );
+    }
+    expect(loopSearchExtentMeters(0)).toBe(0);
+    expect(Number.isFinite(loopSearchExtentMeters(-1))).toBe(true);
+  });
+});
+
+describe('lollipopRingSizing', () => {
+  it('is the sizing lollipopWaypoints actually uses', () => {
+    const start: Coordinate = { lat: 45.6, lon: 25.6 };
+    for (const target of LOOP_DISTANCE_STEPS_METERS) {
+      for (const count of RING_WAYPOINT_CHOICES) {
+        const { radiusMeters, clearanceMeters } = lollipopRingSizing(
+          target,
+          count,
+        );
+        const [anchor] = lollipopWaypoints(start, 0, target, count);
+        // The anchor sits exactly radius + clearance from the start.
+        expect(
+          haversineDistance(
+            [start.lat, start.lon],
+            [anchor!.lat, anchor!.lon],
+          ),
+        ).toBeCloseTo(radiusMeters + clearanceMeters, 0);
+      }
+    }
+  });
+
+  it('never inverts the ring on a budget too small for the clearance', () => {
+    for (const target of [0, 100, 500, 1_000, 2_000]) {
+      const { radiusMeters, clearanceMeters } = lollipopRingSizing(target);
+      expect(radiusMeters).toBeGreaterThanOrEqual(0);
+      expect(clearanceMeters).toBeGreaterThanOrEqual(0);
+    }
   });
 });
