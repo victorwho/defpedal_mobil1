@@ -304,6 +304,13 @@ fi
 
 ./gradlew "${GRADLE_TASKS[@]}" "${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"}"
 
+# ── Step 3b: R8 keep check (minified builds only) ──
+# R8 failures are runtime-only and release-only; this reads R8's own reports
+# and fails the build if a keep rule stopped matching. See error-log #116.
+if grep -q -E '^android\.enableMinifyInReleaseBuilds=true' "$DST/apps/mobile/android/gradle.properties"; then
+  bash "$SRC/scripts/check-r8-keeps.sh" "$DST/apps/mobile/android/app/build/outputs/mapping/${FLAVOR}Release"
+fi
+
 # ── Step 4: Verify output artifacts ──
 if [ "$DO_APK" = true ] && [ ! -f "$APK_PATH" ]; then
   # Fall back to old non-flavored path (before product flavors were added)
