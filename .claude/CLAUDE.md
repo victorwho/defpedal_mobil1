@@ -647,6 +647,7 @@ that cohort.
   only on `trip_tracks`, written at ride END, so a ride whose track never
   uploaded lost the route entirely despite the geometry existing at Start.
   `trip_tracks` stays authoritative when present.
+- **Live since 2026-09-10 on Cloud Run `defpedal-api-00155-tqq`.** Verified by content, not revision id: a negative `plannedRouteDistanceMeters` 400s with the field named, and a bad `appEnvironment` 400s on the enum — an old server strips both and answers 401.
 - **No deploy ordering needed, and that is verified, not assumed.**
   `tripStartRequestSchema` is `additionalProperties: false`, but Fastify's ajv
   defaults to `removeAdditional: true`, so an old server strips the new fields
