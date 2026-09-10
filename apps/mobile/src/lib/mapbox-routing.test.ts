@@ -183,7 +183,7 @@ describe('directPreviewRoute', () => {
         avoidUnpaved: false,
         avoidHills: false,
       }),
-    ).rejects.toThrow('OSRM routing failed (500)');
+    ).rejects.toThrow(/OSRM routing failed.*500/);
   });
 
   it('enriches routes with elevation data', async () => {
@@ -1033,5 +1033,122 @@ describe('avoid unpaved that cannot be honoured', () => {
     }).then((result) => {
       expect(result.routes[0].warnings).toEqual([]);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The paved fallback, which was unreachable for the whole life of this file
+// ---------------------------------------------------------------------------
+
+describe('avoid unpaved, when nothing paved connects the points', () => {
+  /** Exactly what the live router sends. Captured 2026-09-10. */
+  const noRoute400 = {
+    data: { message: 'No route found between points', code: 'NoRoute' },
+    ok: false,
+    status: 400,
+  };
+
+  it('drops the constraint and says so, instead of failing the whole preview', async () => {
+    // THE regression test. OSRM reports "no paved way through here" as HTTP
+    // 400 with `code: NoRoute`, and this file used to test the status before
+    // reading the body — so it threw past the retry underneath, the throw
+    // propagated out of `directPreviewRoute`, and the rider got a failed route
+    // preview. It reproduces every time for a start that snaps to an unpaved
+    // edge: measured on the live router, every Bucharest pair touching one
+    // particular coordinate failed while every pair without it succeeded.
+    setupFetchMock([
+      noRoute400,
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    });
+
+    expect(result.routes).toHaveLength(1);
+    // Still the SAFE profile. The alternative the old code fell into was
+    // Mapbox, which is neither safe-scored nor able to exclude unpaved at all.
+    expect(result.routes[0].source).toBe('custom_osrm');
+    // And the rider is told, rather than quietly handed something else.
+    expect(result.routes[0].warnings).toContain('no_paved_route');
+  });
+
+  it('asks with the constraint first and without it second', async () => {
+    setupFetchMock([
+      noRoute400,
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+    });
+
+    const calls = (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls;
+    expect(String(calls[0][0])).toContain('exclude=unpaved');
+    expect(String(calls[1][0])).not.toContain('exclude=unpaved');
+  });
+
+  it('does NOT drop the constraint when the rider never asked for it', async () => {
+    // A NoRoute with no constraint to relax is a real failure, not a fallback.
+    setupFetchMock([noRoute400]);
+
+    await expect(
+      directPreviewRoute({
+        origin: { lat: 44.43, lon: 26.1 },
+        destination: { lat: 44.44, lon: 26.12 },
+        mode: 'safe',
+        avoidUnpaved: false,
+        avoidHills: false,
+      }),
+    ).rejects.toThrow(/NoRoute/);
+  });
+
+  it('still fails a malformed request that answers the SAME status', async () => {
+    // The fix must not become "stop throwing on 400". The live router returns
+    // InvalidValue, InvalidQuery and InvalidOptions at 400 too, and swallowing
+    // those would turn a real bug into a silent wrong answer.
+    setupFetchMock([
+      {
+        data: { code: 'InvalidValue', message: 'Exclude flag combination is not supported.' },
+        ok: false,
+        status: 400,
+      },
+    ]);
+
+    await expect(
+      directPreviewRoute({
+        origin: { lat: 44.43, lon: 26.1 },
+        destination: { lat: 44.44, lon: 26.12 },
+        mode: 'safe',
+        avoidUnpaved: true,
+        avoidHills: false,
+      }),
+    ).rejects.toThrow(/InvalidValue/);
+  });
+
+  it('retries only once, so a second NoRoute is a real failure', async () => {
+    setupFetchMock([noRoute400, noRoute400]);
+
+    await expect(
+      directPreviewRoute({
+        origin: { lat: 44.43, lon: 26.1 },
+        destination: { lat: 44.44, lon: 26.12 },
+        mode: 'safe',
+        avoidUnpaved: true,
+        avoidHills: false,
+      }),
+    ).rejects.toThrow(/NoRoute/);
   });
 });

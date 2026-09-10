@@ -247,6 +247,10 @@ export const en = {
     emptyTryDirection: 'Try another direction',
     emptyTryElsewhere: 'Start somewhere else',
     offline: 'Finding loops needs a connection.',
+    errorTitle: 'Loop search failed',
+    errorBody: 'Something went wrong on our side, not on your road. Try again.',
+    errorOfflineBody: 'Reconnect and try again.',
+    errorRetry: 'Try again',
 
     unavailableTitle: 'Loops are not available here yet',
     unavailableBody: 'Loops need our safety road data. It covers 31 countries — not this one yet.',

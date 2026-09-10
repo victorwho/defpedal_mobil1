@@ -61,6 +61,13 @@ export const ProfileDeviceSyncManager = () => {
           });
         }
 
+        // Loop-generation rollout switch, from the same response. Absent means
+        // OFF rather than "leave it alone": an older server has no opinion, and
+        // the safe reading of no opinion is the client path riders already run.
+        useAppStore
+          .getState()
+          .setLoopServerEnabled(profile?.loopServerEnabled === true);
+
         // Flat rides taken since the last successful sync. Piggy-backed here
         // because reaching this point already proves we are online and
         // authenticated; without a durable count the allowance would reset on

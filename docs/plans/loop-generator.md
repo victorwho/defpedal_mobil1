@@ -397,3 +397,360 @@ not a tighter cap.
   passes 1004/1004. Unrelated to this feature.
 - `TierLimits` gained a required field. Any future literal must set
   `loopSessionsPerMonth` or it will not compile.
+
+---
+
+# Server-side generation — 2026-09-10
+
+Loop generation moved off the handset. The app now makes **one** request,
+`POST /v1/loops`, and the server does the whole fan-out. Behind a flag, with the
+on-device generator untouched and still reachable, until the new path is
+validated.
+
+## Why it moved
+
+Not because the phone was slow. Because of what it was carrying.
+
+| Per loop search, before | Count |
+|---|---|
+| OSRM requests, typical | 10 to 20 |
+| OSRM requests, worst case | about 60 |
+| Enrichment calls to our API | 15 to 45 |
+| Bytes per OSRM ring response, measured at Bucharest 15 km | 165 KB |
+
+So a single search pulled **1.6 to 5 MB** over mobile data and discarded all but
+five loops. Worse, the enrichment calls — `/v1/elevation-profile`,
+`/v1/risk-segments`, `/v1/scenic-segments` — share the `routePreview` bucket at
+30 requests per 60 seconds. Five finalists cost fifteen, an escalation fifteen
+more, the cap-rescue branch another fifteen: **one unlucky search could exhaust a
+rider's own budget and take the risk overlay down with it for the next minute.**
+
+Server-side those three are in-process function calls. No HTTP, no bucket. What
+bounds the work instead is a `loopSearch` rate limit on the endpoint itself,
+which is the right place for it — one bound on one rider action, rather than a
+shared bound on an internal step of it.
+
+Measured end to end against the live router from a developer machine: **1.3 s**
+for a complete 15 km Bucharest search, twenty candidates routed, five offered.
+The design doc budgeted 3–8 s on 4G for the client path. The enrichment half was
+NOT measured locally (that checkout has no API credentials), so the real figure
+is higher than 1.3 s and lower than the client path — do not quote 1.3 s as the
+end-to-end number.
+
+## Where it lives, and what did NOT move
+
+In the existing API — `services/mobile-api/src/lib/loops/` plus
+`routes/loops.ts` — not in a new service next to OSRM. The deciding factor was
+that loop quality does not come from OSRM alone: climb comes from Mapbox terrain
+tiles, risk and scenery from Supabase, and all three already live behind this
+API with its credentials, auth, rate limiting and deploy pipeline. Placing the
+service beside OSRM would have made the routing half free and the measuring half
+a long hop, plus a change to the OSRM box for no gain.
+
+**Nothing on the OSRM deployment changed.** No nginx edit, no new container, no
+profile or data change.
+
+`packages/core/src/loopPlan.ts` still owns every product decision — ring
+geometry, the convergence controller, terrain cuts, the ladder, the caps, the
+ranking. Both implementations import it. Only the sequencing was ported.
+
+## The contract
+
+```
+POST /v1/loops
+{ "start": {"lat":44.4268,"lon":26.1025}, "targetDistanceMeters": 15000,
+  "terrain": "flat|rolling|hilly", "surface": "paved|any|offroad",
+  "heading": "any|N|NE|E|SE|S|SW|W|NW", "locale": "en|ro|es" }
+```
+
+Answers newline-delimited JSON, one frame per line:
+
+```
+{"type":"candidate","loop":{ ... }}
+{"type":"progress","resolved":3,"attempted":5}
+{"type":"result","status":"ok","loops":[ ... ],"relaxation":"heading","checked":5}
+```
+
+It streams because the planner draws each loop onto the map as it lands. A
+buffered response would replace that with a spinner over the same wait.
+
+⚠ **It always ends with exactly one terminal frame** — `result`, `empty` or
+`error`. A truncated stream and an empty result are otherwise indistinguishable,
+and one of them is a failure nobody would ever see. The client treats a stream
+ending without one as an error.
+
+⚠ **Failures after the first byte are frames, not status codes.** Headers leave
+before the search can fail. Everything checkable up front — auth, body,
+rate limit, coverage — answers with a real status; anything later is an `error`
+frame on a 200.
+
+⚠ **Turn instructions arrive in English and the client rebuilds them.** OSRM
+ships no instruction text and the phrase catalogue lives in the app's i18n
+layer. Rendering what the server sends would put English turn cues in front of
+every Romanian and Spanish rider.
+
+⚠ **`toNavigationSteps` reads EVERY leg.** A ring has four legs and a lollipop
+six. The server's existing `normalizeRoutePreviewResponse` reads `legs[0]`,
+which is right for the single-leg A-to-B routes it was written for and would
+give a loop rider turn-by-turn for the opening quarter of the ride and silence
+after that. That is why loops build their own route object rather than reusing
+that normaliser. Measured on a real response: 94 steps across four legs, 28 in
+the first.
+
+## The flag
+
+`LOOP_SERVER_ENABLED` on Cloud Run, surfaced to the client through
+`GET /v1/profile` as `loopServerEnabled` — the same channel the Sesizări kill
+switch uses, so flipping it takes effect on the rider's next app open with no
+store release.
+
+It **fails closed**, which is the opposite of every other switch in this
+codebase, and the asymmetry is deliberate: those guard shipped features where
+darkening them is the regression, this one guards the unvalidated path where
+serving it by accident is. An older server, a failed profile read and a fresh
+install all mean "use the on-device generator".
+
+```bash
+# on
+gcloud run services update defpedal-api --region europe-central2 \
+  --update-env-vars LOOP_SERVER_ENABLED=true \
+  --project gen-lang-client-0895796477
+# off
+gcloud run services update defpedal-api --region europe-central2 \
+  --update-env-vars LOOP_SERVER_ENABLED=false \
+  --project gen-lang-client-0895796477
+```
+
+A dev or preview build can override with `EXPO_PUBLIC_LOOP_GENERATION_SERVER`,
+in both directions. Ignored on production builds, gated on BOTH `appVariant` and
+`appEnv` like the cool-mode and diagnostics gates.
+
+⚠ **There is no silent fallback.** A failed server search shows a failure, not
+"no loops here". Those are completely different to a rider — one says change
+your distance, the other says try again — and folding the second into the first
+is exactly how a broken rollout looks healthy.
+
+## Holding the port honest
+
+`services/mobile-api/src/__tests__/loops-parity.test.ts` runs BOTH orchestrators
+over one deterministic fake router and compares the ranked output field by
+field, plus the request budget, the measurement count and the order candidates
+are drawn. Seven scenarios.
+
+It was mutation-tested rather than trusted. Four deliberate divergences
+introduced into the server copy, all caught: swapping two rungs of the ladder,
+halving the measured finalists, dropping a cap-rescue sweep, and changing ring
+concurrency. Two gaps were found and closed that way — the first version could
+not see a ladder reorder (no scenario forced the ladder to climb) and could not
+see a concurrency change (the fake resolved instantly). The delay added to fix
+the second was `setTimeout`, which made the test flaky at 1–5 ms; it counts
+microtasks now, which is deterministic and immune to machine load.
+
+`__fixtures__/` holds four responses captured from the live router on
+2026-09-10, with the request geometry that produced each. Real, because three
+features in this codebase shipped dead while their tests passed against
+hand-built fixtures in the shape the code assumed (error-log #113).
+
+## Two live defects found while porting — BOTH FIXED
+
+Both were pre-existing and both were in the shipped app. Both are fixed in every
+implementation at once: a defect fix that lands on one side only would make the
+feature flag change behaviour, which is the one thing it must not do.
+
+Both were found by probing the live router rather than by reading code, and in
+both cases the first write-up OVERSTATED the impact by generalising from a
+single sample. The corrected numbers are in each section, and the pattern is
+worth naming on its own: one probe point measured many times is still one probe
+point.
+
+### 1. The paved fallback was unreachable — FIXED 2026-09-10
+
+OSRM reports "nothing connects these points under the constraints you gave" as
+**HTTP 400** with `{"code":"NoRoute"}` in the body. Every fetcher here was
+written status-first:
+
+```
+if (!response.ok) throw ...                                   // <- the 400 lands here
+const data = await response.json();
+if (avoidUnpaved && isNoRoute(data.code)) { retry without it } // never reached
+```
+
+So the retry that exists precisely for this case was dead, in three separate
+fetchers, for the whole life of each.
+
+**Corrected numbers.** The first write-up said "all six Bucharest attempts
+failed" and reported it as a property of Bucharest. It was a property of ONE
+COORDINATE: the probe used Piața Unirii as the start for every Bucharest sample.
+Re-measured across twelve start points in five cities:
+
+| | |
+|---|---|
+| paved-only rings answering NoRoute | 78 of 216 |
+| start points where EVERY ring failed | 2 of 12 |
+| point-to-point pairs answering NoRoute | 102 of 280 |
+
+The two start points that failed completely are the ones that matter: a rider
+standing there asked for a paved loop and got nothing at all, every time. On
+real Bucharest place-to-place pairs, 42 of 56 routed fine and all 14 failures
+touched that same coordinate — which is what a start snapped to an unpaved edge
+looks like.
+
+**Point-to-point was the worse half.** On a loop the candidate is dropped in
+silence and the rider is told no loops exist here. On an A-to-B route the throw
+propagates out of `directPreviewRoute` and the whole route preview fails.
+
+**The fix is one shared reader**, `packages/core/src/osrmResponse.ts`, used by
+all three fetchers so they cannot drift again. It reads the body FIRST and then
+classifies, into four outcomes: `ok`, `no_route`, `empty` (the router answered
+successfully with nothing) and `failed`.
+
+⚠ **It is NOT "stop throwing on 400".** The live router returns `InvalidValue`,
+`InvalidQuery` and `InvalidOptions` at the same status, and swallowing those
+would turn a real bug into a silent wrong answer. Only `NoRoute` and `NoSegment`
+trigger the fallback; everything else still throws, now with the code in the
+message. The body is also read exactly once, as text, which is why the old shape
+could not simply be reordered — it called `.json()` on the success path and
+`.text()` on the error path.
+
+Verified against the live router with the real fetcher after the change:
+
+| start | before | after |
+|---|---|---|
+| bucharest/unirii | 0 of 18 | 18 of 18, all via fallback |
+| rasnov/north | 0 of 18 | 18 of 18, all via fallback |
+| brasov/centre | 12 of 18 | 18 of 18, 6 via fallback |
+| cluj/manastur | 9 of 18 | 18 of 18, 3 via fallback |
+| amsterdam/centre | 18 of 18 | 18 of 18, none via fallback |
+
+Ninety rings, zero outright failures, 45 fallbacks — every one of which was
+previously a silent drop. Amsterdam is unchanged, which is the control.
+
+The rider is told: `pavedFallback` reaches `loop.noPavedLoop` on the result card
+and `PAVED_FALLBACK_WARNING` reaches route-preview, both already translated into
+all three locales. A fallback nobody sees would be the same silence in a new
+place.
+
+**Still open, and deliberately untouched:** the server's own point-to-point
+client, `lib/clients/customOsrm.ts`, has NO paved fallback at all rather than an
+unreachable one. Adding one is a behaviour change rather than a repair, and that
+path is dormant — the app routes client-side. Worth doing if the server ever
+becomes the routing path.
+
+### 2. The out-and-back guard was measuring the wrong thing — FIXED 2026-09-10
+
+`loopRoundness` divides the furthest point a route reaches by the radius a
+CIRCLE of that length would have. A lollipop rides out before it loops, so its
+excursion is large by construction and the whole-route ratio is structurally
+inflated. A real captured lollipop out of Râșnov scored **1.905** against a
+**1.9** threshold while its ring repeated only **0.9%** of itself.
+
+**The first report of this overstated it, and the correction is the useful
+part.** Generalising from that one fixture, it was written up as the lollipop
+shape being thrown away. Measured properly across 300 live candidates — five
+cities, three distances, five bearings, both ring shapes, both shapes of route —
+the guard rejected **5 of 150** lollipops, and **all five would have failed the
+doubling-back or spur cap anyway**. None of them could ever have reached a
+rider.
+
+Worse for the proposed fix: scoping roundness to the ring produced results
+**identical to having no guard at all**. Shipping it alone would have been
+deleting a check while appearing to repair it.
+
+| Across 300 live candidates | whole-route guard | ring-scoped guard | no guard |
+|---|---|---|---|
+| candidates produced | 295 | 300 | 300 |
+| offerable at the strict rungs | 84 | 85 | 85 |
+| out-and-backs reaching the last rung | 50 | 53 | 53 |
+
+**What the measurement did find is the real defect.** At the last rung the
+doubling-back and spur caps are both dropped, so a route that is really a ride
+out and back could be offered as "the least we could find". Fifty of 300
+candidates reached that rung in that state and the guard stopped three of them.
+Against a control set of genuine out-and-backs, whole-route roundness caught
+four of seven where `ringRetracedShare` caught seven of seven.
+
+**Both halves shipped together**, because the first is only safe with the
+second:
+
+- `ringRoundness` / `isRingOutAndBack` measure the LOOP, taking the reference
+  point from where the loop begins and ends — the snapped start for a plain
+  ring, the anchor for a lollipop. Plain rings are untouched: the scope is the
+  same and the reference-point change flipped no verdict in 300 measurements.
+- `RETRACE_CEILING = 0.9` with `withinRetraceCeiling` is never relaxed at any
+  rung. 0.9 sits in the only visible gap in the data, 0.893 to 0.930, and 30 of
+  the 300 candidates sat at exactly 1.000 — every metre of the loop ridden
+  twice.
+
+Verified against the live router after the change:
+
+| | before | after |
+|---|---|---|
+| candidates produced | 295 | 300 |
+| offerable at the strict rungs | 100 | 101 |
+| lollipops among those | 26 | 27 |
+| available at the last rung | 295 | 259 |
+| repeating over 90% of themselves | 38 | **0** |
+| searches left with nothing to offer | 0 of 15 | **0 of 15** |
+
+That last row is the one that mattered. The ceiling removes every degenerate
+route without starving a single search, and no search dropped even to one or
+two candidates.
+
+⚠ **Two things worth knowing for whoever touches this next.**
+
+`MAX_LOOP_ROUNDNESS = 1.9` is calibrated against ROAD distances, not geometric
+ones, and the comment claiming "a true circle scores 1.0" is wrong. A circle
+through its own start scores **2.0** with no detour, and about **0.95** with the
+measured 2.11x ring detour. Real rings land at 0.41 to 1.20 only because the
+road distance in the denominator is roughly double the geometric path. Any
+synthetic test fixture must carry a realistic detour or it measures a shape no
+router returns — an earlier draft of these tests built a "lobed city loop" that
+scored 6.2.
+
+And 1.9 sits almost exactly at the MEDIAN of real out-and-backs, which measured
+1.875. That is why it was close to a coin flip on the population it was written
+for, and why the ceiling rather than the threshold is what now does that job.
+`isRingOutAndBack` is kept because a lollipop whose three ring waypoints all
+snap onto one road is structurally reachable and the check costs one comparison,
+but it fired on none of the 300 and must not be relied on.
+
+## Server-side TODO — improvements deliberately deferred
+
+Ordered by what a rider would notice first.
+
+1. **The sizing model is uncalibrated below 15 km.** A 5 km ring came back at
+   **11.7 km** on the first attempt — 135% over — because `ringDetourFactor` was
+   measured at 15/30/50 km. The controller recovers, at the cost of two extra
+   round trips on every short search, and 5 km is the first entry in the picker.
+   Measure it at 5 and 10 km and make the factor distance-aware.
+2. **Cache rings across riders.** Two riders starting near each other with the
+   same settings currently pay for the same OSRM work twice. Now that generation
+   is server-side this is a real option, and it was listed as a cut in section 9
+   of the original design specifically because it needed a server.
+3. **Raise concurrency.** `RING_CONCURRENCY` is 4, chosen so a handset drew
+   loops at a legible pace and did not burst the OSRM box. On the server the
+   first reason is gone and the second is better handled by the rate limit.
+4. **Reconcile the loop-session meter server-side.** It is still local and
+   therefore still trusted; the endpoint is the natural place to settle it.
+5. **Revisit the terrain escalation.** Measuring five more after the first five
+   appears to be a no-op in most shapes, because the pool is at most ten by the
+   time the terrain rung runs and the two passes together cover it. Worth
+   confirming before anyone relies on it.
+6. **Delete the on-device generator** once the flag has been on long enough.
+   `loop-generator.ts`, its test, `loopServerFlag.ts`, the flag itself and the
+   parity test all go together.
+
+## Validating it
+
+`scripts/probe-loop-service.mjs` drives the endpoint over a grid of starts and
+distances and prints distance error, doubling back, spur share and which rung of
+the ladder each search stopped at. With `LOOP_PROBE_GEOJSON=out.geojson` it
+also writes every loop for visual checking, which is the part the numbers cannot
+settle.
+
+```bash
+API_BASE_URL=https://defpedal-api-1081412761678.europe-central2.run.app \
+LOOP_PROBE_TOKEN=<supabase access token> \
+LOOP_PROBE_GEOJSON=loops.geojson \
+  node scripts/probe-loop-service.mjs
+```

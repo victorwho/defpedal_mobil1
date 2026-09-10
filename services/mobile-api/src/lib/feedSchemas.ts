@@ -234,6 +234,9 @@ export const profileResponseSchema = {
     // `required` so the field set stays backwards compatible.
     sesizariEnabled: { type: 'boolean' },
     sesizariBaseUrl: { type: 'string' },
+    // Loop-generation rollout switch (server-owned). Also not in `required`,
+    // so an older client simply ignores it.
+    loopServerEnabled: { type: 'boolean' },
     // Fastify strips anything not declared here (gotcha #9) — every premium
     // field must be listed or it silently vanishes from the response.
     premium: {

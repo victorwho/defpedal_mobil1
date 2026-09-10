@@ -1137,6 +1137,18 @@ export interface ProfileResponse {
    */
   sesizariEnabled?: boolean;
   sesizariBaseUrl?: string;
+  /**
+   * Whether loop generation should go through `POST /v1/loops` rather than the
+   * app's own OSRM fan-out. Server-owned rollout switch, delivered here for the
+   * same reason as the Sesizări config: this response is already fetched at
+   * bootstrap by every session.
+   *
+   * Optional and absent means OFF, not "keep what you had". The server path is
+   * the unvalidated one, so an older server, a failed read or a missing field
+   * must all land on the client generator that riders have been using for
+   * months.
+   */
+  loopServerEnabled?: boolean;
   /** Pedal Plus entitlement + paywall visibility. Server-owned. */
   premium: ProfilePremium;
 }

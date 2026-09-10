@@ -19,7 +19,7 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
 } from '@defensivepedal/core';
-import { downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRiskDataAvailable, isRouteSupported, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, isRouteSupported, readOsrmResponse, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -184,16 +184,6 @@ const buildCoordString = (
 class OsrmOutOfCoverageError extends Error {}
 
 /**
- * OSRM's answer when no route exists under the constraints given.
- *
- * Worth naming: with `exclude=unpaved` this is a normal outcome in remote
- * terrain rather than a fault, and it has to be told apart from the network
- * and coverage failures around it.
- */
-const isNoRoute = (code: string | undefined): boolean =>
-  code === 'NoRoute' || code === 'NoSegment';
-
-/**
  * Marks a route that had to drop the rider's "avoid unpaved" request.
  *
  * A warning code rather than a sentence: the string crosses into the UI, which
@@ -249,20 +239,20 @@ const fetchOsrmRoutes = async (
 
   const response = await fetchWithTimeout(url);
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(
-      `OSRM routing failed (${response.status}): ${errorText || 'Unknown error'}`,
-    );
-  }
+  // Body first, status second, and the order is the fix. OSRM reports "nothing
+  // paved connects these points" as HTTP 400 with `code: NoRoute`, so a
+  // status-first check threw straight past the fallback below. On this path
+  // that throw propagates out of `directPreviewRoute` and the rider gets a
+  // failed route preview rather than the paved route they asked for with a
+  // note. It reproduces every time for a start that snaps to an unpaved edge.
+  // See `osrmResponse.ts` for the measurements.
+  const answer = await readOsrmResponse<RouteResponse>(response);
 
-  const data = (await response.json()) as RouteResponse;
-
-  if (data.code !== 'Ok' || !data.routes?.length) {
+  if (answer.outcome === 'no_route') {
     // Nothing paved connects these points. Ask again without the constraint
     // and say so, rather than failing into a route that is neither safe nor
     // paved. Retried once only — a second NoRoute is a real failure.
-    if (avoidUnpaved && isNoRoute(data.code)) {
+    if (avoidUnpaved) {
       const relaxed = await fetchOsrmRoutes(
         origin,
         destination,
@@ -273,8 +263,18 @@ const fetchOsrmRoutes = async (
       );
       return { routes: relaxed.routes, pavedFallback: true };
     }
-    throw new Error(`OSRM returned no routes (code: ${data.code})`);
+    throw new Error(`OSRM returned no routes (code: ${answer.code})`);
   }
+
+  if (answer.outcome === 'empty') {
+    throw new Error(`OSRM returned no routes (code: ${answer.code})`);
+  }
+
+  if (answer.outcome === 'failed') {
+    throw new Error(`OSRM routing failed (${describeOsrmFailure(answer)})`);
+  }
+
+  const data = answer.data;
 
   // Zero-distance guard: for points OUTSIDE its data (e.g. Belgrade inside
   // the loose RO bbox, Bosnia inside the HR bbox, the Canaries), OSRM does
@@ -816,6 +816,16 @@ export interface LoopRouteResult {
    * different ids and an id-based comparison can never see they are the same.
    */
   readonly edgeKeys: readonly string[];
+  /**
+   * True when the LOOP portion is a there-and-back.
+   *
+   * Scoped to the ring rather than the whole route, and the scope is the
+   * point: a lollipop rides out before it loops, so measuring the whole route
+   * penalises the shape for being the shape. Measured on 300 real candidates,
+   * five of 150 lollipops crossed the threshold purely because of their
+   * approach.
+   */
+  readonly ringOutAndBack: boolean;
 }
 
 /**
@@ -877,30 +887,34 @@ export const fetchLoopRoute = async (
 
   const response = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS, options.signal);
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(
-      `OSRM loop routing failed (${response.status}): ${errorText || 'Unknown error'}`,
-    );
-  }
+  // Body first, status second — see the note on the point-to-point fetcher
+  // above, and `osrmResponse.ts` for why.
+  const answer = await readOsrmResponse<RouteResponse>(response);
 
-  const data = (await response.json()) as RouteResponse;
-
-  if (data.code !== 'Ok' || !data.routes?.length) {
+  if (answer.outcome === 'no_route') {
     // Same fallback as the point-to-point path, and it matters more here: a
     // failed candidate is silently dropped by `routeOneRing`, so without this
     // a paved-only search in trail country would report "no loops found" and
     // blame the search rather than the constraint.
-    if (excludesUnpaved(options.surface) && isNoRoute(data.code)) {
+    if (excludesUnpaved(options.surface)) {
       return fetchLoopRoute(start, waypoints, {
         ...options,
         surface: 'any',
         pavedFallback: true,
       });
     }
-    throw new Error(`OSRM returned no loop (code: ${data.code})`);
+    throw new Error(`OSRM returned no loop (code: ${answer.code})`);
   }
 
+  if (answer.outcome === 'empty') {
+    throw new Error(`OSRM returned no loop (code: ${answer.code})`);
+  }
+
+  if (answer.outcome === 'failed') {
+    throw new Error(`OSRM loop routing failed (${describeOsrmFailure(answer)})`);
+  }
+
+  const data = answer.data;
   const routable = data.routes.filter((route) => route.distance > 0);
   if (routable.length === 0) {
     throw new OsrmOutOfCoverageError(
@@ -928,6 +942,7 @@ export const fetchLoopRoute = async (
     edgeKeys: routeEdgeKeys(raw.legs),
     spurShare: spurShare(raw.legs, options.stemLegs ?? 0),
     pavedFallback: options.pavedFallback ?? false,
+    ringOutAndBack: isRingOutAndBack(raw.legs, options.stemLegs ?? 0),
   };
 };
 

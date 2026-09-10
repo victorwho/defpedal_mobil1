@@ -26,6 +26,13 @@ export type RateLimitPolicies = {
   // Region-gate waitlist signups — tight because the caller is usually an
   // anonymous session and each row is a stored email address.
   countryWaitlist: RateLimitPolicy;
+  // Loop generation. ONE rider request here fans out to as many as sixty OSRM
+  // requests and fifteen Supabase round trips, so this bucket is what bounds
+  // the whole feature — deliberately much tighter than `routePreview`, which
+  // it also replaces: measuring finalists in-process no longer spends that
+  // budget. Note the client meters loop SESSIONS separately as a product
+  // limit; this is abuse protection, and the two are not the same thing.
+  loopSearch: RateLimitPolicy;
 };
 
 export type RateLimitDecision = {

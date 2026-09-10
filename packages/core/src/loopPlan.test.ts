@@ -6,18 +6,20 @@ import {
   classifyTerrain,
   climbPerKilometre,
   DEFAULT_DETOUR_FACTOR,
-  ringDetourFactor,
-  STEM_DETOUR_FACTOR,
   DISTANCE_TOLERANCE_RELAXED,
   DISTANCE_TOLERANCE_STRICT,
   distanceError,
   distanceToleranceFor,
+  excludesUnpaved,
   headingAppliesAt,
   headingArcFor,
   highRiskMeters,
   initialRingRadiusMeters,
   isDegenerateLoop,
   isOutAndBack,
+  isRingOutAndBack,
+  LOLLIPOP_STEM_LEGS,
+  lollipopWaypoints,
   LOOP_CANDIDATE_COUNT,
   LOOP_DISTANCE_STEPS_METERS,
   LOOP_HEADINGS,
@@ -25,46 +27,51 @@ import {
   loopBearings,
   loopRoundness,
   matchesTerrain,
+  MAX_LOOP_ROUNDNESS,
+  MAX_RETRACE_SHARE,
+  MAX_RING_CLEARANCE_METERS,
+  MAX_SPUR_SHARE,
+  MIN_RING_CLEARANCE_METERS,
+  MIN_SPUR_METERS,
   nextRelaxation,
   nextRingRadiusMeters,
   normalizeBearing,
-  rankCandidates,
-  RING_PERIMETER_FACTOR,
-  SCENIC_LAMBDA,
-  SCENIC_SAFETY_TOLERANCE_METERS,
-  RING_WAYPOINT_CHOICES,
-  RING_WAYPOINT_COUNT,
-  ringPerimeterFactor,
-  ringWaypointCountFor,
-  ringWaypoints,
-  scoredMeters,
-  terrainAppliesAt,
-  terrainDistance,
-  excludesUnpaved,
-  MAX_RETRACE_SHARE,
-  MAX_SPUR_SHARE,
-  MIN_SPUR_METERS,
-  spurMeters,
-  spurShare,
-  withinSpurCap,
-  SPUR_RANKING_DEADBAND,
-  retraceAppliesAt,
-  withinRetraceCap,
   prefersUnpaved,
+  rankCandidates,
+  RETRACE_CEILING,
+  RETRACE_RANKING_DEADBAND,
+  retraceAppliesAt,
   retracedMeters,
   retracedShare,
+  RING_PERIMETER_FACTOR,
+  RING_WAYPOINT_CHOICES,
+  RING_WAYPOINT_COUNT,
   ringClearanceMeters,
+  ringCoordinates,
+  ringDetourFactor,
+  ringPerimeterFactor,
   ringRetracedShare,
+  ringRoundness,
+  ringWaypointCountFor,
+  ringWaypoints,
+  SCENIC_LAMBDA,
+  SCENIC_SAFETY_TOLERANCE_METERS,
+  scoredMeters,
   splitStemAndRing,
-  lollipopWaypoints,
-  LOLLIPOP_STEM_LEGS,
-  MAX_RING_CLEARANCE_METERS,
-  MIN_RING_CLEARANCE_METERS,
-  RETRACE_RANKING_DEADBAND,
+  SPUR_RANKING_DEADBAND,
+  spurMeters,
+  spurShare,
+  STEM_DETOUR_FACTOR,
+  terrainAppliesAt,
+  terrainDistance,
   unpavedMeters,
   unpavedShare,
   usesFlatProfile,
   withinDistanceTolerance,
+  withinRetraceCap,
+  withinRetraceCeiling,
+  withinSpurCap,
+  type AnnotatedLeg,
   type LoopCandidate,
 } from './loopPlan';
 
@@ -1351,5 +1358,244 @@ describe('ranking prefers one ride over a ride plus errands', () => {
       req,
     );
     expect(ranked[0]!.id).toBe('quiet-with-spur');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The out-and-back guard, scoped to the loop
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a leg whose annotation AGREES with its geometry.
+ *
+ * Edge lengths are derived from the points rather than invented, then scaled by
+ * a detour factor, because that is what a road is: a longer path between the
+ * same two points. Inventing the two independently is how a synthetic fixture
+ * ends up measuring something production never sees — an earlier version of
+ * these tests set a per-edge length by hand and produced a "lobed city loop"
+ * scoring 6.2, which is not a shape any router returns.
+ *
+ * 2.11 is the measured ring detour against the live safety profile. It matters
+ * here rather than being cosmetic: `loopRoundness` divides by the ROAD
+ * distance, so the detour is most of what separates a real loop from the
+ * geometric ideal. A circle through its own start scores 2.0 with no detour at
+ * all and 0.95 with this one, and only the second is a number the threshold
+ * was calibrated against.
+ */
+const legFrom = (
+  nodes: number[],
+  points: [number, number][],
+  detour = 2.11,
+): AnnotatedLeg => {
+  const distance: number[] = [];
+  for (let i = 1; i < points.length; i += 1) {
+    const [lon0, lat0] = points[i - 1]!;
+    const [lon1, lat1] = points[i]!;
+    distance.push(haversineDistance([lat0, lon0], [lat1, lon1]) * detour);
+  }
+  return {
+    annotation: { nodes, distance },
+    steps: [{ geometry: { coordinates: points } }],
+  };
+};
+
+describe('ringCoordinates', () => {
+  it('returns the whole route when there is no stem', () => {
+    const legs = [
+      legFrom([1, 2], [[0, 0], [0, 0.01]]),
+      legFrom([2, 3], [[0, 0.01], [0.01, 0.01]]),
+    ];
+    expect(ringCoordinates(legs, 0)).toHaveLength(4);
+  });
+
+  it('drops one leg at EACH end for a lollipop', () => {
+    const legs = [
+      legFrom([1, 2], [[0, 0], [0, 0.01]]),
+      legFrom([2, 3], [[0, 0.01], [0.01, 0.01]]),
+      legFrom([3, 4], [[0.01, 0.01], [0.01, 0]]),
+      legFrom([4, 1], [[0.01, 0], [0, 0]]),
+    ];
+    expect(ringCoordinates(legs, 1)).toEqual([
+      [0, 0.01],
+      [0.01, 0.01],
+      [0.01, 0.01],
+      [0.01, 0],
+    ]);
+  });
+
+  it('treats a route with too few legs to split as all ring', () => {
+    // Rather than waving an unexpected shape through, judge it on its whole
+    // self. Same rule `splitStemAndRing` follows.
+    const legs = [legFrom([1, 2], [[0, 0], [0, 0.01]])];
+    expect(ringCoordinates(legs, 1)).toHaveLength(2);
+  });
+
+  it('returns nothing when the steps carry no geometry', () => {
+    expect(
+      ringCoordinates([{ annotation: { nodes: [1, 2], distance: [10] } }], 0),
+    ).toEqual([]);
+  });
+});
+
+describe('ringRoundness', () => {
+  const square: [number, number][] = [
+    [0, 0],
+    [0, 0.02],
+    [0.02, 0.02],
+    [0.02, 0],
+    [0, 0],
+  ];
+
+  it('matches the whole-route measurement when there is no stem', () => {
+    // A plain ring must not move. With `stemLegs` 0 the ring IS the route, and
+    // the only difference is that the reference point is read from the
+    // geometry rather than passed in. Across 300 live candidates that flipped
+    // no verdict.
+    const legs = [legFrom([1, 2, 3, 4, 5], square)];
+    const roadMeters = legs[0]!.annotation!.distance!.reduce((a, b) => a + b, 0);
+    expect(ringRoundness(legs, 0)).toBeCloseTo(
+      loopRoundness({ lat: 0, lon: 0 }, square, roadMeters),
+      6,
+    );
+  });
+
+  it('ignores the ride out, which is what a lollipop is made of', () => {
+    // A long stem due north, a small loop at the top, then the stem home.
+    // Measured whole, the excursion is dominated by the approach; measured on
+    // the ring, it is just a loop.
+    const legs = [
+      legFrom([1, 2], [[0, 0], [0, 0.09]], 1.86),
+      legFrom(
+        [2, 3, 4, 5, 2],
+        [
+          [0, 0.09],
+          [0.005, 0.095],
+          [0, 0.1],
+          [-0.005, 0.095],
+          [0, 0.09],
+        ],
+      ),
+      legFrom([2, 1], [[0, 0.09], [0, 0]], 1.86),
+    ];
+
+    const whole = ringRoundness(legs, 0);
+    const scoped = ringRoundness(legs, 1);
+
+    // 1.59 whole against 1.05 on the ring: the approach inflates the figure by
+    // about half again, and that inflation is the defect the scope change
+    // removes. Against the live router the same effect measured 1.23 whole
+    // versus 0.82 scoped as medians over 150 real lollipops.
+    expect(whole).toBeCloseTo(1.59, 1);
+    expect(scoped).toBeCloseTo(1.05, 1);
+    expect(whole).toBeGreaterThan(scoped);
+    expect(scoped).toBeLessThan(MAX_LOOP_ROUNDNESS);
+  });
+
+  it('passes an unmeasurable route rather than rejecting it on a guess', () => {
+    expect(ringRoundness([], 0)).toBe(0);
+    expect(ringRoundness([{ annotation: { nodes: [1, 2], distance: [5] } }], 0)).toBe(0);
+  });
+
+  it('leaves a zero-length ring to the retrace measurement', () => {
+    // Two checks answering the same question differently is how a route slips
+    // between them, so this one declines and `ringRetracedShare` reports 1.
+    const legs = [
+      legFrom([1, 2], [[0, 0], [0, 0.01]], 0),
+      legFrom([2, 3], [[0, 0.01], [0, 0.02]], 0),
+      legFrom([3, 4], [[0, 0.02], [0, 0.01]], 0),
+      legFrom([4, 1], [[0, 0.01], [0, 0]], 0),
+    ];
+    expect(ringRoundness(legs, 1)).toBe(0);
+    expect(ringRetracedShare(legs, 1)).toBe(1);
+  });
+});
+
+describe('isRingOutAndBack', () => {
+  it('rejects a straight ride out and straight back', () => {
+    // Out and back along the same line reaches half its own length from the
+    // start, which is pi times the radius of a circle that long. Independent
+    // of scale, so this is the one absolute the shape guarantees.
+    const line: [number, number][] = [
+      [0, 0],
+      [0, 0.05],
+      [0, 0.1],
+      [0, 0.05],
+      [0, 0],
+    ];
+    const legs = [legFrom([1, 2, 3, 2, 1], line, 1)];
+    expect(ringRoundness(legs, 0)).toBeCloseTo(Math.PI, 1);
+    expect(isRingOutAndBack(legs, 0)).toBe(true);
+  });
+
+  it('accepts a loop whose road distance carries a real detour', () => {
+    // The threshold was calibrated against road distances, not geometric ones,
+    // and the difference is the whole reason a real ring scores 0.41 to 1.20
+    // where the same shape with no detour would score about 2.
+    const square: [number, number][] = [
+      [0, 0],
+      [0, 0.02],
+      [0.02, 0.02],
+      [0.02, 0],
+      [0, 0],
+    ];
+    const legs = [legFrom([1, 2, 3, 4, 1], square)];
+    expect(isRingOutAndBack(legs, 0)).toBe(false);
+  });
+
+  it('accepts a lollipop that the whole-route measurement would reject', () => {
+    // The defect, in one assertion. Same route, two scopes, opposite answers.
+    const legs = [
+      legFrom([1, 2], [[0, 0], [0, 0.09]], 1.4),
+      legFrom(
+        [2, 3, 4, 5, 2],
+        [
+          [0, 0.09],
+          [0.005, 0.095],
+          [0, 0.1],
+          [-0.005, 0.095],
+          [0, 0.09],
+        ],
+      ),
+      legFrom([2, 1], [[0, 0.09], [0, 0]], 1.4),
+    ];
+    expect(ringRoundness(legs, 0)).toBeGreaterThan(MAX_LOOP_ROUNDNESS);
+    expect(isRingOutAndBack(legs, 1)).toBe(false);
+  });
+});
+
+describe('the never-relaxed doubling-back ceiling', () => {
+  it('sits above the relaxable cap, in the gap the measurement found', () => {
+    // 300 real candidates across five cities: the share tails off smoothly
+    // with one visible gap, 0.893 to 0.930, and 30 sit at exactly 1.0.
+    expect(RETRACE_CEILING).toBeGreaterThan(0.893);
+    expect(RETRACE_CEILING).toBeLessThan(0.93);
+    expect(RETRACE_CEILING).toBeGreaterThan(MAX_RETRACE_SHARE);
+  });
+
+  it('refuses a route that repeats effectively all of itself', () => {
+    expect(withinRetraceCeiling({ ringRetracedShare: 1 })).toBe(false);
+    expect(withinRetraceCeiling({ ringRetracedShare: 0.95 })).toBe(false);
+  });
+
+  it('allows everything the ordinary cap already governs', () => {
+    // This is what makes the ceiling free. Every share above MAX_RETRACE_SHARE
+    // already fails `withinRetraceCap` at every rung except the last, so the
+    // ceiling can only ever change the answer where nothing else was looking.
+    for (const share of [0, 0.1, MAX_RETRACE_SHARE, 0.5, 0.7, 0.89]) {
+      expect(withinRetraceCeiling({ ringRetracedShare: share })).toBe(true);
+    }
+  });
+
+  it('takes no relaxation argument, because no rung changes the answer', () => {
+    // The shape of the function IS the promise. If a relaxation parameter ever
+    // appears here, the ceiling has quietly become another cap.
+    expect(withinRetraceCeiling).toHaveLength(1);
+  });
+
+  it('passes an unmeasurable share, like every other cap here', () => {
+    expect(withinRetraceCeiling({ ringRetracedShare: NaN })).toBe(true);
+    expect(
+      withinRetraceCeiling({ ringRetracedShare: undefined as unknown as number }),
+    ).toBe(true);
   });
 });

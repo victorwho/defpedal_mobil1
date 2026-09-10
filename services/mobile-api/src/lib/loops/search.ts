@@ -1,88 +1,77 @@
 /**
- * loop-generator — turn a rider's four choices into loops they can ride.
+ * loops/search — turn a rider's four choices into loops they can ride.
  *
- * The pure decisions all live in `@defensivepedal/core/loopPlan`: ring
- * geometry, the convergence controller, terrain cuts, the relaxation ladder and
- * the ranking. This module owns only the network and the sequencing — which
- * request to make next, how many, when to stop, and what to report while it
- * happens.
+ * A faithful server-side port of `apps/mobile/src/lib/loop-generator.ts`. Every
+ * decision it makes is imported from `@defensivepedal/core/loopPlan`, exactly as
+ * the client does: ring geometry, the convergence controller, terrain cuts, the
+ * relaxation ladder, the caps and the ranking. Nothing about loop QUALITY is
+ * decided here — this module owns only the network and the sequencing, which is
+ * which request to make next, how many, when to stop, and what to report while
+ * it happens.
+ *
+ * It is a port and not an improvement, deliberately. The feature flag can serve
+ * either implementation to the same rider, so a difference between them is a
+ * bug report about loops changing for no reason. Improvements are listed in
+ * `docs/plans/loop-generator.md` under "Server-side TODO" and land after the
+ * flag does.
  *
  * ## The shape of one attempt
  *
  * Two rungs cost network, two do not. That asymmetry is the whole reason the
  * budget works:
  *
- *   1. `none`      — strict heading arc, strict distance. 8 rings.
- *   2. `heading`   — widened arc. 8 more rings, added to the same pool.
+ *   1. `none`      — strict heading arc, strict distance. 5 rings.
+ *   2. `heading`   — widened arc. 5 more rings, added to the same pool.
  *   3. `distance`  — no new requests. The pool already contains the loops that
  *                    were rejected for length; widening the tolerance simply
  *                    stops rejecting them.
  *   4. `terrain`   — no new requests either. Drop the terrain filter over what
  *                    we have and show the closest thing that exists.
  *
- * ## Why the measurement is staged
+ * ## Ports
  *
- * Distance comes free with every OSRM response. Climb and risk do not — each
- * needs a call to our own API, and `/elevation-profile` and `/risk-segments`
- * share the `routePreview` rate-limit bucket at 30 requests per 60 seconds.
- * Measuring all sixteen candidates would let a rider rate-limit their own app
- * and take the risk overlay down with it, so only the three finalists are
- * measured, and only three more if the terrain ask went unmet.
+ * Routing and measurement arrive as injected functions rather than imports, so
+ * the orchestration can be exercised over recorded OSRM responses with no
+ * network at all. That is what lets the parity test run this module and the
+ * app's against the same fixtures and compare the ranked output.
  */
 import {
   classifyTerrain,
   distanceError,
   headingAppliesAt,
   headingArcFor,
-  highRiskMeters,
   initialRingRadiusMeters,
   isDegenerateLoop,
+  LOLLIPOP_STEM_LEGS,
   LOOP_CANDIDATE_COUNT,
   LOOP_DUPLICATE_OVERLAP,
   LOOP_RESULTS_SHOWN,
+  lollipopWaypoints,
   loopBearings,
   matchesTerrain,
   nextRingRadiusMeters,
   rankCandidates,
-  LOLLIPOP_STEM_LEGS,
-  lollipopWaypoints,
-  routeOverlapShare,
-  ringWaypoints,
   ringWaypointCountFor,
+  ringWaypoints,
+  routeOverlapShare,
   terrainAppliesAt,
+  withinDistanceTolerance,
   withinRetraceCap,
   withinRetraceCeiling,
   withinSpurCap,
-  withinDistanceTolerance,
   type Coordinate,
-  type LoopHeading,
+  type GeneratedLoop,
   type LoopRelaxation,
-  type LoopSurface,
-  type LoopTerrain,
-  type RouteOption,
+  type LoopSearchOutcome,
+  type LoopSearchRequest,
 } from '@defensivepedal/core';
 
-import {
-  enrichRouteWithElevation,
-  enrichRouteWithRisk,
-  fetchLoopRoute,
-  fetchRouteScenicScore,
-} from './mapbox-routing';
-import type { Locale } from '../i18n';
+import type { LoopRouteOptions, LoopRouteResult } from './osrm';
 
 // ---------------------------------------------------------------------------
 // Budgets
 // ---------------------------------------------------------------------------
 
-/**
- * Radius corrections allowed per ring before giving up on it.
- *
- * Two, not more. The controller converges fast when the network cooperates and
- * never converges at all when it does not — a ring pinned against a coastline
- * returns the same wrong distance whatever radius it is given. Spending a third
- * round trip discovering that costs the rider seconds and buys nothing; there
- * are seven other bearings that might work.
- */
 /**
  * Attempts to land a ring on the requested length.
  *
@@ -100,107 +89,43 @@ const RINGS_PER_RUNG = LOOP_CANDIDATE_COUNT;
 /**
  * How many rings are in flight at once.
  *
- * Four rather than all eight: the map draws each loop as it lands, so a
- * staggered arrival is what makes the wait legible rather than a stall
- * followed by everything at once. It also keeps a burst off the OSRM box.
+ * Four rather than all five: the map draws each loop as it lands, so a
+ * staggered arrival is what makes the wait legible rather than a stall followed
+ * by everything at once. It also keeps a burst off the OSRM box, which matters
+ * more from here than it did from a phone — one server can have many searches
+ * running at once where one handset has exactly one.
  */
 const RING_CONCURRENCY = 4;
 
 /**
- * Finalists measured for climb and risk on the first pass.
+ * Finalists measured for climb, risk and scenery on the first pass.
  *
  * Matches what the rider is shown: a row without a climb figure is a row they
- * cannot choose between, and showing more rows than we measure produced
- * exactly that.
+ * cannot choose between, and showing more rows than we measure produced exactly
+ * that.
  */
 const MEASURED_FINALISTS = LOOP_RESULTS_SHOWN;
 
-/** Loops shown at once. */
+/** Loops offered at once. */
 export const LOOPS_PER_ATTEMPT = LOOP_RESULTS_SHOWN;
 
 // ---------------------------------------------------------------------------
-// Types
+// Ports
 // ---------------------------------------------------------------------------
 
-export interface LoopSearchRequest {
-  readonly start: Coordinate;
-  readonly targetDistanceMeters: number;
-  readonly terrain: LoopTerrain;
-  readonly surface: LoopSurface;
-  readonly heading: LoopHeading;
-  readonly locale: Locale;
+export interface LoopSearchPorts {
+  /** Route one ring. Throws on failure; the caller drops that candidate. */
+  fetchRing(
+    start: Coordinate,
+    waypoints: readonly Coordinate[],
+    options: LoopRouteOptions,
+  ): Promise<LoopRouteResult>;
+  /** Fetch climb, risk and scenery for one loop. Never throws. */
+  measure(loop: GeneratedLoop): Promise<GeneratedLoop>;
 }
-
-export interface GeneratedLoop {
-  readonly id: string;
-  readonly route: RouteOption;
-  readonly coordinates: [number, number][];
-  readonly bearingDegrees: number;
-  readonly distanceMeters: number;
-  /** Null until the elevation pass has run. */
-  readonly climbMeters: number | null;
-  readonly highRiskMeters: number;
-  /**
-   * Fraction of the loop on unpaved ways, in [0, 1]. Available from the moment
-   * the ring is routed, because it is read off annotations we already request.
-   */
-  readonly unpavedShare: number;
-  /** Fraction of the loop ridden twice, in [0, 1]. Free, like unpavedShare. */
-  readonly retracedShare: number;
-  /** Doubling back inside the loop only — what the cap tests. */
-  readonly ringRetracedShare: number;
-  /**
-   * Fraction of the loop on out-and-back spurs. Distinct from the figure
-   * above: this is the detour hanging off the ride, which is what a rider
-   * means by "a loop plus detours".
-   */
-  readonly spurShare: number;
-  /** True when no paved loop exists here and the constraint had to be dropped. */
-  readonly pavedFallback: boolean;
-  /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
-  readonly stemMeters: number;
-  /**
-   * Length-weighted mean scenic score in [-1, 1]; 0 until measured, and 0
-   * forever in an unscored area — both mean "do not move the ranking".
-   */
-  readonly scenicScore: number;
-  /** Which rung of the ladder produced it. */
-  readonly relaxation: LoopRelaxation;
-  /** Measured terrain, or null when climb was never looked up. */
-  readonly terrain: LoopTerrain | null;
-  /** True once climb and risk have been fetched. */
-  readonly measured: boolean;
-}
-
-export type LoopSearchOutcome =
-  /**
-   * Loops found. `relaxation` names what, if anything, was given up, and the
-   * result card must say so — a relaxation the rider is not told about is
-   * indistinguishable from the generator ignoring them.
-   *
-   * `relaxation === 'terrain'` IS the honest miss. There is deliberately no
-   * separate failure status for it: the last rung of the ladder is "drop the
-   * terrain ask and show the closest thing that exists", which is exactly what
-   * a miss means. A second status would be a second way to say the same thing,
-   * and the two would drift.
-   *
-   * `checked` is how many loops were actually measured. The miss copy quotes
-   * it, and quoting a real number is the difference between a true statement
-   * and a plausible lie.
-   */
-  | {
-      readonly status: 'ok';
-      readonly loops: readonly GeneratedLoop[];
-      readonly relaxation: LoopRelaxation;
-      readonly checked: number;
-    }
-  /** Nothing rideable came back at all. */
-  | { readonly status: 'empty' }
-  /** The rider cancelled. Never charge for this. */
-  | { readonly status: 'cancelled' };
 
 export interface LoopSearchCallbacks {
-  /** Fires as each ring resolves, so the map can draw it immediately. */
+  /** Fires as each ring resolves, so the client can draw it immediately. */
   readonly onCandidate?: (loop: GeneratedLoop) => void;
   /** Fires with resolved/attempted counts for the progress line. */
   readonly onProgress?: (resolved: number, attempted: number) => void;
@@ -212,7 +137,7 @@ export interface LoopSearchCallbacks {
 // ---------------------------------------------------------------------------
 
 interface PooledLoop extends GeneratedLoop {
-  /** Mutable during the search; frozen into `GeneratedLoop` on the way out. */
+  /** Mutable during the search; stripped on the way out. Internal. */
   readonly radiusMeters: number;
   /** Road stretches used, for comparing candidates by content. Internal. */
   readonly edgeKeys: readonly string[];
@@ -231,6 +156,7 @@ const aborted = (signal?: AbortSignal): boolean => signal?.aborted === true;
  * or an out-and-back wearing a loop's clothes.
  */
 const routeOneRing = async (
+  ports: LoopSearchPorts,
   request: LoopSearchRequest,
   bearingDegrees: number,
   relaxation: LoopRelaxation,
@@ -258,9 +184,9 @@ const routeOneRing = async (
 
     // Both shapes converge, they just have different size knobs: a plain ring
     // scales its radius, a lollipop scales the whole stem+ring budget. Skipping
-    // convergence for lollipops was a real bug — measured against live OSRM,
-    // an unconverged 30 km request came back at 53 km, so every lollipop was
-    // then thrown out by the distance filter and none was ever offered.
+    // convergence for lollipops was a real bug — measured against live OSRM, an
+    // unconverged 30 km request came back at 53 km, so every lollipop was then
+    // thrown out by the distance filter and none was ever offered.
     const waypoints = lollipop
       ? lollipopWaypoints(
           request.start,
@@ -270,12 +196,11 @@ const routeOneRing = async (
         )
       : ringWaypoints(request.start, radius, bearingDegrees, waypointCount);
 
-    let result;
+    let result: LoopRouteResult;
     try {
-      result = await fetchLoopRoute(request.start, waypoints, {
+      result = await ports.fetchRing(request.start, waypoints, {
         terrain: request.terrain,
         surface: request.surface,
-        locale: request.locale,
         // The measurement has to agree with the shape we just built, or the
         // stem exemption silently does nothing — which is exactly how the
         // previous detector failed.
@@ -284,7 +209,7 @@ const routeOneRing = async (
       });
     } catch {
       // One dead bearing is not a dead search — out of coverage, a timeout, or
-      // a ring that collapsed into water. Seven others are still running.
+      // a ring that collapsed into water. The others are still running.
       return best;
     }
 
@@ -330,7 +255,9 @@ const routeOneRing = async (
         distanceError(best, request.targetDistanceMeters);
     if (better) best = candidate;
 
-    if (withinDistanceTolerance(candidate, request.targetDistanceMeters, 'none')) {
+    if (
+      withinDistanceTolerance(candidate, request.targetDistanceMeters, 'none')
+    ) {
       return candidate;
     }
 
@@ -354,7 +281,7 @@ const routeOneRing = async (
   return best;
 };
 
-/** Run `tasks` with bounded concurrency, preserving completion order effects. */
+/** Run `tasks` with bounded concurrency. */
 const runPooled = async <T>(
   tasks: readonly (() => Promise<T>)[],
   concurrency: number,
@@ -381,52 +308,6 @@ const runPooled = async <T>(
 };
 
 // ---------------------------------------------------------------------------
-// Measurement
-// ---------------------------------------------------------------------------
-
-/**
- * Fetch climb and risk for one loop.
- *
- * Two API calls, both against the shared `routePreview` bucket. Both degrade
- * quietly: `enrichRouteWithElevation` and `enrichRouteWithRisk` return the
- * route unchanged on failure, so a measured loop with no climb reads as
- * unmeasured rather than as flat — which matters, because `matchesTerrain`
- * refuses to claim a terrain it never measured.
- */
-const measureLoop = async (loop: PooledLoop): Promise<PooledLoop> => {
-  // Three calls, all on the shared routePreview bucket. Scenic joins climb and
-  // risk here rather than being fetched for every candidate, for exactly the
-  // same reason: the bucket is 30/60s and only finalists are worth measuring.
-  const [withElevation, withRisk, scenicScore] = await Promise.all([
-    enrichRouteWithElevation(loop.route, loop.coordinates),
-    enrichRouteWithRisk(loop.route, loop.coordinates),
-    fetchRouteScenicScore(loop.coordinates),
-  ]);
-
-  const climbMeters = withElevation.totalClimbMeters;
-  const riskSegments = withRisk.riskSegments;
-
-  return {
-    ...loop,
-    route: {
-      ...loop.route,
-      totalClimbMeters: climbMeters,
-      elevationProfile: withElevation.elevationProfile,
-      adjustedDurationSeconds: withElevation.adjustedDurationSeconds,
-      riskSegments,
-    },
-    climbMeters,
-    highRiskMeters: highRiskMeters(riskSegments),
-    scenicScore,
-    terrain:
-      climbMeters === null
-        ? null
-        : classifyTerrain(climbMeters, loop.distanceMeters),
-    measured: true,
-  };
-};
-
-// ---------------------------------------------------------------------------
 // The search
 // ---------------------------------------------------------------------------
 
@@ -440,10 +321,11 @@ const strip = (loop: PooledLoop): GeneratedLoop => {
  *
  * Walks the relaxation ladder, stopping at the first rung that produces
  * something the rider asked for. The rung it stopped at is returned so the
- * result card can name what moved — a relaxation the rider is not told about
- * is indistinguishable from the generator ignoring them.
+ * result card can name what moved — a relaxation the rider is not told about is
+ * indistinguishable from the generator ignoring them.
  */
 export const searchLoops = async (
+  ports: LoopSearchPorts,
   request: LoopSearchRequest,
   callbacks: LoopSearchCallbacks = {},
 ): Promise<LoopSearchOutcome> => {
@@ -472,29 +354,23 @@ export const searchLoops = async (
     const tasks = bearings.map((bearing, index) => async () => {
       const slot = index + shapeOffset;
       const loop = await routeOneRing(
+        ports,
         request,
         bearing,
         relaxation,
         // Shape changes every SECOND slot while the ring/lollipop choice
         // alternates every slot, so a batch covers all four combinations.
-        // Deriving both from the same parity — which is what shipped — made
-        // every lollipop a hexagon and every plain ring a triangle, so half
-        // the search space was never tried. Measured at Bucharest 30 km the
-        // three-point lollipop was offerable where the six-point one was not,
-        // and six-point was the only one the code could build.
+        // Deriving both from the same parity — which is what shipped once —
+        // made every lollipop a hexagon and every plain ring a triangle, so
+        // half the search space was never tried.
         ringWaypointCountFor(Math.floor(slot / 2)),
-        // Every OTHER candidate rides out somewhere before looping, rather
-        // than every third. Measured against live OSRM around Rasnov and
-        // Bucharest, a lollipop clears the doubling-back cap noticeably less
-        // often than a plain ring — it has to close a loop out where the road
-        // network is thinner — so sampling them at the same rate as rings is
-        // what gives the rider a real chance of being offered one. They still
-        // compete on merit; this only decides how many get to try.
-        //
-        // Mixed into the same pool rather than hidden behind a control: the
-        // terrain preference already steers towards them where it matters,
-        // because a ring in the foothills measures hillier than one round the
-        // town.
+        // Every OTHER candidate rides out somewhere before looping. Measured
+        // against live OSRM around Rasnov and Bucharest, a lollipop clears the
+        // doubling-back cap noticeably less often than a plain ring — it has to
+        // close a loop out where the road network is thinner — so sampling them
+        // at the same rate as rings is what gives the rider a real chance of
+        // being offered one. They still compete on merit; this only decides how
+        // many get to try.
         slot % 2 === 1,
         signal,
       );
@@ -504,10 +380,9 @@ export const searchLoops = async (
         // bearings routinely converge onto the same roads, and offering both
         // spends one of five slots on a choice the rider cannot make.
         //
-        // Compared by CONTENT, never by id: `generateRouteId` mints ids from
-        // `Date.now()`, so two byte-identical routes fetched a millisecond
-        // apart carry different ids and the id-based filter downstream could
-        // never match them. That is why duplicates reached the list.
+        // Compared by CONTENT, never by id: two byte-identical routes carry
+        // different ids, so an id-based filter could never match them. That is
+        // why duplicates used to reach the list.
         const duplicate = pool.some(
           (existing) =>
             routeOverlapShare(existing.edgeKeys, loop.edgeKeys) >=
@@ -525,7 +400,7 @@ export const searchLoops = async (
     await runPooled(tasks, RING_CONCURRENCY, signal);
   };
 
-  /** Measure up to `limit` unmeasured loops from `ordered`, nearest-first. */
+  /** Measure up to `limit` unmeasured loops from `ordered`, best first. */
   const measureSome = async (
     ordered: readonly PooledLoop[],
     limit: number,
@@ -534,16 +409,19 @@ export const searchLoops = async (
       .filter((loop) => !measured.has(loop.id))
       .slice(0, limit);
 
-    const results = await Promise.all(
+    return Promise.all(
       pending.map(async (loop) => {
-        const done = await measureLoop(loop);
-        measured.set(loop.id, done);
-        onCandidate?.(strip(done));
-        return done;
+        const done = (await ports.measure(strip(loop))) as GeneratedLoop;
+        const pooled: PooledLoop = {
+          ...done,
+          radiusMeters: loop.radiusMeters,
+          edgeKeys: loop.edgeKeys,
+        };
+        measured.set(loop.id, pooled);
+        onCandidate?.(done);
+        return pooled;
       }),
     );
-
-    return results;
   };
 
   /** Everything in the pool, with measurements folded in where we have them. */
@@ -572,8 +450,7 @@ export const searchLoops = async (
     // as a hard limit — spend one more sweep hunting a loop that satisfies it.
     // Compliant loops exist in every network measured; they are just bearing-
     // and shape-dependent, so the fix for "the cap always bends" is to look
-    // harder, not to lower the bar. OSRM is our own box, so this costs latency
-    // and nothing else.
+    // harder, not to lower the bar.
     if (relaxation === 'retrace' && !capRescueDone) {
       capRescueDone = true;
       await generateRung('heading', 1);
@@ -586,7 +463,8 @@ export const searchLoops = async (
             loop,
             request.targetDistanceMeters,
             'distance',
-          ) && withinRetraceCap(loop, 'distance') &&
+          ) &&
+          withinRetraceCap(loop, 'distance') &&
           withinSpurCap(loop, 'distance') &&
           withinRetraceCeiling(loop),
       );
@@ -612,7 +490,11 @@ export const searchLoops = async (
 
     const viable = currentPool().filter(
       (loop) =>
-        withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
+        withinDistanceTolerance(
+          loop,
+          request.targetDistanceMeters,
+          relaxation,
+        ) &&
         withinRetraceCap(loop, relaxation) &&
         withinSpurCap(loop, relaxation) &&
         // Never relaxed, at any rung. `withinRetraceCap` is a preference the
@@ -649,23 +531,34 @@ export const searchLoops = async (
 
     let matching = currentPool().filter(
       (loop) =>
-        withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
+        withinDistanceTolerance(
+          loop,
+          request.targetDistanceMeters,
+          relaxation,
+        ) &&
         withinRetraceCap(loop, relaxation) &&
         withinSpurCap(loop, relaxation) &&
         withinRetraceCeiling(loop) &&
         matchesTerrain(loop, request.terrain),
     );
 
-    // Escalate once. Claiming no hilly loop exists after checking three of
-    // sixteen would be an honest-looking lie, so buy three more measurements
-    // before saying it.
+    // Escalate once. Claiming no hilly loop exists after checking five of ten
+    // would be an honest-looking lie, so buy five more measurements before
+    // saying it.
     if (matching.length === 0) {
-      await measureSome(rankCandidates(currentPool(), request), MEASURED_FINALISTS);
+      await measureSome(
+        rankCandidates(currentPool(), request),
+        MEASURED_FINALISTS,
+      );
       if (aborted(signal)) return { status: 'cancelled' };
 
       matching = currentPool().filter(
         (loop) =>
-          withinDistanceTolerance(loop, request.targetDistanceMeters, relaxation) &&
+          withinDistanceTolerance(
+            loop,
+            request.targetDistanceMeters,
+            relaxation,
+          ) &&
           withinRetraceCeiling(loop) &&
           matchesTerrain(loop, request.terrain),
       );
@@ -687,3 +580,6 @@ export const searchLoops = async (
   // this start do not close into a loop of the length asked for.
   return { status: 'empty' };
 };
+
+/** Re-exported so the route handler and tests agree on the terrain classifier. */
+export { classifyTerrain };

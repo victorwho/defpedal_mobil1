@@ -13,6 +13,7 @@ import { buildFeedRoutes } from './routes/feed';
 import { buildFollowRoutes } from './routes/follow';
 import { buildImportRoutes } from './routes/imports';
 import { buildLeaderboardRoutes } from './routes/leaderboard';
+import { buildLoopRoutes } from './routes/loops';
 import { buildFirstRideNotificationRoutes } from './routes/firstRideNotifications';
 import { buildModerationRoutes } from './routes/moderation';
 import { buildNudgeRoutes } from './routes/nudges';
@@ -284,6 +285,13 @@ export const buildApp = (options: {
     prefix: '/v1',
   });
   void app.register(buildPushReceiptRoutes(dependencies), {
+    prefix: '/v1',
+  });
+  // Server-side loop generation (docs/plans/loop-generator.md). Registered
+  // unconditionally — the app only calls it when its own LOOP_GENERATION_SERVER
+  // flag is on, so an unused endpoint costs nothing, and having it live is what
+  // lets the flag be flipped without a deploy.
+  void app.register(buildLoopRoutes(dependencies), {
     prefix: '/v1',
   });
   // Hazard import pipeline (docs/plans/hazard-import-pipeline.md). Cron-only,

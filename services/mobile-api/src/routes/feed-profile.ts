@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 
 import { config } from '../config';
 import { requireFullUser } from '../lib/auth';
+import { isLoopServerEnabled } from '../lib/loops/flag';
 import { isSesizariEnabled } from '../lib/sesizariKillSwitch';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { loadPremiumProfileFields } from '../lib/entitlements';
@@ -148,6 +149,7 @@ export const buildFeedProfileRoutes = (
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
           sesizariEnabled: isSesizariEnabled(),
+          loopServerEnabled: isLoopServerEnabled(),
           sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };
@@ -222,6 +224,7 @@ export const buildFeedProfileRoutes = (
             quietHoursStart: (created.quiet_hours_start as string) ?? null,
             quietHoursEnd: (created.quiet_hours_end as string) ?? null,
             sesizariEnabled: isSesizariEnabled(),
+          loopServerEnabled: isLoopServerEnabled(),
             sesizariBaseUrl: config.sesizari.baseUrl,
             premium,
           };
@@ -255,6 +258,7 @@ export const buildFeedProfileRoutes = (
           quietHoursStart: (data.quiet_hours_start as string) ?? null,
           quietHoursEnd: (data.quiet_hours_end as string) ?? null,
           sesizariEnabled: isSesizariEnabled(),
+          loopServerEnabled: isLoopServerEnabled(),
           sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };

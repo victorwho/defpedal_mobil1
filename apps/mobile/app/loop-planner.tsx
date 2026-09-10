@@ -59,6 +59,11 @@ import { usePremium } from '../src/hooks/usePremium';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
+import {
+  LoopSearchRequestError,
+  searchLoopsRemote,
+} from '../src/lib/loop-generator-remote';
+import { isLoopServerEnabled } from '../src/lib/loopServerFlag';
 import { useQuery } from '@tanstack/react-query';
 
 import { mobileApi } from '../src/lib/api';
@@ -109,6 +114,19 @@ type SearchState =
   | { readonly kind: 'idle' }
   | { readonly kind: 'searching'; readonly found: number; readonly total: number }
   | { readonly kind: 'empty' }
+  /**
+   * The search FAILED, as distinct from finding nothing.
+   *
+   * Only the server path can reach this. The on-device generator treats every
+   * failure as one dead bearing out of many and reports `empty`, which is right
+   * there and wrong here: "no loops around here" is an answer, "we could not
+   * reach the server" is a fault, and a rider told the first when the second
+   * happened will change their distance and try again forever.
+   *
+   * Deliberately NOT a silent fall-back to the on-device generator. Hiding
+   * these is exactly how a broken rollout looks healthy.
+   */
+  | { readonly kind: 'error'; readonly offline: boolean }
   | { readonly kind: 'quota' };
 
 export default function LoopPlannerScreen() {
@@ -124,6 +142,8 @@ export default function LoopPlannerScreen() {
   const beginLoopSessionLocally = useAppStore((s) => s.beginLoopSessionLocally);
   const loopMeter = useAppStore((s) => s.loopSessionMeter);
   const locale = useAppStore((s) => s.locale);
+  // Server-owned rollout switch, hydrated from /v1/profile at bootstrap.
+  const loopServerFlag = useAppStore((s) => s.loopServerEnabled);
 
   // ── Controls ────────────────────────────────────────────────────────────
   const [distanceIndex, setDistanceIndex] = useState(2); // 15 km
@@ -341,34 +361,66 @@ export default function LoopPlannerScreen() {
       if (periodKey) beginLoopSessionLocally(periodKey, new Date().toISOString());
     };
 
-    const outcome = await searchLoops(
-      {
-        start,
-        targetDistanceMeters,
-        terrain,
-        surface,
-        heading,
-        locale,
+    const searchRequest = {
+      start,
+      targetDistanceMeters,
+      terrain,
+      surface,
+      heading,
+      locale,
+    };
+    const searchCallbacks = {
+      signal: controller.signal,
+      onCandidate: (loop: GeneratedLoop) => {
+        chargeOnce();
+        setSessionLoops((prev) => {
+          const next = prev.filter((existing) => existing.id !== loop.id);
+          // Newest first while the search runs, so arrivals are visible;
+          // the completed search replaces this with the ranked best five.
+          return [loop, ...next].slice(0, LOOP_RESULTS_SHOWN);
+        });
       },
-      {
-        signal: controller.signal,
-        onCandidate: (loop) => {
-          chargeOnce();
-          setSessionLoops((prev) => {
-            const next = prev.filter((existing) => existing.id !== loop.id);
-            // Newest first while the search runs, so arrivals are visible;
-            // the completed search replaces this with the ranked best five.
-            return [loop, ...next].slice(0, LOOP_RESULTS_SHOWN);
-          });
-        },
-        onProgress: (found, total) =>
-          setSearch({
-            kind: 'searching',
-            found,
-            total: Math.max(total, LOOP_CANDIDATE_COUNT),
-          }),
-      },
-    );
+      onProgress: (found: number, total: number) =>
+        setSearch({
+          kind: 'searching' as const,
+          found,
+          total: Math.max(total, LOOP_CANDIDATE_COUNT),
+        }),
+    };
+
+    // The whole feature switch. Both sides take the same request and the same
+    // callbacks and return the same outcome, so everything below this line —
+    // the map, the result list, the ride hand-off — is identical either way.
+    const useServer = isLoopServerEnabled(loopServerFlag);
+
+    let outcome;
+    try {
+      outcome = useServer
+        ? await searchLoopsRemote(searchRequest, searchCallbacks)
+        : await searchLoops(searchRequest, searchCallbacks);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setSearch({ kind: 'idle' });
+        return;
+      }
+      // Only the server path throws, and only for a real fault. It is shown as
+      // a failure rather than folded into "no loops here", and it never falls
+      // back to the on-device generator: a rollout whose failures are invisible
+      // cannot be evaluated.
+      const offline =
+        !isOnline ||
+        (error instanceof LoopSearchRequestError && error.reason === 'offline');
+      setSearch({ kind: 'error', offline });
+      telemetry.capture('loop_search_failed', {
+        km: targetDistanceMeters / 1000,
+        reason:
+          error instanceof LoopSearchRequestError ? error.reason : 'unknown',
+        status:
+          error instanceof LoopSearchRequestError ? (error.status ?? null) : null,
+        source: 'server',
+      });
+      return;
+    }
 
     if (controller.signal.aborted) {
       setSearch({ kind: 'idle' });
@@ -420,6 +472,7 @@ export default function LoopPlannerScreen() {
     heading,
     locale,
     beginLoopSessionLocally,
+    loopServerFlag,
   ]);
 
   const cancelSearch = useCallback(() => {
@@ -955,6 +1008,28 @@ export default function LoopPlannerScreen() {
               }}
             >
               {t('loop.emptyTryDirection')}
+            </Button>
+          </View>
+        </View>
+      ) : null}
+
+      {/*
+        A FAILED search, not an empty one. Kept visually distinct from the
+        "no loop from here" notice above because the two ask the rider for
+        completely different things: that one says change your distance or
+        direction, this one says try again.
+      */}
+      {search.kind === 'error' ? (
+        <View style={styles.notice}>
+          <Text style={styles.noticeTitle}>
+            {search.offline ? t('loop.offline') : t('loop.errorTitle')}
+          </Text>
+          <Text style={styles.noticeBody}>
+            {search.offline ? t('loop.errorOfflineBody') : t('loop.errorBody')}
+          </Text>
+          <View style={styles.noticeActions}>
+            <Button variant="secondary" onPress={() => void runSearch()}>
+              {t('loop.errorRetry')}
             </Button>
           </View>
         </View>

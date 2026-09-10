@@ -247,6 +247,10 @@ export const es: TranslationKeys = {
     emptyTryDirection: 'Probar otra dirección',
     emptyTryElsewhere: 'Empezar en otro sitio',
     offline: 'Buscar rutas necesita conexión.',
+    errorTitle: 'La búsqueda ha fallado',
+    errorBody: 'Ha sido un problema nuestro, no de tus carreteras. Inténtalo otra vez.',
+    errorOfflineBody: 'Vuelve a conectarte e inténtalo de nuevo.',
+    errorRetry: 'Intentar de nuevo',
 
     unavailableTitle: 'Las rutas circulares aún no están disponibles aquí',
     unavailableBody: 'Necesitan nuestros datos de riesgo vial. Cubren 31 países — este todavía no.',

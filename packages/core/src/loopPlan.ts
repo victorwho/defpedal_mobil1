@@ -28,7 +28,7 @@
  */
 import { classMeters, type ClassifiedStep } from './routeClasses';
 import { destinationPoint, haversineDistance } from './distance';
-import type { Coordinate, RiskSegment } from './contracts';
+import type { Coordinate, RiskSegment, RouteOption } from './contracts';
 import { findHighRiskStretches } from './riskStretch';
 import { riskSegmentDistanceMeters } from './riskDistribution';
 
@@ -1390,9 +1390,29 @@ export const loopRoundness = (
 };
 
 /**
- * A true circle scores 1.0. An out-and-back scores about π (it reaches half
- * its own length away from the start). 1.9 keeps genuinely lobed city loops —
- * which are never circular — while rejecting the degenerate shape.
+ * ⚠ Calibrated against ROAD distance, not geometry, and that is the only way
+ * the number makes sense.
+ *
+ * An earlier comment here claimed a true circle scores 1.0. It does not. The
+ * excursion is measured from the START, which sits ON the loop, so the
+ * furthest point of a circle is the far side — a full diameter away. With no
+ * detour at all that scores 2.0, comfortably over this threshold.
+ *
+ * What brings real routes down is the denominator: `distanceMeters` is the
+ * ROAD distance, which is about 2.11x the ideal polygon perimeter (measured).
+ * The same circle with that detour scores 0.95, and 150 real rings measured
+ * across five cities land between 0.41 and 1.20.
+ *
+ * Two consequences worth knowing before touching this.
+ *
+ * A synthetic test fixture must carry a realistic detour or it measures a
+ * shape no router returns — a hand-built "lobed city loop" with geometric
+ * distances scored 6.2 while a real one scores under 1.2.
+ *
+ * And 1.9 sits almost exactly at the MEDIAN of real out-and-backs, which
+ * measured 1.875 over a 60-route control set. That is why it caught only four
+ * of seven genuine ones, and why `RETRACE_CEILING` rather than this threshold
+ * is what now keeps an out-and-back away from a rider.
  */
 export const MAX_LOOP_ROUNDNESS = 1.9;
 
@@ -1402,3 +1422,253 @@ export const isOutAndBack = (
   distanceMeters: number,
 ): boolean =>
   loopRoundness(start, coordinates, distanceMeters) > MAX_LOOP_ROUNDNESS;
+
+/**
+ * The geometry of the loop proper, with any deliberate approach removed.
+ *
+ * Same split as `splitStemAndRing`, applied to coordinates instead of edges:
+ * `stemLegs` legs at each end are the ride out and the ride home, and what is
+ * left is the loop. Coordinates come from `steps[].geometry`, which every
+ * routing request already asks for.
+ *
+ * Returns an empty array when the steps carry no geometry. Callers must read
+ * that as "could not measure", never as "no ring" — the two lead to opposite
+ * decisions.
+ */
+export const ringCoordinates = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): [number, number][] => {
+  const stem = Math.max(0, Math.floor(stemLegs));
+  const splittable = stem > 0 && legs.length > 2 * stem;
+  const kept = splittable ? legs.slice(stem, legs.length - stem) : legs;
+
+  const coordinates: [number, number][] = [];
+  for (const leg of kept) {
+    for (const step of leg.steps ?? []) {
+      for (const point of step.geometry?.coordinates ?? []) {
+        if (point.length >= 2) coordinates.push([point[0]!, point[1]!]);
+      }
+    }
+  }
+  return coordinates;
+};
+
+/**
+ * Roundness of the LOOP, ignoring any deliberate ride out to reach it.
+ *
+ * This is what the out-and-back guard measures, and the scope is the whole
+ * point. `loopRoundness` compares how far a route gets from its start against
+ * the radius a circle of that length would have — which is a fair question to
+ * ask of a ring round the start, and an unfair one to ask of a lollipop. A
+ * lollipop rides OUT before it loops, so its excursion is large by
+ * construction and its whole-route ratio is structurally inflated. Measured
+ * across 300 real candidates, lollipops score a median 1.23 whole-route
+ * against 0.82 on the ring alone, and five of 150 crossed the 1.9 threshold
+ * purely because of their approach.
+ *
+ * The reference point is where the loop begins and ends, which for a plain
+ * ring is the snapped start and for a lollipop is the anchor. Both come out of
+ * the geometry itself, so nothing has to be passed in and the two shapes are
+ * measured the same way. Using the snapped start rather than the rider's raw
+ * coordinate flipped no verdict in 300 measurements.
+ *
+ * Returns 0 — passes — when there is nothing to measure. An unmeasurable route
+ * must not be rejected on a guess, the same rule `retracedShare` and
+ * `withinRetraceCap` follow. A ring that genuinely has no length is caught by
+ * `ringRetracedShare`, which reports 1 for it.
+ */
+export const ringRoundness = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): number => {
+  const coordinates = ringCoordinates(legs, stemLegs);
+  if (coordinates.length === 0) return 0;
+
+  const { ringMeters } = splitStemAndRing(legs, stemLegs);
+  if (ringMeters <= 0) return 0;
+
+  const anchor: Coordinate = {
+    lon: coordinates[0]![0],
+    lat: coordinates[0]![1],
+  };
+  return loopRoundness(anchor, coordinates, ringMeters);
+};
+
+/**
+ * Is the LOOP portion a there-and-back wearing a loop's clothes?
+ *
+ * Measured on 300 real candidates it fires on none of them, and that is worth
+ * stating plainly rather than hiding: as a filter it earns nothing today. It
+ * is kept because the shape it guards is structurally reachable — a lollipop
+ * whose three ring waypoints all snap onto the same road produces a ring that
+ * is ridden out and back — and because it costs one comparison on geometry
+ * already in hand.
+ *
+ * What it must NOT be relied on for is stopping an out-and-back reaching a
+ * rider. It never did that job well: against a control set of genuine
+ * out-and-backs the whole-route version caught four of seven, while the
+ * doubling-back measurement caught seven of seven. That job belongs to
+ * `withinRetraceCeiling`.
+ */
+export const isRingOutAndBack = (
+  legs: readonly AnnotatedLeg[],
+  stemLegs = 0,
+): boolean => ringRoundness(legs, stemLegs) > MAX_LOOP_ROUNDNESS;
+
+/**
+ * The most of itself a loop may repeat and still be offered AT ALL.
+ *
+ * Distinct from `MAX_RETRACE_SHARE`, and the distinction is the reason this
+ * exists. That one is a PREFERENCE the ladder is allowed to give up: in
+ * terrain where every loop repeats part of itself, bending it is how the rider
+ * still gets a ride. This one is never given up, because past it the route is
+ * not a loop at all and offering it as "the least we could find" is offering
+ * the wrong thing entirely.
+ *
+ * 0.9 is MEASURED. Across 300 real candidates the doubling-back share tails off
+ * smoothly with exactly one visible gap, at 0.893 to 0.930, and 30 of them sit
+ * at 1.000 — every single metre of the loop ridden twice. 0.9 sits in that gap
+ * and catches all 30 plus the 11 just below them.
+ *
+ * It costs nothing at any rung where `MAX_RETRACE_SHARE` still applies, because
+ * everything above 0.35 already fails there. It only ever bites at the last
+ * rung, where the cap is dropped and nothing else stood between a rider and an
+ * out-and-back. It is deliberately not tighter: at 0.9, 259 of 300 candidates
+ * remain available when the ladder bottoms out, so a rider in thin terrain is
+ * still offered something.
+ */
+export const RETRACE_CEILING = 0.9;
+
+/**
+ * Is this a loop at all?
+ *
+ * No relaxation argument, on purpose — there is no rung at which the answer
+ * changes. An unmeasurable share passes, like everywhere else here.
+ */
+export const withinRetraceCeiling = (
+  candidate: Pick<LoopCandidate, 'ringRetracedShare'>,
+): boolean => {
+  if (!Number.isFinite(candidate.ringRetracedShare)) return true;
+  return candidate.ringRetracedShare <= RETRACE_CEILING;
+};
+
+// ---------------------------------------------------------------------------
+// The wire contract
+// ---------------------------------------------------------------------------
+
+/**
+ * What the rider asked for, as it crosses the network.
+ *
+ * Lives here rather than beside either implementation because BOTH the app's
+ * own generator and the server endpoint have to agree on it, and a request
+ * vocabulary that exists twice is a vocabulary that drifts. `locale` is
+ * carried because OSRM ships no instruction text, so somebody has to build it
+ * — see `GeneratedLoop.route` for which side does.
+ */
+export interface LoopSearchRequest {
+  readonly start: Coordinate;
+  readonly targetDistanceMeters: number;
+  readonly terrain: LoopTerrain;
+  readonly surface: LoopSurface;
+  readonly heading: LoopHeading;
+  readonly locale: string;
+}
+
+/**
+ * One loop, ready to draw, rank and ride.
+ *
+ * `route` is a full `RouteOption` — the same object an A-to-B route uses, so
+ * the map, the preview sheet and the navigation session all consume it with no
+ * special case. It carries `source: 'generated_loop'`, which is what suppresses
+ * ordinary reroute; losing that stamp routes an off-course rider to
+ * `destination`, which on a loop is where they started.
+ *
+ * ⚠ The step instructions on `route` are NOT localised by the server. OSRM
+ * ships no instruction text and the phrase catalogue lives in the app's i18n
+ * layer, so a server-generated loop arrives with an English fallback and the
+ * client re-derives the rider-visible string from `maneuver` + `streetName`.
+ * Rendering the server's string directly would put English turn cues in front
+ * of every Romanian and Spanish rider.
+ */
+export interface GeneratedLoop {
+  readonly id: string;
+  readonly route: RouteOption;
+  readonly coordinates: [number, number][];
+  /** Bearing the ring was thrown at, i.e. the direction the rider sets off. */
+  readonly bearingDegrees: number;
+  readonly distanceMeters: number;
+  /** Null until the elevation pass has run. */
+  readonly climbMeters: number | null;
+  /** Metres of the loop on roads in the busiest risk tier. */
+  readonly highRiskMeters: number;
+  /** Fraction on unpaved ways, in [0, 1]. Free — read off annotations. */
+  readonly unpavedShare: number;
+  /** Fraction of the whole route ridden twice, in [0, 1]. */
+  readonly retracedShare: number;
+  /** Doubling back inside the loop only — what the cap tests. */
+  readonly ringRetracedShare: number;
+  /** Fraction of the loop spent on out-and-back spurs. */
+  readonly spurShare: number;
+  /** True when no paved loop exists here and the constraint had to be dropped. */
+  readonly pavedFallback: boolean;
+  /** Metres of out-and-back approach, both passes. 0 for a plain loop. */
+  readonly stemMeters: number;
+  /** Length-weighted mean scenic score in [-1, 1]; 0 means "do not move the ranking". */
+  readonly scenicScore: number;
+  /** Which rung of the ladder produced it. */
+  readonly relaxation: LoopRelaxation;
+  /** Measured terrain, or null when climb was never looked up. */
+  readonly terrain: LoopTerrain | null;
+  /** True once climb and risk have been fetched. */
+  readonly measured: boolean;
+}
+
+/**
+ * How a search ended.
+ *
+ * `relaxation === 'terrain'` IS the honest miss — there is deliberately no
+ * separate failure status for it, because the last rung of the ladder is
+ * "drop the terrain ask and show the closest thing that exists". A second
+ * status would be a second way to say the same thing, and the two would drift.
+ *
+ * `checked` is how many loops were actually measured. The miss copy quotes it,
+ * and quoting a real number is the difference between a true statement and a
+ * plausible lie.
+ */
+export type LoopSearchOutcome =
+  | {
+      readonly status: 'ok';
+      readonly loops: readonly GeneratedLoop[];
+      readonly relaxation: LoopRelaxation;
+      readonly checked: number;
+    }
+  /** Nothing rideable came back at all. */
+  | { readonly status: 'empty' }
+  /** The rider cancelled. Never charge for this. */
+  | { readonly status: 'cancelled' };
+
+/**
+ * One line of the streaming `POST /v1/loops` response.
+ *
+ * Newline-delimited JSON rather than one buffered object, because the planner
+ * draws each loop onto the map as it lands. A buffered response would replace
+ * that with a spinner over the same wait.
+ *
+ * The stream always ends with exactly one terminal frame: `result`, `empty` or
+ * `error`. A stream that ends without one was truncated, and the client must
+ * treat that as a failure rather than as an empty result — those look
+ * identical otherwise, and one of them is a bug we would never see.
+ */
+export type LoopStreamFrame =
+  | { readonly type: 'candidate'; readonly loop: GeneratedLoop }
+  | { readonly type: 'progress'; readonly resolved: number; readonly attempted: number }
+  | {
+      readonly type: 'result';
+      readonly status: 'ok';
+      readonly loops: readonly GeneratedLoop[];
+      readonly relaxation: LoopRelaxation;
+      readonly checked: number;
+    }
+  | { readonly type: 'empty' }
+  | { readonly type: 'error'; readonly message: string };

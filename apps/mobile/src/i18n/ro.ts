@@ -247,6 +247,10 @@ export const ro: TranslationKeys = {
     emptyTryDirection: 'Încearcă altă direcție',
     emptyTryElsewhere: 'Pornește din alt loc',
     offline: 'Căutarea tururilor are nevoie de conexiune.',
+    errorTitle: 'Căutarea a eșuat',
+    errorBody: 'A fost o problemă la noi, nu pe drumurile tale. Mai încearcă.',
+    errorOfflineBody: 'Reconectează-te și încearcă din nou.',
+    errorRetry: 'Încearcă din nou',
 
     unavailableTitle: 'Tururile nu sunt încă disponibile aici',
     unavailableBody: 'Tururile au nevoie de datele noastre de risc rutier. Acoperă 31 de țări — încă nu și aceasta.',

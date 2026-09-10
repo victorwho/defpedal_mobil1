@@ -210,6 +210,92 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
   speeds from trip history, ≥3 usable rides). Under that the default 15 km/h
   stands and the label says so — never present a guess as a measurement.
 
+- ✅ **Generation moved SERVER-SIDE 2026-09-10, behind a flag that defaults OFF.**
+  `POST /v1/loops` (`services/mobile-api/src/lib/loops/` + `routes/loops.ts`) does
+  the whole fan-out and streams loops back as NDJSON; the app makes one request.
+  It went in the API, not next to OSRM, because climb, risk and scenery come from
+  Mapbox and Supabase rather than from OSRM — **nothing on the OSRM box changed.**
+  The switch is `LOOP_SERVER_ENABLED` on Cloud Run, delivered to the client as
+  `loopServerEnabled` on `GET /v1/profile`, so it flips without a store release.
+  ⚠ It **fails CLOSED**, unlike every other kill switch here: an older server, a
+  failed profile read or a fresh install all mean "use the on-device generator".
+  ⚠ There is **no silent fallback** — a failed server search shows a failure, not
+  "no loops here"; folding the second into the first is how a broken rollout looks
+  healthy. The on-device generator is untouched and still shipped; it and the
+  parity test are deleted together when the flag goes.
+- ⚠ **`services/mobile-api/src/__tests__/loops-parity.test.ts` is the contract
+  between the two implementations, and it was mutation-tested, not trusted.**
+  Four deliberate divergences were introduced and all four caught; two gaps were
+  found that way and closed. If you change either orchestrator, that test decides
+  whether the change is a port or a behaviour change. Do not "fix" one side alone
+  while the flag can still point either way.
+- ✅ **The paved fallback was unreachable and was fixed 2026-09-10.** OSRM answers
+  "nothing connects these points under your constraints" with **HTTP 400**
+  carrying `code: NoRoute`, and all three fetchers tested `response.ok` BEFORE
+  reading the body — so the retry that exists for exactly that case was dead. On
+  a loop the candidate was dropped in silence; on a point-to-point route the
+  throw propagated and the whole preview failed. `packages/core/src/osrmResponse.ts`
+  is now the single reader for all three: body first, then classify into `ok` /
+  `no_route` / `empty` / `failed`.
+  ⚠ It is NOT "stop throwing on 400" — the router also returns `InvalidValue`,
+  `InvalidQuery` and `InvalidOptions` at that status, and swallowing those would
+  turn a real bug into a silent wrong answer. Only `NoRoute` and `NoSegment`
+  trigger a fallback. The body is read exactly ONCE as text, which is why the old
+  shape could not simply be reordered: it called `.json()` on the success path and
+  `.text()` on the error path.
+  Verified live: two start points that returned NOTHING for every paved ring now
+  return 18 of 18, and 45 of 90 rings fall back where all 45 were previously
+  silent drops. Amsterdam, which never failed, is unchanged.
+- ⚠ **Both loop defects were first written up with OVERSTATED impact**, and the
+  cause is worth remembering: each probe used ONE start coordinate per city and
+  the result was reported as a property of the city. "All six Bucharest attempts
+  failed" was one bad coordinate measured six times — re-probed across twelve
+  start points it is 78 of 216. One probe point measured many times is still one
+  probe point.
+- **Still open, deliberately:** `lib/clients/customOsrm.ts`, the server's own
+  point-to-point client, has NO paved fallback at all rather than an unreachable
+  one. Adding one is a behaviour change rather than a repair, and that path is
+  dormant because the app routes client-side.
+- ✅ **The out-and-back guard was fixed 2026-09-10, in both implementations.**
+  `ringRoundness` / `isRingOutAndBack` measure the LOOP rather than the whole
+  route, so a lollipop is no longer penalised for riding out before it loops.
+  ⚠ On its own that change is IDENTICAL to having no guard (measured over 300
+  live candidates), so it shipped with the half that does the work:
+  **`RETRACE_CEILING = 0.9`, never relaxed at any rung.** At the last rung both
+  ordinary caps are dropped, and 38 of 300 candidates could previously be offered
+  there while repeating over 90% of themselves. Now none can, and no search was
+  starved (0 of 15). The ceiling is free below 0.9 because everything above
+  `MAX_RETRACE_SHARE` already fails the relaxable cap.
+- ⚠ **`MAX_LOOP_ROUNDNESS = 1.9` is calibrated against ROAD distance, and its own
+  comment claiming "a true circle scores 1.0" is WRONG** — a circle through its
+  own start scores 2.0 with no detour and ~0.95 with the measured 2.11x ring
+  detour. Real rings land at 0.41-1.20 only because the denominator carries that
+  detour. A synthetic test fixture without a realistic detour measures a shape no
+  router returns. 1.9 also sits at the MEDIAN of real out-and-backs (1.875), which
+  is why it was a coin flip at the job it was written for and why the retrace
+  ceiling now does that job instead.
+- **Turn instructions come back in English and the client rebuilds them.** OSRM
+  ships none and the phrase catalogue lives in the app's i18n layer, so
+  `loop-generator-remote.ts` re-derives every step through
+  `buildManeuverInstruction`. Rendering what the server sends would put English
+  turn cues in front of every RO and ES rider.
+- ⚠ **Loop routes build their own `RouteOption`, NOT via
+  `normalizeRoutePreviewResponse`.** That normaliser reads `legs[0].steps`, which
+  is correct for the single-leg A-to-B routes it was written for; a ring has four
+  legs and a lollipop six. Measured on a real response: 94 steps across four legs,
+  28 in the first. Reusing it would give a loop rider turn-by-turn for the opening
+  quarter of the ride and silence after that.
+- **The endpoint has its own rate-limit bucket, `loopSearch` (6/min).** One call
+  is worth as many as 60 OSRM requests. It deliberately does NOT share
+  `routePreview`: measuring finalists in-process is what stopped loop generation
+  eating a rider's own risk-overlay budget, which was the state on the client path
+  (5 finalists × 3 calls = 15, up to 45 with escalation, against a 30/60s bucket).
+- **Fixtures are real.** `src/lib/loops/__fixtures__/` holds four responses
+  captured from the live router with the request geometry that produced each, and
+  `integration.test.ts` runs against the real router when
+  `LOOP_INTEGRATION_OSRM_URL` is set. Validation tool for real loops:
+  `node scripts/probe-loop-service.mjs` (see the plan doc for env vars).
+
 ## GPX Course Import (imported courses you follow)
 
 Plan + full implementation record: **`docs/plans/gpx-course-import.md`**. Shipped 2026-09-04, device-confirmed on preview v0.2.132.

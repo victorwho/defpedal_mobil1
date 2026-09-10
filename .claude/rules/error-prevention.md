@@ -88,3 +88,37 @@ The pre-push hook (`.git/hooks/pre-push`) runs both `npm run typecheck` AND `npm
 45. **A feature returns nothing on every real input?** Suspect the ADDRESS before the algorithm. Three readers looked for road classes on `leg.annotation.classes`, which OSRM has never sent — they live on `steps[].intersections[].classes`. A correct parser pointed at `undefined` is indistinguishable from a broken one except that it never throws, so the loop surface split reported "100% paved" forever, and tunnel and bridge markers never once appeared since v0.2.55 shipped. Every test passed because each built its own fixture of the assumed shape and asserted the parse. **At least one test per external-shape reader must use a response captured from the real dependency** (`packages/core/src/__fixtures__/osrm-classes.json`) — a hand-built fixture only proves you can parse your own assumption (Error #113)
 
 46. **Added a field to signal something to the user?** Grep for a consumer before saying it works. A "no paved route" warning was pushed onto `route.warnings` and announced in a release note as telling the rider — nothing in the app has ever rendered that field. The same change added a loop-card note that DID render, and seeing one surface work was taken as evidence for both. Producer and consumer are two separate checks, and this was committed one commit after writing up the identical lesson (Error #114)
+
+47. **Reading a response from a third-party API?** Read the BODY before the
+    status, not after. OSRM reports "no route exists under your constraints" as
+    **HTTP 400** with `code: NoRoute`, so three separate fetchers here threw
+    straight past the fallback written for exactly that case — dead for the whole
+    life of each. On a loop the candidate was dropped in silence and the rider was
+    told no loops exist; on a point-to-point route the throw failed the whole
+    preview. A status alone cannot separate "a normal answer you have a plan for"
+    from "your request was malformed" when the API uses one code for both. The fix
+    is NOT "stop throwing on that status": the same router returns `InvalidValue`,
+    `InvalidQuery` and `InvalidOptions` at 400 too, and swallowing those turns a
+    real bug into a silent wrong answer. Note also that a body can be read only
+    once, so a shape that calls `.json()` on the success path and `.text()` on the
+    error path cannot simply be reordered — `packages/core/src/osrmResponse.ts` is
+    the single reader now (error-log #117)
+
+48. **Reporting a measurement across cities, users or regions?** One probe point
+    measured many times is still ONE probe point. Both loop defects above were
+    first written up with overstated impact because each probe used a single start
+    coordinate per city and the result was reported as a property of the city:
+    "all six Bucharest attempts failed" was one coordinate that snaps to an
+    unpaved edge, sampled six times. Re-probed across twelve start points the true
+    figure was 78 of 216. Vary the thing you are generalising over BEFORE you
+    describe the population, and say which you measured (error-log #117)
+
+49. **About to fix a guard that "never fires"?** Check whether the fix fires
+    either. Scoping the loop generator's out-and-back guard to the ring was
+    correct in principle and, measured over 300 live candidates, produced results
+    IDENTICAL to having no guard at all — shipping it alone would have deleted a
+    check while appearing to repair it. The same measurement found the real
+    defect next to it: at the last rung of the relaxation ladder every cap is
+    dropped, so 38 of 300 candidates could be offered while repeating over 90% of
+    themselves. A guard that measures the wrong thing is usually sitting beside
+    the thing that should have been measured (error-log #117)

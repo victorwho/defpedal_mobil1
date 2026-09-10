@@ -198,6 +198,21 @@ export const config = {
         3600000,
       ),
     },
+    // Loop generation — 6 searches / minute per rider. One search fans out to
+    // as many as 60 OSRM requests and 15 Supabase round trips, so this is the
+    // bound on the whole feature rather than a courtesy limit. Six is roughly
+    // what a human tapping "try another" can produce, and well under what a
+    // script would want.
+    loopSearch: {
+      limit: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_LOOP_SEARCH_MAX'], '6'),
+        6,
+      ),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_LOOP_SEARCH_WINDOW_MS'], '60000'),
+        60000,
+      ),
+    },
     // Follow-graph writes — 20 actions / 10 min per account. Generous for a
     // human working through suggested users, tight enough to stop
     // mass-follow notification spam (audit 2026-07-05 SEC-2).

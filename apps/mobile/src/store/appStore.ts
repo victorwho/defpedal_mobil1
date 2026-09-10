@@ -186,6 +186,18 @@ export type AppStore = QueueSlice & PremiumSlice & {
   sesizariConfig: { enabled: boolean; baseUrl: string };
   setSesizariConfig: (config: { enabled: boolean; baseUrl: string }) => void;
   /**
+   * Whether loop generation runs on the server (`POST /v1/loops`) rather than
+   * as the app's own OSRM fan-out. Server-owned, hydrated from `/v1/profile`.
+   *
+   * Fails CLOSED, unlike `sesizariConfig` beside it, and the asymmetry is the
+   * point: that flag guards a shipped feature and darkening it would be the
+   * regression, while this one guards an unvalidated path, so an older server,
+   * a failed profile read or a fresh install must all land on the client
+   * generator riders have been using for months.
+   */
+  loopServerEnabled: boolean;
+  setLoopServerEnabled: (enabled: boolean) => void;
+  /**
    * Hazards this rider reported during the CURRENT ride, so the post-ride
    * screen can offer to escalate them. Persisted because AWAITING_FEEDBACK
    * survives an app kill and the feedback screen is reached after it.
@@ -788,6 +800,7 @@ export const useAppStore = create<AppStore>()(
       onboardingCompleted: false,
       regionGate: { status: 'unchecked', countryCode: null },
       sesizariConfig: { enabled: true, baseUrl: DEFAULT_CIVIA_BASE_URL },
+      loopServerEnabled: false,
       sessionHazardReports: [],
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
@@ -1064,6 +1077,8 @@ export const useAppStore = create<AppStore>()(
             baseUrl: nextConfig.baseUrl.trim() || DEFAULT_CIVIA_BASE_URL,
           },
         })),
+      setLoopServerEnabled: (enabled) =>
+        set(() => ({ loopServerEnabled: enabled })),
       setAnalyticsConsent: (consent) =>
         set(() => ({
           analyticsConsent: {
@@ -1677,6 +1692,9 @@ export const useAppStore = create<AppStore>()(
         // Persisted so a cold start that cannot reach the API still honours
         // the last known kill-switch state and civia.ro URL.
         sesizariConfig: state.sesizariConfig,
+        // Persisted so a cold start with no signal keeps the last known
+        // routing decision rather than silently switching path mid-rollout.
+        loopServerEnabled: state.loopServerEnabled,
         sessionHazardReports: state.sessionHazardReports,
         analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,
