@@ -19,7 +19,7 @@
     "@supabase/supabase-js": "^2.56.1",
     "fastify": "^5.6.1",
     "pngjs": "^7.0.0",
-    "redis": "^5.11.0"
+    "redis": "^6.1.0"
   },
   "devDependencies": {
     "@types/pngjs": "^6.0.5",
