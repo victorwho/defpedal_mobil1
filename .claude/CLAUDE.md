@@ -206,7 +206,7 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
   loop's destination is its origin. Rows store geometry and turn steps; risk
   segments and elevation are stripped server-side and re-derived on open. The
   device keeps a full-fidelity copy as an offline cache keyed by the server id.
-- ⚠️ **The planner's camera fits a BOX, never a computed zoom** (`focusBounds` on
+- ⚠️ **The planner's camera fits a BOX, never a computed zoom** — device-confirmed on preview v0.2.159 (2026-09-10). (`focusBounds` on
   `RouteMap`, box from `loopSearchExtentMeters`). The zoom it replaced was wrong
   twice in opposite directions and so looked almost right for the feature's whole
   life: it framed `target / 2π`, which is neither shape the search builds, and
