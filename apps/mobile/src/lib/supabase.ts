@@ -488,6 +488,20 @@ export const signOut = async () => {
   return supabaseClient.auth.signOut();
 };
 
+/**
+ * Drop the LOCAL copy of the session only. No server call (it would fail on an
+ * invalid token) and no auth-state event, so it cannot re-enter the provider.
+ * Only ever call this when supabase-js itself has said the session is invalid;
+ * a failure to READ the session is not that (see lib/sessionReadError.ts).
+ */
+export const clearLocalSession = async (): Promise<void> => {
+  try {
+    await supabaseClient?.auth.signOut({ scope: 'local' });
+  } catch {
+    // Already gone, or storage is the thing that is broken. Nothing to do.
+  }
+};
+
 export const getCurrentSession = async (): Promise<MobileAuthSession | null> => {
   const persistedDeveloperSession = await secureStorage.getItem(DEV_AUTH_SESSION_KEY);
 

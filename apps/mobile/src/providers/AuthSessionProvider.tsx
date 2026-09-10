@@ -7,8 +7,11 @@ import { router } from 'expo-router';
 import type { MobileAuthSession, MobileAuthUser } from '../lib/devAuth';
 import { consumePendingPasswordReset } from '../lib/passwordReset';
 import { registerForPushNotificationsIfEligible } from '../lib/push-notifications';
+import { classifySessionReadError, describeSessionReadError } from '../lib/sessionReadError';
+import { telemetry } from '../lib/telemetry';
 import {
   activateDeveloperBypassSession,
+  clearLocalSession,
   getCurrentSession,
   getLastAnonSignInError,
   isDeveloperAuthBypassAvailable,
@@ -71,15 +74,28 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
 
       try {
         currentSession = await getCurrentSession();
-      } catch {
-        // Stale/invalid refresh token — clear only the local session so the
-        // app falls through to anonymous sign-in. Avoid signOut() here because
-        // it calls the server (which fails on an invalid token) and emits
-        // onAuthStateChange events that re-enter this function.
-        try {
-          await supabaseClient?.auth.signOut({ scope: 'local' });
-        } catch {
-          // Ignore — the session may already be gone
+      } catch (error) {
+        // A THROW here is not an expired token. supabase-js reports an invalid
+        // refresh token as `session: null` (and clears storage itself); what
+        // throws is the READ: the secure-store adapter rejecting, a keystore
+        // error. The session is still on disk; we just could not open it.
+        //
+        // Until 2026-09-10 this branch cleared the local session and fell
+        // through to anonymous sign-in, which then WROTE a new session over
+        // the rider's real one. That is how preview v0.2.155 signed everyone
+        // out (error-log #116). Now: keep what is on disk, keep whatever is
+        // already in memory, say so, and let the retry loop read again.
+        if (classifySessionReadError(error) === 'invalid_session') {
+          await clearLocalSession();
+        } else {
+          telemetry.captureError(error, { source: 'auth_session_read' });
+          if (isMounted) {
+            setAuthError(
+              `Could not read the saved sign-in (${describeSessionReadError(error)}). Keeping it and retrying.`,
+            );
+            setIsLoading(false);
+          }
+          return;
         }
       }
 
@@ -159,10 +175,24 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       // An explicit sign-in (or a slow first attempt) may have landed since
       // this retry was scheduled — never stack a second anonymous user on
       // top of an existing session.
-      const current = await getCurrentSession().catch(() => null);
+      let current: MobileAuthSession | null = null;
+      try {
+        current = await getCurrentSession();
+      } catch (error) {
+        if (cancelled) return;
+        if (classifySessionReadError(error) === 'invalid_session') {
+          await clearLocalSession();
+        } else {
+          // The store is still unreadable. An anonymous sign-in now would
+          // write over the rider's real session, so only the read is retried.
+          scheduleNext();
+          return;
+        }
+      }
       if (cancelled) return;
       if (current) {
         setSession(current);
+        setAuthError(null);
         return;
       }
       const next = await signInAnonymously();
