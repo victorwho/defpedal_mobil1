@@ -62,10 +62,10 @@
     "typescript": "~5.8.2"
   },
   "optionalDependencies": {
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   },
   "overrides": {
     "shell-quote": "1.10.0",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   }
 }
