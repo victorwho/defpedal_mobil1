@@ -69,10 +69,14 @@ eas secret:create --scope project --name SENTRY_AUTH_TOKEN --value <your-token>
 
 Verify with `eas secret:list`. The plugin reads `SENTRY_AUTH_TOKEN` from the EAS build env automatically — no further config needed.
 
-For LOCAL release builds (`./gradlew assembleProductionRelease`), set the same variable in your shell or `~/.gradle/gradle.properties`:
-```
-SENTRY_AUTH_TOKEN=<your-token>
-```
+For LOCAL Android release builds (every Android build of this app is local — see CLAUDE.md, never EAS), the upload is done by two gradle hooks that are hand-applied in `apps/mobile/android/app/build.gradle`, because this project never runs `expo prebuild` and so the Sentry config plugin above never wrote them for us:
+
+- `@sentry/react-native`'s `sentry.gradle.kts` — JS bundle + source map, hooked onto the RN bundle task;
+- the Sentry Android Gradle Plugin (`io.sentry.android.gradle` 6.15.0, the version @sentry/react-native pins) — R8 `mapping.txt`, uploaded under a UUID it also writes into `assets/sentry-debug-meta.properties` so events match it.
+
+Both read `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` and `SENTRY_PROJECT` from the **environment**. `scripts/build-preview.sh` exports them from `apps/mobile/.env` before `./gradlew` (step 2c); a production build fails there if any is missing, other flavors warn and build with `SENTRY_DISABLE_AUTO_UPLOAD=true`. Never put the token in a `sentry.properties` file. Step 3c then checks by content that `sentry-debug-meta.properties` is inside the artefact.
+
+> ⚠️ **History (2026-09-10):** until this date NO Android build had ever uploaded anything — the paragraph that used to sit here said to set `SENTRY_AUTH_TOKEN` "in your shell or `~/.gradle/gradle.properties`", but nothing in a non-prebuilt project read it. Android crash frames arrived as `index.android` / obfuscated Java for the app's whole history. Verify a build the way step 3c does, not by reading the runbook.
 
 ## Verification
 

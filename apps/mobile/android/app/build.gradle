@@ -1,3 +1,17 @@
+// Sentry Android Gradle Plugin (SAGP). Declared here with the plugins DSL,
+// NOT as a classpath entry in the root build.gradle, because the root file is
+// gitignored (the blanket `android` rule) and anything added there exists only
+// on one machine — the proguard-rules.pro trap, error-log #116. Version 6.15.0
+// is the one @sentry/react-native 8.x pins (plugin/build/withSentryAndroidGradlePlugin.js),
+// i.e. what `expo prebuild` would have injected if this project ever ran it.
+// What it does: generates a UUID per release build, ships it in
+// assets/sentry-debug-meta.properties, and uploads R8's mapping.txt under that
+// UUID so Sentry can deobfuscate Java/Kotlin frames. Without it every native
+// frame from a minified build arrives as `a.b.c()`.
+plugins {
+    id "io.sentry.android.gradle" version "6.15.0"
+}
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -81,6 +95,15 @@ def enableMinifyInReleaseBuilds = (findProperty('android.enableMinifyInReleaseBu
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+
+// @sentry/react-native's gradle script: JS bundle + source-map upload hooked
+// onto the RN bundle task, and the shouldSentryAutoUpload() switch the sentry {}
+// block below uses. This is the line `expo prebuild` writes; this project never
+// runs prebuild, so it is hand-placed (same as the manifest, error-log #27).
+// Credentials come from the environment at build time — SENTRY_AUTH_TOKEN,
+// SENTRY_ORG, SENTRY_PROJECT — exported by scripts/build-preview.sh from
+// apps/mobile/.env. Never a sentry.properties file with a token in it.
+apply from: new File(["node", "--print", "require('path').dirname(require.resolve('@sentry/react-native/package.json'))"].execute().text.trim(), "sentry.gradle.kts")
 
 android {
 // @generated begin @rnmapbox/maps-libcpp - expo prebuild (DO NOT MODIFY) sync-e24830a5a3e854b398227dfe9630aabfaa1cadd1
@@ -281,5 +304,31 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+// SAGP configuration. Mirrors what @sentry/react-native's Expo plugin would
+// generate, with native-symbol upload OFF: this app has no NDK code of its own
+// and the libraries' .so symbols are not ours to upload. Proguard mapping ON.
+sentry {
+    org = System.getenv("SENTRY_ORG")
+    projectName = System.getenv("SENTRY_PROJECT")
+    authToken = System.getenv("SENTRY_AUTH_TOKEN")
+    autoUploadProguardMapping = shouldSentryAutoUpload()
+    includeProguardMapping = true
+    dexguardEnabled = false
+    uploadNativeSymbols = false
+    autoUploadNativeSymbols = false
+    includeNativeSources = false
+    includeSourceContext = false
+    ignoredBuildTypes = ["debug"]
+    tracingInstrumentation {
+        enabled = false
+    }
+    autoInstallation {
+        // @sentry/react-native pins io.sentry:sentry-android itself (8.49.0);
+        // letting SAGP "auto-install" a different one is how two SDK versions
+        // end up in one APK.
+        enabled = false
     }
 }

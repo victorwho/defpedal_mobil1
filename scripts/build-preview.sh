@@ -302,6 +302,29 @@ if [ "$FLAVOR" = "preview" ]; then
   GRADLE_ARGS+=("-PreactNativeArchitectures=arm64-v8a,armeabi-v7a")
 fi
 
+# ── Step 2c: Sentry upload credentials for the gradle hooks ──
+# app/build.gradle applies @sentry/react-native's sentry.gradle.kts (JS bundle +
+# source map) and the Sentry Android Gradle Plugin (R8 mapping.txt). Both read
+# SENTRY_AUTH_TOKEN / SENTRY_ORG / SENTRY_PROJECT from the environment; they are
+# never written to a properties file. Production MUST upload — an unsymbolicated
+# production crash is not debuggable — so a missing credential fails the build
+# here, before 15 minutes of compiling. Other flavors warn and build without
+# uploads (SENTRY_DISABLE_AUTO_UPLOAD is honoured by both hooks).
+for k in SENTRY_AUTH_TOKEN SENTRY_ORG SENTRY_PROJECT; do
+  v=$(grep -E "^${k}=" "$DST/apps/mobile/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "\r")
+  if [ -n "$v" ]; then export "$k=$v"; fi
+done
+if [ -z "${SENTRY_AUTH_TOKEN:-}" ] || [ -z "${SENTRY_ORG:-}" ] || [ -z "${SENTRY_PROJECT:-}" ]; then
+  if [ "$FLAVOR" = "production" ]; then
+    echo "ERROR: SENTRY_AUTH_TOKEN / SENTRY_ORG / SENTRY_PROJECT missing from apps/mobile/.env — production builds must upload source maps + R8 mapping."
+    exit 1
+  fi
+  echo "WARNING: Sentry credentials missing — building $FLAVOR WITHOUT source-map / mapping upload (SENTRY_DISABLE_AUTO_UPLOAD=true)."
+  export SENTRY_DISABLE_AUTO_UPLOAD=true
+else
+  echo "── Sentry uploads enabled (org=$SENTRY_ORG project=$SENTRY_PROJECT) ──"
+fi
+
 ./gradlew "${GRADLE_TASKS[@]}" "${GRADLE_ARGS[@]+"${GRADLE_ARGS[@]}"}"
 
 # ── Step 3b: R8 keep check (minified builds only) ──
@@ -309,6 +332,23 @@ fi
 # and fails the build if a keep rule stopped matching. See error-log #116.
 if grep -q -E '^android\.enableMinifyInReleaseBuilds=true' "$DST/apps/mobile/android/gradle.properties"; then
   bash "$SRC/scripts/check-r8-keeps.sh" "$DST/apps/mobile/android/app/build/outputs/mapping/${FLAVOR}Release"
+fi
+
+# ── Step 3c: Sentry mapping UUID must be INSIDE the artefact ──
+# SAGP writes assets/sentry-debug-meta.properties with the UUID it uploaded the
+# mapping under; the SDK sends that UUID on every event and Sentry matches on
+# it. An upload that happened but whose UUID is not in the build symbolicates
+# nothing — and looks identical in the gradle log. Check by content.
+if [ "${SENTRY_DISABLE_AUTO_UPLOAD:-}" != "true" ]; then
+  for art in "$APK_PATH" "$AAB_PATH"; do
+    [ -f "$art" ] || continue
+    if unzip -l "$art" | grep -c -E "assets/sentry-debug-meta\.properties" >/dev/null; then
+      echo "  ✓ sentry-debug-meta.properties present in $(basename "$art")"
+    else
+      echo "ERROR: $(basename "$art") has no assets/sentry-debug-meta.properties — mapping upload will not match events."
+      exit 1
+    fi
+  done
 fi
 
 # ── Step 4: Verify output artifacts ──
