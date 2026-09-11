@@ -636,6 +636,7 @@ number to trust for DAU; PostHog is a lower bound of unknown tightness.
   the `write` budget and block a `trip_end`.
 - **Retention 90 days** via `prune_user_telemetry_events()`. Minimisation is
   part of the basis, not housekeeping. ⚠️ **Not yet wired to a cron** — open item.
+- **Live since 2026-09-11:** Cloud Run `defpedal-api-00156-mlb`, client preview v0.2.160 (163). The allowlist was verified IN PRODUCTION, not just in source — posting a behaviour-shaped `event` returns 400 naming the field.
 - DAU queries: `docs/runbooks/monitoring.md` § DAU.
 
 ### Active-user counting — PostHog is joinable to Supabase, and was half-blind until 2026-09-11
