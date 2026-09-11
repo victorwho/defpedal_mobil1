@@ -219,8 +219,13 @@ export type AppStore = QueueSlice & PremiumSlice & {
   // Analytics consent — captured during onboarding, surfaceable post-onboarding
   // via Profile → Privacy & Analytics. Device-scoped (not reset on signOut)
   // because the consent decision is about this install, not this account.
-  // capturedAt = null means the user has not been asked yet (default: telemetry
-  // off, no events fire). Once captured, both flags are independent.
+  // capturedAt = null means the user has not made an explicit choice yet. It
+  // does NOT mean telemetry is off: since 2026-07-19 BOTH flags default to true
+  // (see the initial state below), so a never-asked install emits crash reports
+  // AND product analytics. This comment previously read "default: telemetry
+  // off, no events fire", which was true only before that flip. `capturedAt`
+  // records a USER act and is never stamped by a migration. Once captured, both
+  // flags are independent, and an explicit OFF survives every upgrade.
   analyticsConsent: {
     sentry: boolean;
     posthog: boolean;

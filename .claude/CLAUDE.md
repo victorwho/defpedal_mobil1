@@ -603,6 +603,39 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - **Self-heal — `trip_end`/`trip_track` must NEVER depend only on the in-memory/persisted `tripServerIds[clientTripId]` map.** That map is lost on app kill, the `resetFlow` prune, or a debounced persist write that didn't flush — which used to orphan the mutation forever (skipped every flush, never retried/killed/surfaced) and strand the trip `in_progress` with no GPS track (the May–June 2026 `trip_tracks`-loss regression; error-log #60). When the local map misses and no `trip_start` is still queued, the sync loop resolves the id from the **durable** server record via `GET /v1/trips/resolve?clientTripId=` (`resolveTripIdByClientId`, reads `trips.client_trip_id`); a 404 dead-letters the mutation into `RideLossBanner` instead of skipping it. `isMutationReady`/`shouldSkipMutation` are queue-aware: process an orphan when its `trip_start` is gone, keep waiting while one is pending. On a build with this fix, orphaned mutations still in a device's queue self-heal and retroactively create the missing `trip_tracks` on next launch.
 - **Persist debounce is force-flushed for recovery-critical state.** The persist adapter (`lib/storage.ts`) coalesces writes (3s/8s) to spare the JS thread during GPS-breadcrumb churn, but `queueSlice.ts` calls `flushPersistedWrites()` immediately after `enqueueMutation`/`resolveMutation`/`killMutation`/`setTripServerId`/`setActiveTripClientId` so the offline queue + id-map survive a hard kill. Don't add new trip-critical state to the persisted slice without flushing it on change — a debounced-but-unflushed write is lost on an OS kill (this was the June 22 cliff).
 
+### Active-user counting — PostHog is joinable to Supabase, and was half-blind until 2026-09-11
+
+`telemetry.identify()` uses the Supabase user id, so PostHog `distinct_id` can
+be joined straight onto `profiles.id`. Use that before trusting any DAU number.
+
+- ⚠️ **`TelemetryProvider` must never call `telemetry.identify(null)` while auth
+  is still resolving.** `identify(null)` calls PostHog's `reset()`, which mints a
+  brand-new anonymous `distinct_id`; `user` is null on every cold start for a
+  moment, so the old code began a fresh identity every launch. Measured before
+  the fix: **613 of 796 distinct_ids matched no account**, and **107 of 209
+  users (51%)** with server-side proof of app use had no event under their own
+  id. The guard is `isLoading` from `useAuthSession`, and
+  `TelemetryProvider.test.tsx` fails without it. `reset()` is a SIGN-OUT
+  operation — "auth has not answered yet" is not one.
+- **Both DAU definitions are wrong in opposite directions.** `distinct_id`
+  counts ~2.2x persons (inflation); persons sat BELOW provable humans on several
+  days (11 vs 15 on 2026-09-10). Cross-check against client-driven server writes.
+- **Analytics consent is NOT recorded server-side** (the only consent column is
+  `notify_riding_tips_consented_at`), so the opt-out population is unknowable and
+  the denominator cannot be corrected. Don't claim a coverage percentage without
+  saying that.
+- **The PostHog key lives in `assets/app.config`, NOT the JS bundle.** A
+  bundle-only grep returns nothing and looks like analytics is dark. It reaches
+  the app via `extra.posthogApiKey`; search the whole APK.
+- **`reset()` does NOT clear the event queue** — the SDK keeps `Queue`/`AiQueue`/
+  `LogsQueue`, and `persistence` defaults to `'file'`, so events survive a reset
+  and an app kill. A comment in `disablePostHog()` claimed the opposite for
+  months.
+- **PostHog seeing MORE ids than the server witnesses is normal**: passive riders
+  write nothing, and an anonymous rider without the riding-tips opt-in registers
+  no push token.
+- Full working: `docs/reviews/active-user-counting-2026-09-11.md`.
+
 ### Trip tracking coverage — read this before believing "trips are not being recorded"
 
 ⚠️ **This has been raised three times (2026-07-15, 07-29, 09-10) from the same

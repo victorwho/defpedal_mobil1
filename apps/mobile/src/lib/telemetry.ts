@@ -145,9 +145,18 @@ export const disablePostHog = () => {
   if (!posthogClient) {
     return;
   }
-  // reset() clears the in-memory user identity and pending queue, then we
-  // drop the reference. Future capture/identify/screen calls become no-ops
+  // reset() clears the identity and mints a fresh anonymous distinct_id, then
+  // we drop the reference — future capture/identify/screen calls become no-ops
   // because posthogClient is null.
+  //
+  // ⚠️ It does NOT clear the pending queue. This comment used to claim it did;
+  // posthog-react-native's `reset()` explicitly KEEPS
+  // `PostHogPersistedProperty.Queue` (plus AiQueue and LogsQueue), and
+  // `persistence` defaults to 'file', so already-captured events survive both
+  // a reset and an app kill. Two consequences worth knowing: a withdrawal here
+  // does not retract events already captured under consent, and — the reason
+  // this matters — `reset()` is cheap on data but expensive on IDENTITY, which
+  // is why TelemetryProvider must not call it while auth is still resolving.
   posthogClient.reset();
   posthogClient = null;
 };
