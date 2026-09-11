@@ -215,6 +215,16 @@ where event_type = 'app_open'
 group by 1 order by 1 desc;
 ```
 
+**Until a production build carries app_open, you have two partial views and
+neither is MAU.** Server-side writes count people who DID something and are
+blind to browsers; PostHog counts openers but is blind to opt-outs and to
+anyone the pre-v0.2.160 identity bug stranded. Measured August 2026: 213
+server-witnessed, 881 PostHog ids, only 99 in both — **114 people did real
+things in the app and emitted no PostHog event at all**. The union (995)
+over-counts humans, because one person can hold several anonymous device ids.
+Use the server-witnessed figure as an honest floor, PostHog for nothing that
+needs completeness, and see `docs/reviews/active-user-counting-2026-09-11.md`.
+
 ⚠️ Rows before 2026-05-10 are Mia-era; the series is **silent from 2026-05-10
 to the v0.2.160 rollout**, so do not read that gap as zero users. And the
 client throttles to one open per 5 minutes, so `opens` counts sessions, not

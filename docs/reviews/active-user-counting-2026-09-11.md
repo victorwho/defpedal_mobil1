@@ -82,3 +82,71 @@ reported a 5x undercount. That day was a Monday, and `xp_events` showed 32
 users — the weekly leaderboard settlement cron awarding XP to people who never
 opened the app. The real figure was 7. Every number here excludes cron-written
 tables (`xp_events`, `activity_feed`) and counts only client-driven writes.
+
+## The numbers this unblocked (measured 2026-09-11)
+
+### Lifetime funnel
+
+| | count | of accounts |
+|---|---|---|
+| Accounts (`profiles`) | **3,311** | — |
+| Ever started a ride | **544** | 16.4% |
+| Ever ended a ride | 429 | 13.0% |
+| Ever got a GPS track stored | 182 | 5.5% |
+| Ever explicitly tapped Save | 42 | 1.3% |
+
+1,403 trips total, so the 544 riders average ~2.6 trips each. `ever tapped Save`
+is low only because `end_action` did not exist before 2026-07-29; older saves
+are inside the 182.
+
+⚠️ **3,311 is ACCOUNTS, not installs.** Every fresh open mints an anonymous
+Supabase account, so it tracks installs closely — but a reinstall mints another,
+and so did the pre-0.2.157 auth bug that re-signed-in anonymously over a real
+session. Treat it as an upper bound; Play Console is the real install count.
+
+**~84% of accounts never start a single ride.** That is the largest number on
+this page and it is not a telemetry problem.
+
+### Monthly actives — and why the two sources disagree
+
+| month | server-witnessed | PostHog persons | PostHog ids |
+|---|---|---|---|
+| 2026-05 | 98 | 116 | 186 |
+| 2026-06 | 137 | 24 | 33 |
+| 2026-07 | **550** | 379 | 916 |
+| 2026-08 | 213 | 362 | 881 |
+| 2026-09 (11 d) | 94 | 107 | 280 |
+
+July is the peak — the mandatory-registration cohort (v0.2.120, 2026-07-26)
+arriving and not sticking.
+
+August decomposed, which is the clearest picture of the disagreement:
+
+```
+server-witnessed accounts      213
+PostHog distinct_ids           881
+  in BOTH                       99
+  server only (PostHog blind)  114   <-- did real things, invisible to analytics
+  PostHog only (wrote nothing) 782   <-- openers, mostly anonymous device ids
+  UNION                        995
+```
+
+### How to read them
+
+Neither column is MAU. They measure different populations and neither contains
+the other.
+
+- **Server-witnessed** = people who DID something (ride, hazard vote, quiz,
+  push-token registration). Blind to someone who opens the app, looks at the
+  map and leaves. **A trustworthy floor: engaged users.**
+- **PostHog** = devices that emitted events AND had analytics on AND got
+  identified. **A biased sample of openers, not a count.** In August it was
+  blind to 114 people who did real things — a third of the engaged population.
+- **The union (995) over-counts humans**, because one human can hold several
+  anonymous device ids (the identity bug minted a fresh one per cold start).
+  True MAU sits between 213 and 995, nearer the low hundreds.
+
+Practical guidance: use server-side tables for "is this feature used", the
+server-witnessed floor for "are people using it", and neither for per-user
+retention until v0.2.160 has spread. `user_telemetry_events.app_open` retires
+this whole comparison once a PRODUCTION build carries it.
