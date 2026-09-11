@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-09-11 — We can finally count our own users — and "most trips aren't recorded" turned out to be the metric
+
+Two investigations that started as bug reports and ended somewhere else. Neither was the failure it looked like, and the real defects were in how the app *measures* itself. Shipped as preview v0.2.160 (build 163) and API `defpedal-api-00156-mlb`.
+
+### Behavior
+- **You stay signed in.** A cold start could begin a brand-new identity because the app gave up on the saved session before the check finished. Combined with the v0.2.159 auth fix, sign-in should now be durable across force-closes and reinstalls of the same build.
+- **Your planned route survives a failed upload.** The route you planned was only stored when a ride *ended*, so a ride that never finished uploading lost it — even though the geometry existed the moment you pressed Start. It is now recorded at the start, from all three ride paths (planned route, GPX course, generated loop).
+- **App opens are now counted.** One row per foreground, recording *when* and *which build* — nothing about where you go or what you do. Separate from the analytics toggle in Profile → Privacy & analytics, which still governs product analytics.
+
+### What the investigations actually found
+- **Trip recording was never broken.** When a rider taps Save, the track arrives — **96 of 97 rides (99%)**. The missing 55% is riders discarding trial starts with a **median duration of one minute**. The metric counted deliberate discards as failures, so it could never rise. Correct denominator: `end_action IN ('saved','prompt_saved','completed')`. Coverage had also already recovered on its own (26% July → 45% September) after the 2026-07-29 fixes.
+- **Active-user counting WAS broken.** Analytics identity was reset on every cold start, so **613 of 796 PostHog ids matched no account** and **107 of 209 provably-active users (51%)** were unattributable. Both DAU definitions were wrong in opposite directions — ids inflated ~2.2×, persons sat *below* the number of humans we can prove used the app.
+- **Product finding that dwarfs both: 3,311 accounts, 544 ever started a ride — ~84% never ride.**
+
+### Under the hood
+- `TelemetryProvider` gates identity on `isLoading`; `reset()` is a sign-out operation and "auth hasn't answered yet" is not one. Test fails against the old code.
+- `user_telemetry_events` **revived, not created** — it already existed (migration `202604150004`) with 638 app_open rows, silent since 2026-05-10 when the Mia-era observer was deleted. The series has a four-month hole; do not read it as zero users.
+- Migrations `202609100001` (build provenance on `profiles`, planned route on `trips`) and `202609110001` (per-row provenance, DAU index, 90-day prune function), both applied and verified live.
+- Three stale comments corrected, one compliance-relevant: `TelemetryProvider` claimed PostHog was opt-in when it has defaulted ON since 2026-07-19.
+- Full working: `docs/reviews/gps-tracking-audit-2026-09-10.md`, `docs/reviews/active-user-counting-2026-09-11.md`, error-log #118.
+
+### Outstanding
+- ⚠️ **The Privacy Policy does not yet name the app-open processing.** Its legitimate-interest basis (GDPR Art 6(1)(f), the same footing as crash reports) depends on that disclosure.
+- ⚠️ **The documented 90-day retention is not enforced.** `prune_user_telemetry_events()` exists but no cron calls it, so the table says `RETENTION: 90 days` while keeping rows indefinitely. Storage is a non-issue (~9 MB/year at current scale) — the problem is claiming a control we don't have, and that an unbounded log of app-open times becomes a behavioural timeline rather than operational telemetry. Fix is one RPC call in the existing daily hazards-expire cron.
+
+
+## 2026-09-10 — Two routing bugs that had been live for the life of each feature
+
+Both were found by probing the live router rather than reading code, and both were silent: nothing crashed, nothing logged, the app just quietly gave a worse answer. Shipped as preview v0.2.158/v0.2.159.
+
+### Behavior
+- **"Avoid unpaved" actually falls back now.** When no paved route exists, OSRM says so with an HTTP 400 carrying `NoRoute` — and all three route fetchers checked the status before reading the body, so the retry written for exactly that case had never once run. On a loop the candidate vanished silently; on a normal route the whole preview failed. Measured: 78 of 216 paved rings across twelve start points, with **two start points failing every single ring** (now 18 of 18).
+- **No more loops that ride the same road back and forth.** At the last relaxation rung every quality cap was dropped, so a "loop" repeating over 90% of itself could be offered — 38 of 300 candidates could reach a rider that way. There is now a ceiling that is never relaxed.
+- **The loop planner zooms out far enough to watch the search.** It always meant to; it framed roughly a quarter of the area needed, so loops drew off the edges of the screen.
+
+### Under the hood
+- `packages/core/src/osrmResponse.ts` is now the single reader for all three fetchers: read the body, then classify. This is **not** "stop throwing on 400" — `InvalidValue`/`InvalidQuery`/`InvalidOptions` arrive at the same status and still throw.
+- The camera zoom was wrong twice in opposite directions, which is why it looked almost right: it framed `target / 2π` (the lollipop that actually binds reaches 3.5× further) and converted it assuming a 400-pixel half-viewport no phone has. Replaced with a fitted Mapbox `bounds` box, so the viewport arithmetic is gone rather than corrected. Device-confirmed.
+- `cameraStop.ts` extracted because `@rnmapbox/maps` is Flow-typed and cannot be imported under vitest — the camera had never been testable.
+- Error-log #117 and #118.
+
+
 ## 2026-09-04 — Risk levels re-anchored to the b46v1 score generation: three named tiers, finer map shading
 
 The risk model generation that went live on 2026-09-01 (b46v1) scores the same roads ~13 points higher and wider than the generation the display bands were built for, so the old seven buckets painted far too much of the network as "Very risky"/"Extreme" — and the accident validation showed the old middle bands never measured distinct risk levels anyway. Bands are now anchored to the validated tier scheme (OSRM_Server `BAND_REANCHOR_B46V1.md`).
