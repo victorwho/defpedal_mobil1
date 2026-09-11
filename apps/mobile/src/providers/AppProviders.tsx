@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ThemeProvider } from '../design-system';
 import { ActivationLadderScheduler } from './ActivationLadderScheduler';
+import { AppOpenTelemetryObserver } from './AppOpenTelemetryObserver';
 import { AnonMergeManager } from './AnonMergeManager';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { ConnectivityProvider } from './ConnectivityMonitor';
@@ -46,6 +47,7 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
                 and push copy use real values, not schema-era defaults.
               */}
               <ProfileDeviceSyncManager />
+        <AppOpenTelemetryObserver />
               {/* Ties the store SDK to the signed-in account so a
                   subscription cannot follow the device to the next rider. */}
               <PurchasesIdentityManager />

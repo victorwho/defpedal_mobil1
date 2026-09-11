@@ -43,6 +43,7 @@ import type { ScenicSegment, ScenicVia } from '../lib/scenic';
 import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullUser } from '../lib/auth';
 import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
+import { ACCEPTED_DEVICE_EVENTS, recordDeviceTelemetry } from '../lib/deviceTelemetry';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
 import { assertCanSaveRoute, resolveHistoryCutoff } from '../lib/premiumEnforcement';
@@ -453,6 +454,76 @@ export const buildV1Routes = (
         return undefined;
       }
     };
+
+    /*
+     * POST /telemetry/app-open — first-party operational telemetry.
+     *
+     * Independent of the product-analytics consent toggle by design: PostHog is
+     * consent-gated, so active users could not be counted at all for anyone who
+     * opted out, and the opt-out flag is never reported to the server so the
+     * blind spot was not even measurable. Lawful basis is legitimate interest
+     * (GDPR Art 6(1)(f)), the same footing as Sentry crash reports, and it holds
+     * only because the row is minimal — see lib/deviceTelemetry.ts.
+     *
+     * `requireWriteUser`, not `requireFullUser`: anonymous riders are exactly
+     * the population PostHog was least likely to attribute, and they are the
+     * ones we most need to count.
+     *
+     * Always answers 200 with `{ recorded }`. A rider's app open is not a
+     * request they made, so a failure here must never reach them as an error;
+     * the client fires it and ignores the result.
+     */
+    app.post<{
+      Body: { event?: string; sessionId?: string | null; appEnvironment?: string | null; appVersion?: string | null; appPlatform?: string | null };
+      Reply: { recorded: boolean } | ErrorResponse;
+    }>(
+      '/telemetry/app-open',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              // Allowlisted at the edge AND by a CHECK constraint on the table.
+              event: { type: 'string', enum: [...ACCEPTED_DEVICE_EVENTS] },
+              sessionId: { type: ['string', 'null'], maxLength: 128 },
+              appEnvironment: { type: ['string', 'null'], enum: ['development', 'preview', 'production', null] },
+              appVersion: { type: ['string', 'null'], maxLength: 32 },
+              appPlatform: { type: ['string', 'null'], enum: ['ios', 'android', 'web', null] },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['recorded'],
+              properties: { recorded: { type: 'boolean' } },
+            },
+            401: errorResponseSchema,
+            429: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'deviceTelemetry', {
+          userId: user.id,
+        });
+
+        const result = await recordDeviceTelemetry(
+          {
+            event: 'app_open',
+            sessionId: request.body?.sessionId ?? null,
+            appEnvironment: request.body?.appEnvironment ?? null,
+            appVersion: request.body?.appVersion ?? null,
+            appPlatform: request.body?.appPlatform ?? null,
+          },
+          user.id,
+        );
+
+        return result;
+      },
+    );
 
     app.post<{ Body: TripStartBody; Reply: TripStartResponse | ErrorResponse }>(
       '/trips/start',

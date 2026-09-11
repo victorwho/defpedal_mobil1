@@ -176,6 +176,19 @@ export const config = {
         900000,
       ),
     },
+    // App opens. The client throttles to one per 5 min, so 30/hour is ~6x
+    // headroom for an app being switched into repeatedly; anything past that is
+    // a loop, and dropping it costs one row in a count.
+    deviceTelemetry: {
+      limit: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_DEVICE_TELEMETRY_MAX'], '30'),
+        30,
+      ),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_DEVICE_TELEMETRY_WINDOW_MS'], '3600000'),
+        3600000,
+      ),
+    },
     citySuggestion: {
       limit: parsePositiveNumber(
         resolveConfigValue(['RATE_LIMIT_CITY_SUGGESTION_MAX'], '5'),

@@ -271,6 +271,29 @@ export const mobileApi = {
       method: 'PATCH',
       body: JSON.stringify(payload),
     }),
+  /**
+   * First-party operational telemetry: one row per app foreground.
+   *
+   * Deliberately NOT routed through `telemetry.ts` — that stack is gated on the
+   * product-analytics consent toggle, which is exactly why active users could
+   * not be counted. Lawful basis is legitimate interest (GDPR Art 6(1)(f)), the
+   * same footing as Sentry crash reports, and it holds only because the payload
+   * is minimal: no location, no device id, no behaviour. Do not add fields here
+   * describing what the rider did.
+   *
+   * No timestamp is sent on purpose — the server stamps it, so a wrong device
+   * clock cannot move a user across a day boundary.
+   */
+  recordAppOpen: (payload: {
+    sessionId?: string | null;
+    appEnvironment?: string | null;
+    appVersion?: string | null;
+    appPlatform?: string | null;
+  }) =>
+    mobileApiFetch<{ recorded: boolean }>('/v1/telemetry/app-open', {
+      method: 'POST',
+      body: JSON.stringify({ event: 'app_open', ...payload }),
+    }),
   // Irreversible account deletion. Body must contain { confirmation: 'DELETE' }
   // (verbatim) so accidental calls are rejected with 400.
   deleteAccount: () =>

@@ -8,6 +8,10 @@ export type RateLimitPolicies = {
   routeReroute: RateLimitPolicy;
   write: RateLimitPolicy;
   hazardVote: RateLimitPolicy;
+  // First-party app-open telemetry. Its own bucket so a foregrounding storm can
+  // never eat the rider's `write` budget and block a trip_end — counting users
+  // matters far less than recording their ride.
+  deviceTelemetry: RateLimitPolicy;
   // Read-heavy social surface bucket — separate from routePreview so heavy
   // tab-switching on the leaderboard / City Heartbeat doesn't starve a
   // rider's actual route preview budget (and vice versa).

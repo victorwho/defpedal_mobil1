@@ -186,6 +186,40 @@ like `com.defensivepedal.mobile@X.Y.Z+BUILD`, API releases like
     catches anything that throws without one.
 
 
+### DAU — use first-party telemetry, not PostHog alone (since 2026-09-11)
+
+PostHog is consent-gated, and the opt-out flag is never reported to the server,
+so PostHog DAU is a lower bound of unknown tightness. Measured 2026-09-11: 107
+of 209 users with server-side proof of app use had no PostHog event under their
+own id. `user_telemetry_events.app_open` is now written on every foreground
+regardless of the toggle — this is the number to trust.
+
+```sql
+-- Daily active users, first-party. created_at is SERVER time; never use a
+-- client timestamp for a per-day bucket.
+select created_at::date as day,
+       count(distinct user_id) as dau,
+       count(*)               as opens
+from user_telemetry_events
+where event_type = 'app_open'
+  and created_at >= now() - interval '30 days'
+group by 1 order by 1 desc;
+
+-- Same, excluding developer/tester installs (needs the client to have synced
+-- provenance — NULL means an older build, not a production one).
+select created_at::date as day, count(distinct user_id) as dau
+from user_telemetry_events
+where event_type = 'app_open'
+  and coalesce(app_environment, 'unknown') = 'production'
+  and created_at >= now() - interval '30 days'
+group by 1 order by 1 desc;
+```
+
+⚠️ Rows before 2026-05-10 are Mia-era; the series is **silent from 2026-05-10
+to the v0.2.160 rollout**, so do not read that gap as zero users. And the
+client throttles to one open per 5 minutes, so `opens` counts sessions, not
+foreground transitions.
+
 ## Healthy baselines (as of 2026-07-23, ~70 DAU reporting)
 
 - Mobile errors: ≤ ~5/day, dominated by known benign titles (OSRM NoRoute,

@@ -603,6 +603,41 @@ IDLE → ROUTE_PREVIEW → NAVIGATING → AWAITING_FEEDBACK → IDLE
 - **Self-heal — `trip_end`/`trip_track` must NEVER depend only on the in-memory/persisted `tripServerIds[clientTripId]` map.** That map is lost on app kill, the `resetFlow` prune, or a debounced persist write that didn't flush — which used to orphan the mutation forever (skipped every flush, never retried/killed/surfaced) and strand the trip `in_progress` with no GPS track (the May–June 2026 `trip_tracks`-loss regression; error-log #60). When the local map misses and no `trip_start` is still queued, the sync loop resolves the id from the **durable** server record via `GET /v1/trips/resolve?clientTripId=` (`resolveTripIdByClientId`, reads `trips.client_trip_id`); a 404 dead-letters the mutation into `RideLossBanner` instead of skipping it. `isMutationReady`/`shouldSkipMutation` are queue-aware: process an orphan when its `trip_start` is gone, keep waiting while one is pending. On a build with this fix, orphaned mutations still in a device's queue self-heal and retroactively create the missing `trip_tracks` on next launch.
 - **Persist debounce is force-flushed for recovery-critical state.** The persist adapter (`lib/storage.ts`) coalesces writes (3s/8s) to spare the JS thread during GPS-breadcrumb churn, but `queueSlice.ts` calls `flushPersistedWrites()` immediately after `enqueueMutation`/`resolveMutation`/`killMutation`/`setTripServerId`/`setActiveTripClientId` so the offline queue + id-map survive a hard kill. Don't add new trip-critical state to the persisted slice without flushing it on change — a debounced-but-unflushed write is lost on an OS kill (this was the June 22 cliff).
 
+### First-party app-open telemetry (`user_telemetry_events`, revived 2026-09-11)
+
+`app_open` rows are written on **every foreground, regardless of the
+product-analytics consent toggle** — `POST /v1/telemetry/app-open` →
+`lib/deviceTelemetry.ts`, fired by `AppOpenTelemetryObserver`. This is the
+number to trust for DAU; PostHog is a lower bound of unknown tightness.
+
+- ⚠️ **Lawful basis is legitimate interest (GDPR Art 6(1)(f))**, the same footing
+  the app already uses for Sentry crash reports, and it holds ONLY while the row
+  stays minimal: one row, no location, no device id, no screen, no behaviour.
+  `event_type` is an allowlist at both the edge and a CHECK constraint, and
+  `properties` is deliberately left empty. **Widening either is a privacy
+  decision, not a schema tweak, and must ship with a Privacy Policy update in
+  the same change.** ⚠️ **The Privacy Policy
+  (`apps/web/app/privacy/page.tsx`) does NOT yet name this processing — that is
+  an open item**, as is the ANSPDCP/ePrivacy review noted above.
+- **Not a new table.** `user_telemetry_events` is from migration `202604150004`
+  and already held 638 `app_open` rows from 157 users, written by the Mia-era
+  observer of the same name and **silent since 2026-05-10**, the day Mia was
+  retired. The series has a four-month hole — do not read it as zero users.
+- **`created_at` (server time) is the only valid per-day bucket.** The client
+  sends no timestamp on purpose, so a wrong device clock cannot move a user
+  across a day boundary.
+- **Throttled to one open per 5 minutes in-memory** (`appOpenTelemetry.ts`),
+  never persisted — a cold start must always record. The OS emits `active` far
+  more often than a human opens the app. A failed write does NOT stamp the
+  throttle, so it retries on the next foreground.
+- **Anonymous sessions count** (`requireWriteUser`, not `requireFullUser`) —
+  they are the population PostHog was least likely to attribute. Its own
+  `deviceTelemetry` rate-limit bucket, so a foregrounding storm can never eat
+  the `write` budget and block a `trip_end`.
+- **Retention 90 days** via `prune_user_telemetry_events()`. Minimisation is
+  part of the basis, not housekeeping. ⚠️ **Not yet wired to a cron** — open item.
+- DAU queries: `docs/runbooks/monitoring.md` § DAU.
+
 ### Active-user counting — PostHog is joinable to Supabase, and was half-blind until 2026-09-11
 
 `telemetry.identify()` uses the Supabase user id, so PostHog `distinct_id` can
