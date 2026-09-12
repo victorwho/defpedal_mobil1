@@ -82,7 +82,7 @@ import { useHaptics } from '../src/design-system/hooks/useHaptics';
 import { space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { gray, safetyColors } from '../src/design-system/tokens/colors';
+import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textXs, textSm, textBase } from '../src/design-system/tokens/typography';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -1304,6 +1304,7 @@ function NavigationScreen() {
         <View style={styles.topCluster} pointerEvents="box-none">
           <ManeuverCard
             currentStep={currentStep}
+            nextStep={nextStep}
             distanceToManeuverMeters={navigationSession.distanceToManeuverMeters ?? null}
             gpsAccuracyMeters={locationState.sample?.accuracyMeters}
             isOffline={!isOnline}
@@ -1370,7 +1371,10 @@ function NavigationScreen() {
         </View>
 
         {/* ── Floating control rail (right side) ── */}
-        <View style={styles.floatingControlRail}>
+        {/* box-none is load-bearing now that the rail spans the full height:
+            without it this 80px strip would swallow every map tap down the
+            right edge, including the tap that breaks camera follow. */}
+        <View style={styles.floatingControlRail} pointerEvents="box-none">
           {/* Recenter / Free map — round gray button with GPS icon */}
           <View
             style={styles.roundButton}
@@ -1423,18 +1427,14 @@ function NavigationScreen() {
             </View>
           ) : null}
 
-          {/* End ride — distinct danger-styled stop button */}
-          <View style={styles.endRideButton}>
-            <IconButton
-              icon={<Ionicons name="stop-circle" size={24} color={gray[50]} />}
-              onPress={confirmEndRide}
-              accessibilityLabel={t('nav.endRide')}
-              variant="danger"
-            />
-          </View>
+          {/* End Ride used to live here. It moved into FooterCard on
+              2026-09-12 (docs/plans/navigation-hud-redesign.md) — a 40px rail
+              button was the wrong size for the one control a rider reaches
+              for in traffic. Do not re-add it here: two end-ride controls is
+              exactly what the move was meant to avoid. */}
         </View>
 
-        {/* ── Bottom: elevation progress + "then" strip + metrics ── */}
+        {/* ── Bottom: elevation progress + End Ride + hero ETA + metrics ── */}
         <View style={styles.bottomCluster} pointerEvents="box-none">
           {showElevationProgress && selectedRoute?.elevationProfile?.length ? (
             <ElevationProgressCard
@@ -1444,11 +1444,12 @@ function NavigationScreen() {
                 navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
               }
               isOffRoute={offRouteDetails !== null}
+              onClose={() => setShowElevationProgress(false)}
             />
           ) : null}
           <SteepGradeIndicator gradePercent={currentGrade} />
           <FooterCard
-            nextStep={nextStep}
+            onEndRide={confirmEndRide}
             remainingDurationSeconds={Math.round(
               navigationSession.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
             )}
@@ -1471,7 +1472,13 @@ function NavigationScreen() {
       </View>
 
       {/* Route-feature proximity alerts (bottom-right column) */}
-      <RouteFeatureAlertStack />
+      {/* The stack must park ABOVE the HUD footer, and it is a sibling of
+          overlayRoot so it gets no safe-area padding of its own. The constant
+          IS the bottom cluster's height — paddingBottom 16 + FooterCard ~86 +
+          gap 12 + SteepGradeIndicator ~25 — so it has to move whenever the
+          footer's height does. It was 164 while the footer was ~111.
+          (The component's own 180 default encodes the pre-2026-09-12 footer.) */}
+      <RouteFeatureAlertStack bottomOffset={insets.bottom + 139} />
 
       {/* Waze-style hazard proximity alert */}
       {activeHazardAlert ? (
@@ -1729,8 +1736,17 @@ const createThemedStyles = (colors: ThemeColors) =>
     floatingControlRail: {
       position: 'absolute',
       right: space[3],
-      top: '38%',
-      transform: [{ translateY: -120 }],
+      // Centred by LAYOUT, never by a magic offset. The previous
+      // `top: '38%'` + `translateY(-120)` was calibrated against a 58px
+      // maneuver card and five buttons; it went stale the moment the card
+      // grew and End Ride left the rail, and the top button ended up over
+      // the instruction panel. The rail's height still varies at runtime —
+      // the elevation toggle only renders when the route has a profile — so
+      // any recomputed constant would go stale again the next time a control
+      // is added or removed. top/bottom 0 + centre is immune to both.
+      top: 0,
+      bottom: 0,
+      justifyContent: 'center',
       width: 80,
       gap: space[2],
       alignItems: 'center',
@@ -1870,14 +1886,6 @@ const createThemedStyles = (colors: ThemeColors) =>
       height: 40,
       borderRadius: 20,
       backgroundColor: gray[800],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    endRideButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: safetyColors.danger,
       alignItems: 'center',
       justifyContent: 'center',
     },

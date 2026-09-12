@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop, Path, Line, Rect } from 'react-native-svg';
 
 import { brandColors, gray } from '../tokens/colors';
@@ -21,6 +22,14 @@ type ElevationProgressCardProps = {
   remainingDistanceMeters: number;
   /** Whether user is currently off-route */
   isOffRoute: boolean;
+  /**
+   * Dismisses the card. Load-bearing: this card is opened from the floating
+   * control rail, and when it is tall enough it covers the very button that
+   * opened it — leaving a rider with no way to close it mid-ride. The card
+   * must therefore carry its own escape rather than relying on the toggle
+   * still being reachable, which depends on screen height.
+   */
+  onClose?: () => void;
 };
 
 export const buildPath = (
@@ -65,6 +74,7 @@ export const ElevationProgressCard = ({
   totalDistanceMeters,
   remainingDistanceMeters,
   isOffRoute,
+  onClose,
 }: ElevationProgressCardProps) => {
   const progressRatio = useMemo(
     () => Math.max(0, Math.min(1, 1 - remainingDistanceMeters / totalDistanceMeters)),
@@ -103,7 +113,23 @@ export const ElevationProgressCard = ({
         <Text style={[styles.label, isOffRoute && styles.labelOffRoute]}>
           {isOffRoute ? 'OFF ROUTE' : 'ELEVATION'}
         </Text>
-        <Text style={styles.currentElev}>{Math.round(currentElev)} m</Text>
+        <View style={styles.headerRight}>
+          <Text style={styles.currentElev}>{Math.round(currentElev)} m</Text>
+          {onClose ? (
+            <Pressable
+              testID="elevation-close"
+              onPress={onClose}
+              // The glyph is small; hitSlop brings the real target to ~44pt,
+              // which is what a gloved hand on a moving bike needs.
+              hitSlop={14}
+              accessibilityRole="button"
+              accessibilityLabel="Hide elevation"
+              style={({ pressed }) => [styles.closeBtn, pressed ? styles.closeBtnPressed : null]}
+            >
+              <Ionicons name="close" size={14} color={gray[300]} />
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       <Svg width={CHART_WIDTH} height={CHART_HEIGHT} viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
         <Defs>
@@ -169,6 +195,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+  },
+  closeBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnPressed: {
+    opacity: 0.6,
   },
   label: {
     ...textXs,

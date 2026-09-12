@@ -1,0 +1,57 @@
+Defensive Pedal — Preview v0.2.162 (build 165)
+
+Both fixes from your v0.2.161 ride. Nothing else changed.
+
+1. THE SIDE BUTTONS NO LONGER COVER THE INSTRUCTION PANEL
+
+They now sit in the vertical middle of the screen.
+
+What went wrong: that column was pinned at "38% down the screen, then up by
+120 pixels" — a number someone picked back when the instruction panel was 58px
+tall and there were five buttons. I made the panel 128px and removed one
+button, and never rechecked the number. So the top button climbed onto the
+panel. My mistake, and an avoidable one.
+
+I did not just pick a new number. The column's height still changes while you
+ride — the elevation button only appears on routes that have a hill profile —
+so any fixed offset would drift out of date again the next time anything
+changes. It now centres itself, whatever its height and whatever the panel
+above it is doing.
+
+2. THE BOTTOM BAR IS SHORTER
+
+About 111px down to about 86px — a quarter off. All four numbers are still
+there and still bigger than they were before this whole redesign:
+
+- Time remaining 30px -> 26px (was not there at all before)
+- ETA / distance / climb 17px -> 16px (they were 14px originally)
+- The padding and the gap around the divider took most of the cut, not the type
+
+Net effect across the whole screen: the HUD covered about 10% more map in
+v0.2.161, now it is about 6% more than before the redesign started.
+
+WHAT TO CHECK
+
+- The side buttons: clear of the instruction panel now, and still easy to reach?
+  If they now feel too LOW, say so — moving them is a one-line change.
+- Tap the map on the right-hand edge, in the empty space above or below the
+  buttons. It should still break camera-follow and go to flat overview. That
+  column is now a full-height invisible strip, and I had to explicitly make it
+  let taps through. If taps on the right edge do nothing, that is this.
+- The bottom bar: still readable at a glance while pedalling? If the trim went
+  too far, the type comes back up.
+- Route-feature alerts (tunnel / unprotected left) appear bottom-right and have
+  to sit above the bottom bar. The bar changed height, so their position moved
+  with it. Check they do not overlap the bar or the "Steep" pill.
+
+KNOWN, NOT A BUG
+
+The map tap area behind the button column is invisible but live — that is
+intentional, so you can still grab the map around the buttons.
+
+UNCHANGED FROM v0.2.161
+
+- The instruction panel itself: size, street name, the "Then" row.
+- GPX import (you confirmed this works).
+- The Stop button, bottom-left, same size and behaviour.
+- Routing, hazards, voice, everything off this screen.

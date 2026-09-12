@@ -1,0 +1,66 @@
+Defensive Pedal — Preview v0.2.161 (build 164)
+
+The navigation screen, rebuilt around the three things you reported from the bike.
+
+Your notes were: text too small, the bottom bar repeats the top, and those
+little numbers are unreadable while pedalling. All three checked out in the
+code, so this build is the fix for all three.
+
+TOP PANEL — bigger, and it now tells you what comes after
+
+- The turn instruction went from 18px to 27px. The distance went from 16px to
+  36px, with its unit ("m" / "km") on its own line underneath.
+- The street name now sits under the instruction. "Turn right / Strada Traian".
+- The "Then" row moved UP into the same panel. That is the fix for the
+  repetition you flagged: the next turn was never a duplicate, it was the turn
+  after the current one — but it was rendered at the very bottom of the screen,
+  700 pixels from the turn it follows, so the two read as the same thing said
+  twice. Now they sit together and read as a sequence, and you can see the next
+  turn while you are still committing to the current one.
+
+BOTTOM BAR — one number that matters, and the Stop button
+
+- It now leads with time remaining, big. ETA, distance and climb drop to a row
+  underneath, and they went from 14px to 17px.
+- Speed sits next to the time remaining.
+- STOP MOVED. It is now the big red block at the bottom-left of that bar,
+  roughly 8x the area it had. The small red circle on the right-hand button
+  column is GONE — do not go looking for it. Everything else in that column
+  (recenter, voice, hazard, elevation) is exactly where it was.
+- Stop still asks before it does anything: Keep riding / Discard / Save. One
+  tap to open it, same as before.
+
+WHAT TO CHECK
+
+- Is 27px actually readable at your handlebar distance, in daylight? That is
+  the whole point of this build. If it is still too small, say so and I will
+  push it further — it is a one-line change.
+- The new Stop button is bigger and sits right where your thumb rests. Tell me
+  if you hit it by accident. It is confirm-gated so a stray tap costs you a
+  dismissal, not a ride, but if it happens often that is a design problem.
+- IMPORTED GPX COURSE. Courses from Komoot/Strava carry no street names, so the
+  street line should simply not be there — no blank gap under the instruction.
+  If you see an empty line, that is a bug.
+- A ROUTE WITH A TUNNEL OR AN UNPROTECTED LEFT TURN. Those alerts pop up
+  bottom-right and have to sit ABOVE the bottom bar. The bar got taller, so I
+  moved them up by a calculated amount — calculated, not measured on a real
+  phone. If an alert overlaps the "Steep" pill or the bottom bar, that is this.
+- A MULTI-STOP ROUTE. The "Stop 2 of 3" header and the skip control should look
+  normal, and the red Stop block should stay the same size as on a normal ride
+  rather than stretching into a tall slab.
+- Romanian. The longest turn phrases at the new size — anything clipped?
+
+THE TRADE, STATED PLAINLY
+
+The HUD now covers about 10% more of the map than it did — roughly 150px of
+screen became roughly 240px, top and bottom combined. That is the cost of
+legibility and I made the call deliberately. If it feels like too much of the
+map is gone, tell me and I will trim the type back a couple of steps.
+
+UNCHANGED
+
+- Routing, the map, voice guidance, hazard reporting.
+- The right-hand button column, other than losing the stop button.
+- What happens when you end a ride: same dialog, same save/discard, same
+  "why did you end early" question.
+- Android back button still ends a ride.

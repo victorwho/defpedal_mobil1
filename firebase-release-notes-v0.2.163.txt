@@ -1,0 +1,49 @@
+Defensive Pedal — Preview v0.2.163 (build 166)
+
+Fixes the elevation chart trapping itself open. One change, nothing else.
+
+THE BUG
+
+You opened the elevation chart from the side button, and the chart then covered
+that button — so there was no way to close it again mid-ride.
+
+THE FIX: the chart now has its own X
+
+Top-right corner of the chart card, next to the current-elevation number. Tap
+it and the chart closes. The glyph is small but the tap area is padded out to
+roughly 44pt, which is what a gloved hand on a moving bike needs.
+
+WHY IT IS AN X AND NOT "I MOVED THINGS APART"
+
+I could have shuffled the chart and the button until they stopped colliding.
+That is screen-height arithmetic, and it is exactly the reasoning that put the
+side buttons on top of the instruction panel one build ago — a number that was
+right on my assumptions and wrong on your phone. Whether those two elements
+collide depends on your screen height, your system bars, and whether the
+"Steep" pill happens to be showing. A card that carries its own way out cannot
+be trapped by any of that.
+
+WHAT TO CHECK
+
+- Open the elevation chart, then close it with the X. Then open and close it a
+  few times. It should work every time regardless of where you are on a route.
+- The side elevation button still toggles the chart too, when it is not covered.
+  Both routes work; the X is the one that always works.
+- The X sits next to the elevation reading in the chart's top-right. Tell me if
+  it is hard to hit while moving — I can make the target bigger.
+
+KNOWN, AND YOUR CALL
+
+While the chart is open it still sits ON TOP of the elevation button, so that
+button is hidden until you close the chart. The X means this no longer traps
+you, so I left it there rather than adding a second change I could not test
+from here. If you would rather the buttons floated above the chart so the
+elevation button stays visible, say so — it is a one-line change, but it would
+put the buttons over the right-hand edge of the chart instead.
+
+UNCHANGED FROM v0.2.162
+
+- Side buttons centred vertically, clear of the instruction panel.
+- Shorter bottom bar.
+- Instruction panel, street name, "Then" row, Stop button.
+- GPX import.

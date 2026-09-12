@@ -141,6 +141,17 @@ export const Animated = {
     },
     stop: () => {},
   }),
+  // Runs the inner animation EXACTLY once — a real loop would never settle
+  // under a synchronous test runner. Components that loop (e.g. the HUD's
+  // PulsingGpsIcon on a poor GPS fix) only need `loop()` to exist and be
+  // stoppable; nothing asserts on the oscillation itself.
+  loop: (animation: { start: (cb?: () => void) => void; stop?: () => void }) => ({
+    start: (callback?: () => void) => {
+      animation.start();
+      callback?.();
+    },
+    stop: () => animation.stop?.(),
+  }),
   stagger: (_delay: number, animations: { start: (cb?: () => void) => void }[]) => ({
     start: (callback?: () => void) => {
       animations.forEach((a) => a.start());

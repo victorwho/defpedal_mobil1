@@ -15,7 +15,22 @@
  * shorter current-position-to-destination route cannot collapse the chart
  * mid-ride. It updates only when the route genuinely changes.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// These specs are pure geometry and render nothing — but importing the module
+// pulls the component's whole import graph, and vitest's bundler cannot parse
+// `@expo/vector-icons/Ionicons` (it fails with "Expression expected"). The card
+// gained that import when it got a close button, so the stub is needed here
+// even though no icon is ever rendered by this file.
+vi.mock('@expo/vector-icons/Ionicons', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: React.forwardRef((props: Record<string, unknown>, ref: React.Ref<unknown>) =>
+      React.createElement('span', { ref, 'data-testid': `icon-${props.name}` }),
+    ),
+  };
+});
 
 import { buildPath, CHART_WIDTH, computeMarkerX } from '../ElevationProgressCard';
 

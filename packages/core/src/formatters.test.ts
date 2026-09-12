@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { Step } from './types';
 import {
   formatDistance,
+  formatDistanceParts,
   formatDuration,
+  formatDurationShort,
   formatInstruction,
   formatManeuver,
   formatSpeed,
@@ -178,5 +180,75 @@ describe('formatSpeed', () => {
     expect(formatSpeed(4.17)).toBe('15 km/h');
     // 8.33 m/s ≈ 30 km/h
     expect(formatSpeed(8.33)).toBe('30 km/h');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDistanceParts — split value/unit for the navigation HUD, where the
+// number is rendered ~3x the size of its unit on a separate line.
+// ---------------------------------------------------------------------------
+
+describe('formatDistanceParts', () => {
+  it('splits sub-kilometre distances into a rounded metre value and "m"', () => {
+    expect(formatDistanceParts(102)).toEqual({ value: '102', unit: 'm' });
+    expect(formatDistanceParts(35.4)).toEqual({ value: '35', unit: 'm' });
+  });
+
+  it('splits kilometre distances into a one-decimal value and "km"', () => {
+    expect(formatDistanceParts(13_700)).toEqual({ value: '13.7', unit: 'km' });
+    expect(formatDistanceParts(1000)).toEqual({ value: '1.0', unit: 'km' });
+  });
+
+  it('switches unit at exactly 1000 m, matching formatDistance', () => {
+    expect(formatDistanceParts(999)).toEqual({ value: '999', unit: 'm' });
+    expect(formatDistanceParts(1000).unit).toBe('km');
+  });
+
+  it('clamps negatives to zero rather than rendering "-5 m"', () => {
+    expect(formatDistanceParts(-5)).toEqual({ value: '0', unit: 'm' });
+  });
+
+  it('stays consistent with formatDistance for the same input', () => {
+    // The HUD and every other surface must never disagree about a distance.
+    for (const meters of [0, 35, 102, 999, 1000, 13_700, 42_195]) {
+      const { value, unit } = formatDistanceParts(meters);
+      expect(`${value} ${unit}`).toBe(formatDistance(meters));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDurationShort — hero remaining-time in the HUD footer. Deliberately
+// avoids a bare "1:20" because it sits next to a wall-clock ETA ("14:44").
+// ---------------------------------------------------------------------------
+
+describe('formatDurationShort', () => {
+  it('renders whole minutes under an hour', () => {
+    expect(formatDurationShort(14 * 60)).toEqual({ value: '14', unit: 'min' });
+    expect(formatDurationShort(59 * 60)).toEqual({ value: '59', unit: 'min' });
+  });
+
+  it('rounds seconds to the nearest minute', () => {
+    expect(formatDurationShort(14 * 60 + 29).value).toBe('14');
+    expect(formatDurationShort(14 * 60 + 31).value).toBe('15');
+  });
+
+  it('shows "<1 min" rather than "0 min" for a nearly-finished ride', () => {
+    expect(formatDurationShort(20)).toEqual({ value: '<1', unit: 'min' });
+    expect(formatDurationShort(0)).toEqual({ value: '<1', unit: 'min' });
+  });
+
+  it('carries an hour marker past 60 min so it cannot read as a clock time', () => {
+    expect(formatDurationShort(80 * 60)).toEqual({ value: '1h 20', unit: 'min' });
+    expect(formatDurationShort(95 * 60)).toEqual({ value: '1h 35', unit: 'min' });
+  });
+
+  it('drops the minute part on a whole hour', () => {
+    expect(formatDurationShort(60 * 60)).toEqual({ value: '1', unit: 'h' });
+    expect(formatDurationShort(2 * 60 * 60)).toEqual({ value: '2', unit: 'h' });
+  });
+
+  it('treats negative remaining time as under a minute', () => {
+    expect(formatDurationShort(-120)).toEqual({ value: '<1', unit: 'min' });
   });
 });

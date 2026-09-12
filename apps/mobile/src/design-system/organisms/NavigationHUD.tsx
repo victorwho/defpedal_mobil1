@@ -1,15 +1,17 @@
 /**
  * Design System v1.0 — NavigationHUD Organism
  *
- * Minimal cycling navigation HUD with two separate sections:
- *   - ManeuverCard (top): arrow + description + distance
- *   - FooterCard (bottom): ETA, remaining distance, climb, "then" strip
+ * Cycling navigation HUD, in two separate sections:
+ *   - ManeuverCard (top): arrow + maneuver + street + distance, and the
+ *     inline "Then" row for the maneuver after it
+ *   - FooterCard (bottom): End Ride + hero remaining-time + ETA/dist/climb
  *
+ * Redesigned 2026-09-12 — docs/plans/navigation-hud-redesign.md.
  * Dark-only (forced during navigation per spec rule).
  */
 import React, { useEffect, useRef } from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
-import { formatDistance } from '@defensivepedal/core';
+import { formatDistance, formatDistanceParts, formatDurationShort } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -23,6 +25,7 @@ import {
   textXs,
 } from '../tokens/typography';
 import { darkTheme, gray } from '../tokens/colors';
+import { useHaptics } from '../hooks/useHaptics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useT } from '../../hooks/useTranslation';
 
@@ -43,6 +46,7 @@ export interface NavigationHUDProps {
   routeGapMeters: number;
   offRouteCountdownSeconds: number | null;
   reroutePending: boolean;
+  onEndRide: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,51 +186,133 @@ const PulsingGpsIcon: React.FC<{ color: string }> = ({ color }) => {
 
 export const ManeuverCard: React.FC<{
   currentStep: NavigationStep | null;
+  /**
+   * The maneuver AFTER the current one, rendered as the inline "Then" row.
+   *
+   * This used to live in `FooterCard`, ~700px away at the bottom of the
+   * screen, which made the current and next maneuver read as one repeated
+   * instruction instead of a sequence. Riders need the next turn while the
+   * current one is still on screen — a cyclist commits to a lane earlier
+   * than a driver and cannot re-read the screen mid-junction.
+   */
+  nextStep?: NavigationStep | null;
   distanceToManeuverMeters: number | null;
   gpsAccuracyMeters?: number | null;
   /** When true, replaces the GPS quality dot with an offline indicator. */
   isOffline?: boolean;
   onPress?: () => void;
-}> = ({ currentStep, distanceToManeuverMeters, gpsAccuracyMeters, isOffline, onPress }) => {
+}> = ({
+  currentStep,
+  nextStep,
+  distanceToManeuverMeters,
+  gpsAccuracyMeters,
+  isOffline,
+  onPress,
+}) => {
   const t = useT();
   const iconName = getManeuverIcon(currentStep);
   const description = getManeuverDescription(currentStep, t);
-  const distance =
+
+  const distanceMeters =
     distanceToManeuverMeters !== null
-      ? formatDistance(Math.round(distanceToManeuverMeters))
+      ? Math.round(distanceToManeuverMeters)
       : currentStep
-        ? formatDistance(Math.round(currentStep.distanceMeters))
-        : '—';
+        ? Math.round(currentStep.distanceMeters)
+        : null;
+  // Split so the numeral can be typeset at 36px with its unit at 13px beneath.
+  const distanceParts = distanceMeters !== null ? formatDistanceParts(distanceMeters) : null;
+  // …but a screen reader must hear the whole phrase ("102 m"), never the bare
+  // numeral the sighted layout breaks onto its own line.
+  const spokenDistance = distanceMeters !== null ? formatDistance(distanceMeters) : '—';
+
+  // GPX courses hardcode `streetName: ''` (core/courseSteps.ts) because
+  // synthesized geometry cannot know street names. The row COLLAPSES rather
+  // than reserving a line — a blank gap under every maneuver is how an
+  // imported course ends up looking broken.
+  const streetName = currentStep?.streetName?.trim();
 
   const gpsColor = getGpsSignalColor(gpsAccuracyMeters);
   const poor = isGpsPoor(gpsAccuracyMeters);
+
+  const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
+  const nextLabel = nextStep
+    ? (nextStep.streetName?.trim() || getManeuverDescription(nextStep, t))
+    : null;
 
   const Wrapper = onPress ? Pressable : View;
 
   return (
     <Wrapper
       onPress={onPress}
+      testID="maneuver-card"
       style={[styles.maneuverCard, shadows.lg]}
       accessibilityRole="summary"
-      accessibilityLabel={t('nav.maneuverA11y', { description, distance })}
+      accessibilityLabel={t('nav.maneuverA11y', { description, distance: spokenDistance })}
       accessibilityLiveRegion="assertive"
       accessibilityHint={onPress ? t('nav.tapReplay') : undefined}
     >
-      <Ionicons name={iconName} size={32} color={darkTheme.accent} />
-      {/* adjustsFontSizeToFit shrinks the maneuver text to keep the whole
-          phrase on one line — longer locales (ro/es) would otherwise truncate
-          with an ellipsis. minimumFontScale floors it at a still-legible size. */}
-      <Text
-        style={styles.maneuverDesc}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.55}
-      >
-        {description}
-      </Text>
-      <Text style={styles.maneuverDivider}>·</Text>
-      <Text style={styles.maneuverDist}>{distance}</Text>
+      <View style={styles.maneuverMain}>
+        <Ionicons name={iconName} size={48} color={darkTheme.accent} />
+        <View style={styles.maneuverTextCol}>
+          {/* adjustsFontSizeToFit shrinks the maneuver text to keep the whole
+              phrase on one line — longer locales (ro/es) would otherwise
+              truncate with an ellipsis. minimumFontScale floors it at a
+              still-legible size. */}
+          <Text
+            style={styles.maneuverDesc}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
+            {description}
+          </Text>
+          {streetName ? (
+            <Text testID="maneuver-street" style={styles.maneuverStreet} numberOfLines={1}>
+              {streetName}
+            </Text>
+          ) : null}
+        </View>
+        <View
+          style={styles.maneuverDistCol}
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden
+        >
+          <Text testID="maneuver-distance-value" style={styles.maneuverDistValue}>
+            {distanceParts?.value ?? '—'}
+          </Text>
+          {distanceParts ? (
+            <Text testID="maneuver-distance-unit" style={styles.maneuverDistUnit}>
+              {distanceParts.unit}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+
+      {nextStep && nextIconName ? (
+        <View
+          testID="maneuver-then"
+          style={styles.maneuverThen}
+          accessibilityLabel={`${t('nav.then')} ${nextLabel}`}
+        >
+          <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
+          <Ionicons name={nextIconName} size={20} color={darkTheme.accent} />
+          <Text
+            testID="maneuver-then-text"
+            style={[textSm, styles.thenText]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.6}
+          >
+            {nextLabel}
+          </Text>
+          <Text testID="maneuver-then-distance" style={[textDataSm, { color: gray[300] }]}>
+            {formatDistance(Math.round(nextStep.distanceMeters))}
+          </Text>
+        </View>
+      ) : null}
+
       <View
+        testID="maneuver-gps"
         style={styles.gpsIndicator}
         accessibilityLabel={
           isOffline
@@ -258,44 +344,6 @@ export const ManeuverCard: React.FC<{
 };
 
 /**
- * Standalone "Then" strip showing the next-after-current maneuver.
- * Rendered at the top of the screen below the ManeuverCard.
- */
-export const ThenStrip: React.FC<{
-  nextStep: NavigationStep | null;
-}> = ({ nextStep }) => {
-  const t = useT();
-  if (!nextStep) return null;
-
-  const nextIconName = getManeuverIcon(nextStep);
-  const nextDist = formatDistance(Math.round(nextStep.distanceMeters));
-  const nextDesc = getManeuverDescription(nextStep, t);
-
-  return (
-    <View
-      style={[styles.thenStripStandalone, shadows.md]}
-      accessibilityLabel={`${t('nav.then')} ${nextDesc} · ${nextDist}`}
-    >
-      <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
-      <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
-      <Text
-        style={[textSm, styles.thenText]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.6}
-      >
-        {nextDesc}
-      </Text>
-      <Text style={[textDataSm, { color: gray[300] }]}>{nextDist}</Text>
-    </View>
-  );
-};
-
-/**
- * Bottom card: "then" strip + summary metrics row (ETA, distance, climb).
- * Rendered at the bottom of the navigation screen.
- */
-/**
  * Per-stop metrics for a multi-stop route. When present, the FooterCard shows
  * distance/ETA/climb to the NEXT stop (with a "Stop X of N" header + a subtle
  * total-to-finish line) instead of straight to the final destination.
@@ -308,77 +356,79 @@ export interface FooterNextStop {
   climbMeters: number | null;
 }
 
+/**
+ * Bottom card: End Ride + hero remaining-time + summary metrics.
+ *
+ * Three bands, and the middle one is load-bearing: the End Ride column spans
+ * ONLY the hero+metrics row, never the whole card. In multi-stop mode the card
+ * grows a stop header and a to-finish line, and a full-height red column would
+ * become a ~160px slab of danger red.
+ *
+ * The "then" strip that used to live here moved into `ManeuverCard` — do not
+ * re-add it, that is exactly the duplication riders reported.
+ */
 export const FooterCard: React.FC<{
-  nextStep: NavigationStep | null;
   remainingDurationSeconds: number;
   remainingDistanceMeters: number;
   totalClimbMeters: number | null;
   totalDescentMeters?: number | null;
   isClimbLive?: boolean;
   speedKmh?: number | null;
-  /** When set, primary metrics retarget to this stop. Null/undefined = to destination (legacy). */
+  /** When set, primary metrics retarget to this stop. Null/undefined = to destination. */
   nextStop?: FooterNextStop | null;
   /** Confirm-gated skip of the next stop. Hidden when absent. */
   onSkipStop?: () => void;
   /** Disable the skip control (e.g. offline — reroute needs the network). */
   skipDisabled?: boolean;
+  /**
+   * Ends the ride. This is the ONLY on-screen exit from navigation: the
+   * control-rail stop button was removed 2026-09-12. The Android hardware
+   * back button is the sole remaining fallback, so if this stops firing a
+   * rider on iOS has no way to finish a ride.
+   *
+   * Already confirm-gated by the caller's Alert — do NOT add a second
+   * confirmation, and do NOT make it a long-press. A rider stopping at a
+   * junction gets one tap.
+   */
+  onEndRide: () => void;
 }> = ({
-  nextStep,
   remainingDurationSeconds,
   remainingDistanceMeters,
   totalClimbMeters,
-  totalDescentMeters,
   isClimbLive = false,
   speedKmh,
   nextStop,
   onSkipStop,
   skipDisabled = false,
+  onEndRide,
 }) => {
   const t = useT();
-  const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
-  const nextDist = nextStep
-    ? formatDistance(Math.round(nextStep.distanceMeters))
-    : null;
-  const nextDesc = nextStep ? getManeuverDescription(nextStep, t) : null;
+  const haptics = useHaptics();
 
   // Retarget the primary metrics to the next stop when one is ahead.
   const targetingStop = nextStop != null;
-  const etaSeconds = targetingStop ? nextStop!.durationSeconds : remainingDurationSeconds;
-  const distMeters = targetingStop ? nextStop!.distanceMeters : remainingDistanceMeters;
-  const climbMeters = targetingStop ? nextStop!.climbMeters : totalClimbMeters;
+  const etaSeconds = targetingStop ? nextStop.durationSeconds : remainingDurationSeconds;
+  const distMeters = targetingStop ? nextStop.distanceMeters : remainingDistanceMeters;
+  const climbMeters = targetingStop ? nextStop.climbMeters : totalClimbMeters;
   // Next-stop climb is always recomputed live; the route total may be an estimate.
   const climbLive = targetingStop ? true : isClimbLive;
 
+  const remaining = formatDurationShort(etaSeconds);
+
   return (
     <View style={[styles.footerCard, shadows.md]}>
-      {/* "Then" strip — the upcoming maneuver (turn), distinct from the next stop */}
-      {nextStep && nextIconName ? (
-        <View style={styles.thenStripInline}>
-          <Text style={styles.thenPrefix}>{t('nav.then')}</Text>
-          <Ionicons name={nextIconName} size={16} color={darkTheme.accent} />
-          <Text
-            style={[textSm, styles.thenText]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.6}
-          >
-            {nextDesc}
-          </Text>
-          <Text style={[textDataSm, { color: gray[300] }]}>{nextDist}</Text>
-        </View>
-      ) : null}
-
-      {/* Stop header: "STOP X of N" + skip control */}
+      {/* Band 1 — stop header: "STOP X of N" + skip control */}
       {targetingStop ? (
-        <View style={styles.stopHeaderRow}>
+        <View testID="footer-stop-header" style={styles.stopHeaderRow}>
           <View style={styles.stopBadge}>
             <Ionicons name="flag" size={12} color={darkTheme.accent} />
             <Text style={styles.stopBadgeText}>
-              {t('nav.stopXofN', { index: nextStop!.stopIndex, count: nextStop!.stopCount })}
+              {t('nav.stopXofN', { index: nextStop.stopIndex, count: nextStop.stopCount })}
             </Text>
           </View>
           {onSkipStop ? (
             <Pressable
+              testID="footer-skip-stop"
               onPress={onSkipStop}
               disabled={skipDisabled}
               hitSlop={10}
@@ -403,36 +453,81 @@ export const FooterCard: React.FC<{
         </View>
       ) : null}
 
-      {/* Metrics row (next stop when targeting one, else final destination) */}
-      <View style={styles.metricRow}>
-        <MetricCell
-          label={t('nav.metricSpeed')}
-          value={speedKmh != null ? `${Math.round(speedKmh)}` : '—'}
-          unit="km/h"
-        />
-        <View style={styles.metricDivider} />
-        <MetricCell label={t('nav.metricEta')} value={formatETA(etaSeconds, t)} />
-        <View style={styles.metricDivider} />
-        <MetricCell
-          label={t('nav.metricDist')}
-          value={`${(distMeters / 1000).toFixed(1)} km`}
-        />
-        <View style={styles.metricDivider} />
-        <MetricCell
-          label={t('nav.metricClimb')}
-          value={
-            climbMeters !== null
-              ? climbLive
-                ? `↑${Math.round(climbMeters)} m`
-                : `~↑${Math.round(climbMeters)} m`
-              : '—'
-          }
-        />
+      {/* Band 2 — End Ride + hero + metrics. The red column spans THIS only. */}
+      <View testID="footer-main-band" style={styles.footerMainBand}>
+        {/* Deliberately a plain Pressable, NOT PressableScale: that atom wraps
+            its child in an Animated.View carrying only transform/opacity, so a
+            flush column stretched by the parent would collapse to glyph height
+            inside it (the shape of error-log #105). A spring scale on an
+            edge-flush block reads wrong anyway — opacity is the right feedback. */}
+        <Pressable
+          testID="footer-end-ride"
+          onPress={onEndRide}
+          onPressIn={() => haptics.destructiveConfirm()}
+          style={({ pressed }) => [
+            styles.endRideColumn,
+            pressed ? styles.endRideColumnPressed : null,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={t('nav.endRide')}
+        >
+          <View style={styles.endRideGlyph} />
+        </Pressable>
+
+        <View style={styles.footerBody}>
+          <View style={styles.heroRow}>
+            <View style={styles.heroTime}>
+              <Text testID="footer-hero-value" style={styles.heroValue}>
+                {remaining.value}
+              </Text>
+              <Text testID="footer-hero-unit" style={styles.heroUnit}>
+                {remaining.unit}
+              </Text>
+            </View>
+            <View
+              style={styles.heroSpeed}
+              accessibilityLabel={`${t('nav.metricSpeed')}: ${
+                speedKmh != null ? `${Math.round(speedKmh)} km/h` : '—'
+              }`}
+            >
+              <Text testID="footer-speed-value" style={styles.speedValue}>
+                {speedKmh != null ? `${Math.round(speedKmh)}` : '—'}
+              </Text>
+              <Text style={styles.speedUnit}>km/h</Text>
+            </View>
+          </View>
+
+          <View style={styles.metricRow}>
+            <MetricCell
+              testID="footer-metric-eta"
+              label={t('nav.metricEta')}
+              value={formatETA(etaSeconds, t)}
+            />
+            <View style={styles.metricDivider} />
+            <MetricCell
+              testID="footer-metric-dist"
+              label={t('nav.metricDist')}
+              value={`${(distMeters / 1000).toFixed(1)} km`}
+            />
+            <View style={styles.metricDivider} />
+            <MetricCell
+              testID="footer-metric-climb"
+              label={t('nav.metricClimb')}
+              value={
+                climbMeters !== null
+                  ? climbLive
+                    ? `↑${Math.round(climbMeters)} m`
+                    : `~↑${Math.round(climbMeters)} m`
+                  : '—'
+              }
+            />
+          </View>
+        </View>
       </View>
 
-      {/* Subtle total-to-finish line (only when primary metrics target a stop) */}
+      {/* Band 3 — subtle total-to-finish (only when metrics target a stop) */}
       {targetingStop ? (
-        <Text style={styles.toFinishText} numberOfLines={1}>
+        <Text testID="footer-to-finish" style={styles.toFinishText} numberOfLines={1}>
           {t('nav.toFinish', {
             dist: `${(remainingDistanceMeters / 1000).toFixed(1)} km`,
             eta: formatETA(remainingDurationSeconds, t),
@@ -451,13 +546,14 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = (props) => (
   <View style={styles.root}>
     <ManeuverCard
       currentStep={props.currentStep}
+      nextStep={props.nextStep}
       distanceToManeuverMeters={props.distanceToManeuverMeters}
     />
     <FooterCard
-      nextStep={props.nextStep}
       remainingDurationSeconds={props.remainingDurationSeconds}
       remainingDistanceMeters={props.remainingDistanceMeters}
       totalClimbMeters={props.totalClimbMeters}
+      onEndRide={props.onEndRide}
     />
   </View>
 );
@@ -525,17 +621,14 @@ const steepStyles = StyleSheet.create({
 // Sub-component
 // ---------------------------------------------------------------------------
 
-const MetricCell: React.FC<{ label: string; value: string; unit?: string }> = ({
+const MetricCell: React.FC<{ label: string; value: string; testID?: string }> = ({
   label,
   value,
-  unit,
+  testID,
 }) => (
-  <View style={styles.metricCell} accessibilityLabel={`${label}: ${value}${unit ? ` ${unit}` : ''}`}>
+  <View style={styles.metricCell} testID={testID} accessibilityLabel={`${label}: ${value}`}>
     <Text style={styles.metricLabel}>{label}</Text>
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
-      <Text style={[textDataSm, { color: '#FFFFFF' }]}>{value}</Text>
-      {unit ? <Text style={[{ fontSize: 10, color: gray[400] }]}>{unit}</Text> : null}
-    </View>
+    <Text style={styles.metricValue}>{value}</Text>
   </View>
 );
 
@@ -548,38 +641,75 @@ const styles = StyleSheet.create({
     gap: space[2],
   },
   // -- Maneuver card (top) --
+  // Column container: the main row and the "Then" row each carry their own
+  // padding, and overflow:hidden clips the Then row's fill to the radius.
   maneuverCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
     borderRadius: radii.xl,
     backgroundColor: darkTheme.bgPrimary,
     borderWidth: 1,
     borderColor: darkTheme.borderDefault,
+    overflow: 'hidden',
+  },
+  maneuverMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
     paddingHorizontal: space[4],
-    paddingVertical: space[3],
+    paddingTop: space[4],
+    paddingBottom: space[3],
+  },
+  maneuverTextCol: {
+    flex: 1,
+    // minWidth 0 lets the long maneuver string shrink instead of pushing the
+    // distance column off the card in ro/es.
+    minWidth: 0,
   },
   maneuverDesc: {
-    flex: 1,
     fontFamily: fontFamily.heading.extraBold,
-    fontSize: 18,
+    fontSize: 27,
+    lineHeight: 30,
     color: '#FFFFFF',
   },
-  maneuverDivider: {
+  maneuverStreet: {
     ...textSm,
-    color: gray[500],
+    fontSize: 15,
+    // gray[300] is the token the contrast test already specifies for this
+    // pair (9.97:1 on bgPrimary) — do not swap it for textSecondary.
+    color: gray[300],
+    marginTop: 2,
   },
-  maneuverDist: {
-    ...textDataSm,
-    fontSize: 16,
-    color: gray[200],
+  maneuverDistCol: {
+    alignItems: 'flex-end',
+  },
+  maneuverDistValue: {
     fontFamily: fontFamily.mono.bold,
+    fontSize: 36,
+    lineHeight: 38,
+    color: '#FFFFFF',
   },
+  maneuverDistUnit: {
+    ...textXs,
+    fontSize: 13,
+    color: gray[400],
+  },
+  maneuverThen: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    backgroundColor: darkTheme.bgSecondary,
+    borderTopWidth: 1,
+    borderTopColor: darkTheme.borderStrong,
+    paddingHorizontal: space[4],
+    paddingVertical: space[2],
+  },
+  // Absolute so it stops competing with the distance for the end of the row.
   gpsIndicator: {
+    position: 'absolute',
+    top: space[2],
+    right: space[3],
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginLeft: space[1],
   },
   gpsDotInner: {
     width: 8,
@@ -641,29 +771,77 @@ const styles = StyleSheet.create({
     ...textXs,
     color: gray[400],
     textAlign: 'center',
-    paddingTop: 2,
+    borderTopWidth: 1,
+    borderTopColor: darkTheme.borderDefault,
+    paddingTop: space[2],
     paddingBottom: space[2],
   },
-  thenStripInline: {
+  footerMainBand: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[2],
-    borderBottomWidth: 1,
-    borderBottomColor: darkTheme.borderDefault,
-    backgroundColor: darkTheme.bgSecondary,
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
+    alignItems: 'stretch',
   },
-  thenStripStandalone: {
-    flexDirection: 'row',
+  // Full-bleed danger column. Spans the main band only — see FooterCard.
+  endRideColumn: {
+    width: 76,
+    // Explicit even though the parent stretches by default — this column
+    // filling the band is the whole visual idea, not an incidental result.
+    alignSelf: 'stretch',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: darkTheme.danger,
+    borderRightWidth: 1,
+    borderRightColor: darkTheme.borderDefault,
+  },
+  endRideColumnPressed: {
+    opacity: 0.75,
+  },
+  endRideGlyph: {
+    width: 26,
+    height: 26,
+    borderRadius: radii.sm,
+    backgroundColor: gray[50],
+  },
+  footerBody: {
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: space[3],
+    paddingTop: space[2],
+    paddingBottom: space[2],
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     gap: space[2],
-    borderRadius: radii.xl,
-    backgroundColor: darkTheme.bgPrimary,
-    borderWidth: 1,
-    borderColor: darkTheme.borderDefault,
-    paddingHorizontal: space[4],
-    paddingVertical: space[2],
+  },
+  heroTime: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+  },
+  heroValue: {
+    fontFamily: fontFamily.heading.bold,
+    fontSize: 26,
+    lineHeight: 28,
+    color: '#FFFFFF',
+  },
+  heroUnit: {
+    ...textXs,
+    color: gray[400],
+  },
+  heroSpeed: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+  },
+  speedValue: {
+    fontFamily: fontFamily.mono.bold,
+    fontSize: 20,
+    color: '#FFFFFF',
+  },
+  speedUnit: {
+    fontSize: 11,
+    color: gray[400],
   },
   thenPrefix: {
     fontFamily: fontFamily.body.bold,
@@ -679,8 +857,10 @@ const styles = StyleSheet.create({
   metricRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
+    marginTop: space[1],
+    paddingTop: space[1],
+    borderTopWidth: 1,
+    borderTopColor: darkTheme.borderDefault,
   },
   metricDivider: {
     width: 1,
@@ -691,13 +871,22 @@ const styles = StyleSheet.create({
   metricCell: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
   },
   metricLabel: {
     fontFamily: fontFamily.body.semiBold,
     fontSize: 10,
+    // Explicit: the default 1.4x leading is dead vertical space in a band
+    // the rider only glances at.
+    lineHeight: 12,
     textTransform: 'uppercase',
     letterSpacing: 1,
     color: gray[400],
+  },
+  metricValue: {
+    fontFamily: fontFamily.mono.semiBold,
+    fontSize: 16,
+    lineHeight: 18,
+    color: '#FFFFFF',
   },
 });
