@@ -401,6 +401,22 @@ export default () => ({
             LSItemContentTypes: ['com.topografix.gpx'],
           },
         ],
+        // Required whenever CFBundleDocumentTypes is declared — build 28 was
+        // accepted but warned ITMS-90737 for omitting it.
+        //
+        // FALSE is correct here, even though Apple's warning text calls YES
+        // "recommended". YES means the app opens the user's file IN PLACE:
+        // iOS hands over a security-scoped URL to the original, which may sit
+        // in iCloud Drive or another app's container, and the receiver must
+        // bracket every read in startAccessingSecurityScopedResource.
+        // `stageIncomingGpx` does no such thing — it immediately COPIES the
+        // file into our cache and drops the borrowed handle, which is also
+        // what the Android path needs. With YES that copy would fail on any
+        // file outside our sandbox and the import would surface as an
+        // unreadable file. FALSE makes iOS drop a copy in our Inbox, which is
+        // exactly the shape the existing code already expects, and matches
+        // CFBundleTypeRole: 'Viewer' — we read courses, we never edit them.
+        LSSupportsOpeningDocumentsInPlace: false,
         // Native Google Sign-In keys (GIDClientID + reversed-client-id URL
         // scheme), present only once the iOS OAuth client id is configured.
         ...iosGoogleSignInInfoPlist,
