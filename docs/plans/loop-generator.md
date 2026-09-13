@@ -277,6 +277,106 @@ fail the cap. What it rescues is the lollipop: a hand-checked one out of
 Rasnov (out to Bran, loop Moieciu-Simon, home; 58.0 km) reads 0.515
 whole-route but **0.063 on its ring**.
 
+## Placement — the loop was never getting out of the city (2026-09-13)
+
+Riders reported the generator as "it just circles my neighbourhood". It was
+doing exactly that, and the reason is arithmetic rather than a bug in any one
+function.
+
+**Measured against the live router first.** Sixty candidates, built with the
+real generator geometry and routed for real, across Bucharest, Cluj, Timisoara
+and Brasov:
+
+| Start | Ride | Shape | Furthest point | Average point |
+|---|---|---|---|---|
+| Bucharest | 20 km | ring | 1.7 km | 1.0 km |
+| Bucharest | 40 km | ring | 3.4 km | 1.8 km |
+| Bucharest | 40 km | lollipop | 7.6 km | 4.5 km |
+
+Bucharest's nearest edge is 9.8 km from Piata Unirii. **No shape at any
+distance the picker offered up to 40 km left the city.**
+
+Five causes, largest first:
+
+1. **Three of every five candidates were rings centred on the rider.** A closed
+   ring reaches only `target / (P x detour)`, about a tenth of the ride, so it
+   is geometrically incapable of leaving a city at any offered distance. Sixty
+   per cent of every search was spent on candidates that could not satisfy the
+   request.
+2. **The lollipop was sized for a small town.** `RING_CLEARANCE_FRACTION` is
+   0.14 capped at 8 km, tuned around Rasnov where the edge is 1-2 km out. In a
+   city it lands the loop inside the city.
+3. **Nothing in the stack knew what a city was.**
+4. **Ranking gave no credit for getting out.**
+5. **Convergence pulled the loop home.** A lollipop that came back too long had
+   its whole budget cut, and `ringClearanceMeters` was re-derived from the cut
+   budget — so fitting the distance quietly undid the placement.
+
+### The constraint that governs the whole feature
+
+Riding out to a point and back costs **1.74x** the straight-line distance on
+this profile (median of 160 routes, five cities, eight bearings, four
+distances). So every kilometre of clearance costs three and a half kilometres
+of the ride, and leaving Bucharest costs ~34 km before a single metre of loop.
+
+There is no geometry that avoids this. It is why the mode has to be able to say
+it cannot be done, and why `OUT_OF_TOWN_RING_SHARE` is 0.35: at the limit, 65%
+of the ride is the approach. Reserving less would answer "it circles my
+neighbourhood" with "it is not a loop at all".
+
+### What shipped
+
+A two-way control, `LoopPlacement`, defaulting to **out of town** — the fix
+reaches riders who never go looking for a setting, and around-here is one tap.
+
+- **Every out-of-town candidate is a lollipop** (`isLollipopSlot`). There is
+  deliberately no ring rescue at the last rung: handing a neighbourhood ring to
+  a rider who asked to leave town, without saying so, is the defect. With the
+  shape axis pinned, `loopWaypointCountForSlot` steps the ring size every slot
+  instead of every second one so a batch still spans both shapes.
+- **Clearance targets the real edge** (`planOutOfTown`), clamped by what the
+  ride can afford. The city edge comes from the Mapbox place box, resolved
+  **on the client** — the planner needs it to answer "will 40 km get me out of
+  Bucharest?" while the rider is still moving the slider, and a figure derived
+  on both sides is a figure that disagrees with itself. It is carried in the
+  request as `urbanEdgeMeters`.
+- **Clearance is held fixed while the ring converges**
+  (`lollipopWaypointsFromRing`), and the ring is fitted to whatever the budget
+  has left after the **measured** stem rather than the modelled one.
+- **The honest note.** When the distance cannot reach, the planner says so and
+  quotes a distance step that works. Judged against the boundary, though the
+  target aims a margin past it — folding the margin into the pass/fail test
+  made the app apologise for rides that measurably do get out.
+
+### Verified against the live router
+
+| City | Ride | Around here | Out of town | Clears town |
+|---|---|---|---|---|
+| Bucharest | 30 km | 3.9 km | 6.6 km | no, needs 60 km |
+| Bucharest | 60 km | 8.0 km | 13.4 km | yes |
+| Cluj | 60 km | 8.3 km | 12.6 km | yes |
+| Timisoara | 60 km | 8.8 km | 11.7 km | yes |
+| Brasov | 60 km | 10.4 km | 11.9 km | yes |
+
+Reach improves 1.4-1.7x, and the note agrees with the measurement in every row.
+
+### Two things to know before touching this
+
+**The place box is administrative, not the built-up area.** Rasnov's box is
+13.9 x 24.2 km because the commune owns the mountain behind it, while the town
+is barely 2 km across. The nearest-edge distance mitigates it and the
+affordability clamp usually binds first, but never present this number to a
+rider as a measurement.
+
+**The parity test caught one half of this and missed the other.** Every
+pre-existing scenario passed on the day placement was added, because they all
+leave it at `around_here` and that reproduces the old behaviour exactly. The
+first replacement test checked only the reach of finished loops and a
+deliberate break of the clearance half slipped straight through, because the
+fake router returns a circle sized from the total distance — reach measured off
+its geometry is a function of distance and says nothing about placement. The
+tests now read the REQUESTS. Both halves were mutation-checked.
+
 ## The sizing model, and how it was wrong for the feature's whole life
 
 Every constant below was MEASURED against the live safety profile, not

@@ -172,6 +172,12 @@ const buildBody = (request: LoopSearchRequest) => ({
   terrain: request.terrain,
   surface: request.surface,
   heading: request.heading,
+  placement: request.placement,
+  // Resolved on the device, not here and not on the server. The planner needs
+  // this number to answer "will 40 km get me out of Bucharest?" while the
+  // rider is still moving the slider, so it is looked up once and carried —
+  // a figure derived on both sides is a figure that disagrees with itself.
+  urbanEdgeMeters: request.urbanEdgeMeters,
   locale: request.locale,
 });
 

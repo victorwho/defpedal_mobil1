@@ -25,8 +25,10 @@ import {
   LOOP_DISTANCE_STEPS_METERS,
   loopSessionPeriodKey,
   loopSessionRemainingMs,
+  planOutOfTown,
   type Coordinate,
   type LoopHeading,
+  type LoopPlacement,
   type LoopSurface,
   type LoopTerrain,
 } from '@defensivepedal/core';
@@ -66,6 +68,7 @@ import {
   searchLoopsRemote,
 } from '../src/lib/loop-generator-remote';
 import { isLoopServerEnabled } from '../src/lib/loopServerFlag';
+import { reverseGeocodeUrbanEdgeMeters } from '../src/lib/mapbox-search';
 import { useQuery } from '@tanstack/react-query';
 
 import { mobileApi } from '../src/lib/api';
@@ -83,6 +86,7 @@ import { useAppStore } from '../src/store/appStore';
 const TERRAINS: LoopTerrain[] = ['flat', 'rolling', 'hilly'];
 const SURFACES: LoopSurface[] = ['paved', 'any', 'offroad'];
 const HEADINGS: LoopHeading[] = ['any', 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const PLACEMENTS: LoopPlacement[] = ['out_of_town', 'around_here'];
 
 
 
@@ -127,10 +131,13 @@ const LOOP_FRAME_PADDING = { top: 96, bottom: 168, left: 32, right: 32 };
 const loopSearchBounds = (
   start: Coordinate,
   targetDistanceMeters: number,
+  placement: LoopPlacement,
+  urbanEdgeMeters: number | null,
 ): { ne: readonly [number, number]; sw: readonly [number, number] } => {
   const reach = Math.max(
     250,
-    loopSearchExtentMeters(targetDistanceMeters) * LOOP_FRAME_MARGIN,
+    loopSearchExtentMeters(targetDistanceMeters, placement, urbanEdgeMeters) *
+      LOOP_FRAME_MARGIN,
   );
   const north = destinationPoint(start, 0, reach);
   const east = destinationPoint(start, 90, reach);
@@ -181,6 +188,17 @@ export default function LoopPlannerScreen() {
   const [distanceIndex, setDistanceIndex] = useState(2); // 15 km
   const [terrain, setTerrain] = useState<LoopTerrain>('rolling');
   const [heading, setHeading] = useState<LoopHeading>('any');
+  /**
+   * Where the loop happens, defaulting to out of town.
+   *
+   * Out of town is the default because a ring centred on the rider cannot
+   * leave a city at any distance this picker offers — measured against the
+   * live router, a 20 km ring from central Bucharest never gets further than
+   * 1.7 km from the start. Riders reported that as "it just circles my
+   * neighbourhood". Defaulting to `around_here` would leave the fix sitting
+   * behind a control nobody goes looking for, and around-here is one tap away.
+   */
+  const [placement, setPlacement] = useState<LoopPlacement>('out_of_town');
   const [customStart, setCustomStart] = useState<Coordinate | null>(null);
   const [pickingStart, setPickingStart] = useState(false);
 
@@ -294,6 +312,9 @@ export default function LoopPlannerScreen() {
           coordinates: [],
           bearingDegrees: 0,
           distanceMeters: stored.route.distanceMeters,
+          // Not recorded when the loop was saved, and not worth re-deriving:
+          // the reach figure only ever labels a fresh search result.
+          maxReachMeters: 0,
           climbMeters: stored.route.totalClimbMeters,
           highRiskMeters: 0,
           unpavedShare: 0,
@@ -325,6 +346,55 @@ export default function LoopPlannerScreen() {
   const targetDistanceMeters = LOOP_DISTANCE_STEPS_METERS[distanceIndex]!;
 
   /**
+   * How far this rider must ride to be out of town, or null when we never
+   * found out.
+   *
+   * Looked up once per start point rather than per search, because the hint
+   * under the distance picker has to be right BEFORE the rider searches —
+   * "40 km will not leave Bucharest" is only useful while they can still
+   * change their mind. Resolved here and carried into the request so the
+   * generator and this screen can never disagree about it.
+   *
+   * Failure is silent and ordinary: null simply means the clearance falls back
+   * to a fraction of the ride, which is blind but never wrong-headed.
+   */
+  const [urbanEdgeMeters, setUrbanEdgeMeters] = useState<number | null>(null);
+  useEffect(() => {
+    if (!start) return;
+    let cancelled = false;
+    void reverseGeocodeUrbanEdgeMeters(start.lat, start.lon).then((edge) => {
+      if (!cancelled) setUrbanEdgeMeters(edge);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [start?.lat, start?.lon]);
+
+  /**
+   * What an out-of-town request can actually be given at this distance.
+   *
+   * The arithmetic is unforgiving: riding out and back costs 3.5x the
+   * straight-line distance, so leaving a city whose edge is 10 km away costs
+   * 35 km before a single metre of loop. When the chosen distance cannot reach,
+   * the rider is told which one would rather than handed a city loop in
+   * silence.
+   */
+  const outOfTown = useMemo(
+    () => planOutOfTown(targetDistanceMeters, urbanEdgeMeters),
+    [targetDistanceMeters, urbanEdgeMeters],
+  );
+
+  /** The distance step that would clear town, or null when none is needed. */
+  const minimumOutOfTownStep = useMemo(() => {
+    if (outOfTown.minimumRideMeters === null) return null;
+    return (
+      LOOP_DISTANCE_STEPS_METERS.find(
+        (step) => step >= outOfTown.minimumRideMeters!,
+      ) ?? null
+    );
+  }, [outOfTown.minimumRideMeters]);
+
+  /**
    * Bumped whenever the thing the camera should be looking at changes.
    *
    * `focusCoordinate` alone is not enough: the camera is keyed on its centre,
@@ -335,7 +405,10 @@ export default function LoopPlannerScreen() {
   const [focusKey, setFocusKey] = useState(0);
   useEffect(() => {
     if (start) setFocusKey((n) => n + 1);
-  }, [start?.lat, start?.lon, targetDistanceMeters]);
+    // Placement and the city edge both move the frame as much as distance
+    // does, and the camera is keyed on this — without them the map keeps an
+    // around-here box while out-of-town loops draw outside it.
+  }, [start?.lat, start?.lon, targetDistanceMeters, placement, urbanEdgeMeters]);
 
   /**
    * Coverage is structural, not cosmetic. A loop needs `exclude=unpaved`,
@@ -399,6 +472,8 @@ export default function LoopPlannerScreen() {
       terrain,
       surface,
       heading,
+      placement,
+      urbanEdgeMeters,
       locale,
     };
     const searchCallbacks = {
@@ -722,7 +797,14 @@ export default function LoopPlannerScreen() {
             focusCoordinate={start ?? null}
             focusKey={focusKey}
             focusBounds={
-              start ? loopSearchBounds(start, targetDistanceMeters) : null
+              start
+                ? loopSearchBounds(
+                    start,
+                    targetDistanceMeters,
+                    placement,
+                    urbanEdgeMeters,
+                  )
+                : null
             }
             focusBoundsPadding={LOOP_FRAME_PADDING}
             onMapTap={
@@ -912,6 +994,54 @@ export default function LoopPlannerScreen() {
             ),
           })}
         </Text>
+      </View>
+
+      <View style={styles.control}>
+        <Text style={styles.controlLabel}>{t('loop.placementLabel')}</Text>
+        <View style={styles.pills}>
+          {PLACEMENTS.map((value) => (
+            <PressableScale
+              key={value}
+              onPress={() => setPlacement(value)}
+              style={[styles.pill, value === placement && styles.pillOn]}
+              accessibilityState={{ selected: value === placement }}
+            >
+              <Text
+                style={[
+                  styles.pillText,
+                  value === placement && styles.pillTextOn,
+                ]}
+              >
+                {value === 'out_of_town'
+                  ? t('loop.placementOutOfTown')
+                  : t('loop.placementAroundHere')}
+              </Text>
+            </PressableScale>
+          ))}
+        </View>
+        {/*
+          The honest note. It only ever appears when we actually looked up
+          where town ends AND found this distance cannot reach it, and it
+          quotes a real distance step rather than a vague "try further" —
+          handing back a city loop in silence is the bug this mode exists to
+          fix, and a hint that cannot be acted on is barely better.
+
+          The second branch is NOT the "we don't know" case, which shows no
+          note at all: `clearsTown` is only false once we have looked town up.
+          It is the rider so far inside a very large city that no distance on
+          the picker reaches the edge — roughly 17.5 km of city, which Berlin
+          and Madrid can produce. Telling them to ride further would be advice
+          they cannot take.
+        */}
+        {placement === 'out_of_town' && outOfTown.clearsTown === false ? (
+          <Text style={styles.hint}>
+            {minimumOutOfTownStep === null
+              ? t('loop.placementNoStepClears')
+              : t('loop.placementTooShort', {
+                  km: String(minimumOutOfTownStep / 1000),
+                })}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.control}>
@@ -1182,6 +1312,22 @@ export default function LoopPlannerScreen() {
                     </View>
                   </View>
 
+                  {/*
+                    How far the ride actually gets from the start.
+                    
+                    Shown because it is the ONLY figure that distinguishes the
+                    two placements on a card — a 40 km loop that reaches 3.8 km
+                    out and one that reaches 7.6 km out look the same on a
+                    zoomed-out map, and the difference between them is the
+                    whole reason the control exists. Suppressed for a restored
+                    saved loop, whose reach was never recorded.
+                  */}
+                  {loop.maxReachMeters > 0 ? (
+                    <Text style={styles.reach}>
+                      {t('loop.reach', { km: km(loop.maxReachMeters) })}
+                    </Text>
+                  ) : null}
+
                   {isSelected ? (
                     <View style={styles.detail}>
                       {/*
@@ -1391,6 +1537,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textMuted,
       fontSize: 13,
       marginTop: space[2],
+    },
+    reach: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: space[1],
     },
     headingRowScroll: {
       flexDirection: 'row',

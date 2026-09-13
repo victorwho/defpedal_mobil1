@@ -17,7 +17,11 @@ import type {
   ReverseGeocodeResponse,
   SuggestionFeatureType,
 } from '@defensivepedal/core';
-import { SUPPORTED_APP_COUNTRIES } from '@defensivepedal/core';
+import {
+  distanceToPlaceEdgeMeters,
+  MIN_MEANINGFUL_EDGE_METERS,
+  SUPPORTED_APP_COUNTRIES,
+} from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
 
@@ -140,6 +144,8 @@ interface MapboxGeocodeContext {
 }
 
 interface MapboxGeocodeProperties {
+  /** Present on `place` features: [west, south, east, north] in degrees. */
+  bbox?: [number, number, number, number];
   mapbox_id: string;
   name?: string;
   name_preferred?: string;
@@ -623,6 +629,72 @@ export const reverseGeocodeLocality = async (
     const feature = data.features?.[0];
 
     return feature?.properties.name ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * How far this rider must travel to leave the place they are standing in.
+ *
+ * Feeds the loop planner's out-of-town mode, which needs a real number rather
+ * than a fraction of the ride: leaving Bucharest costs about 34 km of riding
+ * before a single metre of loop exists, and the planner has to be able to say
+ * so while the rider is still moving the distance slider.
+ *
+ * Returns null generously — no place match, a box too small to be worth
+ * escaping, a rider already outside it, or any failure at all. Null is an
+ * ordinary answer here and every caller falls back to a fraction of the ride,
+ * so this never needs to guess and never should.
+ *
+ * ⚠ The box a geocoder returns is an ADMINISTRATIVE boundary, not the edge of
+ * the built-up area. They diverge most for small communes — Râșnov's box is
+ * 13.9 x 24.2 km because the commune owns the mountain behind it, while the
+ * town is barely 2 km across. So this is a hint, never a measurement shown to
+ * a rider, and the clearance it produces is always clamped by what the ride
+ * can afford.
+ */
+export const reverseGeocodeUrbanEdgeMeters = async (
+  lat: number,
+  lon: number,
+): Promise<number | null> => {
+  try {
+    // Inside the try, unlike its neighbours above: this one is called from an
+    // effect that does not await it, so a throw would surface as an unhandled
+    // rejection rather than as a caught failure. It is total on purpose.
+    const params = new URLSearchParams({
+      longitude: String(lon),
+      latitude: String(lat),
+      access_token: ensureMapboxToken(),
+      types: 'place',
+      limit: '1',
+    });
+
+    const response = await fetchWithTimeout(
+      `${MAPBOX_GEOCODING_BASE}/reverse?${params.toString()}`,
+    );
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const bbox = data.features?.[0]?.properties?.bbox;
+    if (!bbox || bbox.length < 4) return null;
+
+    const [west, south, east, north] = bbox;
+    if (
+      !Number.isFinite(west) ||
+      !Number.isFinite(south) ||
+      !Number.isFinite(east) ||
+      !Number.isFinite(north)
+    ) {
+      return null;
+    }
+
+    const edge = distanceToPlaceEdgeMeters(
+      { lat, lon },
+      { west: west!, south: south!, east: east!, north: north! },
+    );
+
+    return edge >= MIN_MEANINGFUL_EDGE_METERS ? edge : null;
   } catch {
     return null;
   }

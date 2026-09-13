@@ -32,9 +32,11 @@ import {
   isRouteSupported,
   LOOP_DISTANCE_STEPS_METERS,
   LOOP_HEADINGS,
+  LOOP_PLACEMENTS,
   type ErrorResponse,
   type GeneratedLoop,
   type LoopHeading,
+  type LoopPlacement,
   type LoopSearchRequest,
   type LoopStreamFrame,
   type LoopSurface,
@@ -55,6 +57,16 @@ const TERRAINS: readonly LoopTerrain[] = ['flat', 'rolling', 'hilly'];
 const SURFACES: readonly LoopSurface[] = ['paved', 'any', 'offroad'];
 
 /**
+ * Ceiling on the urban-edge hint the client may send.
+ *
+ * The client resolves it, so it is untrusted input. A value larger than the
+ * longest ride we accept could only push the loop somewhere the budget can
+ * never reach, and the clearance planner clamps it anyway — this just keeps an
+ * absurd number out of the arithmetic.
+ */
+const MAX_URBAN_EDGE_METERS = 100_000;
+
+/**
  * Bounds on the requested length.
  *
  * Taken from the picker's own steps rather than invented here, so the endpoint
@@ -73,6 +85,8 @@ interface LoopSearchBody {
   terrain: LoopTerrain;
   surface: LoopSurface;
   heading: LoopHeading;
+  placement?: LoopPlacement;
+  urbanEdgeMeters?: number | null;
   locale?: string;
 }
 
@@ -98,6 +112,14 @@ const loopSearchBodySchema = {
     terrain: { type: 'string' as const, enum: [...TERRAINS] },
     surface: { type: 'string' as const, enum: [...SURFACES] },
     heading: { type: 'string' as const, enum: [...LOOP_HEADINGS] },
+    // Optional so an older client, which knows nothing of placement, still
+    // gets the behaviour it was built against rather than a 400.
+    placement: { type: 'string' as const, enum: [...LOOP_PLACEMENTS] },
+    urbanEdgeMeters: {
+      type: ['number', 'null'] as const,
+      minimum: 0,
+      maximum: MAX_URBAN_EDGE_METERS,
+    },
     locale: { type: 'string' as const, maxLength: 12 },
   },
 };
@@ -260,6 +282,12 @@ export const buildLoopRoutes =
           terrain: body.terrain,
           surface: body.surface,
           heading: body.heading,
+          // An older client sends neither field. It gets the behaviour it was
+          // built and tested against — a mixed batch of rings and lollipops
+          // sized as a fraction of the ride — rather than a new shape it has
+          // no control for and its rider never asked for.
+          placement: body.placement ?? 'around_here',
+          urbanEdgeMeters: body.urbanEdgeMeters ?? null,
           locale: body.locale ?? 'en',
         };
 
@@ -323,6 +351,11 @@ export const buildLoopRoutes =
               terrain: body.terrain,
               surface: body.surface,
               heading: body.heading,
+              placement: searchRequest.placement,
+              urbanEdgeKm:
+                searchRequest.urbanEdgeMeters === null
+                  ? null
+                  : Math.round(searchRequest.urbanEdgeMeters / 1000),
               loops: outcome.status === 'ok' ? outcome.loops.length : 0,
               relaxation: outcome.status === 'ok' ? outcome.relaxation : null,
               checked: outcome.status === 'ok' ? outcome.checked : 0,

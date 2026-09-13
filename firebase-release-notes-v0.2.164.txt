@@ -1,0 +1,63 @@
+v0.2.164 (167) — Loops now get you OUT of town
+
+WHAT CHANGED
+Loop generation had a real geometry problem: from a city centre it could not
+leave the city at any distance the picker offered. Measured against the live
+router, a 20 km loop from central Bucharest never got further than 1.7 km from
+the start, and a 40 km one never further than 3.8 km. Bucharest's edge is about
+9.8 km out.
+
+There is now a "Where" control on the loop planner with two options:
+
+  * Out of town (the new default) — rides out, loops out there, comes home
+  * Around here — the old behaviour, a loop that rings your start
+
+Measured improvement in reach, live router:
+
+  Bucharest 30 km    3.9 km  ->   6.6 km
+  Bucharest 60 km    8.0 km  ->  13.4 km
+  Cluj      60 km    8.3 km  ->  12.6 km
+  Brasov    60 km   10.4 km  ->  11.9 km
+
+Each result card now also says how far out that loop actually gets.
+
+WHAT TO TEST
+
+1. Loop planner > Where. Confirm "Out of town" is selected by default and that
+   tapping between the two pills re-runs the search.
+
+2. From a city centre, generate a 30 km and a 60 km out-of-town loop. The loops
+   should visibly head away from town before looping, not circle your
+   neighbourhood. Check the map frames the whole loop rather than cropping it.
+
+3. Switch to "Around here" at the same distance. Loops should stay close to the
+   start, as before. This is the old behaviour and should be unchanged.
+
+4. THE HONEST NOTE. Set "Out of town" and pick a short distance (20 or 30 km)
+   while starting well inside a city. A line should appear under the pills
+   naming the shortest distance that actually gets you out, e.g. "60 km is the
+   shortest ride that gets you out of town from here." Then pick that distance
+   and confirm the note disappears. The note should NEVER appear when you are
+   already outside a town.
+
+5. Read the "Gets N km out" line on each result and sanity-check it against the
+   map.
+
+6. Regression: saved loops still open, riding a loop still works, and
+   auto-reroute is still suppressed mid-ride.
+
+KNOWN LIMITS, DELIBERATE
+
+* Getting out of town is expensive. Riding out and back costs about 3.5x the
+  straight-line distance, so short rides genuinely cannot leave a big city.
+  That is why the note exists rather than a silent city loop.
+
+* The city boundary comes from the map provider and is an ADMINISTRATIVE
+  boundary, not where the houses stop. For small communes that own surrounding
+  countryside (Rasnov, Sibiu) it reads larger than the town really is.
+
+* Out-of-town searches may come back empty more often than before, because
+  every candidate now has to close a loop out where the road network is
+  thinner. If that happens, tell me where and at what distance.
+
+NOT device-tested before this build. This is the first run on a phone.

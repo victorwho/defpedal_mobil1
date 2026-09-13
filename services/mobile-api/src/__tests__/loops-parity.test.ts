@@ -311,6 +311,37 @@ const SCENARIOS: {
       terrain: 'rolling',
       surface: 'any',
       heading: 'any',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
+    },
+  },
+  {
+    // The placement axis. Every candidate here is a lollipop, which changes
+    // both the waypoint geometry and the stem exemption the caps read, so the
+    // two implementations have the most to disagree about.
+    name: 'an out-of-town search with a known city edge',
+    router: { detour: 2.11, ringRetracedShare: 0.05, spurShare: 0 },
+    request: {
+      targetDistanceMeters: 60_000,
+      terrain: 'rolling',
+      surface: 'any',
+      heading: 'any',
+      placement: 'out_of_town',
+      urbanEdgeMeters: 7_200,
+    },
+  },
+  {
+    // The blind path: no geocode, so clearance falls back to the affordable
+    // maximum. It is a different number on both sides or it is a bug.
+    name: 'an out-of-town search with no city edge',
+    router: { detour: 2.6, ringRetracedShare: 0.05, spurShare: 0 },
+    request: {
+      targetDistanceMeters: 40_000,
+      terrain: 'rolling',
+      surface: 'any',
+      heading: 'E',
+      placement: 'out_of_town',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -321,6 +352,8 @@ const SCENARIOS: {
       terrain: 'rolling',
       surface: 'any',
       heading: 'E',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -331,6 +364,8 @@ const SCENARIOS: {
       terrain: 'flat',
       surface: 'any',
       heading: 'N',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -341,6 +376,8 @@ const SCENARIOS: {
       terrain: 'rolling',
       surface: 'any',
       heading: 'any',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -351,6 +388,8 @@ const SCENARIOS: {
       terrain: 'hilly',
       surface: 'offroad',
       heading: 'SW',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -372,6 +411,8 @@ const SCENARIOS: {
       terrain: 'rolling',
       surface: 'any',
       heading: 'NE',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
   {
@@ -382,6 +423,8 @@ const SCENARIOS: {
       terrain: 'rolling',
       surface: 'paved',
       heading: 'NW',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
     },
   },
 ];
@@ -434,6 +477,8 @@ describe('server and on-device loop generation agree', () => {
       terrain: 'rolling',
       surface: 'any',
       heading: 'any',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
       locale: 'en',
     };
 
@@ -469,6 +514,8 @@ describe('server and on-device loop generation agree', () => {
       terrain: 'rolling',
       surface: 'any',
       heading: 'any',
+      placement: 'around_here',
+      urbanEdgeMeters: null,
       locale: 'en',
     };
 
@@ -493,5 +540,111 @@ describe('server and on-device loop generation agree', () => {
     // draw onto the map, so an order difference is visible even when the final
     // five are identical.
     expect(serverDrawn).toEqual(deviceDrawn);
+  });
+
+  /**
+   * Guards against the quietest possible failure of this feature: both sides
+   * accepting `placement` and neither acting on it.
+   *
+   * Every existing scenario passed on the day placement was added, because
+   * they all leave it at `around_here` and that reproduces the old behaviour
+   * exactly. That is the right default and a useless test — a field carried
+   * from the screen to the router and then ignored looks identical to a
+   * working one from the outside.
+   *
+   * Both halves of the fix are asserted separately, because an earlier version
+   * of this test checked only the reach of the finished loops and a deliberate
+   * break of the clearance half slipped straight through it: the fake router
+   * returns a circle sized from the total distance, so reach measured off its
+   * geometry is a function of distance and tells you nothing about where the
+   * loop was actually placed. These read the REQUESTS instead.
+   */
+  const runPlacement = async (
+    placement: 'out_of_town' | 'around_here',
+    overrides: { targetDistanceMeters: number; urbanEdgeMeters: number | null },
+  ) => {
+    fakeRouter = createDeterministicRouter({
+      detour: 2.11,
+      ringRetracedShare: 0.05,
+      spurShare: 0,
+    });
+
+    /** Straight-line distance from the start to each ring's first waypoint. */
+    const anchorMeters: number[] = [];
+    const fetchRing = async (
+      start: Coordinate,
+      waypoints: readonly Coordinate[],
+      options: Record<string, unknown>,
+    ) => {
+      const first = waypoints[0]!;
+      anchorMeters.push(
+        haversineDistance([start.lat, start.lon], [first.lat, first.lon]),
+      );
+      return fakeRouter.fetchRing(start, waypoints, options);
+    };
+
+    const outcome = await searchLoopsOnServer(
+      { fetchRing: fetchRing as never, measure: serverMeasurementPort().measure },
+      {
+        start: START,
+        terrain: 'rolling',
+        surface: 'any',
+        heading: 'any',
+        locale: 'en',
+        placement,
+        ...overrides,
+      },
+    );
+
+    return { outcome, anchorMeters, calls: fakeRouter.calls };
+  };
+
+  it('makes every out-of-town candidate ride out first', async () => {
+    const out = await runPlacement('out_of_town', {
+      targetDistanceMeters: 60_000,
+      urbanEdgeMeters: 7_200,
+    });
+    const around = await runPlacement('around_here', {
+      targetDistanceMeters: 60_000,
+      urbanEdgeMeters: 7_200,
+    });
+
+    // A ring centred on the rider cannot leave a city at any offered distance,
+    // so out-of-town spends none of its budget on one.
+    expect(out.calls.every((call) => call.stemLegs > 0)).toBe(true);
+    expect(around.calls.some((call) => call.stemLegs === 0)).toBe(true);
+  });
+
+  it('puts the loop much further out when town is unknown', async () => {
+    // The blind path, and the one where the two clearances differ most: the
+    // old fraction capped out at 8 km however long the ride, where the
+    // affordable maximum on a 100 km ride is over 17 km.
+    const out = await runPlacement('out_of_town', {
+      targetDistanceMeters: 100_000,
+      urbanEdgeMeters: null,
+    });
+    const around = await runPlacement('around_here', {
+      targetDistanceMeters: 100_000,
+      urbanEdgeMeters: null,
+    });
+
+    expect(Math.max(...out.anchorMeters)).toBeGreaterThan(
+      Math.max(...around.anchorMeters) * 1.3,
+    );
+  });
+
+  it('holds the clearance steady while the ring is resized', async () => {
+    // Convergence used to scale the whole stem-plus-ring budget and re-derive
+    // clearance from it, so a lollipop that came back long had its loop walked
+    // back towards the rider's house. Every attempt on one bearing should now
+    // agree about how far out the loop sits, to within the ring radius.
+    const out = await runPlacement('out_of_town', {
+      targetDistanceMeters: 60_000,
+      urbanEdgeMeters: 7_200,
+    });
+
+    const spread =
+      Math.max(...out.anchorMeters) - Math.min(...out.anchorMeters);
+    expect(spread).toBeLessThan(4_000);
   });
 });

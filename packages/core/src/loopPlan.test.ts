@@ -16,11 +16,13 @@ import {
   highRiskMeters,
   initialRingRadiusMeters,
   isDegenerateLoop,
+  isLollipopSlot,
   isOutAndBack,
   isRingOutAndBack,
   LOLLIPOP_STEM_LEGS,
   lollipopRingSizing,
   lollipopWaypoints,
+  lollipopWaypointsFromRing,
   LOOP_CANDIDATE_COUNT,
   LOOP_DISTANCE_STEPS_METERS,
   LOOP_HEADINGS,
@@ -28,16 +30,23 @@ import {
   loopBearings,
   loopRoundness,
   loopSearchExtentMeters,
+  loopWaypointCountForSlot,
   matchesTerrain,
   MAX_LOOP_ROUNDNESS,
   MAX_RETRACE_SHARE,
   MAX_RING_CLEARANCE_METERS,
   MAX_SPUR_SHARE,
+  maxOutOfTownClearanceMeters,
+  maxReachMeters,
   MIN_RING_CLEARANCE_METERS,
   MIN_SPUR_METERS,
   nextRelaxation,
   nextRingRadiusMeters,
   normalizeBearing,
+  OUT_OF_TOWN_MARGIN_METERS,
+  OUT_OF_TOWN_RING_SHARE,
+  placementClearanceMeters,
+  planOutOfTown,
   prefersUnpaved,
   rankCandidates,
   RETRACE_CEILING,
@@ -66,6 +75,8 @@ import {
   STEM_DETOUR_FACTOR,
   terrainAppliesAt,
   terrainDistance,
+  type AnnotatedLeg,
+  type LoopCandidate,
   unpavedMeters,
   unpavedShare,
   usesFlatProfile,
@@ -73,8 +84,6 @@ import {
   withinRetraceCap,
   withinRetraceCeiling,
   withinSpurCap,
-  type AnnotatedLeg,
-  type LoopCandidate,
 } from './loopPlan';
 
 const BUCHAREST: Coordinate = { lat: 44.4268, lon: 26.1025 };
@@ -91,6 +100,7 @@ const candidate = (over: Partial<LoopCandidate> = {}): LoopCandidate => ({
   spurShare: 0,
   stemMeters: 0,
   scenicScore: 0,
+  maxReachMeters: 2_000,
   relaxation: 'none',
   ...over,
 });
@@ -1703,5 +1713,298 @@ describe('lollipopRingSizing', () => {
       expect(radiusMeters).toBeGreaterThanOrEqual(0);
       expect(clearanceMeters).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Placement - getting the loop out of town
+// ---------------------------------------------------------------------------
+
+/**
+ * Bucharest's nearest edge from Piata Unirii, measured off the box Mapbox
+ * returns. Every figure in this block is about a real rider in a real city,
+ * because the bug this feature fixes was only ever visible at city scale.
+ */
+const BUCHAREST_EDGE_METERS = 9_800;
+
+describe('a ring centred on the rider cannot leave a city', () => {
+  /**
+   * The measurement that justifies the whole placement control, pinned so it
+   * cannot quietly stop being true. Road distance runs 2.1-2.5x the ideal
+   * polygon perimeter, so a closed ring reaches only about a tenth of the
+   * ride. Confirmed against the live router: a 20 km ring from central
+   * Bucharest never got further than 1.7 km from the start and a 40 km one
+   * never further than 3.8 km, against a city edge 9.8 km out.
+   */
+  it('reaches roughly a tenth of the ride, at every offered distance', () => {
+    for (const target of [20_000, 30_000, 40_000]) {
+      expect(initialRingRadiusMeters(target, 3)).toBeLessThan(target / 9);
+    }
+  });
+
+  it('cannot clear Bucharest even at 40 km', () => {
+    expect(initialRingRadiusMeters(40_000, 3)).toBeLessThan(
+      BUCHAREST_EDGE_METERS,
+    );
+  });
+});
+
+describe('planOutOfTown', () => {
+  it('targets the real edge plus a margin when the ride can afford it', () => {
+    // Cluj, Timisoara and Brasov all sit around 7 km from their nearest edge,
+    // which a 60 km ride clears comfortably.
+    const plan = planOutOfTown(60_000, 7_200);
+
+    expect(plan.clearsTown).toBe(true);
+    expect(plan.minimumRideMeters).toBeNull();
+    expect(plan.clearanceMeters).toBeCloseTo(
+      7_200 + OUT_OF_TOWN_MARGIN_METERS,
+      6,
+    );
+  });
+
+  it('is honest that the biggest cities need a long ride', () => {
+    // Not a shortcoming to tune away: riding out and back costs 3.5x the
+    // straight line, so a rider in Piata Unirii genuinely cannot leave
+    // Bucharest and loop on 40 km. Softening the ring share to make that pass
+    // would buy the claim by shipping a ride that is mostly out-and-back.
+    expect(planOutOfTown(40_000, BUCHAREST_EDGE_METERS).clearsTown).toBe(false);
+    // 60 km does it, and the live router agrees: the loop's near edge lands
+    // 10.5 km out and its far side 13.4 km out, against a 9.8 km city edge.
+    expect(planOutOfTown(60_000, BUCHAREST_EDGE_METERS).clearsTown).toBe(true);
+  });
+
+  it('says so, with a usable distance, when the ride cannot reach', () => {
+    const plan = planOutOfTown(30_000, BUCHAREST_EDGE_METERS);
+
+    // The honest note. Handing back a city loop in silence is the defect.
+    expect(plan.clearsTown).toBe(false);
+    expect(plan.minimumRideMeters).not.toBeNull();
+    // Riding out and back costs about 3.5x the straight line, so clearing an
+    // edge 9.8 km away needs a ride in the fifties, not the thirties.
+    expect(plan.minimumRideMeters!).toBeGreaterThan(45_000);
+    expect(plan.minimumRideMeters!).toBeLessThan(70_000);
+  });
+
+  it('quotes a distance that actually works', () => {
+    const plan = planOutOfTown(30_000, BUCHAREST_EDGE_METERS);
+    const retry = planOutOfTown(plan.minimumRideMeters!, BUCHAREST_EDGE_METERS);
+
+    // A hint the rider cannot act on is barely better than no hint.
+    expect(retry.clearsTown).toBe(true);
+  });
+
+  it('never claims to know where town ends when it does not', () => {
+    const plan = planOutOfTown(40_000, null);
+
+    expect(plan.clearsTown).toBeNull();
+    expect(plan.minimumRideMeters).toBeNull();
+    // Blind, but it still spends the whole allowance on getting out rather
+    // than falling back to the in-town fraction.
+    expect(plan.clearanceMeters).toBeCloseTo(
+      maxOutOfTownClearanceMeters(40_000),
+      6,
+    );
+  });
+
+  it('keeps enough of the ride for the loop to still be a loop', () => {
+    for (const target of [15_000, 30_000, 60_000, 100_000]) {
+      const plan = planOutOfTown(target, 50_000);
+      const stemCost = 2 * plan.clearanceMeters * STEM_DETOUR_FACTOR;
+      // Fixing "it circles my neighbourhood" by shipping "it is not a loop at
+      // all" would not be a fix.
+      expect(stemCost).toBeLessThanOrEqual(
+        target * (1 - OUT_OF_TOWN_RING_SHARE) + 1,
+      );
+    }
+  });
+
+  it('falls back to the ordinary clearance on a ride too short to escape', () => {
+    // Below roughly 11.5 km the affordable clearance drops under the minimum,
+    // and the ring left over would be too small to land on real roads.
+    const plan = planOutOfTown(10_000, BUCHAREST_EDGE_METERS);
+
+    expect(plan.clearanceMeters).toBeCloseTo(ringClearanceMeters(10_000), 6);
+    expect(plan.clearsTown).toBe(false);
+    expect(plan.minimumRideMeters).not.toBeNull();
+  });
+});
+
+describe('placementClearanceMeters', () => {
+  it('leaves around_here exactly as it was', () => {
+    for (const target of [10_000, 30_000, 100_000]) {
+      expect(
+        placementClearanceMeters('around_here', target, BUCHAREST_EDGE_METERS),
+      ).toBe(ringClearanceMeters(target));
+    }
+  });
+
+  it('pushes an out-of-town loop much further out than the old fraction', () => {
+    // The old behaviour capped clearance at 8 km however long the ride, which
+    // is why a 60 km loop still happened inside the city.
+    expect(
+      placementClearanceMeters('out_of_town', 60_000, BUCHAREST_EDGE_METERS),
+    ).toBeGreaterThan(ringClearanceMeters(60_000));
+  });
+});
+
+describe('batch shape', () => {
+  it('makes every out-of-town candidate a lollipop', () => {
+    // A ring centred on the rider cannot satisfy the request at any distance,
+    // so sampling one spends an OSRM call on a candidate that cannot win.
+    expect(
+      [0, 1, 2, 3, 4].every((slot) => isLollipopSlot('out_of_town', slot)),
+    ).toBe(true);
+  });
+
+  it('still samples both ring sizes when the shape axis is pinned', () => {
+    const counts = new Set(
+      [0, 1, 2, 3, 4].map((slot) =>
+        loopWaypointCountForSlot('out_of_town', slot),
+      ),
+    );
+
+    expect(counts.size).toBe(2);
+  });
+
+  it('keeps all four combinations for around_here', () => {
+    const seen = new Set([0, 1, 2, 3].map((slot) => `${isLollipopSlot('around_here', slot)}:${loopWaypointCountForSlot('around_here', slot)}`));
+
+    // Deriving both axes from one parity is what shipped once, and it made
+    // every lollipop a hexagon and every plain ring a triangle.
+    expect(seen.size).toBe(4);
+  });
+});
+
+describe('lollipopWaypointsFromRing', () => {
+  const loopStart: Coordinate = { lat: 44.4268, lon: 26.1025 };
+  const nearEdgeMeters = (radius: number, clearance: number): number => {
+    const anchor = lollipopWaypointsFromRing(
+      loopStart,
+      90,
+      radius,
+      clearance,
+      3,
+    )[0]!;
+    return (
+      haversineDistance(
+        [loopStart.lat, loopStart.lon],
+        [anchor.lat, anchor.lon],
+      ) - radius
+    );
+  };
+
+  it('holds the ring clear of the start by exactly the clearance', () => {
+    expect(nearEdgeMeters(1_200, 8_000)).toBeCloseTo(8_000, -1);
+  });
+
+  it('does not move the loop homeward when the ring is resized', () => {
+    // The defect this shape replaced: convergence scaled the whole budget and
+    // re-derived clearance from it, so fitting the distance walked the loop
+    // back towards the rider's own street.
+    expect(nearEdgeMeters(600, 8_000)).toBeCloseTo(
+      nearEdgeMeters(2_400, 8_000),
+      -1,
+    );
+  });
+});
+
+describe('maxReachMeters', () => {
+  const loopStart: Coordinate = { lat: 44.4268, lon: 26.1025 };
+
+  it('reports the furthest point, not the average or the last', () => {
+    const far = destinationPoint(loopStart, 90, 5_000);
+    const near = destinationPoint(loopStart, 90, 1_000);
+
+    expect(
+      maxReachMeters(loopStart, [
+        [near.lon, near.lat],
+        [far.lon, far.lat],
+        [near.lon, near.lat],
+      ]),
+    ).toBeCloseTo(5_000, -2);
+  });
+
+  it('is 0 for an empty route rather than NaN or -Infinity', () => {
+    expect(maxReachMeters(loopStart, [])).toBe(0);
+  });
+});
+
+describe('loopSearchExtentMeters and placement', () => {
+  it('opens the frame wider for an out-of-town search', () => {
+    // The camera is sized from this before any loop exists, so framing an
+    // out-of-town search off the around-here geometry would open the map on a
+    // box the loops draw outside of. Measured live at 60 km from Bucharest:
+    // 13.4 km of reach against 8.0 km.
+    expect(loopSearchExtentMeters(60_000, 'out_of_town', 7_200)).toBeGreaterThan(
+      loopSearchExtentMeters(60_000, 'around_here', 7_200),
+    );
+  });
+
+  it('defaults to the around-here frame, so old callers are unchanged', () => {
+    expect(loopSearchExtentMeters(60_000)).toBe(
+      loopSearchExtentMeters(60_000, 'around_here', null),
+    );
+  });
+});
+
+describe('rankCandidates and placement', () => {
+  const near = candidate({ id: 'near', maxReachMeters: 3_000 });
+  const far = candidate({ id: 'far', maxReachMeters: 8_000 });
+
+  it('prefers the loop that got further out when asked for out of town', () => {
+    const ranked = rankCandidates([near, far], {
+      targetDistanceMeters: 15_000,
+      terrain: 'rolling',
+      placement: 'out_of_town',
+    });
+
+    expect(ranked[0]!.id).toBe('far');
+  });
+
+  it('ignores reach entirely for around_here', () => {
+    const ranked = rankCandidates([near, far], {
+      targetDistanceMeters: 15_000,
+      terrain: 'rolling',
+      placement: 'around_here',
+    });
+
+    // Everything else about these two is identical, so input order stands.
+    expect(ranked[0]!.id).toBe('near');
+  });
+
+  it('never lets reach outrank safety', () => {
+    const busyButFar = candidate({
+      id: 'busy',
+      maxReachMeters: 20_000,
+      highRiskMeters: 4_000,
+    });
+    const quietButNear = candidate({ id: 'quiet', maxReachMeters: 3_000 });
+
+    const ranked = rankCandidates([busyButFar, quietButNear], {
+      targetDistanceMeters: 15_000,
+      terrain: 'rolling',
+      placement: 'out_of_town',
+    });
+
+    // Recreation does not buy its way past the thing the app is for.
+    expect(ranked[0]!.id).toBe('quiet');
+  });
+
+  it('does not reorder loops whose reach differs only by road noise', () => {
+    const ranked = rankCandidates(
+      [
+        candidate({ id: 'a', maxReachMeters: 7_600 }),
+        candidate({ id: 'b', maxReachMeters: 7_900 }),
+      ],
+      {
+        targetDistanceMeters: 15_000,
+        terrain: 'rolling',
+        placement: 'out_of_town',
+      },
+    );
+
+    expect(ranked[0]!.id).toBe('a');
   });
 });

@@ -46,12 +46,16 @@ import {
   LOOP_CANDIDATE_COUNT,
   LOOP_DUPLICATE_OVERLAP,
   LOOP_RESULTS_SHOWN,
-  lollipopWaypoints,
+  isLollipopSlot,
+  lollipopRingSizing,
+  lollipopWaypointsFromRing,
   loopBearings,
+  loopWaypointCountForSlot,
+  maxReachMeters,
   matchesTerrain,
   nextRingRadiusMeters,
+  placementClearanceMeters,
   rankCandidates,
-  ringWaypointCountFor,
   ringWaypoints,
   routeOverlapShare,
   terrainAppliesAt,
@@ -171,12 +175,25 @@ const routeOneRing = async (
   lollipop: boolean,
   signal?: AbortSignal,
 ): Promise<PooledLoop | null> => {
-  let radius = initialRingRadiusMeters(
-    request.targetDistanceMeters,
-    waypointCount,
-  );
-  /** A lollipop's size knob: the notional total the shape is built for. */
-  let shapeBudget = request.targetDistanceMeters;
+  /**
+   * How far out the loop sits. Computed ONCE, from the requested distance and
+   * the placement, and then held fixed for every attempt — see
+   * `lollipopWaypointsFromRing` for the defect that makes this load-bearing.
+   */
+  const { radiusMeters: initialLollipopRadius, clearanceMeters: clearance } =
+    lollipopRingSizing(
+      request.targetDistanceMeters,
+      waypointCount,
+      placementClearanceMeters(
+        request.placement,
+        request.targetDistanceMeters,
+        request.urbanEdgeMeters,
+      ),
+    );
+
+  let radius = lollipop
+    ? initialLollipopRadius
+    : initialRingRadiusMeters(request.targetDistanceMeters, waypointCount);
   let best: PooledLoop | null = null;
 
   for (let attempt = 0; attempt < MAX_RADIUS_ITERATIONS; attempt += 1) {
@@ -188,10 +205,11 @@ const routeOneRing = async (
     // unconverged 30 km request came back at 53 km, so every lollipop was then
     // thrown out by the distance filter and none was ever offered.
     const waypoints = lollipop
-      ? lollipopWaypoints(
+      ? lollipopWaypointsFromRing(
           request.start,
           bearingDegrees,
-          shapeBudget,
+          radius,
+          clearance,
           waypointCount,
         )
       : ringWaypoints(request.start, radius, bearingDegrees, waypointCount);
@@ -233,6 +251,7 @@ const routeOneRing = async (
       coordinates: result.coordinates,
       bearingDegrees,
       distanceMeters,
+      maxReachMeters: maxReachMeters(request.start, result.coordinates),
       climbMeters: null,
       highRiskMeters: 0,
       unpavedShare: result.unpavedShare,
@@ -262,12 +281,15 @@ const routeOneRing = async (
     }
 
     if (lollipop) {
-      // Same proportional controller, applied to the budget rather than a
-      // radius — it scales the stem and the ring together, keeping the shape.
-      shapeBudget = nextRingRadiusMeters(
-        shapeBudget,
-        distanceMeters,
-        request.targetDistanceMeters,
+      // Fit the RING to whatever the budget has left once the stem has been
+      // paid for, using the stem we just MEASURED rather than the one the
+      // model predicted. The approach is what the rider asked for and is not
+      // negotiable; the ring is the part that flexes.
+      const stem = Math.max(0, result.stemMeters);
+      radius = nextRingRadiusMeters(
+        radius,
+        Math.max(0, distanceMeters - stem),
+        Math.max(0, request.targetDistanceMeters - stem),
       );
     } else {
       radius = nextRingRadiusMeters(
@@ -348,7 +370,7 @@ export const searchLoops = async (
       headingArcFor(relaxation),
     );
 
-    // Alternate the ring shape across the batch. Shape is as decisive as
+    // Sample both ring shapes across the batch. Shape is as decisive as
     // bearing for how much a loop repeats itself, and neither 3 nor 6 wins
     // everywhere, so a batch samples both rather than betting on one.
     const tasks = bearings.map((bearing, index) => async () => {
@@ -358,20 +380,20 @@ export const searchLoops = async (
         request,
         bearing,
         relaxation,
-        // Shape changes every SECOND slot while the ring/lollipop choice
-        // alternates every slot, so a batch covers all four combinations.
-        // Deriving both from the same parity — which is what shipped once —
-        // made every lollipop a hexagon and every plain ring a triangle, so
+        // Both shape axes come from the placement now, and they must never be
+        // derived from one expression: deriving the ring size and the
+        // ring/lollipop choice from the same parity is what shipped once, and
+        // it made every lollipop a hexagon and every plain ring a triangle, so
         // half the search space was never tried.
-        ringWaypointCountFor(Math.floor(slot / 2)),
-        // Every OTHER candidate rides out somewhere before looping. Measured
-        // against live OSRM around Rasnov and Bucharest, a lollipop clears the
-        // doubling-back cap noticeably less often than a plain ring — it has to
-        // close a loop out where the road network is thinner — so sampling them
-        // at the same rate as rings is what gives the rider a real chance of
-        // being offered one. They still compete on merit; this only decides how
-        // many get to try.
-        slot % 2 === 1,
+        loopWaypointCountForSlot(request.placement, slot),
+        // `out_of_town` makes every candidate a lollipop, because a ring
+        // centred on the rider cannot leave a city at any offered distance.
+        // `around_here` keeps the one-in-two alternation, which is what gives
+        // a lollipop a real chance of being offered — measured against live
+        // OSRM around Rasnov and Bucharest it clears the doubling-back cap
+        // noticeably less often than a plain ring, having to close a loop
+        // where the road network is thinner.
+        isLollipopSlot(request.placement, slot),
         signal,
       );
       attempted += 1;

@@ -213,6 +213,9 @@ describe('POST /v1/loops — refused before a byte is written', () => {
     ['an unknown terrain', { terrain: 'mountainous' }],
     ['an unknown surface', { surface: 'gravelly' }],
     ['a heading that is not a compass point', { heading: 'ENE' }],
+    ['a placement that is not one of the two', { placement: 'downtown' }],
+    ['a negative city edge', { urbanEdgeMeters: -1 }],
+    ['a city edge wider than any ride could reach', { urbanEdgeMeters: 500_000 }],
     ['a latitude off the planet', { start: { lat: 120, lon: 26 } }],
   ])('rejects %s', async (_name, override) => {
     const app = await buildTestApp();
@@ -230,6 +233,59 @@ describe('POST /v1/loops — refused before a byte is written', () => {
 
     expect(response.statusCode).toBe(400);
     expect(searchLoopsMock).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  /**
+   * The compatibility promise for clients built before placement existed.
+   *
+   * An older app sends neither field, and must get the behaviour it was built
+   * and tested against rather than a 400 or a shape its rider never asked for.
+   * `around_here` reproduces the old batch exactly.
+   */
+  it('defaults an older client to the behaviour it was built against', async () => {
+    const app = await buildTestApp();
+    const payload = validBody();
+    delete (payload as Record<string, unknown>).placement;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/loops',
+      headers: authHeaders,
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(searchLoopsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        placement: 'around_here',
+        urbanEdgeMeters: null,
+      }),
+      expect.anything(),
+    );
+    await app.close();
+  });
+
+  it('passes placement and the city edge through to the search', async () => {
+    const app = await buildTestApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/loops',
+      headers: authHeaders,
+      payload: validBody({ placement: 'out_of_town', urbanEdgeMeters: 9_800 }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(searchLoopsMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        placement: 'out_of_town',
+        urbanEdgeMeters: 9_800,
+      }),
+      expect.anything(),
+    );
     await app.close();
   });
 

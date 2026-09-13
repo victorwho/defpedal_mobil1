@@ -18,6 +18,7 @@ export * from './formatters';
 export * from './geometrySampling';
 export * from './mapboxStaticImageUrl';
 export * from './loopPlan';
+export * from './urbanEdge';
 export * from './osrmResponse';
 export * from './loopSessionMeter';
 export * from './navigation';

@@ -140,6 +140,50 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
 
 - **OSRM has no round-trip service**, so a loop is a waypoint ring we synthesize
   and then measure. Everything below is a consequence of that.
+- ✅ **A loop is placed, not just sized (2026-09-13).** `LoopPlacement` is
+  `out_of_town` (the DEFAULT) or `around_here`. Before it, the generator could
+  not leave a city at any distance it offered: three of every five candidates
+  were rings centred on the rider, and a closed ring reaches only about a tenth
+  of the ride, so measured against the live router a 20 km ring from central
+  Bucharest never got further than **1.7 km** from the start and a 40 km one
+  never further than **3.8 km**, against a city edge **9.8 km** out. Riders
+  called it "it just circles my neighbourhood" and they were describing the
+  geometry exactly. Out-of-town now makes **every** candidate a lollipop and
+  sizes the clearance from the real city edge; measured reach goes up 1.4-1.7x
+  (Bucharest 60 km: 8.0 km -> 13.4 km).
+- ⚠️ **The arithmetic of leaving town is brutal and is not negotiable.** Riding
+  out and back costs **1.74x** the straight line on this profile (median of 160
+  routes, five cities), so each kilometre of clearance costs three and a half
+  of the ride and clearing Bucharest costs ~34 km before any loop exists.
+  `OUT_OF_TOWN_RING_SHARE = 0.35` is what stops the fix for "it circles my
+  neighbourhood" from becoming "it is not a loop at all" — at the limit 65% of
+  the ride is already the approach. When the chosen distance cannot reach, the
+  planner SAYS SO and quotes a distance step that works; it never hands back a
+  city loop in silence, and there is deliberately no plain-ring rescue at the
+  last rung of the ladder.
+- ⚠️ **The city edge is a HINT, resolved on the client, and never shown as a
+  measurement.** `reverseGeocodeUrbanEdgeMeters` reads the Mapbox place box and
+  takes the distance to its NEAREST edge (a rider on the northern fringe of
+  Bucharest is 2 km from open country; one in Piața Unirii is 10 km). It is
+  resolved on the device because the planner must answer "will 40 km get me out
+  of Bucharest?" while the rider is still moving the slider, and it is carried
+  in the request as `urbanEdgeMeters` so no two callers can derive it
+  differently. The box is ADMINISTRATIVE: Râșnov's is 13.9 x 24.2 km because
+  the commune owns the mountain, while the town is 2 km across. Null is an
+  ordinary answer — every consumer falls back to the affordable maximum.
+- ⚠️ **Convergence used to walk the loop home.** A lollipop that came back long
+  had its whole budget cut, and the clearance was re-derived from the cut
+  budget — so fitting the distance quietly undid the placement. Clearance is
+  now held fixed (`lollipopWaypointsFromRing`) and only the ring flexes, fitted
+  to what the budget has left after the **measured** stem, not the modelled one.
+- ⚠️ **`loops-parity.test.ts` passed on the day placement was added, and that
+  was not reassuring.** Every scenario left placement at `around_here`, which
+  reproduces the old behaviour exactly — a field carried from the screen to the
+  router and then ignored looks identical to a working one. Worse, the first
+  replacement test read the reach of finished loops and a deliberate break of
+  the clearance half went straight through it, because the fake router returns
+  a circle sized from the total distance. The tests now assert on the REQUESTS
+  (`stemLegs`, anchor distance), and both halves were mutation-checked.
 - ⚠️ **Every sizing constant is MEASURED against the live router, and the
   measurement is recorded beside it.** They were guesses once and each guess was
   wrong: `DEFAULT_DETOUR_FACTOR` was 1.25 against a real 2.11–2.54, so every

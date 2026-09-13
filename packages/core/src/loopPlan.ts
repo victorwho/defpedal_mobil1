@@ -71,6 +71,32 @@ export const excludesUnpaved = (surface: LoopSurface): boolean =>
 export const prefersUnpaved = (surface: LoopSurface): boolean =>
   surface === 'offroad';
 
+/**
+ * Where the rider wants the loop to happen.
+ *
+ * `out_of_town` rides away from the start, loops out there and comes home;
+ * `around_here` rings the start, which is what a rider wants for a quick spin
+ * or when they already live where the good riding is.
+ *
+ * This is a real choice and not a cosmetic one, because a closed ring centred
+ * on the rider CANNOT leave a city at any distance the picker offers. Road
+ * distance runs 2.1-2.5x the ideal polygon perimeter, so a ring reaches only
+ * `target / 11` — measured against the live router, a 20 km ring from central
+ * Bucharest never gets further than 1.7 km from the start and a 40 km one
+ * never further than 3.8 km, against a city edge 9.8 km out. Riders reported
+ * this as "it just circles my neighbourhood", which is exactly what it was.
+ */
+export type LoopPlacement = 'out_of_town' | 'around_here';
+
+export const LOOP_PLACEMENTS: readonly LoopPlacement[] = [
+  'out_of_town',
+  'around_here',
+];
+
+/** Does this placement ride out somewhere before looping? */
+export const ridesOutOfTown = (placement: LoopPlacement): boolean =>
+  placement === 'out_of_town';
+
 /** Eight compass points plus "wherever" — the rider's local knowledge. */
 export type LoopHeading =
   | 'any'
@@ -125,6 +151,22 @@ export interface LoopRequest {
   readonly terrain: LoopTerrain;
   readonly surface: LoopSurface;
   readonly heading: LoopHeading;
+  readonly placement: LoopPlacement;
+  /**
+   * How far the rider must travel to leave the place they are starting in, or
+   * null when we could not find out.
+   *
+   * Resolved by the CLIENT, not here and not by the server, for one reason:
+   * the planner has to answer "will 40 km get me out of Bucharest?" while the
+   * rider is still moving the distance slider, long before any search runs. A
+   * number resolved twice is a number that disagrees with itself, so it is
+   * resolved once and carried.
+   *
+   * Null is an ordinary state, not an error — a failed geocode, a rider
+   * already in open country, or an old client. Every consumer falls back to a
+   * fraction of the ride, which is blind but never wrong-headed.
+   */
+  readonly urbanEdgeMeters: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +192,45 @@ export const ringWaypointCountFor = (index: number): number =>
   RING_WAYPOINT_CHOICES[
     Math.abs(Math.floor(index)) % RING_WAYPOINT_CHOICES.length
   ]!;
+
+/**
+ * Is candidate `slot` in a batch a lollipop rather than a ring centred on the
+ * rider?
+ *
+ * `out_of_town` says yes to every slot, and that is the point: a ring centred
+ * on the start cannot leave a city at any distance offered, so a batch that
+ * kept sampling them would spend most of its OSRM budget on candidates that
+ * cannot satisfy the request. There is deliberately NO ring rescue at the last
+ * rung — handing back a neighbourhood ring to a rider who asked to get out of
+ * town, without saying so, is the exact failure this mode was added to fix.
+ * When nothing out there works the search comes back empty and says why.
+ *
+ * `around_here` keeps the one-in-two alternation it always had.
+ */
+export const isLollipopSlot = (
+  placement: LoopPlacement,
+  slot: number,
+): boolean =>
+  ridesOutOfTown(placement)
+    ? true
+    : Math.abs(Math.floor(slot)) % 2 === 1;
+
+/**
+ * Ring size for candidate `slot`, given the placement.
+ *
+ * With the ring/lollipop axis pinned to lollipop, `out_of_town` steps the
+ * waypoint count every slot instead of every second one, so a batch still
+ * spans both shapes. Neither 3 nor 6 wins everywhere — that is the whole
+ * reason both are sampled — and losing one axis is not a reason to lose the
+ * other as well.
+ */
+export const loopWaypointCountForSlot = (
+  placement: LoopPlacement,
+  slot: number,
+): number =>
+  ridesOutOfTown(placement)
+    ? ringWaypointCountFor(slot)
+    : ringWaypointCountFor(Math.floor(slot / 2));
 
 /**
  * Perimeter of a regular n-gon inscribed in a unit circle: `2n·sin(π/n)`.
@@ -324,6 +405,162 @@ export const ringClearanceMeters = (targetDistanceMeters: number): number =>
     ),
   );
 
+// ---------------------------------------------------------------------------
+// Getting out of town
+// ---------------------------------------------------------------------------
+
+/**
+ * Share of the ride an out-of-town loop keeps for the loop itself.
+ *
+ * The arithmetic here is unforgiving and worth stating plainly, because it is
+ * the reason this mode cannot always be honoured. Riding to a point and back
+ * costs `2 x STEM_DETOUR_FACTOR`, so 3.72x under the shipped 1.86. A fresh
+ * measurement — 160 point-to-point routes on the live safety profile across
+ * Bucharest, Cluj, Timisoara, Brasov and Amsterdam, eight bearings at 5, 10,
+ * 15 and 20 km — put the real median circuity at 1.74, falling towards 1.6 on
+ * the longer legs. The model is therefore a little conservative, which is the
+ * right direction for a promise about where a ride ends up.
+ *
+ * Either way every kilometre of clearance costs about three and a half
+ * kilometres of the ride, and leaving Bucharest, whose nearest edge is 9.8 km
+ * from the centre, costs roughly 36 km before a single metre of loop exists.
+ *
+ * So the only question is how much of the budget to spend getting out. At 35%
+ * reserved for the ring, a 40 km ride can clear 7 km and a 60 km ride 10.5 km.
+ * Below that share the loop stops being a loop and becomes an out-and-back
+ * with a kink in it, which is the complaint this whole mode exists to answer —
+ * it would be absurd to fix "it circles my neighbourhood" by shipping "it is
+ * not a loop at all".
+ */
+export const OUT_OF_TOWN_RING_SHARE = 0.35;
+
+/**
+ * How far past the edge of town to put the ring's near side.
+ *
+ * A judgement, not a measurement, and small enough that it is usually swamped
+ * by the affordability clamp below. Two things argue for some margin: the
+ * boundary a geocoder returns is administrative, and ribbon development
+ * normally continues past it; and a ring whose near edge sits exactly on the
+ * line spends half its length back inside. Kept modest because every metre
+ * costs three and a half.
+ */
+export const OUT_OF_TOWN_MARGIN_METERS = 1500;
+
+/**
+ * Most clearance a ride of this length can buy while keeping a real loop.
+ *
+ * Solves `2 x C x stemDetour = target x (1 - ringShare)` for C, which works
+ * out at about 17.5% of the ride.
+ */
+export const maxOutOfTownClearanceMeters = (
+  targetDistanceMeters: number,
+): number =>
+  (Math.max(0, targetDistanceMeters) * (1 - OUT_OF_TOWN_RING_SHARE)) /
+  (2 * STEM_DETOUR_FACTOR);
+
+/**
+ * Shortest ride that would put the loop clear of a town `edgeMeters` away.
+ *
+ * The inverse of the clamp above, and the number the planner quotes when the
+ * rider's chosen distance cannot reach. Quoting a real figure is the whole
+ * point: "40 km will not leave Bucharest, 65 km will" is actionable, where
+ * silently handing back a city loop is the bug.
+ */
+export const minimumRideToLeaveTownMeters = (edgeMeters: number): number =>
+  (Math.max(0, edgeMeters) * (2 * STEM_DETOUR_FACTOR)) /
+  (1 - OUT_OF_TOWN_RING_SHARE);
+
+/**
+ * What an out-of-town request can actually be given, and whether it is what
+ * was asked for.
+ *
+ * One function rather than three, because the planner screen, the on-device
+ * generator and the server search all need the same answer and a number
+ * derived three times is a number that disagrees with itself.
+ *
+ * `clearsTown` is deliberately three-valued. False is a real finding the rider
+ * is told about; null means we never learned where town ends, and claiming
+ * either way would be inventing a fact — the app does not tell riders things
+ * it has not looked up.
+ */
+export interface OutOfTownPlan {
+  /** Clearance to build the lollipop with, in metres. */
+  readonly clearanceMeters: number;
+  /** Does the loop end up past the edge of town? Null when town is unknown. */
+  readonly clearsTown: boolean | null;
+  /** Shortest ride that would clear town. Null when unknown or already clear. */
+  readonly minimumRideMeters: number | null;
+}
+
+export const planOutOfTown = (
+  targetDistanceMeters: number,
+  urbanEdgeMeters: number | null,
+): OutOfTownPlan => {
+  const affordable = maxOutOfTownClearanceMeters(targetDistanceMeters);
+
+  // Too short to get anywhere. Below roughly 11.5 km the affordable clearance
+  // drops under the minimum that puts a ring outside the suburbs at all, and
+  // the ring left over would be a few hundred metres across — a shape the
+  // router cannot land on real roads. Fall back to the ordinary lollipop and
+  // say, honestly, that this is not the ride they asked for.
+  if (affordable < MIN_RING_CLEARANCE_METERS) {
+    return {
+      clearanceMeters: ringClearanceMeters(targetDistanceMeters),
+      clearsTown: urbanEdgeMeters === null ? null : false,
+      minimumRideMeters:
+        urbanEdgeMeters === null
+          ? null
+          : minimumRideToLeaveTownMeters(urbanEdgeMeters),
+    };
+  }
+
+  // Town unknown: spend the whole allowance on getting out. It is the best
+  // reading of the request we can honour without knowing where town ends, and
+  // it is never claimed as more than that.
+  if (urbanEdgeMeters === null) {
+    return {
+      clearanceMeters: affordable,
+      clearsTown: null,
+      minimumRideMeters: null,
+    };
+  }
+
+  const edge = Math.max(0, urbanEdgeMeters);
+  const clearance = Math.min(edge + OUT_OF_TOWN_MARGIN_METERS, affordable);
+
+  // Aim PAST the line, judge against the line. The margin makes the target a
+  // little generous, because the boundary is administrative and ribbon
+  // development usually continues past it — but a loop that sits beyond the
+  // boundary has left town, so folding the margin into the pass/fail test
+  // would have the app apologise for rides that measurably do get out.
+  // Confirmed against the live router: a 60 km out-of-town loop from central
+  // Bucharest puts its near edge 10.5 km out and its far side 13.4 km out,
+  // against a 9.8 km edge, while the margin-inclusive test called it a miss.
+  const clears = clearance >= edge;
+
+  return {
+    clearanceMeters: clearance,
+    clearsTown: clears,
+    minimumRideMeters: clears ? null : minimumRideToLeaveTownMeters(edge),
+  };
+};
+
+/**
+ * Clearance to build a candidate with, for either placement.
+ *
+ * `around_here` keeps the shape it always had: a short hop so that the
+ * one-in-two lollipops in the batch are not ringing the rider's own street,
+ * sized as a fraction of the ride.
+ */
+export const placementClearanceMeters = (
+  placement: LoopPlacement,
+  targetDistanceMeters: number,
+  urbanEdgeMeters: number | null,
+): number =>
+  ridesOutOfTown(placement)
+    ? planOutOfTown(targetDistanceMeters, urbanEdgeMeters).clearanceMeters
+    : ringClearanceMeters(targetDistanceMeters);
+
 /**
  * Waypoints for a lollipop: ride out, loop somewhere else, ride home.
  *
@@ -392,6 +629,39 @@ export const lollipopRingSizing = (
   return { radiusMeters, clearanceMeters: clearance };
 };
 
+/**
+ * Lollipop waypoints from an explicit ring radius and clearance.
+ *
+ * The form the search actually converges on, and the reason it exists is a
+ * real defect in the shape that preceded it. Convergence used to scale the
+ * whole stem-plus-ring BUDGET, and the clearance was re-derived from that
+ * budget every iteration — so a lollipop that came back too long had its
+ * budget cut, its clearance cut with it, and the loop walked back towards the
+ * rider's house. Fitting the distance quietly undid the placement.
+ *
+ * Holding clearance fixed and scaling only the radius separates the two: where
+ * the loop happens is what the rider asked for, how big it is is what has to
+ * flex to hit the distance.
+ */
+export const lollipopWaypointsFromRing = (
+  start: Coordinate,
+  bearingDegrees: number,
+  radiusMeters: number,
+  clearanceMeters: number,
+  waypointCount: number = RING_WAYPOINT_COUNT,
+): Coordinate[] => {
+  const count = Math.max(1, Math.floor(waypointCount));
+  const radius = Math.max(0, radiusMeters);
+  const clearance = Math.max(0, clearanceMeters);
+  const anchor = destinationPoint(start, bearingDegrees, radius + clearance);
+
+  return [
+    anchor,
+    ...ringWaypoints(anchor, radius, bearingDegrees + 180, count),
+    anchor,
+  ];
+};
+
 export const lollipopWaypoints = (
   start: Coordinate,
   bearingDegrees: number,
@@ -400,7 +670,6 @@ export const lollipopWaypoints = (
   clearanceMeters: number = ringClearanceMeters(targetDistanceMeters),
   detourFactor: number = ringDetourFactor(waypointCount),
 ): Coordinate[] => {
-  const count = Math.max(1, Math.floor(waypointCount));
   const { radiusMeters: radius, clearanceMeters: clearance } =
     lollipopRingSizing(
       targetDistanceMeters,
@@ -408,13 +677,14 @@ export const lollipopWaypoints = (
       clearanceMeters,
       detourFactor,
     );
-  const anchor = destinationPoint(start, bearingDegrees, radius + clearance);
 
-  return [
-    anchor,
-    ...ringWaypoints(anchor, radius, bearingDegrees + 180, count),
-    anchor,
-  ];
+  return lollipopWaypointsFromRing(
+    start,
+    bearingDegrees,
+    radius,
+    clearance,
+    waypointCount,
+  );
 };
 
 /**
@@ -441,16 +711,37 @@ export const lollipopWaypoints = (
  */
 export const loopSearchExtentMeters = (
   targetDistanceMeters: number,
+  /**
+   * Placement matters here as much as distance. An out-of-town loop sits its
+   * clearance further out by construction, so framing the map off the
+   * around-here geometry would open the camera on a box the loops spill out
+   * of — measured live, a 60 km out-of-town loop from Bucharest reaches
+   * 13.4 km where the around-here one reaches 8.0 km.
+   */
+  placement: LoopPlacement = 'around_here',
+  urbanEdgeMeters: number | null = null,
 ): number => {
+  const clearance = placementClearanceMeters(
+    placement,
+    targetDistanceMeters,
+    urbanEdgeMeters,
+  );
+
   let furthest = 0;
   for (const count of RING_WAYPOINT_CHOICES) {
-    furthest = Math.max(
-      furthest,
-      initialRingRadiusMeters(targetDistanceMeters, count),
-    );
+    // A plain ring is only in the running for `around_here`; out-of-town
+    // batches never build one, so letting it widen the frame there would
+    // waste screen on geometry that is not sampled.
+    if (!ridesOutOfTown(placement)) {
+      furthest = Math.max(
+        furthest,
+        initialRingRadiusMeters(targetDistanceMeters, count),
+      );
+    }
     const { radiusMeters, clearanceMeters } = lollipopRingSizing(
       targetDistanceMeters,
       count,
+      clearance,
     );
     furthest = Math.max(furthest, 2 * radiusMeters + clearanceMeters);
   }
@@ -1168,6 +1459,8 @@ export interface LoopCandidate {
   /** Bearing the ring was thrown at, i.e. the direction the rider sets off. */
   readonly bearingDegrees: number;
   readonly distanceMeters: number;
+  /** Furthest the ride gets from the start, in metres. */
+  readonly maxReachMeters: number;
   readonly climbMeters: number | null;
   /** Metres of the loop on roads in the busiest risk tier. */
   readonly highRiskMeters: number;
@@ -1317,10 +1610,23 @@ export const SCENIC_LAMBDA = 0.08;
  */
 export const SCENIC_SAFETY_TOLERANCE_METERS = 250;
 
+/**
+ * Reach difference below which two out-of-town loops count as equally far out.
+ *
+ * A kilometre, which is wide. Every candidate in an out-of-town batch is built
+ * with the SAME clearance, so their reaches should already agree to within the
+ * noise of where the roads happen to run; this only has to catch the case
+ * where one candidate's ring collapsed back towards home. A tighter deadband
+ * would let road noise reorder loops that the rider would call identical, and
+ * reach is a preference — it must never outrank safety or the retracing that
+ * makes a loop a loop.
+ */
+export const REACH_RANKING_DEADBAND_METERS = 1000;
+
 export const rankCandidates = <T extends LoopCandidate>(
   candidates: readonly T[],
   request: Pick<LoopRequest, 'targetDistanceMeters' | 'terrain'> &
-    Partial<Pick<LoopRequest, 'surface'>>,
+    Partial<Pick<LoopRequest, 'surface' | 'placement'>>,
 ): T[] =>
   [...candidates].sort((a, b) => {
     // Safety first, and outright: a gap wider than the tolerance is decided
@@ -1349,6 +1655,15 @@ export const rankCandidates = <T extends LoopCandidate>(
     // it was silently vetoing the shape a rider explicitly asked for.
     const retraceGap = a.ringRetracedShare - b.ringRetracedShare;
     if (Math.abs(retraceGap) > RETRACE_RANKING_DEADBAND) return retraceGap;
+
+    // Getting out of town is what the rider asked for, so it outranks the
+    // optional preferences below — but it sits UNDER retracing, because a loop
+    // that repeats itself is not a loop wherever it happens. Only consulted
+    // for the placement that asked for it, and only past a wide deadband.
+    if (request.placement && ridesOutOfTown(request.placement)) {
+      const reachGap = b.maxReachMeters - a.maxReachMeters;
+      if (Math.abs(reachGap) > REACH_RANKING_DEADBAND_METERS) return reachGap;
+    }
 
     // Only when the rider asked for it, and only after safety. Unpaved ways are
     // usually car-free and therefore already score well, so the two rarely
@@ -1604,6 +1919,27 @@ export const isRingOutAndBack = (
  * remain available when the ladder bottoms out, so a rider in thin terrain is
  * still offered something.
  */
+/**
+ * Furthest any point of the route gets from the start, in metres.
+ *
+ * The number a rider means by "did it actually take me anywhere". It is
+ * reported on every loop rather than only used internally, because the
+ * difference between a 40 km ride that reaches 3.8 km out and one that reaches
+ * 7.6 km out is invisible on a zoomed map and is the entire distinction
+ * between the two placements.
+ */
+export const maxReachMeters = (
+  start: Coordinate,
+  coordinates: readonly [number, number][],
+): number => {
+  let furthest = 0;
+  for (const [lon, lat] of coordinates) {
+    const d = haversineDistance([start.lat, start.lon], [lat, lon]);
+    if (d > furthest) furthest = d;
+  }
+  return furthest;
+};
+
 export const RETRACE_CEILING = 0.9;
 
 /**
@@ -1638,6 +1974,9 @@ export interface LoopSearchRequest {
   readonly terrain: LoopTerrain;
   readonly surface: LoopSurface;
   readonly heading: LoopHeading;
+  readonly placement: LoopPlacement;
+  /** See `LoopRequest.urbanEdgeMeters` — resolved by the client, carried here. */
+  readonly urbanEdgeMeters: number | null;
   readonly locale: string;
 }
 
@@ -1664,6 +2003,14 @@ export interface GeneratedLoop {
   /** Bearing the ring was thrown at, i.e. the direction the rider sets off. */
   readonly bearingDegrees: number;
   readonly distanceMeters: number;
+  /**
+   * Furthest the ride gets from the start, in metres.
+   *
+   * Carried on the wire because it is the only figure that distinguishes the
+   * two placements on a result card, and because a rider comparing a 3.8 km
+   * reach against a 7.6 km one cannot tell them apart on a zoomed-out map.
+   */
+  readonly maxReachMeters: number;
   /** Null until the elevation pass has run. */
   readonly climbMeters: number | null;
   /** Metres of the loop on roads in the busiest risk tier. */
