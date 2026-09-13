@@ -83,10 +83,44 @@ Set `APP_VARIANT=production` or `app.config.ts` resolves the `.dev` bundle.
 Success looks like: `✔ Submitted your app to Apple App Store Connect!` Then Apple processes the
 binary (~5–10 min) before it appears as a usable build.
 
-### 4. Finish in App Store Connect (web — manual)
-1. App → the version record (e.g. `1.0`) → **Build** → select the new build.
-2. If this is a resubmission after rejection: **Resolution Center** → reply to App Review.
-3. **Submit for Review**.
+### 4. Finish the release — SCRIPTABLE since 2026-09-13, no longer web-only
+
+This step was documented as manual for the app's whole history. It is not: the App Store
+Connect API covers the entire flow, and v1.18 / build 29 was created, populated, attached
+and submitted for review entirely from this machine. Same ES256 JWT as §A above.
+
+```
+POST   /v1/appStoreVersions                     { platform:'IOS', versionString:'1.18',
+                                                  releaseType:'AFTER_APPROVAL',
+                                                  relationships.app }
+PATCH  /v1/appStoreVersions/{id}/relationships/build   { type:'builds', id:<buildId> }
+GET    /v1/appStoreVersions/{id}/appStoreVersionLocalizations
+PATCH  /v1/appStoreVersionLocalizations/{locId}  { whatsNew: '<release notes>' }
+POST   /v1/reviewSubmissions                     { platform:'IOS', relationships.app }
+POST   /v1/reviewSubmissionItems                 { relationships.reviewSubmission,
+                                                   relationships.appStoreVersion }
+PATCH  /v1/reviewSubmissions/{subId}             { submitted: true }   ← IRREVERSIBLE
+```
+
+Notes that cost time to find:
+- **Re-use an open `reviewSubmission`** rather than creating a second one. Filter on
+  `state=READY_FOR_REVIEW,WAITING_FOR_REVIEW,IN_REVIEW,UNRESOLVED_ISSUES` first; Apple
+  rejects a duplicate open submission.
+- **Marketing version ≠ binary version.** Version records run `1.13 … 1.18`; the binaries
+  carry `0.2.x` from `app.config.ts`. TestFlight groups by the binary's short version
+  (`/v1/preReleaseVersions`), the App Store shows the record's `versionString`. Do not try
+  to reconcile them.
+- **Verify the build attachment by its own relationship endpoint.** `GET /v1/apps/{id}/
+  appStoreVersions?include=build` reported `build=(none)` for a version that *did* have
+  build 29 attached; `GET /v1/appStoreVersions/{vid}/build` reported it correctly. A
+  version submitted with no build is a wasted review cycle, so check the direct endpoint.
+- **`releaseType: AFTER_APPROVAL`** (what every release has used) publishes automatically
+  the moment Apple approves, with no further human step. Use `MANUAL` if you want a gate
+  between approval and 100% of iOS users — there is no staged rollout on iOS.
+- Only **`en-US`** exists as an `appStoreVersionLocalization`. Play carries ro-RO/es-ES;
+  iOS does not.
+
+Still manual, unavoidably: replying in **Resolution Center** after a rejection.
 
 ## Gotcha: EAS submission queue can stall (no error, no outage)
 

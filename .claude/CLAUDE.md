@@ -67,6 +67,7 @@ adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8080 tcp:8080
 - **Audit source-of-truth:** `docs/reviews/playstore-readiness-2026-05-06-revised.md`. Stage A + B fixes shipped in commit `7e51ff0` (2026-05-06). The audit's "Stage C: 14-day Open Testing observation" was a quality recommendation, NOT Google's mandatory rule — with the business account the calendar wait collapses to a staged rollout that watches Android Vitals at each step.
 - **Recommended rollout cadence (post-business-account adjustment):** upload AAB → Data Safety form → 5% for 24–48 h → check crash-free ≥ 99.5% / ANR ≤ 0.47% → 20% for 24–48 h → check → 50% → check → 100%. ~5–7 days end-to-end. Don't compress to "1% → 100% same day" — staged rollout is the only good way to catch Android Vitals regressions without nuking the whole user base; the 14-day Google rule has nothing to do with it.
 - **Rollout gate (Phase 4, error-reduction plan):** before bumping a percentage tier, the *previous* tier must hold **crash-free users ≥ 99.5% for 24 h** AND **ANR rate ≤ 0.47% for 24 h** on the production track in Sentry Release Health + Play Console Android Vitals. If either drops below threshold at any point during the tier hold: pause the rollout, triage the regression in Sentry (filter by `release` and `app_variant=production`), ship a fix on a new build, and restart at 5%. Do NOT advance "anyway" — the gate exists because a >0.5% crash rate at 50% rollout is already affecting tens of users by the time you notice. The pre-release smoke checklist (`apkreleases/release-notes-template.txt`) is the local-device companion to this server-side gate.
+- ⚠️ **The gate is currently UNMEASURABLE, and knowing that is part of using it (measured 2026-09-13).** Production session volume is ~**28 sessions per 48 h across all versions**; v0.2.163 held **6** sessions over its first 48 h at 20%→100% rollout. At that volume "crash-free 100%" carries almost no information — a true 20% crash rate produces six clean sessions about a quarter of the time — and a 99.5% threshold needs hundreds of sessions to separate from noise. What low volume DOES exclude is the catastrophic case: a 100%-fatal regression (error-log #116 logged every rider out at cold start) cannot hide behind any number of clean sessions. **So read the gate as a catastrophe detector, not as a quality bar**, and treat new Sentry issues + direct rider reports as the real signal until traffic grows. Do not quote a crash-free percentage as evidence a release is healthy without stating the session count next to it.
 - **Data Safety form checklist:** `docs/legal/counsel-review-2026-04-29/16-data-safety-reconciliation-2026-05-06.md`. **HARD RULE:** apply the form change *after* the matching production AAB is live — never before. Play's re-review cross-references the live AAB; a form-first update creates a mismatch in the opposite direction (form claims clean, live AAB still ships firebase-analytics) and is just as bad as the current mismatch.
 - **EAS Sentry token:** `SENTRY_AUTH_TOKEN` is set as a `secret` env var in EAS production/preview/development environments (set 2026-05-06). Production EAS builds without it now fail-fast at `app.config.ts` so source-maps are guaranteed to upload.
 - **Mapbox SDK telemetry** is disabled at module load (`Mapbox.setTelemetryEnabled(false)` in `RouteMap.tsx` and `offlinePacks.ts`). The Privacy Policy at `apps/web/app/privacy/page.tsx` explicitly states "Mapbox SDK telemetry is disabled" — keep this in sync if the call is ever removed.
@@ -388,6 +389,49 @@ OSRM_Server repo** (`C:\dev\OSRM_Server`). Runbook: `docs/runbooks/road-risk-dat
   "Very safe" as dead copy for a feature retired in v0.2.43; zero consumers.
 - **Server-side companions already live:** Cloud Run `defpedal-api-00152-jg8`, and
   Supabase migration `202609040001` re-cutting `get_neighborhood_safety_score`.
+
+## Navigation HUD (redesigned 2026-09-12, shipped v0.2.163)
+
+Plan + full record: **`docs/plans/navigation-hud-redesign.md`**. Driven by on-bike
+rider feedback; three rounds of device testing (preview v0.2.161 → 163).
+
+- **The "Then" row lives in `ManeuverCard`, not `FooterCard`.** It used to render
+  ~700 px away at the bottom of the screen, which made the current and next
+  maneuver read as one instruction said twice. Moving it back is not a layout
+  tidy-up — it re-creates the exact complaint that motivated the redesign.
+- ⚠️ **The street line COLLAPSES when `streetName` is empty.** GPX courses
+  hardcode `streetName: ''` (`core/courseSteps.ts`) because synthesized geometry
+  cannot know street names. Reserving the row leaves a blank gap under every
+  maneuver of an imported course.
+- **End Ride lives ONLY in the footer.** The control rail's red stop button was
+  removed; the footer button plus the Android hardware-back handler are the only
+  two paths, both through the same confirm-gated `Alert`. Do not re-add a rail
+  stop — two end-ride controls is what the move was avoiding.
+- ⚠️ **The End Ride column is a plain `Pressable`, NOT `PressableScale`.** That
+  atom wraps its child in an `Animated.View` carrying only transform/opacity, so
+  a flush column stretched by its parent collapses to glyph height inside it
+  (error-log #105).
+- ⚠️ **`RouteFeatureAlertStack`'s `bottomOffset` IS the footer height** — 164
+  while the footer was ~111 px, 139 after the trim to ~86 px. Change the
+  footer's padding or type sizes and this moves in the same commit, or
+  tunnel/left-turn alerts land on top of the steep-grade pill. The component's
+  own 180 default encodes the pre-redesign footer.
+- ⚠️ **The rail centres by LAYOUT (`top: 0, bottom: 0, justifyContent: 'center'`),
+  never a constant** — its height varies at runtime because the elevation toggle
+  only renders when the route carries a profile. The old `top:'38%'` +
+  `translateY(-120)` went stale the moment the card grew, and covered the
+  instruction panel (error-log #119). `pointerEvents="box-none"` on it is now
+  load-bearing: the rail spans the full height and would otherwise swallow every
+  map tap down the right edge, including the one that breaks camera follow.
+- **`ElevationProgressCard` carries its own close control.** It is opened from
+  the rail and is tall enough to cover that button, which trapped it open
+  mid-ride. Fixed with an X on the card rather than by separating the two
+  elements — whether they collide depends on screen height, system bars and
+  whether the Steep pill is showing.
+- `NavigationHUD.test.tsx` (32 specs) is new; the component had **zero** coverage
+  before. `src/components/NavigationChrome.tsx` is DEAD (zero consumers) and
+  contains its own street line and "then" strip — it reads like a second HUD.
+  Deleting it is its own change.
 
 ## App Variants
 
@@ -900,10 +944,24 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-09-05)
+## Current State (as of 2026-09-13)
 
 > Entries below are dated and append-only — the newest facts are usually in the
-> most recent bullets, not the top. Latest work: **b46v1 risk re-anchoring**
+> most recent bullets, not the top.
+>
+> **RELEASED 2026-09-13 — v0.2.163 is the first production ship since v0.2.130
+> (2026-08-29), so it carries ~33 versions of accumulated change at once,
+> including the FIRST EVER R8-minified production build.** Android
+> v0.2.163 (versionCode 166) is live on Play at **100%**; iOS **1.18 / build 29**
+> is `WAITING_FOR_REVIEW` with `releaseType: AFTER_APPROVAL` (it publishes the
+> moment Apple approves — there is no staged rollout on iOS). The long
+> "built but never uploaded" backlog below (v0.2.132, v0.2.156) is now
+> superseded: those artefacts were never shipped and never will be.
+> Rollout evidence is thin by nature — see the session-volume warning under
+> **Play Store Release**. Navigation HUD redesign shipped in this release:
+> `docs/plans/navigation-hud-redesign.md`.
+>
+> Earlier work: **b46v1 risk re-anchoring**
 > (2026-09-04) — risk display collapsed to 3 claim tiers over 10 shades; see
 > the "Risk Display Bands" section above. Before that: **GPX course import**
 > (2026-09-04) — a rider can import a .gpx course, see exactly where it gets
@@ -1030,7 +1088,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - **~2,995 tests across 3 packages** (core: 871, mobile-api: 674, mobile: 1,450 — counts as of 2026-08-15). Vitest + happy-dom + @testing-library/react. Zero skipped/excluded files; `npm test` from the root runs all three.
 
 ### Known Incomplete
-- **Production AAB v0.2.156 (159) with R8 is BUILT, VERIFIED and ARCHIVED — NOT yet uploaded to Play (2026-09-10).** `apkreleases/DefensivePedal-Production-v0.2.156.aab` (127.8 MB; `-pre-sentry.aab` beside it is the same build without the Sentry hooks, keep as fallback). Verified by content: upload-key signer `82:7C:FD:44:…:6F:35:73`, versionName 0.2.156, R8 keep check passed on the production flavor, `BUNDLE-METADATA/…/proguard.map` embedded (78 MB), `base/assets/sentry-debug-meta.properties` UUID matches the mapping Sentry holds, release audit passed, DEX 18.2 MB (was 48.5). Victor's step: upload to Internal testing, then App bundle explorer → Details → confirm "App optimisation" is no longer Low and the R8 row has no ⚠️, then the usual staged rollout with the vitals gate.
+- **[SUPERSEDED 2026-09-13 — never uploaded; v0.2.163 shipped instead. Kept for the verification recipe only.]** **Production AAB v0.2.156 (159) with R8 is BUILT, VERIFIED and ARCHIVED — NOT yet uploaded to Play (2026-09-10).** `apkreleases/DefensivePedal-Production-v0.2.156.aab` (127.8 MB; `-pre-sentry.aab` beside it is the same build without the Sentry hooks, keep as fallback). Verified by content: upload-key signer `82:7C:FD:44:…:6F:35:73`, versionName 0.2.156, R8 keep check passed on the production flavor, `BUNDLE-METADATA/…/proguard.map` embedded (78 MB), `base/assets/sentry-debug-meta.properties` UUID matches the mapping Sentry holds, release audit passed, DEX 18.2 MB (was 48.5). Victor's step: upload to Internal testing, then App bundle explorer → Details → confirm "App optimisation" is no longer Low and the R8 row has no ⚠️, then the usual staged rollout with the vitals gate.
 - **CI `Security audit` fixed 2026-09-10 after being red on every push since ≥2026-09-04.** Twenty non-allowlisted high/critical advisories, all cleared by a targeted `npm update next sharp fast-uri @xmldom/xmldom js-yaml` (every intermediate's own caret range already allowed the patched release, so no `overrides` were forced and nothing left the lockfile): `next` 15.5.22→15.5.25 (two CRITICAL RCEs, fixed at 15.5.24 — floor raised in `apps/web/package.json`), `fast-uri` 3.1.5/4.1.2→3.1.7/4.1.4 (**under Fastify in the API server** — the one that could reach production traffic), `@xmldom/xmldom` 0.8.13/0.9.10→0.8.15/0.9.12 and `js-yaml` (Expo config-plugin / xcpretty / istanbul tooling), `sharp`→0.35.4 (root optional dep + `overrides` aligned). `actions/checkout` and `actions/setup-node` v4→v7 (Node 24, ends the Node-20 deprecation warning). ⚠️ `next build` for `apps/web` FAILS LOCALLY in the workspace install regardless of the Next version — `/404` prerender, "Objects are not valid as a React child" — because the root hoists React 19.2.1 from apps/mobile beside the web app's React 18.3.1 (`apps/web/app/not-found.tsx` documents it). Vercel installs `apps/web` alone (`--workspaces=false`) and is the authority for whether the web app builds; check the deployment for the pushed commit, not a local `next build`.
 - **`AuthSessionProvider` no longer signs out on a failed session READ (fixed 2026-09-10, preview v0.2.157).** A throw from `getCurrentSession()` was treated as an expired refresh token → `signOut({ scope: 'local' })` → anonymous sign-in, which then WROTE an anonymous session over the rider's real one. supabase-js never throws for an expired/invalid token (it returns `session: null` and clears storage itself); what throws is the read — the secure-store adapter rejecting, a keystore error. `lib/sessionReadError.ts` classifies a throw as `invalid_session` (a supabase `AuthError` → `clearLocalSession()` + anonymous, as before) or `read_failure` (keep what is on disk AND in memory, `telemetry.captureError` with `source: 'auth_session_read'`, set `authError` "Could not read the saved sign-in…", and let the existing retry loop READ again — never sign in anonymously over an unreadable store). Four provider tests pin it; all four fail against the old provider.
 - ~~**Cloud Run deploy pending** for the server half of commit `e0784c6`~~ — **DONE.** Verified 2026-08-17: live revision `defpedal-api-00129-5n6`, built off merged `main` (nudge `preferred_locale`, NULL→UTC quiet-hours fallbacks, `fromFallback` safety-floor gating, forecast-gated `weather_invitation`, ES City Pulse pool + ES moderation patterns, quiz GENERIC default). Migration `202608130001` was already live.
@@ -1039,7 +1097,7 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Money/impact figures are EUR everywhere including the 11 non-euro supported countries (incl. Romania) and a hardcoded €0.35/km in `StatsDashboard`. Needs an FX/product decision (review P3).
 - iPhone validation (no macOS hardware available) — iOS ships without ever having run on a device in this environment, like every build before it. The release preflight hard-requires `--native-validation-ref` for iOS precisely because of this — no session has ever been able to supply it, so all iOS builds go through the documented manual EAS CLI pipeline (`docs/runbooks/ios-app-store-submission.md`) instead of the GitHub Actions gate. Despite that gap, the app has shipped to real App Store review **seven times successfully since June 2026** with no functional rejection (only two policy-copy rejections, both fixed and re-approved) — Apple's own review process is the closest thing this app has to a device test. **Verify iOS release state via the App Store Connect API before trusting this repo's notes** — see the next bullet for why.
 - **⚠️ This repo's own notes about iOS submission state have gone stale before — verify against the live App Store Connect API before trusting a "not submitted" claim.** As of 2026-09-03, this same section claimed build 26 (v0.2.130) was "not submitted for review." The live ASC API said otherwise: **version 1.17 (build 26) was `READY_FOR_SALE`** — the app had been live on the App Store since 2026-08-29, `releaseType: AFTER_APPROVAL`. The account owner finishes iOS releases directly in App Store Connect (create version record, attach build, Submit for Review — the one step this repo's pipeline has never scripted, see `docs/runbooks/ios-app-store-submission.md` step 4) without always looping back to update this file. **Query, don't assume:** `GET /v1/apps/6778694757/appStoreVersions` (see the runbook's "Verifying status headlessly" section for the JWT-signing recipe) shows every version record and its `appStoreState`; `GET /v1/builds?filter[app]=6778694757&sort=-uploadedDate` shows `processingState` per build.
-- **v0.2.132 (vc 135) cut for both stores 2026-09-03** — first release carrying permanent hazards (see Permanent Hazards section above). Android AAB archived at `apkreleases/DefensivePedal-Production-v0.2.132.aab`, signer-verified, **not uploaded to Play Console**. iOS build 27 built + submitted via EAS, processed `VALID` on the first pass (no rejection) — **not yet attached to a version record / submitted for review**, the manual ASC step above. Both from commit `a67b4d6`. **The standing blocking question is unchanged: alert density in Amsterdam** — 2,051 alert-eligible imported hazards in one city, never ridden. If it is too noisy the fix is one statement (`UPDATE hazard_import_sources SET alert_eligible=false WHERE id='signalen:amsterdam'`), far cheaper to find before a rollout than after an Apple review cycle.
+- **[SUPERSEDED 2026-09-13 — neither artefact shipped; v0.2.163 / iOS build 29 went out instead.]** **v0.2.132 (vc 135) cut for both stores 2026-09-03** — first release carrying permanent hazards (see Permanent Hazards section above). Android AAB archived at `apkreleases/DefensivePedal-Production-v0.2.132.aab`, signer-verified, **not uploaded to Play Console**. iOS build 27 built + submitted via EAS, processed `VALID` on the first pass (no rejection) — **not yet attached to a version record / submitted for review**, the manual ASC step above. Both from commit `a67b4d6`. **The standing blocking question is unchanged: alert density in Amsterdam** — 2,051 alert-eligible imported hazards in one city, never ridden. If it is too noisy the fix is one statement (`UPDATE hazard_import_sources SET alert_eligible=false WHERE id='signalen:amsterdam'`), far cheaper to find before a rollout than after an Apple review cycle.
 - **Amsterdam import licence is an owner override, not a grant** — `hazard_import_sources.licence` reads `UNCONFIRMED-OWNER-OVERRIDE-2026-08-27`; the feed returns zero hits on data.overheid.nl. An email to Amsterdam's open-data team would settle it. **civia.ro consent was granted 2026-09-01** (public pages only). **Zaragoza's licence is UNVERIFIED** and recorded as such in its source row.
 - Redis activation: code complete (`redisStore.ts`), needs GCP Memorystore + REDIS_URL on Cloud Run
 - Habit Engine Phase 7 deferred: neighborhood challenges, Safety Wrapped, mentorship, city reports
