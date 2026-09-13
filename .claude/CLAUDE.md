@@ -140,7 +140,7 @@ Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
 
 - **OSRM has no round-trip service**, so a loop is a waypoint ring we synthesize
   and then measure. Everything below is a consequence of that.
-- ✅ **A loop is placed, not just sized (2026-09-13).** `LoopPlacement` is
+- ✅ **A loop is placed, not just sized (2026-09-13, device-confirmed on preview v0.2.164).** `LoopPlacement` is
   `out_of_town` (the DEFAULT) or `around_here`. Before it, the generator could
   not leave a city at any distance it offered: three of every five candidates
   were rings centred on the rider, and a closed ring reaches only about a tenth
