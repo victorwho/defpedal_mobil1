@@ -1439,6 +1439,8 @@ export const es: TranslationKeys = {
 
   // ── Leaderboard ──
   leaderboard: {
+    scope_region: 'Aún nadie cerca — clasificación en 100 km',
+    scope_community: 'Aún nadie cerca — clasificación de toda la comunidad',
     title: 'Clasificación del barrio',
     loadFailed: 'No pudimos cargar la clasificación. Desliza para actualizar o inténtalo de nuevo.',
     tabs: {

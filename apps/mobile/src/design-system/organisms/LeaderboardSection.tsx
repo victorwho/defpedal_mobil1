@@ -84,6 +84,10 @@ export function LeaderboardSection() {
     return data.entries[0]?.isRequestingUser ?? false;
   }, [data]);
 
+  // Absent on an older server → 'nearby', which is the pre-ladder behaviour and
+  // the safe reading: it never claims a wider scope than was actually used.
+  const scopeUsed = data?.scopeUsed ?? 'nearby';
+
   return (
     <View style={styles.container}>
       <View style={styles.titleRow}>
@@ -94,6 +98,18 @@ export function LeaderboardSection() {
           </View>
         ) : null}
       </View>
+
+      {/* How far the board had to reach. The ladder widens until there are
+          enough riders to rank, and widening a leaderboard changes what the
+          rider is competing IN — "#1 near you" and "#1 across the community"
+          are different claims. Shown only once widened: at the nearby rung the
+          section title already says it, and a redundant line there would just
+          be noise. */}
+      {scopeUsed !== 'nearby' ? (
+        <Text style={styles.scopeNote}>
+          {t(`leaderboard.scope_${scopeUsed}`)}
+        </Text>
+      ) : null}
 
       {/* Metric tab bar */}
       <View style={styles.tabBar}>
@@ -302,6 +318,14 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textSm,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    // Sits directly under the section title, so it reads as a qualifier on the
+    // board rather than a separate statement.
+    scopeNote: {
+      ...textSm,
+      color: colors.textSecondary,
+      marginTop: -space[1],
+      marginBottom: space[2],
     },
     separator: {
       flexDirection: 'row',

@@ -57,6 +57,9 @@ export const leaderboardResponseSchema = {
     },
     periodStart: { type: 'string' },
     periodEnd: { type: 'string' },
+    // Gotcha #9: declare it or Fastify strips it and the UI silently keeps
+    // labelling a community-wide board as "near you".
+    scopeUsed: { type: 'string', enum: ['nearby', 'region', 'community'] },
   },
 } as const;
 

@@ -1463,6 +1463,8 @@ export const en = {
 
   // ── Leaderboard ──
   leaderboard: {
+    scope_region: 'No one close by yet — ranking riders within 100 km',
+    scope_community: 'No one close by yet — ranking the whole community',
     title: 'Neighborhood Leaderboard',
     loadFailed: "Couldn't load the leaderboard. Pull to refresh or try again.",
     tabs: {

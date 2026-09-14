@@ -1623,6 +1623,16 @@ export interface LeaderboardResponse {
   readonly userRank: LeaderboardEntry | null;
   readonly periodStart: string;
   readonly periodEnd: string;
+  /**
+   * How wide the board had to reach to find enough riders to rank.
+   *
+   * ⚠️ Load-bearing for the label, not decoration. Widening a leaderboard
+   * changes what the rider is competing in — "#1 near you" and "#1 across the
+   * community" are different claims, and the second must never be rendered as
+   * the first. Optional so an older server's response still parses; absence is
+   * treated as 'nearby', which is the pre-ladder behaviour.
+   */
+  readonly scopeUsed?: CommunityScope;
 }
 
 // ── Saved Routes ──

@@ -1,4 +1,9 @@
-import type { ErrorResponse } from '@defensivepedal/core';
+import type { CommunityScope, ErrorResponse } from '@defensivepedal/core';
+import {
+  COMMUNITY_MIN_FEED_ITEMS,
+  COMMUNITY_REGION_RADIUS_KM,
+  kmToMeters,
+} from '@defensivepedal/core';
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 
 import { requireFullUser } from '../lib/auth';
@@ -19,6 +24,12 @@ import {
 } from '../lib/leaderboardSchemas';
 
 const DEFAULT_RADIUS_KM = 15;
+
+/**
+ * Radius that covers the whole planet — the 'community' rung, matching the
+ * value the feed uses and the one the settle cron already ranks at.
+ */
+const GLOBAL_RADIUS_METERS = 20_037_508;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -214,32 +225,71 @@ export const buildLeaderboardRoutes = (
           period: rawPeriod,
         } = request.query;
 
-        const radiusMeters = (rawRadius ?? DEFAULT_RADIUS_KM) * 1000;
+        const nearbyRadiusMeters = (rawRadius ?? DEFAULT_RADIUS_KM) * 1000;
         const metric = rawMetric ?? 'co2';
         const period = rawPeriod ?? 'week';
 
-        const { data, error } = await db.rpc('get_neighborhood_leaderboard', {
-          p_user_lat: lat,
-          p_user_lon: lon,
-          p_radius_meters: radiusMeters,
-          p_metric: metric,
-          p_period: period,
-          p_requesting_user_id: user.id,
-        });
-
-        if (error) {
-          request.log.error(
-            { event: 'leaderboard_query_error', error: error.message },
-            'leaderboard query failed',
-          );
-          throw new HttpError('Leaderboard query failed.', {
-            statusCode: 502,
-            code: 'UPSTREAM_ERROR',
-            details: [error.message],
+        const fetchAt = async (radiusMeters: number): Promise<Record<string, unknown>[]> => {
+          const { data, error } = await db.rpc('get_neighborhood_leaderboard', {
+            p_user_lat: lat,
+            p_user_lon: lon,
+            p_radius_meters: radiusMeters,
+            p_metric: metric,
+            p_period: period,
+            p_requesting_user_id: user.id,
           });
-        }
+          if (error) {
+            request.log.error(
+              { event: 'leaderboard_query_error', error: error.message },
+              'leaderboard query failed',
+            );
+            throw new HttpError('Leaderboard query failed.', {
+              statusCode: 502,
+              code: 'UPSTREAM_ERROR',
+              details: [error.message],
+            });
+          }
+          return (data ?? []) as Record<string, unknown>[];
+        };
 
-        const rows = (data ?? []) as Record<string, unknown>[];
+        /*
+         * Scope ladder — nearby (15 km) -> region (100 km) -> community.
+         *
+         * A leaderboard with nobody on it is worse than useless: it tells a new
+         * rider the app is empty at the exact moment it is trying to show them a
+         * community. Most cities here have too few riders to fill fifteen
+         * kilometres, so we widen until there are enough to rank rather than
+         * rendering an empty podium.
+         *
+         * ⚠️ Widening a LEADERBOARD is not the same as widening a feed: it
+         * changes what the rider is competing in, so `scopeUsed` is returned and
+         * the UI must relabel. "#1 near you" and "#1 across the community" are
+         * different claims and the second one must never be shown as the first.
+         *
+         * Same ladder and the same threshold as the community feed, deliberately
+         * — two surfaces answering "is there anyone around" should not disagree.
+         *
+         * Note this moves the DISPLAY toward what settlement already does: the
+         * settle cron ranks globally (p_radius_meters 50,000,000 below), so a
+         * rider could already top the 15 km board and be awarded nothing.
+         * Widening narrows that gap rather than opening it.
+         */
+        const scopeRadii: Record<CommunityScope, number> = {
+          nearby: nearbyRadiusMeters,
+          region: kmToMeters(COMMUNITY_REGION_RADIUS_KM),
+          community: GLOBAL_RADIUS_METERS,
+        };
+
+        let scopeUsed: CommunityScope = 'nearby';
+        let rows = await fetchAt(scopeRadii.nearby);
+        if (rows.length < COMMUNITY_MIN_FEED_ITEMS) {
+          scopeUsed = 'region';
+          rows = await fetchAt(scopeRadii.region);
+        }
+        if (scopeUsed === 'region' && rows.length < COMMUNITY_MIN_FEED_ITEMS) {
+          scopeUsed = 'community';
+          rows = await fetchAt(scopeRadii.community);
+        }
         const entries = rows.map(mapLeaderboardRow);
 
         // Separate the requesting user's entry if it's outside top 50
@@ -253,6 +303,7 @@ export const buildLeaderboardRoutes = (
           userRank: userEntry,
           periodStart: bounds.periodStart,
           periodEnd: bounds.periodEnd,
+          scopeUsed,
         };
       },
     );

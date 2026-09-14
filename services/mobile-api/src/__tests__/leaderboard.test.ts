@@ -135,7 +135,13 @@ describe("GET /v1/leaderboard", () => {
   });
 
   it("maps snake_case RPC row to camelCase entry fields", async () => {
-    enqueueResult({ data: [makeRow(1, "u1", { display_name: "Alice B", rider_tier: "trailblazer", metric_value: 42.5, rank_delta: 3, is_champion: true, is_requesting_user: true })], count: null, error: null });
+    // Three rows so the scope ladder settles at 'nearby' — this test is about
+    // field mapping, not scoping, and a shorter fixture would widen and consume
+    // queue slots the test never queued.
+    enqueueResult({ data: [
+      makeRow(1, "u1", { display_name: "Alice B", rider_tier: "trailblazer", metric_value: 42.5, rank_delta: 3, is_champion: true, is_requesting_user: true }),
+      makeRow(2, "u2"), makeRow(3, "u3"),
+    ], count: null, error: null });
     const app = buildTestApp(); await app.ready();
     const res = await app.inject({ method: "GET", url: "/v1/leaderboard?lat=44.4&lon=26.1", headers: authHeaders });
     expect(res.statusCode).toBe(200);
@@ -162,6 +168,57 @@ describe("GET /v1/leaderboard", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.entries).toHaveLength(0); expect(body.userRank).toBeNull();
+    await app.close();
+  });
+
+  // ── Scope ladder (2026-09-14) ──
+
+  it("stays nearby when the immediate area already has enough riders", async () => {
+    enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2"), makeRow(3, "u3")], count: null, error: null });
+    const app = buildTestApp(); await app.ready();
+    const res = await app.inject({ method: "GET", url: "/v1/leaderboard?lat=44.4&lon=26.1", headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().scopeUsed).toBe("nearby");
+    expect(res.json().entries).toHaveLength(3);
+    await app.close();
+  });
+
+  it("widens to region when nearby is too sparse to rank", async () => {
+    enqueueResult({ data: [makeRow(1, "u1")], count: null, error: null });            // nearby: 1
+    enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2"), makeRow(3, "u3")], count: null, error: null }); // region: 3
+    const app = buildTestApp(); await app.ready();
+    const res = await app.inject({ method: "GET", url: "/v1/leaderboard?lat=44.4&lon=26.1", headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().scopeUsed).toBe("region");
+    expect(res.json().entries).toHaveLength(3);
+    await app.close();
+  });
+
+  it("falls through to community when region is sparse too", async () => {
+    enqueueResult({ data: [], count: null, error: null });                             // nearby: 0
+    enqueueResult({ data: [makeRow(1, "u1")], count: null, error: null });              // region: 1
+    enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2"), makeRow(3, "u3"), makeRow(4, "u4")], count: null, error: null });
+    const app = buildTestApp(); await app.ready();
+    const res = await app.inject({ method: "GET", url: "/v1/leaderboard?lat=44.4&lon=26.1", headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+    // The whole point of the ladder: a rider with nobody nearby still sees a
+    // board rather than an empty podium.
+    expect(res.json().scopeUsed).toBe("community");
+    expect(res.json().entries).toHaveLength(4);
+    await app.close();
+  });
+
+  it("reports community scope even when the widest rung is still empty", async () => {
+    enqueueResult({ data: [], count: null, error: null });
+    enqueueResult({ data: [], count: null, error: null });
+    enqueueResult({ data: [], count: null, error: null });
+    const app = buildTestApp(); await app.ready();
+    const res = await app.inject({ method: "GET", url: "/v1/leaderboard?lat=44.4&lon=26.1", headers: authHeaders });
+    expect(res.statusCode).toBe(200);
+    // Honest rather than flattering: it says how far it looked, and the client
+    // must not label a community-wide empty board as "near you".
+    expect(res.json().scopeUsed).toBe("community");
+    expect(res.json().entries).toHaveLength(0);
     await app.close();
   });
 

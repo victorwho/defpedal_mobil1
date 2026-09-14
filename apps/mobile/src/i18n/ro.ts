@@ -1439,6 +1439,8 @@ export const ro: TranslationKeys = {
 
   // ── Leaderboard ──
   leaderboard: {
+    scope_region: 'Încă nimeni în apropiere — clasament pe 100 km',
+    scope_community: 'Încă nimeni în apropiere — clasamentul întregii comunități',
     title: 'Clasament de cartier',
     loadFailed: 'Nu am putut încărca clasamentul. Trage pentru reîmprospătare sau încearcă din nou.',
     tabs: {
