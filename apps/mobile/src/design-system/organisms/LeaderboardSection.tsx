@@ -181,7 +181,19 @@ export function LeaderboardSection() {
       {/* Empty state */}
       {!isLoading && !error && data && data.entries.length === 0 && (
         <View style={styles.center}>
-          <Text style={styles.emptyText}>{t('leaderboard.emptyState')}</Text>
+          {/* Scope-aware. Saying "in your area" after the ladder has already
+              searched the WHOLE community contradicts the note above it and
+              tells the rider to wait for neighbours who would not help — the
+              board is empty because nothing was ranked anywhere in this
+              period, not because their town is quiet. Measured 2026-09-14:
+              hazards had 0 rider reports in the last 7 days and 22 in the
+              last 30, so this empty state is reached routinely on the weekly
+              tab and its wording matters. */}
+          <Text style={styles.emptyText}>
+            {t(scopeUsed === 'nearby'
+              ? 'leaderboard.emptyState'
+              : 'leaderboard.emptyStateWidened')}
+          </Text>
         </View>
       )}
 

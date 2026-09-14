@@ -1463,6 +1463,7 @@ export const en = {
 
   // ── Leaderboard ──
   leaderboard: {
+    emptyStateWidened: 'Nothing ranked for this period yet — try a longer one',
     scope_region: 'No one close by yet — ranking riders within 100 km',
     scope_community: 'No one close by yet — ranking the whole community',
     title: 'Neighborhood Leaderboard',

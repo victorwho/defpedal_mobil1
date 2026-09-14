@@ -1439,6 +1439,7 @@ export const es: TranslationKeys = {
 
   // ── Leaderboard ──
   leaderboard: {
+    emptyStateWidened: 'Nada clasificado en este periodo — prueba uno más largo',
     scope_region: 'Aún nadie cerca — clasificación en 100 km',
     scope_community: 'Aún nadie cerca — clasificación de toda la comunidad',
     title: 'Clasificación del barrio',

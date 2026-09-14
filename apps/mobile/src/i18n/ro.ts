@@ -1439,6 +1439,7 @@ export const ro: TranslationKeys = {
 
   // ── Leaderboard ──
   leaderboard: {
+    emptyStateWidened: 'Nimic clasat în această perioadă — încearcă una mai lungă',
     scope_region: 'Încă nimeni în apropiere — clasament pe 100 km',
     scope_community: 'Încă nimeni în apropiere — clasamentul întregii comunități',
     title: 'Clasament de cartier',
