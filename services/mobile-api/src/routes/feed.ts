@@ -355,6 +355,7 @@ export const buildFeedRoutes = (
           return {
             routes: Number(r.routes ?? 0),
             planners: Number(r.planners ?? 0),
+            coversWindow: r.coversWindow === true,
           };
         };
 

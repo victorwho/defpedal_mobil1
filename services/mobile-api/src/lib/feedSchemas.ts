@@ -386,6 +386,9 @@ const routesPlannedSchema = {
   properties: {
     routes: { type: 'integer' },
     planners: { type: 'integer' },
+    // Gotcha #9: without this the flag is stripped and the client, treating
+    // absence as "not covered", would hide the cell forever.
+    coversWindow: { type: 'boolean' },
   },
 } as const;
 

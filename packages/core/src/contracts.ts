@@ -1540,6 +1540,17 @@ export interface RidesStarted {
 export interface RoutesPlanned {
   readonly routes: number;
   readonly planners: number;
+  /**
+   * Whether recording actually covers the window this number describes.
+   *
+   * Recording began 2026-09-14 against an empty table, so for any earlier
+   * window the count is a fraction of a period standing next to complete ride
+   * counts — true numbers producing a false impression ("hardly anyone plans
+   * routes" instead of "we only started counting on Tuesday"). The UI renders
+   * the cell only when this is true; it is derived from the data server-side,
+   * so it flips itself once the window is genuinely covered.
+   */
+  readonly coversWindow?: boolean;
 }
 
 // ── Neighborhood Leaderboard ──

@@ -416,6 +416,7 @@ describe('GET /v1/community/heartbeat', () => {
       data: {
         ...heartbeatRpcResult,
         ridesStarted: { rides: 17, activeRiders: 9 },
+        routesPlanned: { routes: 4, planners: 2, coversWindow: true },
         totalsRidesStarted: { rides: 340, activeRiders: 56 },
         communityRidesStarted: { rides: 1419, activeRiders: 551 },
       },
@@ -435,6 +436,10 @@ describe('GET /v1/community/heartbeat', () => {
     const body = response.json();
     // Gotcha #9: these survive the response schema rather than being stripped.
     expect(body.ridesStarted).toEqual({ rides: 17, activeRiders: 9 });
+    // coversWindow must survive too — the client treats absence as "not
+    // covered" and would hide the routes-planned cell forever if it were
+    // stripped.
+    expect(body.routesPlanned).toEqual({ routes: 4, planners: 2, coversWindow: true });
     expect(body.totalsRidesStarted).toEqual({ rides: 340, activeRiders: 56 });
     expect(body.communityRidesStarted).toEqual({ rides: 1419, activeRiders: 551 });
     // The shared-rides pulse is untouched — the two counts stay separate, and

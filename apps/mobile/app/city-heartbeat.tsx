@@ -80,14 +80,20 @@ export default function CityHeartbeatScreen() {
   const totalsRidesStarted = heartbeat?.totalsRidesStarted;
 
   // ── Routes planned (2026-09-14) ──
-  // Gated on > 0, not merely on presence, unlike the rides-started cells above.
-  // Recording began 2026-09-14 with an empty table, so a zero here means "we
-  // were not yet counting", not "nobody planned a route" — and a 0 sitting
-  // beside real ride counts would read as the latter. The cells appear on their
-  // own once there is something true to show.
-  const routesPlanned = heartbeat?.routesPlanned;
-  const totalsRoutesPlanned = heartbeat?.totalsRoutesPlanned;
-  const communityRoutesPlanned = heartbeat?.communityRoutesPlanned;
+  // Rendered ONLY when the server says recording covers the window being shown.
+  // Recording began 2026-09-14 against an empty table, so before that the count
+  // is a fraction of a period sitting beside complete ride counts: the first
+  // render put "1 Routes planned" next to "1422 Rides", two true numbers making
+  // a false point ("hardly anyone plans routes" rather than "we started
+  // counting this morning"). `coversWindow` is derived from the data
+  // server-side, so the cell returns by itself once a full window exists — no
+  // threshold to pick, no launch date to hardcode, no follow-up release.
+  //
+  // The all-time variants are deliberately NOT rendered at all: `trips` reaches
+  // back to 2025-12-17 and planned_routes never will, so an all-time card
+  // cannot compare them fairly however long recording runs.
+  const routesPlanned =
+    heartbeat?.routesPlanned?.coversWindow === true ? heartbeat.routesPlanned : undefined;
   // The orb is the one number read at a glance. It shows how many riders this
   // community actually has at the resolved scope — a larger and far steadier
   // figure than a windowed ride count, which at the old ladder threshold could
@@ -204,16 +210,6 @@ export default function CityHeartbeatScreen() {
                   color={colors.accent}
                   styles={styles}
                 />
-                {communityRoutesPlanned && communityRoutesPlanned.routes > 0 && (
-                  <StatCell
-                    label={t('cityHeartbeat.routesPlanned')}
-                    value={communityRoutesPlanned.routes}
-                    suffix=""
-                    decimals={0}
-                    color={colors.info}
-                    styles={styles}
-                  />
-                )}
                 <StatCell
                   label={t('cityHeartbeat.distance')}
                   value={heartbeat.communityTotals.distanceMeters / 1000}
@@ -276,7 +272,7 @@ export default function CityHeartbeatScreen() {
                 color={colors.accent}
                 styles={styles}
               />
-              {routesPlanned && routesPlanned.routes > 0 && (
+              {routesPlanned && (
                 <StatCell
                   label={t('cityHeartbeat.routesPlanned')}
                   value={routesPlanned.routes}
@@ -357,16 +353,6 @@ export default function CityHeartbeatScreen() {
                 color={colors.accent}
                 styles={styles}
               />
-              {totalsRoutesPlanned && totalsRoutesPlanned.routes > 0 && (
-                <StatCell
-                  label={t('cityHeartbeat.routesPlanned')}
-                  value={totalsRoutesPlanned.routes}
-                  suffix=""
-                  decimals={0}
-                  color={colors.info}
-                  styles={styles}
-                />
-              )}
               <StatCell
                 label={t('cityHeartbeat.distance')}
                 value={heartbeat.totals.distanceMeters / 1000}
