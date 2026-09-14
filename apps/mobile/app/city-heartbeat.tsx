@@ -232,7 +232,12 @@ export default function CityHeartbeatScreen() {
                 />
                 <StatCell
                   label={t('cityHeartbeat.riders')}
-                  value={heartbeat.communityTotals.uniqueRiders}
+                  // Riders who RODE, to match the Rides cell above it. Using
+                  // communityTotals.uniqueRiders here counted only riders who
+                  // SHARED, so the card read "1420 rides / 139 riders" when
+                  // those rides came from 552 people — two populations in one
+                  // card, understating the community roughly 4x.
+                  value={communityRidesStarted?.activeRiders ?? heartbeat.communityTotals.uniqueRiders}
                   suffix=""
                   decimals={0}
                   color={colors.accent}
@@ -380,7 +385,9 @@ export default function CityHeartbeatScreen() {
               />
               <StatCell
                 label={t('cityHeartbeat.riders')}
-                value={heartbeat.totals.uniqueRiders}
+                // Same pairing as the community card: riders who rode, so this
+                // cell and the Rides cell describe one population.
+                value={totalsRidesStarted?.activeRiders ?? heartbeat.totals.uniqueRiders}
                 suffix=""
                 decimals={0}
                 color={colors.accent}
