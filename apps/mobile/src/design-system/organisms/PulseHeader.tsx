@@ -127,38 +127,43 @@ export const PulseHeader = ({
   return (
     <View style={styles.card}>
       <View style={styles.row}>
-        {/* Pulse orb */}
-        <View style={styles.pulseContainer}>
-          {!reducedMotion && (
-            <>
-              <Animated.View
-                style={[
-                  styles.ring,
-                  {
-                    transform: [{ scale: ring1Scale }],
-                    opacity: ring1Opacity,
-                  },
-                ]}
-              />
-              <Animated.View
-                style={[
-                  styles.ring,
-                  {
-                    transform: [{ scale: ring2Scale }],
-                    opacity: ring2Opacity,
-                  },
-                ]}
-              />
-            </>
-          )}
-          <View style={styles.orbCore}>
-            <Text style={styles.orbText}>{totalRidesToday}</Text>
-            {orbLabel ? (
-              <Text style={styles.orbLabel} numberOfLines={1}>
-                {orbLabel}
-              </Text>
-            ) : null}
+        {/* Pulse orb + its caption. The caption sits BELOW the disc, not
+            inside it: `orbCore` is 36 px across, so a number and a word
+            stacked within it overflow the circle in both axes — which is
+            exactly what shipped to the device on the first attempt. */}
+        <View style={styles.orbCol}>
+          <View style={styles.pulseContainer}>
+            {!reducedMotion && (
+              <>
+                <Animated.View
+                  style={[
+                    styles.ring,
+                    {
+                      transform: [{ scale: ring1Scale }],
+                      opacity: ring1Opacity,
+                    },
+                  ]}
+                />
+                <Animated.View
+                  style={[
+                    styles.ring,
+                    {
+                      transform: [{ scale: ring2Scale }],
+                      opacity: ring2Opacity,
+                    },
+                  ]}
+                />
+              </>
+            )}
+            <View style={styles.orbCore}>
+              <Text style={styles.orbText}>{totalRidesToday}</Text>
+            </View>
           </View>
+          {orbLabel ? (
+            <Text style={styles.orbLabel} numberOfLines={1}>
+              {orbLabel}
+            </Text>
+          ) : null}
         </View>
 
         {/* City + riders */}
@@ -228,16 +233,27 @@ const createThemedStyles = (colors: ThemeColors) =>
       color: colors.textInverse,
       fontSize: 16,
     },
-    // Small enough to read as a caption on the number rather than competing
-    // with it, and clipped to one line — the orb is a fixed 72 px disc, so a
-    // long localization must never push the figure off-centre.
+    // Column holding the orb and its caption. Fixed to the orb's width so the
+    // caption cannot widen the row and shove the city name off-screen.
+    orbCol: {
+      width: PULSE_SIZE,
+      alignItems: 'center',
+    },
+    // Caption UNDER the disc, so it is bounded by the 72 px column rather than
+    // the 36 px circle, and readable against the card rather than the accent
+    // fill. One line only: a longer localization ("ciclistas") must shrink to
+    // fit rather than wrap and shift the row height.
     orbLabel: {
-      ...textDataLg,
+      ...textXs,
       fontFamily: fontFamily.body.medium,
-      color: colors.textInverse,
-      fontSize: 9,
-      opacity: 0.85,
-      marginTop: -2,
+      color: colors.textSecondary,
+      // Negative, because `pulseContainer` is 72 px tall around a 36 px disc:
+      // laid out naturally the caption starts 18 px of dead space below the
+      // circle and reads as orphaned. Pulling it up closes that gap without
+      // shrinking the container, which the rings expand into (they scale to
+      // 2.2x and deliberately overflow it).
+      marginTop: -space[3],
+      textAlign: 'center',
     },
     textCol: {
       flex: 1,

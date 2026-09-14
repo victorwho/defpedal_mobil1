@@ -44,6 +44,7 @@ export type PlannedRouteWrite = {
   readonly lon: number;
   readonly routingMode?: PlannedRouteMode | null;
   readonly distanceMeters?: number | null;
+  /** Device-hashed plan key (16 hex chars). Compared for equality only. */
   readonly dedupeKey?: string | null;
 };
 

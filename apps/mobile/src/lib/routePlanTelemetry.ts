@@ -41,15 +41,41 @@ export type PlanKeyInput = {
 };
 
 /**
+ * FNV-1a, 32 bits, as 8 hex chars. Two passes over different seeds give 64
+ * bits of key space.
+ *
+ * Not cryptographic and does not need to be — see `buildPlanKey`. What it
+ * needs is to be stable across launches (so a re-plan an hour later still
+ * matches) and one-way enough that the input is not simply readable back,
+ * which a rounded lat/lon pair in plain text is not.
+ */
+const fnv1a = (input: string, seed: number): string => {
+  let hash = seed;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    // hash * 16777619, kept in 32-bit range without Math.imul overflow games.
+    hash = (hash + ((hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24))) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+};
+
+/**
  * Stable key for one planning intent.
  *
  * Deliberately mode-independent — switching Safe to Flat is the same intent —
  * and rounded to ~11 m so GPS jitter on the origin does not mint a new plan
  * each time the preview remounts.
  *
- * Note the destination is used to BUILD the key but is never transmitted: the
- * key is sent as an opaque string and the destination itself never leaves the
- * device (see the privacy note in lib/plannedRoutes.ts).
+ * ⚠️ HASHED, and that is the privacy design rather than a tidiness choice.
+ * The key has to encode the destination — two rides from one origin to
+ * different places are two intents — but `planned_routes` deliberately stores
+ * only the ORIGIN, on the grounds that where someone INTENDED to go is the
+ * more revealing half. Sending the pair as readable text
+ * (`45.5857,25.4566>45.6514,25.6102`) would have put the destination in the
+ * database anyway, in a text column instead of a geography one, making the
+ * whole minimisation argument false. Verified on a real device 2026-09-14:
+ * the first implementation did exactly that. The server only ever compares
+ * this for equality, so it never needs to be readable.
  */
 export const buildPlanKey = ({
   originLat,
@@ -58,7 +84,8 @@ export const buildPlanKey = ({
   destLon,
 }: PlanKeyInput): string => {
   const r = (n: number): string => n.toFixed(KEY_PRECISION_DP);
-  return `${r(originLat)},${r(originLon)}>${r(destLat)},${r(destLon)}`;
+  const raw = `${r(originLat)},${r(originLon)}>${r(destLat)},${r(destLon)}`;
+  return `${fnv1a(raw, 0x811c9dc5)}${fnv1a(raw, 0x01000193)}`;
 };
 
 export type PlanMemory = Readonly<Record<string, number>>;

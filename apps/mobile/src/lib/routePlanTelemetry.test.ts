@@ -29,6 +29,36 @@ describe('buildPlanKey', () => {
     const b = buildPlanKey({ ...BRASOV, destLat: 46.7712, destLon: 23.6236 });
     expect(a).not.toBe(b);
   });
+
+  it('does not leak either coordinate in readable form', () => {
+    // The privacy invariant of planned_routes, asserted rather than trusted:
+    // the table stores the ORIGIN only, so a key carrying a readable
+    // destination would put it in the database anyway and make the whole
+    // minimisation argument false. The first implementation did exactly that
+    // and was caught on a device — the row read
+    // `45.5857,25.4566>45.6514,25.6102`.
+    const key = buildPlanKey({ ...BRASOV, ...DEST });
+
+    expect(key).not.toContain('45.65');   // origin lat
+    expect(key).not.toContain('25.60');   // origin lon
+    expect(key).not.toContain('44.42');   // destination lat
+    expect(key).not.toContain('26.10');   // destination lon
+    expect(key).not.toContain('>');
+    expect(key).not.toContain(',');
+    expect(key).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('is stable across calls so an hour-later re-plan still matches', () => {
+    const a = buildPlanKey({ ...BRASOV, ...DEST });
+    const b = buildPlanKey({ ...BRASOV, ...DEST });
+    expect(a).toBe(b);
+  });
+
+  it('separates origins that differ beyond the rounding window', () => {
+    const a = buildPlanKey({ ...BRASOV, ...DEST });
+    const b = buildPlanKey({ originLat: 45.7000, originLon: 25.6010, ...DEST });
+    expect(a).not.toBe(b);
+  });
 });
 
 describe('shouldRecordPlan', () => {

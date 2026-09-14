@@ -38,9 +38,15 @@ create table if not exists public.planned_routes (
   -- enum because the routing modes change more often than this table should.
   routing_mode  text,
   distance_meters double precision,
-  -- Client-supplied stable key for one planning intent (rounded origin +
-  -- destination + mode-independent). Stored, never displayed, and used ONLY to
-  -- collapse duplicates; see the dedupe note on record_planned_route below.
+  -- Client-supplied stable key for one planning intent, HASHED on device
+  -- (16 hex chars, mode-independent). Compared for equality only, never
+  -- parsed or displayed.
+  -- ⚠️ The hash is load-bearing, not cosmetic: the key must encode the
+  -- destination to tell two intents apart, so sending it as readable text
+  -- would put the destination in this table after all — in a text column
+  -- instead of a geography one — and make the origin-only claim above false.
+  -- The first device test produced exactly that row
+  -- ('45.5857,25.4566>45.6514,25.6102') before the hash was added.
   dedupe_key    text,
   created_at    timestamptz not null default now()
 );
