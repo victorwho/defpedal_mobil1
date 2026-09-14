@@ -1,4 +1,5 @@
 import type {
+  CityCyclingEstimate,
   CityHeartbeat,
   CommunityLifetimeTotals,
   CommunityPulseCounts,
@@ -14,7 +15,9 @@ import type {
   WeeklyActivity,
 } from '@defensivepedal/core';
 import {
+  applyCyclingVolume,
   calculateCo2SavedKg,
+  cyclingVolumeAdjustment,
   COMMUNITY_MIN_FEED_ITEMS,
   COMMUNITY_REGION_RADIUS_KM,
   kmToMeters,
@@ -37,6 +40,7 @@ import {
   type HeartbeatQuerystring,
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
+import { fetchCyclingForecast } from '../lib/clients/openMeteo';
 import { ensureSupabase, mapFeedRow, requireUser, type ChampionLookup } from './feed-helpers';
 import { buildFeedCommentRoutes } from './feed-comments';
 import { buildFeedProfileRoutes } from './feed-profile';
@@ -317,6 +321,49 @@ export const buildFeedRoutes = (
         const pulse = result.pulse as Record<string, unknown> | undefined;
         const communityTotals = result.communityTotals as Record<string, unknown> | undefined;
 
+        /*
+         * Today's estimate = the city's TYPICAL-day figure, moved by today's
+         * actual conditions.
+         *
+         * ⚠️ Why it is modelled rather than randomised. A figure that changes
+         * daily and says "today" is read as a measurement, so it has to move
+         * for reasons a rider could check by looking out of the window.
+         * Randomising would produce the same visual freshness while making the
+         * movement mean nothing — which is worse than leaving it static,
+         * because the variation is exactly what earns belief.
+         *
+         * Weather comes from the same cached Open-Meteo client the nudge
+         * safety-floor uses, so this costs no new upstream call on a warm
+         * cache. A failed fetch yields a neutral factor: the rider then sees
+         * the typical-day number, which is still true.
+         */
+        let cityCyclingEstimate: CityCyclingEstimate | undefined;
+        if (result.cityCyclingEstimate && typeof result.cityCyclingEstimate === 'object') {
+          const e = result.cityCyclingEstimate as Record<string, unknown>;
+          const typicalDay = Number(e.dailyCyclists ?? 0);
+
+          let forecast = null;
+          try {
+            forecast = await fetchCyclingForecast(lat, lon);
+          } catch {
+            // Neutral rather than absent — see above.
+          }
+          const adjustment = cyclingVolumeAdjustment(forecast, new Date().getDay());
+
+          cityCyclingEstimate = {
+            city: String(e.city ?? ''),
+            dailyCyclists: applyCyclingVolume(typicalDay, adjustment),
+            typicalDayCyclists: typicalDay,
+            conditions: adjustment.reason,
+            isRiderCity: e.isRiderCity === true,
+            distanceMeters: Number(e.distanceMeters ?? 0),
+            modalSharePercent: Number(e.modalSharePercent ?? 0),
+            modalShareSource: String(e.modalShareSource ?? ''),
+            modalShareYear: Number(e.modalShareYear ?? 0),
+            population: Number(e.population ?? 0),
+          };
+        }
+
         const mapDailyRows = (rows: Record<string, unknown>[] | undefined): DailyActivity[] =>
           (rows ?? []).map((d) => ({
             day: String(d.day),
@@ -408,22 +455,7 @@ export const buildFeedRoutes = (
           routesPlanned: mapRoutesPlanned(result.routesPlanned),
           totalsRoutesPlanned: mapRoutesPlanned(result.totalsRoutesPlanned),
           communityRoutesPlanned: mapRoutesPlanned(result.communityRoutesPlanned),
-          cityCyclingEstimate:
-            result.cityCyclingEstimate && typeof result.cityCyclingEstimate === 'object'
-              ? (() => {
-                  const e = result.cityCyclingEstimate as Record<string, unknown>;
-                  return {
-                    city: String(e.city ?? ''),
-                    dailyCyclists: Number(e.dailyCyclists ?? 0),
-                    isRiderCity: e.isRiderCity === true,
-                    distanceMeters: Number(e.distanceMeters ?? 0),
-                    modalSharePercent: Number(e.modalSharePercent ?? 0),
-                    modalShareSource: String(e.modalShareSource ?? ''),
-                    modalShareYear: Number(e.modalShareYear ?? 0),
-                    population: Number(e.population ?? 0),
-                  };
-                })()
-              : undefined,
+          cityCyclingEstimate,
           cyclingInEurope:
             result.cyclingInEurope && typeof result.cyclingInEurope === 'object'
               ? (() => {

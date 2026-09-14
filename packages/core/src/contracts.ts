@@ -2,6 +2,7 @@ import type {
   CommunityScope,
   CommunityWindow,
 } from './communityVisibility';
+import type { CyclingVolumeReason } from './cyclingVolume';
 import type { PremiumTier } from './premiumCatalog';
 import type {
   GeoJsonLineString,
@@ -1578,7 +1579,19 @@ export interface RidesStarted {
  */
 export interface CityCyclingEstimate {
   readonly city: string;
+  /**
+   * Estimate for TODAY — the typical-day figure moved by today's weather and
+   * the weekday/weekend shape.
+   *
+   * ⚠️ Modelled, never randomised. A number that changes daily and says
+   * "today" is read as a measurement, so it moves only for reasons a rider
+   * could check by looking outside. See core/cyclingVolume.ts.
+   */
   readonly dailyCyclists: number;
+  /** The unadjusted typical day, so the UI can say how today compares. */
+  readonly typicalDayCyclists: number;
+  /** Why today differs — drives the explanatory line. */
+  readonly conditions: CyclingVolumeReason;
   /** True when the rider is inside this city's catchment rather than near it. */
   readonly isRiderCity: boolean;
   readonly distanceMeters: number;

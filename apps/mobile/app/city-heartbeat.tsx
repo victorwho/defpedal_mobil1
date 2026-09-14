@@ -360,7 +360,7 @@ export default function CityHeartbeatScreen() {
               </Text>
               <View style={styles.statGrid}>
                 <StatCell
-                  label={t('cityHeartbeat.cyclistsDaily')}
+                  label={t('cityHeartbeat.cyclistsToday')}
                   value={cityEstimate.dailyCyclists}
                   suffix=""
                   decimals={0}
@@ -368,6 +368,15 @@ export default function CityHeartbeatScreen() {
                   styles={styles}
                 />
               </View>
+              {/* Why today differs from a typical day. This is what makes the
+                  daily movement checkable — a rider can look out of the window
+                  and see whether we are right. Hidden when conditions are
+                  ordinary, since "today is typical" is not worth a line. */}
+              {cityEstimate.conditions !== 'typical' && (
+                <Text style={styles.estimateCondition}>
+                  {t(`cityHeartbeat.conditions_${cityEstimate.conditions}`)}
+                </Text>
+              )}
               <Text style={styles.estimateSource}>
                 {t('cityHeartbeat.cityEstimateSource', {
                   percent: cityEstimate.modalSharePercent,
@@ -695,6 +704,11 @@ const createThemedStyles = (colors: ThemeColors) =>
     // Small, but never hidden: this line carries the source and the word
     // "estimate", which is what separates the figure above it from a made-up
     // number.
+    estimateCondition: {
+      ...textSm,
+      color: colors.textSecondary,
+      marginTop: space[2],
+    },
     estimateSource: {
       ...textXs,
       color: colors.textSecondary,

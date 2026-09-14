@@ -493,6 +493,11 @@ export const heartbeatResponseSchema = {
       properties: {
         city: { type: 'string' },
         dailyCyclists: { type: 'integer' },
+        typicalDayCyclists: { type: 'integer' },
+        conditions: {
+          type: 'string',
+          enum: ['storm', 'rain', 'cold', 'hot', 'windy', 'ideal', 'typical'],
+        },
         isRiderCity: { type: 'boolean' },
         distanceMeters: { type: 'integer' },
         modalSharePercent: { type: 'number' },
