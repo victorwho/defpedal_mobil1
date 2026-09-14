@@ -113,3 +113,27 @@ support it, since each counter carries a location.
   licence is still unverified.
 * The number is NOT our activity. It must never be summed with rides, shown in
   the community card, or phrased so a rider could read it as app usage.
+
+## Shipped 2026-09-14
+
+Built as Option A. Registry (`bike_counter_sources`) + readings
+(`bike_counter_readings`) + `get_bike_counter_totals`, migrations
+`202609140008/09`, adapters in `services/mobile-api/src/lib/bikeCounters.ts`,
+cron endpoint `POST /v1/bike-counters/run`, surfaced as the CYCLING IN EUROPE
+card.
+
+Scheduler: **`bike-counters-cron`**, `0 7 * * *` Europe/Bucharest. Verified by
+forcing a run and confirming a reading landed one second after the job fired —
+the job existing is not evidence it works.
+
+Two things confirmed against live data rather than reasoned about:
+
+* Repeat runs do not double-count. With two stored readings the aggregate
+  returns 1,929,105 where a naive `sum()` returns 3,858,210; the helper takes
+  `distinct on (source_id)` ordered by `fetched_at desc`.
+* A zero reading is rejected at the adapter rather than stored, so a broken
+  query shape cannot quietly halve the headline.
+
+Next, to widen: harvest Eco-Visio `idOrganisme` values per city, starting with
+Köln (already seeded, disabled, licence marked UNVERIFIED). Re-read error-log
+#98 first — "it speaks the same protocol" has broken three ways before.
