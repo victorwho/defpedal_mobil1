@@ -485,6 +485,16 @@ export const heartbeatResponseSchema = {
     routesPlanned: routesPlannedSchema,
     totalsRoutesPlanned: routesPlannedSchema,
     communityRoutesPlanned: routesPlannedSchema,
+    // Network scale (global). Gotcha #9 applies as everywhere else.
+    network: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['roadSegmentsScored', 'hazardsMapped'],
+      properties: {
+        roadSegmentsScored: { type: 'integer' },
+        hazardsMapped: { type: 'integer' },
+      },
+    },
     // Riders at the resolved scope, all-time — drives the pulse orb.
     scopeRiders: {
       type: 'object',

@@ -408,6 +408,17 @@ export const buildFeedRoutes = (
           routesPlanned: mapRoutesPlanned(result.routesPlanned),
           totalsRoutesPlanned: mapRoutesPlanned(result.totalsRoutesPlanned),
           communityRoutesPlanned: mapRoutesPlanned(result.communityRoutesPlanned),
+          network:
+            result.network && typeof result.network === 'object'
+              ? {
+                  roadSegmentsScored: Number(
+                    (result.network as Record<string, unknown>).roadSegmentsScored ?? 0,
+                  ),
+                  hazardsMapped: Number(
+                    (result.network as Record<string, unknown>).hazardsMapped ?? 0,
+                  ),
+                }
+              : undefined,
           scopeRiders:
             result.scopeRiders && typeof result.scopeRiders === 'object'
               ? { riders: Number((result.scopeRiders as Record<string, unknown>).riders ?? 0) }

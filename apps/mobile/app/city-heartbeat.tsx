@@ -37,7 +37,7 @@ import {
 } from '../src/design-system/tokens/typography';
 import { useCityHeartbeat } from '../src/hooks/useCityHeartbeat';
 import { useT } from '../src/hooks/useTranslation';
-import { HAZARD_TYPE_OPTIONS, type HazardType } from '@defensivepedal/core';
+import { HAZARD_TYPE_OPTIONS, SUPPORTED_APP_COUNTRIES, type HazardType } from '@defensivepedal/core';
 
 // ---------------------------------------------------------------------------
 // Hazard label lookup
@@ -94,6 +94,23 @@ export default function CityHeartbeatScreen() {
   // cannot compare them fairly however long recording runs.
   const routesPlanned =
     heartbeat?.routesPlanned?.coversWindow === true ? heartbeat.routesPlanned : undefined;
+
+  // ── Network scale (2026-09-14) ──
+  // The community counts are honestly small — 822 signed-up cyclists, 552 who
+  // have ridden — and no framing makes them big without lying. What IS big and
+  // true is the network they ride on. These are global, not scope-resolved:
+  // they answer "how much does this app know", which does not vary by where the
+  // rider is standing.
+  const network = heartbeat?.network;
+  // Rounded to millions because the server sends a planner estimate (~0.014%
+  // out on 67M rows); at this precision the error is three orders of magnitude
+  // below the last digit shown, so the rendered figure is exactly as true as an
+  // exact count. Do NOT render this to the unit.
+  const roadSegmentsMillions = network ? network.roadSegmentsScored / 1_000_000 : 0;
+  // Riding time expressed in days: 1,674 hours is the same fact as 69.8 days,
+  // and the second one a rider can picture.
+  const daysRidden = (heartbeat?.communityTotals?.durationSeconds ?? 0) / 86_400;
+  const countriesCovered = SUPPORTED_APP_COUNTRIES.size;
   // The orb is the one number read at a glance. It shows how many riders this
   // community actually has at the resolved scope — a larger and far steadier
   // figure than a windowed ride count, which at the old ladder threshold could
@@ -309,6 +326,57 @@ export default function CityHeartbeatScreen() {
             </View>
           </Surface>
         </FadeSlideIn>
+
+        {/* Network scale. Deliberately its own card rather than mixed into the
+            community totals: these are not things riders near you did, they are
+            the size of the map everyone rides on, and conflating the two is how
+            a 67-million figure would end up implying 67 million rides. */}
+        {network && network.roadSegmentsScored > 0 && (
+          <FadeSlideIn delay={150}>
+            <Surface>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.networkTitle')}</Text>
+              <Text style={styles.sectionSub}>{t('cityHeartbeat.networkSub')}</Text>
+              <View style={styles.statGrid}>
+                <StatCell
+                  label={t('cityHeartbeat.roadsScored')}
+                  value={roadSegmentsMillions}
+                  suffix="M"
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+                {/* "mapped", never "reported by riders" — ~99% are imported
+                    from civic feeds; only 23 came from riders. */}
+                <StatCell
+                  label={t('cityHeartbeat.hazardsMapped')}
+                  value={network.hazardsMapped}
+                  suffix=""
+                  decimals={0}
+                  color={colors.caution}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.countriesCovered')}
+                  value={countriesCovered}
+                  suffix=""
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+                {daysRidden >= 1 && (
+                  <StatCell
+                    label={t('cityHeartbeat.daysRidden')}
+                    value={daysRidden}
+                    suffix=""
+                    decimals={0}
+                    color={colors.safe}
+                    styles={styles}
+                  />
+                )}
+              </View>
+            </Surface>
+          </FadeSlideIn>
+        )}
 
         {/* Activity chart — daily (7 days) or weekly (4 weeks) at the resolved scope */}
         <FadeSlideIn delay={200}>

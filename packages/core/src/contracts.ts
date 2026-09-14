@@ -1520,6 +1520,15 @@ export interface CityHeartbeat {
   readonly communityRoutesPlanned?: RoutesPlanned;
 
   /**
+   * Network scale — global, not scope-resolved.
+   *
+   * The community counts are honestly small (822 signed-up cyclists, 552 who
+   * have ridden). These describe the network those riders ride on, and are the
+   * largest true numbers the system holds.
+   */
+  readonly network?: NetworkStats;
+
+  /**
    * Distinct riders at the resolved `scopeUsed`, all-time.
    *
    * Drives the pulse orb. Scope-matched on purpose — it is computed from the
@@ -1534,6 +1543,24 @@ export interface CityHeartbeat {
 export interface RidesStarted {
   readonly rides: number;
   readonly activeRiders: number;
+}
+
+/** How much road the app has scored, and how many hazards it knows about. */
+export interface NetworkStats {
+  /**
+   * Scored road segments. A planner estimate rather than an exact count —
+   * the table holds ~67 million rows — accurate to ~0.014%, which is why the
+   * UI renders it rounded to millions rather than to the unit.
+   */
+  readonly roadSegmentsScored: number;
+  /**
+   * Hazards currently on the map.
+   *
+   * ⚠️ ~99% are imported from civic feeds (Cologne, Amsterdam, Zaragoza,
+   * civia); only 23 came from riders. Label it "mapped", never "reported by
+   * the community".
+   */
+  readonly hazardsMapped: number;
 }
 
 /** A count of routes planned, plus the distinct riders who planned them. */
