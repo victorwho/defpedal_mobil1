@@ -1142,6 +1142,13 @@ export interface ProfileResponse {
   username: string | null;
   avatarUrl: string | null;
   autoShareRides: boolean;
+  /**
+   * When `autoShareRides` was last explicitly set, or null if it never has
+   * been — which was true of every account until 2026-09-14, because no screen
+   * wrote the column. The client uses null to mean "the device flag carries the
+   * real intent, seed me from it" and non-null to mean "the server owns this".
+   */
+  autoShareRidesSetAt?: string | null;
   trimRouteEndpoints: boolean;
   cyclingGoal: CyclingGoal | null;
   isPrivate: boolean;
@@ -1477,6 +1484,62 @@ export interface CityHeartbeat {
   readonly chartWeekly?: readonly WeeklyActivity[];
   /** Lifetime community-wide totals (no radius filter, labeled as such). */
   readonly communityTotals?: CommunityLifetimeTotals;
+
+  // ── "Rides started" companions (2026-09-14) ──
+  //
+  // Every field above counts rides a rider chose to SHARE (`trip_shares`).
+  // These count rides actually STARTED (`trips`, one row per trip_start),
+  // including short trial starts that were later discarded. Measured
+  // 2026-09-14: 480 shared vs 1,419 started community-wide.
+  //
+  // Deliberately count-only and kept SEPARATE from `pulse` — `trips` carries
+  // no distance for rides whose track never uploaded, and merging two
+  // populations under one label is how a number stops being defensible.
+  // All optional: an un-migrated DB omits them and the UI hides the row.
+
+  /** Rides started at the resolved (windowUsed, scopeUsed) rung. */
+  readonly ridesStarted?: RidesStarted;
+  /** Rides started all-time within the nearby radius (pairs with `totals`). */
+  readonly totalsRidesStarted?: RidesStarted;
+  /** Rides started lifetime community-wide (pairs with `communityTotals`). */
+  readonly communityRidesStarted?: RidesStarted;
+
+  // ── Routes planned (2026-09-14, migration 202609140002) ──
+  //
+  // The widest signal of intent: a route planned, whether or not it was then
+  // ridden. ⚠️ Recording BEGAN 2026-09-14 — there is no history before that
+  // date, so any window reaching further back is not comparable with the ride
+  // counts beside it. The UI hides these cells while the count is zero rather
+  // than rendering a structural 0 as though nobody planned anything.
+
+  /** Routes planned at the resolved (windowUsed, scopeUsed) rung. */
+  readonly routesPlanned?: RoutesPlanned;
+  /** Routes planned all-time within the nearby radius (pairs with `totals`). */
+  readonly totalsRoutesPlanned?: RoutesPlanned;
+  /** Routes planned lifetime community-wide (pairs with `communityTotals`). */
+  readonly communityRoutesPlanned?: RoutesPlanned;
+
+  /**
+   * Distinct riders at the resolved `scopeUsed`, all-time.
+   *
+   * Drives the pulse orb. Scope-matched on purpose — it is computed from the
+   * same radius the ladder settled on, so the orb and the header title can
+   * never describe different areas. Unwindowed, so it does not shrink because
+   * last week was wet.
+   */
+  readonly scopeRiders?: { readonly riders: number };
+}
+
+/** A count of rides started, plus the distinct riders behind them. */
+export interface RidesStarted {
+  readonly rides: number;
+  readonly activeRiders: number;
+}
+
+/** A count of routes planned, plus the distinct riders who planned them. */
+export interface RoutesPlanned {
+  readonly routes: number;
+  readonly planners: number;
 }
 
 // ── Neighborhood Leaderboard ──

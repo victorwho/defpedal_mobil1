@@ -44,6 +44,11 @@ import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullU
 import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import { ACCEPTED_DEVICE_EVENTS, recordDeviceTelemetry } from '../lib/deviceTelemetry';
+import {
+  ACCEPTED_PLAN_MODES,
+  recordPlannedRoute,
+  type PlannedRouteMode,
+} from '../lib/plannedRoutes';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
 import { assertCanSaveRoute, resolveHistoryCutoff } from '../lib/premiumEnforcement';
@@ -522,6 +527,84 @@ export const buildV1Routes = (
         );
 
         return result;
+      },
+    );
+
+    /*
+     * POST /telemetry/route-plan — "a rider planned a route".
+     *
+     * Separate from /telemetry/app-open on purpose: this carries a coordinate,
+     * and `user_telemetry_events` stays location-free by design (see
+     * lib/deviceTelemetry.ts). It lands in `planned_routes`, which is ride data
+     * already disclosed in the Privacy Policy, minimised to origin-only — the
+     * destination is deliberately never sent or stored.
+     *
+     * `requireWriteUser`: anonymous riders plan routes too, and a count that
+     * silently omitted them would understate exactly the population this whole
+     * exercise is trying to see.
+     *
+     * Always answers 200. Planning a route is not a request to be recorded, so
+     * a failure here must never reach the rider; the client fires and forgets.
+     */
+    app.post<{
+      Body: {
+        lat: number;
+        lon: number;
+        routingMode?: string | null;
+        distanceMeters?: number | null;
+        dedupeKey?: string | null;
+      };
+      Reply: { recorded: boolean; deduped: boolean } | ErrorResponse;
+    }>(
+      '/telemetry/route-plan',
+      {
+        schema: {
+          body: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['lat', 'lon'],
+            properties: {
+              lat: { type: 'number', minimum: -90, maximum: 90 },
+              lon: { type: 'number', minimum: -180, maximum: 180 },
+              routingMode: { type: ['string', 'null'], enum: [...ACCEPTED_PLAN_MODES, null] },
+              distanceMeters: { type: ['number', 'null'], minimum: 0 },
+              // Opaque to the server: compared for equality, never parsed or
+              // displayed. Bounded so it cannot be used as a free-text side
+              // channel into a table that deliberately stores no free text.
+              dedupeKey: { type: ['string', 'null'], maxLength: 128 },
+            },
+          },
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['recorded', 'deduped'],
+              properties: {
+                recorded: { type: 'boolean' },
+                deduped: { type: 'boolean' },
+              },
+            },
+            401: errorResponseSchema,
+            429: errorResponseSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const user = await requireWriteUser(request, dependencies);
+        await applyRateLimit(request, reply, dependencies, 'routePlan', {
+          userId: user.id,
+        });
+
+        return recordPlannedRoute(
+          {
+            lat: request.body.lat,
+            lon: request.body.lon,
+            routingMode: (request.body.routingMode as PlannedRouteMode | null) ?? null,
+            distanceMeters: request.body.distanceMeters ?? null,
+            dedupeKey: request.body.dedupeKey ?? null,
+          },
+          user.id,
+        );
       },
     );
 
@@ -1543,6 +1626,7 @@ export const buildV1Routes = (
             deletedCount: number;
             purgedCount: number;
             prunedAnonPushTokens: number;
+            prunedPlannedRoutes: number;
             reapedStaleTrips: number;
             runAt: string;
           }
@@ -1663,6 +1747,35 @@ export const buildV1Routes = (
         );
       }
 
+      // Planned-route retention (2026-09-14). Piggybacks on this daily cron
+      // deliberately: `prune_user_telemetry_events()` shipped with no caller
+      // and is still unwired months later, and an un-run prune turns a
+      // minimisation promise into a growing pile of location rows. Retention is
+      // part of `planned_routes`' lawful basis, not housekeeping.
+      // Best-effort — a failure here must never break hazard expiry.
+      let prunedPlannedRoutes = -1;
+      try {
+        const { data: prunedPlans, error: planPruneError } = await supabaseAdmin.rpc(
+          'prune_planned_routes',
+        );
+        if (planPruneError) {
+          request.log.warn(
+            { event: 'planned_routes_prune_failed', error: planPruneError.message },
+            'planned-route retention prune failed',
+          );
+        } else {
+          prunedPlannedRoutes = typeof prunedPlans === 'number' ? prunedPlans : 0;
+        }
+      } catch (planPruneErr) {
+        request.log.warn(
+          {
+            event: 'planned_routes_prune_failed',
+            error: planPruneErr instanceof Error ? planPruneErr.message : 'unknown',
+          },
+          'planned-route retention prune failed',
+        );
+      }
+
       // Stale-trip reaper (GPS audit 2026-07-29): trips whose trip_end never
       // arrived — the device churned mid-ride or was killed before the queue
       // drained — sit `in_progress` forever and are indistinguishable from
@@ -1706,13 +1819,21 @@ export const buildV1Routes = (
           purgedCount,
           deletedCount,
           prunedAnonPushTokens,
+          prunedPlannedRoutes,
           reapedStaleTrips,
           runAt: nowIso,
         },
         'Hazard expire cron completed.',
       );
 
-      return { deletedCount, purgedCount, prunedAnonPushTokens, reapedStaleTrips, runAt: nowIso };
+      return {
+        deletedCount,
+        purgedCount,
+        prunedAnonPushTokens,
+        prunedPlannedRoutes,
+        reapedStaleTrips,
+        runAt: nowIso,
+      };
     });
 
     app.post<{ Body: NavigationFeedbackBody; Reply: WriteAckResponse | ErrorResponse }>(

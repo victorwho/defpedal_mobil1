@@ -50,6 +50,11 @@ export const hazardExpireResponseSchema = {
     // stamped end_action='abandoned' (ended_at stays NULL). -1 = the reap
     // failed (best-effort — never fails the hazard cron).
     reapedStaleTrips: { type: 'integer' },
+    // Planned-route retention (2026-09-14): rows older than 180 days deleted by
+    // prune_planned_routes(). -1 = the RPC call failed (best-effort — never
+    // fails the hazard cron). Watch this: retention is part of that table's
+    // lawful basis, so a persistent -1 is a compliance signal, not just noise.
+    prunedPlannedRoutes: { type: 'integer' },
     runAt: { type: 'string', format: 'date-time' },
   },
 } as const;

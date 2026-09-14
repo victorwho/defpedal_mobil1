@@ -61,7 +61,17 @@ export const buildFeedProfileRoutes = (
         const updates: Record<string, unknown> = {};
         if (request.body.displayName !== undefined) updates.display_name = request.body.displayName.trim();
         if (request.body.username !== undefined) updates.username = request.body.username.trim().toLowerCase();
-        if (request.body.autoShareRides !== undefined) updates.auto_share_rides = request.body.autoShareRides;
+        // Stamp WHEN this was set, not just the value. A NULL `set_at` is the
+        // signal that nothing has ever explicitly chosen it — which was true of
+        // every row until 2026-09-14, because no screen wrote this column — and
+        // the client uses that to decide whether the server or the device flag
+        // carries the rider's real intent. Once stamped, the server owns the
+        // field and a reinstall can no longer reset it (migration
+        // 202609140004; error-log #81 for why that direction matters).
+        if (request.body.autoShareRides !== undefined) {
+          updates.auto_share_rides = request.body.autoShareRides;
+          updates.auto_share_rides_set_at = new Date().toISOString();
+        }
         if (request.body.trimRouteEndpoints !== undefined) updates.trim_route_endpoints = request.body.trimRouteEndpoints;
         if (request.body.cyclingGoal !== undefined) updates.cycling_goal = request.body.cyclingGoal;
         if (request.body.avatarUrl !== undefined) updates.avatar_url = request.body.avatarUrl;
@@ -118,7 +128,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
+          .select('id, display_name, username, avatar_url, auto_share_rides, auto_share_rides_set_at, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
           .eq('id', user.id)
           .single();
 
@@ -141,6 +151,7 @@ export const buildFeedProfileRoutes = (
           username: (data.username as string) ?? null,
           avatarUrl: (data.avatar_url as string) ?? null,
           autoShareRides: Boolean(data.auto_share_rides),
+          autoShareRidesSetAt: (data.auto_share_rides_set_at as string) ?? null,
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
           isPrivate: Boolean(data.is_private),
@@ -183,7 +194,7 @@ export const buildFeedProfileRoutes = (
 
         const { data, error } = await db
           .from('profiles')
-          .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
+          .select('id, display_name, username, avatar_url, auto_share_rides, auto_share_rides_set_at, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
           .eq('id', user.id)
           .single();
 
@@ -194,7 +205,7 @@ export const buildFeedProfileRoutes = (
           const { data: created, error: createError } = await db
             .from('profiles')
             .upsert({ id: user.id, display_name: fallbackName }, { onConflict: 'id' })
-            .select('id, display_name, username, avatar_url, auto_share_rides, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
+            .select('id, display_name, username, avatar_url, auto_share_rides, auto_share_rides_set_at, trim_route_endpoints, cycling_goal, is_private, share_conversion_feed_optin, keep_full_gps_history, notify_weather, notify_hazard, notify_community, quiet_hours_start, quiet_hours_end')
             .single();
 
           if (createError || !created) {
@@ -216,6 +227,7 @@ export const buildFeedProfileRoutes = (
             username: (created.username as string) ?? null,
             avatarUrl: (created.avatar_url as string) ?? null,
             autoShareRides: Boolean(created.auto_share_rides),
+            autoShareRidesSetAt: (created.auto_share_rides_set_at as string) ?? null,
             trimRouteEndpoints: Boolean(created.trim_route_endpoints),
             cyclingGoal: (created.cycling_goal as CyclingGoal) ?? null,
             isPrivate: Boolean(created.is_private),
@@ -250,6 +262,7 @@ export const buildFeedProfileRoutes = (
           username: (data.username as string) ?? null,
           avatarUrl: (data.avatar_url as string) ?? null,
           autoShareRides: Boolean(data.auto_share_rides),
+          autoShareRidesSetAt: (data.auto_share_rides_set_at as string) ?? null,
           trimRouteEndpoints: Boolean(data.trim_route_endpoints),
           cyclingGoal: (data.cycling_goal as CyclingGoal) ?? null,
           isPrivate: Boolean(data.is_private),

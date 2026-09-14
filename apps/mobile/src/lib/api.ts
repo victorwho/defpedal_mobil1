@@ -294,6 +294,29 @@ export const mobileApi = {
       method: 'POST',
       body: JSON.stringify({ event: 'app_open', ...payload }),
     }),
+  /**
+   * Record that the rider planned a route.
+   *
+   * ⚠️ `lat`/`lon` are the route's ORIGIN. The destination is never sent — it
+   * is folded into the opaque `dedupeKey` on device and goes no further. That
+   * asymmetry is the privacy design, not an oversight: the server needs a
+   * coordinate only to answer "is this near the viewer" on City Heartbeat, and
+   * where someone intended to go is the more revealing half. See
+   * services/mobile-api/src/lib/plannedRoutes.ts before adding a field.
+   *
+   * No timestamp, for the same reason as recordAppOpen.
+   */
+  recordRoutePlan: (payload: {
+    lat: number;
+    lon: number;
+    routingMode?: string | null;
+    distanceMeters?: number | null;
+    dedupeKey?: string | null;
+  }) =>
+    mobileApiFetch<{ recorded: boolean; deduped: boolean }>('/v1/telemetry/route-plan', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   // Irreversible account deletion. Body must contain { confirmation: 'DELETE' }
   // (verbatim) so accidental calls are rejected with 400.
   deleteAccount: () =>

@@ -34,7 +34,7 @@ import {
   quietHoursAreOff,
   quietHoursWrapMidnight,
 } from '../src/lib/quietHours';
-import { resolveNotificationPrefSync } from '../src/lib/profilePrefSync';
+import { resolveNotificationPrefSync, toProfileUpdatePayload } from '../src/lib/profilePrefSync';
 import { cancelDailyWeatherNotifications } from '../src/lib/daily-weather-notification';
 import { supabaseClient } from '../src/lib/supabase';
 import { mobileEnv } from '../src/lib/env';
@@ -265,6 +265,7 @@ export default function ProfileScreen() {
       quietHoursStart,
       quietHoursEnd,
       shareConversionFeedOptin,
+      shareTripsPublicly,
     };
 
     void (async () => {
@@ -287,14 +288,23 @@ export default function ProfileScreen() {
       if (plan.hydrate.shareConversionFeedOptin !== undefined) {
         setShareConversionFeedOptin(plan.hydrate.shareConversionFeedOptin);
       }
+      // auto_share_rides wins over the device flag, same rule as above: the
+      // server enforces it. This is also the repair path for accounts where
+      // the two had drifted apart while nothing in the app wrote the column.
+      if (plan.hydrate.shareTripsPublicly !== undefined) {
+        setShareTripsPublicly(plan.hydrate.shareTripsPublicly);
+      }
 
       // Always send the timezone: it comes from the device, so it is the one
       // field where local genuinely wins (a travelling rider's zone changes).
       mobileApi
-        .updateProfile({ ...plan.push, quietHoursTimezone: tz })
+        .updateProfile({
+          ...toProfileUpdatePayload(plan.push),
+          quietHoursTimezone: tz,
+        } as Parameters<typeof mobileApi.updateProfile>[0])
         .catch(() => {/* best-effort */});
     })();
-  }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd, shareConversionFeedOptin]);
+  }, [user, notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd, shareConversionFeedOptin, shareTripsPublicly]);
 
   // Sync local text state with the persisted weightKg once on mount.
   const weightSynced = useRef(false);
@@ -1029,7 +1039,15 @@ export default function ProfileScreen() {
               label={t('profile.shareTrips')}
               description={shareTripsPublicly ? t('profile.shareTripsOn') : t('profile.shareTripsOff')}
               checked={shareTripsPublicly}
-              onChange={setShareTripsPublicly}
+              onChange={(checked) => {
+                // Writes BOTH halves. Before 2026-09-14 this set only the
+                // device flag, so the server column it is supposed to control
+                // — which gates activity-feed publishing, the badge/tier
+                // location stamp and the top-contributors join — was never
+                // written by anything and drifted freely.
+                setShareTripsPublicly(checked);
+                syncNotifPref({ autoShareRides: checked });
+              }}
             />
 
             {/* Slice 8: sharer controls whether successful claims publish

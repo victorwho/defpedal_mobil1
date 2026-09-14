@@ -404,6 +404,8 @@ describe('POST /v1/hazards/expire', () => {
     enqueueResult({ data: [{ id: 'd1' }], error: null });
     // Anonymous push-token prune RPC.
     enqueueResult({ data: 4, error: null });
+    // Planned-route retention prune RPC (2026-09-14).
+    enqueueResult({ data: 7, error: null });
     // Stale-trip reaper UPDATE (in_progress >48h → end_action='abandoned').
     enqueueResult({ data: [{ id: 't1' }, { id: 't2' }], error: null });
 
@@ -417,6 +419,7 @@ describe('POST /v1/hazards/expire', () => {
     expect(body.purgedCount).toBe(2);
     expect(body.deletedCount).toBe(1);
     expect(body.prunedAnonPushTokens).toBe(4);
+    expect(body.prunedPlannedRoutes).toBe(7);
     expect(body.reapedStaleTrips).toBe(2);
     expect(typeof body.runAt).toBe('string');
     expect(new Date(body.runAt).toISOString()).toBe(body.runAt);
@@ -433,6 +436,7 @@ describe('POST /v1/hazards/expire', () => {
     enqueueResult({ data: [], error: null });   // purge branch B
     enqueueResult({ data: [], error: null });   // grace DELETE
     enqueueResult({ data: 0, error: null });    // anon push-token prune
+    enqueueResult({ data: 0, error: null });    // planned-route prune
     enqueueResult({ data: [], error: null });   // stale-trip reaper
 
     const app = buildTestApp();
@@ -459,6 +463,7 @@ describe('POST /v1/hazards/expire', () => {
     enqueueResult({ data: [], error: null });
     enqueueResult({ data: [], error: null });
     enqueueResult({ data: 0, error: null });
+    enqueueResult({ data: 0, error: null });   // planned-route prune
     // Reaper UPDATE fails.
     enqueueResult({ data: null, error: { message: 'trips table on fire' } });
 
@@ -469,6 +474,30 @@ describe('POST /v1/hazards/expire', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().reapedStaleTrips).toBe(-1);
+    await app.close();
+  });
+
+  it('a planned-route prune failure is best-effort — cron still succeeds with prunedPlannedRoutes=-1', async () => {
+    // Retention is part of that table's lawful basis, so a persistent -1 here
+    // is a compliance signal — but it must never take hazard expiry down with
+    // it, exactly like the two prunes either side of it.
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: [], error: null });
+    enqueueResult({ data: 0, error: null });
+    // prune_planned_routes fails.
+    enqueueResult({ data: null, error: { message: 'prune exploded' } });
+    enqueueResult({ data: [], error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+    const res = await app.inject({
+      method: 'POST', url: '/v1/hazards/expire', headers: cronHeaders,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().prunedPlannedRoutes).toBe(-1);
+    // The reaper after it still ran.
+    expect(res.json().reapedStaleTrips).toBe(0);
     await app.close();
   });
 

@@ -34,6 +34,16 @@ interface PulseHeaderProps {
    * legacy hardcoded "rider(s) active today".
    */
   readonly activeRidersLabel?: string;
+  /**
+   * Short label naming what the orb number IS (e.g. "riders").
+   *
+   * The orb carried a bare number for its whole life, which was survivable
+   * while it was always "rides today" — but it is now the community's rider
+   * count at the resolved scope, and an unlabelled figure next to a city name
+   * invites the reader to guess. Omitted → nothing renders, so old callers are
+   * unchanged.
+   */
+  readonly orbLabel?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +62,7 @@ export const PulseHeader = ({
   activeRidersToday,
   totalRidesToday,
   activeRidersLabel,
+  orbLabel,
 }: PulseHeaderProps) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
@@ -142,6 +153,11 @@ export const PulseHeader = ({
           )}
           <View style={styles.orbCore}>
             <Text style={styles.orbText}>{totalRidesToday}</Text>
+            {orbLabel ? (
+              <Text style={styles.orbLabel} numberOfLines={1}>
+                {orbLabel}
+              </Text>
+            ) : null}
           </View>
         </View>
 
@@ -211,6 +227,17 @@ const createThemedStyles = (colors: ThemeColors) =>
       fontFamily: fontFamily.mono.bold,
       color: colors.textInverse,
       fontSize: 16,
+    },
+    // Small enough to read as a caption on the number rather than competing
+    // with it, and clipped to one line — the orb is a fixed 72 px disc, so a
+    // long localization must never push the figure off-centre.
+    orbLabel: {
+      ...textDataLg,
+      fontFamily: fontFamily.body.medium,
+      color: colors.textInverse,
+      fontSize: 9,
+      opacity: 0.85,
+      marginTop: -2,
     },
     textCol: {
       flex: 1,

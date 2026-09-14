@@ -908,6 +908,14 @@ export const en = {
     allTimeNearby: 'ALL TIME · NEAR YOU',
     topContributorsCommunity: 'TOP CONTRIBUTORS · COMMUNITY-WIDE',
     rides: 'Rides',
+    // Two distinct populations, deliberately never merged: `ridesStarted`
+    // counts every ride begun (from `trips`), `sharedRides` only those a rider
+    // chose to share (from `trip_shares`). Distance/CO2 on the same card are
+    // computed from shared rides only, so both labels must stay visible.
+    ridesStarted: 'Rides',
+    sharedRides: 'Shared rides',
+    routesPlanned: 'Routes planned',
+    orbRiders: 'riders',
     distance: 'Distance',
     co2Saved: 'CO2 saved',
     donated: 'Donated',

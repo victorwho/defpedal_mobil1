@@ -43,8 +43,29 @@ export interface CommunityPulseRung {
 /**
  * Minimum rides a (window, scope) rung must contain before the City
  * Heartbeat pulse settles on it.
+ *
+ * ⚠️ MEASURED, not chosen for feeling strict — and it was 3 for the ladder's
+ * first fourteen months, which was the single biggest reason the screen read as
+ * dead. `pickCommunityPulseRung` returns the FIRST qualifying rung, so a bar of
+ * 3 means a week holding exactly 3 rides beats a month holding 20. Measured
+ * from Brasov on 2026-09-14: `today/nearby = 0`, `week/nearby = 3` — so the
+ * header showed **3 rides / 6.6 km** while the all-time card directly beneath
+ * it on the same screen said **232 rides / 796 km**.
+ *
+ * 10 is where every city in the live data stops showing a single-digit
+ * headline. Measured the same day across the seven real clusters:
+ *
+ *   Brasov     3 -> 20 (month/nearby)      Bucharest  19 -> 19 (unchanged)
+ *   Cluj       3 -> 73 (month/community)   Iasi        5 -> 73 (month/community)
+ *   Constanta  7 -> 10 (month/region)      Timisoara  73 -> 73 (unchanged)
+ *
+ * The thin cities fall through to community scope, which is the ladder doing
+ * its job rather than a regression: the header relabels itself honestly
+ * (`scopeCommunityTitle`) and no city name is ever shown over community-wide
+ * numbers. Re-measure before changing this — the counts move as the app grows,
+ * and a threshold tuned against an empty database ages badly.
  */
-export const COMMUNITY_MIN_RIDES_PER_WINDOW = 3;
+export const COMMUNITY_MIN_RIDES_PER_WINDOW = 10;
 
 /** Minimum feed items a scope must contain before the feed settles on it. */
 export const COMMUNITY_MIN_FEED_ITEMS = 3;

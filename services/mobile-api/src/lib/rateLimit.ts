@@ -12,6 +12,11 @@ export type RateLimitPolicies = {
   // never eat the rider's `write` budget and block a trip_end — counting users
   // matters far less than recording their ride.
   deviceTelemetry: RateLimitPolicy;
+  // Planned-route recording. Its own bucket rather than sharing
+  // `deviceTelemetry`: planning is far burstier than app opens (a rider trying
+  // several destinations), and letting the two share would mean a planning
+  // session silently starves the app-open count that DAU depends on.
+  routePlan: RateLimitPolicy;
   // Read-heavy social surface bucket — separate from routePreview so heavy
   // tab-switching on the leaderboard / City Heartbeat doesn't starve a
   // rider's actual route preview budget (and vice versa).

@@ -25,7 +25,11 @@ const counts = (
 
 describe('constants', () => {
   it('exposes sane, product-approved thresholds', () => {
-    expect(COMMUNITY_MIN_RIDES_PER_WINDOW).toBe(3);
+    // Raised 3 -> 10 on 2026-09-14. At 3 the picker settled on the first rung
+    // clearing a near-empty bar: Brasov showed "3 rides" in the header while
+    // the card beneath it said 232. See the constant's note for the per-city
+    // measurement behind 10.
+    expect(COMMUNITY_MIN_RIDES_PER_WINDOW).toBe(10);
     expect(COMMUNITY_MIN_FEED_ITEMS).toBe(3);
     expect(COMMUNITY_NEARBY_RADIUS_KM).toBe(15);
     expect(COMMUNITY_REGION_RADIUS_KM).toBe(100);
@@ -43,33 +47,39 @@ describe('constants', () => {
 });
 
 describe('pickCommunityPulseRung', () => {
+  // These exercise the ladder ORDER, so every qualifying count is expressed
+  // relative to the threshold rather than hard-coded — raising the constant
+  // (3 -> 10 on 2026-09-14) must not silently turn an order test into a
+  // threshold test, which is exactly what happened the first time.
+  const PASS = COMMUNITY_MIN_RIDES_PER_WINDOW;
+
   it('keeps (today, nearby) when today has enough local rides', () => {
-    const rung = pickCommunityPulseRung(counts({ today: { nearby: 3 } }));
+    const rung = pickCommunityPulseRung(counts({ today: { nearby: PASS } }));
     expect(rung).toEqual({ window: 'today', scope: 'nearby' });
   });
 
   it('widens the window before the radius', () => {
     // Today-nearby is empty but this week nearby has rides → week, still nearby.
     const rung = pickCommunityPulseRung(
-      counts({ week: { nearby: 5 }, today: { region: 50, community: 50 } }),
+      counts({ week: { nearby: PASS }, today: { region: PASS * 10, community: PASS * 10 } }),
     );
     expect(rung).toEqual({ window: 'week', scope: 'nearby' });
   });
 
   it('falls to (month, nearby) before touching region', () => {
     const rung = pickCommunityPulseRung(
-      counts({ month: { nearby: 4 }, today: { region: 10 } }),
+      counts({ month: { nearby: PASS }, today: { region: PASS * 2 } }),
     );
     expect(rung).toEqual({ window: 'month', scope: 'nearby' });
   });
 
   it('widens radius after exhausting all windows nearby', () => {
-    const rung = pickCommunityPulseRung(counts({ today: { region: 3 } }));
+    const rung = pickCommunityPulseRung(counts({ today: { region: PASS } }));
     expect(rung).toEqual({ window: 'today', scope: 'region' });
   });
 
   it('reaches (month, community) as the last qualifying rung', () => {
-    const rung = pickCommunityPulseRung(counts({ month: { community: 5 } }));
+    const rung = pickCommunityPulseRung(counts({ month: { community: PASS } }));
     expect(rung).toEqual({ window: 'month', scope: 'community' });
   });
 

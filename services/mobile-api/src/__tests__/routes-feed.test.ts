@@ -48,6 +48,8 @@ vi.mock('../lib/notifications', () => ({
 // Real imports after mock declarations
 // ---------------------------------------------------------------------------
 
+import { COMMUNITY_MIN_RIDES_PER_WINDOW as MIN_RIDES } from '@defensivepedal/core';
+
 import { buildApp } from '../app';
 import { createMemoryRouteResponseCache } from '../lib/cache';
 import type { MobileApiDependencies } from '../lib/dependencies';
@@ -366,9 +368,12 @@ describe('GET /v1/community/heartbeat', () => {
   it('keeps (today, nearby) when today already has enough local rides', async () => {
     enqueueResult({
       data: {
-        today: { nearby: 4, region: 6, community: 8 },
-        week: { nearby: 9, region: 12, community: 15 },
-        month: { nearby: 20, region: 30, community: 40 },
+        // Expressed relative to the ladder threshold (raised 3 -> 10 on
+        // 2026-09-14) so this stays a test of the RUNG CHOICE rather than
+        // silently becoming a test of the constant's value.
+        today: { nearby: MIN_RIDES, region: MIN_RIDES + 2, community: MIN_RIDES + 4 },
+        week: { nearby: MIN_RIDES + 5, region: MIN_RIDES + 8, community: MIN_RIDES + 11 },
+        month: { nearby: MIN_RIDES + 16, region: MIN_RIDES + 26, community: MIN_RIDES + 36 },
       },
       error: null,
     });
@@ -389,6 +394,89 @@ describe('GET /v1/community/heartbeat', () => {
     expect(body.scopeUsed).toBe('nearby');
     // 9 rides this week ≥ 7 → daily chart
     expect(body.chartMode).toBe('daily');
+
+    await app.close();
+  });
+
+  // ── "Rides started" (migration 202609140001) ──
+
+  it('forwards rides-started counts alongside the shared-rides pulse', async () => {
+    enqueueResult({
+      data: {
+        // Expressed relative to the ladder threshold (raised 3 -> 10 on
+        // 2026-09-14) so this stays a test of the RUNG CHOICE rather than
+        // silently becoming a test of the constant's value.
+        today: { nearby: MIN_RIDES, region: MIN_RIDES + 2, community: MIN_RIDES + 4 },
+        week: { nearby: MIN_RIDES + 5, region: MIN_RIDES + 8, community: MIN_RIDES + 11 },
+        month: { nearby: MIN_RIDES + 16, region: MIN_RIDES + 26, community: MIN_RIDES + 36 },
+      },
+      error: null,
+    });
+    enqueueResult({
+      data: {
+        ...heartbeatRpcResult,
+        ridesStarted: { rides: 17, activeRiders: 9 },
+        totalsRidesStarted: { rides: 340, activeRiders: 56 },
+        communityRidesStarted: { rides: 1419, activeRiders: 551 },
+      },
+      error: null,
+    });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/community/heartbeat?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    // Gotcha #9: these survive the response schema rather than being stripped.
+    expect(body.ridesStarted).toEqual({ rides: 17, activeRiders: 9 });
+    expect(body.totalsRidesStarted).toEqual({ rides: 340, activeRiders: 56 });
+    expect(body.communityRidesStarted).toEqual({ rides: 1419, activeRiders: 551 });
+    // The shared-rides pulse is untouched — the two counts stay separate, and
+    // distance/CO2 remain on the shared-rides basis.
+    expect(body.pulse).toEqual(pulseStats);
+    expect(body.communityTotals).toEqual(lifetimeTotals);
+
+    await app.close();
+  });
+
+  it('omits rides-started entirely when the DB predates the migration', async () => {
+    enqueueResult({
+      data: {
+        // Expressed relative to the ladder threshold (raised 3 -> 10 on
+        // 2026-09-14) so this stays a test of the RUNG CHOICE rather than
+        // silently becoming a test of the constant's value.
+        today: { nearby: MIN_RIDES, region: MIN_RIDES + 2, community: MIN_RIDES + 4 },
+        week: { nearby: MIN_RIDES + 5, region: MIN_RIDES + 8, community: MIN_RIDES + 11 },
+        month: { nearby: MIN_RIDES + 16, region: MIN_RIDES + 26, community: MIN_RIDES + 36 },
+      },
+      error: null,
+    });
+    // Un-migrated RPC: no ridesStarted keys at all.
+    enqueueResult({ data: heartbeatRpcResult, error: null });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/community/heartbeat?lat=44.4&lon=26.1',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const body = response.json();
+    // Absent, NOT zero — a 0 would render as "0 rides" and read as a dead city.
+    expect(body.ridesStarted).toBeUndefined();
+    expect(body.totalsRidesStarted).toBeUndefined();
+    expect(body.communityRidesStarted).toBeUndefined();
+    // The rest of the payload is unaffected.
+    expect(body.pulse).toEqual(pulseStats);
 
     await app.close();
   });

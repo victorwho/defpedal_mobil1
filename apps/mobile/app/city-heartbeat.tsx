@@ -70,6 +70,34 @@ export default function CityHeartbeatScreen() {
   const chartDaily = heartbeat?.chartDaily ?? heartbeat?.daily ?? [];
   const chartWeekly = heartbeat?.chartWeekly ?? [];
 
+  // ── Rides started (2026-09-14) ──
+  // `pulse` counts rides riders chose to SHARE; these count rides actually
+  // STARTED, trial starts included. Undefined against a server/DB that predates
+  // migration 202609140001 — in that case every "rides started" cell is simply
+  // not rendered, rather than showing a zero that reads as "nobody rode".
+  const ridesStarted = heartbeat?.ridesStarted;
+  const communityRidesStarted = heartbeat?.communityRidesStarted;
+  const totalsRidesStarted = heartbeat?.totalsRidesStarted;
+
+  // ── Routes planned (2026-09-14) ──
+  // Gated on > 0, not merely on presence, unlike the rides-started cells above.
+  // Recording began 2026-09-14 with an empty table, so a zero here means "we
+  // were not yet counting", not "nobody planned a route" — and a 0 sitting
+  // beside real ride counts would read as the latter. The cells appear on their
+  // own once there is something true to show.
+  const routesPlanned = heartbeat?.routesPlanned;
+  const totalsRoutesPlanned = heartbeat?.totalsRoutesPlanned;
+  const communityRoutesPlanned = heartbeat?.communityRoutesPlanned;
+  // The orb is the one number read at a glance. It shows how many riders this
+  // community actually has at the resolved scope — a larger and far steadier
+  // figure than a windowed ride count, which at the old ladder threshold could
+  // read "3" directly above an all-time card saying 232. Scope-matched
+  // server-side, so it can never describe a different area than the title
+  // beside it. Falls back to the ride count against a server without the field.
+  const scopeRiders = heartbeat?.scopeRiders?.riders;
+  const orbValue = scopeRiders ?? ridesStarted?.rides ?? pulse?.rides ?? 0;
+  const orbLabel = scopeRiders === undefined ? undefined : t('cityHeartbeat.orbRiders');
+
   const cityLabel = heartbeat?.localityName ?? t('cityHeartbeat.cityFallback');
   // Header title follows the scope: city name nearby, honest wider labels
   // otherwise — never a city name over region/community-wide numbers.
@@ -143,8 +171,9 @@ export default function CityHeartbeatScreen() {
         <FadeSlideIn delay={0}>
           <PulseHeader
             cityName={headerTitle}
-            activeRidersToday={pulse?.activeRiders ?? 0}
-            totalRidesToday={pulse?.rides ?? 0}
+            activeRidersToday={ridesStarted?.activeRiders ?? pulse?.activeRiders ?? 0}
+            totalRidesToday={orbValue}
+            orbLabel={orbLabel}
             activeRidersLabel={activeRidersLabel}
           />
         </FadeSlideIn>
@@ -157,14 +186,34 @@ export default function CityHeartbeatScreen() {
               <Text style={styles.sectionLabel}>{t('cityHeartbeat.communityAllTime')}</Text>
               <Text style={styles.sectionSub}>{t('cityHeartbeat.communityAllTimeSub')}</Text>
               <View style={styles.statGrid}>
+                {communityRidesStarted && (
+                  <StatCell
+                    label={t('cityHeartbeat.ridesStarted')}
+                    value={communityRidesStarted.rides}
+                    suffix=""
+                    decimals={0}
+                    color={colors.accent}
+                    styles={styles}
+                  />
+                )}
                 <StatCell
-                  label={t('cityHeartbeat.totalRides')}
+                  label={t('cityHeartbeat.sharedRides')}
                   value={heartbeat.communityTotals.rides}
                   suffix=""
                   decimals={0}
                   color={colors.accent}
                   styles={styles}
                 />
+                {communityRoutesPlanned && communityRoutesPlanned.routes > 0 && (
+                  <StatCell
+                    label={t('cityHeartbeat.routesPlanned')}
+                    value={communityRoutesPlanned.routes}
+                    suffix=""
+                    decimals={0}
+                    color={colors.info}
+                    styles={styles}
+                  />
+                )}
                 <StatCell
                   label={t('cityHeartbeat.distance')}
                   value={heartbeat.communityTotals.distanceMeters / 1000}
@@ -199,14 +248,39 @@ export default function CityHeartbeatScreen() {
           <Surface>
             <Text style={styles.sectionLabel}>{pulseLabel}</Text>
             <View style={styles.statGrid}>
+              {/* Rides started comes first: it is the wider count and the one
+                  the orb above shows. "Shared rides" sits beside it so the two
+                  are never mistaken for each other — the km/CO2 cells are
+                  computed from the SHARED rides only (trips carries no
+                  distance), which is why that distinction has to stay visible. */}
+              {ridesStarted && (
+                <StatCell
+                  label={t('cityHeartbeat.ridesStarted')}
+                  value={ridesStarted.rides}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+              )}
               <StatCell
-                label={t('cityHeartbeat.rides')}
+                label={t('cityHeartbeat.sharedRides')}
                 value={pulse?.rides ?? 0}
                 suffix=""
                 decimals={0}
                 color={colors.accent}
                 styles={styles}
               />
+              {routesPlanned && routesPlanned.routes > 0 && (
+                <StatCell
+                  label={t('cityHeartbeat.routesPlanned')}
+                  value={routesPlanned.routes}
+                  suffix=""
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+              )}
               <StatCell
                 label={t('cityHeartbeat.distance')}
                 value={(pulse?.distanceMeters ?? 0) / 1000}
@@ -260,14 +334,34 @@ export default function CityHeartbeatScreen() {
           <Surface>
             <Text style={styles.sectionLabel}>{t('cityHeartbeat.allTimeNearby')}</Text>
             <View style={styles.statGrid}>
+              {totalsRidesStarted && (
+                <StatCell
+                  label={t('cityHeartbeat.ridesStarted')}
+                  value={totalsRidesStarted.rides}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+              )}
               <StatCell
-                label={t('cityHeartbeat.totalRides')}
+                label={t('cityHeartbeat.sharedRides')}
                 value={heartbeat.totals.rides}
                 suffix=""
                 decimals={0}
                 color={colors.accent}
                 styles={styles}
               />
+              {totalsRoutesPlanned && totalsRoutesPlanned.routes > 0 && (
+                <StatCell
+                  label={t('cityHeartbeat.routesPlanned')}
+                  value={totalsRoutesPlanned.routes}
+                  suffix=""
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+              )}
               <StatCell
                 label={t('cityHeartbeat.distance')}
                 value={heartbeat.totals.distanceMeters / 1000}

@@ -226,6 +226,11 @@ export const profileResponseSchema = {
     username: { type: ['string', 'null'] },
     avatarUrl: { type: ['string', 'null'] },
     autoShareRides: { type: 'boolean' },
+    // NULL until a human has explicitly set autoShareRides. The client needs
+    // this to tell a chosen value from the trigger default — see migration
+    // 202609140004. Not in `required`: an older server omits it, and the
+    // client treats absence as "never set", which is the safe reading.
+    autoShareRidesSetAt: { type: ['string', 'null'] },
     trimRouteEndpoints: { type: 'boolean' },
     cyclingGoal: { type: ['string', 'null'] },
     isPrivate: { type: 'boolean' },
@@ -355,6 +360,35 @@ const pulseStatsSchema = {
   },
 } as const;
 
+/**
+ * Rides STARTED (from `trips`), as opposed to rides shared. Count only —
+ * `trips` has no distance for rides whose track never uploaded, so km/CO2
+ * stay on the shared-rides basis rather than being invented here.
+ */
+const ridesStartedSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['rides', 'activeRiders'],
+  properties: {
+    rides: { type: 'integer' },
+    activeRiders: { type: 'integer' },
+  },
+} as const;
+
+/**
+ * Routes PLANNED (from `planned_routes`). Count only, and recorded only from
+ * 2026-09-14 onward — see the contract note before comparing with ride counts.
+ */
+const routesPlannedSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['routes', 'planners'],
+  properties: {
+    routes: { type: 'integer' },
+    planners: { type: 'integer' },
+  },
+} as const;
+
 const communityLifetimeTotalsSchema = {
   type: 'object',
   additionalProperties: false,
@@ -438,6 +472,23 @@ export const heartbeatResponseSchema = {
     chartDaily: { type: 'array', items: dailyActivitySchema },
     chartWeekly: { type: 'array', items: weeklyActivitySchema },
     communityTotals: communityLifetimeTotalsSchema,
+    // ── "Rides started" companions (2026-09-14). Same Gotcha #9 rule: declare
+    // or Fastify strips them. Optional — an un-migrated DB omits them and the
+    // client simply renders the shared-rides numbers alone. ──
+    ridesStarted: ridesStartedSchema,
+    totalsRidesStarted: ridesStartedSchema,
+    communityRidesStarted: ridesStartedSchema,
+    // Routes planned (2026-09-14). Same Gotcha #9 rule.
+    routesPlanned: routesPlannedSchema,
+    totalsRoutesPlanned: routesPlannedSchema,
+    communityRoutesPlanned: routesPlannedSchema,
+    // Riders at the resolved scope, all-time — drives the pulse orb.
+    scopeRiders: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['riders'],
+      properties: { riders: { type: 'integer' } },
+    },
   },
 } as const;
 

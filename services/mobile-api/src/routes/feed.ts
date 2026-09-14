@@ -9,6 +9,8 @@ import type {
   FeedItem,
   FeedResponse,
   HazardType,
+  RidesStarted,
+  RoutesPlanned,
   WeeklyActivity,
 } from '@defensivepedal/core';
 import {
@@ -333,6 +335,29 @@ export const buildFeedRoutes = (
             communitySeconds: Number(w.communitySeconds ?? 0),
           }));
 
+        // Rides STARTED (from `trips`). Returns undefined when the RPC predates
+        // migration 202609140001 so the field is omitted rather than sent as a
+        // zero — a zero here would render as "0 rides started", which is worse
+        // than showing nothing.
+        const mapRidesStarted = (row: unknown): RidesStarted | undefined => {
+          if (!row || typeof row !== 'object') return undefined;
+          const r = row as Record<string, unknown>;
+          return {
+            rides: Number(r.rides ?? 0),
+            activeRiders: Number(r.activeRiders ?? 0),
+          };
+        };
+
+        // Routes PLANNED. Same absent-vs-zero rule as rides started.
+        const mapRoutesPlanned = (row: unknown): RoutesPlanned | undefined => {
+          if (!row || typeof row !== 'object') return undefined;
+          const r = row as Record<string, unknown>;
+          return {
+            routes: Number(r.routes ?? 0),
+            planners: Number(r.planners ?? 0),
+          };
+        };
+
         const mapLifetimeTotals = (row: Record<string, unknown> | undefined): CommunityLifetimeTotals => ({
           rides: Number(row?.rides ?? 0),
           distanceMeters: Number(row?.distanceMeters ?? 0),
@@ -374,6 +399,18 @@ export const buildFeedRoutes = (
           chartDaily: mapDailyRows(result.chartDaily as Record<string, unknown>[]),
           chartWeekly: mapWeeklyRows(result.chartWeekly as Record<string, unknown>[]),
           communityTotals: mapLifetimeTotals(communityTotals),
+          // Rides started — the wider, separately-labeled count (see contracts).
+          ridesStarted: mapRidesStarted(result.ridesStarted),
+          totalsRidesStarted: mapRidesStarted(result.totalsRidesStarted),
+          communityRidesStarted: mapRidesStarted(result.communityRidesStarted),
+          // Routes planned — recording began 2026-09-14, no history before it.
+          routesPlanned: mapRoutesPlanned(result.routesPlanned),
+          totalsRoutesPlanned: mapRoutesPlanned(result.totalsRoutesPlanned),
+          communityRoutesPlanned: mapRoutesPlanned(result.communityRoutesPlanned),
+          scopeRiders:
+            result.scopeRiders && typeof result.scopeRiders === 'object'
+              ? { riders: Number((result.scopeRiders as Record<string, unknown>).riders ?? 0) }
+              : undefined,
           hazardHotspots: ((result.hazardHotspots as Record<string, unknown>[]) ?? []).map((h) => ({
             hazardType: (String(h.hazardType ?? 'other')) as HazardType,
             count: Number(h.count ?? 0),

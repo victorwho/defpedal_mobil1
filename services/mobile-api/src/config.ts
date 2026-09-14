@@ -189,6 +189,19 @@ export const config = {
         3600000,
       ),
     },
+    // Planned routes. The server dedupes identical plans within an hour, so
+    // this bounds distinct destinations tried, not previews fetched. 60/hour is
+    // generous for a human and still caps a client stuck in a replan loop.
+    routePlan: {
+      limit: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_ROUTE_PLAN_MAX'], '60'),
+        60,
+      ),
+      windowMs: parsePositiveNumber(
+        resolveConfigValue(['RATE_LIMIT_ROUTE_PLAN_WINDOW_MS'], '3600000'),
+        3600000,
+      ),
+    },
     citySuggestion: {
       limit: parsePositiveNumber(
         resolveConfigValue(['RATE_LIMIT_CITY_SUGGESTION_MAX'], '5'),

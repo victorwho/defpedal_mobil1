@@ -29,6 +29,12 @@ import { MapStageScreen } from '../src/components/MapStageScreen';
 import { RouteMap } from '../src/components/map';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import {
+  buildPlanKey,
+  rememberPlan,
+  shouldRecordPlan,
+  type PlanMemory,
+} from '../src/lib/routePlanTelemetry';
 import { boundRoutePolyline6 } from '../src/lib/routeGeometry';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import {
@@ -220,6 +226,11 @@ function RoutePreviewScreen() {
   const isFocused = useIsFocused();
   const previewSuccessRef = useRef<number>(0);
   const previewErrorRef = useRef<number>(0);
+  // Plan keys already recorded this session. A ref, not state: it must never
+  // trigger a render, and it is deliberately in-memory only — a fresh process
+  // re-planning the same route an hour later is a genuine second intent, and
+  // the server's own dedupe window catches anything sooner.
+  const plannedRoutesRef = useRef<PlanMemory>({});
 
   const showWeatherWarning =
     isFocused &&
@@ -266,6 +277,41 @@ function RoutePreviewScreen() {
       coverage_status: previewQuery.data.coverage.status,
       using_custom_start: hasStartOverride(routeRequest),
     });
+
+    // First-party planned-route recording. Separate from the PostHog capture
+    // above on purpose: that one is consent-gated, so counting planning through
+    // it would have the same unmeasurable blind spot that made DAU
+    // unanswerable (docs/reviews/active-user-counting-2026-09-11.md).
+    //
+    // Throttled per planning INTENT, not per fetch — cycling Safe/Fast/Flat
+    // refetches this query and must not count three times. The server dedupes
+    // as well; this half only saves the request.
+    const origin = getPreviewOrigin(routeRequest);
+    const planKey = buildPlanKey({
+      originLat: origin.lat,
+      originLon: origin.lon,
+      destLat: routeRequest.destination.lat,
+      destLon: routeRequest.destination.lon,
+    });
+    const nowMs = Date.now();
+    if (shouldRecordPlan(planKey, plannedRoutesRef.current, nowMs)) {
+      plannedRoutesRef.current = rememberPlan(planKey, plannedRoutesRef.current, nowMs);
+      // Fire-and-forget: the rider did not ask to be counted, so nothing here
+      // may surface to them or block the preview.
+      void mobileApi
+        .recordRoutePlan({
+          // ORIGIN only — the destination is folded into planKey on device and
+          // never transmitted. See lib/routePlanTelemetry.ts.
+          lat: origin.lat,
+          lon: origin.lon,
+          routingMode: previewQuery.data.selectedMode ?? null,
+          distanceMeters: previewQuery.data.routes[0]?.distanceMeters ?? null,
+          dedupeKey: planKey,
+        })
+        .catch(() => {
+          // Silent by design; an unrecorded plan costs one row in a count.
+        });
+    }
   }, [previewQuery.data, previewQuery.dataUpdatedAt, routeRequest]);
 
   useEffect(() => {
