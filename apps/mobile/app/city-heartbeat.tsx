@@ -350,7 +350,10 @@ export default function CityHeartbeatScreen() {
             <Surface>
               <Text style={styles.sectionLabel}>{t('cityHeartbeat.cyclingEuropeTitle')}</Text>
               <Text style={styles.sectionSub}>
-                {t('cityHeartbeat.cyclingEuropeSub', { cities: cyclingInEurope.cities })}
+                {t(
+                  `cityHeartbeat.cyclingEuropeSub_${cyclingInEurope.cities === 1 ? 'one' : 'other'}`,
+                  { cities: cyclingInEurope.cities },
+                )}
               </Text>
               <View style={styles.statGrid}>
                 <StatCell
