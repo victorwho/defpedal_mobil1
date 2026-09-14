@@ -1529,6 +1529,17 @@ export interface CityHeartbeat {
   readonly network?: NetworkStats;
 
   /**
+   * Municipal cycle counts, aggregated across contributing cities.
+   *
+   * ⚠️ NOT our activity. A real count of real people on bicycles, taken from
+   * city counters, and it must never be summed with rides or phrased so a
+   * rider could read it as app usage. Labelled as Europe rather than "near
+   * you" — Romania publishes no cyclist counters and nearly all our riders are
+   * Romanian, so a local framing would be both wrong and empty.
+   */
+  readonly cyclingInEurope?: CyclingCounts;
+
+  /**
    * Distinct riders at the resolved `scopeUsed`, all-time.
    *
    * Drives the pulse orb. Scope-matched on purpose — it is computed from the
@@ -1543,6 +1554,16 @@ export interface CityHeartbeat {
 export interface RidesStarted {
   readonly rides: number;
   readonly activeRiders: number;
+}
+
+/** Municipal cycle-counter totals. Not app activity — see CityHeartbeat. */
+export interface CyclingCounts {
+  readonly cyclistsCounted: number;
+  /** Period the count covers. Sources reporting other windows are not mixed in. */
+  readonly windowDays: number;
+  /** Cities contributing. Worth showing: it is what makes the total legible. */
+  readonly cities: number;
+  readonly counters: number;
 }
 
 /** How much road the app has scored, and how many hazards it knows about. */

@@ -485,6 +485,18 @@ export const heartbeatResponseSchema = {
     routesPlanned: routesPlannedSchema,
     totalsRoutesPlanned: routesPlannedSchema,
     communityRoutesPlanned: routesPlannedSchema,
+    // Municipal cycle counts (global). Gotcha #9 as everywhere else.
+    cyclingInEurope: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['cyclistsCounted', 'windowDays', 'cities', 'counters'],
+      properties: {
+        cyclistsCounted: { type: 'integer' },
+        windowDays: { type: 'integer' },
+        cities: { type: 'integer' },
+        counters: { type: 'integer' },
+      },
+    },
     // Network scale (global). Gotcha #9 applies as everywhere else.
     network: {
       type: 'object',

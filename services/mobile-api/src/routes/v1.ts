@@ -49,6 +49,7 @@ import {
   recordPlannedRoute,
   type PlannedRouteMode,
 } from '../lib/plannedRoutes';
+import { runBikeCounterIngest } from '../lib/bikeCounters';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { fetchLoopRoute, type LoopRouteRequest } from '../lib/loopRoute';
 import { assertCanSaveRoute, resolveHistoryCutoff } from '../lib/premiumEnforcement';
@@ -605,6 +606,48 @@ export const buildV1Routes = (
           },
           user.id,
         );
+      },
+    );
+
+    /*
+     * POST /bike-counters/run — daily municipal cycle-counter ingest.
+     *
+     * Cron-only (Bearer CRON_SECRET). Fetches each enabled source and records
+     * one reading; the aggregate the app shows reads the last good reading per
+     * source inside a grace window, so a source failing today cannot make the
+     * headline sag and look like cycling collapsed.
+     *
+     * ⚠️ What this ingests is NOT our activity — it is municipal counts of real
+     * people on bicycles, shown labelled as Europe and never summed with rides.
+     */
+    app.post<{ Reply: { fetched: number; failed: number; runAt: string } | ErrorResponse }>(
+      '/bike-counters/run',
+      {
+        schema: {
+          response: {
+            200: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['fetched', 'failed', 'runAt'],
+              properties: {
+                fetched: { type: 'integer' },
+                failed: { type: 'integer' },
+                runAt: { type: 'string', format: 'date-time' },
+              },
+            },
+            401: errorResponseSchema,
+            500: errorResponseSchema,
+          },
+        },
+      },
+      async (request) => {
+        verifyCronAuth(request);
+        const result = await runBikeCounterIngest();
+        request.log.info(
+          { event: 'bike_counter_ingest', fetched: result.fetched, failed: result.failed, sources: result.sources },
+          'Bike-counter ingest completed.',
+        );
+        return { fetched: result.fetched, failed: result.failed, runAt: new Date().toISOString() };
       },
     );
 

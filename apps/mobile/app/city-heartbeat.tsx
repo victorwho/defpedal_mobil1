@@ -111,6 +111,19 @@ export default function CityHeartbeatScreen() {
   // and the second one a rider can picture.
   const daysRidden = (heartbeat?.communityTotals?.durationSeconds ?? 0) / 86_400;
   const countriesCovered = SUPPORTED_APP_COUNTRIES.size;
+
+  // ── Municipal cycle counts (2026-09-14) ──
+  // ⚠️ NOT our activity. Real counts of real people on bicycles from city
+  // counters, shown ONLY when at least one city is reporting — a zero here
+  // means the ingest has not run or every source is stale, never that nobody
+  // cycled. Kept in its own card and never summed with rides: conflating a
+  // 1.9-million municipal count with our own 1,424 rides is precisely the
+  // false impression this screen has been fixed for repeatedly.
+  const cyclingInEurope =
+    heartbeat?.cyclingInEurope && heartbeat.cyclingInEurope.cities > 0
+      ? heartbeat.cyclingInEurope
+      : undefined;
+  const cyclistsMillions = cyclingInEurope ? cyclingInEurope.cyclistsCounted / 1_000_000 : 0;
   // The orb is the one number read at a glance. It shows how many riders this
   // community actually has at the resolved scope — a larger and far steadier
   // figure than a windowed ride count, which at the old ladder threshold could
@@ -326,6 +339,40 @@ export default function CityHeartbeatScreen() {
             </View>
           </Surface>
         </FadeSlideIn>
+
+        {/* Municipal cycle counts. Its own card, and worded so it cannot be
+            read as our activity: these are city counters measuring everyone on
+            a bike, not Defensive Pedal riders. The city count is shown beside
+            the total because it is what makes the number legible — "across N
+            cities" is the difference between a figure and a claim. */}
+        {cyclingInEurope && (
+          <FadeSlideIn delay={125}>
+            <Surface>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.cyclingEuropeTitle')}</Text>
+              <Text style={styles.sectionSub}>
+                {t('cityHeartbeat.cyclingEuropeSub', { cities: cyclingInEurope.cities })}
+              </Text>
+              <View style={styles.statGrid}>
+                <StatCell
+                  label={t('cityHeartbeat.cyclistsCounted')}
+                  value={cyclistsMillions}
+                  suffix="M"
+                  decimals={1}
+                  color={colors.accent}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.countersReporting')}
+                  value={cyclingInEurope.counters}
+                  suffix=""
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+              </View>
+            </Surface>
+          </FadeSlideIn>
+        )}
 
         {/* Network scale. Deliberately its own card rather than mixed into the
             community totals: these are not things riders near you did, they are
