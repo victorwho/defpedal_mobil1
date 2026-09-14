@@ -408,6 +408,22 @@ export const buildFeedRoutes = (
           routesPlanned: mapRoutesPlanned(result.routesPlanned),
           totalsRoutesPlanned: mapRoutesPlanned(result.totalsRoutesPlanned),
           communityRoutesPlanned: mapRoutesPlanned(result.communityRoutesPlanned),
+          cityCyclingEstimate:
+            result.cityCyclingEstimate && typeof result.cityCyclingEstimate === 'object'
+              ? (() => {
+                  const e = result.cityCyclingEstimate as Record<string, unknown>;
+                  return {
+                    city: String(e.city ?? ''),
+                    dailyCyclists: Number(e.dailyCyclists ?? 0),
+                    isRiderCity: e.isRiderCity === true,
+                    distanceMeters: Number(e.distanceMeters ?? 0),
+                    modalSharePercent: Number(e.modalSharePercent ?? 0),
+                    modalShareSource: String(e.modalShareSource ?? ''),
+                    modalShareYear: Number(e.modalShareYear ?? 0),
+                    population: Number(e.population ?? 0),
+                  };
+                })()
+              : undefined,
           cyclingInEurope:
             result.cyclingInEurope && typeof result.cyclingInEurope === 'object'
               ? (() => {

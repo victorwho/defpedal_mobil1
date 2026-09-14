@@ -485,6 +485,22 @@ export const heartbeatResponseSchema = {
     routesPlanned: routesPlannedSchema,
     totalsRoutesPlanned: routesPlannedSchema,
     communityRoutesPlanned: routesPlannedSchema,
+    // Estimated daily cyclists in the rider's city. Gotcha #9 as everywhere.
+    cityCyclingEstimate: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['city', 'dailyCyclists', 'modalSharePercent', 'modalShareSource', 'modalShareYear', 'population'],
+      properties: {
+        city: { type: 'string' },
+        dailyCyclists: { type: 'integer' },
+        isRiderCity: { type: 'boolean' },
+        distanceMeters: { type: 'integer' },
+        modalSharePercent: { type: 'number' },
+        modalShareSource: { type: 'string' },
+        modalShareYear: { type: 'integer' },
+        population: { type: 'integer' },
+      },
+    },
     // Municipal cycle counts (global). Gotcha #9 as everywhere else.
     cyclingInEurope: {
       type: 'object',

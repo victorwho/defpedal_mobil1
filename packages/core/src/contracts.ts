@@ -1540,6 +1540,17 @@ export interface CityHeartbeat {
   readonly cyclingInEurope?: CyclingCounts;
 
   /**
+   * Estimated daily cyclists in the rider's city.
+   *
+   * ⚠️ An ESTIMATE, not a count, and the UI must say so and cite it. Derived as
+   * population × trips-per-day × cycling modal share ÷ 2 (the ÷2 turns trips
+   * into people — a commuter makes a round trip). Undefined where no seeded
+   * city is close enough, which is the correct answer rather than borrowing a
+   * figure from a city the rider is not in.
+   */
+  readonly cityCyclingEstimate?: CityCyclingEstimate;
+
+  /**
    * Distinct riders at the resolved `scopeUsed`, all-time.
    *
    * Drives the pulse orb. Scope-matched on purpose — it is computed from the
@@ -1554,6 +1565,27 @@ export interface CityHeartbeat {
 export interface RidesStarted {
   readonly rides: number;
   readonly activeRiders: number;
+}
+
+/**
+ * A derived estimate of how many people cycle in a city on a normal day.
+ *
+ * Every input travels with the output on purpose: an estimate whose source is
+ * not visible is indistinguishable from an invention. The weak input is
+ * `modalSharePercent` — 3.4% measured across Romanian county seats in
+ * 2015-2017, so neither city-specific nor recent, and more likely low than
+ * high.
+ */
+export interface CityCyclingEstimate {
+  readonly city: string;
+  readonly dailyCyclists: number;
+  /** True when the rider is inside this city's catchment rather than near it. */
+  readonly isRiderCity: boolean;
+  readonly distanceMeters: number;
+  readonly modalSharePercent: number;
+  readonly modalShareSource: string;
+  readonly modalShareYear: number;
+  readonly population: number;
 }
 
 /** Municipal cycle-counter totals. Not app activity — see CityHeartbeat. */

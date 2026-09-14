@@ -124,6 +124,13 @@ export default function CityHeartbeatScreen() {
       ? heartbeat.cyclingInEurope
       : undefined;
   const cyclistsMillions = cyclingInEurope ? cyclingInEurope.cyclistsCounted / 1_000_000 : 0;
+
+  // ── Estimated daily cyclists in the rider's city (2026-09-14) ──
+  // ⚠️ An ESTIMATE, and the card says so and cites it. Undefined where no
+  // seeded city is close enough — correct, rather than borrowing a figure from
+  // a city the rider is not in. The city is always NAMED: a rider in Râșnov is
+  // shown "Brașov", never their own town's name over Brașov's number.
+  const cityEstimate = heartbeat?.cityCyclingEstimate;
   // The orb is the one number read at a glance. It shows how many riders this
   // community actually has at the resolved scope — a larger and far steadier
   // figure than a windowed ride count, which at the old ladder threshold could
@@ -339,6 +346,38 @@ export default function CityHeartbeatScreen() {
             </View>
           </Surface>
         </FadeSlideIn>
+
+        {/* Estimated daily cyclists in the rider's city.
+            ⚠️ The source line is not decoration — it is the thing that makes
+            this an estimate rather than an invention, and it must not be
+            dropped to tidy the layout. The figure is rounded server-side so it
+            cannot imply precision its inputs do not support. */}
+        {cityEstimate && cityEstimate.dailyCyclists > 0 && (
+          <FadeSlideIn delay={110}>
+            <Surface>
+              <Text style={styles.sectionLabel}>
+                {t('cityHeartbeat.cityEstimateTitle', { city: cityEstimate.city })}
+              </Text>
+              <View style={styles.statGrid}>
+                <StatCell
+                  label={t('cityHeartbeat.cyclistsDaily')}
+                  value={cityEstimate.dailyCyclists}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+              </View>
+              <Text style={styles.estimateSource}>
+                {t('cityHeartbeat.cityEstimateSource', {
+                  percent: cityEstimate.modalSharePercent,
+                  year: cityEstimate.modalShareYear,
+                  population: cityEstimate.population.toLocaleString(),
+                })}
+              </Text>
+            </Surface>
+          </FadeSlideIn>
+        )}
 
         {/* Municipal cycle counts. Its own card, and worded so it cannot be
             read as our activity: these are city counters measuring everyone on
@@ -652,6 +691,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 0.8,
       fontSize: 10,
+    },
+    // Small, but never hidden: this line carries the source and the word
+    // "estimate", which is what separates the figure above it from a made-up
+    // number.
+    estimateSource: {
+      ...textXs,
+      color: colors.textSecondary,
+      marginTop: space[2],
+      lineHeight: 16,
     },
     sectionSub: {
       ...textXs,
