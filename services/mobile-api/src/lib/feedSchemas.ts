@@ -485,6 +485,17 @@ export const heartbeatResponseSchema = {
     routesPlanned: routesPlannedSchema,
     totalsRoutesPlanned: routesPlannedSchema,
     communityRoutesPlanned: routesPlannedSchema,
+    // Community-wide people counts. Gotcha #9 as everywhere else.
+    communityPeople: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['accounts', 'signedUp', 'rode'],
+      properties: {
+        accounts: { type: 'integer' },
+        signedUp: { type: 'integer' },
+        rode: { type: 'integer' },
+      },
+    },
     // Estimated daily cyclists in the rider's city. Gotcha #9 as everywhere.
     cityCyclingEstimate: {
       type: 'object',

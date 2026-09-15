@@ -1552,6 +1552,16 @@ export interface CityHeartbeat {
   readonly cityCyclingEstimate?: CityCyclingEstimate;
 
   /**
+   * How many people are in the community, community-wide.
+   *
+   * ⚠️ Community-wide by necessity: `profiles` has no location, so a
+   * registered rider who has never ridden cannot be placed in a city. The orb
+   * is city-scoped and counts riders; this counts accounts across everywhere.
+   * Never render this under a city name.
+   */
+  readonly communityPeople?: CommunityPeople;
+
+  /**
    * Distinct riders at the resolved `scopeUsed`, all-time.
    *
    * Drives the pulse orb. Scope-matched on purpose — it is computed from the
@@ -1566,6 +1576,20 @@ export interface CityHeartbeat {
 export interface RidesStarted {
   readonly rides: number;
   readonly activeRiders: number;
+}
+
+/** Population of the community. See the warning on `accounts`. */
+export interface CommunityPeople {
+  /**
+   * ⚠️ PROFILE ROWS, not people. Most are anonymous sessions and a reinstall
+   * mints a fresh one, so the same human can appear several times. Label it
+   * "accounts" — never "riders" or "people".
+   */
+  readonly accounts: number;
+  /** Non-anonymous accounts — the defensible people-shaped number. */
+  readonly signedUp: number;
+  /** Distinct users who have actually started a ride. */
+  readonly rode: number;
 }
 
 /**

@@ -131,6 +131,12 @@ export default function CityHeartbeatScreen() {
   // a city the rider is not in. The city is always NAMED: a rider in Râșnov is
   // shown "Brașov", never their own town's name over Brașov's number.
   const cityEstimate = heartbeat?.cityCyclingEstimate;
+
+  // ── Community population (2026-09-15) ──
+  // ⚠️ Rendered ONLY on the community-wide card, never under a city name:
+  // `profiles` has no location, so these people cannot be placed. The orb above
+  // is a different question (riders near you), not the same one smaller.
+  const communityPeople = heartbeat?.communityPeople;
   // The orb is the one number read at a glance. It shows how many riders this
   // community actually has at the resolved scope — a larger and far steadier
   // figure than a windowed ride count, which at the old ladder threshold could
@@ -377,6 +383,21 @@ export default function CityHeartbeatScreen() {
                   color={colors.safe}
                   styles={styles}
                 />
+                {/* ⚠️ "Accounts", never "riders": this counts PROFILE ROWS, and
+                    ~75% are anonymous sessions where a reinstall mints a fresh
+                    one — so the same human can appear several times. The two
+                    cells beside it (riders who rode, and rides) are the
+                    people-shaped numbers. */}
+                {communityPeople && communityPeople.accounts > 0 && (
+                  <StatCell
+                    label={t('cityHeartbeat.accounts')}
+                    value={communityPeople.accounts}
+                    suffix=""
+                    decimals={0}
+                    color={colors.info}
+                    styles={styles}
+                  />
+                )}
                 <StatCell
                   label={t('cityHeartbeat.riders')}
                   // Riders who RODE, to match the Rides cell above it. Using

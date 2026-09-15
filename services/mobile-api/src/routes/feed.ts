@@ -458,6 +458,17 @@ export const buildFeedRoutes = (
           totalsRoutesPlanned: mapRoutesPlanned(result.totalsRoutesPlanned),
           communityRoutesPlanned: mapRoutesPlanned(result.communityRoutesPlanned),
           cityCyclingEstimate,
+          communityPeople:
+            result.communityPeople && typeof result.communityPeople === 'object'
+              ? (() => {
+                  const cp = result.communityPeople as Record<string, unknown>;
+                  return {
+                    accounts: Number(cp.accounts ?? 0),
+                    signedUp: Number(cp.signedUp ?? 0),
+                    rode: Number(cp.rode ?? 0),
+                  };
+                })()
+              : undefined,
           cyclingInEurope:
             result.cyclingInEurope && typeof result.cyclingInEurope === 'object'
               ? (() => {

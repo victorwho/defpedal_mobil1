@@ -916,6 +916,7 @@ export const en = {
     sharedRides: 'Shared rides',
     routesPlanned: 'Routes planned',
     orbRiders: 'riders',
+    accounts: 'Accounts',
     ridersToday: 'On bikes or scooters today (est.)',
     cityEstimateSourceScooter: 'Estimate, not a count: {{percent}}% of trips by bike or scooter (Master Plan Velo, {{year}}) across {{population}} residents.',
     cyclistsToday: 'Cyclists today (est.)',
