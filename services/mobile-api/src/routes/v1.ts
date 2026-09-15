@@ -754,6 +754,13 @@ export const buildV1Routes = (
               // limit alongside the breadcrumb array.
               plannedRoutePolyline6: { type: 'string', maxLength: 6000000 },
               plannedRouteDistanceMeters: { type: 'number', minimum: 0, maximum: 1000000 },
+              // Route provenance (2026-09-15). `plannedRoutePolyline6` now means
+              // the route the rider SET OUT on; these three say what happened to
+              // it afterwards. All optional: an older client sends none of them
+              // and the columns stay NULL, which reads as "unknown", not "none".
+              finalRoutePolyline6: { type: 'string', maxLength: 6000000 },
+              rerouteCount: { type: 'integer', minimum: 0, maximum: 10000 },
+              lastRerouteAt: { type: ['string', 'null'], format: 'date-time' },
               gpsBreadcrumbs: {
                 type: 'array',
                 maxItems: 10000,
@@ -805,6 +812,9 @@ export const buildV1Routes = (
             routingMode: 'safe' | 'fast';
             plannedRoutePolyline6?: string;
             plannedRouteDistanceMeters?: number;
+            finalRoutePolyline6?: string;
+            rerouteCount?: number;
+            lastRerouteAt?: string | null;
             gpsBreadcrumbs: Array<{ lat: number; lon: number; ts: number; acc: number | null; spd: number | null; hdg: number | null }>;
             endReason: 'completed' | 'stopped' | 'app_killed';
             startedAt: string;
@@ -822,6 +832,13 @@ export const buildV1Routes = (
               routingMode: body.routingMode,
               plannedRoutePolyline6: boundPlannedRoutePolyline(body.plannedRoutePolyline6),
               plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
+              // Same bound as the planned geometry — a reroute-heavy ride's
+              // final line is the same order of size as the one it started as.
+              finalRoutePolyline6: boundPlannedRoutePolyline(body.finalRoutePolyline6),
+              // NOT `?? 0`. A client that does not send this does not know the
+              // answer; zero would claim the ride had no reroutes.
+              rerouteCount: body.rerouteCount,
+              lastRerouteAt: body.lastRerouteAt ?? null,
               gpsBreadcrumbs: body.gpsBreadcrumbs,
               endReason: body.endReason,
               startedAt: body.startedAt,
@@ -3365,7 +3382,7 @@ export const buildV1Routes = (
             // Fetch trip track for geometry
             const { data: trackRow } = await supabaseAdmin
               .from('trip_tracks')
-              .select('planned_route_polyline6, started_at, ended_at')
+              .select('planned_route_polyline6, final_route_polyline6, started_at, ended_at')
               .eq('trip_id', tripId)
               .single();
 
@@ -3395,7 +3412,15 @@ export const buildV1Routes = (
               averageSpeedMps: null,
               safetyRating: null,
               safetyTags: [],
-              geometryPolyline6: (trackRow?.planned_route_polyline6 as string) ?? '',
+              // The feed card draws ONE line and calls it the ride, with no GPS
+              // trail beside it to compare against — so it wants the route the
+              // rider finished on, not the one they set out on. Falls back to
+              // the planned geometry for every ride recorded before this
+              // column existed, and for any ride that never rerouted.
+              geometryPolyline6:
+                (trackRow?.final_route_polyline6 as string) ??
+                (trackRow?.planned_route_polyline6 as string) ??
+                '',
               note: null,
               co2SavedKg,
               startLat,

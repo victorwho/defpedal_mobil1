@@ -1311,7 +1311,14 @@ export const useAppStore = create<AppStore>()(
           }
           return {
             navigationSession: setSessionMute(
-              createNavigationSession(route.id, new Date().toISOString(), sessionId),
+              createNavigationSession(route.id, new Date().toISOString(), sessionId, {
+                // Freeze the route the rider is actually setting out on. Every
+                // later reroute replaces `selectedRoute`, so this is the only
+                // place the original geometry can be captured — and the session
+                // is persisted, so it survives a reroute and an app kill.
+                polyline6: route.geometryPolyline6,
+                distanceMeters: route.distanceMeters,
+              }),
               !state.voiceGuidanceEnabled,
             ),
             selectedRouteId: route.id,

@@ -548,8 +548,27 @@ function NavigationScreen() {
         // Bounded to 12k points before upload — an EU-length full-resolution
         // polyline would trip the server's body/schema limits and dead-letter
         // the GPS trail riding in the same request (GPS audit P0-3).
-        plannedRoutePolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
-        plannedRouteDistanceMeters: selectedRoute.distanceMeters,
+        //
+        // ⚠️ The ORIGINAL route, frozen on the session at startNavigation, NOT
+        // `selectedRoute`. Every successful reroute replaces `selectedRoute`
+        // with a leg computed from the rider's position at that moment, so
+        // reading it here recorded the last partial leg as the "planned route".
+        // Measured on 253 production tracks: only 97 started where the ride
+        // did. Falls back to `selectedRoute` for sessions persisted before the
+        // field existed — those rides are mid-flight right now and would
+        // otherwise submit nothing at all.
+        plannedRoutePolyline6: boundRoutePolyline6(
+          currentSession.initialRoutePolyline6 ?? selectedRoute.geometryPolyline6,
+        ),
+        plannedRouteDistanceMeters:
+          currentSession.initialRouteDistanceMeters ?? selectedRoute.distanceMeters,
+        // What the rider was following when they finished. Equal to the planned
+        // route on a ride with no reroutes; the published community-feed
+        // geometry prefers this, because that surface should show the route
+        // actually taken.
+        finalRoutePolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
+        rerouteCount: currentSession.rerouteCount,
+        lastRerouteAt: currentSession.lastRerouteAt ?? null,
         gpsBreadcrumbs: currentSession.gpsBreadcrumbs,
         endReason: reason,
         startedAt: currentSession.startedAt,

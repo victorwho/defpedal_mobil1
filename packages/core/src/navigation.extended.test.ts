@@ -728,3 +728,86 @@ describe('computeCurrentGrade', () => {
     expect(grade).toBe(3.3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Route provenance
+// ---------------------------------------------------------------------------
+//
+// `trip_tracks.planned_route_polyline6` used to be filled at ride END from
+// whatever geometry navigation was holding, so on a rerouted ride it recorded
+// the route the rider finished on under a name that says the opposite. The
+// session now freezes the original at Start; these tests are what stops a
+// later refactor from quietly un-freezing it.
+
+describe('initial route snapshot', () => {
+  const PLANNED = 'planned_polyline_at_start';
+  const REROUTED = 'polyline_after_reroute';
+
+  const startedSession = () =>
+    createNavigationSession('route-original', '2026-09-15T08:00:00.000Z', 'sess-1', {
+      polyline6: PLANNED,
+      distanceMeters: 4200,
+    });
+
+  it('captures the geometry the rider set out on', () => {
+    const session = startedSession();
+    expect(session.initialRoutePolyline6).toBe(PLANNED);
+    expect(session.initialRouteDistanceMeters).toBe(4200);
+  });
+
+  it('starts the reroute count at 0, not undefined', () => {
+    // 0 and undefined are different claims. A session created under this build
+    // genuinely has had no reroutes; undefined would mean "nobody counted",
+    // which is what every pre-existing ride has to say.
+    expect(startedSession().rerouteCount).toBe(0);
+  });
+
+  it('leaves the snapshot empty when no route geometry was supplied', () => {
+    const session = createNavigationSession('route-original');
+    expect(session.initialRoutePolyline6).toBeUndefined();
+    expect(session.initialRouteDistanceMeters).toBeUndefined();
+    expect(session.rerouteCount).toBe(0);
+  });
+
+  it('does NOT change the initial route when the session reroutes', () => {
+    // THE regression this whole change exists to prevent. `syncSessionToRoute`
+    // runs on every reroute; before the snapshot it was the only record of the
+    // route, so each reroute destroyed the rider's original plan.
+    const session = startedSession();
+    const rerouted = syncSessionToRoute(
+      recordRerouteAttempt(session, '2026-09-15T08:12:00.000Z'),
+      'route-after-reroute',
+    );
+
+    expect(rerouted.routeId).toBe('route-after-reroute');
+    expect(rerouted.initialRoutePolyline6).toBe(PLANNED);
+    expect(rerouted.initialRouteDistanceMeters).toBe(4200);
+    expect(rerouted.initialRoutePolyline6).not.toBe(REROUTED);
+  });
+
+  it('survives many reroutes, and counts every one', () => {
+    let session = startedSession();
+    for (let i = 0; i < 5; i += 1) {
+      session = syncSessionToRoute(recordRerouteAttempt(session), `route-${i}`);
+    }
+    expect(session.initialRoutePolyline6).toBe(PLANNED);
+    expect(session.rerouteCount).toBe(5);
+  });
+
+  it('counts a reroute on a session that predates the counter', () => {
+    // A session persisted by an older build hydrates without `rerouteCount`.
+    // It cannot know about earlier reroutes, but 1 is truer than nothing for
+    // the one it just observed.
+    const legacy = { ...startedSession(), rerouteCount: undefined };
+    expect(recordRerouteAttempt(legacy).rerouteCount).toBe(1);
+  });
+
+  it('stamps when the last reroute happened', () => {
+    const session = recordRerouteAttempt(startedSession(), '2026-09-15T08:12:00.000Z');
+    expect(session.lastRerouteAt).toBe('2026-09-15T08:12:00.000Z');
+  });
+
+  it('records no reroute time on a ride that never rerouted', () => {
+    expect(startedSession().lastRerouteAt).toBeNull();
+  });
+});

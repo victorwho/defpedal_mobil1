@@ -338,6 +338,13 @@ export const saveTripTrack = async (
           routing_mode: request.routingMode,
           planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
           planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
+          final_route_polyline6: request.finalRoutePolyline6 ?? null,
+          // ⚠️ `?? null`, never `?? 0`. An older client that does not send a
+          // count has an UNKNOWN number of reroutes, and writing 0 would assert
+          // "this ride had none" — the same false-certainty mistake that
+          // produced a spurious GPS-regression alarm on this project.
+          reroute_count: request.rerouteCount ?? null,
+          last_reroute_at: request.lastRerouteAt ?? null,
           actual_distance_meters: actualDistance,
           gps_trail: cleanTrail,
           end_reason: request.endReason,

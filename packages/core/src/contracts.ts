@@ -545,8 +545,33 @@ export interface TripTrackRequest {
   tripId: string;
   clientTripId: string;
   routingMode: 'safe' | 'fast';
+  /**
+   * The route the rider SET OUT ON.
+   *
+   * ⚠️ Meaning narrowed 2026-09-15. This used to be whatever route was active
+   * at ride END, which after any reroute was the last partial leg starting
+   * wherever the rider happened to be. It is now frozen at startNavigation.
+   * The name is unchanged deliberately — the column and field mean what they
+   * always claimed to mean; they just did not deliver it.
+   */
   plannedRoutePolyline6?: string;
   plannedRouteDistanceMeters?: number;
+  /**
+   * The route being followed when the ride ended.
+   *
+   * Equal to `plannedRoutePolyline6` on a ride with no reroutes. Surfaces that
+   * want "the route actually taken" — the community feed, for one — should
+   * prefer this and fall back to the planned one.
+   */
+  finalRoutePolyline6?: string;
+  /**
+   * Reroutes during the ride. Undefined means UNKNOWN, not zero: sessions that
+   * began before this was tracked cannot report a count, and claiming 0 for
+   * them would assert something we never measured.
+   */
+  rerouteCount?: number;
+  /** When the last reroute happened, or null if none did. */
+  lastRerouteAt?: string | null;
   gpsBreadcrumbs: GpsBreadcrumb[];
   endReason: 'completed' | 'stopped' | 'app_killed';
   startedAt: string;
@@ -649,6 +674,34 @@ export interface NavigationSession {
    * because it is absent on every session persisted before it existed.
    */
   furthestVertexIndex?: number;
+  /**
+   * Geometry of the route the rider ACTUALLY SET OUT ON, frozen at
+   * `startNavigation` and never touched again.
+   *
+   * ⚠️ This exists because `selectedRoute` is replaced on every successful
+   * reroute, and a reroute is computed from the rider's CURRENT position. The
+   * trip_track payload was built at ride END from whatever `selectedRoute` held
+   * by then, so after any reroute the stored "planned route" was the last
+   * partial leg starting wherever the rider happened to be. Measured on 253
+   * production tracks: only 97 began where the ride began, 30 began at the
+   * ride's END, and 122 somewhere else entirely.
+   *
+   * `syncSessionToRoute` must leave this alone — that is the entire point, and
+   * there is a test asserting it. The session is persisted, so the original
+   * survives both a reroute and an app kill.
+   *
+   * Optional because sessions persisted before this existed do not carry it.
+   */
+  initialRoutePolyline6?: string;
+  /** Distance of that original route, frozen with it. */
+  initialRouteDistanceMeters?: number;
+  /**
+   * How many reroutes happened during this session.
+   *
+   * Distinct from `lastRerouteAt`, which only says whether one ever did.
+   * Undefined on pre-existing sessions — "unknown", not "none".
+   */
+  rerouteCount?: number;
   gpsBreadcrumbs: GpsBreadcrumb[];
 }
 

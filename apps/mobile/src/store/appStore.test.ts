@@ -1296,4 +1296,87 @@ describe('useAppStore', () => {
       expect(useAppStore.getState().weatherWarningSeenThisSession).toBe(true);
     });
   });
+  // -------------------------------------------------------------------------
+  // Route provenance
+  // -------------------------------------------------------------------------
+  //
+  // The session is the ONLY place the route the rider set out on can be
+  // captured: every reroute replaces `selectedRoute`, and the trip_track is
+  // written at ride end, long after the original geometry is gone.
+
+  describe('initial route snapshot', () => {
+    const ORIGINAL = 'original_geometry_at_start';
+    const REROUTED = 'geometry_after_reroute';
+
+    const originalRoute = () => ({
+      ...createRoute('safe-1'),
+      geometryPolyline6: ORIGINAL,
+      distanceMeters: 4200,
+    });
+
+    it('startNavigation freezes the route geometry into the session', () => {
+      useAppStore.getState().startNavigation(originalRoute());
+      const session = useAppStore.getState().navigationSession;
+      expect(session?.initialRoutePolyline6).toBe(ORIGINAL);
+      expect(session?.initialRouteDistanceMeters).toBe(4200);
+      expect(session?.rerouteCount).toBe(0);
+    });
+
+    it('a mid-ride reroute does NOT change the frozen geometry', () => {
+      // This is the defect. `syncNavigationRoute` runs on every reroute and
+      // used to be the only record of the route — so the geometry submitted at
+      // ride end was whichever route the reroute had just installed.
+      useAppStore.getState().startNavigation(originalRoute());
+
+      useAppStore.getState().recordNavigationReroute('2026-09-15T08:12:00.000Z');
+      useAppStore.getState().setRoutePreview(
+        createPreviewResponse([
+          { ...createRoute('safe-2'), geometryPolyline6: REROUTED, distanceMeters: 5100 },
+        ]),
+      );
+      useAppStore.getState().syncNavigationRoute('safe-2');
+
+      const session = useAppStore.getState().navigationSession;
+      // The session now points at the new route...
+      expect(session?.routeId).toBe('safe-2');
+      expect(useAppStore.getState().selectedRouteId).toBe('safe-2');
+      // ...but still remembers the one the rider chose.
+      expect(session?.initialRoutePolyline6).toBe(ORIGINAL);
+      expect(session?.initialRouteDistanceMeters).toBe(4200);
+      expect(session?.rerouteCount).toBe(1);
+      expect(session?.lastRerouteAt).toBe('2026-09-15T08:12:00.000Z');
+    });
+
+    it('counts every reroute across a ride', () => {
+      useAppStore.getState().startNavigation(originalRoute());
+      for (let i = 0; i < 3; i += 1) {
+        useAppStore.getState().recordNavigationReroute();
+        useAppStore.getState().syncNavigationRoute(`safe-reroute-${i}`);
+      }
+      const session = useAppStore.getState().navigationSession;
+      expect(session?.rerouteCount).toBe(3);
+      expect(session?.initialRoutePolyline6).toBe(ORIGINAL);
+    });
+
+    it('a ride that never reroutes reports zero, not unknown', () => {
+      useAppStore.getState().startNavigation(originalRoute());
+      const session = useAppStore.getState().navigationSession;
+      expect(session?.rerouteCount).toBe(0);
+      expect(session?.lastRerouteAt).toBeNull();
+    });
+
+    it('switching route BEFORE the ride starts re-freezes to the new route', () => {
+      // Not a reroute: startNavigation on a different route means the rider
+      // picked again, so the new choice is the one they set out on.
+      useAppStore.getState().startNavigation(originalRoute());
+      useAppStore.getState().startNavigation({
+        ...createRoute('safe-2'),
+        geometryPolyline6: REROUTED,
+        distanceMeters: 5100,
+      });
+      const session = useAppStore.getState().navigationSession;
+      expect(session?.initialRoutePolyline6).toBe(REROUTED);
+      expect(session?.initialRouteDistanceMeters).toBe(5100);
+    });
+  });
 });

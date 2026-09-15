@@ -769,6 +769,120 @@ describe('POST /v1/trips/track', () => {
 
     await app.close();
   });
+
+  // ---------------------------------------------------------------------
+  // Route provenance (2026-09-15)
+  //
+  // Gotcha #9 in reverse: the REQUEST schema is `additionalProperties: false`
+  // and Fastify's ajv strips rather than rejects, so a field the client sends
+  // but the schema does not declare vanishes silently between the wire and the
+  // handler — a 200 with the data quietly gone. These assert the three
+  // provenance fields survive the round trip into `saveTripTrack`.
+  // ---------------------------------------------------------------------
+
+  type TrackedProvenance = {
+    plannedRoutePolyline6?: string;
+    finalRoutePolyline6?: string;
+    rerouteCount?: number;
+    lastRerouteAt?: string | null;
+  };
+
+  it('forwards the reroute provenance fields to saveTripTrack', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    const planned = encodePolyline([[26.1, 44.4], [26.2, 44.5]]);
+    const final = encodePolyline([[26.1, 44.4], [26.3, 44.6]]);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: {
+        ...validTrackBody,
+        plannedRoutePolyline6: planned,
+        finalRoutePolyline6: final,
+        rerouteCount: 2,
+        lastRerouteAt: '2026-09-15T08:12:00.000Z',
+      },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const saved = saveTripTrack.mock.calls[0][0] as TrackedProvenance;
+    expect(saved.plannedRoutePolyline6).toBe(planned);
+    expect(saved.finalRoutePolyline6).toBe(final);
+    expect(saved.rerouteCount).toBe(2);
+    expect(saved.lastRerouteAt).toBe('2026-09-15T08:12:00.000Z');
+
+    await app.close();
+  });
+
+  it('forwards rerouteCount 0 rather than dropping it as falsy', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, rerouteCount: 0, lastRerouteAt: null },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const saved = saveTripTrack.mock.calls[0][0] as TrackedProvenance;
+    expect(saved.rerouteCount).toBe(0);
+    expect(saved.lastRerouteAt).toBeNull();
+
+    await app.close();
+  });
+
+  it('leaves the provenance fields undefined when an older client omits them', async () => {
+    // Deployment ordering: the API may go out before the client. Omitted must
+    // stay omitted all the way down, so the columns land NULL ("unknown")
+    // rather than 0 ("no reroutes").
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: validTrackBody,
+    });
+    expect(response.statusCode).toBe(200);
+
+    const saved = saveTripTrack.mock.calls[0][0] as TrackedProvenance;
+    expect(saved.finalRoutePolyline6).toBeUndefined();
+    expect(saved.rerouteCount).toBeUndefined();
+
+    await app.close();
+  });
+
+  it('downsamples an over-cap finalRoutePolyline6, like the planned one', async () => {
+    const saveTripTrack = vi.fn().mockResolvedValue({ acceptedAt: new Date().toISOString() });
+    const app = buildTestApp({ saveTripTrack });
+    await app.ready();
+
+    const points: [number, number][] = Array.from({ length: 20000 }, (_, i) => [
+      26.1 + i * 0.0001,
+      44.4 + i * 0.00005,
+    ]);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/track',
+      headers: authHeaders,
+      payload: { ...validTrackBody, finalRoutePolyline6: encodePolyline(points) },
+    });
+    expect(response.statusCode).toBe(200);
+
+    const saved = saveTripTrack.mock.calls[0][0] as TrackedProvenance;
+    expect(decodePolyline(saved.finalRoutePolyline6 ?? '').length).toBeLessThanOrEqual(15000);
+
+    await app.close();
+  });
 });
 
 // ---------------------------------------------------------------------------

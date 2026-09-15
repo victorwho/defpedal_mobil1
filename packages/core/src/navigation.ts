@@ -76,10 +76,22 @@ const generateSessionId = () => {
   return `session-${Date.now()}`;
 };
 
+/**
+ * The route the rider set out on, captured once at the start of navigation.
+ *
+ * Passed as an options object rather than two more positional parameters so
+ * the three existing call signatures keep working unchanged.
+ */
+export interface InitialRouteSnapshot {
+  readonly polyline6?: string;
+  readonly distanceMeters?: number;
+}
+
 export const createNavigationSession = (
   routeId: string,
   startedAt = new Date().toISOString(),
   sessionId = generateSessionId(),
+  initialRoute: InitialRouteSnapshot = {},
 ): NavigationSession => ({
   sessionId,
   routeId,
@@ -92,6 +104,13 @@ export const createNavigationSession = (
   lastApproachAnnouncementStepId: null,
   offRouteSince: null,
   lastRerouteAt: null,
+  // Frozen here and never written again. See NavigationSession for why.
+  initialRoutePolyline6: initialRoute.polyline6,
+  initialRouteDistanceMeters: initialRoute.distanceMeters,
+  // 0, not undefined: a session that started under this build genuinely has
+  // had no reroutes yet, which is different from an older session where the
+  // count was never tracked and the honest answer is "unknown".
+  rerouteCount: 0,
   gpsBreadcrumbs: [],
 });
 
@@ -143,6 +162,14 @@ export const setSessionApproachAnnouncement = (
   lastApproachAnnouncementStepId: stepId,
 });
 
+/**
+ * Point the session at a new route after a reroute.
+ *
+ * ⚠️ Deliberately does NOT touch `initialRoutePolyline6`,
+ * `initialRouteDistanceMeters` or `rerouteCount`. The spread preserves them,
+ * and `navigation.extended.test.ts` asserts it — this function running on every
+ * reroute is exactly what used to destroy the original plan.
+ */
 export const syncSessionToRoute = (
   session: NavigationSession,
   routeId: string,
@@ -167,6 +194,10 @@ export const recordRerouteAttempt = (
 ): NavigationSession => ({
   ...session,
   lastRerouteAt: at,
+  // `?? 0` rather than leaving it undefined: a session from before this field
+  // existed that then reroutes has had at least this one, and 1 is truer than
+  // nothing. It cannot pretend to know about earlier ones.
+  rerouteCount: (session.rerouteCount ?? 0) + 1,
   rerouteEligible: false,
   offRouteSince: null,
 });
