@@ -151,9 +151,6 @@ export default function CityHeartbeatScreen() {
         ? t('cityHeartbeat.scopeRegionTitle')
         : t('cityHeartbeat.scopeCommunityTitle');
   const pulseLabel = t(`cityHeartbeat.pulse_${windowUsed}_${scopeUsed}`, { city: cityLabel });
-  const activeRidersLabel = t(
-    `cityHeartbeat.activeRiders_${windowUsed}_${(pulse?.activeRiders ?? 0) === 1 ? 'one' : 'other'}`,
-  );
 
   if (isLoading && !heartbeat) {
     return (
@@ -214,75 +211,13 @@ export default function CityHeartbeatScreen() {
         <FadeSlideIn delay={0}>
           <PulseHeader
             cityName={headerTitle}
-            activeRidersToday={ridesStarted?.activeRiders ?? pulse?.activeRiders ?? 0}
             totalRidesToday={orbValue}
             orbLabel={orbLabel}
-            activeRidersLabel={activeRidersLabel}
           />
         </FadeSlideIn>
 
-        {/* Lifetime community totals — community-wide, only ever go up, so
-            the first stat card a user reads is never a zero (Change 4) */}
-        {heartbeat.communityTotals && heartbeat.communityTotals.rides > 0 && (
-          <FadeSlideIn delay={50}>
-            <Surface>
-              <Text style={styles.sectionLabel}>{t('cityHeartbeat.communityAllTime')}</Text>
-              <Text style={styles.sectionSub}>{t('cityHeartbeat.communityAllTimeSub')}</Text>
-              <View style={styles.statGrid}>
-                {communityRidesStarted && (
-                  <StatCell
-                    label={t('cityHeartbeat.ridesStarted')}
-                    value={communityRidesStarted.rides}
-                    suffix=""
-                    decimals={0}
-                    color={colors.accent}
-                    styles={styles}
-                  />
-                )}
-                <StatCell
-                  label={t('cityHeartbeat.sharedRides')}
-                  value={heartbeat.communityTotals.rides}
-                  suffix=""
-                  decimals={0}
-                  color={colors.accent}
-                  styles={styles}
-                />
-                <StatCell
-                  label={t('cityHeartbeat.distance')}
-                  value={heartbeat.communityTotals.distanceMeters / 1000}
-                  suffix=" km"
-                  decimals={0}
-                  color={colors.info}
-                  styles={styles}
-                />
-                <StatCell
-                  label={t('cityHeartbeat.co2Saved')}
-                  value={heartbeat.communityTotals.co2SavedKg}
-                  suffix=" kg"
-                  decimals={1}
-                  color={colors.safe}
-                  styles={styles}
-                />
-                <StatCell
-                  label={t('cityHeartbeat.riders')}
-                  // Riders who RODE, to match the Rides cell above it. Using
-                  // communityTotals.uniqueRiders here counted only riders who
-                  // SHARED, so the card read "1420 rides / 139 riders" when
-                  // those rides came from 552 people — two populations in one
-                  // card, understating the community roughly 4x.
-                  value={communityRidesStarted?.activeRiders ?? heartbeat.communityTotals.uniqueRiders}
-                  suffix=""
-                  decimals={0}
-                  color={colors.accent}
-                  styles={styles}
-                />
-              </View>
-            </Surface>
-          </FadeSlideIn>
-        )}
-
         {/* Pulse stats for the resolved (window, scope) rung */}
-        <FadeSlideIn delay={100}>
+        <FadeSlideIn delay={50}>
           <Surface>
             <Text style={styles.sectionLabel}>{pulseLabel}</Text>
             <View style={styles.statGrid}>
@@ -353,7 +288,7 @@ export default function CityHeartbeatScreen() {
             dropped to tidy the layout. The figure is rounded server-side so it
             cannot imply precision its inputs do not support. */}
         {cityEstimate && cityEstimate.dailyCyclists > 0 && (
-          <FadeSlideIn delay={110}>
+          <FadeSlideIn delay={100}>
             <Surface>
               <Text style={styles.sectionLabel}>
                 {t('cityHeartbeat.cityEstimateTitle', { city: cityEstimate.city })}
@@ -400,13 +335,73 @@ export default function CityHeartbeatScreen() {
           </FadeSlideIn>
         )}
 
+        {/* Lifetime community totals — community-wide, only ever go up, so
+            the first stat card a user reads is never a zero (Change 4) */}
+        {heartbeat.communityTotals && heartbeat.communityTotals.rides > 0 && (
+          <FadeSlideIn delay={150}>
+            <Surface>
+              <Text style={styles.sectionLabel}>{t('cityHeartbeat.communityAllTime')}</Text>
+              <Text style={styles.sectionSub}>{t('cityHeartbeat.communityAllTimeSub')}</Text>
+              <View style={styles.statGrid}>
+                {communityRidesStarted && (
+                  <StatCell
+                    label={t('cityHeartbeat.ridesStarted')}
+                    value={communityRidesStarted.rides}
+                    suffix=""
+                    decimals={0}
+                    color={colors.accent}
+                    styles={styles}
+                  />
+                )}
+                <StatCell
+                  label={t('cityHeartbeat.sharedRides')}
+                  value={heartbeat.communityTotals.rides}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.distance')}
+                  value={heartbeat.communityTotals.distanceMeters / 1000}
+                  suffix=" km"
+                  decimals={0}
+                  color={colors.info}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.co2Saved')}
+                  value={heartbeat.communityTotals.co2SavedKg}
+                  suffix=" kg"
+                  decimals={1}
+                  color={colors.safe}
+                  styles={styles}
+                />
+                <StatCell
+                  label={t('cityHeartbeat.riders')}
+                  // Riders who RODE, to match the Rides cell above it. Using
+                  // communityTotals.uniqueRiders here counted only riders who
+                  // SHARED, so the card read "1420 rides / 139 riders" when
+                  // those rides came from 552 people — two populations in one
+                  // card, understating the community roughly 4x.
+                  value={communityRidesStarted?.activeRiders ?? heartbeat.communityTotals.uniqueRiders}
+                  suffix=""
+                  decimals={0}
+                  color={colors.accent}
+                  styles={styles}
+                />
+              </View>
+            </Surface>
+          </FadeSlideIn>
+        )}
+
         {/* Municipal cycle counts. Its own card, and worded so it cannot be
             read as our activity: these are city counters measuring everyone on
             a bike, not Defensive Pedal riders. The city count is shown beside
             the total because it is what makes the number legible — "across N
             cities" is the difference between a figure and a claim. */}
         {cyclingInEurope && (
-          <FadeSlideIn delay={125}>
+          <FadeSlideIn delay={200}>
             <Surface>
               <Text style={styles.sectionLabel}>{t('cityHeartbeat.cyclingEuropeTitle')}</Text>
               <Text style={styles.sectionSub}>
@@ -442,7 +437,7 @@ export default function CityHeartbeatScreen() {
             the size of the map everyone rides on, and conflating the two is how
             a 67-million figure would end up implying 67 million rides. */}
         {network && network.roadSegmentsScored > 0 && (
-          <FadeSlideIn delay={150}>
+          <FadeSlideIn delay={250}>
             <Surface>
               <Text style={styles.sectionLabel}>{t('cityHeartbeat.networkTitle')}</Text>
               <Text style={styles.sectionSub}>{t('cityHeartbeat.networkSub')}</Text>
@@ -489,7 +484,7 @@ export default function CityHeartbeatScreen() {
         )}
 
         {/* Activity chart — daily (7 days) or weekly (4 weeks) at the resolved scope */}
-        <FadeSlideIn delay={200}>
+        <FadeSlideIn delay={300}>
           <ActivityChart
             daily={chartDaily}
             days={7}
@@ -509,7 +504,7 @@ export default function CityHeartbeatScreen() {
             zeros sat in the same scroll as the community-scope all-time
             card and read as a contradiction (review 2026-08-13 G-22). */}
         {heartbeat.totals.rides > 0 && (
-        <FadeSlideIn delay={300}>
+        <FadeSlideIn delay={350}>
           <Surface>
             <Text style={styles.sectionLabel}>{t('cityHeartbeat.allTimeNearby')}</Text>
             <View style={styles.statGrid}>

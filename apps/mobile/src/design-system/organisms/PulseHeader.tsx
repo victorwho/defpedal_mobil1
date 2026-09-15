@@ -1,8 +1,13 @@
 /**
  * PulseHeader — Animated heartbeat header for the City Heartbeat dashboard.
  *
- * Shows city name, today's active riders, and a pulsing ring animation
- * using the brand accent color. Respects reduced motion.
+ * Shows the city name, a labelled count in a pulsing orb, and a ring
+ * animation using the brand accent color. Respects reduced motion.
+ *
+ * The "N riders active this month" row was removed 2026-09-15: the card sits
+ * directly above "This month in <city>", which carries the windowed figures,
+ * and two windowed rider counts in adjacent cards read as a contradiction
+ * rather than as detail.
  */
 import { useEffect, useRef, useMemo } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
@@ -26,14 +31,7 @@ import { useReducedMotion } from '../hooks/useReducedMotion';
 
 interface PulseHeaderProps {
   readonly cityName: string | null;
-  readonly activeRidersToday: number;
   readonly totalRidesToday: number;
-  /**
-   * Honest label for the active-riders row (e.g. "riders active this
-   * week") — pass the localized, pluralized string. Falls back to the
-   * legacy hardcoded "rider(s) active today".
-   */
-  readonly activeRidersLabel?: string;
   /**
    * Short label naming what the orb number IS (e.g. "riders").
    *
@@ -59,9 +57,7 @@ const PULSE_DURATION = 2000;
 
 export const PulseHeader = ({
   cityName,
-  activeRidersToday,
   totalRidesToday,
-  activeRidersLabel,
   orbLabel,
 }: PulseHeaderProps) => {
   const { colors } = useTheme();
@@ -166,19 +162,12 @@ export const PulseHeader = ({
           ) : null}
         </View>
 
-        {/* City + riders */}
+        {/* City name */}
         <View style={styles.textCol}>
           <Text style={styles.cityName} numberOfLines={1}>
             {cityName ?? 'Your City'}
           </Text>
           <Text style={styles.subtitle}>City Heartbeat</Text>
-          <View style={styles.riderRow}>
-            <Text style={styles.riderCount}>{activeRidersToday}</Text>
-            <Text style={styles.riderLabel}>
-              {activeRidersLabel ??
-                (activeRidersToday === 1 ? 'rider active today' : 'riders active today')}
-            </Text>
-          </View>
         </View>
       </View>
     </View>
@@ -272,22 +261,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       textTransform: 'uppercase',
       letterSpacing: 1.2,
       fontSize: 10,
-    },
-    riderRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: space[1],
-      marginTop: space[1],
-    },
-    riderCount: {
-      ...textDataLg,
-      fontFamily: fontFamily.mono.bold,
-      color: colors.accent,
-      fontSize: 18,
-    },
-    riderLabel: {
-      ...textSm,
-      fontFamily: fontFamily.body.medium,
-      color: colors.textSecondary,
     },
   });
