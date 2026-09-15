@@ -654,6 +654,10 @@ const StatCell = ({ label, value, suffix, decimals, color, styles }: StatCellPro
       targetValue={value}
       suffix={suffix}
       decimals={decimals}
+      // Grouped above four digits. This screen now carries six-digit figures
+      // (Bucharest's estimate is 100,000) and an ungrouped one has to be
+      // counted rather than read.
+      groupThousands={value >= 10000}
       duration={1200}
       style={{ ...textDataMd, fontFamily: fontFamily.mono.bold, color }}
     />
