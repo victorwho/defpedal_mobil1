@@ -360,6 +360,8 @@ export const buildFeedRoutes = (
             modalSharePercent: Number(e.modalSharePercent ?? 0),
             modalShareSource: String(e.modalShareSource ?? ''),
             modalShareYear: Number(e.modalShareYear ?? 0),
+            modalShareCovers:
+              e.modalShareCovers === 'bicycle_or_scooter' ? 'bicycle_or_scooter' : 'bicycle',
             population: Number(e.population ?? 0),
           };
         }

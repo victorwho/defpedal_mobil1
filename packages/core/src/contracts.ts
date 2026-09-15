@@ -1598,6 +1598,15 @@ export interface CityCyclingEstimate {
   readonly modalSharePercent: number;
   readonly modalShareSource: string;
   readonly modalShareYear: number;
+  /**
+   * What the modal share actually measures.
+   *
+   * ⚠️ The UI label MUST follow this. Bucharest's newer figure covers bicycles
+   * AND scooters, so showing it under a "cyclists" label would quietly count
+   * e-scooter riders as cyclists. Never widen a measure without moving the
+   * word that describes it.
+   */
+  readonly modalShareCovers: 'bicycle' | 'bicycle_or_scooter';
   readonly population: number;
 }
 

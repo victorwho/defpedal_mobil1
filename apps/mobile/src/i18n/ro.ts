@@ -902,6 +902,8 @@ export const ro: TranslationKeys = {
     sharedRides: 'Curse partajate',
     routesPlanned: 'Rute planificate',
     orbRiders: 'cicliști',
+    ridersToday: 'Pe bicicletă sau trotinetă azi (est.)',
+    cityEstimateSourceScooter: 'Estimare, nu o numărătoare: {{percent}}% din deplasări cu bicicleta sau trotineta (Master Plan Velo, {{year}}) la {{population}} locuitori.',
     cyclistsToday: 'Cicliști azi (est.)',
     conditions_storm: 'Mult mai puțini azi — furtună',
     conditions_rain: 'Mai puțini azi — probabil plouă',

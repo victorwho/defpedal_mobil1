@@ -902,6 +902,8 @@ export const es: TranslationKeys = {
     sharedRides: 'Rutas compartidas',
     routesPlanned: 'Rutas planificadas',
     orbRiders: 'ciclistas',
+    ridersToday: 'En bici o patinete hoy (est.)',
+    cityEstimateSourceScooter: 'Estimación, no un recuento: {{percent}}% de los viajes en bici o patinete (Master Plan Velo, {{year}}) sobre {{population}} habitantes.',
     cyclistsToday: 'Ciclistas hoy (est.)',
     conditions_storm: 'Muchos menos hoy — tormenta',
     conditions_rain: 'Menos hoy — lluvia probable',

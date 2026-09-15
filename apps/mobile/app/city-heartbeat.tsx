@@ -360,7 +360,14 @@ export default function CityHeartbeatScreen() {
               </Text>
               <View style={styles.statGrid}>
                 <StatCell
-                  label={t('cityHeartbeat.cyclistsToday')}
+                  // ⚠️ The label follows the MEASURE. Bucharest's figure covers
+                  // bikes and scooters, so calling them all "cyclists" would
+                  // quietly count e-scooter riders as cyclists.
+                  label={t(
+                    cityEstimate.modalShareCovers === 'bicycle_or_scooter'
+                      ? 'cityHeartbeat.ridersToday'
+                      : 'cityHeartbeat.cyclistsToday',
+                  )}
                   value={cityEstimate.dailyCyclists}
                   suffix=""
                   decimals={0}
@@ -378,11 +385,16 @@ export default function CityHeartbeatScreen() {
                 </Text>
               )}
               <Text style={styles.estimateSource}>
-                {t('cityHeartbeat.cityEstimateSource', {
-                  percent: cityEstimate.modalSharePercent,
-                  year: cityEstimate.modalShareYear,
-                  population: cityEstimate.population.toLocaleString(),
-                })}
+                {t(
+                  cityEstimate.modalShareCovers === 'bicycle_or_scooter'
+                    ? 'cityHeartbeat.cityEstimateSourceScooter'
+                    : 'cityHeartbeat.cityEstimateSource',
+                  {
+                    percent: cityEstimate.modalSharePercent,
+                    year: cityEstimate.modalShareYear,
+                    population: cityEstimate.population.toLocaleString(),
+                  },
+                )}
               </Text>
             </Surface>
           </FadeSlideIn>

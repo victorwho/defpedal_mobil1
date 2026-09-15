@@ -503,6 +503,7 @@ export const heartbeatResponseSchema = {
         modalSharePercent: { type: 'number' },
         modalShareSource: { type: 'string' },
         modalShareYear: { type: 'integer' },
+        modalShareCovers: { type: 'string', enum: ['bicycle', 'bicycle_or_scooter'] },
         population: { type: 'integer' },
       },
     },
