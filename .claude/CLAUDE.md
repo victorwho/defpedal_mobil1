@@ -434,6 +434,59 @@ OSRM_Server repo** (`C:\dev\OSRM_Server`). Runbook: `docs/runbooks/road-risk-dat
 - **Server-side companions already live:** Cloud Run `defpedal-api-00152-jg8`, and
   Supabase migration `202609040001` re-cutting `get_neighborhood_safety_score`.
 
+## Trip route provenance (`trip_tracks`, 2026-09-15, v0.2.165)
+
+Migration `202609150003`. `planned_route_polyline6` now means **the route the
+rider set out on**. Its name did not change; its meaning narrowed.
+
+- ⚠️ **It used to mean the opposite of what it says.** The trip_track payload is
+  built at ride END from `selectedRoute`, and every successful reroute REPLACES
+  `selectedRoute` with a leg computed from wherever the rider was standing. So
+  on exactly the rides where planned-vs-actual matters, the column stored the
+  final route. Measured over 253 production tracks with both a planned polyline
+  and a GPS trail: **97 began where the ride began, 30 began at the ride's END,
+  122 somewhere else entirely.**
+- **The fix is a snapshot on the session, not a change to reroute behaviour.**
+  `createNavigationSession` takes an `InitialRouteSnapshot` and freezes
+  `initialRoutePolyline6` / `initialRouteDistanceMeters` at `startNavigation`.
+  `syncSessionToRoute` runs on every reroute and deliberately does NOT touch
+  them — the spread preserves them and `navigation.extended.test.ts` asserts it.
+  The session is persisted, so the original survives a reroute AND an app kill.
+- **Three new columns record what happened after.** `final_route_polyline6` (the
+  route finished on), `reroute_count`, `last_reroute_at`.
+- ⚠️ **`reroute_count` is NULLABLE WITH NO DEFAULT and must stay that way.**
+  NULL = unknown (a pre-2026-09-15 ride, or a client too old to report it);
+  0 = the ride genuinely never rerouted. A default of 0 collapses the two into a
+  false zero. The API mirrors it: `request.rerouteCount ?? null`, **never `?? 0`**.
+  Same rule client-side — the payload sends `undefined`, not 0, when unknown.
+- ⚠️ **NO BACKFILL IS POSSIBLE.** For rides before v0.2.165 the original geometry
+  was never stored anywhere — not on `trips`, not in the feed, not in the
+  activity payload. Those rides stay uncomparable and the columns stay NULL.
+  Do not invent a value.
+- **The community feed reads `final ?? planned`** (`routes/v1.ts` auto-publish).
+  That card draws ONE line and calls it the ride, with no GPS trail beside it,
+  so it wants the route actually taken.
+- ⚠️ **`getTripHistory` deliberately still returns only `plannedRoutePolyline6`,
+  and must not be "fixed" without splitting the field.** It feeds two
+  incompatible intents: `TripCard` and `trip/[id]` draw the planned line
+  ALONGSIDE the GPS trail (comparison — planned is correct, and swapping in the
+  final route would draw the ridden route against itself), while `trips.tsx:45`,
+  `history.tsx:129`, the elevation lookup, GPX export and route-share use it as a
+  STAND-IN when no trail exists (final would be better). Adding
+  `finalRoutePolyline6` to `TripHistoryItem` as a second field is the fix; one
+  field cannot serve both.
+- ⚠️ **Deploy ordering, and the failure is silent.** The migration must be live
+  BEFORE the API. Auto-publish selects `final_route_polyline6`, PostgREST 400s on
+  an unknown column, and that call destructures only `data` — so the error is
+  discarded, `trackRow` is null, and every ride publishes to the feed with an
+  EMPTY geometry while nothing logs it. The WRITE path needs no ordering: the
+  fields are optional from the wire down, and an older server strips them
+  (pinned by `routes-v1.test.ts`).
+- **The request schema is load-bearing** — see error-log #122. All three fields
+  are declared in the `POST /v1/trips/track` body schema; without that,
+  `removeAdditional` strips them and the endpoint returns 200 having written
+  nothing.
+
 ## Navigation HUD (redesigned 2026-09-12, shipped v0.2.163)
 
 Plan + full record: **`docs/plans/navigation-hud-redesign.md`**. Driven by on-bike
@@ -988,17 +1041,35 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 - Use emoji in Mapbox SymbolLayer textField
 - Skip bundle check before phone testing
 
-## Current State (as of 2026-09-13)
+## Current State (as of 2026-09-15)
 
 > Entries below are dated and append-only — the newest facts are usually in the
 > most recent bullets, not the top.
 >
-> **RELEASED 2026-09-13 — v0.2.163 is the first production ship since v0.2.130
-> (2026-08-29), so it carries ~33 versions of accumulated change at once,
+> **SUBMITTED 2026-09-15 — v0.2.165 (versionCode 168) is at BOTH stores, 25
+> commits after v0.2.163.** Android: AAB built, verified and uploaded to Play
+> Console (release notes en-US/ro-RO/es-ES; staged rollout + vitals gate as
+> usual). iOS: **1.19 / build 30** `WAITING_FOR_REVIEW` with
+> `releaseType: AFTER_APPROVAL` — it publishes the moment Apple approves, with
+> no staged rollout. Build 30 is `VALID` at Apple and was never run on a device.
+> ⚠️ **iOS 1.18 / build 29 is `READY_FOR_SALE`** — this file previously recorded
+> it as `WAITING_FOR_REVIEW`; it was approved and went live. Query ASC, do not
+> trust these notes (the file already warns about exactly this).
+>
+> What v0.2.165 carries: **trip route provenance** (see that section above —
+> `planned_route_polyline6` finally means the route the rider set out on), the
+> **City Heartbeat** batch (estimated daily cyclists per city, European
+> municipal counters, network scale, community population, counts that include
+> unshared rides), **leaderboard scope widening**, and **loop placement**
+> (loops leave town instead of circling the neighbourhood — previously preview-only
+> in v0.2.164, which never went to production).
+> Server side: Cloud Run **`defpedal-api-00166-pd8`**, migration
+> `202609150003` applied live before the deploy.
+>
+> **RELEASED 2026-09-13 — v0.2.163 was the first production ship since v0.2.130
+> (2026-08-29), so it carried ~33 versions of accumulated change at once,
 > including the FIRST EVER R8-minified production build.** Android
-> v0.2.163 (versionCode 166) is live on Play at **100%**; iOS **1.18 / build 29**
-> is `WAITING_FOR_REVIEW` with `releaseType: AFTER_APPROVAL` (it publishes the
-> moment Apple approves — there is no staged rollout on iOS). The long
+> v0.2.163 (versionCode 166) went live on Play at **100%**. The long
 > "built but never uploaded" backlog below (v0.2.132, v0.2.156) is now
 > superseded: those artefacts were never shipped and never will be.
 > Rollout evidence is thin by nature — see the session-volume warning under

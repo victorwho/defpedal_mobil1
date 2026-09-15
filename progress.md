@@ -2325,3 +2325,61 @@ neither safe nor paved. All three now warn, and `route-preview` renders them —
 which it never did, so the first fix was invisible. Error-log #114.
 
 4,305 tests across the three packages.
+
+## Session 119 — trip route provenance + v0.2.165 to both stores (2026-09-15)
+
+**The defect.** `trip_tracks.planned_route_polyline6` was written at ride END
+from `selectedRoute`, and every successful reroute replaces `selectedRoute` with
+a leg computed from the rider's position at that moment. So on precisely the
+rides where planned-vs-actual matters, the column held the FINAL route under a
+name that says the opposite. Measured over 253 production tracks carrying both a
+planned polyline and a GPS trail: 97 began where the ride began, 30 began at the
+ride's END, 122 somewhere else.
+
+**The fix** (worktree `feat/trip-track-route-provenance`, merged as `6e3efc7`):
+`createNavigationSession` freezes `initialRoutePolyline6` /
+`initialRouteDistanceMeters` at `startNavigation`; `syncSessionToRoute` runs on
+every reroute and deliberately leaves them alone. Three new columns record what
+happened after — `final_route_polyline6`, `reroute_count`, `last_reroute_at` —
+with `reroute_count` NULLABLE and NO DEFAULT so "unknown" stays distinguishable
+from "none". No backfill is possible; pre-v0.2.165 rides stay uncomparable.
+Full invariants in `.claude/CLAUDE.md` § "Trip route provenance".
+
+**The plan was wrong in one place, and it was the load-bearing place.** It listed
+six changes and omitted the trip_track REQUEST schema. `additionalProperties:
+false` + ajv `removeAdditional` would have stripped all three fields between the
+wire and the handler: 200 response, handler called, columns NULL, every other
+layer correct. Error-log #122.
+
+**Item 6 conclusion (asked for, not silently applied):** the community feed's
+auto-publish now reads `final ?? planned` — that card draws one line and calls it
+the ride. `getTripHistory` was left alone: it serves both a COMPARISON overlay
+(TripCard, trip/[id] — planned is right) and a STAND-IN for a missing GPS trail
+(trips.tsx, history.tsx, elevation, GPX export, route-share — final would be
+better). One field cannot serve both; splitting it is a screen change.
+
+**Shipped.**
+- Migration `202609150003` applied live (Management API), verified through
+  PostgREST with a matched control before deploying.
+- Cloud Run `defpedal-api-00166-pd8` from a clean tree at `origin/main`, verified
+  BY CONTENT: validation runs before auth on `/v1/trips/track`, so an
+  out-of-range value on a declared field 400s naming it while an undeclared one
+  is stripped and 401s. All ten recently-shipped routes smoke-tested for reverts.
+- v0.2.165 (168) — Android AAB signer-verified, R8 keeps intact, proguard map
+  embedded, Sentry symbolication confirmed both halves, this session's symbols
+  grepped out of the shipped bundle; archived to `apkreleases/`. Uploaded to Play.
+- iOS build 30 `VALID`, version record **1.19** created, build attached (verified
+  on `/v1/appStoreVersions/{id}/build`, not `?include=build` which lies),
+  release notes set, submitted for review — entirely headless from Windows.
+
+**Three false alarms, one shape** (error-log #123): a probe that returns the same
+answer whether the thing works or not. Claimed the migration ASCII-folded em
+dashes (probed the one column with no em dash, and read a console-mangled
+response); claimed the Sentry source map never uploaded (404 on the release
+endpoint — debug-ID artifact bundles do not create release records); claimed a
+schema field was missing (ajv `coerceTypes` turned `42` into `"42"`). Each was
+settled in one step once a matched control was added.
+
+**Still open:** no Google Play service account exists on this machine or on EAS,
+so the Play upload cannot be automated — it remains a manual Console step. Wiring
+one is ~10 minutes and would close the last manual gap in the release pipeline.

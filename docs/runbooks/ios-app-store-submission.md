@@ -168,6 +168,33 @@ mutation($id:ID!){ submission{ cancelSubmission(submissionId:$id){ id status } }
 
 ---
 
+## Log: 2026-09-15 — v1.19 / build 30 (0.2.165), fully headless
+
+Second end-to-end headless release (after v1.18/29 proved step 4 is scriptable).
+`eas build` → `eas submit` → version record → attach → notes → submit for review,
+all from Windows. Build 30 `VALID`; submission `40335ac7-f191-48f0-9d4f-6558312e1926`
+at `WAITING_FOR_REVIEW`, version record id `6ffa6558-0503-454b-8a11-20d9fe24731f`.
+
+Two things worth keeping:
+
+- ⚠️ **Write `ascApiKeyPath` with FORWARD slashes.** Adding the key to `eas.json`
+  through a shell heredoc, a backslash layer was eaten and the value landed as
+  `C:\dev` + a **BEL control character** + `dminInfo` (`\a`). JSON stayed valid
+  and the failure would have surfaced only as a confusing key-not-found. Use
+  `C:/dev/adminInfo/...` — Node resolves it fine on Windows — and **read the file
+  back and `os.path.isfile()` the value** rather than trusting what you wrote.
+  Same family as error-log #107.
+- **The pre-submit guard that matters:** refuse to proceed unless build N is
+  `VALID`. An `INVALID` binary is invisible in TestFlight, so "not in TestFlight"
+  and "still processing" look identical (cf. build 10, ITMS-90771).
+- Re-confirmed: `GET /v1/appStoreVersions/{id}/build` is the honest attachment
+  check; `?include=build` under-reports.
+
+**Release notes live in two places with different limits:** App Store `whatsNew`
+allows 4000 chars and only `en-US` exists; Play allows **500 per locale** and
+carries `en-US` + `ro-RO` + `es-ES`. Do not paste the iOS text into Play — it
+will be over the cap.
+
 ## Log: 2026-06-17/18 — Guideline 5.1.1(iv) resubmission (build 15)
 
 **Rejection.** First App Store submission (**v1.0 build 14**, reviewed 2026-06-17, submission
