@@ -50,6 +50,8 @@ export const ro: TranslationKeys = {
     fast: 'Rapid',
     flat: 'Plat',
     cool: 'Răcoros',
+    ebike: 'E-bike',
+    ebikeA11y: 'Rutare pentru bicicletă electrică — urcări mai ușoare și durate realiste',
     searchPlaceholder: 'Unde mergem?',
     searchPlaceholderOffline: 'Conectează-te la internet pentru a căuta',
     searchStartPlaceholder: 'Caută alt punct de plecare',

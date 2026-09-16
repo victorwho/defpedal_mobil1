@@ -43,8 +43,10 @@ import {
   type NavigationProgressSnapshot,
   updateNavigationSessionProgress,
   avoidUnpavedForBikeType,
+  fromRoutingDisplayMode,
   legacyBikeTypeToId,
   type BikeTypeId,
+  type RoutingDisplayMode,
 } from '@defensivepedal/core';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
@@ -89,6 +91,7 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   avoidUnpaved: false,
   avoidHills: false,
   avoidHeat: false,
+  isEbike: false,
   locale: getDeviceLocale(),
   // Intentionally undefined so cold-start search isn't locked to a single
   // country before GPS resolves. `useResolvedCountry` writes the resolved
@@ -128,6 +131,11 @@ export type AppStore = QueueSlice & PremiumSlice & {
   avoidUnpaved: boolean;
   avoidHills: boolean;
   avoidHeat: boolean;
+  /**
+   * E-bike routing mode. Persisted: the bike a rider owns does not change
+   * between trips, unlike a one-off "avoid hills" decision.
+   */
+  isEbike: boolean;
   showBicycleLanes: boolean;
   poiVisibility: {
     hydration: boolean;
@@ -460,8 +468,15 @@ export type AppStore = QueueSlice & PremiumSlice & {
   setAvoidUnpaved: (enabled: boolean) => void;
   setAvoidHills: (enabled: boolean) => void;
   setAvoidHeat: (enabled: boolean) => void;
+  setIsEbike: (enabled: boolean) => void;
   setVoiceGuidanceEnabled: (enabled: boolean) => void;
   setRoutingMode: (mode: RoutingMode) => void;
+  /**
+   * Pick one of the five routing modes (Safe / Fast / Flat / E-bike / Cool)
+   * in a single update: `mode` plus all three profile flags, so no mode can be
+   * entered with a stale flag from the previous one still set.
+   */
+  selectRoutingMode: (displayMode: RoutingDisplayMode) => void;
   setRouteRequest: (request: Partial<RoutePreviewRequest>) => void;
   addWaypoint: (coordinate: Coordinate) => void;
   removeWaypoint: (index: number) => void;
@@ -744,6 +759,7 @@ export const useAppStore = create<AppStore>()(
       avoidUnpaved: false,
       avoidHills: false,
       avoidHeat: false,
+      isEbike: false,
       notifyWeather: true,
       dailyWeatherChain: [],
       dailyWeatherGeneration: null,
@@ -1174,14 +1190,27 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ weightKg: Math.round(Math.max(30, Math.min(300, kg))) })),
       setAvoidUnpaved: (enabled) =>
         set(() => ({ avoidUnpaved: enabled })),
+      // E-bike, Flat and Cool are separate OSRM graphs and no combined graph
+      // exists, so turning one of them ON turns e-bike OFF (and vice versa).
+      // Enforced here rather than only in the pill handlers so a saved route,
+      // a shared-route claim or the preview cycle-pill cannot leave two set.
       setAvoidHills: (enabled) =>
-        set(() => ({ avoidHills: enabled })),
+        set(() => ({ avoidHills: enabled, ...(enabled ? { isEbike: false } : {}) })),
       // Cool mode is hidden in production (src/lib/coolMode.ts). Guarding the
       // SETTER rather than only the pill closes all five paths that can turn
       // avoidHeat on — pill, preview cycle-pill, shared-route claim, saved
       // route, and persisted state.
       setAvoidHeat: (enabled) =>
-        set(() => ({ avoidHeat: resolveAvoidHeat(enabled) })),
+        set(() => {
+          const avoidHeat = resolveAvoidHeat(enabled);
+          return { avoidHeat, ...(avoidHeat ? { isEbike: false } : {}) };
+        }),
+      setIsEbike: (enabled) =>
+        set(() =>
+          enabled
+            ? { isEbike: true, avoidHills: false, avoidHeat: false }
+            : { isEbike: false },
+        ),
       setVoiceGuidanceEnabled: (enabled) =>
         set((state) => ({
           voiceGuidanceEnabled: enabled,
@@ -1196,6 +1225,17 @@ export const useAppStore = create<AppStore>()(
             mode,
           },
         })),
+      selectRoutingMode: (displayMode) =>
+        set((state) => {
+          const next = fromRoutingDisplayMode(displayMode);
+          return {
+            avoidHills: next.avoidHills,
+            // Same production gate as setAvoidHeat — 'cool' degrades to Safe.
+            avoidHeat: resolveAvoidHeat(next.avoidHeat),
+            isEbike: next.isEbike,
+            routeRequest: { ...state.routeRequest, mode: next.mode },
+          };
+        }),
       lastLoadedSavedRouteId: null,
       setLastLoadedSavedRouteId: (id) =>
         set(() => ({ lastLoadedSavedRouteId: id })),
@@ -1204,6 +1244,7 @@ export const useAppStore = create<AppStore>()(
           // Sync top-level preference flags when present in the request
           ...(request.avoidHills !== undefined ? { avoidHills: request.avoidHills } : {}),
           ...(request.avoidHeat !== undefined ? { avoidHeat: request.avoidHeat } : {}),
+          ...(request.isEbike !== undefined ? { isEbike: request.isEbike } : {}),
           ...(request.avoidUnpaved !== undefined ? { avoidUnpaved: request.avoidUnpaved } : {}),
           routeRequest: {
             ...state.routeRequest,
@@ -1699,6 +1740,7 @@ export const useAppStore = create<AppStore>()(
         avoidUnpaved: state.avoidUnpaved,
         avoidHills: state.avoidHills,
         avoidHeat: state.avoidHeat,
+        isEbike: state.isEbike,
         onboardingCompleted: state.onboardingCompleted,
         regionGate: state.regionGate,
         // Persisted so a cold start that cannot reach the API still honours

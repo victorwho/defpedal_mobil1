@@ -2,8 +2,13 @@ import type {
   Coordinate,
   RoutePreviewRequest,
   RouteResponse,
+  SafeRoutingProfile,
 } from '@defensivepedal/core';
-import { isHeatRoutingAvailable, isRouteSupported } from '@defensivepedal/core';
+import {
+  isHeatRoutingAvailable,
+  isRouteSupported,
+  resolveSafeRoutingProfile,
+} from '@defensivepedal/core';
 
 import { config } from '../../config';
 
@@ -47,19 +52,26 @@ const fetchOsrmWithRetry = async (url: string): Promise<Response> => {
 
 /**
  * Resolve the OSRM base URL. Single EU-wide deployment (2026-07-12): one
- * graph covers all 31 supported countries; the profile flags select the
- * instance (cool shade-model > flat > standard safe). Mirrors the
- * mobile-side dispatch in `apps/mobile/src/lib/mapbox-routing.ts`.
+ * graph covers all 31 supported countries; the profile — resolved in core by
+ * `resolveSafeRoutingProfile`, the same function the mobile dispatcher in
+ * `apps/mobile/src/lib/mapbox-routing.ts` uses — selects the instance.
  */
-const resolveBaseUrl = (avoidHills: boolean, avoidHeat: boolean): string =>
-  avoidHeat
-    ? config.safeOsrmCoolBaseUrl
-    : avoidHills
-      ? config.safeOsrmFlatBaseUrl
-      : config.safeOsrmBaseUrl;
+const resolveBaseUrl = (profile: SafeRoutingProfile): string => {
+  switch (profile) {
+    case 'cool':
+      return config.safeOsrmCoolBaseUrl;
+    case 'ebike':
+      return config.safeOsrmEbikeBaseUrl;
+    case 'flat':
+      return config.safeOsrmFlatBaseUrl;
+    case 'standard':
+      return config.safeOsrmBaseUrl;
+  }
+};
 
 export const fetchSafeRoutes = async (
-  request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills' | 'avoidHeat'> & {
+  request: Pick<RoutePreviewRequest, 'avoidUnpaved' | 'avoidHills' | 'avoidHeat'> &
+    Partial<Pick<RoutePreviewRequest, 'isEbike'>> & {
     origin: Coordinate;
     destination: Coordinate;
   },
@@ -83,11 +95,10 @@ export const fetchSafeRoutes = async (
     params.set('exclude', 'unpaved');
   }
 
-  // Cool only where the shade graph has data — degrade to the standard safe
-  // instance elsewhere (mirrors the mobile dispatcher's effectiveAvoidHeat).
+  // Cool only where the shade graph has data — elsewhere the next flag wins
+  // (mirrors the mobile dispatcher).
   const baseUrl = resolveBaseUrl(
-    request.avoidHills,
-    Boolean(request.avoidHeat) && isHeatRoutingAvailable(support.country),
+    resolveSafeRoutingProfile(request, isHeatRoutingAvailable(support.country)),
   );
   const url = `${baseUrl}/${buildCoordinates(
     request.origin,

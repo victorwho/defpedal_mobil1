@@ -87,6 +87,7 @@ export function useExportSavedRouteGpx(): UseExportSavedRouteGpxReturn {
           avoidUnpaved: saved.avoidUnpaved,
           avoidHills: saved.avoidHills,
           avoidHeat: saved.avoidHeat ?? false,
+          isEbike: saved.isEbike ?? false,
           locale,
         });
 

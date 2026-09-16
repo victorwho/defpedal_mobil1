@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints } from '@defensivepedal/core';
+import { getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -136,9 +136,8 @@ function RoutePreviewScreen() {
   const avoidUnpaved = useAppStore((state) => state.avoidUnpaved);
   const avoidHills = useAppStore((state) => state.avoidHills);
   const avoidHeat = useAppStore((state) => state.avoidHeat);
-  const setRoutingMode = useAppStore((state) => state.setRoutingMode);
-  const setAvoidHills = useAppStore((state) => state.setAvoidHills);
-  const setAvoidHeat = useAppStore((state) => state.setAvoidHeat);
+  const isEbike = useAppStore((state) => state.isEbike);
+  const selectRoutingMode = useAppStore((state) => state.selectRoutingMode);
   const resolvedCountry = useResolvedCountry();
 
   const { isOnline } = useConnectivity();
@@ -246,7 +245,7 @@ function RoutePreviewScreen() {
   }, [showWeatherWarning, markWeatherWarningSeen]);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, avoidHeat, showRouteComparison };
+  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, avoidHeat, isEbike, showRouteComparison };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -417,11 +416,11 @@ function RoutePreviewScreen() {
   const handleShareConfirm = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;
     setShareOptionsVisible(false);
-    const routingMode: 'safe' | 'fast' | 'flat' | 'cool' = avoidHeat
-      ? 'cool'
-      : avoidHills
-        ? 'flat'
-        : routeRequest.mode;
+    const routingMode = toRoutingDisplayMode(routeRequest.mode, {
+      avoidHills,
+      avoidHeat,
+      isEbike,
+    });
     void shareRoute({
       route: selectedRoute,
       origin: routeRequest.origin,
@@ -437,6 +436,7 @@ function RoutePreviewScreen() {
     routeRequest,
     avoidHills,
     avoidHeat,
+    isEbike,
     shareRoute,
     shareHideEndpoints,
     shareShortRouteFallback,
@@ -581,7 +581,9 @@ function RoutePreviewScreen() {
     // Cool is Plus-only and Plus is never metered, so the overlap cannot
     // charge anyone. `flatRideToCharge` returns null while the paywall is
     // dark and for unmetered riders, so a reveal starts everyone clean.
-    if (routeRequest.mode !== 'fast' && avoidHills) {
+    // `!isEbike`: e-bike outranks flat at dispatch, so a stale avoidHills
+    // under an e-bike ride did not use the flat graph and must not be charged.
+    if (routeRequest.mode !== 'fast' && avoidHills && !isEbike) {
       const chargeTo = premium.flatRideToCharge();
       if (chargeTo) consumeFlatRouteLocally(chargeTo);
     }
@@ -668,9 +670,14 @@ function RoutePreviewScreen() {
         destination: routeRequest.destination,
         waypoints: routeRequest.waypoints ?? [],
         mode: routeRequest.mode,
-        avoidUnpaved: routeRequest.avoidUnpaved,
-        avoidHills: routeRequest.avoidHills,
-        avoidHeat: routeRequest.avoidHeat,
+        // The flags the preview was actually computed with. `routeRequest`'s
+        // own copies are only written when a saved route is loaded — the mode
+        // pills set the top-level flags — so reading them here saved a route
+        // picked as Flat (or E-bike) as plain Safe.
+        avoidUnpaved,
+        avoidHills,
+        avoidHeat,
+        isEbike,
       });
       void queryClient.invalidateQueries({ queryKey: ['saved-routes'] });
       setSaveModalVisible(false);
@@ -683,68 +690,52 @@ function RoutePreviewScreen() {
     } finally {
       setSavingRoute(false);
     }
-  }, [saveRouteName, routeRequest, queryClient, premium]);
+  }, [saveRouteName, routeRequest, avoidUnpaved, avoidHills, avoidHeat, isEbike, queryClient, premium]);
 
-  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → Cool → Safe) ──
+  // ── Tap-to-cycle routing mode (Safe → Fast → Flat → E-bike → Cool → Safe) ──
   // Mirrors the ModeTogglePill row on route-planning so the user can switch
   // profiles directly from the preview without going back. Changing
-  // `routeRequest.mode` and/or `avoidHills`/`avoidHeat` invalidates the
+  // `routeRequest.mode` and/or `avoidHills`/`avoidHeat`/`isEbike` invalidates the
   // previewQuery key (`effectiveRequest`), which triggers an automatic
   // refetch. Cool is skipped outside the shade-graph countries (RO at
   // launch) — same gate as the Cool pill on route-planning.
   // Same gate as route-planning: hidden in production (src/lib/coolMode.ts).
   // This drops 'cool' out of the tap-to-cycle rotation, so the pill cycles
-  // Safe -> Fast -> Flat -> Safe rather than offering a mode with no control.
+  // Safe -> Fast -> Flat -> E-bike -> Safe rather than offering a mode with no control.
   const coolAvailable =
     isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
     isHeatRoutingAvailable(resolvedCountry.destinationCountry);
 
-  type RoutingDisplay = 'safe' | 'fast' | 'flat' | 'cool';
-  const currentDisplayMode: RoutingDisplay =
-    routeRequest.mode === 'fast'
-      ? 'fast'
-      : avoidHeat && coolAvailable
-        ? 'cool'
-        : avoidHills
-          ? 'flat'
-          : 'safe';
+  const currentDisplayMode = toRoutingDisplayMode(routeRequest.mode, {
+    avoidHills,
+    avoidHeat: avoidHeat && coolAvailable,
+    isEbike,
+  });
 
   const modeDisplay: Record<
-    RoutingDisplay,
+    RoutingDisplayMode,
     {
       label: string;
       variant: 'risk-safe' | 'info' | 'accent' | 'cool';
-      next: RoutingDisplay;
+      next: RoutingDisplayMode;
     }
   > = {
     safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
     fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
-    flat: { label: t('planning.flat'), variant: 'accent', next: coolAvailable ? 'cool' : 'safe' },
+    flat: { label: t('planning.flat'), variant: 'accent', next: 'ebike' },
+    // E-bike is the Safe safety model with pedelec effort pricing — same risk
+    // data, same colour family as Safe.
+    ebike: { label: t('planning.ebike'), variant: 'risk-safe', next: coolAvailable ? 'cool' : 'safe' },
     cool: { label: t('planning.cool'), variant: 'cool', next: 'safe' },
   };
+  const nextDisplayMode = modeDisplay[currentDisplayMode].next;
 
   const cycleRoutingMode = useCallback(() => {
     // Cancel any speech triggered by an earlier mode preview before switching.
     void Speech.stop();
-    if (currentDisplayMode === 'safe') {
-      setAvoidHills(false);
-      setAvoidHeat(false);
-      setRoutingMode('fast');
-    } else if (currentDisplayMode === 'fast') {
-      setAvoidHills(true);
-      setAvoidHeat(false);
-      setRoutingMode('safe');
-    } else if (currentDisplayMode === 'flat' && coolAvailable) {
-      setAvoidHills(false);
-      setAvoidHeat(true);
-      setRoutingMode('safe');
-    } else {
-      setAvoidHills(false);
-      setAvoidHeat(false);
-      setRoutingMode('safe');
-    }
-  }, [currentDisplayMode, coolAvailable, setAvoidHills, setAvoidHeat, setRoutingMode]);
+    selectRoutingMode(nextDisplayMode);
+  }, [nextDisplayMode, selectRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
   // Outside the covered countries (EU-27 + EEA + CH) we only have Mapbox

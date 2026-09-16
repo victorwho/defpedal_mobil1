@@ -35,17 +35,18 @@ export type TripStartBody = TripStartRequest;
 export type TripEndBody = TripEndRequest;
 export type NavigationFeedbackBody = NavigationFeedbackRequest;
 
-// avoidHeat optional: clients that pre-date cool routing don't send it.
-export type SavedRouteCreateBody = WithOptional<SavedRouteCreateRequest, 'avoidHeat'>;
+// avoidHeat / isEbike optional: clients that pre-date cool or e-bike routing
+// don't send them.
+export type SavedRouteCreateBody = WithOptional<SavedRouteCreateRequest, 'avoidHeat' | 'isEbike'>;
 
 export type RoutePreviewBody = WithOptional<
   RoutePreviewRequest,
-  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'locale' | 'countryHint' | 'debug'
+  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'isEbike' | 'locale' | 'countryHint' | 'debug'
 >;
 
 export type RerouteBody = WithOptional<
   RerouteRequest,
-  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'locale' | 'countryHint' | 'debug' | 'activeRouteId'
+  'startOverride' | 'avoidUnpaved' | 'avoidHeat' | 'isEbike' | 'locale' | 'countryHint' | 'debug' | 'activeRouteId'
 >;
 
 const coordinatePairSchema = {
@@ -830,6 +831,9 @@ export const routePreviewRequestSchema = {
     avoidHeat: {
       type: 'boolean',
     },
+    isEbike: {
+      type: 'boolean',
+    },
     locale: localeSchema,
     countryHint: countryHintSchema,
     debug: {
@@ -893,6 +897,7 @@ export const savedRouteCreateRequestSchema = {
     avoidUnpaved: { type: 'boolean' },
     avoidHills: { type: 'boolean' },
     avoidHeat: { type: 'boolean' },
+    isEbike: { type: 'boolean' },
   },
 } as const;
 
@@ -972,6 +977,7 @@ export const savedRouteResponseSchema = {
     avoidUnpaved: { type: 'boolean' },
     avoidHills: { type: 'boolean' },
     avoidHeat: { type: 'boolean' },
+    isEbike: { type: 'boolean' },
     createdAt: { type: 'string' },
     lastUsedAt: { type: 'string' },
   },
@@ -998,6 +1004,7 @@ export const normalizeSavedRouteCreateRequest = (
   avoidUnpaved: body.avoidUnpaved,
   avoidHills: body.avoidHills,
   avoidHeat: body.avoidHeat ?? false,
+  isEbike: body.isEbike ?? false,
 });
 
 export class HttpError extends Error {
@@ -1120,6 +1127,7 @@ export const normalizeRoutePreviewRequest = (
   avoidUnpaved: body.avoidUnpaved ?? false,
   avoidHills: body.avoidHills ?? false,
   avoidHeat: body.avoidHeat ?? false,
+  isEbike: body.isEbike ?? false,
   locale: body.locale ?? 'en',
   countryHint: body.countryHint,
   debug: body.debug ?? false,

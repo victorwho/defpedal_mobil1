@@ -48,6 +48,8 @@ afterEach(() => {
     cyclingFrequency: null,
     avoidUnpaved: false,
     avoidHills: false,
+    avoidHeat: false,
+    isEbike: false,
     voiceGuidanceEnabled: false,
     themePreference: 'dark',
     showBicycleLanes: true,
@@ -835,6 +837,69 @@ describe('useAppStore', () => {
       useAppStore.getState().setAvoidHills(false);
       expect(useAppStore.getState().avoidHills).toBe(false);
       expect(useAppStore.getState().avoidUnpaved).toBe(true);
+    });
+
+    it('isEbike defaults to false', () => {
+      expect(useAppStore.getState().isEbike).toBe(false);
+    });
+
+    // No e-bike flat graph exists, so the two can never both be set.
+    it('setIsEbike(true) clears avoidHills and keeps avoidUnpaved', () => {
+      useAppStore.getState().setAvoidHills(true);
+      useAppStore.getState().setAvoidUnpaved(true);
+      useAppStore.getState().setIsEbike(true);
+      expect(useAppStore.getState().isEbike).toBe(true);
+      expect(useAppStore.getState().avoidHills).toBe(false);
+      expect(useAppStore.getState().avoidUnpaved).toBe(true);
+    });
+
+    it('setAvoidHills(true) clears isEbike', () => {
+      useAppStore.getState().setIsEbike(true);
+      useAppStore.getState().setAvoidHills(true);
+      expect(useAppStore.getState().avoidHills).toBe(true);
+      expect(useAppStore.getState().isEbike).toBe(false);
+    });
+
+    it('turning a flag OFF leaves the other profile flags alone', () => {
+      useAppStore.getState().setIsEbike(true);
+      useAppStore.getState().setAvoidHills(false);
+      useAppStore.getState().setAvoidHeat(false);
+      expect(useAppStore.getState().isEbike).toBe(true);
+    });
+
+    it('selectRoutingMode sets mode and exactly the matching profile flag', () => {
+      const store = useAppStore.getState();
+      store.selectRoutingMode('flat');
+      expect(useAppStore.getState()).toMatchObject({ avoidHills: true, isEbike: false });
+      expect(useAppStore.getState().routeRequest.mode).toBe('safe');
+
+      useAppStore.getState().selectRoutingMode('ebike');
+      expect(useAppStore.getState()).toMatchObject({
+        avoidHills: false,
+        avoidHeat: false,
+        isEbike: true,
+      });
+      expect(useAppStore.getState().routeRequest.mode).toBe('safe');
+
+      useAppStore.getState().selectRoutingMode('fast');
+      expect(useAppStore.getState()).toMatchObject({
+        avoidHills: false,
+        avoidHeat: false,
+        isEbike: false,
+      });
+      expect(useAppStore.getState().routeRequest.mode).toBe('fast');
+
+      useAppStore.getState().selectRoutingMode('safe');
+      expect(useAppStore.getState().routeRequest.mode).toBe('safe');
+      expect(useAppStore.getState().isEbike).toBe(false);
+    });
+
+    it('setRouteRequest syncs isEbike from a loaded route', () => {
+      useAppStore.getState().setRouteRequest({ isEbike: true });
+      expect(useAppStore.getState().isEbike).toBe(true);
+      expect(useAppStore.getState().routeRequest.isEbike).toBe(true);
+      useAppStore.getState().setRouteRequest({ isEbike: false });
+      expect(useAppStore.getState().isEbike).toBe(false);
     });
 
     it('notification preferences can be toggled independently', () => {

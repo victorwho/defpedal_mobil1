@@ -77,6 +77,23 @@ describe('mapShareClaimToPreview', () => {
     expect(request.avoidHills).toBe(false);
   });
 
+  it('collapses routingMode="ebike" to safe + isEbike=true', () => {
+    const { response, request } = mapShareClaimToPreview(
+      baseClaim({ routingMode: 'ebike' }),
+    );
+    expect(response.selectedMode).toBe('safe');
+    expect(response.routes[0]?.source).toBe('custom_osrm');
+    expect(request.mode).toBe('safe');
+    expect(request.isEbike).toBe(true);
+    expect(request.avoidHills).toBe(false);
+    expect(request.avoidHeat).toBe(false);
+  });
+
+  it('sends isEbike=false for a non-e-bike share so a stale flag is cleared', () => {
+    const { request } = mapShareClaimToPreview(baseClaim({ routingMode: 'flat' }));
+    expect(request.isEbike).toBe(false);
+  });
+
   it('emits a Partial<RoutePreviewRequest> with origin/destination/mode/avoid flags', () => {
     const { request } = mapShareClaimToPreview(baseClaim());
     expect(request.origin).toEqual({ lat: 44.4268, lon: 26.1025 });

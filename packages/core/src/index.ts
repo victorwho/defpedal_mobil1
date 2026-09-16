@@ -27,6 +27,7 @@ export * from './polyline';
 export * from './premiumCatalog';
 export * from './routeFeatures';
 export * from './routeRequest';
+export * from './routingProfile';
 export * from './routeAnalysis';
 export * from './reviewEligibility';
 export * from './ridePattern';

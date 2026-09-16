@@ -50,6 +50,8 @@ export const es: TranslationKeys = {
     fast: 'Rápido',
     flat: 'Llano',
     cool: 'Fresco',
+    ebike: 'E-bike',
+    ebikeA11y: 'Ruta para bicicleta eléctrica — subidas más fáciles y tiempos realistas',
     searchPlaceholder: '¿A dónde vamos?',
     searchPlaceholderOffline: 'Conéctate a internet para buscar',
     searchStartPlaceholder: 'Busca otro punto de partida',

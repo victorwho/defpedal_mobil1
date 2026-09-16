@@ -134,6 +134,61 @@ Migration `202609020001`. A reporter may tick "This hazard is permanent" in the 
   renders them. It did not before, so the first version of that fix was
   invisible — producer and consumer are two checks (error-log #114).
 
+## E-bike Routing (pedelec OSRM profile, 2026-09-16)
+
+Server-side record: `C:\Users\Victor\orca\workspaces\OSRM_Server\ebike\addebike.md`
+(written for the old web app, so its file names do not exist here).
+
+- **A fifth routing mode, NOT a toggle.** Route planning shows Safe / Fast /
+  Flat on the first row and **E-bike / Cool** on the second; all five are
+  mutually exclusive. On the wire E-bike is `mode: 'safe'` + `isEbike: true`,
+  exactly as Flat is `avoidHills` and Cool is `avoidHeat`.
+- **`osrm-ebike.defensivepedal.com`** runs `bicycle46-ebike.lua`: the
+  production safety profile with EN 15194 pedelec effort pricing (250 W,
+  assist to 25 km/h). Risk weights, legal gates, access rules and descents are
+  byte-identical to standard; only climb cost and speeds change. Measured by
+  the server team over 128 EU pairs: flat cities give the **same geometry with
+  a ~7–14% lower ETA**, climbs are 13–30% faster, never slower. Live check:
+  Brașov Piața Sfatului → Poiana is 9,024 m on both hosts, 3,153 s standard vs
+  2,318 s e-bike — if both durations match you are on the wrong host.
+- ⚠️ **One hostname for all 31 countries.** There is no `osrm-es-ebike`; a
+  country-suffixed host has no DNS/vhost and fails TLS in exactly that country
+  (the Madrid incident). A test routes Madrid on e-bike and asserts the host.
+- ⚠️ **No e-bike flat or e-bike cool graph exists**, so at most one profile flag
+  can be honoured. `resolveSafeRoutingProfile` (core, `routingProfile.ts`) is
+  the ONLY place the graph is chosen, for both the mobile dispatcher and the
+  API's `customOsrm.ts`: **cool > e-bike > flat > standard**, cool only inside
+  heat coverage. E-bike beats flat because falling back to flat silently drops
+  the pedelec. The store also keeps the flags exclusive (`setIsEbike`,
+  `setAvoidHills`, `setAvoidHeat`, `selectRoutingMode`), so the precedence
+  only settles inconsistent state such as an old saved route.
+- **`toRoutingDisplayMode` / `fromRoutingDisplayMode`** (same file) are the
+  only conversions between flags and the five named modes — the highlighted
+  pill, the preview cycle-pill, share payloads, share claims and the offline
+  route cache all go through them. They replaced four inline ternaries that
+  each had to be found when a mode was added.
+- **Risk data, colours and `RISK_BUCKETS` are untouched** — the e-bike arm
+  publishes exactly the standard risk data. Editing risk display code for this
+  mode is solving a problem that does not exist.
+- **Persisted and free.** `isEbike` survives cold start like `avoidHills`
+  (the bike a rider owns does not change between trips). Not metered, not
+  Plus-gated. Reroutes stay on the e-bike graph (Flat is the one mode that
+  reroutes as Fast). Rides still record `routing_mode` as `safe` —
+  `trip_tracks_routing_mode_check` accepts only `safe`/`fast`, and Flat and
+  Cool are not recorded either.
+- **Not covered: S-pedelecs (45 km/h).** Those are mopeds in most EU countries
+  and are banned from cycleways in DE/NL/FR/AT; nothing in the UI may imply the
+  mode suits them.
+- ⚠️ **Deploy order, and the failures are silent.** (1) Migration
+  `202609160001` (`saved_routes.is_ebike`) BEFORE (2) `202609160002`
+  (`claim_route_share` names the column — applied first it breaks EVERY
+  claim) and BEFORE (3) the API deploy. (4) The app release goes LAST: a new
+  client sharing an e-bike route to an old API gets a 400, because
+  `routeShareSchemas.ts` enumerates `routingMode`. An old API also strips
+  `isEbike` from a saved route (removeAdditional) and saves it as plain Safe.
+  The API writes `is_ebike` only when true, so a lagging migration breaks
+  e-bike saves rather than every save (error-log #83b).
+
 ## Recreational Loops (generated rides that return to the start)
 
 Plan + full record: **`docs/plans/loop-generator.md`**. Screen is
@@ -1273,6 +1328,7 @@ DEV_AUTH_BYPASS_USER_ID=dev-user
 ### OSRM Servers (EU-wide single graph, 2026-07-12)
 - **Safe**: `https://osrm.defensivepedal.com/route/v1/bicycle` (Caddy + Let's Encrypt TLS in front of port 5000)
 - **Flat**: `https://osrm-flat.defensivepedal.com/route/v1/bicycle` (Caddy in front of port 5001 — same path; the subdomain alone selects the container)
+- **E-bike**: `https://osrm-ebike.defensivepedal.com/route/v1/bicycle` (live 2026-09-15, `bicycle46-ebike.lua`; one hostname for every covered country — see § E-bike Routing)
 - **One graph covers all 31 supported countries** (EU-27 + EEA + CH — see `packages/core/src/appAvailability.ts`); verified 2026-07-12 by probing Berlin/Paris/Madrid/Stockholm/Reykjavik/Nicosia + a Vienna→Bratislava cross-border route. The former `osrm-es.*` / `osrm-es-flat.*` per-country pair is retired (config keys + dispatch removed).
 - **Out-of-coverage failure shape**: OSRM does NOT error for points outside its data (UK, Serbia, Canaries…) — it returns `Ok` with a degenerate distance-0 route. Both the client (`fetchOsrmRoutes` → `OsrmOutOfCoverageError` → silent degrade to Mapbox fast + coverage `unsupported`) and the server (`customOsrm.ts`) carry a **zero-distance guard**; do not remove it — the loose coverage bboxes deliberately over-include neighbors (Bosnia inside the HR box, Belgrade/Chișinău inside the RO box) and rely on the guard as the backstop.
 - Direct IP (debugging only, plaintext): `http://34.116.139.172:5000` and `:5001` — not used by the app, exceptions removed from manifests

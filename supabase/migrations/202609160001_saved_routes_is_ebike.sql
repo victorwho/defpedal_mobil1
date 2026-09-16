@@ -1,0 +1,13 @@
+-- Add is_ebike to saved_routes for e-bike (pedelec) routing. Mirrors
+-- 202604110001_saved_routes_avoid_hills.sql and 202608010001_saved_routes_avoid_heat.sql.
+--
+-- E-bike routing dispatches safe-mode requests to osrm-ebike.defensivepedal.com
+-- (bicycle46-ebike.lua): the production safety profile with pedelec effort
+-- pricing. Like avoid_hills / avoid_heat it refines mode = 'safe'; the mode
+-- column is unchanged.
+--
+-- DEPLOY ORDER: apply this BEFORE the API revision that reads/writes is_ebike,
+-- and BEFORE 202609160002 (claim_route_share names the column explicitly).
+-- The API only writes the column when true, so a lagging migration breaks
+-- e-bike saves only — but it still breaks them.
+ALTER TABLE saved_routes ADD COLUMN IF NOT EXISTS is_ebike BOOLEAN NOT NULL DEFAULT false;

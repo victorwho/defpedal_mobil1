@@ -1,5 +1,6 @@
 import type {
   ActivityFeedResponse,
+  RoutingDisplayMode,
   AutocompleteRequest,
   AutocompleteResponse,
   CommunityScope,
@@ -768,7 +769,7 @@ export type RouteShareRoutePayload = {
   geometryPolyline6: string;
   distanceMeters: number;
   durationSeconds: number;
-  routingMode: 'safe' | 'fast' | 'flat' | 'cool';
+  routingMode: RoutingDisplayMode;
   /** Optional per-segment risk data (drives web viewer's safety colors). */
   riskSegments?: RouteShareRiskSegment[];
   /** Optional aggregate 0-100 safety score. Null when unscored. */

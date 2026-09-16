@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { ROUTING_DISPLAY_MODES } from './routingProfile';
 import { SHARE_CODE_REGEX } from './shareCodeGenerator';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ const plannedRoutePayloadSchema = z.object({
   geometryPolyline6: z.string().min(1),
   distanceMeters: z.number().nonnegative(),
   durationSeconds: z.number().nonnegative(),
-  routingMode: z.enum(['safe', 'fast', 'flat', 'cool']),
+  routingMode: z.enum(ROUTING_DISPLAY_MODES),
   /** Per-segment risk category for safety-colored rendering. Optional — may be empty for unscored routes. */
   riskSegments: z.array(riskSegmentSchema).default([]),
   /** Aggregate 0-100 safety score. Null when the route wasn't safety-scored. */

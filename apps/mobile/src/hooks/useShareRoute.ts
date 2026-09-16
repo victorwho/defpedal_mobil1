@@ -14,7 +14,7 @@
 import { useCallback, useState } from 'react';
 import { Share } from 'react-native';
 
-import type { RouteOption } from '@defensivepedal/core';
+import type { RouteOption, RoutingDisplayMode } from '@defensivepedal/core';
 import { PLAY_STORE_URL } from '@defensivepedal/core';
 
 import {
@@ -36,8 +36,8 @@ export type ShareRouteInput = {
   readonly route: RouteOption;
   readonly origin: { readonly lat: number; readonly lon: number };
   readonly destination: { readonly lat: number; readonly lon: number };
-  /** Matches the server-side routingMode enum. Flat = avoid hills, cool = least heat. */
-  readonly routingMode: 'safe' | 'fast' | 'flat' | 'cool';
+  /** Matches the server-side routingMode enum. Flat = avoid hills, ebike = pedelec profile, cool = least heat. */
+  readonly routingMode: RoutingDisplayMode;
   /** Optional human-readable destination for the caption. */
   readonly destinationLabel?: string;
   /**

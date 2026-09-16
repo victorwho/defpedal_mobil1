@@ -57,6 +57,13 @@ export const config = {
       ['SAFE_OSRM_COOL_BASE_URL'],
       'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
     ),
+  // E-bike routing — bicycle46-ebike.lua pedelec instance. ONE hostname for
+  // all 31 covered countries; never derive it per country.
+  safeOsrmEbikeBaseUrl:
+    resolveConfigValue(
+      ['SAFE_OSRM_EBIKE_BASE_URL'],
+      'https://osrm-ebike.defensivepedal.com/route/v1/bicycle',
+    ),
   // safeOsrmEs(Flat)BaseUrl removed 2026-07-12 — the EU-wide graph on the
   // main pair covers Spain; the osrm-es.* servers are retired.
   mapboxAccessToken: resolveConfigValue(

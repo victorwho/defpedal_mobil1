@@ -145,6 +145,12 @@ export interface RoutePreviewRequest {
   avoidHills: boolean;
   /** Cool routing — dispatch safe-mode requests to the shade/heat-model OSRM instance. */
   avoidHeat: boolean;
+  /**
+   * E-bike routing — dispatch safe-mode requests to the pedelec OSRM instance
+   * (osrm-ebike.defensivepedal.com). Same safety model and risk data, cheaper
+   * climbs, a realistic ETA. See `resolveSafeRoutingProfile` for precedence.
+   */
+  isEbike: boolean;
   showRouteComparison?: boolean;
   locale: string;
   countryHint?: string;
@@ -1778,6 +1784,7 @@ export interface SavedRoute {
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
   readonly avoidHeat: boolean;
+  readonly isEbike: boolean;
   readonly createdAt: string;
   readonly lastUsedAt: string;
 }
@@ -1827,4 +1834,5 @@ export interface SavedRouteCreateRequest {
   readonly avoidUnpaved: boolean;
   readonly avoidHills: boolean;
   readonly avoidHeat: boolean;
+  readonly isEbike: boolean;
 }

@@ -18,8 +18,9 @@ import type {
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
+  SafeRoutingProfile,
 } from '@defensivepedal/core';
-import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, isRouteSupported, readOsrmResponse, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, isRouteSupported, readOsrmResponse, resolveSafeRoutingProfile, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -43,14 +44,22 @@ import { getAccessToken } from './supabase';
  * RO+ES-only until `road_risk_data` ships for more countries — routes
  * elsewhere render without them.
  */
-const OSRM_BASE = {
-  safe: 'https://osrm.defensivepedal.com/route/v1/bicycle',
+const OSRM_BASE: Record<SafeRoutingProfile, string> = {
+  standard: 'https://osrm.defensivepedal.com/route/v1/bicycle',
   flat: 'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
+  // E-bike routing — bicycle46-ebike.lua, the production safety profile with
+  // pedelec effort pricing (EN 15194, assist to 25 km/h). Risk weights, legal
+  // gates and access rules are byte-identical to standard; only what a
+  // vertical metre costs changes. ONE hostname for all 31 countries — never
+  // derive it per country (there is no osrm-es-ebike; a suffixed host fails
+  // TLS). No e-bike flat or cool graph exists, which is why the profile is
+  // resolved to exactly one instance in core (`resolveSafeRoutingProfile`).
+  ebike: 'https://osrm-ebike.defensivepedal.com/route/v1/bicycle',
   // Cool routing — bicycle36shade.lua heat model. Coverage is narrower than
   // the EU-wide safe/flat graphs (see HEAT_ROUTING_COUNTRIES in core), so
   // dispatch gates on isHeatRoutingAvailable before selecting this base.
   cool: 'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
-} as const;
+};
 
 const MAPBOX_DIRECTIONS_BASE =
   'https://api.mapbox.com/directions/v5/mapbox/cycling';
@@ -221,16 +230,16 @@ const fetchOsrmRoutes = async (
   origin: Coordinate,
   destination: Coordinate,
   avoidUnpaved: boolean,
-  avoidHills: boolean,
-  avoidHeat: boolean,
+  profile: SafeRoutingProfile,
   waypoints?: readonly Coordinate[],
 ): Promise<OsrmRouteFetch> => {
   const coords = buildCoordString(origin, destination, waypoints);
   // OSRM doesn't support alternatives with 3+ coordinates (waypoints)
   const hasWaypoints = waypoints && waypoints.length > 0;
-  // Profile flags select the OSRM instance (each is a separate graph):
-  // cool (shade/heat model) > flat (7x uphill penalty) > standard safe.
-  const base = avoidHeat ? OSRM_BASE.cool : avoidHills ? OSRM_BASE.flat : OSRM_BASE.safe;
+  // Each profile is a separate graph behind its own hostname. The profile is
+  // resolved once by the caller (`resolveSafeRoutingProfile`), so this never
+  // has to know how the rider's flags combine.
+  const base = OSRM_BASE[profile];
   let url = `${base}/${coords}?overview=full&geometries=geojson&steps=true&alternatives=${hasWaypoints ? 'false' : 'true'}&annotations=true`;
 
   if (avoidUnpaved) {
@@ -257,8 +266,7 @@ const fetchOsrmRoutes = async (
         origin,
         destination,
         false,
-        avoidHills,
-        avoidHeat,
+        profile,
         waypoints,
       );
       return { routes: relaxed.routes, pavedFallback: true };
@@ -535,13 +543,14 @@ export const directPreviewRoute = async (
     }
   };
 
-  // Cool routing only where the shade graph has data (RO at launch). A stale
-  // persisted avoidHeat preference outside coverage silently degrades to the
-  // standard safe profile — mirrors the safe→fast degrade above.
-  const effectiveAvoidHeat =
-    Boolean(request.avoidHeat) &&
-    support.supported &&
-    isHeatRoutingAvailable(support.country);
+  // Which OSRM graph serves this request. Cool routing only where the shade
+  // graph has data (RO at launch) — a stale persisted avoidHeat preference
+  // outside coverage degrades to the next flag, mirroring the safe→fast
+  // degrade above. E-bike covers every supported country on one hostname.
+  const safeProfile = resolveSafeRoutingProfile(
+    request,
+    support.supported && isHeatRoutingAvailable(support.country),
+  );
 
   let rawRoutes: Route[];
   let pavedFallback = false;
@@ -553,8 +562,7 @@ export const directPreviewRoute = async (
         origin,
         destination,
         request.avoidUnpaved,
-        request.avoidHills,
-        effectiveAvoidHeat,
+        safeProfile,
         waypoints,
       );
       rawRoutes = fetched.routes;
@@ -663,8 +671,7 @@ export const directPreviewRoute = async (
             origin,
             destination,
             request.avoidUnpaved,
-            request.avoidHills,
-            effectiveAvoidHeat,
+            safeProfile,
             waypoints,
           )
         ).routes;
@@ -875,7 +882,7 @@ export const fetchLoopRoute = async (
 ): Promise<LoopRouteResult> => {
   const points = [start, ...waypoints, start];
   const coords = points.map((p) => `${p.lon},${p.lat}`).join(';');
-  const base = usesFlatProfile(options.terrain) ? OSRM_BASE.flat : OSRM_BASE.safe;
+  const base = usesFlatProfile(options.terrain) ? OSRM_BASE.flat : OSRM_BASE.standard;
 
   let url =
     `${base}/${coords}?overview=full&geometries=geojson&steps=true` +

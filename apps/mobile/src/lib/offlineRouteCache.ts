@@ -7,7 +7,8 @@
  *
  * Excludes elevation and risk segments (acceptable fidelity loss).
  */
-import type { NavigationStep } from '@defensivepedal/core';
+import type { NavigationStep, RoutingDisplayMode } from '@defensivepedal/core';
+import { isRoutingDisplayMode } from '@defensivepedal/core';
 
 import { keyValueStorage } from './storage';
 
@@ -23,7 +24,7 @@ export interface CachedRouteData {
   readonly durationSeconds: number;
   readonly originLabel: string;
   readonly destinationLabel: string;
-  readonly routingMode: 'safe' | 'fast' | 'flat' | 'cool';
+  readonly routingMode: RoutingDisplayMode;
   readonly waypoints: readonly { readonly lat: number; readonly lon: number; readonly label: string }[];
   readonly cachedAt: string; // ISO timestamp
 }
@@ -54,7 +55,7 @@ const isValidCachedRouteData = (data: unknown): data is CachedRouteData => {
     typeof record.originLabel === 'string' &&
     typeof record.destinationLabel === 'string' &&
     typeof record.routingMode === 'string' &&
-    ['safe', 'fast', 'flat', 'cool'].includes(record.routingMode as string) &&
+    isRoutingDisplayMode(record.routingMode) &&
     Array.isArray(record.waypoints) &&
     typeof record.cachedAt === 'string'
   );

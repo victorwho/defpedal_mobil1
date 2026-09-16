@@ -48,6 +48,8 @@ export const en = {
     fast: 'Fast',
     flat: 'Flat',
     cool: 'Cool',
+    ebike: 'E-bike',
+    ebikeA11y: 'E-bike routing — easier climbs and e-bike arrival times',
     searchPlaceholder: 'Where to?',
     searchPlaceholderOffline: 'Connect to internet to search',
     searchStartPlaceholder: 'Search a different start point',

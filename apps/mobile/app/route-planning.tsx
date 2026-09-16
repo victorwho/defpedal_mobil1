@@ -1,5 +1,5 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL } from '@defensivepedal/core';
+import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, toRoutingDisplayMode } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -140,11 +140,11 @@ export default function RoutePlanningScreen() {
   const routeRequest = useAppStore((state) => state.routeRequest);
   const voiceGuidanceEnabled = useAppStore((state) => state.voiceGuidanceEnabled);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
-  const setRoutingMode = useAppStore((state) => state.setRoutingMode);
+  const selectRoutingMode = useAppStore((state) => state.selectRoutingMode);
   const avoidHills = useAppStore((state) => state.avoidHills);
-  const setAvoidHills = useAppStore((state) => state.setAvoidHills);
   const avoidHeat = useAppStore((state) => state.avoidHeat);
   const setAvoidHeat = useAppStore((state) => state.setAvoidHeat);
+  const isEbike = useAppStore((state) => state.isEbike);
   const setRouteRequest = useAppStore((state) => state.setRouteRequest);
   const addWaypoint = useAppStore((state) => state.addWaypoint);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
@@ -173,9 +173,7 @@ export default function RoutePlanningScreen() {
     if (!hasDestination) return;
     if (resolvedCountry.routeSupported) return;
     if (routeRequest.mode !== 'fast') {
-      setAvoidHills(false);
-      setAvoidHeat(false);
-      setRoutingMode('fast');
+      selectRoutingMode('fast');
     }
     if (resolvedCountry.unsupportedReason === 'origin_unsupported') {
       // Origin moved out of coverage — previous preview is no longer relevant
@@ -186,9 +184,7 @@ export default function RoutePlanningScreen() {
     resolvedCountry.routeSupported,
     resolvedCountry.unsupportedReason,
     routeRequest.mode,
-    setAvoidHills,
-    setAvoidHeat,
-    setRoutingMode,
+    selectRoutingMode,
     setRoutePreview,
   ]);
 
@@ -210,6 +206,14 @@ export default function RoutePlanningScreen() {
     if (!resolvedCountry.routeSupported) return; // force-fast effect owns this case
     if (avoidHeat && !coolAvailable) setAvoidHeat(false);
   }, [hasDestination, resolvedCountry.routeSupported, coolAvailable, avoidHeat, setAvoidHeat]);
+  // Which mode pill is lit. Same precedence as the dispatcher's graph choice
+  // (`resolveSafeRoutingProfile`), so the highlighted pill is always the one
+  // that computes the route.
+  const routingDisplayMode = toRoutingDisplayMode(routeRequest.mode, {
+    avoidHills,
+    avoidHeat,
+    isEbike,
+  });
   const poiVisibility = useAppStore((state) => state.poiVisibility);
   const setPoiVisibility = useAppStore((state) => state.setPoiVisibility);
   const setShowBicycleLanes = useAppStore((state) => state.setShowBicycleLanes);
@@ -469,6 +473,9 @@ export default function RoutePlanningScreen() {
       avoidHills: route.avoidHills,
       // Nullish-guard: rows saved by pre-cool clients / servers lack the field.
       avoidHeat: route.avoidHeat ?? false,
+      // Always sent, even false: setRouteRequest only syncs a flag that is
+      // present, and a stale e-bike flag would outrank a saved Flat route.
+      isEbike: route.isEbike ?? false,
     });
     // Slice 5a: stash the saved route id so a subsequent Share action on
     // route-preview emits `source: 'saved'` and populates `source_ref_id`
@@ -1525,12 +1532,15 @@ export default function RoutePlanningScreen() {
             <WeatherWidget weather={weather} isLoading={weatherLoading} hasLocation={planningOrigin != null} />
           ) : null}
 
-          {/* Safe / Fast / Flat / Cool routing toggle — gated by coverage
-              support. Outside the 31 covered countries (EU-27 + EEA + CH) we
-              hide Safe + Flat + Cool (no OSRM data) and surface a banner so
-              the rider understands why only Fast is on offer. Cross-border
-              rides within coverage are supported (single EU graph). Cool is
-              additionally gated to the shade-graph countries (RO at launch). */}
+          {/* Routing mode toggle — Safe / Fast / Flat on the first row,
+              E-bike / Cool on the second. Gated by coverage support: outside
+              the 31 covered countries (EU-27 + EEA + CH) we hide every OSRM
+              mode and surface a banner so the rider understands why only
+              Fast is on offer. Cross-border rides within coverage are
+              supported (single EU graph). E-bike covers every covered country
+              on one graph; Cool is additionally gated to the shade-graph
+              countries (RO at launch) and hidden in production. The modes are
+              mutually exclusive — each is its own OSRM graph. */}
           {hasValidDestination ? (
             resolvedCountry.routeSupported ? (
               <View>
@@ -1538,38 +1548,49 @@ export default function RoutePlanningScreen() {
                   <ModeTogglePill
                     iconName="shield-checkmark-outline"
                     label={t('planning.safe')}
-                    isActive={routeRequest.mode === 'safe' && !avoidHills && !avoidHeat}
+                    isActive={routingDisplayMode === 'safe'}
                     activeBgColor={safetyTints.infoLight}
                     activeFgColor={colors.info}
-                    onPress={() => { setAvoidHills(false); setAvoidHeat(false); setRoutingMode('safe'); }}
+                    onPress={() => selectRoutingMode('safe')}
                     accessibilityLabel="Safe routing"
                   />
                   <ModeTogglePill
                     iconName="flash-outline"
                     label={t('planning.fast')}
-                    isActive={routeRequest.mode === 'fast'}
+                    isActive={routingDisplayMode === 'fast'}
                     activeBgColor={safetyTints.infoLight}
                     activeFgColor={colors.info}
-                    onPress={() => { setAvoidHills(false); setAvoidHeat(false); setRoutingMode('fast'); }}
+                    onPress={() => selectRoutingMode('fast')}
                     accessibilityLabel="Fast routing"
                   />
                   <ModeTogglePill
                     iconName="trending-down-outline"
                     label={t('planning.flat')}
-                    isActive={avoidHills && routeRequest.mode === 'safe'}
+                    isActive={routingDisplayMode === 'flat'}
                     activeBgColor={safetyTints.safeGreenLight}
                     activeFgColor={colors.safe}
-                    onPress={() => { setAvoidHills(true); setAvoidHeat(false); setRoutingMode('safe'); }}
+                    onPress={() => selectRoutingMode('flat')}
                     accessibilityLabel="Flat routing — avoid hills"
+                  />
+                </View>
+                <View style={[styles.modeToggleRow, styles.modeToggleRowSecondary]}>
+                  <ModeTogglePill
+                    iconName="battery-charging-outline"
+                    label={t('planning.ebike')}
+                    isActive={routingDisplayMode === 'ebike'}
+                    activeBgColor={safetyTints.infoLight}
+                    activeFgColor={colors.info}
+                    onPress={() => selectRoutingMode('ebike')}
+                    accessibilityLabel={t('planning.ebikeA11y')}
                   />
                   {coolAvailable ? (
                     <ModeTogglePill
                       iconName="partly-sunny-outline"
                       label={t('planning.cool')}
-                      isActive={avoidHeat && routeRequest.mode === 'safe'}
+                      isActive={routingDisplayMode === 'cool'}
                       activeBgColor={safetyTints.coolLight}
                       activeFgColor={colors.cool}
-                      onPress={() => { setAvoidHills(false); setAvoidHeat(true); setRoutingMode('safe'); }}
+                      onPress={() => selectRoutingMode('cool')}
                       accessibilityLabel="Cool routing — least heat"
                     />
                   ) : null}
@@ -2276,6 +2297,9 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.full,
       padding: 3,
       ...shadows.sm,
+    },
+    modeToggleRowSecondary: {
+      marginTop: space[2],
     },
     coverageNotice: {
       flexDirection: 'row',

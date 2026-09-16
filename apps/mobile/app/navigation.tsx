@@ -15,6 +15,7 @@ import {
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
   shouldTriggerAutomaticReroute,
+  toRoutingDisplayMode,
 } from '@defensivepedal/core';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -142,6 +143,7 @@ function NavigationScreen() {
     shareTripsPublicly,
     avoidHills,
     avoidHeat,
+    isEbike,
     avoidUnpaved,
   } = useAppStore(useShallow((state) => ({
     routeRequest: state.routeRequest,
@@ -155,6 +157,7 @@ function NavigationScreen() {
     shareTripsPublicly: state.shareTripsPublicly,
     avoidHills: state.avoidHills,
     avoidHeat: state.avoidHeat,
+    isEbike: state.isEbike,
     avoidUnpaved: state.avoidUnpaved,
   })));
 
@@ -812,17 +815,21 @@ function NavigationScreen() {
   //   Cool  → reroute as Cool  (heat avoidance is the mode's whole point and
   //           must survive detours; the shade OSRM has the same latency
   //           profile as the standard safe instance)
+  //   E-bike → reroute as E-bike (a detour on the standard graph would change
+  //           the rider's ETA by ~8% and price climbs for an unassisted bike;
+  //           the e-bike instance is a peer of the standard one)
   const effectiveRouteRequest = useMemo(() => {
-    const isFlat = routeRequest.mode === 'safe' && avoidHills;
+    const isFlat = routeRequest.mode === 'safe' && avoidHills && !isEbike;
     return {
       ...routeRequest,
       avoidUnpaved,
       avoidHeat,
+      isEbike,
       // Flat mode reroutes as Fast (Mapbox) for speed; otherwise preserve original profile
       mode: isFlat ? 'fast' as const : routeRequest.mode,
       avoidHills: isFlat ? false : avoidHills,
     };
-  }, [routeRequest, avoidHills, avoidHeat, avoidUnpaved]);
+  }, [routeRequest, avoidHills, avoidHeat, isEbike, avoidUnpaved]);
 
   /**
    * An imported GPX course is a fixed line the rider brought with them, and
@@ -857,11 +864,12 @@ function NavigationScreen() {
       // reroute. Mirrors the effectiveRouteRequest profile transform.
       const s = useAppStore.getState();
       const base = s.routeRequest;
-      const isFlat = base.mode === 'safe' && s.avoidHills;
+      const isFlat = base.mode === 'safe' && s.avoidHills && !s.isEbike;
       const freshRequest = {
         ...base,
         avoidUnpaved: s.avoidUnpaved,
         avoidHeat: s.avoidHeat,
+        isEbike: s.isEbike,
         mode: isFlat ? ('fast' as const) : base.mode,
         avoidHills: isFlat ? false : s.avoidHills,
       };
@@ -876,6 +884,7 @@ function NavigationScreen() {
         mode: effectiveRouteRequest.mode,
         avoid_hills: effectiveRouteRequest.avoidHills,
         avoid_heat: effectiveRouteRequest.avoidHeat,
+        is_ebike: effectiveRouteRequest.isEbike,
       });
     },
     onSuccess: (response) => {
@@ -900,6 +909,7 @@ function NavigationScreen() {
         mode: effectiveRouteRequest.mode,
         avoid_hills: effectiveRouteRequest.avoidHills,
         avoid_heat: effectiveRouteRequest.avoidHeat,
+        is_ebike: effectiveRouteRequest.isEbike,
       });
       telemetry.captureError(error, {
         feature: 'reroute',
@@ -923,12 +933,10 @@ function NavigationScreen() {
   useEffect(() => {
     if (!selectedRoute || !navigationSession) return;
 
-    const routingMode: CachedRouteData['routingMode'] =
-      routeRequest.mode === 'safe' && avoidHeat
-        ? 'cool'
-        : routeRequest.mode === 'safe' && avoidHills
-          ? 'flat'
-          : routeRequest.mode;
+    const routingMode: CachedRouteData['routingMode'] = toRoutingDisplayMode(
+      routeRequest.mode,
+      { avoidHills, avoidHeat, isEbike },
+    );
 
     const cachedData: CachedRouteData = {
       routeId: selectedRoute.id,
@@ -948,7 +956,7 @@ function NavigationScreen() {
     };
 
     void cacheActiveRoute(cachedData);
-  }, [selectedRoute?.id, navigationSession?.sessionId, routeRequest.mode, avoidHills, avoidHeat]);
+  }, [selectedRoute?.id, navigationSession?.sessionId, routeRequest.mode, avoidHills, avoidHeat, isEbike]);
 
   // ── Hazard proximity detection ──
   useEffect(() => {

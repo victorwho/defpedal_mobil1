@@ -265,6 +265,7 @@ const buildRouteResponse = async (
             avoidUnpaved: normalizedRequest.avoidUnpaved,
             avoidHills: normalizedRequest.avoidHills,
             avoidHeat: normalizedRequest.avoidHeat,
+            isEbike: normalizedRequest.isEbike,
           })
         : await dependencies.fetchFastRoutes(
             previewOrigin,
@@ -4305,6 +4306,7 @@ export const buildV1Routes = (
           avoidUnpaved: (row.avoid_unpaved as boolean) ?? false,
           avoidHills: (row.avoid_hills as boolean) ?? false,
           avoidHeat: (row.avoid_heat as boolean) ?? false,
+          isEbike: (row.is_ebike as boolean) ?? false,
           createdAt: row.created_at as string,
           lastUsedAt: row.last_used_at as string,
         }));
@@ -4343,6 +4345,12 @@ export const buildV1Routes = (
             avoid_unpaved: payload.avoidUnpaved,
             avoid_hills: payload.avoidHills,
             avoid_heat: payload.avoidHeat,
+            // Written only when true. A column named in an INSERT that the live
+            // DB lacks fails the WHOLE insert (error-log #83b — `avoid_heat`
+            // broke every save for a week), so if this deploy ever lands ahead
+            // of migration 202609160001, only e-bike saves are affected rather
+            // than every saved route.
+            ...(payload.isEbike ? { is_ebike: true } : {}),
           })
           .select()
           .single();
@@ -4363,6 +4371,7 @@ export const buildV1Routes = (
           avoidUnpaved: (data.avoid_unpaved as boolean) ?? false,
           avoidHills: (data.avoid_hills as boolean) ?? false,
           avoidHeat: (data.avoid_heat as boolean) ?? false,
+          isEbike: (data.is_ebike as boolean) ?? false,
           createdAt: data.created_at as string,
           lastUsedAt: data.last_used_at as string,
         };

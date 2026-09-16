@@ -26,8 +26,8 @@ import type {
   RoutePreviewRequest,
   RoutePreviewResponse,
   RouteOption,
-  RoutingMode,
 } from '@defensivepedal/core';
+import { fromRoutingDisplayMode } from '@defensivepedal/core';
 
 import type { RouteShareClaimResponseBody } from './api';
 
@@ -68,12 +68,15 @@ export const mapShareClaimToPreview = (claim: ShareClaim): MappedShareClaim => {
   } = routePayload;
 
   // The store's RoutingMode is 'safe' | 'fast'. The share payload's
-  // routingMode is 'safe' | 'fast' | 'flat' | 'cool' — 'flat' and 'cool'
-  // are refinements of 'safe' via the avoidHills/avoidHeat flags. Collapse
-  // here and set the flags in the request.
-  const storeMode: RoutingMode = routingMode === 'fast' ? 'fast' : 'safe';
-  const avoidHills = routingMode === 'flat';
-  const avoidHeat = routingMode === 'cool';
+  // routingMode is one of the five named modes — 'flat', 'ebike' and 'cool'
+  // are refinements of 'safe' via the avoidHills/isEbike/avoidHeat flags.
+  // Collapse here and set the flags in the request.
+  const {
+    mode: storeMode,
+    avoidHills,
+    avoidHeat,
+    isEbike,
+  } = fromRoutingDisplayMode(routingMode);
 
   // Single synthesized RouteOption. `id` is stable per claim code so the
   // store's `selectedRouteId` stays pointing at the same object across
@@ -111,6 +114,7 @@ export const mapShareClaimToPreview = (claim: ShareClaim): MappedShareClaim => {
     mode: storeMode,
     avoidHills,
     avoidHeat,
+    isEbike,
     avoidUnpaved: false,
   };
 

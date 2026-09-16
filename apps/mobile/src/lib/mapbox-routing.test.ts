@@ -467,6 +467,133 @@ describe('directPreviewRoute', () => {
     expect(firstCallUrl).not.toContain('osrm-shade');
   });
 
+  it('uses the e-bike OSRM endpoint when isEbike is enabled', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm-ebike.defensivepedal.com/route/v1/bicycle/');
+    expect(firstCallUrl).not.toContain('exclude=unpaved');
+  });
+
+  it('isEbike wins over avoidHills — there is no e-bike flat graph', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: true,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-ebike.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-flat.defensivepedal.com');
+  });
+
+  it('composes isEbike with avoidUnpaved (exclude param on the e-bike endpoint)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-ebike.defensivepedal.com');
+    expect(firstCallUrl).toContain('exclude=unpaved');
+  });
+
+  it('uses the same e-bike hostname in Spain — never a country-split host', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 40.4168, lon: -3.7038 },
+      destination: { lat: 40.4531, lon: -3.6883 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm-ebike.defensivepedal.com/route/v1/bicycle/');
+    expect(firstCallUrl).not.toContain('osrm-es');
+  });
+
+  it('ignores isEbike in fast mode', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('api.mapbox.com');
+    expect(firstCallUrl).not.toContain('osrm-ebike');
+  });
+
+  it('falls back to the e-bike graph when a stale avoidHeat is outside heat coverage', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 52.52, lon: 13.4 },
+      destination: { lat: 52.53, lon: 13.42 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      avoidHeat: true,
+      isEbike: true,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('osrm-ebike.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-shade.defensivepedal.com');
+  });
+
   it('includes coverage region in response', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
@@ -933,6 +1060,34 @@ describe('no paved route exists', () => {
     });
 
     expect(result.routes[0].warnings).toContain('no_paved_route');
+  });
+
+  it('keeps the e-bike graph on the relaxed retry', async () => {
+    setupFetchMock([
+      { data: { code: 'NoRoute', message: 'Impossible route' } },
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: true,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    const [pavedUrl, relaxedUrl] = vi
+      .mocked(fetch)
+      .mock.calls.slice(0, 2)
+      .map((call) => call[0] as string);
+    expect(pavedUrl).toContain('osrm-ebike.defensivepedal.com');
+    expect(pavedUrl).toContain('exclude=unpaved');
+    // Dropping the surface constraint must not also drop the pedelec.
+    expect(relaxedUrl).toContain('osrm-ebike.defensivepedal.com');
+    expect(relaxedUrl).not.toContain('exclude=unpaved');
   });
 
   it('does not warn when the paved route was found normally', async () => {

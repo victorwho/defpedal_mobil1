@@ -25,6 +25,8 @@ const ROUTING_MODE_LABEL: Record<string, string> = {
   safe: 'Safe route',
   fast: 'Fast route',
   flat: 'Flat route',
+  ebike: 'E-bike route',
+  cool: 'Cool route',
 };
 
 // Delegates to lib/format's safetyLabel rather than keeping a second copy:
