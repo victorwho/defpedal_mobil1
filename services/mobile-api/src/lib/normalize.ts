@@ -61,7 +61,10 @@ export const normalizeRoutePreviewResponse = (options: {
       geometryPolyline6: encodePolyline(route.geometry.coordinates),
       distanceMeters: route.distance,
       durationSeconds: route.duration,
-      adjustedDurationSeconds: adjusted.adjustedDuration,
+      // The router's duration already includes climbing (OSRM and Mapbox both —
+      // measured, see `ElevationEnrichmentOptions` in the app's mapbox-routing.ts),
+      // so the ETA is that duration. Elevation is still used for the climb total.
+      adjustedDurationSeconds: route.duration,
       totalClimbMeters: elevationProfile ? adjusted.elevationGain : null,
       elevationProfile: elevationProfile ?? undefined,
       steps: toNavigationSteps(options.routeResponse, index),

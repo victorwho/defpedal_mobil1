@@ -193,23 +193,6 @@ const fakeElevationGain = (coordinates: readonly [number, number][]): number => 
   return (length / 1000) * 12;
 };
 
-/**
- * The app's terrain-adjusted duration, copied from `mapbox-routing.ts`.
- *
- * Written out here rather than imported from the server's port on purpose: the
- * server has its own copy of this formula, and calling one function from both
- * sides would prove they agree with themselves. Copying the app's is what makes
- * a divergence in the ported formula fail this test.
- */
-const mobileAdjustedDuration = (
-  flatDuration: number,
-  elevationGain: number,
-): number => {
-  const estimatedClimbs =
-    elevationGain > 2 ? Math.max(1, Math.round(elevationGain / 30)) : 0;
-  return flatDuration + elevationGain * 0.75 + estimatedClimbs * 10;
-};
-
 /** Stands in for `enrichRouteWithElevation`, matching what the real one does. */
 const fakeElevation = async (
   route: RouteOption,
@@ -220,9 +203,9 @@ const fakeElevation = async (
     ...route,
     totalClimbMeters: Math.round(gain),
     elevationProfile: FAKE_ELEVATION_PROFILE,
-    adjustedDurationSeconds: Math.round(
-      mobileAdjustedDuration(route.durationSeconds, gain),
-    ),
+    // A routed loop's duration already includes climbing, so enrichment leaves
+    // the ETA at the router's duration (`durationIncludesClimbs: true`).
+    adjustedDurationSeconds: route.durationSeconds,
   };
 };
 
@@ -238,7 +221,7 @@ const fakeScenic = async (): Promise<number> => 0;
  *
  * Built through the real `createMeasurementPort` rather than hand-rolled, so
  * the parity check covers how the server assembles a measurement — including
- * its own adjusted-duration formula — and not merely that one happened.
+ * how it sets the adjusted duration — and not merely that one happened.
  */
 const serverMeasurementPort = () =>
   createMeasurementPort({

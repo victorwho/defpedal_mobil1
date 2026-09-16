@@ -218,6 +218,9 @@ describe('mobile-api v1 routes', () => {
         source: 'custom_osrm',
         distanceMeters: 2100,
         durationSeconds: 620,
+        // 28 m of ascent, but OSRM's duration already includes climbing — the
+        // app penalty (620 + 28 * 0.75 + 10 = 651) would count it twice.
+        adjustedDurationSeconds: 620,
         totalClimbMeters: 28,
       });
       expect(payload.routes[0].warnings).toEqual([]);
@@ -231,6 +234,40 @@ describe('mobile-api v1 routes', () => {
           totalRiskScore: 37,
         },
       ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('does not add the climb penalty to an e-bike preview, whose OSRM duration already prices assisted climbs', async () => {
+    const fetchSafeRoutes = vi.fn().mockResolvedValue(sampleRouteResponse);
+    const app = createApp({
+      fetchSafeRoutes,
+      getElevationProfile: vi.fn().mockResolvedValue([80, 96, 108]),
+      fetchRiskSegments: vi.fn().mockResolvedValue([]),
+    });
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/routes/preview',
+        headers: authHeader,
+        payload: {
+          origin: { lat: 44.4268, lon: 26.1025 },
+          destination: { lat: 44.4378, lon: 26.0946 },
+          mode: 'safe',
+          countryHint: 'RO',
+          isEbike: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(fetchSafeRoutes).toHaveBeenCalledWith(expect.objectContaining({ isEbike: true }));
+      expect(response.json().routes[0]).toMatchObject({
+        durationSeconds: 620,
+        adjustedDurationSeconds: 620,
+        totalClimbMeters: 28,
+      });
     } finally {
       await app.close();
     }
@@ -284,6 +321,9 @@ describe('mobile-api v1 routes', () => {
         source: 'mapbox',
         routingEngineVersion: 'mapbox-directions-cycling-v5',
         routingProfileVersion: 'mapbox-cycling',
+        // Mapbox's cycling duration also includes climbing — no app penalty.
+        durationSeconds: 620,
+        adjustedDurationSeconds: 620,
       });
     } finally {
       await app.close();

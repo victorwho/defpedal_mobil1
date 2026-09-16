@@ -122,3 +122,13 @@ The pre-push hook (`.git/hooks/pre-push`) runs both `npm run typecheck` AND `npm
     dropped, so 38 of 300 candidates could be offered while repeating over 90% of
     themselves. A guard that measures the wrong thing is usually sitting beside
     the thing that should have been measured (error-log #117)
+
+50. **Adding time, cost or risk on top of an external engine's output?** Check
+    whether the engine already includes it, by MEASUREMENT with a control — not
+    by reading its code. The app added a climb penalty to OSRM and Mapbox
+    durations that already priced climbs, so every ETA on every mode counted each
+    climb twice (Râșnov → Poiana previewed 1 h 41 for OSRM's 1 h 30). Same road
+    both directions at identical distance distinguishes "includes it" from
+    "doesn't"; a flat road is the control. Make the deciding flag describe the
+    input and be required (`durationIncludesClimbs`), so no caller inherits a
+    default it never thought about (error-log #124)

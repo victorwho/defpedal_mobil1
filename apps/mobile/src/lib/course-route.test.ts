@@ -9,8 +9,9 @@ vi.mock('./mapbox-routing', () => ({
   enrichRouteWithRisk: vi.fn(async (route: unknown) => route),
 }));
 
-const { buildCourseRoute, courseStepInstruction, downsampleCourse, MAX_COURSE_POINTS } =
+const { buildCourseRoute, courseStepInstruction, downsampleCourse, enrichCourseRoute, MAX_COURSE_POINTS } =
   await import('./course-route');
+const { enrichRouteWithElevation } = await import('./mapbox-routing');
 
 import type { ParsedCourse } from './gpx-parse';
 
@@ -202,5 +203,18 @@ describe('buildCourseRoute', () => {
     expect(route.durationSeconds).toBeGreaterThan(20);
     expect(route.durationSeconds).toBeLessThan(60);
     expect(route.adjustedDurationSeconds).toBe(route.durationSeconds);
+  });
+});
+
+describe('enrichCourseRoute', () => {
+  // A course duration is distance at a constant pace, so it knows nothing about
+  // climbs — unlike a router's duration. The climb penalty is the only climb
+  // time a course ETA gets, and must stay on.
+  it('asks elevation enrichment to add climb time to the elevation-blind duration', async () => {
+    const route = buildCourseRoute(course(straight(30)), { locale: 'en' })!;
+    await enrichCourseRoute(route, straight(30));
+    expect(enrichRouteWithElevation).toHaveBeenCalledWith(route, expect.any(Array), {
+      durationIncludesClimbs: false,
+    });
   });
 });

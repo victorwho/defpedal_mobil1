@@ -426,7 +426,8 @@ const measureLoop = async (loop: PooledLoop): Promise<PooledLoop> => {
   // risk here rather than being fetched for every candidate, for exactly the
   // same reason: the bucket is 30/60s and only finalists are worth measuring.
   const [withElevation, withRisk, scenicScore] = await Promise.all([
-    enrichRouteWithElevation(loop.route, loop.coordinates),
+    // An OSRM loop's duration already includes climbing.
+    enrichRouteWithElevation(loop.route, loop.coordinates, { durationIncludesClimbs: true }),
     enrichRouteWithRisk(loop.route, loop.coordinates),
     fetchRouteScenicScore(loop.coordinates),
   ]);

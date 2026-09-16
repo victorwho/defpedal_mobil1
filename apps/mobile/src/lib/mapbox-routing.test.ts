@@ -11,7 +11,7 @@ vi.mock('./supabase', () => ({
   getAccessToken: vi.fn().mockResolvedValue('test-access-token'),
 }));
 
-import { directPreviewRoute, directReroute } from './mapbox-routing';
+import { directPreviewRoute, directReroute, enrichRouteWithElevation } from './mapbox-routing';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -203,6 +203,111 @@ describe('directPreviewRoute', () => {
 
     expect(result.routes[0].totalClimbMeters).toBe(15);
     expect(result.routes[0].elevationProfile).toEqual([100, 105, 110, 108, 112]);
+  });
+
+  // The fixture route is 900 s with 15 m of ascent, so the app's climb
+  // penalty would be 15 * 0.75 + one climb * 10 = 21 s. Both routers already
+  // price climbs into their duration (measured against the live services —
+  // see `enrichRouteWithElevation`), so a routed ETA must stay at 900.
+  it('does not add the climb penalty to a standard safe route, whose OSRM duration already includes climbs', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    expect(result.routes[0].durationSeconds).toBe(900);
+    expect(result.routes[0].adjustedDurationSeconds).toBe(900);
+    expect(result.routes[0].totalClimbMeters).toBe(15);
+  });
+
+  it('does not add the climb penalty to a flat-profile route', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: true,
+    });
+
+    expect(result.routes[0].adjustedDurationSeconds).toBe(900);
+  });
+
+  it('does not add the climb penalty to a fast (Mapbox) route, whose duration also includes climbs', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'fast',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    expect(result.routes[0].source).toBe('mapbox');
+    expect(result.routes[0].adjustedDurationSeconds).toBe(900);
+  });
+
+  it('does not add the climb penalty to an e-bike route, whose OSRM duration already prices assisted climbs', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    expect(result.routes[0].adjustedDurationSeconds).toBe(900);
+    // Still elevation-enriched — only the time penalty is skipped.
+    expect(result.routes[0].totalClimbMeters).toBe(15);
+    expect(result.routes[0].elevationProfile).toEqual([100, 105, 110, 108, 112]);
+  });
+
+  it('does not add the climb penalty when an e-bike request degrades to Mapbox on a coverage miss', async () => {
+    const zeroDistanceRoute = { ...createOsrmRoute(), distance: 0 };
+    setupFetchMock([
+      { data: { code: 'Ok', routes: [zeroDistanceRoute] } }, // e-bike OSRM mis-hit
+      { data: createRouteResponse() },                       // Mapbox fallback
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 47.0105, lon: 28.8638 },
+      destination: { lat: 47.02, lon: 28.88 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      isEbike: true,
+    });
+
+    expect(result.routes[0].source).toBe('mapbox');
+    expect(result.routes[0].adjustedDurationSeconds).toBe(900);
   });
 
   it('enriches routes with risk segments', async () => {
@@ -987,6 +1092,40 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
       verdict: 'less_safe',
       diffPercent: 400, // |1 - 50/10| = 400%
     });
+  });
+});
+
+describe('enrichRouteWithElevation — who owns climb time', () => {
+  // 900 s, 15 m of ascent: the app penalty is 15 * 0.75 + one climb * 10 = 21 s.
+  const route = {
+    id: 'r',
+    durationSeconds: 900,
+    adjustedDurationSeconds: 900,
+    distanceMeters: 5000,
+    totalClimbMeters: null,
+  } as unknown as Parameters<typeof enrichRouteWithElevation>[0];
+  const coordinates: [number, number][] = [[26.1, 44.43], [26.12, 44.44]];
+
+  it('leaves the ETA at the router duration when that duration already includes climbs', async () => {
+    setupFetchMock([{ data: createElevationResponse() }]);
+
+    const enriched = await enrichRouteWithElevation(route, coordinates, {
+      durationIncludesClimbs: true,
+    });
+
+    expect(enriched.adjustedDurationSeconds).toBe(900);
+    expect(enriched.totalClimbMeters).toBe(15);
+  });
+
+  it('adds climb time when the duration is an elevation-blind estimate (GPX courses)', async () => {
+    setupFetchMock([{ data: createElevationResponse() }]);
+
+    const enriched = await enrichRouteWithElevation(route, coordinates, {
+      durationIncludesClimbs: false,
+    });
+
+    expect(enriched.adjustedDurationSeconds).toBe(921);
+    expect(enriched.totalClimbMeters).toBe(15);
   });
 });
 

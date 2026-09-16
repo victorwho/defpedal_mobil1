@@ -181,7 +181,9 @@ export const enrichCourseRoute = async (
   const bounded = downsampleCourse(coordinates);
 
   const [withElevation, withRisk] = await Promise.all([
-    enrichRouteWithElevation(route, bounded),
+    // A course duration is distance at a constant pace — it knows nothing about
+    // climbs, so this is the one caller that asks for climb time to be added.
+    enrichRouteWithElevation(route, bounded, { durationIncludesClimbs: false }),
     enrichRouteWithRisk(route, bounded),
   ]);
 

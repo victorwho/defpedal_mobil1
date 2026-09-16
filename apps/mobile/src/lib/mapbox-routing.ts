@@ -398,14 +398,45 @@ interface ElevationResponse {
 }
 
 /**
+ * Where a route's duration came from, as far as climbing is concerned.
+ *
+ * `durationIncludesClimbs: true` — a ROUTER computed it. Every router this app
+ * uses already slows the rider on climbs inside its own duration, so the ETA
+ * stays at that duration and only the elevation data is added.
+ * `durationIncludesClimbs: false` — an elevation-blind estimate (a GPX course
+ * is distance at a constant pace), so climb time is added here.
+ *
+ * Required rather than defaulted: a caller that guesses wrong either counts
+ * every climb twice or not at all, and neither shows up as a failure.
+ *
+ * MEASURED 2026-09-16, not assumed. The same road ridden both ways, identical
+ * distance, against the live services: uphill is slower on every router by MORE
+ * than this penalty's own up/down difference — OSRM Brașov→Poiana 671 s vs the
+ * penalty's 336 s, Sinaia→Cota 1400 2,072 s vs 787 s, Tibidabo 489 s vs 191 s,
+ * Innsbruck 287 s vs 100 s; Mapbox cycling Brașov→Poiana 914 s vs 336 s,
+ * Stuttgart 410 s vs 147 s. Flat controls are symmetric (Copenhagen 1.00 on
+ * both). The Lua reason for OSRM is `grade_speed_factor` on way speeds in
+ * bicycle46/-flat/36 and a power-balance climb speed in bicycle46-ebike (§E1).
+ * Adding the penalty on top counted every climb twice for the whole life of the
+ * app: Râșnov → Poiana Brașov previewed 1 h 41 for an OSRM 1 h 30, and 1 h 16
+ * on e-bike for 1 h 04 — while navigation, which sums raw step durations,
+ * disagreed with its own preview from the first second of the ride.
+ */
+export interface ElevationEnrichmentOptions {
+  readonly durationIncludesClimbs: boolean;
+}
+
+/**
  * Enrich a route with elevation data. Fetches elevation profile, gain, and loss
  * from the server using Mapbox Terrain-RGB tiles. Computes totalClimbMeters
- * and adjustedDurationSeconds. Fails gracefully — returns unchanged route
- * if elevation fetch fails.
+ * and adjustedDurationSeconds (see `ElevationEnrichmentOptions` for when climb
+ * time is added). Fails gracefully — returns unchanged route if elevation
+ * fetch fails.
  */
 export const enrichRouteWithElevation = async (
   route: RouteOption,
   coordinates: [number, number][],
+  options: ElevationEnrichmentOptions,
 ): Promise<RouteOption> => {
   if (!mobileEnv.mobileApiUrl) return route;
 
@@ -425,11 +456,9 @@ export const enrichRouteWithElevation = async (
     const data = (await response.json()) as ElevationResponse;
 
     const elevationGain = data.elevationGain ?? 0;
-    const adjustedDurationSeconds = computeAdjustedDuration(
-      route.durationSeconds,
-      elevationGain,
-      route.distanceMeters,
-    );
+    const adjustedDurationSeconds = options.durationIncludesClimbs
+      ? route.durationSeconds
+      : computeAdjustedDuration(route.durationSeconds, elevationGain, route.distanceMeters);
 
     return {
       ...route,
@@ -602,10 +631,14 @@ export const directPreviewRoute = async (
       : { ...mapped, warnings };
   });
 
-  // Enrich all routes with elevation data in parallel (non-blocking)
+  // Enrich all routes with elevation data in parallel (non-blocking). Every
+  // route here came from a router (OSRM or Mapbox), whose duration already
+  // includes climbing.
   const elevationEnriched = await Promise.all(
     rawRoutes.map((rawRoute, index) =>
-      enrichRouteWithElevation(routes[index], rawRoute.geometry.coordinates),
+      enrichRouteWithElevation(routes[index], rawRoute.geometry.coordinates, {
+        durationIncludesClimbs: true,
+      }),
     ),
   );
 

@@ -160,6 +160,15 @@ describe('a straightforward search', () => {
     expect(enrichRouteWithRisk).toHaveBeenCalledTimes(LOOP_RESULTS_SHOWN);
   });
 
+  it('tells elevation enrichment that an OSRM loop duration already includes climbs', async () => {
+    alwaysOnTarget(15_000);
+    await searchLoops(request);
+    for (const call of enrichRouteWithElevation.mock.calls) {
+      expect(call[2]).toEqual({ durationIncludesClimbs: true });
+    }
+    expect(enrichRouteWithElevation).toHaveBeenCalled();
+  });
+
   it('reports each loop as it lands so the map can draw it', async () => {
     alwaysOnTarget(15_000);
     const onCandidate = vi.fn();

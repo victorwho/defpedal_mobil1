@@ -43,36 +43,6 @@ import { lengthWeightedScenic } from '../scenic';
  */
 export const MAX_MEASURED_GEOMETRY_POINTS = 12_000;
 
-/** Adjusted-duration model, ported verbatim from the app's routing module. */
-const HILL_START_PENALTY_SEC = 10;
-const ELEVATION_TIME_FACTOR = 0.75;
-const CLIMB_THRESHOLD_M = 2;
-
-/**
- * Terrain-adjusted duration.
- *
- * Deliberately NOT `getAdjustedDuration` from core, which counts real climbs by
- * walking the elevation profile. The app estimates them from the gain total
- * instead, and the two do not agree. Since the flag can serve either path to
- * the same rider, the estimate is what has to be reproduced — an ETA that
- * changes when a flag flips is a bug report about the ETA.
- */
-export const computeAdjustedDuration = (
-  flatDuration: number,
-  elevationGain: number,
-): number => {
-  const estimatedClimbs =
-    elevationGain > CLIMB_THRESHOLD_M
-      ? Math.max(1, Math.round(elevationGain / 30))
-      : 0;
-
-  return (
-    flatDuration +
-    elevationGain * ELEVATION_TIME_FACTOR +
-    estimatedClimbs * HILL_START_PENALTY_SEC
-  );
-};
-
 /** The measurement surface, injected so the search can be tested without I/O. */
 export interface LoopMeasurementPort {
   measure(loop: GeneratedLoop): Promise<GeneratedLoop>;
@@ -173,15 +143,10 @@ export const createMeasurementPort = (
           elevation && elevation.elevationProfile.length > 0
             ? elevation.elevationProfile
             : undefined,
-        adjustedDurationSeconds:
-          elevation === null
-            ? loop.route.adjustedDurationSeconds
-            : Math.round(
-                computeAdjustedDuration(
-                  loop.route.durationSeconds,
-                  elevation.elevationGain,
-                ),
-              ),
+        // No climb time added: an OSRM loop's duration already includes
+        // climbing, so the ETA stays at the router's own duration — the same
+        // rule the app applies (`ElevationEnrichmentOptions`, mapbox-routing.ts).
+        adjustedDurationSeconds: loop.route.durationSeconds,
         riskSegments,
       },
       climbMeters,
