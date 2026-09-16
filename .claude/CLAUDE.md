@@ -179,6 +179,14 @@ Server-side record: `C:\Users\Victor\orca\workspaces\OSRM_Server\ebike\addebike.
 - **Not covered: S-pedelecs (45 km/h).** Those are mopeds in most EU countries
   and are banned from cycleways in DE/NL/FR/AT; nothing in the UI may imply the
   mode suits them.
+- ✅ **Server half LIVE 2026-09-16 (main `2fe7de5`).** Both migrations applied
+  in order and verified (column via `information_schema` AND PostgREST; RPC
+  diffed byte-identical to the migration, grants unchanged), then Cloud Run
+  **`defpedal-api-00167-ttv`** deployed by image digest. Verified by content,
+  not revision id: an `'ebike'` share now answers 401 where the old revision
+  answered 400 on the enum, and `isEbike: "notabool"` on `POST /v1/saved-routes`
+  now 400s naming the field where the old one stripped it and answered 401.
+  The CLIENT has not shipped — no store build carries the E-bike button yet.
 - ⚠️ **Deploy order, and the failures are silent.** (1) Migration
   `202609160001` (`saved_routes.is_ebike`) BEFORE (2) `202609160002`
   (`claim_route_share` names the column — applied first it breaks EVERY
