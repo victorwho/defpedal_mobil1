@@ -1578,8 +1578,8 @@ export default function RoutePlanningScreen() {
                     iconName="battery-charging-outline"
                     label={t('planning.ebike')}
                     isActive={routingDisplayMode === 'ebike'}
-                    activeBgColor={safetyTints.infoLight}
-                    activeFgColor={colors.info}
+                    activeBgColor={safetyTints.ebikeLight}
+                    activeFgColor={colors.ebikeText}
                     onPress={() => selectRoutingMode('ebike')}
                     accessibilityLabel={t('planning.ebikeA11y')}
                   />
@@ -1588,8 +1588,8 @@ export default function RoutePlanningScreen() {
                       iconName="partly-sunny-outline"
                       label={t('planning.cool')}
                       isActive={routingDisplayMode === 'cool'}
-                      activeBgColor={safetyTints.coolLight}
-                      activeFgColor={colors.cool}
+                      activeBgColor={colors.cool}
+                      activeFgColor={colors.coolOnFill}
                       onPress={() => selectRoutingMode('cool')}
                       accessibilityLabel="Cool routing — least heat"
                     />

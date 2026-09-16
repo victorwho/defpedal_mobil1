@@ -100,8 +100,8 @@ export const safetyTints = {
   /** Safe green — light background (flat routing pill) */
   safeGreenLight: 'rgba(34, 197, 94, 0.12)',
 
-  /** Cool cyan — light background (cool routing pill) */
-  coolLight: 'rgba(6, 182, 212, 0.12)',
+  /** E-bike sky blue — light background (e-bike routing pill). Over the white glass capsule this is #D3F0FD. */
+  ebikeLight: 'rgba(56, 189, 248, 0.22)',
 } as const;
 
 // ---------------------------------------------------------------------------

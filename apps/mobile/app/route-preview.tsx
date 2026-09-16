@@ -63,7 +63,7 @@ import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarni
 import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Button } from '../src/design-system/atoms/Button';
-import { Badge } from '../src/design-system/atoms/Badge';
+import { Badge, badgeForegroundColor, type BadgeVariant } from '../src/design-system/atoms/Badge';
 import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { FadeSlideIn } from '../src/design-system/atoms/FadeSlideIn';
@@ -717,16 +717,14 @@ function RoutePreviewScreen() {
     RoutingDisplayMode,
     {
       label: string;
-      variant: 'risk-safe' | 'info' | 'accent' | 'cool';
+      variant: BadgeVariant;
       next: RoutingDisplayMode;
     }
   > = {
     safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
     fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
     flat: { label: t('planning.flat'), variant: 'accent', next: 'ebike' },
-    // E-bike is the Safe safety model with pedelec effort pricing — same risk
-    // data, same colour family as Safe.
-    ebike: { label: t('planning.ebike'), variant: 'risk-safe', next: coolAvailable ? 'cool' : 'safe' },
+    ebike: { label: t('planning.ebike'), variant: 'ebike', next: coolAvailable ? 'cool' : 'safe' },
     cool: { label: t('planning.cool'), variant: 'cool', next: 'safe' },
   };
   const nextDisplayMode = modeDisplay[currentDisplayMode].next;
@@ -769,7 +767,7 @@ function RoutePreviewScreen() {
             <Ionicons
               name="swap-horizontal"
               size={12}
-              color={colors.textPrimary}
+              color={badgeForegroundColor(currentMode.variant)}
             />
           )
         }

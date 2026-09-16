@@ -24,7 +24,8 @@ vi.mock('../../ThemeContext', () => ({
   }),
 }));
 
-const { Badge } = await import('../Badge');
+const { Badge, badgeForegroundColor } = await import('../Badge');
+const { safetyColors } = await import('../../tokens/colors');
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -90,6 +91,8 @@ describe('Badge', () => {
         'info',
         'neutral',
         'accent',
+        'ebike',
+        'cool',
       ];
       for (const variant of variants) {
         const { unmount } = render(<Badge variant={variant}>Label</Badge>);
@@ -151,6 +154,18 @@ describe('Badge', () => {
       const { container } = render(<Badge variant="neutral">Neutral</Badge>);
       const badge = container.querySelector('[accessibilitylabel="Neutral"]');
       expect(badge).toBeTruthy();
+    });
+  });
+
+  describe('routing-mode colours', () => {
+    it('renders e-bike as the light sky tint and cool as the glacial fill', () => {
+      expect(badgeForegroundColor('ebike')).toBe(safetyColors.ebikeText);
+      expect(badgeForegroundColor('cool')).toBe(safetyColors.coolOnFill);
+    });
+
+    it('exposes each variant text colour so a caller icon can match it', () => {
+      expect(badgeForegroundColor('risk-safe')).toBe(safetyColors.safeText);
+      expect(badgeForegroundColor('info')).toBe(safetyColors.infoText);
     });
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Design System v1.0 — Badge / Chip Atom
  *
- * 7 variants: risk-safe | risk-caution | risk-danger | info | neutral | accent | cool
+ * 8 variants: risk-safe | risk-caution | risk-danger | info | neutral | accent | ebike | cool
  * 2 sizes: sm (24px) | md (28px)
  * Pill shape. Risk score numbers use mono font.
  */
@@ -17,13 +17,14 @@ import { safetyColors, darkTheme, gray } from '../tokens/colors';
 // Types
 // ---------------------------------------------------------------------------
 
-type BadgeVariant =
+export type BadgeVariant =
   | 'risk-safe'
   | 'risk-caution'
   | 'risk-danger'
   | 'info'
   | 'neutral'
   | 'accent'
+  | 'ebike'
   | 'cool';
 
 type BadgeSize = 'sm' | 'md';
@@ -48,6 +49,7 @@ const variantLabel: Record<BadgeVariant, string> = {
   info: 'Info',
   neutral: '',
   accent: '',
+  ebike: '',
   cool: 'Cool',
 };
 
@@ -62,8 +64,18 @@ const variantMap: Record<BadgeVariant, { bg: string; text: string }> = {
   info: { bg: safetyColors.infoTint, text: safetyColors.infoText },
   neutral: { bg: darkTheme.bgSecondary, text: gray[300] },
   accent: { bg: darkTheme.accent, text: darkTheme.textInverse },
-  cool: { bg: safetyColors.coolTint, text: safetyColors.coolText },
+  ebike: { bg: safetyColors.ebikeTint, text: safetyColors.ebikeText },
+  // Solid glacial fill with icy text — the one routing-mode badge that is dark.
+  cool: { bg: safetyColors.cool, text: safetyColors.coolOnFill },
 };
+
+/**
+ * The text colour a badge variant renders with. For an `icon` passed in by the
+ * caller: the icon must match the badge's own text, because a theme colour
+ * (e.g. textPrimary) is dark-on-dark on the glacial `cool` fill in light theme.
+ */
+export const badgeForegroundColor = (variant: BadgeVariant): string =>
+  variantMap[variant].text;
 
 const sizeMap: Record<BadgeSize, { height: number; px: number; fontSize: number }> = {
   sm: { height: 24, px: space[2], fontSize: 12 },

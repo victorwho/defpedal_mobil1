@@ -78,6 +78,9 @@ const badgePairs: ComponentPairs = {
     { name: 'risk-caution', fg: safetyColors.cautionText, bg: safetyColors.cautionTint, size: 'body', theme: 'all' },
     { name: 'risk-danger', fg: safetyColors.dangerText, bg: safetyColors.dangerTint, size: 'body', theme: 'all' },
     { name: 'info', fg: safetyColors.infoText, bg: safetyColors.infoTint, size: 'body', theme: 'all' },
+    // Routing-mode identities: E-bike is the light sky tint, Cool the glacial solid fill.
+    { name: 'ebike', fg: safetyColors.ebikeText, bg: safetyColors.ebikeTint, size: 'body', theme: 'all' },
+    { name: 'cool', fg: safetyColors.coolOnFill, bg: safetyColors.cool, size: 'body', theme: 'all' },
     // Neutral — uses gray[300] on dark bg-secondary.
     { name: 'neutral', fg: gray[300], bg: darkTheme.bgSecondary, size: 'body', theme: 'all' },
     // Accent — dark text on yellow.

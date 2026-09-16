@@ -44,6 +44,8 @@ Pairs that meet WCAG AA today. The component reference points to where the pair 
 | risk-caution | `cautionText` `#92400E` | `cautionTint` `#FEF3C7` | 6.37 | ✅ AA |
 | risk-danger | `dangerText` `#991B1B` | `dangerTint` `#FEE2E2` | 6.80 | ✅ AA |
 | info | `infoText` `#1E40AF` | `infoTint` `#DBEAFE` | 7.15 | ✅ AAA |
+| ebike | `ebikeText` `#0369A1` | `ebikeTint` `#E0F2FE` | 5.17 | ✅ AA |
+| cool | `coolOnFill` `#E6F4FA` | `cool` `#1B4F72` | 7.76 | ✅ AAA |
 | neutral | `gray[300]` `#D1D5DB` | `bgSecondary` `#374151` | 7.00 | ✅ AAA |
 | accent | `textInverse` `#111827` | `accent` `#FACC15` | 11.58 | ✅ AAA |
 

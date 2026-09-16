@@ -65,10 +65,23 @@ export const safetyColors = {
   infoTint: '#DBEAFE',
   infoText: '#1E40AF',
 
-  /** Cool — shade/heat-model routing cues (routing-mode identity, not a risk tier) */
-  cool: '#06B6D4',
-  coolTint: '#CFFAFE',
-  coolText: '#155E75',
+  /**
+   * E-bike — pedelec routing (routing-mode identity, not a risk tier).
+   * A LIGHT cool sky blue, so it reads as the airy sibling of the glacial Cool
+   * mode beside it. Text contrast: ebikeText on ebikeTint 5.17:1, on the
+   * ebikeLight pill tint over the white glass capsule 4.99:1 (AA body).
+   */
+  ebike: '#38BDF8',
+  ebikeTint: '#E0F2FE',
+  ebikeText: '#0369A1',
+
+  /**
+   * Cool — shade/heat-model routing (routing-mode identity, not a risk tier).
+   * A GLACIAL dark blue used as a solid fill with icy text, so it is the
+   * unmistakably darker of the two blue modes. coolOnFill on cool 7.76:1 (AAA).
+   */
+  cool: '#1B4F72',
+  coolOnFill: '#E6F4FA',
 } as const;
 
 // ---------------------------------------------------------------------------

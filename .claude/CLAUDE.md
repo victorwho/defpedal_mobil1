@@ -173,6 +173,14 @@ Server-side record: `C:\Users\Victor\orca\workspaces\OSRM_Server\ebike\addebike.
 - ⚠️ **No routed ETA gets the app's climb penalty — on ANY mode (fixed
   2026-09-16).** See Key Decisions › "Routed ETA = router duration". The e-bike
   trip that exposed it previewed 1 h 16 for an OSRM 1 h 04.
+- **Mode colours (2026-09-16): E-bike is a LIGHT cool sky blue, Cool a GLACIAL
+  dark blue — deliberately a light/dark pair.** Tokens in `safetyColors`:
+  `ebike`/`ebikeTint`/`ebikeText` (+ `tints.ebikeLight` for the pill) and
+  `cool` #1B4F72 with `coolOnFill` icy text — Cool is the one routing mode
+  rendered as a SOLID fill (pill and `Badge` variant `cool`). Both pairs are in
+  the contrast gate (5.17:1 / 7.76:1); the old cyan Cool text was 2.43:1. A
+  caller-supplied Badge icon must use `badgeForegroundColor(variant)`, never a
+  theme colour — `textPrimary` is dark-on-dark on the glacial fill.
 - **Persisted and free.** `isEbike` survives cold start like `avoidHills`
   (the bike a rider owns does not change between trips). Not metered, not
   Plus-gated. Reroutes stay on the e-bike graph (Flat is the one mode that
