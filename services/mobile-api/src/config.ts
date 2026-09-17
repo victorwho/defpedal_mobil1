@@ -50,8 +50,8 @@ export const config = {
       ['SAFE_OSRM_FLAT_BASE_URL'],
       'https://osrm-flat.defensivepedal.com/route/v1/bicycle',
     ),
-  // Cool routing — bicycle36shade.lua heat-model instance. Narrower graph
-  // coverage than safe/flat (HEAT_ROUTING_COUNTRIES in core — RO at launch).
+  // Cool routing — heat-model instance. Coverage is HEAT_ROUTING_COUNTRIES in
+  // core: every covered country since 2026-09-17 (RO-only before).
   safeOsrmCoolBaseUrl:
     resolveConfigValue(
       ['SAFE_OSRM_COOL_BASE_URL'],

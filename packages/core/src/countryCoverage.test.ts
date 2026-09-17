@@ -56,13 +56,19 @@ describe('isHeatRoutingAvailable', () => {
     }
   });
 
-  it('is available in RO (launch coverage)', () => {
-    expect(isHeatRoutingAvailable('RO')).toBe(true);
+  // Measured 2026-09-17: osrm-shade returned a real route from the capital of
+  // every one of the 31 covered countries. Cool is no longer RO-only.
+  it('covers the whole routing footprint, not just Romania', () => {
+    expect([...HEAT_ROUTING_COUNTRIES].sort()).toEqual([...ROUTING_COVERED_COUNTRIES].sort());
+    for (const country of ROUTING_COVERED_COUNTRIES) {
+      expect(isHeatRoutingAvailable(country)).toBe(true);
+    }
   });
 
-  it('is unavailable outside the shade-graph countries', () => {
-    expect(isHeatRoutingAvailable('DE')).toBe(false);
-    expect(isHeatRoutingAvailable('ES')).toBe(false);
+  it('is available well outside Romania', () => {
+    expect(isHeatRoutingAvailable('RO')).toBe(true);
+    expect(isHeatRoutingAvailable('DE')).toBe(true);
+    expect(isHeatRoutingAvailable('ES')).toBe(true);
   });
 
   it('is unavailable for null/undefined attribution', () => {

@@ -135,15 +135,18 @@ describe('usePremium — gates', () => {
   });
 
   it('tells a free rider in an uncovered country the truth about cool routing', () => {
-    // Never sell coverage that does not exist.
-    expect(read().coolRouting('ES')).toBe('country_unavailable');
+    // Never sell coverage that does not exist — but the shade graph now routes
+    // in every covered country, so only an unresolved country is "unavailable".
+    expect(read().coolRouting(null as never)).toBe('country_unavailable');
+    expect(read().coolRouting('ES')).toBe('requires_plus');
     expect(read().coolRouting('RO')).toBe('requires_plus');
   });
 
   it('unlocks cool routing for plus in a covered country only', () => {
     seed();
     expect(read().coolRouting('RO')).toBe('available');
-    expect(read().coolRouting('ES')).toBe('country_unavailable');
+    expect(read().coolRouting('ES')).toBe('available');
+    expect(read().coolRouting(null as never)).toBe('country_unavailable');
   });
 });
 

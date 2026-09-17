@@ -188,11 +188,12 @@ export default function RoutePlanningScreen() {
     setRoutePreview,
   ]);
 
-  // Cool routing is served by the shade-model OSRM whose graph covers fewer
-  // countries than safe/flat (HEAT_ROUTING_COUNTRIES — RO at launch). Gates
-  // the Cool pill, and heals a stale avoidHeat preference when the route
-  // lands in a supported-but-not-cool country so the pill row and the
-  // dispatcher (which ignores avoidHeat outside coverage) agree.
+  // Cool routing is served by the shade-model OSRM. Its coverage is its own
+  // named list (HEAT_ROUTING_COUNTRIES — the full routing footprint since
+  // 2026-09-17, RO-only before). Gates the Cool pill, and heals a stale
+  // avoidHeat preference if the route ever lands in a supported-but-not-cool
+  // country, so the pill row and the dispatcher (which ignores avoidHeat
+  // outside coverage) agree.
   // isCoolModeEnabled() hides the mode entirely in production (product
   // decision, see src/lib/coolMode.ts). Folded into the SAME predicate as the
   // coverage gate so the existing heal-effect below also clears a stale
@@ -1538,7 +1539,7 @@ export default function RoutePlanningScreen() {
               mode and surface a banner so the rider understands why only
               Fast is on offer. Cross-border rides within coverage are
               supported (single EU graph). E-bike covers every covered country
-              on one graph; Cool is additionally gated to the shade-graph
+              on one graph; Cool has its own coverage list (HEAT_ROUTING_COUNTRIES, now the same 31) and is also gated by the shade-graph
               countries (RO at launch) and hidden in production. The modes are
               mutually exclusive — each is its own OSRM graph. */}
           {hasValidDestination ? (

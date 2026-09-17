@@ -530,7 +530,7 @@ describe('directPreviewRoute', () => {
     expect(firstCallUrl).toContain('exclude=unpaved');
   });
 
-  it('ignores avoidHeat outside heat-routing coverage (Berlin → standard safe OSRM)', async () => {
+  it('uses the shade OSRM endpoint outside Romania too (Berlin)', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
@@ -547,8 +547,7 @@ describe('directPreviewRoute', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
-    expect(firstCallUrl).not.toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).toContain('://osrm-shade.defensivepedal.com/route/v1/bicycle/');
   });
 
   it('ignores avoidHeat in fast mode', async () => {
@@ -677,7 +676,7 @@ describe('directPreviewRoute', () => {
     expect(firstCallUrl).not.toContain('osrm-ebike');
   });
 
-  it('falls back to the e-bike graph when a stale avoidHeat is outside heat coverage', async () => {
+  it('cool outranks e-bike when both flags are set, now in every covered country (Berlin)', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
       { data: createElevationResponse() },
@@ -695,8 +694,8 @@ describe('directPreviewRoute', () => {
     });
 
     const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
-    expect(firstCallUrl).toContain('osrm-ebike.defensivepedal.com');
-    expect(firstCallUrl).not.toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).toContain('osrm-shade.defensivepedal.com');
+    expect(firstCallUrl).not.toContain('osrm-ebike.defensivepedal.com');
   });
 
   it('includes coverage region in response', async () => {

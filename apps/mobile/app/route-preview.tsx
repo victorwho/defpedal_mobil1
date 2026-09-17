@@ -697,8 +697,8 @@ function RoutePreviewScreen() {
   // profiles directly from the preview without going back. Changing
   // `routeRequest.mode` and/or `avoidHills`/`avoidHeat`/`isEbike` invalidates the
   // previewQuery key (`effectiveRequest`), which triggers an automatic
-  // refetch. Cool is skipped outside the shade-graph countries (RO at
-  // launch) — same gate as the Cool pill on route-planning.
+  // refetch. Cool is skipped outside HEAT_ROUTING_COUNTRIES (every covered
+  // country since 2026-09-17) — same gate as the Cool pill on route-planning.
   // Same gate as route-planning: hidden in production (src/lib/coolMode.ts).
   // This drops 'cool' out of the tap-to-cycle rotation, so the pill cycles
   // Safe -> Fast -> Flat -> E-bike -> Safe rather than offering a mode with no control.

@@ -223,13 +223,29 @@ export const getCountryCenter = (country: SupportedCountry): Coordinate => {
 
 /**
  * Countries where the shade/heat-model OSRM instance
- * (osrm-shade.defensivepedal.com, `bicycle36shade.lua`) has graph data.
- * Cool routing is offered only when the route attributes to one of these
- * countries; elsewhere the Cool pill is hidden and any persisted avoidHeat
- * preference is ignored at dispatch. RO-only at launch — widen this list as
- * shade graphs are built for more countries.
+ * (osrm-shade.defensivepedal.com) routes — where Cool routing is offered.
+ *
+ * The FULL routing footprint since 2026-09-17. It was RO-only from launch, but
+ * the shade instance is a customized copy of the EU-wide standard graph, not a
+ * Romanian extract: probed that day from the capital of every one of the 31
+ * covered countries, it returned a real route in 31/31. Kept as a named list
+ * rather than a constant `true` for the same reason as RISK_DATA_COUNTRIES —
+ * if the shade graph and the routing graph ever diverge, narrow THIS list and
+ * the Cool pill, the dispatchers (app + API) and the paywall all follow.
+ *
+ * ⚠️ Two facts about what Cool buys outside the canopy data, measured the same
+ * day, so nobody mistakes "routes" for "cools":
+ *  - The heat model has canopy data for 119 city points in 26 countries
+ *    (`eu_uhi_cities.json`); none resolve to LU, SI, LI or CH (PT falls
+ *    inside the ES bbox, so it cannot be told apart here). Outside those
+ *    cities a Cool route is the shade graph's standard routing, not a cooler
+ *    line.
+ *  - The shade graph is one generation behind Safe (b36 vs b46 per the OSRM
+ *    handoff), so a Cool route can differ from Safe for model reasons as well
+ *    as heat — it differed in 25 of the 31 capitals, including LU and CH.
  */
-export const HEAT_ROUTING_COUNTRIES: readonly SupportedCountry[] = ['RO'];
+export const HEAT_ROUTING_COUNTRIES: readonly SupportedCountry[] =
+  ROUTING_COVERED_COUNTRIES;
 
 export const isHeatRoutingAvailable = (
   country: SupportedCountry | null | undefined,

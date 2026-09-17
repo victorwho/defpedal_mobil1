@@ -55,9 +55,10 @@ const OSRM_BASE: Record<SafeRoutingProfile, string> = {
   // TLS). No e-bike flat or cool graph exists, which is why the profile is
   // resolved to exactly one instance in core (`resolveSafeRoutingProfile`).
   ebike: 'https://osrm-ebike.defensivepedal.com/route/v1/bicycle',
-  // Cool routing — bicycle36shade.lua heat model. Coverage is narrower than
-  // the EU-wide safe/flat graphs (see HEAT_ROUTING_COUNTRIES in core), so
-  // dispatch gates on isHeatRoutingAvailable before selecting this base.
+  // Cool routing — the heat-model instance, a customized copy of the EU-wide
+  // standard graph. Routes in all 31 covered countries (measured 2026-09-17);
+  // dispatch still gates on isHeatRoutingAvailable so a future divergence
+  // narrows one list in core (HEAT_ROUTING_COUNTRIES).
   cool: 'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
 };
 

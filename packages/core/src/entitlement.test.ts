@@ -292,9 +292,9 @@ describe('cool routing availability', () => {
     expect(resolveCoolRoutingAvailability(free, 'RO')).toBe('requires_plus');
   });
 
-  it('reports country_unavailable ahead of requires_plus — never sell coverage that does not exist', () => {
-    expect(resolveCoolRoutingAvailability(free, 'ES')).toBe('country_unavailable');
-    expect(resolveCoolRoutingAvailability(plus, 'ES')).toBe('country_unavailable');
+  it('is sold everywhere the shade graph routes — Spain included', () => {
+    expect(resolveCoolRoutingAvailability(free, 'ES')).toBe('requires_plus');
+    expect(resolveCoolRoutingAvailability(plus, 'ES')).toBe('available');
   });
 
   it('treats an unknown country as unavailable', () => {
