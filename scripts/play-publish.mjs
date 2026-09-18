@@ -7,6 +7,7 @@
  *
  *   node scripts/play-publish.mjs --aab <path> [--track production]
  *                                 [--status draft] [--notes <dir>] [--dry-run]
+ *                                 [--fraction 0.05]   (with --status inProgress)
  *
  * Auth: a service-account JSON key, path from PLAY_SERVICE_ACCOUNT_KEY (default
  * below). The key is NEVER in the repo. Play permissions come from Play Console
@@ -35,6 +36,7 @@ const aabPath = arg('aab');
 const track   = arg('track', 'production');
 const status  = arg('status', 'draft');
 const notesDir = arg('notes');
+const fraction = arg('fraction');
 const dryRun  = has('dry-run');
 const keyPath = process.env.PLAY_SERVICE_ACCOUNT_KEY || DEFAULT_KEY;
 
@@ -43,6 +45,29 @@ if (!fs.existsSync(aabPath)) { console.error(`AAB not found: ${aabPath}`); proce
 if (!fs.existsSync(keyPath)) { console.error(`Service-account key not found: ${keyPath}`); process.exit(2); }
 if (!['draft', 'completed', 'halted', 'inProgress'].includes(status)) {
   console.error(`--status must be draft|completed|halted|inProgress`); process.exit(2);
+}
+
+/*
+ * Staged rollout. Play expresses "5% of users" as status `inProgress` plus a
+ * `userFraction`; the two are not independent, and sending a fraction with any
+ * other status is rejected. Guarded here rather than left to the caller,
+ * because the failure mode is asymmetric: a fraction silently dropped on a
+ * `completed` release ships to 100% of users with no undo.
+ */
+let userFraction;
+if (fraction !== undefined) {
+  if (status !== 'inProgress') {
+    console.error(`--fraction requires --status inProgress (got '${status}')`);
+    process.exit(2);
+  }
+  userFraction = Number(fraction);
+  if (!Number.isFinite(userFraction) || userFraction <= 0 || userFraction >= 1) {
+    console.error(`--fraction must be between 0 and 1 exclusive (got '${fraction}')`);
+    process.exit(2);
+  }
+} else if (status === 'inProgress') {
+  console.error(`--status inProgress requires --fraction (e.g. --fraction 0.05)`);
+  process.exit(2);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,11 +153,15 @@ if (proceed) {
         releases: [{
           versionCodes: [String(uploaded.versionCode)],
           status,
+          ...(userFraction !== undefined ? { userFraction } : {}),
           ...(releaseNotes ? { releaseNotes } : {}),
         }],
       },
     });
-    console.log(`assigned to '${track}' as ${status}`);
+    console.log(
+      `assigned to '${track}' as ${status}` +
+        (userFraction !== undefined ? ` at ${userFraction * 100}% of users` : ''),
+    );
 
     await api('POST', `/androidpublisher/v3/applications/${PKG}/edits/${edit.id}:commit`);
     console.log('edit committed');
