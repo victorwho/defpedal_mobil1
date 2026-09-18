@@ -106,7 +106,27 @@ export const FREE_LIMITS: TierLimits = {
   offlinePackExpiryDays: 5,
   offlinePackStorageBudgetBytes: 200 * 1024 * 1024,
   historyWindowDays: 90,
-  flatRidesPerMonth: 3,
+  /*
+   * Flat routing is FREE AND UNLIMITED, deliberately.
+   *
+   * This was 3/month, and it never worked: `canStartFlatRoute` was called from
+   * nowhere, `consumeFlatRouteLocally` was called from nowhere, so the meter
+   * never moved. Its only surface was a loop-planner label reading
+   * "3 left this month" — a quota that did not exist, permanently reading 3,
+   * announcing a paywall that was dark. It was invisible only because the
+   * 2099 launch sentinel made every account grandfathered; setting a real
+   * launch date would have shown it to every new rider.
+   *
+   * Metering it properly would also have meant taking away a routing mode
+   * that has shipped free for months, which is the thing grandfathering
+   * exists to prevent. Flat loops are already covered: loop SEARCHES are
+   * metered below, and a flat loop is a loop.
+   *
+   * The meter machinery (`flatRouteMeter.ts`, the store slice, the sync) is
+   * now dead and should be deleted — left in place here only because that is
+   * a ten-file refactor and this is a behaviour fix.
+   */
+  flatRidesPerMonth: null,
   loopSessionsPerMonth: 3,
 };
 
@@ -146,7 +166,25 @@ export const limitsForTier = (tier: PremiumTier): TierLimits =>
  * EVERY account and nobody loses a feature. Failing safe in this direction
  * costs revenue; failing the other way costs rider trust.
  */
-export const PLUS_LAUNCH_AT_ISO = '2099-01-01T00:00:00.000Z';
+/**
+ * When Pedal Plus starts applying to NEW accounts.
+ *
+ * Accounts created before this instant are grandfathered: they keep every
+ * limit they have today, forever. Accounts created after it are subject to
+ * the free-tier ceilings once the paywall is switched on.
+ *
+ * Was a `2099-01-01` sentinel while the tier was built, which grandfathered
+ * everybody — the state the app is still in at the time of writing, because
+ * `profiles.premium_ui_enabled` is false for every account.
+ *
+ * ⚠️ This date is a COMMITMENT, not a default. Set to 2026-10-01 on
+ * 2026-09-18, which means the paywall must be switched on by then: a rider
+ * who signs up after this instant while the paywall is still dark would be
+ * capped retroactively the day it is flipped, which is precisely what
+ * grandfathering exists to prevent. If the paywall is not ready, move this
+ * date forward in the same change that extends `COOL_ROUTING_FREE_UNTIL`.
+ */
+export const PLUS_LAUNCH_AT_ISO = '2026-10-01T00:00:00.000Z';
 
 // ---------------------------------------------------------------------------
 // Offline entitlement grace

@@ -292,7 +292,6 @@ export const ro: TranslationKeys = {
     sessionActive: 'Sesiunea mai e deschisă {{minutes}} min',
     quotaTitle: 'Ai folosit sesiunile de tururi',
     quotaBody: 'Riderii gratuiți au {{total}} sesiuni de căutare pe lună. Se resetează luna viitoare.',
-    flatQuotaNote: 'Tururile plate consumă și o tură plată: {{count}} rămase luna aceasta.',
 
     sectionTitle: 'Tururi',
     emptyLoops: 'Niciun tur salvat încă.',

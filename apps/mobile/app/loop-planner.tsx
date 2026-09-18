@@ -1064,13 +1064,6 @@ export default function LoopPlannerScreen() {
             </PressableScale>
           ))}
         </View>
-        {terrain === 'flat' && Number.isFinite(premium.flatRoutesLeft()) ? (
-          <Text style={styles.hint}>
-            {t('loop.flatQuotaNote', {
-              count: String(premium.flatRoutesLeft()),
-            })}
-          </Text>
-        ) : null}
       </View>
 
       <View style={styles.control}>

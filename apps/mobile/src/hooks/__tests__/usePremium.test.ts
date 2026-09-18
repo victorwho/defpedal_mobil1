@@ -168,49 +168,36 @@ describe('usePremium — gates', () => {
   });
 });
 
-describe('usePremium — flat routing', () => {
-  it('meters a non-grandfathered free rider', () => {
-    seed({ tier: 'free', isGrandfathered: false, expiresAt: null });
-    const r = read();
-    expect(r.flatRoute()).toMatchObject({ allowed: true, reason: 'within_quota' });
-    expect(r.flatRoutesLeft()).toBe(FREE_LIMITS.flatRidesPerMonth);
+describe('usePremium — flat routing is free and unlimited', () => {
+  /*
+   * The 3/month flat meter was removed on 2026-09-18. It never metered
+   * anything — the gate and the consume action were both unreachable, so the
+   * counter never moved — and its only surface was a loop-planner label
+   * permanently reading "3 left this month" for a quota that did not exist.
+   * Flat loops stay covered by the loop-search meter.
+   */
+  it('allows every rider regardless of tier or meter state', () => {
+    for (const seedArgs of [
+      { tier: 'free' as const, isGrandfathered: false, expiresAt: null },
+      { tier: 'free' as const, isGrandfathered: true, expiresAt: null },
+      undefined,
+    ]) {
+      seedArgs ? seed(seedArgs) : seed();
+      const r = read();
+      expect(r.flatRoute().allowed).toBe(true);
+      expect(r.flatRoutesLeft()).toBe(Number.POSITIVE_INFINITY);
+    }
   });
 
-  it('never meters a grandfathered account', () => {
-    // The feature shipped free and unlimited; metering it would be a takeaway.
-    seed({ tier: 'free', isGrandfathered: true, expiresAt: null });
-    expect(read().flatRoute()).toMatchObject({ allowed: true, reason: 'grandfathered' });
-  });
-
-  it('never meters plus', () => {
-    seed();
-    expect(read().flatRoute()).toMatchObject({ allowed: true, reason: 'entitled' });
-  });
-
-  it('refuses once the monthly allowance is spent', () => {
+  it('charges nothing, so the meter can never be spent', () => {
     seed({ tier: 'free', isGrandfathered: false, expiresAt: null });
     const periodKey = read().flatRoute().periodKey;
     act(() => {
-      for (let i = 0; i < FREE_LIMITS.flatRidesPerMonth!; i += 1) {
+      for (let i = 0; i < 10; i += 1) {
         useAppStore.getState().consumeFlatRouteLocally(periodKey);
       }
     });
-    const r = read();
-    expect(r.flatRoute()).toMatchObject({ allowed: false, reason: 'quota_exhausted' });
-    expect(r.flatRoutesLeft()).toBe(0);
-  });
-
-  it('counts rides taken offline against the allowance', () => {
-    seed({ tier: 'free', isGrandfathered: false, expiresAt: null });
-    const periodKey = read().flatRoute().periodKey;
-    act(() => {
-      useAppStore.getState().consumeFlatRouteLocally(periodKey);
-    });
-    expect(read().flatRoutesLeft()).toBe(FREE_LIMITS.flatRidesPerMonth! - 1);
-  });
-
-  it('reports an unlimited allowance for plus', () => {
-    seed();
+    expect(read().flatRoute().allowed).toBe(true);
     expect(read().flatRoutesLeft()).toBe(Number.POSITIVE_INFINITY);
   });
 });
@@ -256,9 +243,15 @@ describe('usePremium — enforcement is dark-gated', () => {
     expect(read().blockDownloadPack(9999)).toBe(false);
   });
 
-  it('charges a metered rider once revealed', () => {
+  /*
+   * `flatRideToCharge` now always returns null: flat routing became unmetered
+   * on 2026-09-18, so there is no rider left to charge. Kept as an assertion
+   * rather than deleted, because a future re-metering must not silently start
+   * charging a counter whose UI was removed.
+   */
+  it('charges nobody, because flat routing is no longer metered', () => {
     seed({ tier: 'free', isGrandfathered: false, expiresAt: null, uiEnabled: true });
-    expect(read().flatRideToCharge()).toBe(read().flatRoute().periodKey);
+    expect(read().flatRideToCharge()).toBeNull();
   });
 
   it('charges nothing for a grandfathered rider — the counter is meaningless there', () => {

@@ -18,10 +18,19 @@ import {
 } from './premiumEnforcement';
 
 const NOW = '2026-08-15T12:00:00.000Z';
+/*
+ * Ceiling tests must use an account created AFTER the Plus launch date.
+ * Grandfathering was widened on 2026-09-18 to exempt pre-launch accounts from
+ * the ceilings as well as the meters, so the old `2020-01-01` fixture is now
+ * exempt from everything and could not exercise a limit at all.
+ */
+const POST_LAUNCH_ACCOUNT = '2026-10-02T00:00:00.000Z';
+const PRE_LAUNCH_ACCOUNT = '2020-01-01T00:00:00.000Z';
 const USER = 'user-1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 interface Config {
+  createdAt?: string;
   uiEnabled?: boolean;
   subscription?: Record<string, unknown> | null;
   savedRouteCount?: number | null;
@@ -39,7 +48,7 @@ const makeDb = (c: Config = {}) => ({
               if (c.profileThrows) throw new Error('no such column');
               return Promise.resolve({
                 data: {
-                  created_at: '2020-01-01T00:00:00.000Z',
+                  created_at: c.createdAt ?? POST_LAUNCH_ACCOUNT,
                   premium_ui_enabled: c.uiEnabled === true,
                 },
                 error: null,
@@ -161,10 +170,27 @@ describe('assertCanSaveRoute — enforcement', () => {
     await expect(assertCanSaveRoute(db, USER, NOW)).resolves.toBeUndefined();
   });
 
-  it('does NOT exempt a grandfathered rider from the saved-route ceiling', async () => {
-    // Grandfathering preserves existing content; it does not grant unlimited
-    // new additions. Same rule the client enforces.
-    const db = makeDb({ uiEnabled: true, savedRouteCount: FREE_LIMITS.savedRoutes! });
+  /*
+   * Policy change 2026-09-18: grandfathering now exempts pre-launch accounts
+   * from the CEILINGS as well as the meters. The server must agree with the
+   * client exactly — a limit that differs between the two would show a rider
+   * one number and enforce another.
+   */
+  it('exempts a grandfathered rider from the saved-route ceiling', async () => {
+    const db = makeDb({
+      uiEnabled: true,
+      createdAt: PRE_LAUNCH_ACCOUNT,
+      savedRouteCount: FREE_LIMITS.savedRoutes! * 10,
+    });
+    await expect(assertCanSaveRoute(db, USER, NOW)).resolves.toBeUndefined();
+  });
+
+  it('still refuses a post-launch rider at the ceiling', async () => {
+    const db = makeDb({
+      uiEnabled: true,
+      createdAt: POST_LAUNCH_ACCOUNT,
+      savedRouteCount: FREE_LIMITS.savedRoutes!,
+    });
     await expect(assertCanSaveRoute(db, USER, NOW)).rejects.toMatchObject({
       code: PREMIUM_LIMIT_CODE,
     });

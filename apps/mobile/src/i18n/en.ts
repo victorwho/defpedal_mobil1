@@ -316,7 +316,6 @@ export const en = {
     sessionActive: 'This session is open for another {{minutes}} min',
     quotaTitle: 'You have used your loop sessions',
     quotaBody: 'Free riders get {{total}} loop-finding sessions a month. Yours reset next month.',
-    flatQuotaNote: 'Flat loops also use a flat ride: {{count}} left this month.',
 
     sectionTitle: 'Loops',
     emptyLoops: 'No saved loops yet.',

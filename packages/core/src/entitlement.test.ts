@@ -10,11 +10,11 @@ import {
   historyRetentionCutoff,
   COOL_ROUTING_FREE_UNTIL,
   isCoolRoutingEntitled,
+  isExemptFromCeilings,
   isCoolRoutingPromoActive,
   resolveCoolRoutingAvailability,
   isGrandfatheredAccount,
   offlinePackPolicy,
-  resolveCoolRoutingAvailability,
   resolveEntitlement,
   type EntitlementSnapshot,
   type ResolvedEntitlement,
@@ -244,11 +244,46 @@ describe('saved routes and offline packs', () => {
     expect(canSaveAnotherRoute(plus, 500)).toBe(true);
   });
 
-  it('does NOT exempt grandfathered riders from the saved-route cap', () => {
-    // Grandfathering preserves existing content; it does not grant unlimited
-    // new additions. Locking this so the two promises never get merged.
+  /*
+   * Policy change, 2026-09-18: grandfathering was widened from the two meters
+   * to the ceilings as well.
+   *
+   * The previous rule ("existing content stays usable, new additions are
+   * capped") did not survive the case it produces: a rider with twelve saved
+   * routes keeps all twelve and then cannot save a thirteenth. Their app got
+   * worse because we introduced a price. Plus is sold to riders who arrive
+   * after the launch date, and to everyone on features that did not exist
+   * before it.
+   */
+  it('exempts grandfathered riders from every ceiling', () => {
     const grandfathered = resolved({ tier: 'free', isGrandfathered: true });
-    expect(canSaveAnotherRoute(grandfathered, FREE_LIMITS.savedRoutes!)).toBe(false);
+    expect(canSaveAnotherRoute(grandfathered, 500)).toBe(true);
+    expect(canImportAnotherCourse(grandfathered, 500)).toBe(true);
+    expect(canDownloadAnotherPack(grandfathered, 500)).toBe(true);
+    expect(historyRetentionCutoff(grandfathered, NOW)).toBeNull();
+    expect(offlinePackPolicy(grandfathered).maxPacks).toBeNull();
+    expect(offlinePackPolicy(grandfathered).expiryDays).toBeNull();
+  });
+
+  it('still caps a free rider who arrived after the launch date', () => {
+    expect(canSaveAnotherRoute(free, FREE_LIMITS.savedRoutes!)).toBe(false);
+  });
+
+  /*
+   * ⚠️ THE ONE THING GRANDFATHERING MUST NOT GIVE AWAY.
+   *
+   * Cool is a feature gate, not a ceiling, and it is the only thing Pedal Plus
+   * has to offer riders who predate it — the in-app notice told them, in three
+   * languages, that it becomes part of Plus. If `resolveCoolRoutingAvailability`
+   * ever started consulting `isExemptFromCeilings`, Plus would sell nothing at
+   * all to the existing base and that notice would become untrue.
+   */
+  it('does NOT give grandfathered riders cool routing once the promo ends', () => {
+    const grandfathered = resolved({ tier: 'free', isGrandfathered: true });
+    expect(isExemptFromCeilings(grandfathered)).toBe(true);
+    expect(resolveCoolRoutingAvailability(grandfathered, 'RO', AFTER_COOL_PROMO)).toBe(
+      'requires_plus',
+    );
   });
 
   it('caps offline packs for free and not for Plus', () => {
@@ -321,65 +356,41 @@ describe('cool routing availability', () => {
   });
 });
 
-describe('canStartFlatRoute', () => {
-  const gate = (
-    entitlement: ResolvedEntitlement,
-    state: FlatRouteMeterState = meter(),
-  ) => canStartFlatRoute({ entitlement, meter: state, nowIso: NOW, timeZone: 'UTC' });
-
-  it('is unlimited for Plus', () => {
-    const decision = gate(resolved({ tier: 'plus' }));
-    expect(decision).toMatchObject({ allowed: true, reason: 'entitled' });
-    expect(decision.remaining).toBe(Number.POSITIVE_INFINITY);
+describe('canStartFlatRoute — flat routing is free and unlimited', () => {
+  /*
+   * The 3/month flat meter was removed on 2026-09-18 (FREE_LIMITS
+   * .flatRidesPerMonth is null). It never metered anything: the gate and the
+   * consume action were both called from nowhere, so the counter never moved,
+   * and its only surface was a loop-planner label permanently reading
+   * "3 left this month" for a quota that did not exist.
+   *
+   * Flat routing has shipped free for months as a core routing mode, so
+   * metering it now would take away a shipped feature. Flat LOOPS remain
+   * covered: loop searches are metered, and a flat loop is a loop.
+   *
+   * The meter's own mechanics stay covered by `flatRouteMeter.test.ts` (30
+   * specs) until that dead subsystem is deleted.
+   */
+  it('allows every rider, whatever the meter says', () => {
+    const spent = meter({ used: 999 });
+    for (const entitlement of [
+      resolved({ tier: 'free' }),
+      resolved({ tier: 'plus' }),
+      resolved({ tier: 'free', isGrandfathered: true }),
+    ]) {
+      const decision = canStartFlatRoute({
+        entitlement,
+        meter: spent,
+        nowIso: NOW,
+        timeZone: 'UTC',
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.remaining).toBe(Number.POSITIVE_INFINITY);
+    }
   });
 
-  it('is unlimited for a grandfathered account — the feature shipped free and stays free', () => {
-    const decision = gate(resolved({ tier: 'free', isGrandfathered: true }));
-    expect(decision).toMatchObject({ allowed: true, reason: 'grandfathered' });
-    expect(decision.remaining).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it('meters a post-launch free account', () => {
-    const decision = gate(resolved({ tier: 'free' }));
-    expect(decision).toMatchObject({ allowed: true, reason: 'within_quota' });
-    expect(decision.remaining).toBe(FREE_LIMITS.flatRidesPerMonth);
-  });
-
-  it('refuses once the monthly allowance is spent', () => {
-    const spent = meter({ syncedCount: FREE_LIMITS.flatRidesPerMonth! });
-    const decision = gate(resolved({ tier: 'free' }), spent);
-    expect(decision).toMatchObject({
-      allowed: false,
-      reason: 'quota_exhausted',
-      remaining: 0,
-    });
-  });
-
-  it('counts pending offline rides against the allowance', () => {
-    const spent = meter({ syncedCount: 1, pendingCount: FREE_LIMITS.flatRidesPerMonth! - 1 });
-    expect(gate(resolved({ tier: 'free' }), spent).allowed).toBe(false);
-  });
-
-  it('restores the allowance when the month rolls over', () => {
-    const lastMonth = meter({ periodKey: '2026-07', syncedCount: 99 });
-    const decision = gate(resolved({ tier: 'free' }), lastMonth);
-    expect(decision.allowed).toBe(true);
-    expect(decision.remaining).toBe(FREE_LIMITS.flatRidesPerMonth);
-  });
-
-  it('returns the period key the caller should persist against', () => {
-    expect(gate(resolved({ tier: 'free' })).periodKey).toBe('2026-08');
-  });
-
-  it('meters against the rider timezone, not UTC', () => {
-    const decision = canStartFlatRoute({
-      entitlement: resolved({ tier: 'free' }),
-      meter: meter({ periodKey: '2026-09', syncedCount: FREE_LIMITS.flatRidesPerMonth! }),
-      nowIso: '2026-08-31T12:00:00.000Z',
-      timeZone: 'Pacific/Kiritimati',
-    });
-    // Already September for this rider, so September's spent quota applies.
-    expect(decision.allowed).toBe(false);
+  it('keeps the free limit unmetered in the catalog', () => {
+    expect(FREE_LIMITS.flatRidesPerMonth).toBeNull();
   });
 });
 

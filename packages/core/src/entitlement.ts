@@ -257,18 +257,47 @@ export const limitsFor = (entitlement: ResolvedEntitlement): TierLimits =>
 // ---------------------------------------------------------------------------
 
 /**
+ * Is this rider exempt from the free-tier CEILINGS (counts, storage, history)?
+ *
+ * True for Plus, and true for grandfathered accounts — riders who were using
+ * the app before Pedal Plus existed.
+ *
+ * WHY GRANDFATHERING WAS WIDENED TO THE CEILINGS (2026-09-18)
+ * ----------------------------------------------------------
+ * It used to cover only the two METERS, on the reasoning that existing content
+ * stays usable so nothing is taken away. That reasoning does not survive
+ * contact with the case: a rider with twelve saved routes keeps all twelve and
+ * then cannot save a thirteenth. Their app got worse on an ordinary Tuesday,
+ * because we introduced a price. Plus is now sold to new riders on the
+ * ceilings, and to everyone on features that did not exist before it.
+ *
+ * ⚠️ DELIBERATELY NOT APPLIED TO COOL ROUTING. Cool is a distinct feature
+ * gate, not a ceiling, and it is the one thing Plus has to offer the existing
+ * base — the in-app notice told those riders, in three languages, that it
+ * becomes part of Plus. `resolveCoolRoutingAvailability` does not consult this
+ * predicate, and a test pins that, so widening this function can never
+ * silently give Cool away.
+ *
+ * Note this is NOT the same as `limitsFor`, which still reports the free
+ * numbers for a grandfathered rider — the paywall renders those as the
+ * description of the free tier, and must keep saying "5 saved routes".
+ */
+export const isExemptFromCeilings = (entitlement: ResolvedEntitlement): boolean =>
+  entitlement.tier === 'plus' || entitlement.isGrandfathered;
+
+/**
  * Can the rider save one more route?
  *
- * Grandfathering deliberately does NOT apply. Existing routes above the cap
- * are kept and stay usable — nothing is deleted — but a free rider at the
- * ceiling must delete one or subscribe before adding another. That is the
- * "grandfather content, cap new additions" promise; exempting old accounts
- * entirely would be a different, unshipped promise.
+ * Existing routes above the cap are kept and stay usable — nothing is ever
+ * deleted for tier reasons. A free rider who joined after the Plus launch and
+ * is at the ceiling must delete one or subscribe before adding another;
+ * a grandfathered rider is exempt entirely (`isExemptFromCeilings`).
  */
 export const canSaveAnotherRoute = (
   entitlement: ResolvedEntitlement,
   currentCount: number,
 ): boolean => {
+  if (isExemptFromCeilings(entitlement)) return true;
   const limit = limitsFor(entitlement).savedRoutes;
   if (limit === null) return true;
   return currentCount < limit;
@@ -285,6 +314,7 @@ export const canImportAnotherCourse = (
   entitlement: ResolvedEntitlement,
   currentCount: number,
 ): boolean => {
+  if (isExemptFromCeilings(entitlement)) return true;
   const limit = limitsFor(entitlement).importedCourses;
   if (limit === null) return true;
   return currentCount < limit;
@@ -295,6 +325,7 @@ export const canDownloadAnotherPack = (
   entitlement: ResolvedEntitlement,
   currentCount: number,
 ): boolean => {
+  if (isExemptFromCeilings(entitlement)) return true;
   const limit = limitsFor(entitlement).offlinePacks;
   if (limit === null) return true;
   return currentCount < limit;
@@ -312,6 +343,16 @@ export const offlinePackPolicy = (
   entitlement: ResolvedEntitlement,
 ): OfflinePackPolicy => {
   const limits = limitsFor(entitlement);
+  if (isExemptFromCeilings(entitlement)) {
+    // A grandfathered rider keeps the unmetered behaviour they already had:
+    // no pack count cap and no age expiry. The storage budget still applies —
+    // it is a property of the handset, not of the price list.
+    return {
+      maxPacks: null,
+      expiryDays: null,
+      storageBudgetBytes: limits.offlinePackStorageBudgetBytes,
+    };
+  }
   return {
     maxPacks: limits.offlinePacks,
     expiryDays: limits.offlinePackExpiryDays,
@@ -335,6 +376,7 @@ export const historyRetentionCutoff = (
   entitlement: ResolvedEntitlement,
   nowIso: string,
 ): string | null => {
+  if (isExemptFromCeilings(entitlement)) return null;
   const days = limitsFor(entitlement).historyWindowDays;
   if (days === null) return null;
   const now = Date.parse(nowIso);
@@ -474,6 +516,20 @@ export const canStartFlatRoute = (input: FlatRouteGateInput): FlatRouteDecision 
   }
 
   const limit = limitsFor(entitlement).flatRidesPerMonth;
+
+  // Unmetered for everyone since 2026-09-18. Reported as `entitled` rather
+  // than an infinite `within_quota`, because `within_quota` is what tells the
+  // caller to CHARGE the ride — and charging an unmetered ride increments a
+  // counter no one reads, forever.
+  if (limit === null) {
+    return {
+      allowed: true,
+      reason: 'entitled',
+      remaining: Number.POSITIVE_INFINITY,
+      periodKey,
+    };
+  }
+
   const remaining = flatRoutesRemaining(meter, periodKey, limit);
 
   return remaining > 0

@@ -104,6 +104,8 @@ export interface UsePremiumResult {
   readonly canImportCourse: (currentCount: number) => boolean;
   readonly canDownloadPack: (currentCount: number) => boolean;
   readonly coolRouting: (country: SupportedCountry | null | undefined) => CoolRoutingAvailability;
+  /** True when cool routing must be refused: paywall live AND not entitled. */
+  readonly blockCoolRouting: (country: SupportedCountry | null | undefined) => boolean;
   readonly flatRoute: () => FlatRouteDecision;
   readonly flatRoutesLeft: () => number;
   /** May the rider search for loops right now? */
@@ -162,6 +164,22 @@ export const usePremium = (): UsePremiumResult => {
         snapshot?.uiEnabled === true && !canDownloadAnotherPack(entitlement, currentCount),
       blockImportCourse: (currentCount: number) =>
         snapshot?.uiEnabled === true && !canImportAnotherCourse(entitlement, currentCount),
+      /*
+       * Cool routing is Plus-only once the launch promotion ends.
+       *
+       * Folds in `uiEnabled` like every other block* gate, and that is
+       * load-bearing here rather than merely consistent: if the paywall flip
+       * slips past COOL_ROUTING_FREE_UNTIL, this would otherwise take Cool
+       * away on the promised date while leaving no way to buy it back. Dark
+       * paywall therefore means Cool stays free, which is the failure we can
+       * live with.
+       *
+       * Country coverage is checked by the CALLER, which already knows it —
+       * this answers only "may this rider have it".
+       */
+      blockCoolRouting: (country: SupportedCountry | null | undefined) =>
+        snapshot?.uiEnabled === true &&
+        resolveCoolRoutingAvailability(entitlement, country) !== 'available',
       flatRideToCharge: () => {
         if (snapshot?.uiEnabled !== true) return null;
         const decision = canStartFlatRoute({ entitlement, meter, nowIso, timeZone });

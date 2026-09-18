@@ -292,7 +292,6 @@ export const es: TranslationKeys = {
     sessionActive: 'La sesión sigue abierta {{minutes}} min',
     quotaTitle: 'Has usado tus sesiones de rutas',
     quotaBody: 'Los ciclistas gratuitos tienen {{total}} sesiones de búsqueda al mes. Se reinician el mes que viene.',
-    flatQuotaNote: 'Las rutas llanas también gastan una ruta llana: quedan {{count}} este mes.',
 
     sectionTitle: 'Rutas circulares',
     emptyLoops: 'Aún no hay rutas guardadas.',

@@ -744,7 +744,11 @@ function RoutePreviewScreen() {
   const coolAvailable =
     isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
-    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
+    // Entitlement, once the launch promotion ends. Folded into the SAME
+    // predicate as coverage so the request mask below (`avoidHeat &&
+    // coolAvailable`) and the cycle-pill both follow without a second gate.
+    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
 
   const currentDisplayMode = toRoutingDisplayMode(routeRequest.mode, {
     avoidHills,

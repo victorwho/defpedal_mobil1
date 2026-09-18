@@ -56,6 +56,7 @@ import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { usePremium } from '../src/hooks/usePremium';
 import { pickGpxFile } from '../src/lib/gpx-import';
 import { deleteCourseGeometry, pruneOrphanedCourses } from '../src/lib/courseStorage';
 import { deleteSavedLoop, pruneOrphanedLoops } from '../src/lib/loopStorage';
@@ -194,14 +195,18 @@ export default function RoutePlanningScreen() {
   // avoidHeat preference if the route ever lands in a supported-but-not-cool
   // country, so the pill row and the dispatcher (which ignores avoidHeat
   // outside coverage) agree.
-  // isCoolModeEnabled() hides the mode entirely in production (product
-  // decision, see src/lib/coolMode.ts). Folded into the SAME predicate as the
-  // coverage gate so the existing heal-effect below also clears a stale
-  // avoidHeat preference, rather than needing a second one.
+  const premium = usePremium();
+
+  // Cool is live in production since 2026-09-18; `isCoolModeEnabled()` is the
+  // kill switch that can hide it again. Coverage and ENTITLEMENT are folded
+  // into the SAME predicate so the heal-effect below also clears a stale
+  // avoidHeat preference, rather than needing a second one — which is how a
+  // rider ends up routing on a graph the pill says they are not using.
   const coolAvailable =
     isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
-    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
+    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
   useEffect(() => {
     if (!hasDestination) return;
     if (!resolvedCountry.routeSupported) return; // force-fast effect owns this case
