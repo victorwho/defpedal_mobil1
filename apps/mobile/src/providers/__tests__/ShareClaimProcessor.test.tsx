@@ -38,6 +38,16 @@ vi.mock('../../i18n', () => ({
 vi.mock('../../lib/env', () => ({
   getEnvVar: (key: string) =>
     key === 'EXPO_PUBLIC_MOBILE_API_URL' ? 'http://localhost:8080' : '',
+  // `mobileEnv` is needed because claiming a share calls `setRouteRequest`,
+  // which now runs `avoidHeat` through `resolveAvoidHeat` -> `coolMode.ts` ->
+  // `mobileEnv`. Omitting it made every claim in this file throw on an
+  // undefined module export. Development values keep the claim behaviour these
+  // tests assert (Cool is visible off-production).
+  mobileEnv: {
+    appEnv: 'development',
+    appVariant: 'development',
+    mobileApiUrl: 'http://localhost:8080',
+  },
 }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },

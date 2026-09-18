@@ -1243,12 +1243,31 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           // Sync top-level preference flags when present in the request
           ...(request.avoidHills !== undefined ? { avoidHills: request.avoidHills } : {}),
-          ...(request.avoidHeat !== undefined ? { avoidHeat: request.avoidHeat } : {}),
+          // Through `resolveAvoidHeat`, like `setAvoidHeat` and
+          // `selectRoutingMode`. This path is how a claimed share and a saved
+          // route reach the store, and both can carry `avoidHeat: true` from a
+          // build where Cool was visible. A claim goes straight to
+          // /route-preview (ShareClaimProcessor), bypassing route-planning's
+          // heal effect, so without the coercion here a production rider gets a
+          // shade-graph route with the mode pill reading Safe — the exact
+          // invisible-mode state coolMode.ts exists to prevent.
+          ...(request.avoidHeat !== undefined
+            ? { avoidHeat: resolveAvoidHeat(request.avoidHeat) }
+            : {}),
           ...(request.isEbike !== undefined ? { isEbike: request.isEbike } : {}),
           ...(request.avoidUnpaved !== undefined ? { avoidUnpaved: request.avoidUnpaved } : {}),
           routeRequest: {
             ...state.routeRequest,
             ...request,
+            // ...and again on the nested request, which is a second copy of
+            // the same flag. route-preview happens to override it from the
+            // top-level value, so leaving a raw `true` here is currently
+            // inert — but it is the store's own record of what was asked
+            // for, and two disagreeing copies of one flag is how this class
+            // of bug is built.
+            ...(request.avoidHeat !== undefined
+              ? { avoidHeat: resolveAvoidHeat(request.avoidHeat) }
+              : {}),
           },
           // Any origin/destination/mode change breaks the saved-route lineage
           // — the resulting preview no longer corresponds to the saved_route
