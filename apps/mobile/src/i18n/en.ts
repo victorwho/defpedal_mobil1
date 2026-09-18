@@ -124,12 +124,47 @@ export const en = {
       calmerCost: '+{{minutes}} min for a calmer ride',
       calmerCostSub: 'A little distance traded for a lot less traffic.',
       calmerFree: 'Calmer than the fast route — at no extra time',
+      // How much safer, quantified. Metres on HIGH-RISK roads, length-weighted
+      // — a tier-level figure the rider can also see as red on the map.
+      // Deliberately NOT "X% safer": that compares at score level, finer than
+      // the risk model validates, and reads as a likelihood claim when the
+      // only validated claim is about severity. See `describeBusyRoadSaving`.
+      busySaving: '{{distance}} less on busy roads than the fast route.',
       similarFast: 'Similar safety to the fast route',
       sameFast: 'Same safety as the fast route',
       lessSafe: '{{percent}}% less safe than the safe route',
       slightlyLessSafe: 'Slightly less safe than the safe route',
       similarSafe: 'Similar safety to the safe route',
       sameSafe: 'Same safety as the safe route',
+    },
+    // Tree-canopy comparison, shown only on a shade (Cool) route when the
+    // shade server says its coverage is good enough to present.
+    //
+    // Two ABSOLUTE percentages, never a delta: a shade route can legitimately
+    // score lower than the standard one, so "X% more shade" would go negative
+    // on real data. The claim is tree cover — never degrees, never "cooler",
+    // never heat exposure. Time is not mentioned either: the shade profile
+    // changes which roads are chosen, not how fast they are ridden, so an ETA
+    // difference is not a cost of shade.
+    canopy: {
+      // The headline gain. {{points}} is a PERCENTAGE-POINT difference (73% of
+      // the ride vs 46% of the ride -> 27), never a relative increase — see
+      // CANOPY_MEANINGFUL_POINTS in core for why. The subline always restates
+      // both absolute figures so the unit is never ambiguous.
+      moreShade: '+{{points}}% more shade',
+      moreShadeSub:
+        '{{shade}}% of this ride is under trees, vs {{standard}}% on the standard route.',
+      // Difference inside the noise band, in EITHER direction. Measured: the
+      // two routes tie exactly on 8 of 18 real routes.
+      similar: 'Similar tree cover to the standard route',
+      similarSub: '{{shade}}% of this ride is under trees.',
+      // Shade route carries meaningfully LESS canopy. No headline claim is
+      // possible here, so both figures are stated plainly and the reader
+      // draws their own conclusion. Never phrased as a negative gain.
+      comparison:
+        'Shade route: {{shade}}% tree-lined · Standard route: {{standard}}% tree-lined',
+      comparisonA11y:
+        'Shade route: {{shade}} percent tree-lined. Standard route: {{standard}} percent tree-lined.',
     },
   },
 

@@ -1,6 +1,7 @@
 export * from './appAvailability';
 export * from './breadcrumbs';
 export * from './calories';
+export * from './canopyComparison';
 export * from './cityPulse';
 export * from './co2';
 export * from './communityVisibility';

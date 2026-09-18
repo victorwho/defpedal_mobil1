@@ -2,6 +2,7 @@ import type {
   CommunityScope,
   CommunityWindow,
 } from './communityVisibility';
+import type { RouteCanopyComparison } from './canopyComparison';
 import type { CyclingVolumeReason } from './cyclingVolume';
 import type { PremiumTier } from './premiumCatalog';
 import type {
@@ -175,6 +176,20 @@ export interface RouteComparison {
   diffPercent: number;
   /** Whole minutes the current route costs vs the compared one; present only when >= 1. */
   extraMinutes?: number;
+  /**
+   * Metres each route spends on 'High risk' roads — length-weighted, and a
+   * TIER-level figure rather than a score-level one.
+   *
+   * Present only when both routes had risk segments. Two absolute values
+   * rather than a saving, for the same reason the canopy comparison carries
+   * two: the safe route does not always use less busy road, and a stored
+   * delta could render negative. `describeBusyRoadSaving` decides whether
+   * there is a claim to make.
+   */
+  busyRoadMeters?: {
+    readonly current: number;
+    readonly comparison: number;
+  };
 }
 
 export interface RoutePreviewResponse {
@@ -184,6 +199,20 @@ export interface RoutePreviewResponse {
   /** @deprecated Pre-2026-08 free-text label; kept so old persisted previews still render. New code populates `comparison`. */
   comparisonLabel?: string;
   comparison?: RouteComparison;
+  /**
+   * Tree-canopy comparison, present only on a shade (Cool) route whose
+   * `/compare` call succeeded AND whose server said `display: true`. Absent
+   * everywhere else, including on an error — see `canopyComparison.ts`.
+   *
+   * Response-level, not per-route, because the shade server routes the
+   * origin/destination pair ITSELF on both graphs rather than measuring the
+   * geometry we hand it. So it describes the primary of each graph, i.e.
+   * `routes[0]` here. Nothing on this screen can select an alternative today;
+   * if that ever changes, this field has to move onto `RouteOption` or be
+   * suppressed for a non-primary selection, because it would otherwise start
+   * describing a route the rider is not looking at.
+   */
+  canopy?: RouteCanopyComparison;
   generatedAt: string;
   debug?: RouteDebugInfo[];
 }

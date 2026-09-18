@@ -31,5 +31,7 @@ export type { SuggestedUserCardProps } from './SuggestedUserCard';
 export { FollowRequestItem } from './FollowRequestItem';
 export type { FollowRequestItemProps } from './FollowRequestItem';
 export * from './SesizareRow';
+export { CanopyComparisonRow } from './CanopyComparisonRow';
+export type { CanopyComparisonRowProps } from './CanopyComparisonRow';
 export { PermanentHazardCheckbox } from './PermanentHazardCheckbox';
 export type { PermanentHazardCheckboxProps } from './PermanentHazardCheckbox';

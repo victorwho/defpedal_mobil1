@@ -52,6 +52,33 @@ export const brandTints = {
 // ---------------------------------------------------------------------------
 
 export const safetyTints = {
+  /*
+   * Cool glacial blue — the shade/canopy routing identity, NOT a risk tier.
+   *
+   * Uses #2E86C1 rather than the solid-fill `cool` token (#1B4F72): these are
+   * alpha tints that have to work over BOTH the light (#FFFFFF) and dark
+   * (#1F2937) card surfaces, and a dark navy at 16% is invisible on dark.
+   * #2E86C1 is the one blue in the family that clears the 3:1 non-text
+   * contrast bar on both — measured 3.29:1 on the light surface and 3.05:1 on
+   * the dark one. Don't swap it for `cool` or `ebike` without re-measuring:
+   * `cool` scores 1.39:1 on dark and `ebike` 1.78:1 on light.
+   */
+
+  /** Cool blue — card background */
+  coolLight: 'rgba(46, 134, 193, 0.16)',
+
+  /** Cool blue — border accent */
+  coolBorder: 'rgba(46, 134, 193, 0.38)',
+
+  /**
+   * Cool blue — icon and headline colour.
+   *
+   * Only for LARGE text (>= 18.66px bold) or non-text UI such as icons, where
+   * 3:1 is the WCAG bar. Body-size text in this blue fails AA on the light
+   * surface, so supporting copy uses the theme's own text colours.
+   */
+  coolAccent: '#2E86C1',
+
   /** Safe green — subtle background */
   safeSubtle: 'rgba(34, 197, 94, 0.05)',
 

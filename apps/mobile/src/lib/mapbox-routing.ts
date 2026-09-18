@@ -14,13 +14,14 @@ import type {
   NavigationStep,
   RerouteRequest,
   RiskSegment,
+  RouteCanopyComparison,
   RouteComparison,
   RouteOption,
   RoutePreviewRequest,
   RoutePreviewResponse,
   SafeRoutingProfile,
 } from '@defensivepedal/core';
-import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, isRouteSupported, readOsrmResponse, resolveSafeRoutingProfile, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, busyRoadMeters, isRouteSupported, parseCanopyCompareResponse, readOsrmResponse, resolveSafeRoutingProfile, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -213,6 +214,91 @@ export const PAVED_FALLBACK_WARNING = 'no_paved_route';
  * complaint that found this: "avoid unpaved selected, route uses trails".
  */
 export const UNPAVED_UNSUPPORTED_WARNING = 'unpaved_not_supported';
+
+/**
+ * Shade-graph canopy comparison endpoint.
+ *
+ * Lives on the same host as the shade router but is NOT a routing call: it
+ * routes the pair on both graphs itself and reports how much of each sits
+ * under tree canopy. Rate limited to 60/min per IP.
+ */
+const CANOPY_COMPARE_URL = 'https://osrm-shade.defensivepedal.com/compare';
+
+/**
+ * Shorter than the 15s routing budget on purpose. This is a garnish on a
+ * route the rider already has; it runs concurrently with the elevation and
+ * risk enrichment, and if it is the slowest thing in the preview it has
+ * stopped being worth waiting for.
+ */
+const CANOPY_TIMEOUT_MS = 8_000;
+
+/**
+ * How long the preview will WAIT for the canopy call once everything else is
+ * done — as opposed to how long the request itself is allowed to live.
+ *
+ * These are two different budgets and conflating them was a real defect: the
+ * fetch starts early and overlaps the elevation and risk round-trips, so in
+ * the normal case it has long since resolved and this costs nothing. But when
+ * the shade host is slow or half-down, awaiting the full 8s timeout would add
+ * those seconds to a route the rider already has. "Fails open" has to mean the
+ * route display is unaffected in TIME as well as in content, so the wait is
+ * capped here and the in-flight request is simply abandoned.
+ */
+const CANOPY_WAIT_DEADLINE_MS = 1_500;
+
+/**
+ * Resolve `promise`, or `undefined` if it has not settled within `ms`.
+ *
+ * The abandoned promise cannot reject (see `fetchCanopyComparison`), so
+ * nothing is left to go unhandled.
+ */
+const resolveWithinDeadline = async <T>(
+  promise: Promise<T | undefined>,
+  ms: number,
+): Promise<T | undefined> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<undefined>((resolve) => {
+        timer = setTimeout(() => resolve(undefined), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
+/**
+ * Ask the shade server how much of each route runs under trees.
+ *
+ * Resolves to `undefined` for every failure — HTTP 400/429/502, a timeout, a
+ * `NoRoute`/`TooLong` code, `display: false`, or a body we cannot read. The
+ * caller renders nothing in that case and the route is unaffected, which is
+ * the whole contract: this can never degrade a route preview.
+ *
+ * Note the coordinate order: `/compare` takes **lon,lat**, like OSRM's own
+ * path segments and unlike our `Coordinate`.
+ */
+export const fetchCanopyComparison = async (
+  origin: Coordinate,
+  destination: Coordinate,
+): Promise<RouteCanopyComparison | undefined> => {
+  const url =
+    `${CANOPY_COMPARE_URL}?from=${origin.lon},${origin.lat}` +
+    `&to=${destination.lon},${destination.lat}`;
+
+  try {
+    const response = await fetchWithTimeout(url, CANOPY_TIMEOUT_MS);
+    // 429 (rate limited), 400 and 502 all land here and all mean "show
+    // nothing" — there is no retry, because a second call is exactly what
+    // the 60/min budget is protecting against.
+    if (!response.ok) return undefined;
+    return parseCanopyCompareResponse(await response.json()) ?? undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export interface OsrmRouteFetch {
   readonly routes: Route[];
@@ -538,8 +624,22 @@ export const enrichRouteWithRisk = async (
 // Public API
 // ---------------------------------------------------------------------------
 
+export interface DirectPreviewOptions {
+  /**
+   * Whether a shade route may fetch its canopy comparison.
+   *
+   * False for reroutes. `directReroute` shares this whole function, so without
+   * an opt-out every mid-ride reroute on a Cool ride fired a `/compare` call
+   * that NOTHING renders — the row lives only on route-preview. That wasted a
+   * slice of the 60/min per-IP budget (shared across a carrier NAT), and did
+   * it at the one moment latency actually matters: the rider is off-course.
+   */
+  readonly canopyComparison?: boolean;
+}
+
 export const directPreviewRoute = async (
   request: RoutePreviewRequest,
+  options?: DirectPreviewOptions,
 ): Promise<RoutePreviewResponse> => {
   const origin = request.startOverride ?? request.origin;
   const destination = request.destination;
@@ -616,6 +716,45 @@ export const directPreviewRoute = async (
 
   const source: 'custom_osrm' | 'mapbox' =
     effectiveMode === 'safe' ? 'custom_osrm' : 'mapbox';
+
+  /*
+   * Canopy comparison for shade routes.
+   *
+   * Started HERE, immediately after the route comes back and before the
+   * elevation/risk enrichment below, so it overlaps work the preview is
+   * already waiting on and costs no wall-clock of its own. Awaited once, at
+   * the end, next to the response.
+   *
+   * Eligibility is deliberately narrow — this describes the route on screen
+   * or it describes nothing:
+   *
+   *  - `safeProfile === 'cool'` is the only signal that the shade graph
+   *    actually served this route. `request.avoidHeat` is not: it is still
+   *    true when heat routing is unavailable for the country and the request
+   *    fell through to another profile.
+   *  - A coverage miss means Mapbox served the route, so there is no shade
+   *    route to compare.
+   *  - `/compare` takes one origin and one destination and has no way to
+   *    express a via point, so on a multi-stop route its numbers would
+   *    describe a DIFFERENT path than the one the rider is looking at. Two
+   *    honest percentages about the wrong route are still the wrong route.
+   *  - `avoidUnpaved` is the same problem in quieter form. Our shade route is
+   *    fetched with `exclude=unpaved`; `/compare` has no such parameter and —
+   *    measured against the live server on 2026-09-17 — passing one anyway
+   *    returns a BYTE-IDENTICAL response, i.e. it is accepted and silently
+   *    ignored (error-log #93/#98). So there is no way to align the two, and
+   *    "fixing" it by appending the parameter would look like it worked.
+   */
+  const canopyPromise =
+    options?.canopyComparison !== false &&
+    effectiveMode === 'safe' &&
+    support.supported &&
+    !osrmCoverageMiss &&
+    safeProfile === 'cool' &&
+    (waypoints?.length ?? 0) === 0 &&
+    !request.avoidUnpaved
+      ? fetchCanopyComparison(origin, destination)
+      : null;
 
   const routes: RouteOption[] = rawRoutes.map((route, index) => {
     const mapped = mapRoute(route, source, index, locale);
@@ -737,8 +876,22 @@ export const directPreviewRoute = async (
 
           // Time cost of the calmer route vs the fast one — feeds the
           // "+X min for a calmer ride" line on the preview screen.
+          //
+          // Deliberately NOT produced for the cool graph. On a shade route
+          // this delta is the time cost of the shade PATH, and it renders
+          // directly above the canopy comparison, where the two read as one
+          // statement: "+4 min ... / Shade route: 29% tree-lined". Shade is
+          // not allowed to be priced in minutes — the shade profile changes
+          // which roads are chosen, not how fast they are ridden, so the
+          // delta is not a cost of shade and must not be presented as one.
+          // (The "calmer ride" framing is also wrong here: the cool graph
+          // optimises canopy, not traffic.)
           let extraMinutes: number | undefined;
-          if (verdict === 'safer' && comparisonDurationSeconds !== undefined) {
+          if (
+            verdict === 'safer' &&
+            comparisonDurationSeconds !== undefined &&
+            safeProfile !== 'cool'
+          ) {
             const extra = Math.round(
               (enrichedRoutes[0].durationSeconds - comparisonDurationSeconds) / 60,
             );
@@ -750,6 +903,12 @@ export const directPreviewRoute = async (
             verdict,
             diffPercent: verdict === 'safer' ? diffPercent : 0,
             extraMinutes,
+            // Length-weighted tier-level exposure, alongside the older
+            // score-level `diffPercent`. See `describeBusyRoadSaving`.
+            busyRoadMeters: {
+              current: busyRoadMeters(currentSegments),
+              comparison: busyRoadMeters(comparisonSegments),
+            },
           };
         } else if (effectiveMode === 'fast') {
           let verdict: RouteComparison['verdict'];
@@ -791,11 +950,19 @@ export const directPreviewRoute = async (
     fastRouting: true,
   };
 
+  // In flight across the elevation and risk round-trips, so this normally
+  // resolves instantly. Capped so a slow shade host cannot hold up a route
+  // the rider already has — see CANOPY_WAIT_DEADLINE_MS.
+  const canopy = canopyPromise
+    ? await resolveWithinDeadline(canopyPromise, CANOPY_WAIT_DEADLINE_MS)
+    : undefined;
+
   return {
     routes: enrichedRoutes,
     selectedMode: effectiveMode,
     coverage,
     comparison,
+    canopy,
     generatedAt: new Date().toISOString(),
   };
 };
@@ -803,8 +970,10 @@ export const directPreviewRoute = async (
 export const directReroute = async (
   request: RerouteRequest,
 ): Promise<RoutePreviewResponse> => {
-  // Reroute uses the same logic as preview
-  return directPreviewRoute(request);
+  // Reroute uses the same logic as preview, minus the canopy comparison:
+  // nothing renders it mid-ride, and a reroute is the worst moment to spend
+  // latency or rate-limit budget on a garnish.
+  return directPreviewRoute(request, { canopyComparison: false });
 };
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,82 @@ const BUSY_ROAD_CATEGORIES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Minimum busy-road saving, in metres, worth quoting to the rider.
+ *
+ * ⚠️ NOT measured against real routes, unlike the canopy threshold. Quoting a
+ * safe-vs-fast saving needs the risk API, which is authenticated, so no probe
+ * was run. 150 m matches `BUSY_STRETCH_MIN_M`, the length at which this app
+ * already considers a busy stretch worth mentioning at all — reusing that is a
+ * consistent starting point, not a validated one. Measure it on real routes
+ * before treating the number as tuned.
+ */
+export const BUSY_SAVING_MIN_METERS = 150;
+
+/**
+ * Metres of a route spent on busy roads.
+ *
+ * LENGTH-WEIGHTED, which is the whole point. The pre-existing safe-vs-fast
+ * figure (`RouteComparison.diffPercent`) is an unweighted mean of segment
+ * risk SCORES, so a 20 m segment at a junction counts the same as a 2 km
+ * arterial. This counts metres, so it cannot be skewed by how the router
+ * happened to chop the route up.
+ *
+ * Uses the shared `BUSY_ROAD_CATEGORIES`, so "busy" means exactly what it
+ * means everywhere else in the app (error-log #20).
+ */
+export const busyRoadMeters = (
+  riskSegments: readonly RiskSegment[],
+): number =>
+  riskSegments.reduce((total, segment) => {
+    if (!BUSY_ROAD_CATEGORIES.has(segment.riskCategory)) return total;
+    // `riskSegmentDistanceMeters` dereferences `geometry.type`, and the risk
+    // response is consumed without per-item validation. A malformed segment
+    // must cost this figure only — the caller computes it inside the
+    // comparison's single try/catch, so an unguarded throw here would take
+    // the whole safe-vs-fast verdict down with it.
+    if (!segment.geometry) return total;
+    return total + riskSegmentDistanceMeters(segment);
+  }, 0);
+
+/**
+ * What may be CLAIMED about two routes' busy-road exposure.
+ *
+ * WHY THIS IS NOT "X% SAFER"
+ * --------------------------
+ * Two constraints from the risk model, both load-bearing:
+ *
+ *  - The TIER is the only level at which risk may be named or compared. A
+ *    percentage derived from mean scores compares at a finer granularity than
+ *    the validation supports. This stays at tier level: it counts metres in
+ *    the 'High risk' tier and says nothing about any other.
+ *  - The one validated claim is about SEVERITY, not frequency — a crash on a
+ *    high-risk road is more likely to be SERIOUS. "30% safer" reads as "30%
+ *    less likely to crash", which is the unvalidated frequency claim. Metres
+ *    of exposure makes no probability claim at all: it says where the route
+ *    goes, which the rider can also see on the map.
+ *
+ * `none` deliberately carries no number, so a safe route that happens to use
+ * MORE busy road than the fast one cannot render as a negative saving.
+ */
+export type BusyRoadSaving =
+  | { readonly kind: 'saves'; readonly metersSaved: number }
+  | { readonly kind: 'none' };
+
+/**
+ * Classify the busy-road difference between the current route and the one it
+ * was compared against. Pure and total; never produces a negative.
+ */
+export const describeBusyRoadSaving = (
+  currentMeters: number,
+  comparisonMeters: number,
+): BusyRoadSaving => {
+  const saved = comparisonMeters - currentMeters;
+  return saved >= BUSY_SAVING_MIN_METERS
+    ? { kind: 'saves', metersSaved: saved }
+    : { kind: 'none' };
+};
+
+/**
  * Length in meters of the longest contiguous run of high-risk segments along
  * a route. Segments are assumed to be ordered along the route geometry (as
  * returned by `/v1/risk-segments`). Returns 0 when no high-risk segments

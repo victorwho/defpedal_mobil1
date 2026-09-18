@@ -1063,6 +1063,10 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
       verdict: 'safer',
       diffPercent: 80, // |1 - 10/50| = 80%
       extraMinutes: 5, // 1200s vs 900s
+      // These stub segments carry neither `riskCategory` nor `geometry`, so
+      // nothing counts as busy. Real segments are exercised in the
+      // busy-road-exposure suite below.
+      busyRoadMeters: { current: 0, comparison: 0 },
     });
     // The legacy free-text label is no longer produced.
     expect(result.comparisonLabel).toBeUndefined();
@@ -1443,5 +1447,554 @@ describe('avoid unpaved, when nothing paved connects the points', () => {
         avoidHills: false,
       }),
     ).rejects.toThrow(/NoRoute/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shade-route canopy comparison
+// ---------------------------------------------------------------------------
+
+describe('directPreviewRoute — canopy comparison', () => {
+  /**
+   * URL-routed mock rather than the index-based `setupFetchMock`.
+   *
+   * The canopy call is fired between the route fetch and the enrichment
+   * fetches, so an ordinal mock would silently hand the elevation payload to
+   * whichever call happened to land in that slot. Routing by URL also makes
+   * "was /compare called at all?" an assertion instead of an inference.
+   */
+  const setupRoutedFetchMock = (
+    canopy?: { data: unknown; ok?: boolean; status?: number } | 'network-error',
+  ) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+
+      if (urlStr.includes('/compare')) {
+        if (canopy === 'network-error') throw new Error('socket hang up');
+        const resp = canopy ?? { data: {} };
+        return {
+          ok: resp.ok ?? true,
+          status: resp.status ?? 200,
+          json: async () => resp.data,
+          text: async () => JSON.stringify(resp.data),
+        } as Response;
+      }
+
+      let data: unknown = {};
+      if (urlStr.includes('/route/v1/bicycle') || urlStr.includes('api.mapbox.com')) {
+        data = createRouteResponse();
+      } else if (urlStr.includes('elevation-profile')) {
+        data = createElevationResponse();
+      } else if (urlStr.includes('risk-segments')) {
+        data = createRiskResponse();
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => data,
+        text: async () => JSON.stringify(data),
+      } as Response;
+    });
+  };
+
+  const okCanopy = (overrides?: Record<string, unknown>) => ({
+    data: {
+      code: 'Ok',
+      shade: { tree_pct: 29.0, coverage_pct: 83.6, distance_m: 9804 },
+      safe: { tree_pct: 28.6, coverage_pct: 84.9, distance_m: 9836 },
+      display: true,
+      gen: 'b46v2-armEp2',
+      ...overrides,
+    },
+  });
+
+  const compareCalls = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.map((call) => String(call[0]))
+      .filter((url) => url.includes('/compare'));
+
+  const coolRequest = (overrides?: Record<string, unknown>) => ({
+    origin: { lat: 44.43, lon: 26.1 },
+    destination: { lat: 44.44, lon: 26.12 },
+    mode: 'safe' as const,
+    avoidUnpaved: false,
+    avoidHills: false,
+    avoidHeat: true,
+    ...overrides,
+  });
+
+  it('asks the shade server once, with lon,lat coordinates', async () => {
+    setupRoutedFetchMock(okCanopy());
+
+    await directPreviewRoute(coolRequest());
+
+    const calls = compareCalls();
+    expect(calls).toHaveLength(1);
+    // lon first — the opposite order to our own Coordinate type, and the
+    // easiest thing in this integration to get backwards.
+    expect(calls[0]).toBe(
+      'https://osrm-shade.defensivepedal.com/compare?from=26.1,44.43&to=26.12,44.44',
+    );
+  });
+
+  it('returns both absolute percentages on the preview', async () => {
+    setupRoutedFetchMock(okCanopy());
+
+    const result = await directPreviewRoute(coolRequest());
+
+    expect(result.canopy).toEqual({ shadeTreePct: 29.0, standardTreePct: 28.6 });
+  });
+
+  it('reports a shade route that scores below the standard one as-is', async () => {
+    setupRoutedFetchMock(
+      okCanopy({ shade: { tree_pct: 11.2 }, safe: { tree_pct: 30.4 } }),
+    );
+
+    const result = await directPreviewRoute(coolRequest());
+
+    // Both values survive. Nothing in the response can express a delta, which
+    // is what stops this case from rendering as negative shade.
+    expect(result.canopy).toEqual({ shadeTreePct: 11.2, standardTreePct: 30.4 });
+  });
+
+  describe('is not requested at all when', () => {
+    it('the route is a plain safe route', async () => {
+      setupRoutedFetchMock();
+      await directPreviewRoute(coolRequest({ avoidHeat: false }));
+      expect(compareCalls()).toHaveLength(0);
+    });
+
+    it('the route is a fast route', async () => {
+      setupRoutedFetchMock();
+      await directPreviewRoute(coolRequest({ mode: 'fast' as const }));
+      expect(compareCalls()).toHaveLength(0);
+    });
+
+    it('the route is an e-bike or flat route', async () => {
+      setupRoutedFetchMock();
+      await directPreviewRoute(coolRequest({ avoidHeat: false, isEbike: true }));
+      await directPreviewRoute(coolRequest({ avoidHeat: false, avoidHills: true }));
+      expect(compareCalls()).toHaveLength(0);
+    });
+
+    // /compare takes one origin and one destination. On a multi-stop route
+    // its numbers would describe a different path than the one on screen.
+    it('the route has waypoints', async () => {
+      setupRoutedFetchMock(okCanopy());
+
+      const result = await directPreviewRoute(
+        coolRequest({ waypoints: [{ lat: 44.435, lon: 26.11 }] }),
+      );
+
+      expect(compareCalls()).toHaveLength(0);
+      expect(result.canopy).toBeUndefined();
+    });
+
+    // Outside the routing bboxes the shade graph never served the route —
+    // Mapbox did — so there is no shade route to describe.
+    it('the country is outside OSRM coverage', async () => {
+      setupRoutedFetchMock(okCanopy());
+
+      const result = await directPreviewRoute(
+        coolRequest({
+          // London: deliberately excluded from the covered set.
+          origin: { lat: 51.5, lon: -0.12 },
+          destination: { lat: 51.51, lon: -0.1 },
+        }),
+      );
+
+      expect(compareCalls()).toHaveLength(0);
+      expect(result.canopy).toBeUndefined();
+    });
+  });
+
+  describe('fails open — no comparison, route unaffected —', () => {
+    const expectRouteStillFine = (
+      result: Awaited<ReturnType<typeof directPreviewRoute>>,
+    ) => {
+      expect(result.canopy).toBeUndefined();
+      expect(result.routes.length).toBeGreaterThan(0);
+      expect(result.routes[0].distanceMeters).toBe(5000);
+      expect(result.selectedMode).toBe('safe');
+    };
+
+    it('on 429 rate limiting', async () => {
+      setupRoutedFetchMock({ data: {}, ok: false, status: 429 });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('on HTTP 400', async () => {
+      setupRoutedFetchMock({ data: {}, ok: false, status: 400 });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('on HTTP 502', async () => {
+      setupRoutedFetchMock({ data: {}, ok: false, status: 502 });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    // Both arrive at HTTP 200, which is exactly why the code is checked.
+    it('on a NoRoute code', async () => {
+      setupRoutedFetchMock({ data: { code: 'NoRoute' } });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('on a TooLong code', async () => {
+      setupRoutedFetchMock({ data: { code: 'TooLong' } });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('when the server withholds display consent', async () => {
+      setupRoutedFetchMock(okCanopy({ display: false }));
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('on a network failure', async () => {
+      setupRoutedFetchMock('network-error');
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+
+    it('on a body it cannot read', async () => {
+      setupRoutedFetchMock({ data: 'not json at all' });
+      expectRouteStillFine(await directPreviewRoute(coolRequest()));
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shade-route canopy comparison — composition with the rest of the preview
+// ---------------------------------------------------------------------------
+
+describe('directPreviewRoute — canopy composition', () => {
+  /**
+   * Per-URL-kind mock with independent call sequences, so the cool route and
+   * the fast comparison route can differ (same URL shape, different call).
+   */
+  const setupCompositionMock = (opts: {
+    osrm?: unknown[];
+    mapbox?: unknown[];
+    risk?: unknown[];
+    compare?: unknown;
+    compareHangs?: boolean;
+  }) => {
+    const seq = { osrm: 0, mapbox: 0, risk: 0 };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      const wrap = (data: unknown) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => data,
+          text: async () => JSON.stringify(data),
+        }) as Response;
+
+      if (urlStr.includes('/compare')) {
+        if (opts.compareHangs) return new Promise<Response>(() => {});
+        return wrap(opts.compare ?? {});
+      }
+      if (urlStr.includes('/route/v1/bicycle')) {
+        const i = seq.osrm++;
+        return wrap(opts.osrm?.[i] ?? opts.osrm?.[0] ?? createRouteResponse());
+      }
+      if (urlStr.includes('api.mapbox.com')) {
+        const i = seq.mapbox++;
+        return wrap(opts.mapbox?.[i] ?? opts.mapbox?.[0] ?? createRouteResponse());
+      }
+      if (urlStr.includes('elevation-profile')) return wrap(createElevationResponse());
+      if (urlStr.includes('risk-segments')) {
+        const i = seq.risk++;
+        return wrap(opts.risk?.[i] ?? opts.risk?.[0] ?? createRiskResponse());
+      }
+      return wrap({});
+    });
+  };
+
+  const riskResponse = (score: number) => ({
+    riskSegments: [
+      { start: 0, end: 0.5, riskScore: score, riskLevel: 'low' },
+      { start: 0.5, end: 1.0, riskScore: score, riskLevel: 'low' },
+    ],
+  });
+
+  const slowRoute = createRouteResponse([
+    { ...createOsrmRoute(), duration: 2400, distance: 8000 },
+  ]);
+  const quickRoute = createRouteResponse([
+    { ...createOsrmRoute(), duration: 900, distance: 5000 },
+  ]);
+
+  const compareBody = {
+    code: 'Ok',
+    shade: { tree_pct: 29.0 },
+    safe: { tree_pct: 28.6 },
+    display: true,
+  };
+
+  const comparisonRequest = (overrides?: Record<string, unknown>) => ({
+    origin: { lat: 44.43, lon: 26.1 },
+    destination: { lat: 44.44, lon: 26.12 },
+    mode: 'safe' as const,
+    avoidUnpaved: false,
+    avoidHills: false,
+    showRouteComparison: true,
+    ...overrides,
+  });
+
+  /*
+   * Requirement: shade is never priced in minutes.
+   *
+   * The "+X min for a calmer ride" line renders directly above the canopy row,
+   * so on a Cool preview the two read as one statement — "+25 min ... / Shade
+   * route: 29% tree-lined". The shade profile changes which roads are chosen,
+   * not how fast they are ridden, so that delta is not a cost of shade.
+   *
+   * The non-cool control below is what makes this test able to fail: it proves
+   * the fixture really does produce an extraMinutes when the profile allows it.
+   */
+  describe('never prices shade in minutes', () => {
+    const slowVsQuick = {
+      osrm: [slowRoute],
+      mapbox: [quickRoute],
+      risk: [riskResponse(1), riskResponse(9)],
+      compare: compareBody,
+    };
+
+    it('control: a plain safe route DOES report the extra minutes', async () => {
+      setupCompositionMock(slowVsQuick);
+
+      const result = await directPreviewRoute(comparisonRequest());
+
+      expect(result.comparison?.verdict).toBe('safer');
+      expect(result.comparison?.extraMinutes).toBeGreaterThanOrEqual(1);
+    });
+
+    it('a shade route reports the same verdict with NO minute figure', async () => {
+      setupCompositionMock(slowVsQuick);
+
+      const result = await directPreviewRoute(
+        comparisonRequest({ avoidHeat: true }),
+      );
+
+      expect(result.comparison?.verdict).toBe('safer');
+      expect(result.comparison?.extraMinutes).toBeUndefined();
+      // ...and the canopy row is present, i.e. this is the exact composed
+      // screen where the two lines would have sat together.
+      expect(result.canopy).toEqual({ shadeTreePct: 29.0, standardTreePct: 28.6 });
+    });
+  });
+
+  /*
+   * Fail open must mean open in TIME as well as in content. The fetch starts
+   * early and overlaps the enrichment, but a slow shade host must never hold
+   * up a route the rider already has.
+   */
+  it('does not wait on a shade server that never answers', async () => {
+    setupCompositionMock({ compareHangs: true });
+
+    const started = Date.now();
+    const result = await directPreviewRoute(
+      comparisonRequest({ avoidHeat: true, showRouteComparison: false }),
+    );
+    const elapsed = Date.now() - started;
+
+    expect(result.routes.length).toBeGreaterThan(0);
+    expect(result.canopy).toBeUndefined();
+    // Well inside the 8s request timeout: the preview abandons the wait.
+    expect(elapsed).toBeLessThan(4000);
+  }, 15_000);
+
+  /*
+   * `exclude=unpaved` is accepted and silently ignored by /compare (measured
+   * against the live server, 2026-09-17: byte-identical response). So our
+   * displayed shade route and the one /compare measures are different paths,
+   * and there is no parameter that would align them.
+   */
+  it('skips the comparison when the rider is avoiding unpaved', async () => {
+    setupCompositionMock({ compare: compareBody });
+
+    const result = await directPreviewRoute(
+      comparisonRequest({ avoidHeat: true, avoidUnpaved: true, showRouteComparison: false }),
+    );
+
+    const calls = vi
+      .mocked(fetch)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((u) => u.includes('/compare'));
+    expect(calls).toHaveLength(0);
+    expect(result.canopy).toBeUndefined();
+  });
+
+  /*
+   * A reroute shares directPreviewRoute wholesale. Nothing renders the canopy
+   * mid-ride, and a reroute is the worst moment to spend latency or the
+   * 60/min per-IP budget on a garnish.
+   */
+  it('never fetches a comparison on a reroute, even on a cool ride', async () => {
+    setupCompositionMock({ compare: compareBody });
+
+    const result = await directReroute({
+      origin: { lat: 44.43, lon: 26.1 },
+      destination: { lat: 44.44, lon: 26.12 },
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+      avoidHeat: true,
+    } as any);
+
+    const calls = vi
+      .mocked(fetch)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((u) => u.includes('/compare'));
+    expect(calls).toHaveLength(0);
+    expect(result.canopy).toBeUndefined();
+    // The reroute itself still worked.
+    expect(result.routes.length).toBeGreaterThan(0);
+  });
+
+  /*
+   * A coverage MISS inside a supported bbox: OSRM answers Ok with a
+   * zero-distance route, the request degrades to Mapbox, and the rider is
+   * looking at a Mapbox route — so there is no shade route to describe.
+   *
+   * Distinct from the London case, which never reaches the shade graph at all
+   * because `effectiveMode` becomes 'fast' first. This one exercises the
+   * `!osrmCoverageMiss` clause specifically.
+   */
+  it('skips the comparison when OSRM answers a covered bbox with no usable route', async () => {
+    setupCompositionMock({
+      osrm: [createRouteResponse([{ ...createOsrmRoute(), distance: 0, duration: 0 }])],
+      compare: compareBody,
+    });
+
+    const result = await directPreviewRoute(
+      comparisonRequest({ avoidHeat: true, showRouteComparison: false }),
+    );
+
+    expect(result.selectedMode).toBe('fast');
+    expect(result.coverage.status).toBe('unsupported');
+    const calls = vi
+      .mocked(fetch)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((u) => u.includes('/compare'));
+    expect(calls).toHaveLength(0);
+    expect(result.canopy).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Busy-road exposure on the safe-vs-fast comparison
+// ---------------------------------------------------------------------------
+
+describe('directPreviewRoute — busy-road exposure', () => {
+  /**
+   * Risk segments in the shape the API actually returns — with `riskCategory`
+   * and `geometry`, which the simplified `createRiskResponse` fixture above
+   * omits. `busyRoadMeters` needs both, so a test built on that stub would
+   * measure 0 metres and pass against a broken implementation.
+   */
+  const riskSegment = (category: string, lengthDeg: number, index: number) => ({
+    id: `seg-${index}`,
+    riskScore: category === 'High risk' ? 90 : 20,
+    riskCategory: category,
+    color: '#000000',
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [26.1, 44.43 + index * 0.02],
+        [26.1, 44.43 + index * 0.02 + lengthDeg],
+      ],
+    },
+  });
+
+  const riskBody = (segments: unknown[]) => ({ riskSegments: segments });
+
+  const setupRiskMock = (safeSegments: unknown[], fastSegments: unknown[]) => {
+    let riskCall = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      const wrap = (data: unknown) =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => data,
+          text: async () => JSON.stringify(data),
+        }) as Response;
+
+      if (urlStr.includes('/compare')) return wrap({});
+      if (urlStr.includes('/route/v1/bicycle') || urlStr.includes('api.mapbox.com')) {
+        return wrap(createRouteResponse());
+      }
+      if (urlStr.includes('elevation-profile')) return wrap(createElevationResponse());
+      if (urlStr.includes('risk-segments')) {
+        // First risk call enriches the safe route, second the fast comparison.
+        const body = riskCall === 0 ? safeSegments : fastSegments;
+        riskCall += 1;
+        return wrap(riskBody(body));
+      }
+      return wrap({});
+    });
+  };
+
+  const request = {
+    origin: { lat: 44.43, lon: 26.1 },
+    destination: { lat: 44.44, lon: 26.12 },
+    mode: 'safe' as const,
+    avoidUnpaved: false,
+    avoidHills: false,
+    showRouteComparison: true,
+  };
+
+  it('reports both routes’ busy-road exposure on the comparison', async () => {
+    setupRiskMock(
+      // Safe route: mostly calm, one short busy run.
+      [riskSegment('Typical', 0.01, 0), riskSegment('High risk', 0.002, 1)],
+      // Fast route: a long busy run.
+      [riskSegment('Typical', 0.002, 0), riskSegment('High risk', 0.02, 1)],
+    );
+
+    const result = await directPreviewRoute(request);
+
+    expect(result.comparison?.busyRoadMeters).toBeDefined();
+    const { current, comparison } = result.comparison!.busyRoadMeters!;
+    // ~222 m vs ~2220 m.
+    expect(current).toBeGreaterThan(150);
+    expect(current).toBeLessThan(350);
+    expect(comparison).toBeGreaterThan(2000);
+    // The whole point: the fast route spends far more on busy roads.
+    expect(comparison).toBeGreaterThan(current);
+  });
+
+  it('counts metres, not segments — so the safe route is not penalised for being chopped finer', async () => {
+    setupRiskMock(
+      // Safe route: ten SHORT busy segments (many segments, little distance).
+      Array.from({ length: 10 }, (_, i) => riskSegment('High risk', 0.0002, i)),
+      // Fast route: one LONG busy segment (few segments, lots of distance).
+      [riskSegment('High risk', 0.02, 0)],
+    );
+
+    const result = await directPreviewRoute(request);
+    const { current, comparison } = result.comparison!.busyRoadMeters!;
+
+    // By segment COUNT the safe route looks ten times worse. By metres — the
+    // thing that matters to a rider — it is an order of magnitude better.
+    expect(current).toBeLessThan(comparison / 5);
+  });
+
+  it('still reports exposure when neither route touches a busy road', async () => {
+    setupRiskMock([riskSegment('Typical', 0.01, 0)], [riskSegment('Safer', 0.01, 0)]);
+
+    const result = await directPreviewRoute(request);
+
+    expect(result.comparison?.busyRoadMeters).toEqual({ current: 0, comparison: 0 });
+  });
+
+  it('omits the field entirely when there is no comparison to make', async () => {
+    setupRiskMock([], []);
+
+    const result = await directPreviewRoute({ ...request, showRouteComparison: false });
+
+    expect(result.comparison).toBeUndefined();
   });
 });

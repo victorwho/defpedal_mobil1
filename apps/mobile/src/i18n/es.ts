@@ -126,12 +126,27 @@ export const es: TranslationKeys = {
       calmerCost: '+{{minutes}} min por una ruta más tranquila',
       calmerCostSub: 'Un poco más de distancia a cambio de mucho menos tráfico.',
       calmerFree: 'Más tranquila que la ruta rápida — sin tiempo extra',
+      busySaving: '{{distance}} menos por vías con mucho tráfico que la ruta rápida.',
       similarFast: 'Seguridad similar a la ruta rápida',
       sameFast: 'La misma seguridad que la ruta rápida',
       lessSafe: 'Un {{percent}}% menos segura que la ruta segura',
       slightlyLessSafe: 'Algo menos segura que la ruta segura',
       similarSafe: 'Seguridad similar a la ruta segura',
       sameSafe: 'La misma seguridad que la ruta segura',
+    },
+    // Porcentajes ABSOLUTOS, nunca una diferencia — la ruta con sombra puede
+    // puntuar por debajo de la estándar. La afirmación es sobre arbolado, no
+    // sobre temperatura: nunca «X grados más fresco».
+    canopy: {
+      moreShade: '+{{points}}% más de sombra',
+      moreShadeSub:
+        'El {{shade}}% de esta ruta va bajo arbolado, frente al {{standard}}% de la ruta estándar.',
+      similar: 'Arbolado similar al de la ruta estándar',
+      similarSub: 'El {{shade}}% de esta ruta va bajo arbolado.',
+      comparison:
+        'Ruta con sombra: {{shade}}% bajo arbolado · Ruta estándar: {{standard}}% bajo arbolado',
+      comparisonA11y:
+        'Ruta con sombra: {{shade}} por ciento bajo arbolado. Ruta estándar: {{standard}} por ciento bajo arbolado.',
     },
   },
 

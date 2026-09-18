@@ -126,12 +126,27 @@ export const ro: TranslationKeys = {
       calmerCost: '+{{minutes}} min pentru o rută mai liniștită',
       calmerCostSub: 'Puțină distanță în plus pentru mult mai puțin trafic.',
       calmerFree: 'Mai liniștită decât ruta rapidă — fără timp în plus',
+      busySaving: 'Cu {{distance}} mai puțin pe drumuri aglomerate decât ruta rapidă.',
       similarFast: 'Siguranță similară cu ruta rapidă',
       sameFast: 'Aceeași siguranță ca ruta rapidă',
       lessSafe: 'Cu {{percent}}% mai puțin sigură decât ruta sigură',
       slightlyLessSafe: 'Puțin mai puțin sigură decât ruta sigură',
       similarSafe: 'Siguranță similară cu ruta sigură',
       sameSafe: 'Aceeași siguranță ca ruta sigură',
+    },
+    // Procente ABSOLUTE, niciodată o diferență — ruta umbrită poate avea un
+    // scor mai mic decât cea standard. Afirmația este despre copaci, nu
+    // despre temperatură: niciodată „mai răcoros cu X grade”.
+    canopy: {
+      moreShade: '+{{points}}% mai multă umbră',
+      moreShadeSub:
+        '{{shade}}% din traseu trece pe sub copaci, față de {{standard}}% pe ruta standard.',
+      similar: 'Umbră similară cu ruta standard',
+      similarSub: '{{shade}}% din traseu trece pe sub copaci.',
+      comparison:
+        'Ruta umbrită: {{shade}}% sub copaci · Ruta standard: {{standard}}% sub copaci',
+      comparisonA11y:
+        'Ruta umbrită: {{shade}} la sută sub copaci. Ruta standard: {{standard}} la sută sub copaci.',
     },
   },
 

@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
+import { describeBusyRoadSaving, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -61,6 +61,8 @@ import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistrib
 import { RiskScoreExplainerSheet } from '../src/design-system/organisms/RiskScoreExplainerSheet';
 import { WeatherWarningModal } from '../src/design-system/molecules/WeatherWarningModal';
 import { ShareOptionsModal } from '../src/design-system/molecules/ShareOptionsModal';
+import { CanopyComparisonRow } from '../src/design-system/molecules/CanopyComparisonRow';
+import { safetyOnTint } from '../src/design-system/tokens/safetyOnTint';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { Button } from '../src/design-system/atoms/Button';
 import { Badge, badgeForegroundColor, type BadgeVariant } from '../src/design-system/atoms/Badge';
@@ -73,7 +75,7 @@ import { useExportRouteGpx } from '../src/hooks/useExportRouteGpx';
 import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
-import { useTheme, type ThemeColors } from '../src/design-system';
+import { useTheme, type ThemeColors, type ThemeMode } from '../src/design-system';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { space } from '../src/design-system/tokens/spacing';
@@ -105,8 +107,17 @@ const formatStretchDistance = (meters: number): string =>
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function RoutePreviewScreen() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createThemedStyles(colors), [colors]);
+  const { colors, mode } = useTheme();
+  const styles = useMemo(() => createThemedStyles(colors, mode), [colors, mode]);
+
+  /*
+   * Content drawn ON a safety-tinted surface needs the tone's readable
+   * variant, which differs per theme — the bright green that works on the
+   * dark tint scores 2.09:1 on the light one. Resolved once here because both
+   * the styles factory and the inline icon colours below need the same answer.
+   */
+  const onTintSafe = safetyOnTint(colors, mode, 'safe');
+  const onTintCaution = safetyOnTint(colors, mode, 'caution');
   const { user } = useAuthSession();
   const t = useT();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
@@ -358,11 +369,38 @@ function RoutePreviewScreen() {
       let subtitle: string | null = null;
       if (comparison.against === 'fast') {
         if (comparison.verdict === 'safer') {
+          /*
+           * Quantify "calmer" where we honestly can.
+           *
+           * The saving is metres on HIGH-RISK roads — length-weighted, and a
+           * tier-level figure rather than the score-level `diffPercent` that
+           * this comparison has always carried and never rendered. That older
+           * number is an unweighted mean over segments (a 20 m junction counts
+           * as much as a 2 km arterial) and a percentage off it reads as a
+           * likelihood claim, which the risk model does not validate.
+           *
+           * Falls back to the generic line when there is no saving to quote —
+           * including when the safe route uses MORE busy road, which happens.
+           */
+          const saving = comparison.busyRoadMeters
+            ? describeBusyRoadSaving(
+                comparison.busyRoadMeters.current,
+                comparison.busyRoadMeters.comparison,
+              )
+            : { kind: 'none' as const };
+          const savingLine =
+            saving.kind === 'saves'
+              ? t('preview.comparison.busySaving', {
+                  distance: formatStretchDistance(saving.metersSaved),
+                })
+              : null;
+
           if (comparison.extraMinutes) {
             title = t('preview.comparison.calmerCost', { minutes: comparison.extraMinutes });
-            subtitle = t('preview.comparison.calmerCostSub');
+            subtitle = savingLine ?? t('preview.comparison.calmerCostSub');
           } else {
             title = t('preview.comparison.calmerFree');
+            subtitle = savingLine;
           }
         } else if (comparison.verdict === 'similar') {
           title = t('preview.comparison.similarFast');
@@ -389,6 +427,7 @@ function RoutePreviewScreen() {
     }
     return null;
   }, [routePreview?.comparison, routePreview?.comparisonLabel, t]);
+
 
   // Slice 6: the share button no longer jumps straight to the native
   // share sheet — it opens ShareOptionsModal where the user can flip
@@ -713,6 +752,30 @@ function RoutePreviewScreen() {
     isEbike,
   });
 
+  /*
+   * Canopy survives a refetch the same way the route does, and that is a
+   * problem the route does not have.
+   *
+   * `routePreview` is the PREVIOUS response until a new one arrives, which is
+   * deliberate for geometry (session 54: cycling Safe/Fast/Flat keeps the old
+   * line on screen instead of blanking the map). But the canopy row names its
+   * subject — "Shade route" — so the instant the rider cycles the mode pill
+   * off Cool, the pill reads Safe while the row below still claims a shade
+   * route, for as long as the refetch takes.
+   *
+   * Two conditions, both required: the live request must still be a cool one,
+   * and the endpoints must still match (the same check `displayedRoutes`
+   * makes — when it hides the route, there is nothing left for the canopy to
+   * describe).
+   */
+  const freshCanopy = useMemo(
+    () =>
+      displayedRoutes && avoidHeat && coolAvailable
+        ? routePreview?.canopy
+        : undefined,
+    [displayedRoutes, avoidHeat, coolAvailable, routePreview?.canopy],
+  );
+
   const modeDisplay: Record<
     RoutingDisplayMode,
     {
@@ -995,7 +1058,7 @@ function RoutePreviewScreen() {
 
       {busyStretchMeters >= BUSY_STRETCH_MIN_M ? (
         <View style={styles.busyStretchRow}>
-          <Ionicons name="warning-outline" size={16} color={colors.caution} />
+          <Ionicons name="warning-outline" size={16} color={onTintCaution} />
           <Text style={styles.busyStretchText}>
             {t('risk.busyStretch', { distance: formatStretchDistance(busyStretchMeters) })}
           </Text>
@@ -1030,7 +1093,7 @@ function RoutePreviewScreen() {
             <Ionicons
               name={comparisonContent.isWarning ? 'warning' : 'shield-checkmark'}
               size={18}
-              color={comparisonContent.isWarning ? colors.caution : colors.safe}
+              color={comparisonContent.isWarning ? onTintCaution : onTintSafe}
             />
             <View style={styles.comparisonTextColumn}>
               <Text style={[
@@ -1064,7 +1127,7 @@ function RoutePreviewScreen() {
                 </>
               ) : (
                 <>
-                  <Ionicons name="shield-checkmark" size={16} color={colors.safe} />
+                  <Ionicons name="shield-checkmark" size={16} color={onTintSafe} />
                   <Text style={styles.switchToSafeText}>{t('preview.switchToSafe')}</Text>
                 </>
               )}
@@ -1072,6 +1135,15 @@ function RoutePreviewScreen() {
           ) : null}
         </View>
       ) : null}
+
+      {/*
+        Tree cover on the shade route. Leads with the gain where there is one,
+        and falls back to stating both figures where there is not — measured,
+        that is more than half of real routes. No time figure sits beside it:
+        the shade profile changes the path, not the speeds, so an ETA
+        difference would invent a cost that shade does not have.
+      */}
+      <CanopyComparisonRow canopy={freshCanopy} />
 
       {selectedRoute?.elevationProfile && selectedRoute.elevationProfile.length > 1 ? (
         <ElevationChart
@@ -1085,7 +1157,7 @@ function RoutePreviewScreen() {
         <View style={styles.offlineDownloadCard}>
           {isRouteOfflineReady || offlineDownloadStatus === 'complete' ? (
             <View style={styles.offlineReadyRow}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.safe} />
+              <Ionicons name="checkmark-circle" size={18} color={onTintSafe} />
               <Text style={styles.offlineReadyText}>{t('preview.availableOffline')}</Text>
             </View>
           ) : offlineDownloadStatus === 'downloading' ? (
@@ -1280,7 +1352,7 @@ function RoutePreviewScreen() {
   );
 }
 
-const createThemedStyles = (colors: ThemeColors) =>
+const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
   StyleSheet.create({
     topBar: {
       flexDirection: 'row',
@@ -1402,7 +1474,9 @@ const createThemedStyles = (colors: ThemeColors) =>
     comparisonText: {
       ...textSm,
       fontFamily: fontFamily.heading.bold,
-      color: colors.safe,
+      // NOT `colors.safe`: that is the fill/border green, and on the light
+      // theme's near-white tint it reads 2.09:1 — under even the icon bar.
+      color: safetyOnTint(colors, mode, 'safe'),
     },
     comparisonTextColumn: {
       flex: 1,
@@ -1417,7 +1491,7 @@ const createThemedStyles = (colors: ThemeColors) =>
       backgroundColor: safetyTints.cautionLight,
     },
     comparisonTextWarning: {
-      color: colors.caution,
+      color: safetyOnTint(colors, mode, 'caution'),
     },
     busyStretchRow: {
       flexDirection: 'row',
@@ -1468,7 +1542,7 @@ const createThemedStyles = (colors: ThemeColors) =>
     switchToSafeText: {
       ...textSm,
       fontFamily: fontFamily.heading.bold,
-      color: colors.safe,
+      color: safetyOnTint(colors, mode, 'safe'),
     },
     warningPanel: {
       borderRadius: radii['2xl'],
@@ -1478,7 +1552,8 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     warningTitle: {
       ...textXs,
-      color: colors.caution,
+      // Measured 5.81:1 dark / 6.97:1 light on the panel's own amber surface.
+      color: safetyOnTint(colors, mode, 'caution'),
       fontFamily: fontFamily.heading.extraBold,
       textTransform: 'uppercase',
       letterSpacing: 1.1,
@@ -1637,7 +1712,10 @@ const createThemedStyles = (colors: ThemeColors) =>
     offlineReadyText: {
       ...textSm,
       fontFamily: fontFamily.body.bold,
-      color: colors.safe,
+      // Card sits on bgSecondary rather than a safety tint, but the rule is
+      // the same — the surface follows the theme, so the colour must too.
+      // Measured 4.52:1 dark / 6.48:1 light.
+      color: safetyOnTint(colors, mode, 'safe'),
     },
     offlineDownloadingWrap: {
       gap: space[2],
