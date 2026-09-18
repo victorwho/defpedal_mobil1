@@ -33,6 +33,8 @@ import { RideLossBanner } from '../src/design-system/molecules/RideLossBanner';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
+import { isCoolRoutingPromoActive } from '@defensivepedal/core';
+import { CoolPromoNotice } from '../src/design-system/molecules/CoolPromoNotice';
 import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
@@ -402,6 +404,7 @@ const RootLayoutInner = () => {
       <RankUpOverlayManager />
       <WeatherNoticeManager />
       <MeetPedalCardManager />
+      <CoolPromoNoticeManager />
       <RideLossBannerManager />
       <RouteShareDeepLinkHandler />
       <GpxOpenHandler />
@@ -471,6 +474,42 @@ const RideLossBannerManager = () => {
  * `hasSeenMeetPedalCard` (persisted) + completedRideCount + appState.
  * Suppressed during NAVIGATING per the mascot quarantine rule.
  */
+/**
+ * One-time notice that Cool routing is now open to everyone, and free until
+ * the promotion ends.
+ *
+ * Three gates, all here rather than in the component:
+ *  - shown once per device (`hasSeenCoolPromoNotice`);
+ *  - only WHILE the promotion is running — a rider who upgrades after the
+ *    cutoff gets nothing rather than an offer that has expired, which matters
+ *    because a staged rollout spreads first-opens over days;
+ *  - never during a ride, like every other overlay in this file;
+ *  - never during onboarding. A fresh install has not "upgraded" to anything,
+ *    and this would otherwise pop over the mandatory signup wall — the rider
+ *    is told about Cool when they first reach the app, not while they are
+ *    still being asked for an account.
+ *
+ * Deliberately NOT routed through `useCelebrationStage`: this is an
+ * informational notice about what the rider is entitled to, not a
+ * celebration, and it should not queue behind a badge unlock.
+ */
+const CoolPromoNoticeManager = () => {
+  const hasSeen = useAppStore((s) => s.hasSeenCoolPromoNotice);
+  const setHasSeen = useAppStore((s) => s.setHasSeenCoolPromoNotice);
+  const appState = useAppStore((s) => s.appState);
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+
+  const show =
+    !hasSeen &&
+    onboardingCompleted &&
+    isCoolRoutingPromoActive() &&
+    appState !== 'NAVIGATING';
+
+  if (!show) return null;
+
+  return <CoolPromoNotice visible onDismiss={() => setHasSeen(true)} />;
+};
+
 const MeetPedalCardManager = () => {
   const hasSeen = useAppStore((s) => s.hasSeenMeetPedalCard);
   const setHasSeen = useAppStore((s) => s.setHasSeenMeetPedalCard);

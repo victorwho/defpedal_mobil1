@@ -1,75 +1,53 @@
 /**
- * Cool mode is hidden in production (product decision, 2026-08-29).
+ * Cool mode went LIVE in production on 2026-09-18. Before that it was
+ * dev/preview only, and these tests asserted that a production build could
+ * never end up in cool mode through any of the five `avoidHeat` entry paths.
  *
- * The property that actually matters is not "the pill is hidden" — it is
- * "a production rider can never END UP in cool mode", because `avoidHeat`
- * has five entry paths and only one is the pill. These tests pin the choke
- * point rather than the UI.
+ * ⚠️ THE DISABLE BRANCH IS NOW UNREACHABLE, AND IS NOT TESTED HERE.
+ *
+ * `isCoolModeEnabled()` returns a literal `true`, so `resolveAvoidHeat`'s
+ * `: false` arm cannot be exercised without reimplementing it — and a test
+ * that reimplements the code under test proves only that the test agrees with
+ * itself. There is deliberately no such test in this file; pretending to cover
+ * a dead branch is worse than leaving it visibly uncovered.
+ *
+ * If cool mode is ever gated again, restore a stubbable source for the flag
+ * (it previously read `mobileEnv.appVariant` / `appEnv`, which `vi.doMock`
+ * could control) and bring back the disabled-path cases from git history —
+ * `git log -- apps/mobile/src/lib/__tests__/coolMode.test.ts`. Those cases are
+ * what make re-gating safe, because `avoidHeat` has five entry paths and only
+ * one of them is the Cool pill.
+ *
+ * What IS still worth pinning, and is pinned below: `resolveAvoidHeat` remains
+ * the single choke point every write path calls, and it always yields a
+ * boolean. The store-level proof that each of those paths actually routes
+ * through it lives in `store/__tests__/appStore.coolModeGate.test.ts`.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-const loadWith = async (appVariant: string, appEnv: string) => {
-  vi.resetModules();
-  vi.doMock('../env', () => ({ mobileEnv: { appVariant, appEnv } }));
-  return import('../coolMode');
-};
-
-afterEach(() => {
-  vi.doUnmock('../env');
-  vi.resetModules();
-});
+import { isCoolModeEnabled, resolveAvoidHeat } from '../coolMode';
 
 describe('isCoolModeEnabled', () => {
-  it('is OFF for a production build', async () => {
-    const { isCoolModeEnabled } = await loadWith('production', 'production');
-    expect(isCoolModeEnabled()).toBe(false);
-  });
-
-  it('is ON for development and preview builds', async () => {
-    for (const [variant, env] of [
-      ['development', 'development'],
-      ['preview', 'preview'],
-    ] as const) {
-      const { isCoolModeEnabled } = await loadWith(variant, env);
-      expect(isCoolModeEnabled()).toBe(true);
-    }
-  });
-
-  it('fails safe when only ONE of variant/env says production', async () => {
-    // A production APK with a mis-set env var, or a preview binary pointed at
-    // production, must both land on the hidden side — matching the existing
-    // dev-tool gates in devMockLocation.ts and diagnostics.tsx.
-    for (const [variant, env] of [
-      ['production', 'preview'],
-      ['preview', 'production'],
-    ] as const) {
-      const { isCoolModeEnabled } = await loadWith(variant, env);
-      expect(isCoolModeEnabled()).toBe(false);
-    }
+  it('is on for every build, including production', () => {
+    expect(isCoolModeEnabled()).toBe(true);
   });
 });
 
 describe('resolveAvoidHeat — the choke point', () => {
-  it('refuses to enable cool mode in production, whatever asked for it', async () => {
-    // Covers all five entry paths at once: pill, preview cycle-pill, shared
-    // route claim, saved route, and rehydrated persisted state.
-    const { resolveAvoidHeat } = await loadWith('production', 'production');
-    expect(resolveAvoidHeat(true)).toBe(false);
-    expect(resolveAvoidHeat(false)).toBe(false);
-    expect(resolveAvoidHeat(undefined)).toBe(false);
-  });
-
-  it('heals a rider who already had it on before it was hidden', async () => {
-    // The important one: without this, an existing avoidHeat=true rehydrates
-    // into cool routing with no visible control to leave it.
-    const { resolveAvoidHeat } = await loadWith('production', 'production');
-    expect(resolveAvoidHeat(true)).toBe(false);
-  });
-
-  it('passes the request through untouched off production', async () => {
-    const { resolveAvoidHeat } = await loadWith('preview', 'preview');
+  it('passes an explicit request through while the mode is enabled', () => {
     expect(resolveAvoidHeat(true)).toBe(true);
     expect(resolveAvoidHeat(false)).toBe(false);
+  });
+
+  // `undefined` means "not specified", never "on". A saved route or a claimed
+  // share that omits the flag must not opt the rider into cool routing.
+  it('treats a missing preference as off, not as on', () => {
     expect(resolveAvoidHeat(undefined)).toBe(false);
+  });
+
+  it('always yields a boolean, whatever it is handed', () => {
+    for (const input of [true, false, undefined]) {
+      expect(typeof resolveAvoidHeat(input)).toBe('boolean');
+    }
   });
 });

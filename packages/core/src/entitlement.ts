@@ -358,6 +358,36 @@ export type CoolRoutingAvailability =
   | 'country_unavailable';
 
 /**
+ * Cool routing is free to every rider until this instant, then Plus-only.
+ *
+ * Exclusive: free THROUGH 2026-09-30, chargeable from 2026-10-01. UTC because
+ * a device clock in another zone must not move the boundary by a day, in
+ * either direction — a rider in Auckland should not lose the promotion a day
+ * early, and one in Honolulu should not keep it a day late.
+ *
+ * Announced in-app by the one-time notice on first open of the release that
+ * turned Cool on in production (see `hasSeenCoolPromoNotice`). The date lives
+ * here, once, so the notice copy, the entitlement gate and the paywall cannot
+ * disagree about when it ends.
+ *
+ * ⚠️ TWO THINGS THIS DOES NOT DO.
+ *  - It does not enforce anything on the routing REQUEST. Nothing checks this
+ *    entitlement before dispatching to the shade graph; `usePremium().coolRouting`
+ *    is read only for paywall copy. So on 2026-10-01 a free rider whose stored
+ *    `avoidHeat` is already true keeps getting shade routes. Closing that is
+ *    separate work and must land before the date, or the promise lapses in
+ *    name only.
+ *  - It does not migrate anyone. A rider who turned Cool on during the promo
+ *    keeps the preference; what changes is whether the product is willing to
+ *    keep serving it.
+ */
+export const COOL_ROUTING_FREE_UNTIL = new Date('2026-10-01T00:00:00Z');
+
+/** True while cool routing is free to everyone regardless of tier. */
+export const isCoolRoutingPromoActive = (now: Date = new Date()): boolean =>
+  now.getTime() < COOL_ROUTING_FREE_UNTIL.getTime();
+
+/**
  * Country availability is checked FIRST and wins. Showing an upgrade prompt
  * to a rider whose country has no shade graph would sell them something
  * they cannot use — the paywall must never imply coverage that does not
@@ -366,8 +396,10 @@ export type CoolRoutingAvailability =
 export const resolveCoolRoutingAvailability = (
   entitlement: ResolvedEntitlement,
   country: SupportedCountry | null | undefined,
+  now: Date = new Date(),
 ): CoolRoutingAvailability => {
   if (!isHeatRoutingAvailable(country)) return 'country_unavailable';
+  if (isCoolRoutingPromoActive(now)) return 'available';
   if (entitlement.tier !== 'plus') return 'requires_plus';
   return 'available';
 };
@@ -376,7 +408,9 @@ export const resolveCoolRoutingAvailability = (
 export const isCoolRoutingEntitled = (
   entitlement: ResolvedEntitlement,
   country: SupportedCountry | null | undefined,
-): boolean => resolveCoolRoutingAvailability(entitlement, country) === 'available';
+  now: Date = new Date(),
+): boolean =>
+  resolveCoolRoutingAvailability(entitlement, country, now) === 'available';
 
 // ---------------------------------------------------------------------------
 // Gate — flat routing

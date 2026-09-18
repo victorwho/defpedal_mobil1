@@ -168,6 +168,19 @@ export const en = {
     },
   },
 
+  // ── Cool routing promotion ──
+  // One-time notice on first open after Cool went live in production.
+  // {{date}} is formatted from COOL_ROUTING_FREE_UNTIL in core, never written
+  // out here, so the copy and the entitlement gate cannot disagree.
+  cool: {
+    promo: {
+      title: 'Cool routes are open to everyone',
+      body: 'Pick Cool when planning a ride and we will route you under trees where we can. Free for every rider until {{date}}.',
+      afterwards: 'After that it becomes part of Plus.',
+      cta: 'Got it',
+    },
+  },
+
   // ── Imported GPX courses ──
   course: {
     importCta: 'Import GPX',

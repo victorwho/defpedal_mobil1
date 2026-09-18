@@ -9,7 +9,11 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 import type { ProfilePremium } from '@defensivepedal/core';
-import { FREE_LIMITS, PLUS_OFFLINE_GRACE_DAYS } from '@defensivepedal/core';
+import {
+  FREE_LIMITS,
+  PLUS_OFFLINE_GRACE_DAYS,
+  isCoolRoutingPromoActive,
+} from '@defensivepedal/core';
 
 import { useAppStore } from '../../store/appStore';
 import { usePremium } from '../usePremium';
@@ -137,9 +141,23 @@ describe('usePremium — gates', () => {
   it('tells a free rider in an uncovered country the truth about cool routing', () => {
     // Never sell coverage that does not exist — but the shade graph now routes
     // in every covered country, so only an unresolved country is "unavailable".
+    // Country coverage is checked before entitlement, so this holds during the
+    // launch promotion too.
     expect(read().coolRouting(null as never)).toBe('country_unavailable');
-    expect(read().coolRouting('ES')).toBe('requires_plus');
-    expect(read().coolRouting('RO')).toBe('requires_plus');
+  });
+
+  /*
+   * Cool routing is free to everyone until COOL_ROUTING_FREE_UNTIL, so a free
+   * rider in a covered country is currently 'available', not 'requires_plus'.
+   * `usePremium` reads the wall clock, so this asserts the promotion is in
+   * force rather than hard-coding the post-promotion answer — and it will fail
+   * loudly on the day the promotion ends, which is the reminder that the
+   * request-level enforcement still has to be built by then.
+   */
+  it('gives a free rider cool routing while the launch promotion runs', () => {
+    expect(isCoolRoutingPromoActive()).toBe(true);
+    expect(read().coolRouting('ES')).toBe('available');
+    expect(read().coolRouting('RO')).toBe('available');
   });
 
   it('unlocks cool routing for plus in a covered country only', () => {

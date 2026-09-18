@@ -1,42 +1,33 @@
 /**
- * Cool-mode production gate — every write path into `avoidHeat`.
+ * Every store path that can set `avoidHeat` must go through `resolveAvoidHeat`.
  *
- * `coolMode.ts` states that guarding the SETTER closes all five ways the flag
- * can turn on, so hiding the Cool pill is only about not showing a dead
- * control. That claim was false: `setRouteRequest` synced the flag straight
- * from the request without coercion, and that is precisely the path a claimed
- * share takes — `ShareClaimProcessor` calls it and pushes to `/route-preview`,
- * bypassing route-planning's heal effect entirely.
+ * `coolMode.ts` claims that guarding the setters closes all five ways the flag
+ * can turn on, so gating the mode is a one-line change rather than an audit.
+ * That claim was false once: `setRouteRequest` synced the flag straight from
+ * the request, and that is exactly the path a claimed share takes —
+ * `ShareClaimProcessor` calls it and pushes to `/route-preview`, bypassing
+ * route-planning's heal effect. The visible result in a store build was a
+ * shade-graph route with the mode pill reading "Safe".
  *
- * The visible result in a store build was a route served by the shade graph
- * with the mode pill reading Safe. The canopy comparison then made it legible
- * to the rider ("Shade route: 29% tree-lined"), which is what surfaced it.
- *
- * `mobileEnv` is mocked to a production build so the REAL `resolveAvoidHeat`
- * runs, rather than mocking the gate itself and proving only that a mock was
- * called.
+ * ⚠️ WHY THE MODULE IS STUBBED RATHER THAN THE BUILD ENV.
+ * Cool mode is now ON in production, so `resolveAvoidHeat` is currently an
+ * identity function and a test using the real module could not tell a coercing
+ * path from a bypassing one — every assertion would pass either way. Stubbing
+ * `isCoolModeEnabled` to `false` restores the distinction: any path that does
+ * NOT delegate keeps its `true` and fails. This tests the plumbing, which is
+ * the durable property, rather than today's flag value.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../lib/env', () => ({
-  mobileEnv: {
-    appEnv: 'production',
-    appVariant: 'production',
-    mobileApiUrl: 'https://api.example.com',
-    mapboxPublicToken: 'pk.test',
-    supabaseUrl: 'https://test.supabase.co',
-    supabaseAnonKey: 'anon',
-    revenueCatAndroidKey: '',
-    revenueCatIosKey: '',
-    googleWebClientId: '',
-    googleIosClientId: '',
-    sentryDsn: '',
-    posthogApiKey: '',
-  },
+/** The real implementation's shape, with the flag forced off. */
+vi.mock('../../lib/coolMode', () => ({
+  isCoolModeEnabled: () => false,
+  // Mirrors `isCoolModeEnabled() ? requested === true : false` with the flag
+  // off, which is the behaviour these paths must honour.
+  resolveAvoidHeat: (_requested: boolean | undefined) => false,
 }));
 
 const { useAppStore } = await import('../appStore');
-const { isCoolModeEnabled } = await import('../../lib/coolMode');
 
 const initial = useAppStore.getState();
 
@@ -48,25 +39,37 @@ afterEach(() => {
   useAppStore.setState(initial, true);
 });
 
-describe('avoidHeat in a production build', () => {
-  it('confirms the fixture really is a production build', () => {
-    // Without this the whole file would pass vacuously on a dev-flavoured env.
-    expect(isCoolModeEnabled()).toBe(false);
-  });
-
-  it('refuses the direct setter', () => {
+describe('every avoidHeat write path delegates to resolveAvoidHeat', () => {
+  it('the direct setter', () => {
     useAppStore.getState().setAvoidHeat(true);
     expect(useAppStore.getState().avoidHeat).toBe(false);
   });
 
-  // The share-claim / saved-route path.
-  it('refuses a request carrying avoidHeat, as a claimed share does', () => {
+  // The share-claim and saved-route path — the one that was broken.
+  it('a request carrying avoidHeat, as a claimed share does', () => {
     useAppStore.getState().setRouteRequest({ avoidHeat: true });
     expect(useAppStore.getState().avoidHeat).toBe(false);
+    // The nested copy is a second source of truth for the same flag; two
+    // disagreeing copies is how this class of bug is built.
     expect(useAppStore.getState().routeRequest.avoidHeat).toBeFalsy();
   });
 
-  it('still honours the other profile flags on the same request', () => {
+  it('the named routing mode', () => {
+    useAppStore.getState().selectRoutingMode('cool');
+    expect(useAppStore.getState().avoidHeat).toBe(false);
+  });
+
+  it('re-coerces a stale true that reached the store some other way', () => {
+    useAppStore.setState({ avoidHeat: true });
+    useAppStore.getState().setRouteRequest({ avoidHeat: true });
+    expect(useAppStore.getState().avoidHeat).toBe(false);
+  });
+
+  /*
+   * The coercion must be surgical. An earlier fix that dropped the whole
+   * profile-flag sync would also have passed the assertions above.
+   */
+  it('leaves the other profile flags on the same request untouched', () => {
     useAppStore.getState().setRouteRequest({
       avoidHeat: true,
       avoidHills: true,
@@ -76,17 +79,5 @@ describe('avoidHeat in a production build', () => {
     expect(state.avoidHeat).toBe(false);
     expect(state.avoidHills).toBe(true);
     expect(state.avoidUnpaved).toBe(true);
-  });
-
-  it('refuses the named routing mode', () => {
-    useAppStore.getState().selectRoutingMode('cool');
-    expect(useAppStore.getState().avoidHeat).toBe(false);
-  });
-
-  it('clears a stale true that reaches the store some other way', () => {
-    useAppStore.setState({ avoidHeat: true });
-    // Any subsequent request sync re-coerces rather than preserving it.
-    useAppStore.getState().setRouteRequest({ avoidHeat: true });
-    expect(useAppStore.getState().avoidHeat).toBe(false);
   });
 });

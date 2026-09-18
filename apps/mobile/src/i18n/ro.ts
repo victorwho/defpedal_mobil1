@@ -151,6 +151,15 @@ export const ro: TranslationKeys = {
   },
 
   // ── Trasee GPX importate ──
+  cool: {
+    promo: {
+      title: 'Rutele Răcoros sunt deschise tuturor',
+      body: 'Alege Răcoros când îți planifici tura și te ducem pe sub copaci acolo unde se poate. Gratuit pentru toți bicicliștii până pe {{date}}.',
+      afterwards: 'După aceea va face parte din Plus.',
+      cta: 'Am înțeles',
+    },
+  },
+
   course: {
     importCta: 'Importă GPX',
     importCtaA11y: 'Importă un traseu dintr-un fişier GPX',

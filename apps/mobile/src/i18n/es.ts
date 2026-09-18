@@ -151,6 +151,15 @@ export const es: TranslationKeys = {
   },
 
   // ── Rutas GPX importadas ──
+  cool: {
+    promo: {
+      title: 'Las rutas Fresco están abiertas a todos',
+      body: 'Elige Fresco al planificar tu ruta y te llevaremos bajo los árboles siempre que podamos. Gratis para todos los ciclistas hasta el {{date}}.',
+      afterwards: 'Después pasará a formar parte de Plus.',
+      cta: 'Entendido',
+    },
+  },
+
   course: {
     importCta: 'Importar GPX',
     importCtaA11y: 'Importar una ruta desde un archivo GPX',

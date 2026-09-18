@@ -8,7 +8,10 @@ import {
   daysSince,
   freeSnapshot,
   historyRetentionCutoff,
+  COOL_ROUTING_FREE_UNTIL,
   isCoolRoutingEntitled,
+  isCoolRoutingPromoActive,
+  resolveCoolRoutingAvailability,
   isGrandfatheredAccount,
   offlinePackPolicy,
   resolveCoolRoutingAvailability,
@@ -25,6 +28,8 @@ import {
 } from './premiumCatalog';
 
 const NOW = '2026-08-15T12:00:00.000Z';
+/** An instant after the cool-routing launch promotion has ended. */
+const AFTER_COOL_PROMO = new Date('2026-10-02T00:00:00.000Z');
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const daysBefore = (iso: string, days: number): string =>
@@ -288,13 +293,27 @@ describe('cool routing availability', () => {
     expect(isCoolRoutingEntitled(plus, 'RO')).toBe(true);
   });
 
+  /*
+   * These now pass an explicit instant AFTER the launch promotion.
+   *
+   * Without it they read the wall clock, so they failed the day cool routing
+   * went free to everyone and would have started passing again by themselves
+   * on 2026-10-01 — a test that changes its answer depending on the day it is
+   * run is worse than one that fails, because the failure is at least visible.
+   * `AFTER_COOL_PROMO` is the post-promotion contract; the promotion itself is
+   * covered in its own describe block below.
+   */
   it('asks a free rider in a covered country to upgrade', () => {
-    expect(resolveCoolRoutingAvailability(free, 'RO')).toBe('requires_plus');
+    expect(resolveCoolRoutingAvailability(free, 'RO', AFTER_COOL_PROMO)).toBe(
+      'requires_plus',
+    );
   });
 
   it('is sold everywhere the shade graph routes — Spain included', () => {
-    expect(resolveCoolRoutingAvailability(free, 'ES')).toBe('requires_plus');
-    expect(resolveCoolRoutingAvailability(plus, 'ES')).toBe('available');
+    expect(resolveCoolRoutingAvailability(free, 'ES', AFTER_COOL_PROMO)).toBe(
+      'requires_plus',
+    );
+    expect(resolveCoolRoutingAvailability(plus, 'ES', AFTER_COOL_PROMO)).toBe('available');
   });
 
   it('treats an unknown country as unavailable', () => {
@@ -388,5 +407,74 @@ describe('canImportAnotherCourse', () => {
     expect(limit).not.toBeNull();
     expect(canImportAnotherCourse(free, limit! - 1)).toBe(true);
     expect(canImportAnotherCourse(free, limit!)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cool routing promotion window
+// ---------------------------------------------------------------------------
+
+describe('cool routing promotion', () => {
+  const dayBefore = new Date('2026-09-30T23:59:59Z');
+  const atCutoff = new Date('2026-10-01T00:00:00Z');
+  const afterCutoff = new Date('2026-10-01T00:00:01Z');
+
+  const freeRider = resolveEntitlement({
+    server: freeSnapshot(NOW),
+    cached: null,
+    accountCreatedAt: POST_LAUNCH_ACCOUNT,
+    nowIso: NOW,
+  });
+  const plusRider = resolveEntitlement({
+    server: snapshot(),
+    cached: null,
+    accountCreatedAt: POST_LAUNCH_ACCOUNT,
+    nowIso: NOW,
+  });
+
+  describe('isCoolRoutingPromoActive', () => {
+    it('is active through the last free day', () => {
+      expect(isCoolRoutingPromoActive(dayBefore)).toBe(true);
+    });
+
+    // Exclusive boundary: the cutoff instant is the first chargeable moment.
+    it('is over at the cutoff instant itself', () => {
+      expect(isCoolRoutingPromoActive(atCutoff)).toBe(false);
+      expect(isCoolRoutingPromoActive(afterCutoff)).toBe(false);
+    });
+  });
+
+  describe('resolveCoolRoutingAvailability', () => {
+    it('gives a free rider cool routing during the promotion', () => {
+      expect(resolveCoolRoutingAvailability(freeRider, 'RO', dayBefore)).toBe('available');
+    });
+
+    it('asks a free rider for Plus once the promotion ends', () => {
+      expect(resolveCoolRoutingAvailability(freeRider, 'RO', atCutoff)).toBe('requires_plus');
+    });
+
+    it('never changes anything for a Plus rider', () => {
+      expect(resolveCoolRoutingAvailability(plusRider, 'RO', dayBefore)).toBe('available');
+      expect(resolveCoolRoutingAvailability(plusRider, 'RO', atCutoff)).toBe('available');
+    });
+
+    /*
+     * Country coverage is checked FIRST and still wins. The promotion must not
+     * promise a rider in a country with no shade graph something that cannot
+     * work for them — that would be selling coverage that does not exist.
+     */
+    it('does not let the promotion override missing country coverage', () => {
+      expect(resolveCoolRoutingAvailability(freeRider, null, dayBefore)).toBe(
+        'country_unavailable',
+      );
+    });
+  });
+
+  /*
+   * The date is a promise made to riders in three languages and enforced by a
+   * gate. One constant so they cannot drift apart.
+   */
+  it('exposes the cutoff as a single UTC instant', () => {
+    expect(COOL_ROUTING_FREE_UNTIL.toISOString()).toBe('2026-10-01T00:00:00.000Z');
   });
 });

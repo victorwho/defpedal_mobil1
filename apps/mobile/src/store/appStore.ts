@@ -430,7 +430,10 @@ export type AppStore = QueueSlice & PremiumSlice & {
   /** One-time onboarding card explaining Pedal's voice. Persisted so the
    * card only ever appears once per device. */
   hasSeenMeetPedalCard: boolean;
+  /** One-time notice that Cool routing is free until the promo ends. */
+  hasSeenCoolPromoNotice: boolean;
   setHasSeenMeetPedalCard: (seen: boolean) => void;
+  setHasSeenCoolPromoNotice: (seen: boolean) => void;
   // ── Anonymous Activation Ladder (spec: docs/plans/anonymous-activation-ladder.md) ──
   /** Device-scoped like regionGate — NOT reset by resetUserScopedState
    * (sign-out must not restart the ladder). Max 3 local notifications ever;
@@ -775,6 +778,7 @@ export const useAppStore = create<AppStore>()(
       pedalVoiceSassy: true,
       notifyStreak: true,
       hasSeenMeetPedalCard: false,
+      hasSeenCoolPromoNotice: false,
       // Anonymous Activation Ladder defaults (device-scoped)
       notifyActivationLadder: true,
       activationLadder: {
@@ -1147,6 +1151,8 @@ export const useAppStore = create<AppStore>()(
       notifyPedalNudges: true,
       setNotifyPedalNudges: (enabled) => set(() => ({ notifyPedalNudges: enabled })),
       setHasSeenMeetPedalCard: (seen) => set(() => ({ hasSeenMeetPedalCard: seen })),
+      setHasSeenCoolPromoNotice: (seen) =>
+        set(() => ({ hasSeenCoolPromoNotice: seen })),
       showBicycleLanes: true,
       poiVisibility: {
         hydration: false,
@@ -1748,6 +1754,7 @@ export const useAppStore = create<AppStore>()(
         notifyStreak: state.notifyStreak,
         notifyPedalNudges: state.notifyPedalNudges,
         hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
+        hasSeenCoolPromoNotice: state.hasSeenCoolPromoNotice,
         // Anonymous activation ladder — device-scoped; intentionally NOT in
         // resetUserScopedState (sign-out must not restart the ladder).
         activationLadder: state.activationLadder,
