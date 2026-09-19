@@ -1,10 +1,10 @@
 # Pedal Plus — what is actually in it
 
-**Source of truth for the offering.** Every number here is read from the code,
-not from intent. If this file and `docs/plans/pedal-plus-premium-tier.md`
+**Source of truth for the offering.** Every number here is read from the code
+or queried from the live Play / App Store Connect APIs — never from intent. If this file and `docs/plans/pedal-plus-premium-tier.md`
 disagree, this file is right — see [Superseded claims](#superseded-claims).
 
-Last verified against the code: **2026-09-19.**
+Last verified: **2026-09-19** (code, Play Developer API, App Store Connect API).
 
 - Limits: `packages/core/src/premiumCatalog.ts` (`FREE_LIMITS`, `PLUS_LIMITS`)
 - Gates: `packages/core/src/entitlement.ts`
@@ -121,18 +121,76 @@ means the modes stay free.
 
 ---
 
-## Pricing
+## Pricing and billing setup
 
-Intent from the plan doc: **EUR 3/month**, a discounted annual plan, and a
-**7-day free trial** as a store-native introductory offer. No custom trial
-logic exists — trial state is read from the entitlement.
+Verified against the live Play and App Store Connect APIs on **2026-09-19**, not
+from intent. An earlier version of this file said no products existed anywhere;
+that was wrong, asserted from a code read instead of querying the stores.
 
-⚠️ **None of this is configured.** There are no subscription products in Play
-Console or App Store Connect, and no RevenueCat offering mapping them to the
-`plus` entitlement. Until that exists the paywall renders with no prices and
-the subscribe button does nothing. This is the hard blocker for launch.
+### Google Play — complete and live
 
----
+| Product | Base plan | State | Period | Regions | Price |
+|---|---|---|---|---|---|
+| `pedal_plus_monthly` | `pedal-monthly` | ACTIVE | P1M | 173 | **EUR 3.59** (USD 3.51 fallback) |
+| `pedal_plus_annual` | `pedal-plus-annual` | ACTIVE | P1Y | 173 | **EUR 35.99** |
+
+**Free trial: 7 days, ACTIVE on both** (offer `freetrial-7d`, created
+2026-09-19). Free in all 173 regions plus the `otherRegions` fallback, so it
+cannot be silently missing anywhere the plan sells. Eligibility is
+`anySubscriptionInApp` — never subscribed to ANY subscription in this app —
+rather than per-subscription, which would have let a rider take 7 free days on
+monthly and another 7 on annual.
+
+RevenueCat's Android offering `default` maps `$rc_monthly` and `$rc_annual` to
+exactly these product and base-plan IDs, and the app looks for entitlement
+`pedal_plus` (`PLUS_ENTITLEMENT_ID`). That chain is complete.
+
+⚠️ **The annual is only a 16% discount** on 12 monthly payments (EUR 35.99 vs
+EUR 43.08). Typical annual plans discount 30-40%. The annual plan is what
+protects against monthly churn, so this is worth revisiting before launch.
+
+### Apple — products exist, NOT finishable from here
+
+| | State |
+|---|---|
+| Subscription group `Pedal Plus` (22397898) | created, localized en-US |
+| `pedal_plus_monthly` (6813978807), ONE_MONTH | `MISSING_METADATA` |
+| `pedal_plus_annual` (6813978720), ONE_YEAR | `MISSING_METADATA` |
+| Localizations | 1 each (en-US) |
+| **Prices** | **0 — blocked** |
+| **Introductory offers (trial)** | **0 — blocked behind prices** |
+
+`POST /v1/subscriptionPrices` rejects every documented payload shape with
+`409 ENTITY_ERROR.RELATIONSHIP.INVALID — An error occurred while processing the
+pricing information`, including with and without `startDate` /
+`preserveCurrentPrice`, and with an explicit `territory` relationship. The
+price points themselves resolve correctly (USD 3.59 and USD 35.99 both exist as
+exact points for these subscriptions). **Finish pricing in the ASC UI**, then
+the 7-day introductory offer, then the review screenshot each subscription
+needs before it can be submitted.
+
+### RevenueCat — iOS is pointed at the Test Store
+
+`EXPO_PUBLIC_REVENUECAT_IOS_KEY` begins **`test_`**. Real Apple SDK keys begin
+`appl_`. Its offering returns generic `monthly` / `yearly` with no base-plan
+identifiers — RevenueCat's sandbox defaults, not App Store Connect products. So
+on iOS the paywall would show test data and no real purchase is possible.
+
+Fixing it is dashboard work and **cannot be scripted from here**: no RevenueCat
+secret or v2 API key exists on this machine, and the public SDK key can only
+read offerings. Required: point the RevenueCat iOS app at App Store app
+6778694757, map both products to the `pedal_plus` entitlement, add them to the
+`default` offering, then put the real `appl_` key in `apps/mobile/.env` and all
+three EAS environments.
+
+The server already has `POST /v1/billing/webhook` for RevenueCat.
+
+### Blockers for launch
+
+1. Apple prices + 7-day offer + review screenshots (ASC UI).
+2. RevenueCat iOS reconfiguration and a real `appl_` key.
+
+Android has no remaining billing blockers.
 
 ## Dates and commitments
 
