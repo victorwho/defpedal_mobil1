@@ -151,11 +151,11 @@ export const ro: TranslationKeys = {
   },
 
   // ── Trasee GPX importate ──
-  cool: {
+  plusModes: {
     promo: {
-      title: 'Rutele Răcoros sunt deschise tuturor',
-      body: 'Alege Răcoros când îți planifici tura și te ducem pe sub copaci acolo unde se poate. Gratuit pentru toți bicicliștii până pe {{date}}.',
-      afterwards: 'După aceea va face parte din Plus.',
+      title: 'Rutele Răcoros și E-bike sunt deschise tuturor',
+      body: 'Răcoros te duce pe sub copaci acolo unde se poate. E-bike calculează urcușurile pentru un motor. Ambele sunt gratuite pentru toți bicicliștii până pe {{date}}.',
+      afterwards: 'După aceea vor face parte din Plus.',
       cta: 'Am înțeles',
     },
   },
@@ -1749,10 +1749,10 @@ export const ro: TranslationKeys = {
     benefitPacksBody: 'Descarcarile nu mai expira dupa {{days}} zile si ai loc pentru mai multe.',
     benefitHistoryTitle: 'Tot istoricul tau',
     benefitHistoryBody: 'Fiecare tura facuta, nu doar ultimele {{days}} zile.',
-    benefitFlatTitle: 'Rute plate nelimitate',
-    benefitFlatBody: 'Evita dealurile ori de cate ori vrei.',
+    benefitEbikeTitle: 'Rutare pentru e-bike',
+    benefitEbikeBody: 'Trasee si timpi calculati pentru un motor, nu pentru picioarele tale.',
     benefitCoolTitle: 'Rute racoroase',
-    benefitCoolBody: 'Rute cu umbra pentru zilele toride. Deocamdata in Romania.',
+    benefitCoolBody: 'Rute cu umbra pentru zilele toride.',
     planMonthly: 'Lunar',
     planAnnual: 'Anual',
     perMonth: '{{price}} / luna',

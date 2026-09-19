@@ -151,11 +151,11 @@ export const es: TranslationKeys = {
   },
 
   // ── Rutas GPX importadas ──
-  cool: {
+  plusModes: {
     promo: {
-      title: 'Las rutas Fresco están abiertas a todos',
-      body: 'Elige Fresco al planificar tu ruta y te llevaremos bajo los árboles siempre que podamos. Gratis para todos los ciclistas hasta el {{date}}.',
-      afterwards: 'Después pasará a formar parte de Plus.',
+      title: 'Las rutas Fresco y E-bike están abiertas a todos',
+      body: 'Fresco te lleva bajo los árboles siempre que podamos. E-bike calcula las cuestas pensando en un motor. Ambas son gratis para todos los ciclistas hasta el {{date}}.',
+      afterwards: 'Después pasarán a formar parte de Plus.',
       cta: 'Entendido',
     },
   },
@@ -1749,10 +1749,10 @@ export const es: TranslationKeys = {
     benefitPacksBody: 'Las descargas dejan de caducar a los {{days}} dias, y caben mas.',
     benefitHistoryTitle: 'Todo tu historial',
     benefitHistoryBody: 'Cada ruta que has hecho, no solo los ultimos {{days}} dias.',
-    benefitFlatTitle: 'Rutas llanas ilimitadas',
-    benefitFlatBody: 'Evita las cuestas tantas veces como quieras.',
+    benefitEbikeTitle: 'Rutas para e-bike',
+    benefitEbikeBody: 'Rutas y tiempos calculados para un motor, no para tus piernas.',
     benefitCoolTitle: 'Rutas frescas',
-    benefitCoolBody: 'Rutas con sombra para los dias de calor. De momento en Rumania.',
+    benefitCoolBody: 'Rutas con sombra para los dias de calor.',
     planMonthly: 'Mensual',
     planAnnual: 'Anual',
     perMonth: '{{price}} / mes',

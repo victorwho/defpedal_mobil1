@@ -8,11 +8,12 @@ import {
   daysSince,
   freeSnapshot,
   historyRetentionCutoff,
-  COOL_ROUTING_FREE_UNTIL,
+  PLUS_MODES_FREE_UNTIL,
   isCoolRoutingEntitled,
   isExemptFromCeilings,
-  isCoolRoutingPromoActive,
+  isPlusModesPromoActive,
   resolveCoolRoutingAvailability,
+  resolveEbikeRoutingAvailability,
   isGrandfatheredAccount,
   offlinePackPolicy,
   resolveEntitlement,
@@ -278,6 +279,39 @@ describe('saved routes and offline packs', () => {
    * ever started consulting `isExemptFromCeilings`, Plus would sell nothing at
    * all to the existing base and that notice would become untrue.
    */
+  /*
+   * Same rule for E-bike, which joined the promotion on 2026-09-19 — three
+   * days after it shipped free. Cool and E-bike together are the entire Plus
+   * proposition for riders who predate the tier; if either leaked through
+   * grandfathering, Plus would have nothing to sell them.
+   */
+  it('does NOT give grandfathered riders e-bike routing once the promo ends', () => {
+    const grandfathered = resolved({ tier: 'free', isGrandfathered: true });
+    expect(isExemptFromCeilings(grandfathered)).toBe(true);
+    expect(resolveEbikeRoutingAvailability(grandfathered, AFTER_COOL_PROMO)).toBe(
+      'requires_plus',
+    );
+  });
+
+  it('gives every rider both premium modes while the promotion runs', () => {
+    const duringPromo = new Date('2026-09-25T00:00:00Z');
+    for (const e of [
+      resolved({ tier: 'free' }),
+      resolved({ tier: 'free', isGrandfathered: true }),
+    ]) {
+      expect(resolveEbikeRoutingAvailability(e, duringPromo)).toBe('available');
+      expect(resolveCoolRoutingAvailability(e, 'RO', duringPromo)).toBe('available');
+    }
+  });
+
+  it('keeps both premium modes for a subscriber after the promotion', () => {
+    const plusRider = resolved({ tier: 'plus' });
+    expect(resolveEbikeRoutingAvailability(plusRider, AFTER_COOL_PROMO)).toBe('available');
+    expect(resolveCoolRoutingAvailability(plusRider, 'RO', AFTER_COOL_PROMO)).toBe(
+      'available',
+    );
+  });
+
   it('does NOT give grandfathered riders cool routing once the promo ends', () => {
     const grandfathered = resolved({ tier: 'free', isGrandfathered: true });
     expect(isExemptFromCeilings(grandfathered)).toBe(true);
@@ -443,15 +477,15 @@ describe('cool routing promotion', () => {
     nowIso: NOW,
   });
 
-  describe('isCoolRoutingPromoActive', () => {
+  describe('isPlusModesPromoActive', () => {
     it('is active through the last free day', () => {
-      expect(isCoolRoutingPromoActive(dayBefore)).toBe(true);
+      expect(isPlusModesPromoActive(dayBefore)).toBe(true);
     });
 
     // Exclusive boundary: the cutoff instant is the first chargeable moment.
     it('is over at the cutoff instant itself', () => {
-      expect(isCoolRoutingPromoActive(atCutoff)).toBe(false);
-      expect(isCoolRoutingPromoActive(afterCutoff)).toBe(false);
+      expect(isPlusModesPromoActive(atCutoff)).toBe(false);
+      expect(isPlusModesPromoActive(afterCutoff)).toBe(false);
     });
   });
 
@@ -486,6 +520,6 @@ describe('cool routing promotion', () => {
    * gate. One constant so they cannot drift apart.
    */
   it('exposes the cutoff as a single UTC instant', () => {
-    expect(COOL_ROUTING_FREE_UNTIL.toISOString()).toBe('2026-10-01T00:00:00.000Z');
+    expect(PLUS_MODES_FREE_UNTIL.toISOString()).toBe('2026-10-01T00:00:00.000Z');
   });
 });

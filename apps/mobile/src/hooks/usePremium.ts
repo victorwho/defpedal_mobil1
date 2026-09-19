@@ -29,6 +29,7 @@ import {
   offlinePackPolicy,
   PLUS_SNAPSHOT_FRESH_MINUTES,
   resolveCoolRoutingAvailability,
+  resolveEbikeRoutingAvailability,
   resolveEntitlement,
   type CoolRoutingAvailability,
   type EntitlementSnapshot,
@@ -106,6 +107,8 @@ export interface UsePremiumResult {
   readonly coolRouting: (country: SupportedCountry | null | undefined) => CoolRoutingAvailability;
   /** True when cool routing must be refused: paywall live AND not entitled. */
   readonly blockCoolRouting: (country: SupportedCountry | null | undefined) => boolean;
+  /** True when e-bike routing must be refused: paywall live AND not entitled. */
+  readonly blockEbikeRouting: () => boolean;
   readonly flatRoute: () => FlatRouteDecision;
   readonly flatRoutesLeft: () => number;
   /** May the rider search for loops right now? */
@@ -169,7 +172,7 @@ export const usePremium = (): UsePremiumResult => {
        *
        * Folds in `uiEnabled` like every other block* gate, and that is
        * load-bearing here rather than merely consistent: if the paywall flip
-       * slips past COOL_ROUTING_FREE_UNTIL, this would otherwise take Cool
+       * slips past PLUS_MODES_FREE_UNTIL, this would otherwise take Cool
        * away on the promised date while leaving no way to buy it back. Dark
        * paywall therefore means Cool stays free, which is the failure we can
        * live with.
@@ -180,6 +183,15 @@ export const usePremium = (): UsePremiumResult => {
       blockCoolRouting: (country: SupportedCountry | null | undefined) =>
         snapshot?.uiEnabled === true &&
         resolveCoolRoutingAvailability(entitlement, country) !== 'available',
+      /*
+       * E-bike is Plus-only on the same date as Cool, and gated the same way.
+       *
+       * No country argument: the e-bike graph is one hostname covering all 31
+       * supported countries, so there is nothing per-country to decide.
+       */
+      blockEbikeRouting: () =>
+        snapshot?.uiEnabled === true &&
+        resolveEbikeRoutingAvailability(entitlement) !== 'available',
       flatRideToCharge: () => {
         if (snapshot?.uiEnabled !== true) return null;
         const decision = canStartFlatRoute({ entitlement, meter, nowIso, timeZone });

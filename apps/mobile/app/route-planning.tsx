@@ -212,6 +212,13 @@ export default function RoutePlanningScreen() {
     if (!resolvedCountry.routeSupported) return; // force-fast effect owns this case
     if (avoidHeat && !coolAvailable) setAvoidHeat(false);
   }, [hasDestination, resolvedCountry.routeSupported, coolAvailable, avoidHeat, setAvoidHeat]);
+
+  // E-bike needs no country gate — one graph serves all 31 supported
+  // countries — so entitlement is the only thing that can withdraw it.
+  const ebikeAvailable = !premium.blockEbikeRouting();
+  useEffect(() => {
+    if (isEbike && !ebikeAvailable) selectRoutingMode('safe');
+  }, [isEbike, ebikeAvailable, selectRoutingMode]);
   // Which mode pill is lit. Same precedence as the dispatcher's graph choice
   // (`resolveSafeRoutingProfile`), so the highlighted pill is always the one
   // that computes the route.
@@ -1579,16 +1586,24 @@ export default function RoutePlanningScreen() {
                     accessibilityLabel="Flat routing — avoid hills"
                   />
                 </View>
+                {/*
+                  The second row exists only for the premium modes. Once both
+                  are Plus-only and this rider has neither, rendering it would
+                  leave an empty gap under the first row.
+                */}
+                {ebikeAvailable || coolAvailable ? (
                 <View style={[styles.modeToggleRow, styles.modeToggleRowSecondary]}>
-                  <ModeTogglePill
-                    iconName="battery-charging-outline"
-                    label={t('planning.ebike')}
-                    isActive={routingDisplayMode === 'ebike'}
-                    activeBgColor={safetyTints.ebikeLight}
-                    activeFgColor={colors.ebikeText}
-                    onPress={() => selectRoutingMode('ebike')}
-                    accessibilityLabel={t('planning.ebikeA11y')}
-                  />
+                  {ebikeAvailable ? (
+                    <ModeTogglePill
+                      iconName="battery-charging-outline"
+                      label={t('planning.ebike')}
+                      isActive={routingDisplayMode === 'ebike'}
+                      activeBgColor={safetyTints.ebikeLight}
+                      activeFgColor={colors.ebikeText}
+                      onPress={() => selectRoutingMode('ebike')}
+                      accessibilityLabel={t('planning.ebikeA11y')}
+                    />
+                  ) : null}
                   {coolAvailable ? (
                     <ModeTogglePill
                       iconName="partly-sunny-outline"
@@ -1601,6 +1616,7 @@ export default function RoutePlanningScreen() {
                     />
                   ) : null}
                 </View>
+                ) : null}
                 {/* Supported country WITHOUT road_risk_data: unreachable
                     since the b36v1 EU-wide dataset (2026-08-01) put risk
                     data in all 31 covered countries, but kept armed — if

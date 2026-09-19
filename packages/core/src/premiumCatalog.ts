@@ -182,7 +182,7 @@ export const limitsForTier = (tier: PremiumTier): TierLimits =>
  * who signs up after this instant while the paywall is still dark would be
  * capped retroactively the day it is flipped, which is precisely what
  * grandfathering exists to prevent. If the paywall is not ready, move this
- * date forward in the same change that extends `COOL_ROUTING_FREE_UNTIL`.
+ * date forward in the same change that extends `PLUS_MODES_FREE_UNTIL`.
  */
 export const PLUS_LAUNCH_AT_ISO = '2026-10-01T00:00:00.000Z';
 

@@ -256,7 +256,35 @@ function RoutePreviewScreen() {
   }, [showWeatherWarning, markWeatherWarningSeen]);
 
   const showRouteComparison = useAppStore((state) => state.showRouteComparison);
-  const effectiveRequest = { ...routeRequest, avoidUnpaved, avoidHills, avoidHeat, isEbike, showRouteComparison };
+  /*
+   * Which premium routing modes this rider may actually use.
+   *
+   * Declared HERE, above `effectiveRequest`, because the request is what
+   * reaches the router. Computing it lower down — as this did — left the
+   * dispatch reading the raw store flags while the mode pill read the gated
+   * ones, which is exactly how a rider ends up on a graph the UI says they
+   * are not using.
+   *
+   * Cool additionally needs shade-graph coverage; e-bike is one hostname for
+   * all 31 supported countries and needs none.
+   */
+  const coolAvailable =
+    isCoolModeEnabled() &&
+    resolvedCountry.routeSupported &&
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
+    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
+  const ebikeAvailable = !premium.blockEbikeRouting();
+
+  const effectiveRequest = {
+    ...routeRequest,
+    avoidUnpaved,
+    avoidHills,
+    // Masked, so an unentitled rider is dispatched to the standard graph
+    // rather than silently kept on a premium one.
+    avoidHeat: avoidHeat && coolAvailable,
+    isEbike: isEbike && ebikeAvailable,
+    showRouteComparison,
+  };
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -741,19 +769,11 @@ function RoutePreviewScreen() {
   // Same gate as route-planning: hidden in production (src/lib/coolMode.ts).
   // This drops 'cool' out of the tap-to-cycle rotation, so the pill cycles
   // Safe -> Fast -> Flat -> E-bike -> Safe rather than offering a mode with no control.
-  const coolAvailable =
-    isCoolModeEnabled() &&
-    resolvedCountry.routeSupported &&
-    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
-    // Entitlement, once the launch promotion ends. Folded into the SAME
-    // predicate as coverage so the request mask below (`avoidHeat &&
-    // coolAvailable`) and the cycle-pill both follow without a second gate.
-    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
 
   const currentDisplayMode = toRoutingDisplayMode(routeRequest.mode, {
     avoidHills,
     avoidHeat: avoidHeat && coolAvailable,
-    isEbike,
+    isEbike: isEbike && ebikeAvailable,
   });
 
   /*
@@ -790,7 +810,11 @@ function RoutePreviewScreen() {
   > = {
     safe: { label: t('planning.safe'), variant: 'risk-safe', next: 'fast' },
     fast: { label: t('planning.fast'), variant: 'info', next: 'flat' },
-    flat: { label: t('planning.flat'), variant: 'accent', next: 'ebike' },
+    flat: {
+      label: t('planning.flat'),
+      variant: 'accent',
+      next: ebikeAvailable ? 'ebike' : coolAvailable ? 'cool' : 'safe',
+    },
     ebike: { label: t('planning.ebike'), variant: 'ebike', next: coolAvailable ? 'cool' : 'safe' },
     cool: { label: t('planning.cool'), variant: 'cool', next: 'safe' },
   };

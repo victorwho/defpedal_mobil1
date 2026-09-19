@@ -1,13 +1,22 @@
 /**
- * Design System v1.0 — CoolPromoNotice Molecule
+ * Design System v1.0 — PlusModesPromoNotice Molecule
  *
- * One-time notice, on first open of the release that turned Cool routing on in
- * production: the mode is free to everyone until the promotion ends, and part
- * of Plus after that.
+ * One-time notice naming both premium routing modes: Cool and E-bike are
+ * free to every rider until the promotion ends, and part of Plus after that.
+ *
+ * E-bike was added on 2026-09-19, three days after it shipped free. Taking a
+ * shipped feature back needs the same warning Cool got, which is why both
+ * modes share one date and one notice rather than each growing its own.
+ *
+ * ⚠️ It is gated on a NEW store flag (`hasSeenPlusModesNotice`), not the
+ * Cool-only one it replaces. The riders already carrying v0.2.170 dismissed
+ * a notice that named Cool alone; reusing that flag would mean they were
+ * never told about E-bike at all. They see one more notice; everyone else
+ * sees only this one.
  *
  * WHY A DATE IS RENDERED RATHER THAN THE WORDS "end of September"
  * ---------------------------------------------------------------
- * The cutoff is a single constant in core (`COOL_ROUTING_FREE_UNTIL`) that the
+ * The cutoff is a single constant in core (`PLUS_MODES_FREE_UNTIL`) that the
  * entitlement gate reads too, and the copy formats that same instant. Hard-
  * coding a month name into three locales would let the promise and the gate
  * drift apart the moment the date moves — and this date is likely to move,
@@ -19,7 +28,7 @@
  *
  * SAFETY / TIMING GATES LIVE AT THE CALL SITE, NOT HERE
  * -----------------------------------------------------
- * `CoolPromoNoticeManager` in `app/_layout.tsx` owns "has it been seen", "is
+ * `PlusModesPromoNoticeManager` in `app/_layout.tsx` owns "has it been seen", "is
  * the promo still running", and "is the rider mid-ride" — this component only
  * renders. That split is what makes the decision logic testable without
  * standing up the whole layout.
@@ -28,7 +37,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { COOL_ROUTING_FREE_UNTIL } from '@defensivepedal/core';
+import { PLUS_MODES_FREE_UNTIL } from '@defensivepedal/core';
 
 import { useTheme } from '../ThemeContext';
 import { useT } from '../../hooks/useTranslation';
@@ -39,7 +48,7 @@ import { safetyColors } from '../tokens/colors';
 import { safetyTints } from '../tokens/tints';
 import { fontFamily, textBase, textLg, textSm } from '../tokens/typography';
 
-export interface CoolPromoNoticeProps {
+export interface PlusModesPromoNoticeProps {
   visible: boolean;
   onDismiss: () => void;
 }
@@ -51,7 +60,7 @@ const DATE_LOCALE: Record<string, string> = {
   es: 'es-ES',
 };
 
-export const CoolPromoNotice: React.FC<CoolPromoNoticeProps> = ({
+export const PlusModesPromoNotice: React.FC<PlusModesPromoNoticeProps> = ({
   visible,
   onDismiss,
 }) => {
@@ -61,7 +70,7 @@ export const CoolPromoNotice: React.FC<CoolPromoNoticeProps> = ({
 
   // The promo runs THROUGH the day before the cutoff instant, so the date the
   // rider is told is the last free day, not the first chargeable one.
-  const lastFreeDay = new Date(COOL_ROUTING_FREE_UNTIL.getTime() - 24 * 60 * 60 * 1000);
+  const lastFreeDay = new Date(PLUS_MODES_FREE_UNTIL.getTime() - 24 * 60 * 60 * 1000);
   let deadline: string;
   try {
     deadline = new Intl.DateTimeFormat(DATE_LOCALE[locale] ?? 'en-GB', {
@@ -84,15 +93,15 @@ export const CoolPromoNotice: React.FC<CoolPromoNoticeProps> = ({
           </View>
 
           <Text style={[styles.title, { color: colors.textPrimary }]}>
-            {t('cool.promo.title')}
+            {t('plusModes.promo.title')}
           </Text>
 
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {t('cool.promo.body', { date: deadline })}
+            {t('plusModes.promo.body', { date: deadline })}
           </Text>
 
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {t('cool.promo.afterwards')}
+            {t('plusModes.promo.afterwards')}
           </Text>
 
           <Pressable
@@ -100,9 +109,9 @@ export const CoolPromoNotice: React.FC<CoolPromoNoticeProps> = ({
             onPress={onDismiss}
             accessible={true}
             accessibilityRole="button"
-            accessibilityLabel={t('cool.promo.cta')}
+            accessibilityLabel={t('plusModes.promo.cta')}
           >
-            <Text style={styles.ctaText}>{t('cool.promo.cta')}</Text>
+            <Text style={styles.ctaText}>{t('plusModes.promo.cta')}</Text>
           </Pressable>
         </View>
       </View>

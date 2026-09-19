@@ -170,13 +170,13 @@ export const en = {
 
   // ── Cool routing promotion ──
   // One-time notice on first open after Cool went live in production.
-  // {{date}} is formatted from COOL_ROUTING_FREE_UNTIL in core, never written
+  // {{date}} is formatted from PLUS_MODES_FREE_UNTIL in core, never written
   // out here, so the copy and the entitlement gate cannot disagree.
-  cool: {
+  plusModes: {
     promo: {
-      title: 'Cool routes are open to everyone',
-      body: 'Pick Cool when planning a ride and we will route you under trees where we can. Free for every rider until {{date}}.',
-      afterwards: 'After that it becomes part of Plus.',
+      title: 'Cool and E-bike routes are open to everyone',
+      body: 'Cool routes you under trees where we can. E-bike prices the hills for a motor. Both are free for every rider until {{date}}.',
+      afterwards: 'After that they become part of Plus.',
       cta: 'Got it',
     },
   },
@@ -1797,10 +1797,10 @@ export const en = {
     benefitPacksBody: 'Downloads stop expiring after {{days}} days, with room for more.',
     benefitHistoryTitle: 'Your full riding history',
     benefitHistoryBody: 'Every ride you have taken, not just the last {{days}} days.',
-    benefitFlatTitle: 'Unlimited flat routes',
-    benefitFlatBody: 'Avoid hills as often as you like.',
+    benefitEbikeTitle: 'E-bike routing',
+    benefitEbikeBody: 'Routes and times priced for a motor, not your legs.',
     benefitCoolTitle: 'Cool routing',
-    benefitCoolBody: 'Shade-aware routes for hot days. Romania for now.',
+    benefitCoolBody: 'Shade-aware routes for hot days.',
     planMonthly: 'Monthly',
     planAnnual: 'Annual',
     perMonth: '{{price}} / month',

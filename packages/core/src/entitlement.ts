@@ -400,17 +400,21 @@ export type CoolRoutingAvailability =
   | 'country_unavailable';
 
 /**
- * Cool routing is free to every rider until this instant, then Plus-only.
+ * The Plus routing modes — Cool and E-bike — are free to every rider until
+ * this instant, then Plus-only.
  *
  * Exclusive: free THROUGH 2026-09-30, chargeable from 2026-10-01. UTC because
  * a device clock in another zone must not move the boundary by a day, in
  * either direction — a rider in Auckland should not lose the promotion a day
  * early, and one in Honolulu should not keep it a day late.
  *
- * Announced in-app by the one-time notice on first open of the release that
- * turned Cool on in production (see `hasSeenCoolPromoNotice`). The date lives
- * here, once, so the notice copy, the entitlement gate and the paywall cannot
- * disagree about when it ends.
+ * Announced in-app by a one-time notice naming BOTH modes. The date lives
+ * here, once, so the notice copy, the entitlement gates and the paywall
+ * cannot disagree about when it ends.
+ *
+ * E-bike joined this promotion on 2026-09-19, three days after it shipped
+ * free. Taking a shipped feature back needs the same warning Cool got, and
+ * sharing one date means there is one thing to move if the launch slips.
  *
  * ⚠️ TWO THINGS THIS DOES NOT DO.
  *  - It does not enforce anything on the routing REQUEST. Nothing checks this
@@ -423,11 +427,11 @@ export type CoolRoutingAvailability =
  *    keeps the preference; what changes is whether the product is willing to
  *    keep serving it.
  */
-export const COOL_ROUTING_FREE_UNTIL = new Date('2026-10-01T00:00:00Z');
+export const PLUS_MODES_FREE_UNTIL = new Date('2026-10-01T00:00:00Z');
 
 /** True while cool routing is free to everyone regardless of tier. */
-export const isCoolRoutingPromoActive = (now: Date = new Date()): boolean =>
-  now.getTime() < COOL_ROUTING_FREE_UNTIL.getTime();
+export const isPlusModesPromoActive = (now: Date = new Date()): boolean =>
+  now.getTime() < PLUS_MODES_FREE_UNTIL.getTime();
 
 /**
  * Country availability is checked FIRST and wins. Showing an upgrade prompt
@@ -441,7 +445,7 @@ export const resolveCoolRoutingAvailability = (
   now: Date = new Date(),
 ): CoolRoutingAvailability => {
   if (!isHeatRoutingAvailable(country)) return 'country_unavailable';
-  if (isCoolRoutingPromoActive(now)) return 'available';
+  if (isPlusModesPromoActive(now)) return 'available';
   if (entitlement.tier !== 'plus') return 'requires_plus';
   return 'available';
 };
@@ -453,6 +457,40 @@ export const isCoolRoutingEntitled = (
   now: Date = new Date(),
 ): boolean =>
   resolveCoolRoutingAvailability(entitlement, country, now) === 'available';
+
+
+// ---------------------------------------------------------------------------
+// Gate — e-bike routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Why e-bike routing is or is not offered.
+ *
+ * Two states rather than Cool's three: the e-bike graph is ONE hostname
+ * covering all 31 supported countries, so there is no country dimension to
+ * report. Never add one by copying the Cool shape — a per-country e-bike host
+ * does not exist and a country-suffixed hostname fails TLS in exactly the
+ * country that suffix names.
+ */
+export type EbikeRoutingAvailability = 'available' | 'requires_plus';
+
+/**
+ * May this rider use e-bike routing?
+ *
+ * Free to everyone until `PLUS_MODES_FREE_UNTIL`, then Plus-only.
+ *
+ * ⚠️ Like Cool, this deliberately does NOT consult `isExemptFromCeilings`.
+ * E-bike is a feature gate rather than a ceiling, and Cool plus E-bike are the
+ * only things Pedal Plus has to offer riders who predate it. A test pins this,
+ * so widening grandfathering can never silently give either mode away.
+ */
+export const resolveEbikeRoutingAvailability = (
+  entitlement: ResolvedEntitlement,
+  now: Date = new Date(),
+): EbikeRoutingAvailability => {
+  if (isPlusModesPromoActive(now)) return 'available';
+  return entitlement.tier === 'plus' ? 'available' : 'requires_plus';
+};
 
 // ---------------------------------------------------------------------------
 // Gate — flat routing

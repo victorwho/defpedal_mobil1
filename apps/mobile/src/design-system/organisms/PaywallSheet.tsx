@@ -176,10 +176,17 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
       body: 'premium.benefitHistoryBody',
       vars: { days: limits.historyWindowDays ?? 0 },
     },
+    /*
+     * E-bike replaced "unlimited flat routes" on 2026-09-19.
+     *
+     * Flat became free and unlimited for everyone the same day — it had never
+     * actually been metered — so selling it here would have been advertising
+     * something the free tier already has.
+     */
     {
-      icon: 'trending-up-outline',
-      title: 'premium.benefitFlatTitle',
-      body: 'premium.benefitFlatBody',
+      icon: 'battery-charging-outline',
+      title: 'premium.benefitEbikeTitle',
+      body: 'premium.benefitEbikeBody',
     },
     // Only where the shade graph exists — see the honesty rule above.
     ...(coolRoutingAvailable

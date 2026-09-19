@@ -12,7 +12,7 @@ import type { ProfilePremium } from '@defensivepedal/core';
 import {
   FREE_LIMITS,
   PLUS_OFFLINE_GRACE_DAYS,
-  isCoolRoutingPromoActive,
+  isPlusModesPromoActive,
 } from '@defensivepedal/core';
 
 import { useAppStore } from '../../store/appStore';
@@ -147,7 +147,7 @@ describe('usePremium — gates', () => {
   });
 
   /*
-   * Cool routing is free to everyone until COOL_ROUTING_FREE_UNTIL, so a free
+   * Cool routing is free to everyone until PLUS_MODES_FREE_UNTIL, so a free
    * rider in a covered country is currently 'available', not 'requires_plus'.
    * `usePremium` reads the wall clock, so this asserts the promotion is in
    * force rather than hard-coding the post-promotion answer — and it will fail
@@ -155,7 +155,7 @@ describe('usePremium — gates', () => {
    * request-level enforcement still has to be built by then.
    */
   it('gives a free rider cool routing while the launch promotion runs', () => {
-    expect(isCoolRoutingPromoActive()).toBe(true);
+    expect(isPlusModesPromoActive()).toBe(true);
     expect(read().coolRouting('ES')).toBe('available');
     expect(read().coolRouting('RO')).toBe('available');
   });
