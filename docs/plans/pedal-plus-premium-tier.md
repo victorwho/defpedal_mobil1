@@ -1,3 +1,11 @@
+> ⚠️ **The offering described below has changed. See
+> [`docs/pedal-plus-offering.md`](../pedal-plus-offering.md) for what Pedal Plus
+> actually contains.** This document remains the record of why the tier exists
+> — problem statement, user stories, rollout design — and those parts still
+> hold. Four of its specific claims do not: Cool is no longer Romania-only,
+> Flat is free and unlimited, pre-launch accounts are exempt from the caps
+> entirely, and E-bike is now a Plus mode. The offering doc lists them.
+
 ## Problem Statement
 
 Defensive Pedal is free in full today. Every feature — safety-first routing, risk overlays, offline maps, saved routes, the badge and tier systems — costs riders nothing, and costs real money to run: OSRM instances for three routing profiles, a 67.9M-row PostGIS risk dataset, Mapbox tiles and Directions, Cloud Run, Supabase, Expo push. There is no revenue line at all, so every new rider makes the product more expensive to operate, and there is no mechanism that lets the riders who get the most value contribute to keeping it alive.
