@@ -82,14 +82,37 @@ Deliberately not automated. The API can upload one, but a review screenshot is
 meant to show Apple's reviewer the actual purchase UI — a generated placeholder
 is a misrepresentation and an easy rejection.
 
-1. Run a preview build and reveal the paywall for your own account only:
+⚠️ **Do NOT use a preview build — it cannot show prices.** The preview APK's
+package is `com.defensivepedal.mobile.preview`, and Play Console has no app
+under that package (the Play API 404s on it) while `com.defensivepedal.mobile`
+carries both subscriptions. Play Billing resolves products by installed package
+name, so RevenueCat returns nothing purchasable, `getStoreOffers` yields empty,
+and `PaywallSheet` renders its benefits with no plan buttons — leaving only the
+Restore row. The SDK and the real `goog…` key ARE in the preview APK; the
+package is the whole problem. Verified 2026-09-20.
+
+Use the **production** build from Play instead:
+
+1. Reveal the paywall for the account you will sign in as:
    ```sql
    UPDATE profiles SET premium_ui_enabled = true WHERE id = '<your-user-id>';
    ```
-2. Screenshot the paywall sheet with prices and the trial visible.
-3. ASC → each subscription → **App Store Review Screenshot** → upload. The same
+2. Install **Defensive Pedal** (the store app, not Preview) from Play. The
+   production track already serves this code — v0.2.170 / versionCode 173.
+3. Profile → Pedal Plus. Prices must render (EUR 3.59 / EUR 35.99).
+4. Screenshot the paywall sheet.
+5. ASC → each subscription → **App Store Review Screenshot** → upload. The same
    image works for both.
-4. Revert the flag.
+6. Revert the flag.
+
+⚠️ **The trial line is per GOOGLE account, not per app account.** Play's
+`freetrial-7d` eligibility is `anySubscriptionInApp`, so a Google account that
+has ever subscribed sees no trial: `trialDays` is null and the CTA falls back
+to `premium.ctaNoTrial`. `victorrotariu@gmail.com` bought the monthly on
+2026-08-20 (row still in `subscriptions`, expired 08-21). Use a Google account
+that has never subscribed, or accept a prices-only screenshot — Apple's own
+7-day intro offer is configured separately and is not evidenced by this image.
+Play trial eligibility is not resettable from here.
 
 State should move `MISSING_METADATA` → `READY_TO_SUBMIT`.
 
@@ -243,8 +266,13 @@ That rider should see the paywall and still be able to save a 6th route.
 
 ## Step 8 — advance the Android rollout
 
-v0.2.170 is at **5%**. Before each tier increase, check crash-free users and
-ANR for 24h on the previous tier.
+⚠️ **Already done — v0.2.170 (versionCode 173) is at 100%.** The Play API
+reports the production release as `status: completed` with no `userFraction`
+(checked 2026-09-20), so the staged cadence below was never used and there is
+nothing left to advance for this version. Kept for the NEXT release.
+
+Before each tier increase, check crash-free users and ANR for 24h on the
+previous tier.
 
 ```bash
 node scripts/play-publish.mjs --aab <same aab> --track production \
