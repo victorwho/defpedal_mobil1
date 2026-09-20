@@ -149,25 +149,31 @@ exactly these product and base-plan IDs, and the app looks for entitlement
 EUR 43.08). Typical annual plans discount 30-40%. The annual plan is what
 protects against monthly churn, so this is worth revisiting before launch.
 
-### Apple — products exist, NOT finishable from here
+### Apple — priced and trialled, one step left
 
 | | State |
 |---|---|
 | Subscription group `Pedal Plus` (22397898) | created, localized en-US |
-| `pedal_plus_monthly` (6813978807), ONE_MONTH | `MISSING_METADATA` |
-| `pedal_plus_annual` (6813978720), ONE_YEAR | `MISSING_METADATA` |
-| Localizations | 1 each (en-US) |
-| **Prices** | **0 — blocked** |
-| **Introductory offers (trial)** | **0 — blocked behind prices** |
+| `pedal_plus_monthly` (6813978807), ONE_MONTH | **USD 3.59**, 7-day trial in 175 territories |
+| `pedal_plus_annual` (6813978720), ONE_YEAR | **USD 35.99**, 7-day trial in 175 territories |
+| Territory availability | all 175, `availableInNewTerritories: true` |
+| **Review screenshot** | **missing — the only thing holding both at `MISSING_METADATA`** |
 
-`POST /v1/subscriptionPrices` rejects every documented payload shape with
+⚠️ **Pricing fails until territory availability exists**, and the error does not
+say so. A new subscription has no `subscriptionAvailability` resource at all,
+and `POST /v1/subscriptionPrices` answers
 `409 ENTITY_ERROR.RELATIONSHIP.INVALID — An error occurred while processing the
-pricing information`, including with and without `startDate` /
-`preserveCurrentPrice`, and with an explicit `territory` relationship. The
-price points themselves resolve correctly (USD 3.59 and USD 35.99 both exist as
-exact points for these subscriptions). **Finish pricing in the ASC UI**, then
-the 7-day introductory offer, then the review screenshot each subscription
-needs before it can be submitted.
+pricing information`. Create availability first, then price. Introductory
+offers are also strictly per-territory — 175 POSTs each, no "all" form.
+
+The review screenshot is deliberately left manual: it is what Apple's reviewer
+uses to see the real purchase UI, so a generated placeholder is a
+misrepresentation and an easy rejection.
+
+⚠️ **The FIRST subscription must be submitted alongside an app version.**
+v1.20 is already `READY_FOR_SALE` and cannot carry them, so a new version
+record (1.21) is needed, submitted together with both subscriptions in one
+review submission. Later subscription changes can be submitted alone.
 
 ### RevenueCat — iOS is pointed at the Test Store
 
@@ -187,8 +193,10 @@ The server already has `POST /v1/billing/webhook` for RevenueCat.
 
 ### Blockers for launch
 
-1. Apple prices + 7-day offer + review screenshots (ASC UI).
+1. Apple review screenshot on each subscription, then submit both with a new
+   app version (1.21).
 2. RevenueCat iOS reconfiguration and a real `appl_` key.
+3. A real purchase tested on a device — nothing here has run on one.
 
 Android has no remaining billing blockers.
 

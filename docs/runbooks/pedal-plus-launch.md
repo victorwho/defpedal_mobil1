@@ -36,62 +36,83 @@ retroactive-capping hole.
 
 ---
 
-## Step 1 — finish Apple pricing (ASC UI, ~10 min)
+## Steps 1-2 — Apple pricing and trial — DONE (2026-09-20)
 
-Blocked from automation: every documented `POST /v1/subscriptionPrices` shape
-returns `409 ENTITY_ERROR.RELATIONSHIP.INVALID`. The rest of each product is
-already created.
+Both completed via the API. Recorded here because the reason they first failed
+is not discoverable from the error message.
 
-App Store Connect → My Apps → Defensive Pedal (**6778694757**) →
-Subscriptions → group **Pedal Plus** (22397898).
+| Subscription | Price | Trial |
+|---|---|---|
+| `pedal_plus_monthly` (6813978807) | USD 3.59 base | 7 days free, **175 territories** |
+| `pedal_plus_annual` (6813978720) | USD 35.99 base | 7 days free, **175 territories** |
 
-| Subscription | ID | Period | Set price to |
-|---|---|---|---|
-| Pedal Plus Monthly | `pedal_plus_monthly` (6813978807) | 1 month | **USD 3.59** base |
-| Pedal Plus Annual | `pedal_plus_annual` (6813978720) | 1 year | **USD 35.99** base |
+⚠️ **`POST /v1/subscriptionPrices` fails until territory availability exists.**
+It returns `409 ENTITY_ERROR.RELATIONSHIP.INVALID — An error occurred while
+processing the pricing information`, which says nothing about territories. A
+new subscription has NO `subscriptionAvailability` resource at all
+(`GET .../subscriptionAvailability` 404s), and a price cannot attach to a
+product that is sold nowhere. Create availability first:
 
-Those two USD price points exist exactly — no rounding needed. Apple generates
-every other storefront from the base territory, the same way Play's
-`otherRegionsConfig` works. Set USA as the base territory.
-
-Both currently read `MISSING_METADATA`. Name and description (en-US) are
-already filled in; price is the only missing piece at this step.
-
-**Verify:** re-run and expect `prices=1` for each.
-```bash
-node <scratch>/asc-state.mjs
+```
+POST /v1/subscriptionAvailabilities
+  attributes.availableInNewTerritories = true
+  relationships.availableTerritories   = all 175 from GET /v1/territories
 ```
 
----
+Pricing then succeeds on the first try.
 
-## Step 2 — add the Apple free trial (ASC UI, ~5 min)
+⚠️ **Introductory offers are PER TERRITORY.** Omitting the `territory`
+relationship returns `409 … missing a required relationship`. There is no
+"all territories" form — it is 175 POSTs per subscription, 350 in total. That
+matches Play, where the trial is explicitly free in all 173 regions plus the
+fallback.
 
-Per subscription → **Subscription Prices → Introductory Offers → Create**.
-
-- Territory: **All**
-- Type: **Free**
-- Duration: **1 week**
-- Eligibility: **New subscribers**
-
-⚠️ Match Play's behaviour: on Play the trial is scoped to
-`anySubscriptionInApp`, so a rider cannot take 7 free days on monthly and
-another 7 on annual. Apple's equivalent is one introductory offer per
-*subscription group* — since both products are in the **Pedal Plus** group,
-Apple enforces this for you. Do not create a second group.
-
-**Verify:** `introOffers=1` on each.
+Scripts used, in the session scratchpad: `asc-set-avail.mjs`,
+`asc-price-retry.mjs`, `asc-intro-all.mjs`.
 
 ---
 
-## Step 3 — review screenshots (ASC UI, ~5 min)
+## Step 3 — review screenshot (ASC UI, ~5 min) — STILL REQUIRED
 
-Each subscription needs one before it can be submitted. A screenshot of the
-paywall sheet is what reviewers expect.
+**The only thing left before the subscriptions can be submitted.** Both sit at
+`MISSING_METADATA` solely because of this; localizations, prices and trials are
+all in place.
 
-Easiest source: run a preview build, open Profile → any Plus prompt, screenshot
-the paywall. Upload the same image to both subscriptions.
+Deliberately not automated. The API can upload one, but a review screenshot is
+meant to show Apple's reviewer the actual purchase UI — a generated placeholder
+is a misrepresentation and an easy rejection.
+
+1. Run a preview build and reveal the paywall for your own account only:
+   ```sql
+   UPDATE profiles SET premium_ui_enabled = true WHERE id = '<your-user-id>';
+   ```
+2. Screenshot the paywall sheet with prices and the trial visible.
+3. ASC → each subscription → **App Store Review Screenshot** → upload. The same
+   image works for both.
+4. Revert the flag.
 
 State should move `MISSING_METADATA` → `READY_TO_SUBMIT`.
+
+---
+
+## Step 3b — submit them with a NEW app version
+
+⚠️ **Apple requires the FIRST subscription to be submitted alongside an app
+version.** Subsequent ones can go on their own; the first cannot.
+
+v1.20 is already `READY_FOR_SALE`, so it cannot carry them. You need a fresh
+version record:
+
+1. Create version **1.21** in ASC (`PREPARE_FOR_SUBMISSION`) and attach a build
+   — build 31 is uploaded and valid, or a newer one.
+2. Add **1.21 and both subscriptions** as items on ONE review submission.
+3. Submit.
+
+Apple rejects a second *open* review submission, so there must be only one. A
+stale empty one (`9f6ce98a-…`) was cleared on 2026-09-20 — note it could not be
+cancelled (`409 … not in cancellable state`, which only applies to submissions
+actually in review); the fix was deleting its items via
+`DELETE /v1/reviewSubmissionItems/{id}`.
 
 ---
 
