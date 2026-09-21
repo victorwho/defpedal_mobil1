@@ -83,6 +83,29 @@ describe('PaywallSheet — copy is driven by the catalog', () => {
   });
 });
 
+describe('PaywallSheet — subscription legal disclosure (Guideline 3.1.2)', () => {
+  // Apple rejected the 1.21 submission on 2026-09-21 for the METADATA half of
+  // this rule (no Terms of Use link on the product page). The binary half is
+  // the same rule and is checked by human reviewers: the purchase flow must
+  // carry functional Terms of Use and Privacy Policy links. These assertions
+  // fail if either link is dropped from the sheet — error-log #106, where a
+  // valid prop that is never rendered looks identical to a working one.
+  it('renders a Terms of Use link in the purchase flow', () => {
+    wrap(<PaywallSheet {...sheetProps} monthlyPrice="3,00 €" />);
+    expect(screen.getByText('Terms of Use')).toBeTruthy();
+  });
+
+  it('renders a Privacy Policy link in the purchase flow', () => {
+    wrap(<PaywallSheet {...sheetProps} monthlyPrice="3,00 €" />);
+    expect(screen.getByText('Privacy Policy')).toBeTruthy();
+  });
+
+  it('still states the renewal terms next to the links', () => {
+    wrap(<PaywallSheet {...sheetProps} monthlyPrice="3,00 €" />);
+    expect(screen.getByText(/renews automatically until cancelled/i)).toBeTruthy();
+  });
+});
+
 describe('PaywallSheet — plans', () => {
   it('offers nothing until the store returns a price', () => {
     // Never render a purchase button that cannot name what it charges.

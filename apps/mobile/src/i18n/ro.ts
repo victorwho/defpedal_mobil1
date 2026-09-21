@@ -1791,6 +1791,8 @@ export const ro: TranslationKeys = {
     flatRemaining: '{{count}} rute plate ramase luna asta',
     coolUnavailable: 'Rutele racoroase nu sunt inca disponibile in tara ta.',
     coolRequiresPlus: 'Rutele racoroase fac parte din Pedal Plus.',
+    termsOfUse: 'Termeni de utilizare',
+    privacyPolicy: 'Politica de confidențialitate',
     upgrade: 'Treci pe Plus',
     notNow: 'Nu acum',
   },

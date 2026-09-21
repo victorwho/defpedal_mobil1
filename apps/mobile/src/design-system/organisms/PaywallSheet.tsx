@@ -21,6 +21,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Linking,
   Modal,
   PanResponder,
   Pressable,
@@ -51,6 +52,19 @@ const SWIPE_DISMISS_VY = 0.6;
 
 /** Which plan the rider tapped. The caller turns this into a store purchase. */
 export type PaywallPlan = 'monthly' | 'annual';
+
+/**
+ * Legal links required IN THE BINARY for auto-renewable subscriptions
+ * (App Store Review Guideline 3.1.2). The metadata half lives in the App Store
+ * description; this is the other half, and its absence is a routine rejection.
+ *
+ * The EULA is Apple's standard one because no custom EULA is uploaded in App
+ * Store Connect — if a custom agreement is ever added there, this URL must
+ * change with it or the app links to terms that do not govern.
+ */
+const APPLE_STANDARD_EULA_URL =
+  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const PRIVACY_POLICY_URL = 'https://routes.defensivepedal.com/privacy';
 
 interface BenefitRow {
   readonly icon: string;
@@ -340,6 +354,30 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
           </Pressable>
 
           <Text style={[styles.legal, { color: colors.textMuted }]}>{t('premium.legal')}</Text>
+
+          <View style={styles.legalLinks}>
+            <Pressable
+              onPress={() => void Linking.openURL(APPLE_STANDARD_EULA_URL)}
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel={t('premium.termsOfUse')}
+            >
+              <Text style={[styles.legalLink, { color: colors.textSecondary }]}>
+                {t('premium.termsOfUse')}
+              </Text>
+            </Pressable>
+            <Text style={[styles.legalLink, { color: colors.textMuted }]}>{'  ·  '}</Text>
+            <Pressable
+              onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel={t('premium.privacyPolicy')}
+            >
+              <Text style={[styles.legalLink, { color: colors.textSecondary }]}>
+                {t('premium.privacyPolicy')}
+              </Text>
+            </Pressable>
+          </View>
         </Animated.View>
       </View>
     </Modal>
@@ -379,4 +417,11 @@ const styles = StyleSheet.create({
   trialNote: { ...textXs, textAlign: 'center', marginTop: space[2] },
   restore: { ...textSm, textAlign: 'center', marginTop: space[3] },
   legal: { ...textXs, textAlign: 'center', marginTop: space[2], lineHeight: 16 },
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: space[1],
+  },
+  legalLink: { ...textXs, lineHeight: 16, textDecorationLine: 'underline' },
 });

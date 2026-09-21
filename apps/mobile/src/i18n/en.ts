@@ -1841,6 +1841,8 @@ export const en = {
     flatRemaining: '{{count}} flat routes left this month',
     coolUnavailable: 'Cool routing is not available in your country yet.',
     coolRequiresPlus: 'Cool routing is part of Pedal Plus.',
+    termsOfUse: 'Terms of Use',
+    privacyPolicy: 'Privacy Policy',
     upgrade: 'Go Plus',
     notNow: 'Not now',
   },

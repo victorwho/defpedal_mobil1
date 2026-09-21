@@ -1791,6 +1791,8 @@ export const es: TranslationKeys = {
     flatRemaining: 'Te quedan {{count}} rutas llanas este mes',
     coolUnavailable: 'Las rutas frescas aun no estan disponibles en tu pais.',
     coolRequiresPlus: 'Las rutas frescas forman parte de Pedal Plus.',
+    termsOfUse: 'Términos de uso',
+    privacyPolicy: 'Política de privacidad',
     upgrade: 'Pasate a Plus',
     notNow: 'Ahora no',
   },
