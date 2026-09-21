@@ -1121,6 +1121,27 @@ See `.claude/error-log.md` for the full list with details. Key ones:
 
 ## Current State (as of 2026-09-15)
 
+> **PEDAL PLUS SUBMITTED TO APPLE 2026-09-21.** Review submission `a2bed298…`
+> carries version **1.21** (build 33 / 0.2.171) **and both subscriptions** as
+> ONE submission — Apple requires the first IAP to ship with an app version.
+> ⚠️ 1.21 is `releaseType: MANUAL`: it does **not** publish on approval.
+> ⚠️ Two things remain UNVERIFIED and both fail only *after* a rider pays: the
+> App Store products' entitlement must be `pedal_plus` (`PLUS_ENTITLEMENT_ID`;
+> the public API cannot show entitlement names), and **no purchase has ever
+> been made on a handset** on either platform.
+> Apple prices are anchored on **Romania 18.99 / 189.99 RON**, which equalizes
+> to EUR 3.99 / 39.99 against Play's EUR 3.59 / 35.99 — iOS ~11% dearer,
+> deliberate. The paywall stays dark (`premium_ui_enabled = false`) for everyone
+> except Apple's demo account `testuser@example.com`, which **must stay true**
+> through review or the reviewer cannot reach the purchase UI.
+> Three traps cost a day and are written up as error-log **#125/#126**: a
+> preview build can never show store prices (its package has no Play app), every
+> EAS iOS build shipped an empty RevenueCat key (EAS reads the EAS *environment*,
+> not `.env`), and both subscriptions were held at `MISSING_METADATA` by having
+> 175 territories available but only ONE priced — not by the review screenshot.
+> Offering: `docs/pedal-plus-offering.md`. Remaining steps:
+> `docs/runbooks/pedal-plus-launch.md`.
+
 > Entries below are dated and append-only — the newest facts are usually in the
 > most recent bullets, not the top.
 >

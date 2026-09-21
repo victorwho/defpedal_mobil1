@@ -4,7 +4,7 @@
 or queried from the live Play / App Store Connect APIs — never from intent. If this file and `docs/plans/pedal-plus-premium-tier.md`
 disagree, this file is right — see [Superseded claims](#superseded-claims).
 
-Last verified: **2026-09-19** (code, Play Developer API, App Store Connect API).
+Last verified: **2026-09-21** (code, Play Developer API, App Store Connect API, RevenueCat offerings API).
 
 - Limits: `packages/core/src/premiumCatalog.ts` (`FREE_LIMITS`, `PLUS_LIMITS`)
 - Gates: `packages/core/src/entitlement.ts`
@@ -191,12 +191,52 @@ three EAS environments.
 
 The server already has `POST /v1/billing/webhook` for RevenueCat.
 
-### Blockers for launch
+### Apple — SUBMITTED FOR REVIEW 2026-09-21
 
-1. Apple review screenshot on each subscription, then submit both with a new
-   app version (1.21).
-2. RevenueCat iOS reconfiguration and a real `appl_` key.
-3. A real purchase tested on a device — nothing here has run on one.
+Version **1.21** and BOTH subscriptions went in as one review submission
+(`a2bed298…`, submitted 12:26 UTC), which is what Apple's first-IAP rule
+requires. All three read `WAITING_FOR_REVIEW`. 1.21 carries build **33**
+(0.2.171) and is `releaseType: MANUAL` — **it will NOT publish on approval;
+someone must press Publish.**
+
+What had to be fixed to get there, none of it visible from the code:
+
+- **Prices existed in ONE territory (USA).** That, not the review screenshot,
+  is what held both subscriptions at `MISSING_METADATA` — the screenshot was
+  uploaded and the state did not move, which is what exposed it. Apple does not
+  equalize automatically: 175 price rows per subscription were written from a
+  ROMANIA anchor. Both flipped to `READY_TO_SUBMIT` on the last row.
+- **Every EAS iOS build shipped an empty RevenueCat key.** `.env` is not read by
+  EAS builds; the `production` profile reads the EAS *environment*, which had no
+  `EXPO_PUBLIC_REVENUECAT_*` at all. Android was unaffected (local Gradle reads
+  `.env`). Now set in all three EAS environments.
+- **The iOS offering had no packages.** Products existed in RevenueCat but were
+  not attached to `$rc_monthly` / `$rc_annual` for the App Store app.
+- **The demo account could not see the paywall.** `testuser@example.com` had
+  `premium_ui_enabled = false`, so the Pedal Plus row did not render and a
+  reviewer had no route to the purchase UI. Set true — **must stay true**.
+
+See error-log #125 and #126, and `docs/runbooks/pedal-plus-launch.md`.
+
+⚠️ **iOS and Play now disagree on price.** Apple equalizes from Romania to
+EUR 3.99 / 39.99 against Play's EUR 3.59 / 35.99 — ~11% more on iPhone for the
+same subscription. Deliberate (Romania's price was what was being anchored);
+re-anchor near 16.99 RON to match, at the cost of moving Romania off 18.99.
+
+| | Monthly | Annual |
+|---|---|---|
+| Romania (anchor) | 18.99 RON | 189.99 RON |
+| Eurozone | EUR 3.99 | EUR 39.99 |
+| USA | USD 3.99 | USD 34.99 |
+
+### Still open
+
+1. **The entitlement identifier is UNVERIFIED.** The App Store products must map
+   to `pedal_plus` (`PLUS_ENTITLEMENT_ID`). The public API cannot show
+   entitlement names, so this is the one link nobody has confirmed — and it is
+   the failure that passes review, charges a rider, and grants nothing.
+2. **No purchase has ever been made on a handset**, on either platform.
+3. The paywall flip itself (`202610010001_pedal_plus_go_live.sql`) is untouched.
 
 Android has no remaining billing blockers.
 
