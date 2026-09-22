@@ -3,6 +3,7 @@ import type {
   RouteFeature,
   RouteFeatureTier,
   RouteFeatureType,
+  TurnDirection,
 } from './contracts';
 import { haversineDistance } from './distance';
 import { classRuns } from './routeClasses';
@@ -142,6 +143,10 @@ export const computeApproachingFeatures = (
   const approaching: ApproachingFeature[] = [];
   for (const feature of features) {
     const config = ROUTE_FEATURE_ALERT_CONFIG[feature.type];
+    // A type this build does not know — a feature saved by a newer app and
+    // synced back through a saved loop. Skipping it costs one alert; reading
+    // `config.dismissPastMeters` off `undefined` would end the ride.
+    if (!config) continue;
     const metersAhead =
       feature.distanceAlongRouteMeters - riderDistanceAlongRouteMeters;
     if (metersAhead < -config.dismissPastMeters) continue;
@@ -296,13 +301,30 @@ const extractZoneFeatures = (
   return features;
 };
 
-const LEFT_MODIFIERS = new Set(['left', 'sharp left', 'slight left']);
-const LEFT_MANEUVER_TYPES = new Set(['turn', 'fork', 'end of road', 'on ramp']);
+const TURN_MODIFIERS: Record<TurnDirection, ReadonlySet<string>> = {
+  left: new Set(['left', 'sharp left', 'slight left']),
+  right: new Set(['right', 'sharp right', 'slight right']),
+};
+const TURN_MANEUVER_TYPES = new Set(['turn', 'fork', 'end of road', 'on ramp']);
 
 /**
- * Left-turn-without-intersection: any left maneuver where the intersection
- * has fewer than 4 distinct bearings (T-junction, side street, or driveway
- * — not a controlled 4-way intersection). Heuristic — see step-1 notes.
+ * Which way a turn across oncoming traffic goes on this step. OSRM stamps
+ * `driving_side` on every step from the profile's country data, and Mapbox
+ * Directions does the same — probed 2026-09-22: `left` on every step in
+ * London, Belfast, Dublin, Valletta and Nicosia, `right` in Paris and
+ * Bucharest, on all four OSRM arms. Anything but `left` (including a missing
+ * field on an old persisted route) means right-hand traffic.
+ */
+const turnAcrossTraffic = (drivingSide: string | undefined): TurnDirection =>
+  drivingSide === 'left' ? 'right' : 'left';
+
+/**
+ * Turn-across-traffic-without-intersection: a turn across oncoming traffic
+ * — left under right-hand traffic, right under left-hand traffic — where
+ * the intersection has fewer than 4 distinct bearings (T-junction, side
+ * street, or driveway — not a controlled 4-way intersection). Decided per
+ * step, so a route that changes driving side is read correctly. Heuristic —
+ * see step-1 notes.
  */
 const extractLeftTurns = (
   route: Route,
@@ -316,10 +338,11 @@ const extractLeftTurns = (
     for (const step of leg.steps ?? []) {
       const maneuver = step.maneuver;
       if (!maneuver) continue;
-      if (!LEFT_MANEUVER_TYPES.has(maneuver.type)) continue;
+      if (!TURN_MANEUVER_TYPES.has(maneuver.type)) continue;
 
+      const turnDirection = turnAcrossTraffic(step.driving_side);
       const modifier = maneuver.modifier?.toLowerCase() ?? '';
-      if (!LEFT_MODIFIERS.has(modifier)) continue;
+      if (!TURN_MODIFIERS[turnDirection].has(modifier)) continue;
 
       const intersection = step.intersections?.[0];
       const bearingCount = intersection?.bearings?.length ?? 0;
@@ -340,6 +363,7 @@ const extractLeftTurns = (
         lat,
         distanceAlongRouteMeters: cumulative,
         lengthMeters: null,
+        turnDirection,
       });
     }
   }

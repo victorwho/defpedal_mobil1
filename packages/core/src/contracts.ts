@@ -55,8 +55,13 @@ export interface NavigationStep {
  * - `tunnel` / `bridge`: extracted from OSRM `annotation.classes` runs.
  * - `semafor` / `railway_crossing`: require OSM node-tag data; currently
  *   stub extractors that return empty until the data layer ships.
- * - `left_turn_no_intersection`: detected from step maneuvers — left turns
- *   at non-4-way junctions where the rider crosses opposing traffic.
+ * - `left_turn_no_intersection`: detected from step maneuvers — a turn
+ *   ACROSS opposing traffic at a non-4-way junction. The name predates
+ *   left-hand-traffic support: in the UK, Ireland, Malta and Cyprus that turn
+ *   is a RIGHT turn, and `turnDirection` says which way it goes. The wire
+ *   value is kept rather than adding a `right_turn_*` type because saved
+ *   loops carry their features through the server, and an older app that
+ *   meets an unknown type crashes in `computeApproachingFeatures` mid-ride.
  */
 export type RouteFeatureType =
   | 'tunnel'
@@ -88,7 +93,17 @@ export interface RouteFeature {
    * `null`.
    */
   readonly lengthMeters: number | null;
+  /**
+   * `left_turn_no_intersection` only: which way the turn across traffic
+   * goes — `left` where traffic drives on the right, `right` where it drives
+   * on the left (read from the step's `driving_side`). Absent on features
+   * built before 2026-09-22, which were all right-hand-traffic lefts, so
+   * readers must treat absence as `left`.
+   */
+  readonly turnDirection?: TurnDirection;
 }
+
+export type TurnDirection = 'left' | 'right';
 
 export interface RouteOption {
   id: string;

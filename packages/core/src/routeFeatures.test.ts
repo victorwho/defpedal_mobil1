@@ -185,4 +185,32 @@ describe('computeApproachingFeatures', () => {
   it('exposes a visible-count cap constant', () => {
     expect(MAX_VISIBLE_FEATURE_ALERTS).toBe(2);
   });
+
+  it('skips a feature type this build does not know instead of throwing', () => {
+    // Saved loops carry their features through the server, so a type added by
+    // a newer app can reach an older one. Throwing here ends the ride.
+    const unknown = baseFeature({
+      id: 'from-the-future',
+      type: 'roundabout_entry' as RouteFeature['type'],
+      distanceAlongRouteMeters: 1010,
+    });
+    const known = baseFeature({ id: 'semafor', distanceAlongRouteMeters: 1020 });
+
+    const result = computeApproachingFeatures([unknown, known], 1000);
+    expect(result.map((r) => r.feature.id)).toEqual(['semafor']);
+  });
+
+  it('alerts a left-hand-traffic right turn exactly like a right-hand-traffic left', () => {
+    const turn = baseFeature({
+      id: 'uk-right-turn',
+      type: 'left_turn_no_intersection',
+      tier: 'warning',
+      turnDirection: 'right',
+      distanceAlongRouteMeters: 1150,
+    });
+
+    const [item] = computeApproachingFeatures([turn], 1000);
+    expect(item.feature.turnDirection).toBe('right');
+    expect(item.config.a11yLiveRegion).toBe('assertive');
+  });
 });

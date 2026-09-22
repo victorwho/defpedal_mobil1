@@ -255,6 +255,13 @@ const routeFeatureSchema = {
       type: ['number', 'null'],
       minimum: 0,
     },
+    // Optional: only turn-across-traffic features carry it (see the
+    // RouteFeature contract). Without this line `additionalProperties: false`
+    // strips it and every UK right turn reaches the app labelled as a left.
+    turnDirection: {
+      type: 'string',
+      enum: ['left', 'right'],
+    },
   },
 } as const;
 

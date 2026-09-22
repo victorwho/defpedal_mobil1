@@ -30,6 +30,8 @@ export {
   routeFeatureIconImageExpression,
   routeFeatureMarker,
   getRouteFeatureIcon,
+  getRouteFeatureIconFor,
   getRouteFeatureTierColor,
+  rightTurnAcrossTrafficIcon,
 } from './routeFeatureIcons';
 export type { RouteFeatureIcon } from './routeFeatureIcons';

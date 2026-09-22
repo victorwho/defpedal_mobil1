@@ -2,7 +2,7 @@
  * Design System — Route Feature Icons & Tier Colors
  *
  * Visual contract for the route-feature awareness layer (tunnels, bridges,
- * traffic signals, unprotected left turns, railway crossings). Backed by
+ * traffic signals, turns across traffic, railway crossings). Backed by
  * server-emitted `RouteFeature[]` on every `RouteOption`.
  *
  * Icons are SDF PNGs at `apps/mobile/assets/map-icons/` — black-on-alpha
@@ -15,7 +15,7 @@
  * (`packages/core/src/routeFeatures.ts`); keep this file in sync if the
  * TIER_BY_TYPE map there ever shifts.
  */
-import type { RouteFeatureTier, RouteFeatureType } from '@defensivepedal/core';
+import type { RouteFeature, RouteFeatureTier, RouteFeatureType } from '@defensivepedal/core';
 
 // ES `import` syntax (rather than `require()`) so Vitest can resolve the
 // asset reference at bundle time without trying to parse the binary as JS.
@@ -24,6 +24,7 @@ import tunnelIcon from '../../../assets/map-icons/tunnel.png';
 import bridgeIcon from '../../../assets/map-icons/bridge.png';
 import semaforIcon from '../../../assets/map-icons/semafor.png';
 import leftTurnIcon from '../../../assets/map-icons/left_turn.png';
+import rightTurnIcon from '../../../assets/map-icons/right_turn.png';
 import railwayIcon from '../../../assets/map-icons/railway_crossing.png';
 
 /**
@@ -123,8 +124,35 @@ export const routeFeatureIcons: Record<RouteFeatureType, RouteFeatureIcon> = {
   },
 } as const;
 
+/**
+ * The turn across traffic under LEFT-hand traffic (UK, Ireland, Malta,
+ * Cyprus) is a right turn. It rides on the `left_turn_no_intersection` type
+ * with `turnDirection: 'right'` (see the RouteFeature contract for why no new
+ * type), so it is not a `routeFeatureIcons` entry — resolve through
+ * `getRouteFeatureIconFor`, never by type alone.
+ */
+export const rightTurnAcrossTrafficIcon: RouteFeatureIcon = {
+  label: 'RT',
+  iconImage: rightTurnIcon,
+  spriteName: 'route-feature-right-turn',
+  accessibilityLabel: 'Right turn across traffic',
+};
+
 export const getRouteFeatureIcon = (type: RouteFeatureType): RouteFeatureIcon =>
   routeFeatureIcons[type];
+
+/**
+ * Icon for one feature. Use this wherever a feature is on hand — the type
+ * alone cannot tell a right-hand-traffic left turn from a left-hand-traffic
+ * right turn. A missing `turnDirection` (features built before 2026-09-22)
+ * reads as a left turn, which is what every one of them was.
+ */
+export const getRouteFeatureIconFor = (
+  feature: Pick<RouteFeature, 'type' | 'turnDirection'>,
+): RouteFeatureIcon =>
+  feature.type === 'left_turn_no_intersection' && feature.turnDirection === 'right'
+    ? rightTurnAcrossTrafficIcon
+    : routeFeatureIcons[feature.type];
 
 export const getRouteFeatureTierColor = (tier: RouteFeatureTier): string =>
   routeFeatureTierColors[tier];
@@ -165,7 +193,14 @@ export const routeFeatureIconImageExpression: unknown = [
   'semafor',
   routeFeatureSpriteNames.semafor,
   'left_turn_no_intersection',
-  routeFeatureSpriteNames.left_turn_no_intersection,
+  // Left-hand traffic turns across traffic to the RIGHT. Features without the
+  // property (pre-2026-09-22) read `null` here and keep the left arrow.
+  [
+    'case',
+    ['==', ['get', 'turnDirection'], 'right'],
+    rightTurnAcrossTrafficIcon.spriteName,
+    routeFeatureSpriteNames.left_turn_no_intersection,
+  ],
   'railway_crossing',
   routeFeatureSpriteNames.railway_crossing,
   '',

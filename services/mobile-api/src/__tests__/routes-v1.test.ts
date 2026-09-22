@@ -224,6 +224,39 @@ describe('POST /v1/routes/preview', () => {
     await app.close();
   });
 
+  it('keeps turnDirection on a turn-across-traffic feature through serialization', async () => {
+    // The response schema is additionalProperties:false, which strips any
+    // field it does not list — a UK right turn would arrive as a left.
+    const ukRightTurn = {
+      id: 'route-0-feature-left_turn_no_intersection-0',
+      type: 'left_turn_no_intersection',
+      tier: 'warning',
+      lat: 51.5074,
+      lon: -0.1278,
+      distanceAlongRouteMeters: 420,
+      lengthMeters: null,
+      turnDirection: 'right',
+    };
+    const app = buildTestApp({
+      normalizeRoutePreviewResponse: vi.fn().mockReturnValue({
+        ...mockRoutePreviewResponse,
+        routes: [{ ...mockRouteOption, routeFeatures: [ukRightTurn] }],
+      }),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/routes/preview',
+      headers: authHeaders,
+      payload: validPreviewBody,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().routes[0].routeFeatures).toEqual([ukRightTurn]);
+
+    await app.close();
+  });
+
   it('returns 400 when required fields are missing', async () => {
     const app = buildTestApp();
     await app.ready();

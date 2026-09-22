@@ -10,7 +10,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getRouteFeatureIcon,
+  getRouteFeatureIconFor,
   getRouteFeatureTierColor,
+  rightTurnAcrossTrafficIcon,
+  routeFeatureIconImageExpression,
   routeFeatureIcons,
   routeFeatureLabelColor,
   routeFeatureTierColors,
@@ -90,6 +93,53 @@ describe('routeFeatureIcons', () => {
     for (const type of ALL_FEATURE_TYPES) {
       expect(getRouteFeatureIcon(type)).toBe(routeFeatureIcons[type]);
     }
+  });
+});
+
+describe('turn across traffic under left-hand traffic (UK, IE, MT, CY)', () => {
+  const allIcons = [...ALL_FEATURE_TYPES.map((t) => routeFeatureIcons[t]), rightTurnAcrossTrafficIcon];
+
+  it('resolves a right turn to the right-turn icon, not the left one', () => {
+    const icon = getRouteFeatureIconFor({
+      type: 'left_turn_no_intersection',
+      turnDirection: 'right',
+    });
+    expect(icon).toBe(rightTurnAcrossTrafficIcon);
+    expect(icon.accessibilityLabel).toBe('Right turn across traffic');
+    expect(icon.iconImage).toBeTruthy();
+  });
+
+  it('keeps the left-turn icon for right-hand traffic and for features without a direction', () => {
+    const left = routeFeatureIcons.left_turn_no_intersection;
+    expect(getRouteFeatureIconFor({ type: 'left_turn_no_intersection', turnDirection: 'left' })).toBe(left);
+    // Persisted before 2026-09-22 — every one of them was a left turn.
+    expect(getRouteFeatureIconFor({ type: 'left_turn_no_intersection' })).toBe(left);
+  });
+
+  it('ignores turnDirection on every other type', () => {
+    for (const type of ALL_FEATURE_TYPES.filter((t) => t !== 'left_turn_no_intersection')) {
+      expect(getRouteFeatureIconFor({ type, turnDirection: 'right' })).toBe(routeFeatureIcons[type]);
+    }
+  });
+
+  it('gives the right turn its own label and sprite', () => {
+    expect(new Set(allIcons.map((i) => i.label)).size).toBe(allIcons.length);
+    expect(new Set(allIcons.map((i) => i.spriteName)).size).toBe(allIcons.length);
+    expect(rightTurnAcrossTrafficIcon.label).toMatch(/^[A-Z]{2}$/);
+    expect(rightTurnAcrossTrafficIcon.spriteName).toMatch(/^route-feature-[a-z-]+$/);
+  });
+
+  it('the map sprite expression branches on turnDirection for the turn type', () => {
+    // Validated against the Mapbox style-spec evaluator on 2026-09-22: right
+    // → right-turn sprite, left or missing → left-turn sprite.
+    const expr = routeFeatureIconImageExpression as unknown[];
+    const branch = expr[expr.indexOf('left_turn_no_intersection') + 1];
+    expect(branch).toEqual([
+      'case',
+      ['==', ['get', 'turnDirection'], 'right'],
+      rightTurnAcrossTrafficIcon.spriteName,
+      routeFeatureIcons.left_turn_no_intersection.spriteName,
+    ]);
   });
 });
 

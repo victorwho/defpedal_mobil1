@@ -15,7 +15,7 @@ import { brandColors } from '../tokens/colors';
 import { duration as motionDuration, easing } from '../tokens/motion';
 import { radii } from '../tokens/radii';
 import {
-  getRouteFeatureIcon,
+  getRouteFeatureIconFor,
   getRouteFeatureTierColor,
   routeFeatureLabelColor,
   routeFeatureMarker,
@@ -40,7 +40,7 @@ export interface RouteFeatureAlertProps {
 export const RouteFeatureAlert = React.memo(({ item }: RouteFeatureAlertProps) => {
   const reducedMotion = useReducedMotion();
   const { feature, metersAhead, config } = item;
-  const icon = getRouteFeatureIcon(feature.type);
+  const icon = getRouteFeatureIconFor(feature);
   const tierColor = getRouteFeatureTierColor(feature.tier);
 
   const opacityAnim = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;

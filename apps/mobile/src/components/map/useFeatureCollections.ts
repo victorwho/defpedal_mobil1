@@ -99,7 +99,7 @@ export const useFeatureCollections = ({
     [selectedRoute],
   );
 
-  // Route awareness markers (tunnel / bridge / semafor / left-turn / railway).
+  // Route awareness markers (tunnel / bridge / semafor / turn across traffic / railway).
   // Pulled from the SELECTED route only — features on dropped alternatives
   // would just be visual noise that doesn't match what the rider is about to
   // do. Server-emitted features are deduplicated against community-reported
@@ -121,6 +121,10 @@ export const useFeatureCollections = ({
           tier: f.tier,
           lengthMeters: f.lengthMeters,
           distanceAlongRouteMeters: f.distanceAlongRouteMeters,
+          // Read by the sprite expression: a right turn across traffic under
+          // left-hand traffic shares the left-turn type. Omitted when absent
+          // so older features keep the left arrow.
+          ...(f.turnDirection ? { turnDirection: f.turnDirection } : {}),
         },
         geometry: {
           type: 'Point' as const,

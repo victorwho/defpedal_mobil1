@@ -1,6 +1,6 @@
 /**
  * RouteFeatureLayer — route awareness markers (tunnel, bridge, semafor,
- * unprotected left turn, railway crossing).
+ * turn across traffic, railway crossing).
  *
  * Render contract: single `ShapeSource` produces every feature type; one
  * `CircleLayer` renders the tier-colored disc, one `SymbolLayer` renders
@@ -27,6 +27,7 @@ import {
   routeFeatureLabelColor,
   routeFeatureMarker,
   routeFeatureStrokeColor,
+  rightTurnAcrossTrafficIcon,
 } from '../../../design-system/tokens/routeFeatureIcons';
 import { useAppStore } from '../../../store/appStore';
 
@@ -54,6 +55,12 @@ const SDF_IMAGES = {
   },
   [routeFeatureIcons.left_turn_no_intersection.spriteName]: {
     image: routeFeatureIcons.left_turn_no_intersection.iconImage,
+    sdf: true,
+  },
+  // Left-hand traffic (UK, IE, MT, CY): same feature type, mirrored arrow —
+  // `routeFeatureIconImageExpression` picks it on `turnDirection`.
+  [rightTurnAcrossTrafficIcon.spriteName]: {
+    image: rightTurnAcrossTrafficIcon.iconImage,
     sdf: true,
   },
   [routeFeatureIcons.railway_crossing.spriteName]: {

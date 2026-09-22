@@ -288,6 +288,133 @@ describe('extractRouteFeatures — left turns', () => {
       lefts[1].distanceAlongRouteMeters,
     );
   });
+
+  it('marks right-hand-traffic turns with turnDirection "left"', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [turnStep({ modifier: 'left', drivingSide: 'right', at: 3 })],
+    });
+
+    const [turn] = extractRouteFeatures(route, 0);
+    expect(turn).toMatchObject({ type: 'left_turn_no_intersection', turnDirection: 'left' });
+  });
+});
+
+/**
+ * A turn step at a T-junction (3 bearings) — the shape the extractor flags.
+ * `drivingSide` is OSRM's per-step `driving_side`, which the b47v1 profiles
+ * set from `countries.geojson` (GB, IE, MT, CY drive on the left) and Mapbox
+ * Directions reports the same way. Probed live 2026-09-22 on all four arms.
+ */
+const turnStep = ({
+  modifier,
+  drivingSide,
+  at,
+  bearings = [0, 90, 180],
+}: {
+  modifier: string;
+  drivingSide?: string;
+  at: number;
+  bearings?: number[];
+}) =>
+  makeStep({
+    ...(drivingSide === undefined ? {} : { driving_side: drivingSide }),
+    maneuver: {
+      bearing_after: 0,
+      bearing_before: 0,
+      location: [COORDS[at][0], COORDS[at][1]],
+      type: 'turn',
+      modifier,
+    },
+    intersections: [
+      {
+        entry: bearings.map(() => true),
+        bearings,
+        location: [COORDS[at][0], COORDS[at][1]],
+      },
+    ],
+  });
+
+describe('extractRouteFeatures — left-hand traffic (UK, IE, MT, CY)', () => {
+  it('flags the RIGHT turn — the one that crosses oncoming traffic', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [turnStep({ modifier: 'right', drivingSide: 'left', at: 3 })],
+    });
+
+    const features = extractRouteFeatures(route, 0);
+    expect(features).toHaveLength(1);
+    expect(features[0]).toMatchObject({
+      type: 'left_turn_no_intersection',
+      turnDirection: 'right',
+      tier: 'warning',
+      lengthMeters: null,
+    });
+  });
+
+  it('does not flag a kerbside LEFT turn', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [turnStep({ modifier: 'left', drivingSide: 'left', at: 3 })],
+    });
+
+    expect(extractRouteFeatures(route, 0)).toEqual([]);
+  });
+
+  it('flags sharp-right and slight-right the same way', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [
+        turnStep({ modifier: 'sharp right', drivingSide: 'left', at: 2, bearings: [0, 270] }),
+        turnStep({ modifier: 'slight right', drivingSide: 'left', at: 5 }),
+      ],
+    });
+
+    const turns = extractRouteFeatures(route, 0);
+    expect(turns.map((t) => t.turnDirection)).toEqual(['right', 'right']);
+  });
+
+  it('does not flag a right turn at a 4-way intersection', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [
+        turnStep({ modifier: 'right', drivingSide: 'left', at: 3, bearings: [0, 90, 180, 270] }),
+      ],
+    });
+
+    expect(extractRouteFeatures(route, 0)).toEqual([]);
+  });
+
+  it('decides per step, so a route that changes driving side is read correctly', () => {
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [
+        turnStep({ modifier: 'left', drivingSide: 'right', at: 2 }),
+        turnStep({ modifier: 'right', drivingSide: 'left', at: 5 }),
+        // Neither of these crosses traffic on its own side of the road.
+        turnStep({ modifier: 'right', drivingSide: 'right', at: 6 }),
+        turnStep({ modifier: 'left', drivingSide: 'left', at: 7 }),
+      ],
+    });
+
+    const turns = extractRouteFeatures(route, 0);
+    expect(turns.map((t) => t.turnDirection)).toEqual(['left', 'right']);
+  });
+
+  it('treats a step without driving_side as right-hand traffic', () => {
+    // Routes persisted before the field was read, and hand-built fixtures.
+    const route = makeRoute({
+      coordinates: COORDS,
+      steps: [
+        { ...turnStep({ modifier: 'left', at: 2 }), driving_side: undefined as unknown as string },
+        { ...turnStep({ modifier: 'right', at: 5 }), driving_side: undefined as unknown as string },
+      ],
+    });
+
+    const turns = extractRouteFeatures(route, 0);
+    expect(turns).toHaveLength(1);
+    expect(turns[0].turnDirection).toBe('left');
+  });
 });
 
 describe('extractRouteFeatures — defensive', () => {
