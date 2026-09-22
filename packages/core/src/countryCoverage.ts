@@ -9,6 +9,14 @@ import type { Coordinate } from './contracts';
  * graph, cross-border rides are now routable; the per-country server split
  * (osrm-es.*) is retired.
  *
+ * 2026-09-21: the b47v1 generation added Great Britain to the same graph on
+ * every arm (safe, flat, cool, e-bike), so the UK is covered too. Probed
+ * 2026-09-22 from the app side: London, Belfast, Edinburgh, Lerwick,
+ * Stornoway, Penzance and the Scilly Isles all return real routes, and
+ * Dublin→Belfast crosses the land border. There is no fixed link across
+ * the Channel in the graph — London→Paris answers `NoRoute`, like any other
+ * sea crossing between covered countries (mainland→Iceland, →Cyprus).
+ *
  * This list must stay in sync with `SUPPORTED_APP_COUNTRIES` in
  * `appAvailability.ts` (the onboarding region gate) — a test enforces it.
  */
@@ -16,7 +24,8 @@ export type SupportedCountry =
   | 'AT' | 'BE' | 'BG' | 'HR' | 'CY' | 'CZ' | 'DK' | 'EE' | 'FI' | 'FR'
   | 'DE' | 'GR' | 'HU' | 'IE' | 'IT' | 'LV' | 'LT' | 'LU' | 'MT' | 'NL'
   | 'PL' | 'PT' | 'RO' | 'SK' | 'SI' | 'ES' | 'SE'
-  | 'IS' | 'LI' | 'NO' | 'CH';
+  | 'IS' | 'LI' | 'NO' | 'CH'
+  | 'GB';
 
 /** Axis-aligned bounding box: [minLon, minLat, maxLon, maxLat]. */
 type Bbox = readonly [number, number, number, number];
@@ -34,7 +43,7 @@ type Bbox = readonly [number, number, number, number];
  *   2026-07-12). The zero-distance guard in the OSRM fetchers catches that
  *   and falls back to Mapbox, so a mis-hit degrades gracefully.
  * - The Canary Islands (~28°N, ~16°W) remain excluded — probed distance-0,
- *   no data in the graph. Same for the UK.
+ *   no data in the graph.
  */
 const COUNTRY_BBOXES: Record<SupportedCountry, readonly Bbox[]> = {
   // RO + ES FIRST: `resolveCountryFromCoord` is first-match, and these two
@@ -53,6 +62,27 @@ const COUNTRY_BBOXES: Record<SupportedCountry, readonly Bbox[]> = {
     [-9.40, 35.95, 4.33, 43.79],
     [-5.42, 35.85, -5.26, 35.95], // Ceuta
     [-3.00, 35.25, -2.90, 35.36], // Melilla
+  ],
+  // Great Britain + Northern Ireland. Listed BEFORE FR and IE on purpose:
+  // the loose FR box reaches 51.2°N, which swallows the whole English south
+  // coast (Dover, Brighton, Southampton, Plymouth), so GB has to win that
+  // overlap on first-match. The boxes are cut so they never touch French or
+  // Republic-of-Ireland land, which keeps GB-first from stealing either:
+  // France north of 50.15°N lies east of 1.4°E, and the Republic lies west
+  // of -5.99°E everywhere and has no land north of 54.05°N east of -6.1°E.
+  // Most of Northern Ireland still attributes as IE through the IE box —
+  // cosmetic, same graph and both drive on the left. The Isle of Man sits
+  // inside the main box but is not in the graph (probed: 58 km snap,
+  // distance-0), so it degrades through the zero-distance guard. The
+  // Channel Islands are outside every GB box and keep their FR attribution.
+  // The first box is the "main" one: `getCountryCenter` reads it.
+  GB: [
+    [-5.9, 51.2, 1.8, 55.45], // England, Wales, southern Scotland, east Belfast
+    [-7.9, 55.45, 1.8, 61.0], // Scotland north of Ireland, Hebrides, Orkney, Shetland
+    [-6.5, 49.85, -4.0, 51.2], // Cornwall, the Scilly Isles, west Devon
+    [-4.0, 50.15, 1.0, 51.2], // South coast from Devon to Dungeness
+    [1.0, 51.0, 1.8, 51.2], // East Kent: Folkestone, Dover, Deal
+    [-6.1, 54.05, -5.9, 55.35], // Belfast city centre, Lisburn, Newtownabbey
   ],
   AT: [[9.4, 46.3, 17.2, 49.1]],
   BE: [[2.5, 49.4, 6.5, 51.6]],
@@ -116,8 +146,8 @@ const isInBbox = (coord: Coordinate, bbox: Bbox): boolean => {
 
 /**
  * Pure, deterministic country resolution for a single coordinate. Returns
- * `null` when the point sits outside every supported bounding box (e.g. the
- * UK, Serbia, Canary Islands, mid-Atlantic, invalid coords).
+ * `null` when the point sits outside every supported bounding box (e.g.
+ * Serbia, Canary Islands, Faroe Islands, mid-Atlantic, invalid coords).
  *
  * First match wins; where two supported countries' boxes overlap the
  * attribution is cosmetic (same EU graph either way).
@@ -197,7 +227,10 @@ export const isRouteSupported = (
  * graph (b36v1 generation, 67.9M segments, `export_risk_eu.py` in the
  * OSRM_Server project) and covers the SAME 31 countries — verified live
  * 2026-08-13 (Berlin 28k segments in the center alone; RPCs return scored
- * segments for Berlin/Paris routes). It was RO+ES-only from launch until
+ * segments for Berlin/Paris routes). The b47v1 swap (2026-09-21, 74.06M
+ * rows) added Great Britain the same day as its routing; checked live
+ * 2026-09-22 — central London 12.4k segments, Belfast 6.2k, Edinburgh 4.0k.
+ * It was RO+ES-only from launch until
  * then, which is why this gate exists as a named list rather than a
  * constant `true`: if data and routing generations ever diverge again,
  * narrow THIS list — the comparison eligibility in `mapbox-routing.ts` and
@@ -228,7 +261,9 @@ export const getCountryCenter = (country: SupportedCountry): Coordinate => {
  * The FULL routing footprint since 2026-09-17. It was RO-only from launch, but
  * the shade instance is a customized copy of the EU-wide standard graph, not a
  * Romanian extract: probed that day from the capital of every one of the 31
- * covered countries, it returned a real route in 31/31. Kept as a named list
+ * covered countries, it returned a real route in 31/31. The shade arm moved to
+ * b47v1 on 2026-09-22 with canopy data for 14 UK cities, so the UK is in too
+ * (London and Belfast probed that day). Kept as a named list
  * rather than a constant `true` for the same reason as RISK_DATA_COUNTRIES —
  * if the shade graph and the routing graph ever diverge, narrow THIS list and
  * the Cool pill, the dispatchers (app + API) and the paywall all follow.

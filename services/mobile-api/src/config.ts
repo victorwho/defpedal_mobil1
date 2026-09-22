@@ -58,7 +58,7 @@ export const config = {
       'https://osrm-shade.defensivepedal.com/route/v1/bicycle',
     ),
   // E-bike routing — bicycle46-ebike.lua pedelec instance. ONE hostname for
-  // all 31 covered countries; never derive it per country.
+  // every covered country; never derive it per country.
   safeOsrmEbikeBaseUrl:
     resolveConfigValue(
       ['SAFE_OSRM_EBIKE_BASE_URL'],
@@ -96,7 +96,7 @@ export const config = {
     email: resolveConfigValue(['DEV_AUTH_BYPASS_EMAIL'], ''),
   },
   // Default derives from the core routing-coverage list (EU-27 + EEA + CH,
-  // 2026-07-13) so /v1/coverage can't drift from what the OSRM graph
+  // 2026-07-13; UK added 2026-09-22) so /v1/coverage can't drift from what the OSRM graph
   // actually serves — it lied "safeRouting: false" for the 29 new countries
   // while the RO,ES default lingered. Note splitCsv MERGES the env var into
   // the default (additive), so the legacy SUPPORTED_SAFE_COUNTRIES=RO,ES on

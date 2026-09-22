@@ -196,7 +196,7 @@ export default function CourseImportScreen() {
   );
 
   /**
-   * Risk coverage is per-country. A course from outside the 31 covered
+   * Risk coverage is per-country. A course from outside the covered
    * countries gets no scoring, and we say so rather than rendering a
    * fabricated number — the mistake the deleted `safety-score.tsx` made.
    */

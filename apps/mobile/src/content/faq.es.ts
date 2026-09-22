@@ -33,7 +33,7 @@ export const faqEs: FaqSections = [
         id: 'risk-score-source',
         question: '¿De dónde sale la Puntuación de Riesgo?',
         answer:
-          'De la propia calle: límites de velocidad, carriles, infraestructura ciclista y cómo de bien te separa de los coches, volúmenes de tráfico modelados, calidad del firme, iluminación y decenas de señales más — a partir de OpenStreetMap, datos de elevación y modelado de tráfico. Cuanto más baja, más segura. Las puntuaciones calle a calle cubren los 31 países europeos compatibles.',
+          'De la propia calle: límites de velocidad, carriles, infraestructura ciclista y cómo de bien te separa de los coches, volúmenes de tráfico modelados, calidad del firme, iluminación y decenas de señales más — a partir de OpenStreetMap, datos de elevación y modelado de tráfico. Cuanto más baja, más segura. Las puntuaciones calle a calle cubren los 32 países europeos compatibles.',
       },
       {
         id: 'wrong-street-color',
@@ -51,7 +51,7 @@ export const faqEs: FaqSections = [
         id: 'supported-countries',
         question: '¿Qué países están cubiertos?',
         answer:
-          'La ruta segura y los colores de riesgo calle a calle están disponibles en 31 países europeos (la UE, el EEE y Suiza). La ruta rápida funciona en todo el mundo, mediante Mapbox.',
+          'La ruta segura y los colores de riesgo calle a calle están disponibles en 32 países europeos (la UE, el EEE, Suiza y el Reino Unido). La ruta rápida funciona en todo el mundo, mediante Mapbox.',
       },
       {
         id: 'avoid-unpaved',

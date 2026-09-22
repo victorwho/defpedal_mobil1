@@ -24,7 +24,7 @@ Defensive Pedal está hecha para ciclistas europeos, con residencia de datos en 
 
 DÓNDE FUNCIONA
 
-La ruta segura y los colores de riesgo calle a calle — la capa de seguridad que se dibuja sobre tu ruta — están disponibles en los 31 países europeos compatibles: la UE, el EEE y Suiza. La ruta rápida funciona en todo el mundo.
+La ruta segura y los colores de riesgo calle a calle — la capa de seguridad que se dibuja sobre tu ruta — están disponibles en los 32 países europeos compatibles: la UE, el EEE, Suiza y el Reino Unido. La ruta rápida funciona en todo el mundo.
 
 La app está traducida por completo al español y al rumano, y el test diario de seguridad incluye preguntas adaptadas a la normativa de tráfico y a la etiqueta ciclista de España y de Rumanía.
 

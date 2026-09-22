@@ -33,7 +33,7 @@ export const faqEn: FaqSections = [
         id: 'risk-score-source',
         question: 'Where does the Risk Score come from?',
         answer:
-          'From the street itself: speed limits, lanes, bike infrastructure and how well it separates you from cars, modeled traffic volumes, surface quality, lighting, and dozens of other signals — sourced from OpenStreetMap, elevation data and traffic modeling. Lower is safer. Street-by-street scores cover all 31 supported European countries.',
+          'From the street itself: speed limits, lanes, bike infrastructure and how well it separates you from cars, modeled traffic volumes, surface quality, lighting, and dozens of other signals — sourced from OpenStreetMap, elevation data and traffic modeling. Lower is safer. Street-by-street scores cover all 32 supported European countries.',
       },
       {
         id: 'wrong-street-color',
@@ -51,7 +51,7 @@ export const faqEn: FaqSections = [
         id: 'supported-countries',
         question: 'Which countries are supported?',
         answer:
-          'Safe routing and street-by-street risk colors are available across 31 European countries (the EU, EEA and Switzerland). Fast routing works worldwide via Mapbox.',
+          'Safe routing and street-by-street risk colors are available across 32 European countries (the EU, EEA, Switzerland and the UK). Fast routing works worldwide via Mapbox.',
       },
       {
         id: 'avoid-unpaved',

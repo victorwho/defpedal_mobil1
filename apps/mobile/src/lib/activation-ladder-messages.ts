@@ -164,8 +164,9 @@ export const LADDER_COPY: Record<LadderLocale, LadderCopyCatalog> = {
       // Stage-A copy replaced 2026-07-16: the spec's original "Your safety
       // score is waiting" referenced the onboarding safety-score screen cut
       // on 2026-07-04 — stage-A users have never seen a safety score. The
-      // fast≠safe framing is accurate in all 31 supported countries (OSRM
-      // safety profile), unlike per-street risk ratings (RO+ES only).
+      // fast≠safe framing is accurate in every supported country (OSRM
+      // safety profile); per-street risk ratings were RO+ES only when this
+      // was written and have covered the full routing list since 2026-08-01.
       stageA: {
         title: "Your fastest route isn't your safest",
         body: "Type where you're headed — Pedal picks the calm streets, not just the quick ones. See the difference in two minutes.",

@@ -8,9 +8,29 @@ describe('cities dataset', () => {
     expect(stats.count).toBeGreaterThan(5000);
     // Liechtenstein legitimately has no >=15k city; every other supported
     // country must be present.
-    for (const cc of ['RO', 'ES', 'DE', 'FR', 'NL', 'SE', 'PL', 'IT', 'IS', 'NO', 'CH']) {
+    for (const cc of ['RO', 'ES', 'DE', 'FR', 'NL', 'SE', 'PL', 'IT', 'IS', 'NO', 'CH', 'GB']) {
       expect(stats.countries.has(cc)).toBe(true);
     }
+  });
+});
+
+describe('findNearestCity — United Kingdom (supported since 2026-09-21)', () => {
+  it('resolves central London to London, on GMT', () => {
+    const city = findNearestCity(51.5074, -0.1278);
+    expect(city?.name).toBe('London');
+    expect(city?.countryCode).toBe('GB');
+    expect(city?.utcOffsetHours).toBe(0);
+  });
+
+  it('resolves Belfast to a GB entry — Northern Ireland is GB, not IE', () => {
+    const city = findNearestCity(54.5973, -5.9301);
+    expect(city?.name).toBe('Belfast');
+    expect(city?.countryCode).toBe('GB');
+  });
+
+  it('does not match a Dover rider to a French city across the Channel', () => {
+    const city = findNearestCity(51.1279, 1.3134);
+    expect(city?.countryCode).toBe('GB');
   });
 });
 

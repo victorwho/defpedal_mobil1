@@ -1,7 +1,7 @@
 /**
  * City Riders Pulse — cities dataset access + nearest-city lookup.
  *
- * The dataset (GeoNames cities15000 filtered to the 31 supported countries)
+ * The dataset (GeoNames cities15000 filtered to the 32 supported countries)
  * lives server-side only: Metro does not tree-shake, so shipping it through
  * packages/core would put ~280 KB of city tuples in the mobile bundle for a
  * feature the client never computes.
@@ -39,7 +39,7 @@ export const DEFAULT_NEAREST_CITY_MAX_KM = 30;
 
 /**
  * Nearest dataset city within `maxKm` of the given point, or null when the
- * rider is outside every city's radius (deep countryside / outside the 31
+ * rider is outside every city's radius (deep countryside / outside the 32
  * supported countries). Callers falling into null use the 100k-population
  * fallback (`CITY_PULSE_FALLBACK_POPULATION`) and leave the city name unset
  * so pedalVoice renders its localized "your city" fallback instead of a

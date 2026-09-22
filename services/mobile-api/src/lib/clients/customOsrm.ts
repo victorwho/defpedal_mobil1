@@ -52,7 +52,7 @@ const fetchOsrmWithRetry = async (url: string): Promise<Response> => {
 
 /**
  * Resolve the OSRM base URL. Single EU-wide deployment (2026-07-12): one
- * graph covers all 31 supported countries; the profile — resolved in core by
+ * graph covers every supported country; the profile — resolved in core by
  * `resolveSafeRoutingProfile`, the same function the mobile dispatcher in
  * `apps/mobile/src/lib/mapbox-routing.ts` uses — selects the instance.
  */

@@ -285,7 +285,7 @@ export const es: TranslationKeys = {
     errorRetry: 'Intentar de nuevo',
 
     unavailableTitle: 'Las rutas circulares aún no están disponibles aquí',
-    unavailableBody: 'Necesitan nuestros datos de riesgo vial. Cubren 31 países — este todavía no.',
+    unavailableBody: 'Necesitan nuestros datos de riesgo vial. Cubren 32 países — este todavía no.',
     unavailableCta: 'Únete a la lista de espera',
 
     sessionsLeft: 'Te quedan {{count}} de {{total}} sesiones este mes',
@@ -316,11 +316,11 @@ export const es: TranslationKeys = {
     busyStretch:
       '{{distance}} por una vía con mucho tráfico — aquí no hay alternativa más tranquila. Extrema la precaución en este tramo o camina con la bici donde esté permitido.',
     dataUnavailable:
-      'Las puntuaciones de riesgo calle a calle aún no están disponibles en esta zona — por ahora cubren 31 países europeos (la UE, el EEE y Suiza).',
+      'Las puntuaciones de riesgo calle a calle aún no están disponibles en esta zona — por ahora cubren 32 países europeos (la UE, el EEE, Suiza y el Reino Unido).',
     explainer: {
       title: 'Cómo puntuamos cada calle',
       intro:
-        'Cada carretera, camino y carril de la app lleva una Puntuación de Riesgo — nuestra estimación de cuánto te expone una calle al peligro cuando la recorres. Cuanto más baja, más segura. Las puntuaciones calle a calle cubren 31 países europeos — la UE, el EEE y Suiza.',
+        'Cada carretera, camino y carril de la app lleva una Puntuación de Riesgo — nuestra estimación de cuánto te expone una calle al peligro cuando la recorres. Cuanto más baja, más segura. Las puntuaciones calle a calle cubren 32 países europeos — la UE, el EEE, Suiza y el Reino Unido.',
       anchor:
         'Una calle residencial tranquila queda hacia la mitad de la escala. Las calles por debajo se sienten más calmadas que tu calle de casa; las de arriba, más transitadas y exigentes.',
       legendTitle: 'Qué significan los colores',
@@ -1321,7 +1321,7 @@ export const es: TranslationKeys = {
     featureStat: '2,1× más seguro que Google Maps',
     featureStatSub: 'Medido en más de 10.000 rutas con puntuación de riesgo en Rumanía y España',
     featureRoutes: 'Rutas centradas en la seguridad',
-    featureRoutesSub: 'Datos reales de riesgo vial en 31 países europeos',
+    featureRoutesSub: 'Datos reales de riesgo vial en 32 países europeos',
     featureHazards: 'Alertas de peligro',
     featureHazardsSub: 'Peligros reportados por la comunidad cerca de tu ruta',
     locationDenied: 'Ubicación no disponible. Aún puedes explorar rutas buscando una ciudad.',
@@ -1357,7 +1357,7 @@ export const es: TranslationKeys = {
     regionNoResults: 'Ningún país coincide con tu búsqueda',
     regionUnavailableTitle: 'Aún no estamos en {{country}}',
     regionUnavailableSubtitle:
-      'Defensive Pedal cubre actualmente la UE, el EEE y Suiza. Déjanos tu email y te avisaremos en cuanto lancemos en {{country}}.',
+      'Defensive Pedal cubre actualmente la UE, el EEE, Suiza y el Reino Unido. Déjanos tu email y te avisaremos en cuanto lancemos en {{country}}.',
     regionEmailPlaceholder: 'tu@ejemplo.com',
     regionEmailConsent: 'Solo te escribiremos sobre la disponibilidad en tu país — nada más.',
     regionNotifyMe: 'Avisadme',

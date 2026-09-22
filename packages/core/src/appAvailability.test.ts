@@ -24,13 +24,17 @@ describe('SUPPORTED_APP_COUNTRIES', () => {
     }
   });
 
-  it('has exactly 31 entries (EU-27 + IS/LI/NO + CH)', () => {
-    expect(SUPPORTED_APP_COUNTRIES.size).toBe(31);
+  it('contains the United Kingdom (b47v1 routing generation, 2026-09-21)', () => {
+    expect(SUPPORTED_APP_COUNTRIES.has('GB')).toBe(true);
   });
 
-  it('does not contain the UK or other unsupported countries', () => {
-    // GB is deliberately outside the OSRM routing coverage (2026-07-12).
-    for (const code of ['GB', 'US', 'RS', 'UA', 'TR', 'MD', 'AL', 'BA', 'MK', 'ME', 'XK']) {
+  it('has exactly 32 entries (EU-27 + IS/LI/NO + CH + GB)', () => {
+    expect(SUPPORTED_APP_COUNTRIES.size).toBe(32);
+  });
+
+  it('does not contain the Crown Dependencies or other unsupported countries', () => {
+    // IM/JE/GG are separate ISO codes and are not in the routing graph.
+    for (const code of ['IM', 'JE', 'GG', 'US', 'RS', 'UA', 'TR', 'MD', 'AL', 'BA', 'MK', 'ME', 'XK']) {
       expect(SUPPORTED_APP_COUNTRIES.has(code)).toBe(false);
     }
   });
@@ -64,11 +68,13 @@ describe('isAppCountrySupported', () => {
     expect(isAppCountrySupported('fr')).toBe(true);
   });
 
-  it('rejects the UK consistently via both GB and the UK alias', () => {
-    // The alias still matters: a UK rider must resolve to GB and land on
-    // the waitlist, not fall through as "unknown country" to the picker.
-    expect(isAppCountrySupported('GB')).toBe(false);
-    expect(isAppCountrySupported('UK')).toBe(false);
+  it('accepts the UK consistently via both GB and the UK alias', () => {
+    // The alias still matters: some Android geocoders return "UK", and a UK
+    // rider must pass the gate silently rather than fall through as an
+    // "unknown country" to the manual picker.
+    expect(isAppCountrySupported('GB')).toBe(true);
+    expect(isAppCountrySupported('UK')).toBe(true);
+    expect(isAppCountrySupported('gb')).toBe(true);
   });
 
   it('rejects unsupported countries', () => {

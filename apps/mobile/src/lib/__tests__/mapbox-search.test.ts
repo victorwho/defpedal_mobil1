@@ -280,12 +280,13 @@ describe('mapboxAutocomplete', () => {
     const countries = (new URL(fetchCall).searchParams.get('country') ?? '').split(',');
     // A rider physically in RO must be able to search destinations in every
     // supported country — not just RO+ES (pre-gate behavior).
-    expect(countries).toHaveLength(31);
+    expect(countries).toHaveLength(32);
     expect(countries).toEqual(
       expect.arrayContaining(['RO', 'ES', 'DE', 'FR', 'AT', 'CH', 'NO', 'IS', 'LI']),
     );
-    // UK is deliberately outside the supported set (2026-07-12).
-    expect(countries).not.toContain('GB');
+    // UK joined the supported set with the b47v1 routing generation
+    // (2026-09-21) — a rider in Bucharest can autocomplete "Tower Bridge".
+    expect(countries).toContain('GB');
   });
 
   it('throws on non-OK response', async () => {
@@ -465,12 +466,18 @@ describe('mapboxGetCoverage', () => {
     expect(result.matched?.countryCode).toBe('RO');
   });
 
-  it('returns unsupported for countries outside the supported set (GB, BR)', async () => {
+  it('returns supported for GB (b47v1 routing generation, 2026-09-21)', async () => {
+    const gb = await mapboxGetCoverage(51.5, -0.12, 'GB');
+    expect(gb.matched?.status).toBe('supported');
+    expect(gb.matched?.safeRouting).toBe(true);
+  });
+
+  it('returns unsupported for countries outside the supported set (UA, BR)', async () => {
     // BR was in the legacy hardcoded set (Pedala Defensiva origins) — the
     // set now derives from SUPPORTED_APP_COUNTRIES, which excludes it.
-    const gb = await mapboxGetCoverage(51.5, -0.12, 'GB');
-    expect(gb.matched?.status).toBe('unsupported');
-    expect(gb.matched?.safeRouting).toBe(false);
+    const ua = await mapboxGetCoverage(50.45, 30.52, 'UA');
+    expect(ua.matched?.status).toBe('unsupported');
+    expect(ua.matched?.safeRouting).toBe(false);
 
     const br = await mapboxGetCoverage(-23.55, -46.63, 'BR');
     expect(br.matched?.status).toBe('unsupported');

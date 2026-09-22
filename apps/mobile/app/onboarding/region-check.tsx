@@ -47,7 +47,7 @@ type Phase = 'detecting' | 'picker' | 'waitlist';
  * consent screen was removed from the flow 2026-07-16 — telemetry controls
  * live in Profile › Privacy & analytics, with a transparency notice on the
  * first onboarding screen). GPS reverse-geocode resolves the rider's
- * country: supported (EU-27 + EEA + CH, see core `appAvailability.ts`)
+ * country: supported (EU-27 + EEA + CH + UK, see core `appAvailability.ts`)
  * passes straight through — the rider only ever sees a brief spinner.
  * Unknown → manual country picker. Unsupported → waitlist panel that
  * collects an email for the launch announcement, with a "Continue anyway"

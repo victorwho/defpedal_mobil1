@@ -213,8 +213,8 @@ export default function RoutePlanningScreen() {
     if (avoidHeat && !coolAvailable) setAvoidHeat(false);
   }, [hasDestination, resolvedCountry.routeSupported, coolAvailable, avoidHeat, setAvoidHeat]);
 
-  // E-bike needs no country gate — one graph serves all 31 supported
-  // countries — so entitlement is the only thing that can withdraw it.
+  // E-bike needs no country gate — one graph serves every supported
+  // country — so entitlement is the only thing that can withdraw it.
   const ebikeAvailable = !premium.blockEbikeRouting();
   useEffect(() => {
     if (isEbike && !ebikeAvailable) selectRoutingMode('safe');
@@ -1547,11 +1547,11 @@ export default function RoutePlanningScreen() {
 
           {/* Routing mode toggle — Safe / Fast / Flat on the first row,
               E-bike / Cool on the second. Gated by coverage support: outside
-              the 31 covered countries (EU-27 + EEA + CH) we hide every OSRM
+              the covered countries (EU-27 + EEA + CH + UK) we hide every OSRM
               mode and surface a banner so the rider understands why only
               Fast is on offer. Cross-border rides within coverage are
               supported (single EU graph). E-bike covers every covered country
-              on one graph; Cool has its own coverage list (HEAT_ROUTING_COUNTRIES, now the same 31) and is also gated by the shade-graph
+              on one graph; Cool has its own coverage list (HEAT_ROUTING_COUNTRIES, now the full routing list) and is also gated by the shade-graph
               countries (RO at launch) and hidden in production. The modes are
               mutually exclusive — each is its own OSRM graph. */}
           {hasValidDestination ? (
@@ -1619,7 +1619,7 @@ export default function RoutePlanningScreen() {
                 ) : null}
                 {/* Supported country WITHOUT road_risk_data: unreachable
                     since the b36v1 EU-wide dataset (2026-08-01) put risk
-                    data in all 31 covered countries, but kept armed — if
+                    data in every covered country, but kept armed — if
                     RISK_DATA_COUNTRIES ever narrows again this notice is
                     the honest-degradation surface (review G-05). */}
                 {!isRiskDataAvailable(resolvedCountry.destinationCountry) ? (
@@ -1700,7 +1700,7 @@ export default function RoutePlanningScreen() {
           {/*
             Loops need `exclude=unpaved`, `annotation.classes` AND the safety
             profile — all three OSRM-only, and Mapbox Directions populates none
-            of them. So there is no degraded mode outside the 31 covered
+            of them. So there is no degraded mode outside the covered
             countries. The FAB stays visible but dimmed rather than hidden: a
             rider who later crosses a border should already know the feature
             exists, and the screen itself explains why it cannot run here.

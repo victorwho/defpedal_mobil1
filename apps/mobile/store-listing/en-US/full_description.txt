@@ -24,7 +24,7 @@ Defensive Pedal is built for European cyclists, with EU data residency where it 
 
 WHERE IT WORKS
 
-Safe routing and street-by-street risk colors — the safety layer painted onto your route — are available across all 31 supported European countries: the EU, the EEA and Switzerland. Fast routing works worldwide.
+Safe routing and street-by-street risk colors — the safety layer painted onto your route — are available across all 32 supported European countries: the EU, the EEA, Switzerland and the United Kingdom. Fast routing works worldwide.
 
 The app is fully translated into Romanian and Spanish, and the daily safety quiz includes questions tailored to Romanian and Spanish road law and cycling etiquette.
 

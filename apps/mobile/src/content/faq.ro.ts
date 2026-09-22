@@ -33,7 +33,7 @@ export const faqRo: FaqSections = [
         id: 'risk-score-source',
         question: 'De unde vine Scorul de Risc?',
         answer:
-          'De la stradă în sine: limite de viteză, benzi, infrastructura pentru biciclete și cât de bine te separă de mașini, volume de trafic modelate, calitatea suprafeței, iluminatul și zeci de alte semnale — din OpenStreetMap, date de elevație și modelare de trafic. Mai mic înseamnă mai sigur. Scorurile stradă cu stradă acoperă toate cele 31 de țări europene suportate.',
+          'De la stradă în sine: limite de viteză, benzi, infrastructura pentru biciclete și cât de bine te separă de mașini, volume de trafic modelate, calitatea suprafeței, iluminatul și zeci de alte semnale — din OpenStreetMap, date de elevație și modelare de trafic. Mai mic înseamnă mai sigur. Scorurile stradă cu stradă acoperă toate cele 32 de țări europene suportate.',
       },
       {
         id: 'wrong-street-color',
@@ -51,7 +51,7 @@ export const faqRo: FaqSections = [
         id: 'supported-countries',
         question: 'Ce țări sunt acoperite?',
         answer:
-          'Rutarea sigură și culorile de risc stradă cu stradă sunt disponibile în 31 de țări europene (UE, SEE și Elveția). Rutarea rapidă funcționează în toată lumea, prin Mapbox.',
+          'Rutarea sigură și culorile de risc stradă cu stradă sunt disponibile în 32 de țări europene (UE, SEE, Elveția și Regatul Unit). Rutarea rapidă funcționează în toată lumea, prin Mapbox.',
       },
       {
         id: 'avoid-unpaved',

@@ -887,6 +887,28 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
     expect(result.coverage.safeRouting).toBe(true);
   });
 
+  it('routes a UK ride via OSRM with risk segments (b47v1, 2026-09-21)', async () => {
+    setupFetchMock([
+      { data: createRouteResponse() },
+      { data: createElevationResponse() },
+      { data: createRiskResponse() },
+    ]);
+
+    const result = await directPreviewRoute({
+      origin: { lat: 51.5074, lon: -0.1278 },   // London
+      destination: { lat: 51.5155, lon: -0.0877 }, // the City
+      mode: 'safe',
+      avoidUnpaved: false,
+      avoidHills: false,
+    });
+
+    const firstCallUrl = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(firstCallUrl).toContain('://osrm.defensivepedal.com');
+    expect(result.selectedMode).toBe('safe');
+    expect(result.coverage.safeRouting).toBe(true);
+    expect(result.coverage.countryCode).toBe('GB');
+  });
+
   it('falls back to Mapbox when safe is requested in an unsupported country', async () => {
     setupFetchMock([
       { data: createRouteResponse() },
@@ -894,10 +916,11 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
       { data: createRiskResponse() },
     ]);
 
-    // London → London (UK outside coverage)
+    // Kyiv → Kyiv (Ukraine outside coverage; London was the example until
+    // the UK joined the graph on 2026-09-21)
     const result = await directPreviewRoute({
-      origin: { lat: 51.5074, lon: -0.1278 },
-      destination: { lat: 51.51, lon: -0.1 },
+      origin: { lat: 50.4501, lon: 30.5234 },
+      destination: { lat: 50.46, lon: 30.54 },
       mode: 'safe',
       avoidUnpaved: false,
       avoidHills: false,
@@ -992,8 +1015,8 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
 
     await expect(
       directPreviewRoute({
-        origin: { lat: 51.5074, lon: -0.1278 },  // London (unsupported → Mapbox)
-        destination: { lat: 55.9533, lon: -3.1883 }, // Edinburgh (~530km)
+        origin: { lat: 50.4501, lon: 30.5234 },  // Kyiv (unsupported → Mapbox)
+        destination: { lat: 46.4825, lon: 30.7233 }, // Odesa (~440km)
         mode: 'safe',
         avoidUnpaved: false,
         avoidHills: false,
@@ -1599,9 +1622,9 @@ describe('directPreviewRoute — canopy comparison', () => {
 
       const result = await directPreviewRoute(
         coolRequest({
-          // London: deliberately excluded from the covered set.
-          origin: { lat: 51.5, lon: -0.12 },
-          destination: { lat: 51.51, lon: -0.1 },
+          // Kyiv: outside the covered set.
+          origin: { lat: 50.4501, lon: 30.5234 },
+          destination: { lat: 50.46, lon: 30.54 },
         }),
       );
 
@@ -1858,7 +1881,7 @@ describe('directPreviewRoute — canopy composition', () => {
    * zero-distance route, the request degrades to Mapbox, and the rider is
    * looking at a Mapbox route — so there is no shade route to describe.
    *
-   * Distinct from the London case, which never reaches the shade graph at all
+   * Distinct from the Kyiv case, which never reaches the shade graph at all
    * because `effectiveMode` becomes 'fast' first. This one exercises the
    * `!osrmCoverageMiss` clause specifically.
    */

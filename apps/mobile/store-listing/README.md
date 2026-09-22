@@ -24,7 +24,7 @@ store-listing/
 ```
 
 `en-US` is the **default** listing language in Play Console. The app is
-available across 31 European countries, and Play serves the default language
+available across 32 European countries, and Play serves the default language
 to every locale that has no dedicated translation — so the default has to be
 the one that reads sensibly everywhere. `ro-RO` and `es-ES` are added as
 translations for the two markets with street-by-street risk data and a fully

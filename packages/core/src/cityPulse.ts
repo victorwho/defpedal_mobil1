@@ -51,7 +51,7 @@ const ESTIMATED: CountryCyclingShare = { share: 0.08, measured: false };
 
 /**
  * Keyed by the same ISO 3166-1 alpha-2 codes as
- * `appAvailability.SUPPORTED_APP_COUNTRIES` (all 31 supported countries).
+ * `appAvailability.SUPPORTED_APP_COUNTRIES` (all 32 supported countries).
  * Measured anchors from the Eurobarometer mobility survey (see plan doc);
  * everything else defaults to the 8% EU average as an estimate. Upgrading a
  * country from estimate to measured is a data edit here, not a formula change.
@@ -94,6 +94,12 @@ export const COUNTRY_CYCLING_SHARE: Readonly<Record<string, CountryCyclingShare>
   NO: ESTIMATED,
   // Bilateral
   CH: ESTIMATED,
+  // United Kingdom (routing since 2026-09-21). No Eurobarometer figure after
+  // Brexit, and the 8% EU default is the one that read ~60% high in
+  // Bucharest. The DfT National Travel Survey puts cycling at about 2% of
+  // trips in England, closer to Romania than to the EU average, so GB takes
+  // Romania's calibrated estimate. Revisit against real London pulse numbers.
+  GB: { share: 0.032, measured: false },
 };
 
 // ---------------------------------------------------------------------------

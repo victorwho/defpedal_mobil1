@@ -186,8 +186,8 @@ export const usePremium = (): UsePremiumResult => {
       /*
        * E-bike is Plus-only on the same date as Cool, and gated the same way.
        *
-       * No country argument: the e-bike graph is one hostname covering all 31
-       * supported countries, so there is nothing per-country to decide.
+       * No country argument: the e-bike graph is one hostname covering every
+       * supported country, so there is nothing per-country to decide.
        */
       blockEbikeRouting: () =>
         snapshot?.uiEnabled === true &&

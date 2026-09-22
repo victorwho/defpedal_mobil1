@@ -18,7 +18,7 @@
  *    profile flag can be honoured. The UI keeps them mutually exclusive; the
  *    precedence below only settles inconsistent state (an old saved route, a
  *    hand-built request) instead of letting it pick a graph by accident.
- *  - The e-bike graph is ONE hostname for all 31 covered countries. Never
+ *  - The e-bike graph is ONE hostname for every covered country. Never
  *    derive it per country — there is no `osrm-es-ebike` and a country-suffixed
  *    host fails TLS in exactly the country that suffix names.
  */

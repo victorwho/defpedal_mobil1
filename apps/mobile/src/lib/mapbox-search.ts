@@ -43,7 +43,7 @@ const MIN_QUERY_LENGTH = 2;
 const SUPPORTED_COUNTRIES: ReadonlySet<string> = SUPPORTED_APP_COUNTRIES;
 
 /**
- * Search-filter expansion for supported app countries (EU-27 + EEA + CH —
+ * Search-filter expansion for supported app countries (EU-27 + EEA + CH + UK —
  * `SUPPORTED_APP_COUNTRIES` from core, single source of truth with the
  * onboarding region gate). When the rider is physically inside ANY of these
  * (`countryHint` is resolved by `useResolvedCountry` — RO/ES routing bboxes

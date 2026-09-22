@@ -7,6 +7,7 @@ import {
   ROUTING_COVERED_COUNTRIES,
   isHeatRoutingAvailable,
   isRiskDataAvailable,
+  getCountryCenter,
   isRouteSupported,
   resolveCountryFromCoord,
 } from './countryCoverage';
@@ -28,6 +29,8 @@ describe('isRiskDataAvailable', () => {
     expect(isRiskDataAvailable('RO')).toBe(true);
     expect(isRiskDataAvailable('ES')).toBe(true);
     expect(isRiskDataAvailable('DE')).toBe(true);
+    // b47v1 risk export (2026-09-21) — UK street scores went live with routing.
+    expect(isRiskDataAvailable('GB')).toBe(true);
     expect(isRiskDataAvailable(null)).toBe(false);
     expect(isRiskDataAvailable(undefined)).toBe(false);
   });
@@ -57,7 +60,8 @@ describe('isHeatRoutingAvailable', () => {
   });
 
   // Measured 2026-09-17: osrm-shade returned a real route from the capital of
-  // every one of the 31 covered countries. Cool is no longer RO-only.
+  // every one of the 31 covered countries. Cool is no longer RO-only. The UK
+  // joined with the b47v1 shade arm (2026-09-22).
   it('covers the whole routing footprint, not just Romania', () => {
     expect([...HEAT_ROUTING_COUNTRIES].sort()).toEqual([...ROUTING_COVERED_COUNTRIES].sort());
     for (const country of ROUTING_COVERED_COUNTRIES) {
@@ -69,6 +73,7 @@ describe('isHeatRoutingAvailable', () => {
     expect(isHeatRoutingAvailable('RO')).toBe(true);
     expect(isHeatRoutingAvailable('DE')).toBe(true);
     expect(isHeatRoutingAvailable('ES')).toBe(true);
+    expect(isHeatRoutingAvailable('GB')).toBe(true);
   });
 
   it('is unavailable for null/undefined attribution', () => {
@@ -148,8 +153,8 @@ describe('resolveCountryFromCoord', () => {
     expect(resolveCountryFromCoord({ lat: 28.1248, lon: -15.43 })).toBeNull();
   });
 
-  it('returns null for London (UK deliberately outside coverage)', () => {
-    expect(resolveCountryFromCoord({ lat: 51.5074, lon: -0.1278 })).toBeNull();
+  it('returns null for the Faroe Islands (north of the Shetland box, no graph data)', () => {
+    expect(resolveCountryFromCoord({ lat: 62.0107, lon: -6.7741 })).toBeNull(); // Tórshavn
   });
 
   it('returns null for Kyiv and Istanbul (outside coverage)', () => {
@@ -166,6 +171,110 @@ describe('resolveCountryFromCoord', () => {
   });
 });
 
+describe('resolveCountryFromCoord — United Kingdom (b47v1, 2026-09-21)', () => {
+  it('resolves British cities to GB, islands included', () => {
+    const cities: readonly [string, number, number][] = [
+      ['London', 51.5074, -0.1278],
+      ['Manchester', 53.4808, -2.2426],
+      ['Cardiff', 51.4816, -3.1791],
+      ['Edinburgh', 55.9533, -3.1883],
+      ['Glasgow', 55.8642, -4.2518],
+      ['Inverness', 57.4778, -4.2247],
+      ['Lerwick (Shetland)', 60.155, -1.145],
+      ['Kirkwall (Orkney)', 58.9809, -2.9605],
+      ['Stornoway (Lewis)', 58.209, -6.387],
+      ['Bowmore (Islay)', 55.7568, -6.2893],
+      ['Campbeltown (Kintyre)', 55.4254, -5.6053],
+      ['St Davids', 51.8812, -5.2656],
+      ['Holyhead (Anglesey)', 53.3094, -4.6331],
+      ['Norwich', 52.6309, 1.2974],
+      ['Lowestoft', 52.4811, 1.7534],
+      ['Belfast', 54.5973, -5.9301],
+      ['Bangor (County Down)', 54.6538, -5.6682],
+    ];
+    for (const [name, lat, lon] of cities) {
+      expect(resolveCountryFromCoord({ lat, lon }), name).toBe('GB');
+    }
+  });
+
+  it('wins the English south coast back from the loose FR box', () => {
+    // The FR box reaches 51.2°N. Before GB was listed ahead of it, every one
+    // of these attributed as France.
+    const southCoast: readonly [string, number, number][] = [
+      ['Dover', 51.1279, 1.3134],
+      ['Folkestone', 51.0814, 1.1695],
+      ['Dungeness', 50.9135, 0.9767],
+      ['Brighton', 50.8225, -0.1372],
+      ['Southampton', 50.9097, -1.4044],
+      ['Newport (Isle of Wight)', 50.7008, -1.2926],
+      ['Exeter', 50.7184, -3.5339],
+      ['Start Point', 50.2222, -3.6417],
+      ['Plymouth', 50.3755, -4.1427],
+      ['Penzance', 50.1188, -5.5371],
+      ['Lizard Point', 49.9594, -5.2064],
+      ['Hugh Town (Scilly)', 49.9146, -6.3131],
+    ];
+    for (const [name, lat, lon] of southCoast) {
+      expect(resolveCountryFromCoord({ lat, lon }), name).toBe('GB');
+    }
+  });
+
+  it('does not steal French land on the other side of the Channel', () => {
+    const northFrance: readonly [string, number, number][] = [
+      ['Calais', 50.9513, 1.8587],
+      ['Sangatte', 50.9453, 1.7532],
+      ['Cap Gris-Nez', 50.8697, 1.5836],
+      ['Boulogne-sur-Mer', 50.7264, 1.6147],
+      ['Le Tréport', 50.0599, 1.3708],
+      ['Dieppe', 49.9229, 1.0775],
+      ['Saint-Valery-en-Caux', 49.8686, 0.7113],
+      ['Cherbourg', 49.6337, -1.6222],
+      ['Dunkirk', 51.0344, 2.3768],
+    ];
+    for (const [name, lat, lon] of northFrance) {
+      expect(resolveCountryFromCoord({ lat, lon }), name).toBe('FR');
+    }
+  });
+
+  it('does not steal the Republic of Ireland', () => {
+    const republic: readonly [string, number, number][] = [
+      ['Dublin', 53.3498, -6.2603],
+      ['Howth', 53.3867, -6.0653],
+      ['Wicklow', 52.9808, -6.0446],
+      ['Dundalk', 54.0, -6.4167],
+      ['Carlingford', 54.0405, -6.1869],
+      ['Letterkenny', 54.9558, -7.7342],
+      ['Malin Head', 55.3814, -7.3739],
+    ];
+    for (const [name, lat, lon] of republic) {
+      expect(resolveCountryFromCoord({ lat, lon }), name).toBe('IE');
+    }
+  });
+
+  it('covers the rest of Northern Ireland through the IE box (cosmetic attribution)', () => {
+    // West of the Belfast box the IE box claims Northern Ireland. Same graph,
+    // same left-hand traffic — what matters is that the point is covered.
+    expect(resolveCountryFromCoord({ lat: 54.9966, lon: -7.3086 })).toBe('IE'); // Derry
+    expect(resolveCountryFromCoord({ lat: 54.1751, lon: -6.3402 })).toBe('IE'); // Newry
+    expect(resolveCountryFromCoord({ lat: 54.3438, lon: -7.6315 })).toBe('IE'); // Enniskillen
+  });
+
+  it('leaves the Channel Islands with their existing FR attribution', () => {
+    // Crown Dependencies, not in the graph (probed: 29 km snap, distance-0) —
+    // outside every GB box, unchanged by the UK launch.
+    expect(resolveCountryFromCoord({ lat: 49.186, lon: -2.106 })).toBe('FR'); // St Helier
+    expect(resolveCountryFromCoord({ lat: 49.456, lon: -2.536 })).toBe('FR'); // St Peter Port
+  });
+
+  it('centres the camera default on England, not the North Sea', () => {
+    const center = getCountryCenter('GB');
+    expect(center.lat).toBeGreaterThan(52);
+    expect(center.lat).toBeLessThan(54.5);
+    expect(center.lon).toBeGreaterThan(-3);
+    expect(center.lon).toBeLessThan(-1);
+  });
+});
+
 describe('isRouteSupported', () => {
   const bucharest = { lat: 44.4268, lon: 26.1025 };
   const cluj = { lat: 46.7712, lon: 23.6236 };
@@ -175,6 +284,10 @@ describe('isRouteSupported', () => {
   const vienna = { lat: 48.2082, lon: 16.3738 };
   const bratislava = { lat: 48.1486, lon: 17.1077 };
   const london = { lat: 51.5074, lon: -0.1278 };
+  const edinburgh = { lat: 55.9533, lon: -3.1883 };
+  const dublin = { lat: 53.3498, lon: -6.2603 };
+  const belfast = { lat: 54.5973, lon: -5.9301 };
+  const kyiv = { lat: 50.4501, lon: 30.5234 };
 
   it('supports a same-country RO ride', () => {
     expect(isRouteSupported(bucharest, cluj)).toEqual({ supported: true, country: 'RO' });
@@ -193,8 +306,13 @@ describe('isRouteSupported', () => {
     expect(isRouteSupported(bucharest, madrid)).toEqual({ supported: true, country: 'RO' });
   });
 
+  it('supports UK rides, including across the Irish land border', () => {
+    expect(isRouteSupported(london, edinburgh)).toEqual({ supported: true, country: 'GB' });
+    expect(isRouteSupported(dublin, belfast)).toEqual({ supported: true, country: 'IE' });
+  });
+
   it('rejects when origin is in an unsupported country', () => {
-    expect(isRouteSupported(london, madrid)).toEqual({
+    expect(isRouteSupported(kyiv, madrid)).toEqual({
       supported: false,
       originCountry: null,
       destinationCountry: 'ES',
@@ -203,7 +321,7 @@ describe('isRouteSupported', () => {
   });
 
   it('rejects when destination is in an unsupported country', () => {
-    expect(isRouteSupported(bucharest, london)).toEqual({
+    expect(isRouteSupported(bucharest, kyiv)).toEqual({
       supported: false,
       originCountry: 'RO',
       destinationCountry: null,
@@ -212,7 +330,7 @@ describe('isRouteSupported', () => {
   });
 
   it('rejects when both endpoints are unsupported', () => {
-    expect(isRouteSupported(london, london)).toEqual({
+    expect(isRouteSupported(kyiv, kyiv)).toEqual({
       supported: false,
       originCountry: null,
       destinationCountry: null,

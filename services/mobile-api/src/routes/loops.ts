@@ -271,7 +271,7 @@ export const buildLoopRoutes =
             statusCode: 403,
             code: 'FEATURE_DISABLED',
             details: [
-              'Loops need the safety routing graph, which covers the EU, EEA and Switzerland.',
+              'Loops need the safety routing graph, which covers the EU, EEA, Switzerland and the UK.',
             ],
           });
         }

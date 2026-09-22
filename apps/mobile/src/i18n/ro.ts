@@ -285,7 +285,7 @@ export const ro: TranslationKeys = {
     errorRetry: 'Încearcă din nou',
 
     unavailableTitle: 'Tururile nu sunt încă disponibile aici',
-    unavailableBody: 'Tururile au nevoie de datele noastre de risc rutier. Acoperă 31 de țări — încă nu și aceasta.',
+    unavailableBody: 'Tururile au nevoie de datele noastre de risc rutier. Acoperă 32 de țări — încă nu și aceasta.',
     unavailableCta: 'Intră pe lista de așteptare',
 
     sessionsLeft: '{{count}} din {{total}} sesiuni de tururi rămase luna aceasta',
@@ -316,11 +316,11 @@ export const ro: TranslationKeys = {
     busyStretch:
       '{{distance}} pe un drum aglomerat — nu există o alternativă mai liniștită aici. Fii extra atent pe această porțiune sau mergi pe lângă bicicletă unde e permis.',
     dataUnavailable:
-      'Scorurile de risc stradă-cu-stradă nu sunt încă disponibile în această zonă — momentan acoperă 31 de țări europene (UE, SEE și Elveția).',
+      'Scorurile de risc stradă-cu-stradă nu sunt încă disponibile în această zonă — momentan acoperă 32 de țări europene (UE, SEE, Elveția și Regatul Unit).',
     explainer: {
       title: 'Cum evaluăm fiecare stradă',
       intro:
-        'Fiecare drum, alee și pistă de pe hartă are un Scor de Risc — estimarea noastră despre cât de mult te expune o stradă la pericol când o parcurgi. Mai mic înseamnă mai sigur. Scorurile stradă-cu-stradă acoperă 31 de țări europene — UE, SEE și Elveția.',
+        'Fiecare drum, alee și pistă de pe hartă are un Scor de Risc — estimarea noastră despre cât de mult te expune o stradă la pericol când o parcurgi. Mai mic înseamnă mai sigur. Scorurile stradă-cu-stradă acoperă 32 de țări europene — UE, SEE, Elveția și Regatul Unit.',
       anchor:
         'O stradă rezidențială liniștită se află pe la mijlocul scalei. Străzile de sub ea se simt mai calme decât strada ta de acasă; cele de deasupra, mai aglomerate și mai solicitante.',
       legendTitle: 'Ce înseamnă culorile',
@@ -1321,7 +1321,7 @@ export const ro: TranslationKeys = {
     featureStat: 'De 2,1× mai sigur decât Google Maps',
     featureStatSub: 'Măsurat pe peste 10.000 de rute cu scor de risc din România și Spania',
     featureRoutes: 'Rute axate pe siguranță',
-    featureRoutesSub: 'Date reale de risc rutier în 31 de țări europene',
+    featureRoutesSub: 'Date reale de risc rutier în 32 de țări europene',
     featureHazards: 'Alerte de pericol',
     featureHazardsSub: 'Pericole raportate de comunitate aproape de ruta ta',
     locationDenied: 'Locație indisponibilă. Poți explora în continuare rute căutând un oraș.',
@@ -1357,7 +1357,7 @@ export const ro: TranslationKeys = {
     regionNoResults: 'Nicio țară nu corespunde căutării',
     regionUnavailableTitle: 'Încă nu suntem în {{country}}',
     regionUnavailableSubtitle:
-      'Defensive Pedal acoperă momentan UE, SEE și Elveția. Lasă-ne emailul tău și te anunțăm imediat ce lansăm în {{country}}.',
+      'Defensive Pedal acoperă momentan UE, SEE, Elveția și Regatul Unit. Lasă-ne emailul tău și te anunțăm imediat ce lansăm în {{country}}.',
     regionEmailPlaceholder: 'tu@exemplu.com',
     regionEmailConsent: 'Îți vom scrie doar despre disponibilitatea în țara ta — nimic altceva.',
     regionNotifyMe: 'Anunță-mă',

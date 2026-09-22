@@ -17,6 +17,7 @@ import {
   localDateISO,
   type Rng,
 } from './cityPulse';
+import { SUPPORTED_APP_COUNTRIES } from './appAvailability';
 import type { CyclingForecast } from './cyclingWeather';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,8 +48,8 @@ const rngOf = (...values: number[]): Rng => {
 };
 
 describe('COUNTRY_CYCLING_SHARE', () => {
-  it('covers all 31 supported countries with the documented anchors', () => {
-    expect(Object.keys(COUNTRY_CYCLING_SHARE)).toHaveLength(31);
+  it('covers all 32 supported countries with the documented anchors', () => {
+    expect(Object.keys(COUNTRY_CYCLING_SHARE)).toHaveLength(32);
     expect(COUNTRY_CYCLING_SHARE.NL).toEqual({ share: 0.41, measured: true });
     expect(COUNTRY_CYCLING_SHARE.SE).toEqual({ share: 0.21, measured: true });
     expect(COUNTRY_CYCLING_SHARE.DE).toEqual({ share: 0.15, measured: true });
@@ -64,6 +65,17 @@ describe('COUNTRY_CYCLING_SHARE', () => {
     // RO calibrated down 60% from the EU-average estimate (2026-07-19) — the
     // Bucharest pulse read ~137k with the 8% default, judged far too high.
     expect(COUNTRY_CYCLING_SHARE.RO).toEqual({ share: 0.032, measured: false });
+    // GB has no Eurobarometer figure; it takes RO's calibrated estimate rather
+    // than the 8% default (DfT puts cycling at ~2% of trips in England).
+    expect(COUNTRY_CYCLING_SHARE.GB).toEqual({ share: 0.032, measured: false });
+  });
+
+  it('has an entry for every supported app country', () => {
+    // A missing key silently falls back to the 8% default — the figure that
+    // read ~60% high in Bucharest. Adding a country means deciding its share.
+    for (const code of SUPPORTED_APP_COUNTRIES) {
+      expect(COUNTRY_CYCLING_SHARE[code], code).toBeDefined();
+    }
   });
 });
 

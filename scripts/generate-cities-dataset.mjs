@@ -7,8 +7,8 @@
  *   unzip cities15000.zip
  *   node scripts/generate-cities-dataset.mjs path/to/cities15000.txt
  *
- * Filters to the 31 supported app countries (EU-27 + EEA + CH, same list as
- * packages/core/src/appAvailability.ts) and population >= 15000, then emits
+ * Filters to the 32 supported app countries (EU-27 + EEA + CH + GB, same list
+ * as packages/core/src/appAvailability.ts) and population >= 15000, then emits
  * services/mobile-api/src/lib/nudges/citiesData.ts as compact tuples.
  *
  * The utcOffset column is the STANDARD-TIME (winter) offset in hours, derived
@@ -31,6 +31,7 @@ const SUPPORTED = new Set([
   'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
   'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',
   'IS', 'LI', 'NO', 'CH',
+  'GB',
 ]);
 
 const MIN_POPULATION = 15000;
@@ -97,8 +98,8 @@ const tupleLines = rows.map(
 const out = `/**
  * GENERATED FILE — do not edit by hand.
  *
- * City Riders Pulse dataset: cities with population >= ${MIN_POPULATION} in the 31
- * supported app countries (EU-27 + EEA + CH). Source: GeoNames cities15000
+ * City Riders Pulse dataset: cities with population >= ${MIN_POPULATION} in the 32
+ * supported app countries (EU-27 + EEA + CH + GB). Source: GeoNames cities15000
  * (CC BY 4.0, https://www.geonames.org/). Regenerate with:
  *   node scripts/generate-cities-dataset.mjs <cities15000.txt>
  *

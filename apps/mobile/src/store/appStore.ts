@@ -171,7 +171,7 @@ export type AppStore = QueueSlice & PremiumSlice & {
   // like analyticsConsent — the answer is about where this install physically
   // is, not which account is signed in, so it is NOT reset by
   // resetUserScopedState. `unchecked` = gate not yet run (new install);
-  // `passed` = detected/picked country is supported (EU-27+EEA+CH);
+  // `passed` = detected/picked country is supported (EU-27+EEA+CH+UK);
   // `waitlisted` = unsupported country acknowledged (soft gate — the user may
   // still use the app with Mapbox fallback routing).
   regionGate: {

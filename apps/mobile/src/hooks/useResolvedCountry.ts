@@ -15,7 +15,7 @@ export type UnsupportedReason =
   | 'destination_unsupported';
 
 export interface ResolvedCountry {
-  /** Country resolved from the current planning origin. `null` outside the 31 covered countries. */
+  /** Country resolved from the current planning origin. `null` outside the covered countries. */
   readonly originCountry: SupportedCountry | null;
   /** Country resolved from the planning destination. `null` if unset/unsupported. */
   readonly destinationCountry: SupportedCountry | null;
@@ -97,7 +97,7 @@ export const useResolvedCountry = (): ResolvedCountry => {
   // biasing follows where the rider actually IS (proximity / Mapbox country
   // filter), not the custom map origin they may be planning from.
   // `mapbox-search.ts` expands any supported-country hint to the full
-  // EU-27+EEA+CH list, so the hint's job is just "is the rider inside a
+  // EU-27+EEA+CH+UK list, so the hint's job is just "is the rider inside a
   // supported country, and which one".
   //
   // - Physical origin in RO or ES → the routing bboxes answer synchronously.

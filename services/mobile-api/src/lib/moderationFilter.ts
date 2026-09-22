@@ -16,7 +16,7 @@
  *
  * Covered languages track the shipped UI locales: English, Romanian, and
  * Spanish (added 2026-08-13, review finding G-26 — the ES UI had shipped
- * long before the filter learned any Spanish). The app serves 31 countries,
+ * long before the filter learned any Spanish). The app serves 32 countries,
  * so most languages still rely on the report flow; add locales here as
  * moderation volume in them appears.
  */

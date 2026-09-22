@@ -266,7 +266,7 @@ function RoutePreviewScreen() {
    * are not using.
    *
    * Cool additionally needs shade-graph coverage; e-bike is one hostname for
-   * all 31 supported countries and needs none.
+   * every supported country and needs none.
    */
   const coolAvailable =
     isCoolModeEnabled() &&
@@ -827,7 +827,7 @@ function RoutePreviewScreen() {
   }, [nextDisplayMode, selectRoutingMode]);
 
   const isCyclingMode = previewQuery.isFetching;
-  // Outside the covered countries (EU-27 + EEA + CH) we only have Mapbox
+  // Outside the covered countries (EU-27 + EEA + CH + UK) we only have Mapbox
   // fast routing — the cycle pill becomes a passive label so taps don't kick
   // the request through unavailable Safe/Flat profiles. The route-planning
   // gate already forced mode to fast.
@@ -1073,7 +1073,7 @@ function RoutePreviewScreen() {
         />
       ) : selectedRoute && !isRiskDataAvailable(resolvedCountry.destinationCountry) ? (
         // Route outside risk-data coverage (since the 2026-08-01 EU-wide
-        // dataset that means: outside the 31 covered countries — the
+        // dataset that means: outside the covered countries — the
         // "Continue anyway" cohort): explain the missing risk card instead
         // of rendering nothing (review G-05). Inside coverage an empty
         // riskSegments means load-failure/not-yet — keep the silent null

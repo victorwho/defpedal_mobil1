@@ -467,7 +467,7 @@ export const isCoolRoutingEntitled = (
  * Why e-bike routing is or is not offered.
  *
  * Two states rather than Cool's three: the e-bike graph is ONE hostname
- * covering all 31 supported countries, so there is no country dimension to
+ * covering every supported country, so there is no country dimension to
  * report. Never add one by copying the Cool shape — a per-country e-bike host
  * does not exist and a country-suffixed hostname fails TLS in exactly the
  * country that suffix names.

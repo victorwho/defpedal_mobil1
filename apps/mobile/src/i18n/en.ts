@@ -309,7 +309,7 @@ export const en = {
     errorRetry: 'Try again',
 
     unavailableTitle: 'Loops are not available here yet',
-    unavailableBody: 'Loops need our safety road data. It covers 31 countries — not this one yet.',
+    unavailableBody: 'Loops need our safety road data. It covers 32 countries — not this one yet.',
     unavailableCta: 'Join the waitlist',
 
     sessionsLeft: '{{count}} of {{total}} loop sessions left this month',
@@ -340,11 +340,11 @@ export const en = {
     busyStretch:
       '{{distance}} on a busy road — there’s no calmer alternative here. Take extra care on this stretch, or walk your bike where allowed.',
     dataUnavailable:
-      'Street-by-street risk scores aren’t available in this area yet — they currently cover 31 European countries (the EU, EEA and Switzerland).',
+      'Street-by-street risk scores aren’t available in this area yet — they currently cover 32 European countries (the EU, EEA, Switzerland and the UK).',
     explainer: {
       title: 'How we score every street',
       intro:
-        'Every road, path and cycleway on the map carries a Risk Score — our estimate of how much a street exposes you to danger when you ride it. Lower is safer. Street-by-street scores cover 31 European countries — the EU, EEA and Switzerland.',
+        'Every road, path and cycleway on the map carries a Risk Score — our estimate of how much a street exposes you to danger when you ride it. Lower is safer. Street-by-street scores cover 32 European countries — the EU, EEA, Switzerland and the UK.',
       anchor:
         'A quiet residential street sits around the middle of the scale. Streets below it feel calmer than your home street; streets above it feel busier and more demanding.',
       legendTitle: 'What the colors mean',
@@ -1364,7 +1364,7 @@ export const en = {
     featureStat: '2.1× safer than Google Maps',
     featureStatSub: 'Measured on 10,000+ risk-scored routes in Romania & Spain',
     featureRoutes: 'Safety-first routes',
-    featureRoutesSub: 'Real road risk data across 31 European countries',
+    featureRoutesSub: 'Real road risk data across 32 European countries',
     featureHazards: 'Hazard alerts',
     featureHazardsSub: 'Community-reported hazards near your route',
     locationDenied: 'Location not available. You can still explore routes by searching for a city.',
@@ -1402,7 +1402,7 @@ export const en = {
     regionNoResults: 'No countries match your search',
     regionUnavailableTitle: 'Not in {{country}} yet',
     regionUnavailableSubtitle:
-      'Defensive Pedal currently covers the EU, EEA and Switzerland. Leave your email and we’ll let you know the moment we launch in {{country}}.',
+      'Defensive Pedal currently covers the EU, EEA, Switzerland and the UK. Leave your email and we’ll let you know the moment we launch in {{country}}.',
     regionEmailPlaceholder: 'you@example.com',
     regionEmailConsent: 'We’ll only email you about availability in your country — nothing else.',
     regionNotifyMe: 'Notify me',

@@ -34,16 +34,17 @@ import { getAccessToken } from './supabase';
 // ---------------------------------------------------------------------------
 
 /**
- * Single EU-wide OSRM deployment (2026-07-12): one graph covering all 31
- * supported countries (EU-27 + EEA + CH), so there is no per-country server
- * split anymore and cross-border rides route natively. The former
+ * Single OSRM deployment (2026-07-12): one graph covering every supported
+ * country (EU-27 + EEA + CH, plus the UK since b47v1 on 2026-09-21), so
+ * there is no per-country server split anymore and cross-border rides
+ * route natively. The former
  * osrm-es.* pair is retired. Coverage gating lives in `isRouteSupported`
  * (`countryCoverage.ts`); adding coverage = extend the bboxes there, not
  * this constant.
  *
- * Risk segments (colored overlays + safe-vs-fast comparison) remain
- * RO+ES-only until `road_risk_data` ships for more countries — routes
- * elsewhere render without them.
+ * Risk segments (colored overlays + safe-vs-fast comparison) follow
+ * `RISK_DATA_COUNTRIES` in core — the full routing list since the
+ * 2026-08-01 EU-wide dataset, the UK included since b47v1.
  */
 const OSRM_BASE: Record<SafeRoutingProfile, string> = {
   standard: 'https://osrm.defensivepedal.com/route/v1/bicycle',
@@ -51,7 +52,7 @@ const OSRM_BASE: Record<SafeRoutingProfile, string> = {
   // E-bike routing — bicycle46-ebike.lua, the production safety profile with
   // pedelec effort pricing (EN 15194, assist to 25 km/h). Risk weights, legal
   // gates and access rules are byte-identical to standard; only what a
-  // vertical metre costs changes. ONE hostname for all 31 countries — never
+  // vertical metre costs changes. ONE hostname for every country — never
   // derive it per country (there is no osrm-es-ebike; a suffixed host fails
   // TLS). No e-bike flat or cool graph exists, which is why the profile is
   // resolved to exactly one instance in core (`resolveSafeRoutingProfile`).

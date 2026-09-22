@@ -43,7 +43,8 @@ import { useAppStore } from '../src/store/appStore';
 
 // Dev/preview-only fake GPS presets (Diagnostics card below). Chosen to
 // cover every location-dependent surface: RO/ES (country content + risk
-// data), a newly covered EU country, EEA/CH edges, the UK exclusion, and a
+// data), a newly covered EU country, EEA/CH edges, the UK (covered since
+// 2026-09-21, left-hand traffic), a European country outside coverage, and a
 // non-European waitlist country.
 const DEV_LOCATION_PRESETS: readonly { label: string; lat: number; lon: number }[] = [
   { label: 'Bucharest 🇷🇴', lat: 44.4268, lon: 26.1025 },
@@ -53,6 +54,7 @@ const DEV_LOCATION_PRESETS: readonly { label: string; lat: number; lon: number }
   { label: 'Zurich 🇨🇭', lat: 47.3769, lon: 8.5417 },
   { label: 'Reykjavik 🇮🇸', lat: 64.1466, lon: -21.9426 },
   { label: 'London 🇬🇧', lat: 51.5074, lon: -0.1278 },
+  { label: 'Kyiv 🇺🇦', lat: 50.4501, lon: 30.5234 },
   { label: 'New York 🇺🇸', lat: 40.7128, lon: -74.006 },
 ];
 
