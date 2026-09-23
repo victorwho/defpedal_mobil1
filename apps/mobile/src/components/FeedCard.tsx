@@ -14,6 +14,7 @@ import { TierPill } from '../design-system/atoms/TierPill';
 import { riderTiers, type RiderTierKey } from '../design-system/tokens/tierColors';
 import { useBlockUser } from '../hooks/useBlockUser';
 import { useT } from '../hooks/useTranslation';
+import { useUnits } from '../hooks/useUnits';
 import { ReactionBar } from './LikeButton';
 import { RouteMap } from './map';
 
@@ -72,6 +73,7 @@ export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUser
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
   const [expanded, setExpanded] = useState(false);
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
   const [optimisticallyHidden, setOptimisticallyHidden] = useState(false);
@@ -226,7 +228,7 @@ export const FeedCard = memo(({ item, isVisible, onLike, onLove, onPress, onUser
 
       {/* Compact summary line */}
       <Text style={styles.summaryLine}>
-        {formatDistance(item.distanceMeters)} · {formatDuration(item.durationSeconds)}
+        {formatDistance(item.distanceMeters, units)} · {formatDuration(item.durationSeconds)}
         {item.co2SavedKg != null && item.co2SavedKg > 0
           ? ` · ${formatCo2Saved(item.co2SavedKg)} CO2`
           : ''}

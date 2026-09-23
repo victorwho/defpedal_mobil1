@@ -1,3 +1,6 @@
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { formatSpeedKmh } from '@defensivepedal/core';
+
 /**
  * Random witty / friendly / slightly-sarcastic message variants for the
  * morning "today is a good day to cycle" push notification.
@@ -127,12 +130,15 @@ const conditionWord = (code: number): string => {
  * Body copy = pure weather facts. The title already carries the wit, so
  * keep the body informative and scannable at a glance on the lock screen.
  */
-export const buildGoodWeatherBody = (f: GoodWeatherForecast): string => {
+export const buildGoodWeatherBody = (
+  f: GoodWeatherForecast,
+  units: MeasurementSystem = 'metric',
+): string => {
   const tempRange = formatTempRange(f.tempMin, f.tempMax);
   const condition = conditionWord(f.weatherCode);
-  const wind = Math.round(f.windSpeedMax);
+  const wind = formatSpeedKmh(f.windSpeedMax, units);
   const rain = Math.round(f.precipitationProbability);
-  return `${tempRange}, ${condition}. Wind ${wind} km/h, rain ${rain}%.`;
+  return `${tempRange}, ${condition}. Wind ${wind}, rain ${rain}%.`;
 };
 
 // ---------------------------------------------------------------------------
@@ -166,15 +172,18 @@ export const buildCyclingAdvice = (
   forecast: GoodWeatherForecast,
   random: () => number = Math.random,
   excludeTitles: readonly string[] = [],
+  units: MeasurementSystem = 'metric',
 ): { title: string; body: string } => {
   const tempRange = formatTempRange(forecast.tempMin, forecast.tempMax);
   const precipChance = forecast.precipitationProbability;
-  const windMax = Math.round(forecast.windSpeedMax);
+  // Wind thresholds below stay in km/h — only the rendered figure converts.
+  const windKmh = Math.round(forecast.windSpeedMax);
+  const windMax = formatSpeedKmh(forecast.windSpeedMax, units);
 
   if (weatherCodeIsStorm(forecast.weatherCode)) {
     return {
       title: 'Storm alert — skip the bike today',
-      body: `Thunderstorms expected. ${tempRange}, gusts up to ${windMax} km/h. Stay safe indoors.`,
+      body: `Thunderstorms expected. ${tempRange}, gusts up to ${windMax}. Stay safe indoors.`,
     };
   }
 
@@ -192,10 +201,10 @@ export const buildCyclingAdvice = (
     };
   }
 
-  if (windMax > 40) {
+  if (windKmh > 40) {
     return {
       title: 'Very strong winds today',
-      body: `Gusts up to ${windMax} km/h. ${tempRange}. Cycling will be difficult — consider alternatives.`,
+      body: `Gusts up to ${windMax}. ${tempRange}. Cycling will be difficult — consider alternatives.`,
     };
   }
 
@@ -220,10 +229,10 @@ export const buildCyclingAdvice = (
     };
   }
 
-  if (windMax > 25) {
+  if (windKmh > 25) {
     return {
       title: 'Windy day ahead',
-      body: `${tempRange} with winds up to ${windMax} km/h. Give yourself extra time and energy for headwinds.`,
+      body: `${tempRange} with winds up to ${windMax}. Give yourself extra time and energy for headwinds.`,
     };
   }
 
@@ -245,7 +254,7 @@ export const buildCyclingAdvice = (
 
   return {
     title: "Today's cycling forecast",
-    body: `${tempRange}, ${precipChance}% rain, wind ${windMax} km/h. Ride prepared!`,
+    body: `${tempRange}, ${precipChance}% rain, wind ${windMax}. Ride prepared!`,
   };
 };
 

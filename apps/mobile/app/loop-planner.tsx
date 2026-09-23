@@ -23,10 +23,15 @@ import {
   MAX_RETRACE_SHARE,
   SPUR_RANKING_DEADBAND,
   LOOP_DISTANCE_STEPS_METERS,
+  formatDistance,
+  formatDistanceParts,
+  formatElevation,
+  formatSpeedKmh,
   loopSessionPeriodKey,
   loopSessionRemainingMs,
   planOutOfTown,
   type Coordinate,
+  type MeasurementSystem,
   type LoopHeading,
   type LoopPlacement,
   type LoopSurface,
@@ -62,6 +67,7 @@ import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
 import {
   LoopSearchRequestError,
@@ -90,7 +96,14 @@ const PLACEMENTS: LoopPlacement[] = ['out_of_town', 'around_here'];
 
 
 
-const km = (metres: number): string => (metres / 1000).toFixed(1).replace(/\.0$/, '');
+/**
+ * Bare number for the distance step picker — no unit, the hint line under it
+ * carries one. Drops a trailing ".0" so the metric steps read "5" not "5.0";
+ * on imperial the same steps land on "3.1", "6.2", which is honest about
+ * what a 5 km step is rather than inventing round mile steps.
+ */
+const stepValue = (metres: number, units: MeasurementSystem): string =>
+  formatDistanceParts(metres, units).value.replace(/\.0$/, '');
 
 
 
@@ -170,6 +183,7 @@ type SearchState =
 
 export default function LoopPlannerScreen() {
   const t = useT();
+  const units = useUnits();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   useLockOrientation();
@@ -622,7 +636,9 @@ export default function LoopPlannerScreen() {
       return;
     }
 
-    const name = t('loop.nameFallback', { km: km(selected.distanceMeters) });
+    const name = t('loop.nameFallback', {
+      distance: formatDistance(selected.distanceMeters, units),
+    });
 
     void (async () => {
       // The account is the source of truth, so it goes first and its id is
@@ -716,7 +732,9 @@ export default function LoopPlannerScreen() {
       route: selected.route,
       start,
       distanceMeters: selected.distanceMeters,
-      loopName: t('loop.nameFallback', { km: km(selected.distanceMeters) }),
+      loopName: t('loop.nameFallback', {
+        distance: formatDistance(selected.distanceMeters, units),
+      }),
       startedAt: new Date().toISOString(),
       sessionId:
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -970,7 +988,7 @@ export default function LoopPlannerScreen() {
               style={[styles.step, index === distanceIndex && styles.stepOn]}
               hitSlop={8}
               accessibilityLabel={t('loop.distanceValue', {
-                km: String(metres / 1000),
+                distance: formatDistance(metres, units),
               })}
               accessibilityState={{ selected: index === distanceIndex }}
             >
@@ -980,13 +998,15 @@ export default function LoopPlannerScreen() {
                   index === distanceIndex && styles.stepTextOn,
                 ]}
               >
-                {metres / 1000}
+                {stepValue(metres, units)}
               </Text>
             </PressableScale>
           ))}
         </View>
         <Text style={styles.hint}>
-          {t('loop.distanceValue', { km: String(targetDistanceMeters / 1000) })}
+          {t('loop.distanceValue', {
+            distance: formatDistance(targetDistanceMeters, units),
+          })}
           {'  ·  '}
           {t('loop.timeEstimate', {
             minutes: String(
@@ -1038,7 +1058,7 @@ export default function LoopPlannerScreen() {
             {minimumOutOfTownStep === null
               ? t('loop.placementNoStepClears')
               : t('loop.placementTooShort', {
-                  km: String(minimumOutOfTownStep / 1000),
+                  distance: formatDistance(minimumOutOfTownStep, units),
                 })}
           </Text>
         ) : null}
@@ -1137,7 +1157,9 @@ export default function LoopPlannerScreen() {
       {search.kind === 'empty' ? (
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>
-            {t('loop.emptyTitle', { km: String(targetDistanceMeters / 1000) })}
+            {t('loop.emptyTitle', {
+              distance: formatDistance(targetDistanceMeters, units),
+            })}
           </Text>
           <Text style={styles.noticeBody}>{t('loop.emptyBody')}</Text>
           <View style={styles.noticeActions}>
@@ -1151,10 +1173,11 @@ export default function LoopPlannerScreen() {
               }}
             >
               {t('loop.emptyTryLonger', {
-                km: String(
-                  (LOOP_DISTANCE_STEPS_METERS[
+                distance: formatDistance(
+                  LOOP_DISTANCE_STEPS_METERS[
                     Math.min(distanceIndex + 1, LOOP_DISTANCE_STEPS_METERS.length - 1)
-                  ] ?? targetDistanceMeters) / 1000,
+                  ] ?? targetDistanceMeters,
+                  units,
                 ),
               })}
             </Button>
@@ -1225,8 +1248,11 @@ export default function LoopPlannerScreen() {
               })
             : relaxation === 'distance'
               ? t('loop.relaxedDistance', {
-                  km: km(selected?.distanceMeters ?? targetDistanceMeters),
-                  asked: String(targetDistanceMeters / 1000),
+                  distance: formatDistance(
+                    selected?.distanceMeters ?? targetDistanceMeters,
+                    units,
+                  ),
+                  asked: formatDistance(targetDistanceMeters, units),
                 })
               : t('loop.relaxedHeading', {
                   actual: t(`loop.heading${heading}`).toLowerCase(),
@@ -1269,7 +1295,7 @@ export default function LoopPlannerScreen() {
                   <View style={styles.specRow}>
                     <View style={styles.spec}>
                       <Text style={styles.specValue}>
-                        {km(loop.distanceMeters)} km
+                        {formatDistance(loop.distanceMeters, units)}
                       </Text>
                       <Text style={styles.specLabel}>
                         {t('loop.statDistance')}
@@ -1291,7 +1317,7 @@ export default function LoopPlannerScreen() {
                         {pace.personal
                           ? t('loop.statTime')
                           : t('loop.statTimeAtPace', {
-                              kmh: String(Math.round(pace.kmh)),
+                              speed: formatSpeedKmh(pace.kmh, units),
                             })}
                       </Text>
                     </View>
@@ -1299,7 +1325,7 @@ export default function LoopPlannerScreen() {
                       <Text style={styles.specValue}>
                         {loop.climbMeters === null
                           ? '—'
-                          : `${loop.climbMeters} m`}
+                          : formatElevation(loop.climbMeters, units)}
                       </Text>
                       <Text style={styles.specLabel}>{t('loop.statClimb')}</Text>
                     </View>
@@ -1317,7 +1343,9 @@ export default function LoopPlannerScreen() {
                   */}
                   {loop.maxReachMeters > 0 ? (
                     <Text style={styles.reach}>
-                      {t('loop.reach', { km: km(loop.maxReachMeters) })}
+                      {t('loop.reach', {
+                        distance: formatDistance(loop.maxReachMeters, units),
+                      })}
                     </Text>
                   ) : null}
 
@@ -1381,7 +1409,7 @@ export default function LoopPlannerScreen() {
                             {loop.highRiskMeters < 50
                               ? t('loop.roadsNoneBusy')
                               : t('loop.roadsBusy', {
-                                  distance: km(loop.highRiskMeters),
+                                  distance: formatDistance(loop.highRiskMeters, units),
                                 })}
                           </Text>
                         </>
@@ -1412,7 +1440,7 @@ export default function LoopPlannerScreen() {
                   {loop.spurShare > SPUR_RANKING_DEADBAND ? (
                     <Text style={styles.loopWarn}>
                       {t('loop.spurNote', {
-                        km: km(loop.spurShare * loop.distanceMeters),
+                        distance: formatDistance(loop.spurShare * loop.distanceMeters, units),
                       })}
                     </Text>
                   ) : loop.retracedShare >= MAX_RETRACE_SHARE ? (

@@ -1445,3 +1445,48 @@ describe('useAppStore', () => {
     });
   });
 });
+
+describe('measurementSystem — units the rider reads', () => {
+  it('defaults to metric on a fresh install, before the gate has run', () => {
+    expect(useAppStore.getState().measurementSystem).toBe('metric');
+  });
+
+  it('switches a UK install to imperial when the region gate resolves GB', () => {
+    useAppStore.getState().setRegionGate({ status: 'passed', countryCode: 'GB' });
+    expect(useAppStore.getState().measurementSystem).toBe('imperial');
+  });
+
+  it('keeps every other covered country metric — Ireland drives left but measures in km', () => {
+    for (const countryCode of ['RO', 'ES', 'DE', 'IE', 'MT', 'CY']) {
+      useAppStore.setState({ measurementSystem: 'imperial' });
+      useAppStore.getState().setRegionGate({ status: 'passed', countryCode });
+      expect(useAppStore.getState().measurementSystem, countryCode).toBe('metric');
+    }
+  });
+
+  it('seeds on the waitlist path too — "continue anyway" riders read distances as well', () => {
+    useAppStore.setState({ measurementSystem: 'metric' });
+    useAppStore.getState().setRegionGate({ status: 'waitlisted', countryCode: 'GB' });
+    expect(useAppStore.getState().measurementSystem).toBe('imperial');
+  });
+
+  it('leaves the choice alone when a gate reset carries no country', () => {
+    // The Diagnostics reset sets status back to unchecked with a null country;
+    // it must not quietly flip a tester's units.
+    useAppStore.setState({ measurementSystem: 'imperial' });
+    useAppStore.getState().setRegionGate({ status: 'passed', countryCode: null });
+    expect(useAppStore.getState().measurementSystem).toBe('imperial');
+  });
+
+  it('is device-scoped — signing out does not reset it', () => {
+    useAppStore.setState({ measurementSystem: 'imperial' });
+    useAppStore.getState().resetUserScopedState();
+    expect(useAppStore.getState().measurementSystem).toBe('imperial');
+  });
+
+  it('the Profile toggle wins over the detected country', () => {
+    useAppStore.getState().setRegionGate({ status: 'passed', countryCode: 'GB' });
+    useAppStore.getState().setMeasurementSystem('metric');
+    expect(useAppStore.getState().measurementSystem).toBe('metric');
+  });
+});

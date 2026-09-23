@@ -272,7 +272,9 @@ describe('useMapA11ySummary — liveRegionText transitions', () => {
       },
     );
     const firstText = result.current.liveRegionText;
-    expect(firstText).toContain('"distance":180');
+    // Formatted, not raw: a screen reader must hear "180 m", and on imperial
+    // the same announcement becomes "590 ft".
+    expect(firstText).toContain('"distance":"180 m"');
 
     // Same bucket (150-199 m) — no re-announcement.
     act(() => {
@@ -292,7 +294,7 @@ describe('useMapA11ySummary — liveRegionText transitions', () => {
         nearestApproachingHazard: makeHazard(120),
       });
     });
-    expect(result.current.liveRegionText).toContain('"distance":120');
+    expect(result.current.liveRegionText).toContain('"distance":"120 m"');
     expect(result.current.liveRegionText).not.toBe(firstText);
   });
 

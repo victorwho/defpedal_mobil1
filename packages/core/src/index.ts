@@ -17,6 +17,7 @@ export * from './distance';
 export * from './entitlement';
 export * from './flatRouteMeter';
 export * from './formatters';
+export * from './units';
 export * from './geometrySampling';
 export * from './mapboxStaticImageUrl';
 export * from './loopPlan';

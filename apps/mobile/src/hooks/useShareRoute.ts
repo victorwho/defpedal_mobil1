@@ -25,6 +25,9 @@ import {
 } from '../lib/api';
 import { boundRoutePolyline6 } from '../lib/routeGeometry';
 import { useConnectivity } from '../providers/ConnectivityMonitor';
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { formatDistance } from '@defensivepedal/core';
+
 import { useAppStore } from '../store/appStore';
 
 // ---------------------------------------------------------------------------
@@ -94,24 +97,25 @@ const GENERIC_ERROR_MESSAGE = 'Couldn\u2019t share this route. Try again.';
 const buildShareCaption = (
   input: ShareRouteInput,
   source: 'planned' | 'saved',
+  units: MeasurementSystem,
 ): string => {
-  const km = (input.route.distanceMeters / 1000).toFixed(1);
+  const km = formatDistance(input.route.distanceMeters, units);
   // A loop has no destination to name, and "a route to nowhere" is worse than
   // saying what it actually is.
   if (input.isLoop) {
-    return `I found this ${km} km cycling loop — open it in Defensive Pedal.`;
+    return `I found this ${km} cycling loop — open it in Defensive Pedal.`;
   }
   // Slice 5a: saved-route shares get their own voice — the sharer is
   // signalling "this is a route I've saved and use", not "I just planned
   // this". Keeps the same Defensive Pedal sign-off for consistency.
   if (source === 'saved') {
-    return `I saved this safer ${km} km cycling route \u2014 open it in Defensive Pedal.`;
+    return `I saved this safer ${km} cycling route \u2014 open it in Defensive Pedal.`;
   }
   const label = input.destinationLabel?.trim();
   if (label) {
-    return `Check out this ${km} km cycling route to ${label} on Defensive Pedal.`;
+    return `Check out this ${km} cycling route to ${label} on Defensive Pedal.`;
   }
-  return `Check out this ${km} km cycling route on Defensive Pedal.`;
+  return `Check out this ${km} cycling route on Defensive Pedal.`;
 };
 
 // ---------------------------------------------------------------------------
@@ -187,7 +191,11 @@ export function useShareRoute(): UseShareRouteReturn {
             : basePayload;
 
         const created = await mobileApi.createRouteShare(payload);
-        const caption = buildShareCaption(input, source);
+        const caption = buildShareCaption(
+          input,
+          source,
+          useAppStore.getState().measurementSystem,
+        );
 
         // Native share sheet. iOS prefers `url`; Android concatenates the
         // message. Passing both fields gives us the best behavior on both.

@@ -1,8 +1,10 @@
+import { formatElevation } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop, Path, Line, Rect } from 'react-native-svg';
 
+import { useUnits } from '../../hooks/useUnits';
 import { brandColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
@@ -76,6 +78,7 @@ export const ElevationProgressCard = ({
   isOffRoute,
   onClose,
 }: ElevationProgressCardProps) => {
+  const units = useUnits();
   const progressRatio = useMemo(
     () => Math.max(0, Math.min(1, 1 - remainingDistanceMeters / totalDistanceMeters)),
     [remainingDistanceMeters, totalDistanceMeters],
@@ -114,7 +117,7 @@ export const ElevationProgressCard = ({
           {isOffRoute ? 'OFF ROUTE' : 'ELEVATION'}
         </Text>
         <View style={styles.headerRight}>
-          <Text style={styles.currentElev}>{Math.round(currentElev)} m</Text>
+          <Text style={styles.currentElev}>{formatElevation(currentElev, units)}</Text>
           {onClose ? (
             <Pressable
               testID="elevation-close"
@@ -171,11 +174,11 @@ export const ElevationProgressCard = ({
         />
       </Svg>
       <View style={styles.footer}>
-        <Text style={styles.footerText}>{Math.round(minElev)} m</Text>
+        <Text style={styles.footerText}>{formatElevation(minElev, units)}</Text>
         <Text style={styles.footerText}>
           {Math.round(progressRatio * 100)}%
         </Text>
-        <Text style={styles.footerText}>{Math.round(maxElev)} m</Text>
+        <Text style={styles.footerText}>{formatElevation(maxElev, units)}</Text>
       </View>
     </View>
   );

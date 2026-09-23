@@ -1,5 +1,6 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
-import { hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, toRoutingDisplayMode } from '@defensivepedal/core';
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { formatDistance, formatElevation, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, toRoutingDisplayMode } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -73,6 +74,7 @@ import { duration, easing } from '../src/design-system/tokens/motion';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { useRecentRideDestinations } from '../src/hooks/useRecentRideDestinations';
 import { useSubmitCitySuggestion } from '../src/hooks/useCitySuggestions';
 
@@ -413,6 +415,7 @@ export default function RoutePlanningScreen() {
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
   const { user } = useAuthSession();
   const t = useT();
+  const units = useUnits();
 
   // Saved routes — show when destination is empty and user is signed in
   const savedRoutesQuery = useQuery({
@@ -879,7 +882,7 @@ export default function RoutePlanningScreen() {
   const startOverrideAutocompleteQuery = useQuery({
     queryKey: [
       'autocomplete', 'start-override', deferredStartOverrideQuery,
-      routeRequest.origin, routeRequest.locale, routeRequest.countryHint,
+      routeRequest.origin, routeRequest.locale, routeRequest.countryHint, units,
     ],
     queryFn: () =>
       mobileApi.autocomplete({
@@ -888,7 +891,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
         limit: 5,
-      }),
+      }, units),
     enabled:
       Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'startOverride' &&
@@ -899,7 +902,7 @@ export default function RoutePlanningScreen() {
   const destinationAutocompleteQuery = useQuery({
     queryKey: [
       'autocomplete', 'destination', deferredDestinationQuery,
-      routeRequest.origin, routeRequest.locale, routeRequest.countryHint,
+      routeRequest.origin, routeRequest.locale, routeRequest.countryHint, units,
     ],
     queryFn: () =>
       mobileApi.autocomplete({
@@ -908,7 +911,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
         limit: 5,
-      }),
+      }, units),
     enabled:
       Boolean(mobileEnv.mapboxPublicToken) &&
       activeField === 'destination' &&
@@ -947,7 +950,7 @@ export default function RoutePlanningScreen() {
   const waypointAutocompleteQuery = useQuery({
     queryKey: [
       'autocomplete', 'waypoint', deferredWaypointQuery,
-      routeRequest.origin, routeRequest.locale, routeRequest.countryHint,
+      routeRequest.origin, routeRequest.locale, routeRequest.countryHint, units,
     ],
     queryFn: () =>
       mobileApi.autocomplete({
@@ -956,7 +959,7 @@ export default function RoutePlanningScreen() {
         locale: routeRequest.locale,
         countryHint: routeRequest.countryHint,
         limit: 5,
-      }),
+      }, units),
     enabled:
       Boolean(mobileEnv.mapboxPublicToken) &&
       activeWaypointIndex >= 0 &&
@@ -2119,7 +2122,7 @@ export default function RoutePlanningScreen() {
                 </Text>
                 <Text style={styles.savedRouteMode}>
                   {t('course.badge')}
-                  {` · ${(course.distanceMeters / 1000).toFixed(1)} km`}
+                  {` · ${formatDistance(course.distanceMeters, units)}`}
                   {course.busyStretchCount > 0
                     ? ` · ${t(
                         course.busyStretchCount === 1
@@ -2164,10 +2167,12 @@ export default function RoutePlanningScreen() {
                 </Text>
                 <Text style={styles.savedRouteMode}>
                   {t('loop.badge')}
-                  {` · ${(loop.distanceMeters / 1000).toFixed(1)} km`}
+                  {` · ${formatDistance(loop.distanceMeters, units)}`}
                   {loop.climbMeters === null
                     ? ''
-                    : ` · ${t('loop.climb', { meters: String(loop.climbMeters) })}`}
+                    : ` · ${t('loop.climb', {
+                        distance: formatElevation(loop.climbMeters, units),
+                      })}`}
                 </Text>
               </View>
               <Pressable

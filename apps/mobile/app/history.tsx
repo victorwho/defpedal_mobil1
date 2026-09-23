@@ -4,6 +4,7 @@ import {
   calculateTrailDistanceMeters,
   decodePolyline,
   formatCo2Saved,
+  formatDistanceParts,
 } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useCallback, useMemo } from 'react';
@@ -28,6 +29,7 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { Toast } from '../src/design-system/molecules/Toast';
 
@@ -90,6 +92,7 @@ export default function HistoryScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -176,7 +179,9 @@ export default function HistoryScreen() {
 
   // ── Derived stat values ──
   const totalRides = stats?.totalTrips ?? 0;
-  const totalKm = stats ? (stats.totalDistanceMeters / 1000).toFixed(0) : '0';
+  // Value and unit are rendered on separate lines, so they are split here —
+  // and the unit follows the rider's system ("km" / "mi").
+  const totalDistance = formatDistanceParts(stats?.totalDistanceMeters ?? 0, units);
   const currentStreak = dashboard?.streak.currentStreak ?? 0;
   const co2Display = stats ? formatCo2Saved(stats.totalCo2SavedKg) : '0 g';
 
@@ -212,8 +217,8 @@ export default function HistoryScreen() {
                 <CompactStat
                   icon="speedometer-outline"
                   iconColor={colors.info}
-                  value={`${totalKm}`}
-                  label={t('history.km')}
+                  value={totalDistance.value}
+                  label={totalDistance.unit}
                   colors={colors}
                 />
                 <CompactStat
@@ -307,7 +312,7 @@ export default function HistoryScreen() {
       </View>
     ),
     [
-      styles, user, statsLoading, colors, totalRides, totalKm,
+      styles, user, statsLoading, colors, totalRides, totalDistance,
       currentStreak, co2Display, trips, dashboard, t,
     ],
   );

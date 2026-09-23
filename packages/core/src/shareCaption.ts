@@ -1,3 +1,6 @@
+import type { MeasurementSystem } from './units';
+import { formatDistance } from './formatters';
+
 export type ShareCaptionInput =
   | {
       type: 'ride';
@@ -42,6 +45,13 @@ const round1 = (value: number): string => {
 };
 
 /**
+ * Ride distance in the rider's own units, keeping this file's rule that a
+ * caption carries no decimal it has not earned: "10 km", not "10.0 km".
+ */
+const captionDistance = (distanceKm: number, units: MeasurementSystem): string =>
+  formatDistance(distanceKm * 1000, units).replace(/\.0(?= )/, '');
+
+/**
  * Rounds to the nearest whole number and returns a string.
  */
 const roundInt = (value: number): string => String(Math.round(value));
@@ -55,16 +65,19 @@ const roundInt = (value: number): string => String(Math.round(value));
  * are crossposted, and a mixed-language caption reads badly.
  *
  * Numeric formatting:
- *   - distanceKm  → 1 decimal
+ *   - distanceKm  → the rider's own units (1 decimal), unit included
  *   - durationMinutes → whole number
  *   - co2SavedKg → 1 decimal
  */
-export function buildShareCaption(input: ShareCaptionInput): string {
+export function buildShareCaption(
+  input: ShareCaptionInput,
+  units: MeasurementSystem = 'metric',
+): string {
   switch (input.type) {
     case 'ride': {
       const { distanceKm, durationMinutes, co2SavedKg, safetyScore, microlivesGained } = input;
       const parts = [
-        `I just rode ${round1(distanceKm)} km in ${roundInt(durationMinutes)} min on Defensive Pedal.`,
+        `I just rode ${captionDistance(distanceKm, units)} in ${roundInt(durationMinutes)} min on Defensive Pedal.`,
         `${round1(co2SavedKg)} kg CO₂ saved.`,
       ];
 

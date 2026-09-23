@@ -37,7 +37,24 @@ import {
 } from '../src/design-system/tokens/typography';
 import { useCityHeartbeat } from '../src/hooks/useCityHeartbeat';
 import { useT } from '../src/hooks/useTranslation';
-import { HAZARD_TYPE_OPTIONS, SUPPORTED_APP_COUNTRIES, type HazardType } from '@defensivepedal/core';
+import { useUnits } from '../src/hooks/useUnits';
+import {
+  HAZARD_TYPE_OPTIONS,
+  SUPPORTED_APP_COUNTRIES,
+  distanceUnitFor,
+  formatDistance,
+  metersToMiles,
+  type HazardType,
+  type MeasurementSystem,
+} from '@defensivepedal/core';
+
+/**
+ * `StatCell` animates a raw number and appends a suffix, so the value and its
+ * unit are handed over separately here. Totals are always big enough to be
+ * km/mi rather than m/ft.
+ */
+const distanceValue = (meters: number, units: MeasurementSystem): number =>
+  units === 'imperial' ? metersToMiles(meters) : meters / 1000;
 
 // ---------------------------------------------------------------------------
 // Hazard label lookup
@@ -59,6 +76,8 @@ export default function CityHeartbeatScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const { heartbeat, isLoading, isRefreshing, error, refetch } = useCityHeartbeat();
   const t = useT();
+  const units = useUnits();
+  const distanceUnit = distanceUnitFor(Number.POSITIVE_INFINITY, units);
   const screenTitle = t('cityHeartbeat.title');
 
   // ── Community-visibility ladder (honest labels). Every fallback keeps
@@ -262,8 +281,8 @@ export default function CityHeartbeatScreen() {
               )}
               <StatCell
                 label={t('cityHeartbeat.distance')}
-                value={(pulse?.distanceMeters ?? 0) / 1000}
-                suffix=" km"
+                value={distanceValue(pulse?.distanceMeters ?? 0, units)}
+                suffix={` ${distanceUnit}`}
                 decimals={1}
                 color={colors.info}
                 styles={styles}
@@ -369,8 +388,8 @@ export default function CityHeartbeatScreen() {
                 />
                 <StatCell
                   label={t('cityHeartbeat.distance')}
-                  value={heartbeat.communityTotals.distanceMeters / 1000}
-                  suffix=" km"
+                  value={distanceValue(heartbeat.communityTotals.distanceMeters, units)}
+                  suffix={` ${distanceUnit}`}
                   decimals={0}
                   color={colors.info}
                   styles={styles}
@@ -549,8 +568,8 @@ export default function CityHeartbeatScreen() {
               />
               <StatCell
                 label={t('cityHeartbeat.distance')}
-                value={heartbeat.totals.distanceMeters / 1000}
-                suffix=" km"
+                value={distanceValue(heartbeat.totals.distanceMeters, units)}
+                suffix={` ${distanceUnit}`}
                 decimals={0}
                 color={colors.info}
                 styles={styles}
@@ -632,7 +651,8 @@ export default function CityHeartbeatScreen() {
                       {c.displayName}
                     </Text>
                     <Text style={styles.contributorStats}>
-                      {c.rideCount} {t('cityHeartbeat.rides').toLowerCase()} · {c.distanceKm} km
+                      {c.rideCount} {t('cityHeartbeat.rides').toLowerCase()} ·{' '}
+                      {formatDistance(c.distanceKm * 1000, units)}
                     </Text>
                   </View>
                 </View>

@@ -7,6 +7,7 @@
  * - Coverage uses a local country allowlist (no external API call).
  */
 import type {
+  MeasurementSystem,
   AutocompleteRequest,
   AutocompleteResponse,
   AutocompleteSuggestion,
@@ -21,6 +22,8 @@ import {
   distanceToPlaceEdgeMeters,
   MIN_MEANINGFUL_EDGE_METERS,
   SUPPORTED_APP_COUNTRIES,
+  formatDistance,
+  metersToMiles,
 } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -377,9 +380,19 @@ const buildSecondaryText = (
 };
 
 /**
- * Format distance in meters to human-readable "350 m" or "1.2 km".
+ * How far a search result is: "350 m" / "1.2 km", or "0.2 mi" on imperial.
+ *
+ * Short distances round to the nearest 50 m — a result list is a rough
+ * "which of these is closest", not a measurement. The imperial side lets the
+ * shared formatter round to tens of feet, then switches to miles at a tenth
+ * of a mile, and drops the decimal past ten so "12 mi" does not read as more
+ * precise than it is.
  */
-const formatDistanceLabel = (meters: number): string => {
+const formatDistanceLabel = (meters: number, units: MeasurementSystem): string => {
+  if (units === 'imperial') {
+    const miles = metersToMiles(meters);
+    return miles >= 10 ? `${Math.round(miles)} mi` : formatDistance(meters, units);
+  }
   if (meters < 1000) {
     const rounded = Math.round(meters / 50) * 50;
     return `${Math.max(50, rounded)} m`;
@@ -394,6 +407,7 @@ const formatDistanceLabel = (meters: number): string => {
 
 export const mapboxAutocomplete = async (
   payload: AutocompleteRequest,
+  units: MeasurementSystem = 'metric',
 ): Promise<AutocompleteResponse> => {
   const query = payload.query.trim();
 
@@ -495,7 +509,7 @@ export const mapboxAutocomplete = async (
         distanceMeters = Math.round(
           haversineDistanceMeters(payload.proximity, coords),
         );
-        distanceLabel = formatDistanceLabel(distanceMeters);
+        distanceLabel = formatDistanceLabel(distanceMeters, units);
       }
 
       const suggestion: AutocompleteSuggestion = {

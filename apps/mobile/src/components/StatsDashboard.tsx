@@ -26,6 +26,7 @@ import { space } from '../design-system/tokens/spacing';
 import { radii } from '../design-system/tokens/radii';
 import { useStatsDashboard, type StatsPeriod } from '../hooks/useStatsDashboard';
 import { useT } from '../hooks/useTranslation';
+import { useUnits } from '../hooks/useUnits';
 
 // ── Skeleton Placeholder ──
 
@@ -380,6 +381,7 @@ function RideFrequencyChart({ buckets, period }: RideFrequencyChartProps) {
 
 function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly dashboard: TripStatsDashboard; readonly period: StatsPeriod; readonly hazardsReported?: number }) {
   const t = useT();
+  const units = useUnits();
 
   // Pick the period-appropriate totals + mode split. The chart still uses the
   // bucket arrays (weekly/monthly) — those drive the bars; the cards drive
@@ -410,7 +412,7 @@ function DashboardContent({ dashboard, period, hazardsReported = 0 }: { readonly
           icon="speedometer-outline"
           iconColor={safetyColors.info}
           label={t('stats.distance')}
-          value={formatDistance(totals.totalDistanceMeters)}
+          value={formatDistance(totals.totalDistanceMeters, units)}
         />
         <SummaryCard
           icon="time-outline"

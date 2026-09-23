@@ -39,6 +39,8 @@ import { useKeyboardHeight } from '../src/hooks/useKeyboardHeight';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
+import { spokenDistance } from '../src/lib/spokenDistance';
 import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
@@ -178,6 +180,7 @@ function NavigationScreen() {
 
   const { isOnline } = useConnectivity();
   const t = useT();
+  const units = useUnits();
 
   const locationState = useForegroundNavigationLocation(Boolean(navigationSession));
   const backgroundSnapshot = useBackgroundNavigationSnapshot();
@@ -1055,12 +1058,22 @@ function NavigationScreen() {
     if (!progress.isOffRoute && progress.shouldPreAnnounce && activeStep) {
       markPreAnnouncement(activeStep.id);
       const dist = Math.round(progress.distanceToManeuverMeters ?? 200);
-      speak(t('nav.inMeters', { distance: dist, instruction: activeStep.instruction }));
+      speak(
+        t('nav.inMeters', {
+          distance: spokenDistance(dist, units, t),
+          instruction: activeStep.instruction,
+        }),
+      );
     }
 
     if (!progress.isOffRoute && progress.shouldAnnounceApproach && activeStep) {
       markApproachAnnouncement(activeStep.id);
-      speak(t('nav.inMeters', { distance: 50, instruction: activeStep.instruction }));
+      speak(
+        t('nav.inMeters', {
+          distance: spokenDistance(50, units, t),
+          instruction: activeStep.instruction,
+        }),
+      );
     }
 
     if (progress.shouldAdvanceStep && activeStep) {
@@ -1236,7 +1249,7 @@ function NavigationScreen() {
     isCourse && navigationSession.offRouteSince != null
       ? navigationSession.distanceToRouteMeters != null
         ? t('nav.offCourseDistance', {
-            distance: formatDistance(navigationSession.distanceToRouteMeters),
+            distance: formatDistance(navigationSession.distanceToRouteMeters, units),
           })
         : t('nav.offCourse')
       : null;
@@ -1339,7 +1352,7 @@ function NavigationScreen() {
               if (currentStep) {
                 const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);
                 // Explicit tap — repeat the instruction even while off-route.
-                speak(t('nav.inMeters', { distance: dist, instruction: currentStep.instruction }), {
+                speak(t('nav.inMeters', { distance: spokenDistance(dist, units, t), instruction: currentStep.instruction }), {
                   allowWhenOffRoute: true,
                 });
               }

@@ -14,11 +14,12 @@
  *    state change). Memoized via a key-based dedup ref so the same hazard
  *    isn't announced repeatedly on 1 Hz GPS ticks.
  */
-import type { HazardType, RouteOption } from '@defensivepedal/core';
-import { formatDistance, formatDuration } from '@defensivepedal/core';
+import type { HazardType, MeasurementSystem, RouteOption } from '@defensivepedal/core';
+import { formatDistance, formatDuration, formatElevation } from '@defensivepedal/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { computeRiskDistribution } from '@defensivepedal/core';
 
 export type MapSummaryMode = 'planning' | 'navigating' | 'historical' | 'feed' | 'empty';
@@ -71,6 +72,7 @@ export interface MapA11yOutput {
 const buildLabel = (
   t: (key: string, vars?: Record<string, string | number>) => string,
   input: MapA11yInput,
+  units: MeasurementSystem,
 ): string => {
   const parts: string[] = [];
 
@@ -81,7 +83,7 @@ const buildLabel = (
   }
 
   const route = input.selectedRoute;
-  const distance = formatDistance(route.distanceMeters);
+  const distance = formatDistance(route.distanceMeters, units);
   const duration = formatDuration(route.adjustedDurationSeconds ?? route.durationSeconds);
   const climbMeters = route.totalClimbMeters ?? 0;
 
@@ -90,7 +92,7 @@ const buildLabel = (
       ? t('mapA11y.routeWithClimb', {
           distance,
           duration,
-          climb: `${Math.round(climbMeters)} m`,
+          climb: formatElevation(climbMeters, units),
         })
       : t('mapA11y.routeSummary', { distance, duration });
 
@@ -101,7 +103,7 @@ const buildLabel = (
     if (typeof input.remainingDistanceMeters === 'number' && input.remainingDistanceMeters > 0) {
       parts.push(
         t('mapA11y.navigating', {
-          remaining: formatDistance(input.remainingDistanceMeters),
+          remaining: formatDistance(input.remainingDistanceMeters, units),
         }),
       );
     }
@@ -180,6 +182,7 @@ const buildAnnouncement = (
   t: (key: string, vars?: Record<string, string | number>) => string,
   input: MapA11yInput,
   key: string,
+  units: MeasurementSystem,
 ): string | null => {
   if (key === 'off-route') {
     return t('mapA11y.offRouteEntered');
@@ -187,7 +190,7 @@ const buildAnnouncement = (
   if (key.startsWith('hazard:') && input.nearestApproachingHazard) {
     return t('mapA11y.hazardUpcoming', {
       type: hazardTypeLabel(t, input.nearestApproachingHazard.hazardType),
-      distance: Math.round(input.nearestApproachingHazard.distanceMeters),
+      distance: formatDistance(input.nearestApproachingHazard.distanceMeters, units),
     });
   }
   return null;
@@ -195,12 +198,13 @@ const buildAnnouncement = (
 
 export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
   const t = useT();
+  const units = useUnits();
   const [liveRegionText, setLiveRegionText] = useState<string | null>(null);
   const lastKeyRef = useRef<string | null>(null);
   const wasOffRouteRef = useRef<boolean>(false);
 
   const label = useMemo(
-    () => buildLabel(t, input),
+    () => buildLabel(t, input, units),
     // Stable deps from primitives + the one optional object we actually read.
     // We intentionally depend on `input` as a whole — the caller is expected
     // to memoize inputs upstream (or accept that `label` re-computes when
@@ -208,6 +212,7 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       t,
+      units,
       input.mode,
       input.selectedRoute?.id,
       input.selectedRoute?.distanceMeters,
@@ -232,7 +237,7 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
     }
 
     if (key) {
-      const text = buildAnnouncement(t, input, key);
+      const text = buildAnnouncement(t, input, key, units);
       lastKeyRef.current = key;
       setLiveRegionText(text);
       if (key === 'off-route') wasOffRouteRef.current = true;
@@ -249,6 +254,7 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
     }
   }, [
     t,
+    units,
     input.isOffRoute,
     input.nearestApproachingHazard?.id,
     input.nearestApproachingHazard?.distanceMeters,

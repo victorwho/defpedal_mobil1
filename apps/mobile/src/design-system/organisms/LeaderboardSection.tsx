@@ -17,6 +17,14 @@ import {
 } from 'react-native';
 
 import type { LeaderboardMetric, LeaderboardPeriod } from '@defensivepedal/core';
+import { formatDistance } from '@defensivepedal/core';
+
+/**
+ * The middle rung of the server's scope ladder (nearby 15 km → region 100 km
+ * → community) — see `services/mobile-api/src/routes/leaderboard.ts`. Stated
+ * here only to name the radius in the scope note.
+ */
+const REGION_SCOPE_RADIUS_METERS = 100_000;
 
 import { useTheme, type ThemeColors } from '../ThemeContext';
 import { FadeSlideIn } from '../atoms/FadeSlideIn';
@@ -31,6 +39,7 @@ import { fontFamily, textSm, textXs } from '../tokens/typography';
 import { brandTints } from '../tokens/tints';
 import { useLeaderboard } from '../../hooks/useLeaderboard';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -40,6 +49,7 @@ export function LeaderboardSection() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
 
   const METRICS: readonly { readonly key: LeaderboardMetric; readonly label: string }[] = [
     { key: 'co2', label: t('leaderboard.tabs.co2') },
@@ -107,7 +117,9 @@ export function LeaderboardSection() {
           be noise. */}
       {scopeUsed !== 'nearby' ? (
         <Text style={styles.scopeNote}>
-          {t(`leaderboard.scope_${scopeUsed}`)}
+          {t(`leaderboard.scope_${scopeUsed}`, {
+            distance: formatDistance(REGION_SCOPE_RADIUS_METERS, units),
+          })}
         </Text>
       ) : null}
 

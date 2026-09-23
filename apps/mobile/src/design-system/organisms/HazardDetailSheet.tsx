@@ -20,6 +20,7 @@
 import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
 import {
   HAZARD_TYPE_OPTIONS,
+  formatDistance,
   getHazardImportSourceDisplay,
   PERMANENT_HAZARD_DENY_THRESHOLD,
 } from '@defensivepedal/core';
@@ -52,6 +53,7 @@ import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
 import { zIndex } from '../tokens/zIndex';
 import { duration as dur, easing } from '../tokens/motion';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 const POSITIVE_SCORE_THRESHOLD = 3;
 const NEGATIVE_SCORE_THRESHOLD = -3;
@@ -113,6 +115,7 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
   const reducedMotion = useReducedMotion();
   const haptics = useHaptics();
   const t = useT();
+  const units = useUnits();
 
   const [reportSheetVisible, setReportSheetVisible] = useState(false);
 
@@ -279,7 +282,7 @@ export const HazardDetailSheet: React.FC<HazardDetailSheetProps> = ({
           <View style={styles.metaRow}>
             {typeof dist === 'number' ? (
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                {t('common.mAway', { distance: Math.round(dist) })}
+                {t('common.mAway', { distance: formatDistance(dist, units) })}
               </Text>
             ) : null}
             {reportedAgo ? (

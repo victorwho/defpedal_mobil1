@@ -1,7 +1,8 @@
 import type { NavigationStep } from '@defensivepedal/core';
-import { formatDistance, formatSpeed } from '@defensivepedal/core';
+import { formatDistance, formatSpeed, speedUnitFor } from '@defensivepedal/core';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useUnits } from '../hooks/useUnits';
 import { brandColors } from '../design-system/tokens/colors';
 import { shadows } from '../design-system/tokens/shadows';
 
@@ -49,11 +50,12 @@ export const NavigationManeuverCard = ({
   distanceToManeuverMeters,
   gpsLabel,
 }: NavigationManeuverCardProps) => {
+  const units = useUnits();
   const distanceLabel =
     distanceToManeuverMeters !== null
-      ? formatDistance(Math.round(distanceToManeuverMeters))
+      ? formatDistance(Math.round(distanceToManeuverMeters), units)
       : currentStep
-        ? formatDistance(Math.round(currentStep.distanceMeters))
+        ? formatDistance(Math.round(currentStep.distanceMeters), units)
         : 'Waiting';
 
   return (
@@ -79,7 +81,7 @@ export const NavigationManeuverCard = ({
           <Text style={styles.thenText} numberOfLines={1}>
             {nextStep.instruction}
           </Text>
-          <Text style={styles.thenDistance}>{formatDistance(Math.round(nextStep.distanceMeters))}</Text>
+          <Text style={styles.thenDistance}>{formatDistance(Math.round(nextStep.distanceMeters), units)}</Text>
         </View>
       ) : null}
     </View>
@@ -103,6 +105,7 @@ export const NavigationFooterPanel = ({
   offRouteCountdownSeconds,
   reroutePending,
 }: NavigationFooterPanelProps) => {
+  const units = useUnits();
   const etaLabel =
     remainingDurationSeconds > 0
       ? new Date(Date.now() + remainingDurationSeconds * 1000).toLocaleTimeString([], {
@@ -111,8 +114,9 @@ export const NavigationFooterPanel = ({
         })
       : 'Soon';
 
-  const speedLabel = formatSpeed(currentSpeedMetersPerSecond) ?? '0 km/h';
-  const routeGapLabel = formatDistance(Math.round(routeGapMeters));
+  const speedLabel =
+    formatSpeed(currentSpeedMetersPerSecond, units) ?? `0 ${speedUnitFor(units)}`;
+  const routeGapLabel = formatDistance(Math.round(routeGapMeters), units);
   const offRouteMessage = reroutePending
     ? 'Rerouting from live GPS...'
     : offRouteCountdownSeconds !== null && offRouteCountdownSeconds > 0
@@ -130,7 +134,7 @@ export const NavigationFooterPanel = ({
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>Distance</Text>
-          <Text style={styles.metricValue}>{(remainingDistanceMeters / 1000).toFixed(1)} km</Text>
+          <Text style={styles.metricValue}>{formatDistance(remainingDistanceMeters, units)}</Text>
         </View>
         <View style={styles.metricCell}>
           <Text style={styles.metricLabel}>Speed</Text>

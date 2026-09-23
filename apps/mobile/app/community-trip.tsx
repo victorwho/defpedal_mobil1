@@ -4,7 +4,7 @@ import type {
   RideActivity,
   RouteOption,
 } from '@defensivepedal/core';
-import { decodePolyline, formatDistance, formatDuration, formatSpeed } from '@defensivepedal/core';
+import { decodePolyline, formatDistance, formatDuration, formatElevation, formatSpeed } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -49,6 +49,7 @@ import { useBlockUser } from '../src/hooks/useBlockUser';
 import { useCurrentLocation } from '../src/hooks/useCurrentLocation';
 import { useShareRide } from '../src/hooks/useShareRide';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
@@ -115,6 +116,7 @@ export default function CommunityTripScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
   const [commentText, setCommentText] = useState('');
 
   const location = useCurrentLocation();
@@ -469,13 +471,13 @@ export default function CommunityTripScreen() {
 
             {/* Stats grid */}
             <View style={styles.statsGrid}>
-              <StatTile label="Distance" value={formatDistance(item.distanceMeters)} styles={styles} />
+              <StatTile label="Distance" value={formatDistance(item.distanceMeters, units)} styles={styles} />
               <StatTile label="Duration" value={formatDuration(item.durationSeconds)} styles={styles} />
               {item.elevationGainMeters != null ? (
-                <StatTile label="Climb" value={`${Math.round(item.elevationGainMeters)} m`} styles={styles} />
+                <StatTile label="Climb" value={formatElevation(item.elevationGainMeters, units)} styles={styles} />
               ) : null}
               {item.averageSpeedMps != null ? (
-                <StatTile label="Avg speed" value={formatSpeed(item.averageSpeedMps) ?? '-'} styles={styles} />
+                <StatTile label="Avg speed" value={formatSpeed(item.averageSpeedMps, units) ?? '-'} styles={styles} />
               ) : null}
             </View>
 

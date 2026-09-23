@@ -38,6 +38,7 @@ import { RouteMap } from '../../components/map';
 import { useActivityComments } from '../../hooks/useActivityFeed';
 import { useBlockUser } from '../../hooks/useBlockUser';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { ReportSheet } from '../molecules/ReportSheet';
 import { riderTiers, type RiderTierKey } from '../tokens/tierColors';
 import { tierImages } from '../tokens/tierImages';
@@ -441,6 +442,7 @@ const RideContent = React.memo(function RideContent({
   styles,
   colors,
 }: RideContentProps) {
+  const units = useUnits();
   const syntheticRoute = useMemo(() => buildSyntheticRoute(item), [item]);
   const [noteExpanded, setNoteExpanded] = useState(false);
   const toggleNote = useCallback(() => setNoteExpanded((prev) => !prev), []);
@@ -480,7 +482,7 @@ const RideContent = React.memo(function RideContent({
 
       {/* Summary line */}
       <Text style={styles.summaryLine}>
-        {formatDistance(payload.distanceMeters)} · {formatDuration(payload.durationSeconds)}
+        {formatDistance(payload.distanceMeters, units)} · {formatDuration(payload.durationSeconds)}
         {payload.co2SavedKg != null && payload.co2SavedKg > 0
           ? ` · ${formatCo2Saved(payload.co2SavedKg)} CO2`
           : ''}

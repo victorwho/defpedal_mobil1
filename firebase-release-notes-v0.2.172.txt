@@ -1,0 +1,39 @@
+Defensive Pedal Preview v0.2.172 (build 175)
+
+Three things in this build: the UK is now a supported country, the
+"turn across traffic" warning was pointing the wrong way in left-hand-traffic
+countries, and distances can now be shown in miles.
+
+WHAT TO TEST — MILES / KILOMETRES
+- Profile > Display > "Distances in miles". Flip it and walk the app: route
+  preview, the peek strip, navigation HUD (distance, climb, speed), trip
+  history, trip detail, community feed, City Heartbeat, loop planner, search
+  results, the elevation chart's axes.
+- On miles you should see: miles for distance, FEET for climbs and for short
+  distances ("260 ft"), mph for speed AND for wind in the weather widget.
+- Temperature stays Celsius, CO2 stays kg, weight stays kg. That is deliberate.
+- Voice guidance: with voice on, an instruction should SAY "in 260 feet" —
+  spelled out, not "in 260 ft". Same number you see on screen.
+- Nothing should read "12.0 km" style double units or a bare number with no
+  unit. If you find one, tell me the screen.
+
+WHAT TO TEST — UK
+- Fake GPS to London: Diagnostics > dev location presets > "London". Plan a
+  route and confirm you get Safe/Flat/Cool/E-bike, risk colours on the map and
+  a Risk Score — not the "fast routing only" fallback.
+- A rider detected in the UK gets miles automatically. Because this build is an
+  upgrade on your phone, you should get miles only if your app already thinks
+  you are in the UK; otherwise use the Profile toggle.
+
+WHAT TO TEST — TURN WARNING (best checked on a UK/Ireland route)
+- The route-feature warning that used to say "Left turn across traffic" should
+  now say "Right turn across traffic", with a mirrored arrow, when riding where
+  traffic drives on the left. Everywhere else it is unchanged.
+
+KNOWN / DELIBERATE
+- Money figures are still EUR everywhere, including the UK. Separate decision.
+- Distance step buttons in the loop planner read "3.1 / 6.2" on miles — those
+  are the same 5 km / 10 km steps, honestly converted.
+
+Nothing here has been on a phone before this build, so treat the whole app as
+worth a look — especially anything that prints a number.

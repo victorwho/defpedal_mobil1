@@ -1,7 +1,10 @@
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { elevationUnitFor, metersToFeet, metersToMiles } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Path, Line, Text as SvgText } from 'react-native-svg';
 
+import { useUnits } from '../../hooks/useUnits';
 import { useTheme, type ThemeColors } from '..';
 import { Mascot } from '../atoms/Mascot';
 import { radii } from '../tokens/radii';
@@ -51,9 +54,10 @@ const buildPath = (
   return { linePath, areaPath };
 };
 
-const formatElevLabel = (meters: number): string => {
-  if (meters >= 1000) return `${(meters / 1000).toFixed(1)}k`;
-  return `${Math.round(meters)}`;
+const formatElevLabel = (meters: number, units: MeasurementSystem): string => {
+  const value = units === 'imperial' ? metersToFeet(meters) : meters;
+  if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return `${Math.round(value)}`;
 };
 
 export const ElevationChart = ({
@@ -61,6 +65,7 @@ export const ElevationChart = ({
   distanceMeters,
 }: ElevationChartProps) => {
   const { colors } = useTheme();
+  const units = useUnits();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const chartData = useMemo(() => {
     if (elevationProfile.length < 2) return null;
@@ -84,8 +89,10 @@ export const ElevationChart = ({
     const displayMax = Math.ceil(maxElev + padding);
     const elevRange = displayMax - displayMin;
 
-    // Distance labels
-    const distKm = distanceMeters / 1000;
+    // Distance labels — ticks are whole units of whatever the rider reads, so
+    // an imperial axis steps in miles rather than showing converted kilometres.
+    const distKm =
+      units === 'imperial' ? metersToMiles(distanceMeters) : distanceMeters / 1000;
     const distLabels: { km: number; fraction: number }[] = [];
     const stepKm = distKm <= 2 ? 0.5 : distKm <= 5 ? 1 : distKm <= 20 ? 2 : 5;
     for (let km = stepKm; km < distKm; km += stepKm) {
@@ -104,7 +111,7 @@ export const ElevationChart = ({
       distLabels,
       distKm,
     };
-  }, [elevationProfile, distanceMeters]);
+  }, [elevationProfile, distanceMeters, units]);
 
   if (!chartData) return null;
 
@@ -167,7 +174,7 @@ export const ElevationChart = ({
                   fill={LABEL_COLOR}
                   fontFamily="monospace"
                 >
-                  {formatElevLabel(elev)} m
+                  {formatElevLabel(elev, units)} {elevationUnitFor(units)}
                 </SvgText>
               );
             },
@@ -187,7 +194,9 @@ export const ElevationChart = ({
                 fill={LABEL_COLOR}
                 letterSpacing={0.5}
               >
-                {label.km % 1 === 0 ? `${label.km} km` : `${label.km.toFixed(1)} km`}
+                {`${label.km % 1 === 0 ? label.km : label.km.toFixed(1)} ${
+                  units === 'imperial' ? 'mi' : 'km'
+                }`}
               </SvgText>
             );
           })}

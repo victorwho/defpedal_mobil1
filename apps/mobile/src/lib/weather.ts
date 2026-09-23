@@ -1,3 +1,6 @@
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { formatSpeedKmh } from '@defensivepedal/core';
+
 const OPEN_METEO_WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
 const OPEN_METEO_AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -315,7 +318,10 @@ const PM25_THRESHOLD = 25;
  * advisory — surfaces ride-with-caution guidance rather than discouraging
  * the ride.
  */
-export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[] => {
+export const getWeatherWarnings = (
+  data: WeatherData,
+  units: MeasurementSystem,
+): readonly WeatherWarning[] => {
   const warnings: WeatherWarning[] = [];
 
   if (data.remainingPrecipMax > RAIN_THRESHOLD) {
@@ -407,8 +413,10 @@ export const getWeatherWarnings = (data: WeatherData): readonly WeatherWarning[]
       icon: 'flag',
       messageKey: windKeyByTier[windTier],
       messageParams: {
-        wind: data.remainingWindMax,
-        gust: data.remainingGustMax,
+        // Pre-formatted: the warning strings carry no unit of their own, so a
+        // rider on imperial reads "18 mph" in the same sentence shape.
+        wind: formatSpeedKmh(data.remainingWindMax, units),
+        gust: formatSpeedKmh(data.remainingGustMax, units),
       },
     });
   }

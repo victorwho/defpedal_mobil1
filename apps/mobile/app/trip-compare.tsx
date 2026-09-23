@@ -24,6 +24,7 @@ import { shadows } from '../src/design-system/tokens/shadows';
 import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 
 type TripMetrics = {
   distanceMeters: number;
@@ -78,6 +79,7 @@ export default function TripCompareScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthSession();
   const t = useT();
+  const units = useUnits();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
 
@@ -159,8 +161,8 @@ export default function TripCompareScreen() {
           <StatRow
             ss={styles}
             label={t('compare.distance')}
-            value1={formatDistance(Math.round(metricsA.distanceMeters))}
-            value2={formatDistance(Math.round(metricsB.distanceMeters))}
+            value1={formatDistance(Math.round(metricsA.distanceMeters), units)}
+            value2={formatDistance(Math.round(metricsB.distanceMeters), units)}
             highlight={longerTrip}
           />
           <StatRow
@@ -172,8 +174,8 @@ export default function TripCompareScreen() {
           <StatRow
             ss={styles}
             label={t('compare.avgSpeed')}
-            value1={formatSpeed(metricsA.avgSpeedMps) ?? '—'}
-            value2={formatSpeed(metricsB.avgSpeedMps) ?? '—'}
+            value1={formatSpeed(metricsA.avgSpeedMps, units) ?? '—'}
+            value2={formatSpeed(metricsB.avgSpeedMps, units) ?? '—'}
             highlight={fasterTrip}
           />
           <StatRow

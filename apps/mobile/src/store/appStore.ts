@@ -1,6 +1,7 @@
 import type {
   CityHeartbeat,
   Coordinate,
+  MeasurementSystem,
   CyclingGoal,
   HazardType,
   HazardVoteDirection,
@@ -18,6 +19,7 @@ import type {
 } from '@defensivepedal/core';
 import {
   advanceNavigationStep,
+  normalizeCountryCode,
   completeNavigationSession,
   createNavigationSession,
   DEFAULT_CIVIA_BASE_URL,
@@ -255,6 +257,17 @@ export type AppStore = QueueSlice & PremiumSlice & {
   // overwritten by device-locale detection on a later boot.
   localeExplicitlySet: boolean;
   themePreference: 'system' | 'dark' | 'light';
+  /**
+   * Distance, climb and speed units. Device-scoped like the theme — NOT reset
+   * by `resetUserScopedState`, because it is a reading preference of whoever
+   * holds the phone, not a property of the account.
+   *
+   * Seeded once from the country the onboarding region gate resolved (the UK
+   * gets imperial, everyone else metric) and from there owned by the Profile
+   * toggle. Nothing re-detects it afterwards: a rider who crosses the Channel
+   * keeps the units they chose.
+   */
+  measurementSystem: MeasurementSystem;
   // Daily safety quiz country pool.
   //
   // 'auto' lets `useResolvedQuizCountry` pick via GPS → device-locale → default;
@@ -380,6 +393,7 @@ export type AppStore = QueueSlice & PremiumSlice & {
   markWeatherWarningSeen: () => void;
   setLocale: (locale: Locale) => void;
   setThemePreference: (pref: 'system' | 'dark' | 'light') => void;
+  setMeasurementSystem: (system: MeasurementSystem) => void;
   setQuizCountryPreference: (pref: QuizCountryPreference) => void;
   setShowMascot: (show: boolean) => void;
   incrementRatingSkipCount: () => void;
@@ -586,6 +600,16 @@ export type AppStore = QueueSlice & PremiumSlice & {
  * opted PostHog ON stays ON, and — since the 2026-07-19 default flip — one
  * who explicitly turned PostHog OFF stays OFF).
  */
+/**
+ * Units a rider in this country reads by default. The UK is the only
+ * imperial country the app serves; everywhere else in coverage is metric,
+ * including Ireland, which drives on the left but measures in kilometres.
+ */
+export const defaultMeasurementSystemFor = (
+  countryCode: string | null | undefined,
+): MeasurementSystem =>
+  normalizeCountryCode(countryCode) === 'GB' ? 'imperial' : 'metric';
+
 export const migratePersistedAppState = (
   persistedState: unknown,
   version: number,
@@ -743,6 +767,23 @@ export const migratePersistedAppState = (
     }
   }
 
+  // v7 → v8: units preference (2026-09-23). Installs that predate it have no
+  // value; seed from the country the region gate already resolved so a UK
+  // rider who has been using the app sees miles after the update without
+  // touching a setting. Everyone else — and anyone whose gate never ran —
+  // stays metric, which is what they had.
+  if (version < 8) {
+    const state = next as
+      | { regionGate?: { countryCode?: string | null }; measurementSystem?: unknown }
+      | undefined;
+    if (state && state.measurementSystem === undefined) {
+      next = {
+        ...(state as object),
+        measurementSystem: defaultMeasurementSystemFor(state.regionGate?.countryCode),
+      };
+    }
+  }
+
   return next;
 };
 
@@ -860,6 +901,8 @@ export const useAppStore = create<AppStore>()(
       locale: getDeviceLocale(),
       localeExplicitlySet: false,
       themePreference: 'dark',
+      // Metric until the region gate says otherwise — see `measurementSystem`.
+      measurementSystem: 'metric',
       quizCountryPreference: 'auto',
       showMascot: true,
       ratingSkipCount: 0,
@@ -1045,6 +1088,7 @@ export const useAppStore = create<AppStore>()(
           routeRequest: { ...state.routeRequest, locale },
         })),
       setThemePreference: (pref) => set(() => ({ themePreference: pref })),
+      setMeasurementSystem: (system) => set(() => ({ measurementSystem: system })),
       setQuizCountryPreference: (pref) =>
         set(() => ({ quizCountryPreference: pref })),
       setShowMascot: (show) => set(() => ({ showMascot: show })),
@@ -1094,6 +1138,13 @@ export const useAppStore = create<AppStore>()(
       setRegionGate: (gate) =>
         set(() => ({
           regionGate: { status: gate.status, countryCode: gate.countryCode },
+          // Seed the units from the country the gate resolved — this is the
+          // one moment the app learns where the rider is, and it runs once
+          // per install. The Profile toggle owns it from here; nothing
+          // re-detects, so a rider who travels keeps what they chose.
+          ...(gate.countryCode
+            ? { measurementSystem: defaultMeasurementSystemFor(gate.countryCode) }
+            : {}),
         })),
       appendSessionHazardReport: (report) =>
         set((state) => ({
@@ -1715,7 +1766,7 @@ export const useAppStore = create<AppStore>()(
       //   - For users who explicitly chose (`capturedAt !== null`), respect
       //     their saved choice. We never silently flip an explicit decision.
       // Decision recorded: docs/legal/consent-split-2026-05-25.md
-      version: 7,
+      version: 8,
       migrate: (persistedState, version) => migratePersistedAppState(persistedState, version),
       // A rider who enabled Cool before it was hidden would otherwise rehydrate
       // into an invisible mode with no control to leave it. Coerce on the way
@@ -1797,6 +1848,7 @@ export const useAppStore = create<AppStore>()(
         analyticsPrompt: state.analyticsPrompt,
         // showHistoryOverlay excluded — UI-only state that resets on app restart
         themePreference: state.themePreference,
+        measurementSystem: state.measurementSystem,
         quizCountryPreference: state.quizCountryPreference,
         showMascot: state.showMascot,
         anonymousOpenCount: state.anonymousOpenCount,

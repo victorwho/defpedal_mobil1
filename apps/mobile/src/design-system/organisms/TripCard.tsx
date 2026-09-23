@@ -1,11 +1,12 @@
-import type { TripHistoryItem } from '@defensivepedal/core';
-import { calculateCo2SavedKg, calculateTrailDistanceMeters, decodePolyline, formatCaloriesBurned } from '@defensivepedal/core';
+import type { MeasurementSystem, TripHistoryItem } from '@defensivepedal/core';
+import { calculateCo2SavedKg, calculateTrailDistanceMeters, decodePolyline, formatCaloriesBurned, formatDistance } from '@defensivepedal/core';
 import { memo, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { useTheme, type ThemeColors } from '..';
 import { useLocale } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 import { intlLocaleTag } from '../../lib/dateFormat';
 import type { Locale } from '../../i18n';
 import { Co2Badge } from '../atoms/Co2Badge';
@@ -54,10 +55,8 @@ const formatDuration = (start: string, end: string | null): string => {
   return `${hours}h ${mins}m`;
 };
 
-const formatDistance = (meters?: number): string => {
-  if (!meters) return '—';
-  return `${(meters / 1000).toFixed(1)} km`;
-};
+const formatTripDistance = (meters: number | undefined, units: MeasurementSystem): string =>
+  meters ? formatDistance(meters, units) : '—';
 
 const endReasonIcon = (reason: string): { name: keyof typeof Ionicons.glyphMap; color: string } => {
   switch (reason) {
@@ -84,6 +83,7 @@ export const TripCard = memo(({
 }: TripCardProps) => {
   const { colors } = useTheme();
   const { locale } = useLocale();
+  const units = useUnits();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const icon = endReasonIcon(trip.endReason);
   const hasGpsTrail = trip.gpsBreadcrumbs.length > 0;
@@ -115,11 +115,12 @@ export const TripCard = memo(({
         <View style={styles.metricsCol}>
           <View style={styles.metric}>
             <Ionicons name="resize-outline" size={14} color={gray[400]} />
-            <Text style={styles.metricText}>{formatDistance(
+            <Text style={styles.metricText}>{formatTripDistance(
               trip.distanceMeters
                 ?? (trip.gpsBreadcrumbs.length >= 2
                   ? calculateTrailDistanceMeters(trip.gpsBreadcrumbs)
-                  : trip.plannedRouteDistanceMeters ?? 0)
+                  : trip.plannedRouteDistanceMeters ?? 0),
+              units,
             )}</Text>
           </View>
           <View style={styles.metric}>

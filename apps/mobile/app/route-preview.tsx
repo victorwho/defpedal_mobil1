@@ -1,5 +1,6 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { describeBusyRoadSaving, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -75,6 +76,7 @@ import { useExportRouteGpx } from '../src/hooks/useExportRouteGpx';
 import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { useTheme, type ThemeColors, type ThemeMode } from '../src/design-system';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -100,10 +102,15 @@ const formatDuration = (seconds: number): string => {
 /** Minimum contiguous high-risk stretch (m) before the busy-road callout shows. */
 const BUSY_STRETCH_MIN_M = 150;
 
-const formatStretchDistance = (meters: number): string =>
+/**
+ * Busy-stretch distances round to the nearest 10 m (or the formatter's 10 ft)
+ * — a callout that says "183 m on a busy road" implies a precision the
+ * risk-segment geometry does not have.
+ */
+const formatStretchDistance = (meters: number, units: MeasurementSystem): string =>
   meters >= 1000
-    ? `${(meters / 1000).toFixed(1)} km`
-    : `${Math.round(meters / 10) * 10} m`;
+    ? formatDistance(meters, units)
+    : formatDistance(Math.round(meters / 10) * 10, units);
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function RoutePreviewScreen() {
@@ -120,6 +127,7 @@ function RoutePreviewScreen() {
   const onTintCaution = safetyOnTint(colors, mode, 'caution');
   const { user } = useAuthSession();
   const t = useT();
+  const units = useUnits();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
   // (brief transitional state while router.push('/navigation') is in flight).
   // Without NAVIGATING here, the guard fires router.replace('/route-planning')
@@ -419,7 +427,7 @@ function RoutePreviewScreen() {
           const savingLine =
             saving.kind === 'saves'
               ? t('preview.comparison.busySaving', {
-                  distance: formatStretchDistance(saving.metersSaved),
+                  distance: formatStretchDistance(saving.metersSaved, units),
                 })
               : null;
 
@@ -886,7 +894,7 @@ function RoutePreviewScreen() {
       onConfirm={handleShareConfirm}
       onDismiss={() => setShareOptionsVisible(false)}
       shortRouteFallback={shareShortRouteFallback}
-      distanceKm={((selectedRoute?.distanceMeters ?? 0) / 1000).toFixed(1)}
+      distanceLabel={formatDistance(selectedRoute?.distanceMeters ?? 0, units)}
     />
     <RiskScoreExplainerSheet
       visible={riskExplainerVisible}
@@ -898,7 +906,7 @@ function RoutePreviewScreen() {
         <View style={styles.peekStrip}>
           {renderModeCyclePill(false)}
           <Text style={styles.peekStat}>
-            {(selectedRoute.distanceMeters / 1000).toFixed(1)} km
+            {formatDistance(selectedRoute.distanceMeters, units)}
           </Text>
           <Text style={styles.peekDivider}>·</Text>
           <Text style={styles.peekStat}>
@@ -1025,9 +1033,11 @@ function RoutePreviewScreen() {
           <View style={styles.statGroup}>
             <View style={styles.stat}>
               <Text style={styles.statValue}>
-                {(selectedRoute.distanceMeters / 1000).toFixed(1)}
+                {formatDistanceParts(selectedRoute.distanceMeters, units).value}
               </Text>
-              <Text style={styles.statUnit}>km</Text>
+              <Text style={styles.statUnit}>
+                {formatDistanceParts(selectedRoute.distanceMeters, units).unit}
+              </Text>
             </View>
 
             <Text style={styles.statDivider}>·</Text>
@@ -1043,11 +1053,13 @@ function RoutePreviewScreen() {
             <View style={styles.stat}>
               <Text style={styles.statValue} numberOfLines={1}>
                 ↑{selectedRoute.totalClimbMeters !== null
-                  ? Math.round(selectedRoute.totalClimbMeters)
+                  ? formatElevationParts(selectedRoute.totalClimbMeters, units).value
                   : '—'}
               </Text>
               {selectedRoute.totalClimbMeters !== null ? (
-                <Text style={styles.statUnit}>m</Text>
+                <Text style={styles.statUnit}>
+                  {formatElevationParts(selectedRoute.totalClimbMeters, units).unit}
+                </Text>
               ) : null}
             </View>
 
@@ -1088,7 +1100,7 @@ function RoutePreviewScreen() {
         <View style={styles.busyStretchRow}>
           <Ionicons name="warning-outline" size={16} color={onTintCaution} />
           <Text style={styles.busyStretchText}>
-            {t('risk.busyStretch', { distance: formatStretchDistance(busyStretchMeters) })}
+            {t('risk.busyStretch', { distance: formatStretchDistance(busyStretchMeters, units) })}
           </Text>
         </View>
       ) : null}

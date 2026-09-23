@@ -558,9 +558,11 @@ describe('mobileApi', () => {
       const { mapboxAutocomplete } = await import('./mapbox-search');
 
       const payload = { query: 'test' };
-      await mobileApi.autocomplete(payload);
+      await mobileApi.autocomplete(payload, 'imperial');
 
-      expect(mapboxAutocomplete).toHaveBeenCalledWith(payload);
+      // The rider's units reach the search client — result distances are
+      // labelled "0.2 mi" rather than "350 m".
+      expect(mapboxAutocomplete).toHaveBeenCalledWith(payload, 'imperial');
     });
   });
 

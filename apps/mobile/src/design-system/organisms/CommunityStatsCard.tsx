@@ -1,4 +1,5 @@
-import type { CommunityStats } from '@defensivepedal/core';
+import type { CommunityStats, MeasurementSystem } from '@defensivepedal/core';
+import { metersToMiles } from '@defensivepedal/core';
 import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -14,6 +15,7 @@ import {
   textDataMd,
 } from '../tokens/typography';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,10 +31,14 @@ type CommunityStatsCardProps = {
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
-const formatDistance = (meters: number): string => {
-  const km = meters / 1000;
-  if (km >= 1000) return `${(km / 1000).toFixed(1)}k`;
-  return km.toFixed(0);
+/**
+ * Community totals are big — the tile abbreviates past a thousand ("12.4k")
+ * and renders its unit separately, so this returns the number alone.
+ */
+const formatBigDistance = (meters: number, units: MeasurementSystem): string => {
+  const value = units === 'imperial' ? metersToMiles(meters) : meters / 1000;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toFixed(0);
 };
 
 const formatDuration = (seconds: number): string => {
@@ -57,6 +63,7 @@ export const CommunityStatsCard = ({
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
 
   if (isLoading) {
     return (
@@ -109,8 +116,8 @@ export const CommunityStatsCard = ({
           styles={styles}
         />
         <StatTile
-          value={formatDistance(stats.totalDistanceMeters)}
-          unit={t('common.km')}
+          value={formatBigDistance(stats.totalDistanceMeters, units)}
+          unit={units === 'imperial' ? 'mi' : t('common.km')}
           label={t('communityStats.distance')}
           styles={styles}
         />

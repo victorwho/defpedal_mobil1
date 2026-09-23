@@ -47,6 +47,7 @@ import { useConnectivity } from '../../src/providers/ConnectivityMonitor';
 import { useExportTripGpx } from '../../src/hooks/useExportTripGpx';
 import { useGpxDestinationChooser } from '../../src/hooks/useGpxDestinationChooser';
 import { useT } from '../../src/hooks/useTranslation';
+import { useUnits } from '../../src/hooks/useUnits';
 
 const MAP_HEIGHT = 300;
 
@@ -88,6 +89,7 @@ export default function TripDetailScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
   const { user } = useAuthSession();
   const queryClient = useQueryClient();
   const [deleteToast, setDeleteToast] = useState<string | null>(null);
@@ -224,7 +226,7 @@ export default function TripDetailScreen() {
   const communitySeconds = impact?.communitySeconds ?? 0;
   const newBadges = impact?.newBadges ?? [];
 
-  const speedLabel = formatSpeed(metrics.avgSpeedMps) ?? '—';
+  const speedLabel = formatSpeed(metrics.avgSpeedMps, units) ?? '—';
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => mobileApi.deleteTrip(id),
@@ -321,8 +323,10 @@ export default function TripDetailScreen() {
         },
       });
 
-      const km = (distanceMeters / 1000).toFixed(1);
-      const caption = `I rode this ${km} km cycling route on Defensive Pedal — see the route.`;
+      const caption = `I rode this ${formatDistance(
+        distanceMeters,
+        units,
+      )} cycling route on Defensive Pedal — see the route.`;
       // iOS prefers `url` for previews; Android concatenates message+url.
       // Passing both gives the best behavior on both platforms.
       await Share.share(
@@ -477,7 +481,7 @@ export default function TripDetailScreen() {
               icon="resize-outline"
               iconColor={colors.accent}
               label="Distance"
-              value={formatDistance(metrics.distanceMeters)}
+              value={formatDistance(metrics.distanceMeters, units)}
               styles={styles}
             />
             <StatTile

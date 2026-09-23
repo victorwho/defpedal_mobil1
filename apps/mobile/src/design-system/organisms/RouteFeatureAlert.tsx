@@ -6,10 +6,12 @@
  * `prefers-reduced-motion`. Pure presentation — the parent stack owns
  * which features appear, haptic firing, and dismiss state.
  */
-import type { ApproachingFeature } from '@defensivepedal/core';
+import type { ApproachingFeature, MeasurementSystem } from '@defensivepedal/core';
+import { formatDistance } from '@defensivepedal/core';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
+import { useUnits } from '../../hooks/useUnits';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { brandColors } from '../tokens/colors';
 import { duration as motionDuration, easing } from '../tokens/motion';
@@ -28,10 +30,8 @@ import { fontFamily, textSm, textXs } from '../tokens/typography';
 const ENTRY_DURATION = motionDuration.fast;
 const ENTRY_OFFSET_X = 32;
 
-const formatDistance = (metersAhead: number): string => {
-  const m = Math.max(0, Math.round(metersAhead));
-  return m < 1000 ? `in ${m} m` : `in ${(m / 1000).toFixed(1)} km`;
-};
+const formatAhead = (metersAhead: number, units: MeasurementSystem): string =>
+  `in ${formatDistance(Math.max(0, Math.round(metersAhead)), units)}`;
 
 export interface RouteFeatureAlertProps {
   readonly item: ApproachingFeature;
@@ -39,6 +39,7 @@ export interface RouteFeatureAlertProps {
 
 export const RouteFeatureAlert = React.memo(({ item }: RouteFeatureAlertProps) => {
   const reducedMotion = useReducedMotion();
+  const units = useUnits();
   const { feature, metersAhead, config } = item;
   const icon = getRouteFeatureIconFor(feature);
   const tierColor = getRouteFeatureTierColor(feature.tier);
@@ -73,7 +74,7 @@ export const RouteFeatureAlert = React.memo(({ item }: RouteFeatureAlertProps) =
     // would replay the slide-in every GPS tick as `metersAhead` ticks down.
   }, []);
 
-  const distanceText = formatDistance(metersAhead);
+  const distanceText = formatAhead(metersAhead, units);
 
   return (
     <Animated.View

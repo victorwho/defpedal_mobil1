@@ -11,7 +11,14 @@
  */
 import React, { useEffect, useRef } from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
-import { formatDistance, formatDistanceParts, formatDurationShort } from '@defensivepedal/core';
+import {
+  formatDistance,
+  formatDistanceParts,
+  formatDurationShort,
+  formatElevationParts,
+  formatSpeedKmhParts,
+  speedUnitFor,
+} from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -28,6 +35,7 @@ import { darkTheme, gray } from '../tokens/colors';
 import { useHaptics } from '../hooks/useHaptics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 /** Translator function shape returned by `useT()`. */
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -210,6 +218,7 @@ export const ManeuverCard: React.FC<{
   onPress,
 }) => {
   const t = useT();
+  const units = useUnits();
   const iconName = getManeuverIcon(currentStep);
   const description = getManeuverDescription(currentStep, t);
 
@@ -220,10 +229,12 @@ export const ManeuverCard: React.FC<{
         ? Math.round(currentStep.distanceMeters)
         : null;
   // Split so the numeral can be typeset at 36px with its unit at 13px beneath.
-  const distanceParts = distanceMeters !== null ? formatDistanceParts(distanceMeters) : null;
+  const distanceParts =
+    distanceMeters !== null ? formatDistanceParts(distanceMeters, units) : null;
   // …but a screen reader must hear the whole phrase ("102 m"), never the bare
   // numeral the sighted layout breaks onto its own line.
-  const spokenDistance = distanceMeters !== null ? formatDistance(distanceMeters) : '—';
+  const spokenDistance =
+    distanceMeters !== null ? formatDistance(distanceMeters, units) : '—';
 
   // GPX courses hardcode `streetName: ''` (core/courseSteps.ts) because
   // synthesized geometry cannot know street names. The row COLLAPSES rather
@@ -306,7 +317,7 @@ export const ManeuverCard: React.FC<{
             {nextLabel}
           </Text>
           <Text testID="maneuver-then-distance" style={[textDataSm, { color: gray[300] }]}>
-            {formatDistance(Math.round(nextStep.distanceMeters))}
+            {formatDistance(Math.round(nextStep.distanceMeters), units)}
           </Text>
         </View>
       ) : null}
@@ -403,6 +414,7 @@ export const FooterCard: React.FC<{
   onEndRide,
 }) => {
   const t = useT();
+  const units = useUnits();
   const haptics = useHaptics();
 
   // Retarget the primary metrics to the next stop when one is ahead.
@@ -414,6 +426,9 @@ export const FooterCard: React.FC<{
   const climbLive = targetingStop ? true : isClimbLive;
 
   const remaining = formatDurationShort(etaSeconds);
+  // Split so the numeral sits at speedValue size with its unit beneath.
+  const speed = speedKmh != null ? formatSpeedKmhParts(speedKmh, units) : null;
+  const climb = climbMeters !== null ? formatElevationParts(climbMeters, units) : null;
 
   return (
     <View style={[styles.footerCard, shadows.md]}>
@@ -487,13 +502,13 @@ export const FooterCard: React.FC<{
             <View
               style={styles.heroSpeed}
               accessibilityLabel={`${t('nav.metricSpeed')}: ${
-                speedKmh != null ? `${Math.round(speedKmh)} km/h` : '—'
+                speed != null ? `${speed.value} ${speed.unit}` : '—'
               }`}
             >
               <Text testID="footer-speed-value" style={styles.speedValue}>
-                {speedKmh != null ? `${Math.round(speedKmh)}` : '—'}
+                {speed != null ? speed.value : '—'}
               </Text>
-              <Text style={styles.speedUnit}>km/h</Text>
+              <Text style={styles.speedUnit}>{speed?.unit ?? speedUnitFor(units)}</Text>
             </View>
           </View>
 
@@ -507,17 +522,15 @@ export const FooterCard: React.FC<{
             <MetricCell
               testID="footer-metric-dist"
               label={t('nav.metricDist')}
-              value={`${(distMeters / 1000).toFixed(1)} km`}
+              value={formatDistance(distMeters, units)}
             />
             <View style={styles.metricDivider} />
             <MetricCell
               testID="footer-metric-climb"
               label={t('nav.metricClimb')}
               value={
-                climbMeters !== null
-                  ? climbLive
-                    ? `↑${Math.round(climbMeters)} m`
-                    : `~↑${Math.round(climbMeters)} m`
+                climb !== null
+                  ? `${climbLive ? '↑' : '~↑'}${climb.value} ${climb.unit}`
                   : '—'
               }
             />
@@ -529,7 +542,7 @@ export const FooterCard: React.FC<{
       {targetingStop ? (
         <Text testID="footer-to-finish" style={styles.toFinishText} numberOfLines={1}>
           {t('nav.toFinish', {
-            dist: `${(remainingDistanceMeters / 1000).toFixed(1)} km`,
+            dist: formatDistance(remainingDistanceMeters, units),
             eta: formatETA(remainingDurationSeconds, t),
           })}
         </Text>

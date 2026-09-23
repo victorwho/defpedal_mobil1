@@ -1,6 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { formatSpeedKmh } from '@defensivepedal/core';
+
+import { useUnits } from '../../hooks/useUnits';
 import type { WeatherData } from '../../lib/weather';
 import { brandColors, gray, safetyColors } from '../tokens/colors';
 import { radii } from '../tokens/radii';
@@ -25,6 +28,9 @@ const windColor = (speed: number): string => {
 };
 
 export const WeatherWidget = ({ weather, isLoading, hasLocation = true }: WeatherWidgetProps) => {
+  // Before the early returns below — hooks cannot sit behind a condition.
+  const units = useUnits();
+
   // Hide entirely when we have no location to fetch weather for
   if (!hasLocation && !weather) return null;
 
@@ -59,7 +65,7 @@ export const WeatherWidget = ({ weather, isLoading, hasLocation = true }: Weathe
 
         <Ionicons name="flag" size={14} color={windColor(weather.windSpeed)} />
         <Text style={[styles.metricText, { color: windColor(weather.windSpeed) }]}>
-          {weather.windSpeed} km/h
+          {formatSpeedKmh(weather.windSpeed, units)}
         </Text>
 
         {weather.airQuality ? (

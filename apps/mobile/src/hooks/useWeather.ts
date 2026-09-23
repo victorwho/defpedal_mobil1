@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { useUnits } from './useUnits';
+
 import {
   fetchWeather,
   getWeatherWarnings,
@@ -21,6 +23,7 @@ export const useWeather = (
   warnings: readonly WeatherWarning[];
   isLoading: boolean;
 } => {
+  const units = useUnits();
   const roundedLat = lat !== null ? Math.round(lat * 100) / 100 : null;
   const roundedLon = lon !== null ? Math.round(lon * 100) / 100 : null;
   const enabled = roundedLat !== null && roundedLon !== null;
@@ -33,7 +36,7 @@ export const useWeather = (
   });
 
   const weather = query.data ?? null;
-  const warnings = weather ? getWeatherWarnings(weather) : [];
+  const warnings = weather ? getWeatherWarnings(weather, units) : [];
 
   return { weather, warnings, isLoading: query.isLoading };
 };

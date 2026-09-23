@@ -113,7 +113,7 @@ describe('migratePersistedAppState — telemetry choice preservation', () => {
     expect(result.analyticsConsent?.capturedAt).toBeNull();
   });
 
-  it('a current-version (v7) state passes through untouched — no migration step runs', () => {
+  it('a current-version (v8) state passes through untouched — no migration step runs', () => {
     const persisted = {
       analyticsConsent: {
         sentry: false,
@@ -122,9 +122,39 @@ describe('migratePersistedAppState — telemetry choice preservation', () => {
       },
     };
 
-    const result = migratePersistedAppState(persisted, 7) as MigratedConsent;
+    const result = migratePersistedAppState(persisted, 8) as MigratedConsent;
 
     expect(result).toEqual(persisted);
+  });
+});
+
+describe('migratePersistedAppState — units seeding (v7 → v8)', () => {
+  const migrate = (persisted: unknown) =>
+    migratePersistedAppState(persisted, 7) as { measurementSystem?: string };
+
+  it('gives a UK install miles without it having to touch a setting', () => {
+    expect(migrate({ regionGate: { status: 'passed', countryCode: 'GB' } }).measurementSystem)
+      .toBe('imperial');
+  });
+
+  it('leaves every other covered country metric — including left-hand-traffic Ireland', () => {
+    for (const countryCode of ['RO', 'ES', 'DE', 'IE', 'MT', 'CY']) {
+      expect(migrate({ regionGate: { status: 'passed', countryCode } }).measurementSystem)
+        .toBe('metric');
+    }
+  });
+
+  it('falls back to metric when the gate never resolved a country', () => {
+    expect(migrate({ regionGate: { status: 'unchecked', countryCode: null } }).measurementSystem)
+      .toBe('metric');
+    expect(migrate({}).measurementSystem).toBe('metric');
+  });
+
+  it('never overwrites a value the rider already has', () => {
+    // Only reachable if a later build re-runs the step; an explicit choice
+    // outranks the country it was seeded from.
+    expect(migrate({ regionGate: { countryCode: 'GB' }, measurementSystem: 'metric' })
+      .measurementSystem).toBe('metric');
   });
 });
 

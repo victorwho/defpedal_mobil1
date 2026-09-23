@@ -1,4 +1,5 @@
 import type {
+  MeasurementSystem,
   ActivityFeedResponse,
   RoutingDisplayMode,
   AutocompleteRequest,
@@ -93,8 +94,8 @@ export const mobileApi = {
     directPreviewRoute(payload),
   reroute: (payload: RerouteRequest) =>
     directReroute(payload),
-  autocomplete: (payload: AutocompleteRequest) =>
-    mapboxAutocomplete(payload),
+  autocomplete: (payload: AutocompleteRequest, units: MeasurementSystem = 'metric') =>
+    mapboxAutocomplete(payload, units),
   reverseGeocode: (payload: ReverseGeocodeRequest) =>
     mapboxReverseGeocode(payload),
   reportHazard: (payload: HazardReportRequest) =>

@@ -99,7 +99,7 @@ describe('useWeather', () => {
     expect(result.current.warnings).toEqual([]);
     // Coordinates should be rounded to 2 decimal places
     expect(mockFetchWeather).toHaveBeenCalledWith(44.43, 26.11);
-    expect(mockGetWeatherWarnings).toHaveBeenCalledWith(sampleWeatherData);
+    expect(mockGetWeatherWarnings).toHaveBeenCalledWith(sampleWeatherData, 'metric');
   });
 
   it('rounds coordinates to 2 decimal places for cache efficiency', async () => {

@@ -1,5 +1,5 @@
 import type { HazardType, HazardVoteDirection, NearbyHazard } from '@defensivepedal/core';
-import { HAZARD_TYPE_OPTIONS } from '@defensivepedal/core';
+import { HAZARD_TYPE_OPTIONS, formatDistance } from '@defensivepedal/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -9,6 +9,7 @@ import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm, textXs } from '../tokens/typography';
 import { getHazardIcon } from '../tokens/hazardIcons';
 import { useT } from '../../hooks/useTranslation';
+import { useUnits } from '../../hooks/useUnits';
 
 const POSITIVE_SCORE_THRESHOLD = 3;
 const NEGATIVE_SCORE_THRESHOLD = -3;
@@ -53,13 +54,14 @@ export const HazardAlert = ({
   voteState = 'idle',
 }: HazardAlertProps) => {
   const t = useT();
+  const units = useUnits();
   const iconName = getHazardIcon(hazard.hazardType);
   const label = getHazardLabel(hazard.hazardType);
   const displayScore = score ?? hazard.score ?? (hazard.confirmCount - hazard.denyCount);
   const distanceText =
     distanceMeters < 100
-      ? t('common.mAhead', { distance: Math.round(distanceMeters) })
-      : t('common.mAway', { distance: Math.round(distanceMeters) });
+      ? t('common.mAhead', { distance: formatDistance(distanceMeters, units) })
+      : t('common.mAway', { distance: formatDistance(distanceMeters, units) });
 
   const isPending = voteState === 'pending';
   const upActive = userVote === 'up';

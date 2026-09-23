@@ -1,3 +1,5 @@
+import type { DistanceUnit, MeasurementSystem } from './units';
+import { distanceUnitFor, distanceValueIn, elevationUnitFor, kmhToMph, metersToFeet, speedUnitFor } from './units';
 import type { Step } from './types';
 
 export const formatManeuver = (step: Step): string => {
@@ -21,13 +23,45 @@ export const formatInstruction = (step: Step): string => {
   return maneuver;
 };
 
-export const formatDistance = (distanceMeters: number): string => {
-  if (distanceMeters < 1000) {
-    return `${Math.round(distanceMeters)} m`;
-  }
-
-  return `${(distanceMeters / 1000).toFixed(1)} km`;
+/**
+ * A distance as the rider reads it: "850 m" / "8.4 km", or "260 ft" /
+ * "8.4 mi" on imperial.
+ *
+ * `units` is REQUIRED on purpose. Two thirds of this app's distance strings
+ * were hand-rolled `toFixed(1)} km` template literals when the toggle was
+ * added (2026-09-23); a default would have let every one of them keep
+ * compiling while silently ignoring the rider's choice.
+ */
+export const formatDistance = (
+  distanceMeters: number,
+  units: MeasurementSystem,
+): string => {
+  const unit = distanceUnitFor(distanceMeters, units);
+  return `${distanceValueIn(distanceMeters, unit)} ${unit}`;
 };
+
+/**
+ * A climb or an altitude: "195 m" / "640 ft". Never switches to miles —
+ * elevation is always the small unit, however long the ride.
+ */
+export const formatElevation = (
+  elevationMeters: number,
+  units: MeasurementSystem,
+): string => {
+  const parts = formatElevationParts(elevationMeters, units);
+  return `${parts.value} ${parts.unit}`;
+};
+
+/** Split form of {@link formatElevation} for value/unit rendered apart. */
+export const formatElevationParts = (
+  elevationMeters: number,
+  units: MeasurementSystem,
+): { value: string; unit: string } => ({
+  value: `${Math.round(
+    units === 'imperial' ? metersToFeet(elevationMeters) : elevationMeters,
+  )}`,
+  unit: elevationUnitFor(units),
+});
 
 export const formatDuration = (totalSeconds: number): string => {
   if (totalSeconds < 60) {
@@ -50,14 +84,37 @@ export const formatDuration = (totalSeconds: number): string => {
   return `${hours} hr ${remainingMinutes} min`;
 };
 
-export const formatSpeed = (speedMetersPerSecond: number | null): string | null => {
+export const formatSpeed = (
+  speedMetersPerSecond: number | null,
+  units: MeasurementSystem,
+): string | null => {
   if (speedMetersPerSecond === null || speedMetersPerSecond < 0.5) {
     return null;
   }
 
-  const speedKmh = Math.round(speedMetersPerSecond * 3.6);
-  return `${speedKmh} km/h`;
+  return formatSpeedKmh(speedMetersPerSecond * 3.6, units);
 };
+
+/**
+ * Speed given in km/h — what the weather API reports for wind, and what the
+ * navigation HUD already holds. "20 km/h" / "12 mph".
+ */
+export const formatSpeedKmh = (
+  speedKmh: number,
+  units: MeasurementSystem,
+): string => {
+  const parts = formatSpeedKmhParts(speedKmh, units);
+  return `${parts.value} ${parts.unit}`;
+};
+
+/** Split form of {@link formatSpeedKmh} — the HUD renders the unit smaller. */
+export const formatSpeedKmhParts = (
+  speedKmh: number,
+  units: MeasurementSystem,
+): { value: string; unit: string } => ({
+  value: `${Math.round(units === 'imperial' ? kmhToMph(speedKmh) : speedKmh)}`,
+  unit: speedUnitFor(units),
+});
 
 /**
  * Split form of {@link formatDistance} for the navigation HUD, where the
@@ -68,14 +125,12 @@ export const formatSpeed = (speedMetersPerSecond: number | null): string | null 
  */
 export const formatDistanceParts = (
   distanceMeters: number,
-): { value: string; unit: string } => {
+  units: MeasurementSystem,
+): { value: string; unit: DistanceUnit } => {
   const meters = Math.max(0, distanceMeters);
+  const unit = distanceUnitFor(meters, units);
 
-  if (meters < 1000) {
-    return { value: `${Math.round(meters)}`, unit: 'm' };
-  }
-
-  return { value: (meters / 1000).toFixed(1), unit: 'km' };
+  return { value: distanceValueIn(meters, unit), unit };
 };
 
 /**

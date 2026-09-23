@@ -178,10 +178,12 @@ export const scheduleDailyWeatherNotifications = async (
     const forecast = rows[Math.min(forecastDayIndex(fireAt, now), rows.length - 1)];
     if (!forecast) return null;
     const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';
-    const { title, body } = buildCyclingAdvice(forecast, undefined, [
-      ...previousTitles,
-      ...usedTitles,
-    ]);
+    const { title, body } = buildCyclingAdvice(
+      forecast,
+      undefined,
+      [...previousTitles, ...usedTitles],
+      store.getState().measurementSystem,
+    );
     if (tone === 'good') usedTitles.push(title);
     return { fireAt, index, title, body, tone };
   });

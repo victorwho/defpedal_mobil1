@@ -16,6 +16,7 @@
 import {
   findHighRiskStretches,
   formatDistance,
+  formatElevation,
   formatDuration,
   isRiskDataAvailable,
   resolveCountryFromCoord,
@@ -39,6 +40,7 @@ import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
 import { space } from '../src/design-system/tokens/spacing';
 import { useT } from '../src/hooks/useTranslation';
+import { useUnits } from '../src/hooks/useUnits';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
 import { buildCourseRoute, enrichCourseRoute } from '../src/lib/course-route';
@@ -82,6 +84,7 @@ export default function CourseImportScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
+  const units = useUnits();
   const locale = useAppStore((s) => s.locale);
 
   // Map screens are handlebar-mounted — portrait only, like route-preview.
@@ -414,7 +417,7 @@ export default function CourseImportScreen() {
         <View style={styles.peekStrip}>
           <Badge variant="info">{t('course.badge')}</Badge>
           <Text style={styles.peekStat}>
-            {formatDistance(state.route.distanceMeters)}
+            {formatDistance(state.route.distanceMeters, units)}
           </Text>
           <Text style={styles.peekDivider}>·</Text>
           <Text style={styles.peekStat}>
@@ -484,7 +487,7 @@ export default function CourseImportScreen() {
         <View style={styles.statsRow}>
           <Stat
             label={t('course.distance')}
-            value={formatDistance(state.route.distanceMeters)}
+            value={formatDistance(state.route.distanceMeters, units)}
             styles={styles}
           />
           <Stat
@@ -497,7 +500,7 @@ export default function CourseImportScreen() {
             value={
               state.route.totalClimbMeters === null
                 ? '—'
-                : `${Math.round(state.route.totalClimbMeters)} m`
+                : formatElevation(state.route.totalClimbMeters, units)
             }
             styles={styles}
           />
@@ -519,18 +522,18 @@ export default function CourseImportScreen() {
                     style={styles.busyRow}
                     accessibilityRole="button"
                     accessibilityLabel={t('course.busyRowLabel', {
-                      distance: formatDistance(stretch.lengthMeters),
+                      distance: formatDistance(stretch.lengthMeters, units),
                       category: stretch.category,
                     })}
                   >
                     <Ionicons name="warning-outline" size={18} color={colors.caution} />
                     <View style={styles.busyTextColumn}>
                       <Text style={styles.busyDistance}>
-                        {formatDistance(stretch.lengthMeters)}
+                        {formatDistance(stretch.lengthMeters, units)}
                       </Text>
                       <Text style={styles.busyMeta}>
                         {t('course.atKm', {
-                          distance: formatDistance(stretch.distanceFromStartMeters),
+                          distance: formatDistance(stretch.distanceFromStartMeters, units),
                         })}
                       </Text>
                     </View>

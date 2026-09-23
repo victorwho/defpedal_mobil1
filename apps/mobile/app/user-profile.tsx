@@ -1,4 +1,13 @@
-import type { UserPublicProfile } from '@defensivepedal/core';
+import type { MeasurementSystem, UserPublicProfile } from '@defensivepedal/core';
+import { formatDistance, metersToMiles } from '@defensivepedal/core';
+
+import { useUnits } from '../src/hooks/useUnits';
+
+/** Lifetime total — whole km/mi, no decimal. */
+const formatBigDistance = (meters: number, units: MeasurementSystem): string =>
+  units === 'imperial'
+    ? `${metersToMiles(meters).toFixed(0)} mi`
+    : `${(meters / 1000).toFixed(0)} km`;
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -18,6 +27,7 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 
 export default function UserProfileScreen() {
+  const units = useUnits();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
@@ -145,7 +155,9 @@ export default function UserProfileScreen() {
                 <Text style={styles.statLabel}>Trips</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{(profile.totalDistanceMeters / 1000).toFixed(0)} km</Text>
+                <Text style={styles.statValue}>
+                  {formatBigDistance(profile.totalDistanceMeters, units)}
+                </Text>
                 <Text style={styles.statLabel}>Cycled</Text>
               </View>
               <View style={styles.statItem}>
@@ -180,7 +192,7 @@ export default function UserProfileScreen() {
                 </View>
                 <View style={styles.tripStats}>
                   <Text style={styles.tripStat}>
-                    {(trip.distanceMeters / 1000).toFixed(1)} km
+                    {formatDistance(trip.distanceMeters, units)}
                   </Text>
                   <Text style={styles.tripStatDivider}>|</Text>
                   <Text style={styles.tripStat}>

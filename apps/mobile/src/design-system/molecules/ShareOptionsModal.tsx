@@ -37,8 +37,8 @@ export interface ShareOptionsModalProps {
    * server-side trim is a no-op on short routes regardless.
    */
   shortRouteFallback: boolean;
-  /** Optional: distance label for the route summary line. */
-  distanceKm: string;
+  /** Formatted distance for the summary line — already carries its unit. */
+  distanceLabel: string;
 }
 
 export const ShareOptionsModal = ({
@@ -48,7 +48,7 @@ export const ShareOptionsModal = ({
   onConfirm,
   onDismiss,
   shortRouteFallback,
-  distanceKm,
+  distanceLabel,
 }: ShareOptionsModalProps) => {
   const { colors } = useTheme();
   const styles = createThemedStyles(colors);
@@ -80,7 +80,7 @@ export const ShareOptionsModal = ({
           accessible={false}
         >
           <Text style={styles.title}>Share this route</Text>
-          <Text style={styles.summary}>{distanceKm} km route</Text>
+          <Text style={styles.summary}>{distanceLabel} route</Text>
 
           <Pressable
             style={[styles.toggleRow, shortRouteFallback && styles.toggleRowDisabled]}

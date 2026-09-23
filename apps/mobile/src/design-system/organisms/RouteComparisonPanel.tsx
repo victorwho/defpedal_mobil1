@@ -7,8 +7,10 @@
  */
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { RouteOption } from '@defensivepedal/core';
+import type { MeasurementSystem, RouteOption } from '@defensivepedal/core';
+import { formatDistance, formatElevation } from '@defensivepedal/core';
 
+import { useUnits } from '../../hooks/useUnits';
 import { useTheme } from '../ThemeContext';
 import { RouteCard, type RiskBarSegment } from '../molecules/RouteCard';
 import { Spinner } from '../atoms/Spinner';
@@ -60,16 +62,15 @@ const avgRisk = (route: RouteOption): number => {
   );
 };
 
-const formatDist = (m: number) =>
-  m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+const formatDist = (m: number, units: MeasurementSystem) => formatDistance(m, units);
 
 const formatDur = (s: number) => {
   const min = Math.round(s / 60);
   return min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${min % 60}m`;
 };
 
-const formatClimb = (m: number | null) =>
-  m !== null ? `${Math.round(m)} m` : null;
+const formatClimb = (m: number | null, units: MeasurementSystem) =>
+  m !== null ? formatElevation(m, units) : null;
 
 const buildRiskBar = (route: RouteOption): RiskBarSegment[] => {
   if (route.riskSegments.length === 0) return [];
@@ -106,6 +107,7 @@ export const RouteComparisonPanel: React.FC<RouteComparisonPanelProps> = ({
   loading = false,
 }) => {
   const { colors } = useTheme();
+  const units = useUnits();
   const [sortMode, setSortMode] = useState<SortMode>('safest');
 
   const sorted = sortRoutes(routes, sortMode);
@@ -169,9 +171,9 @@ export const RouteComparisonPanel: React.FC<RouteComparisonPanelProps> = ({
             <RouteCard
               key={route.id}
               name={routeDisplayName(route)}
-              distance={formatDist(route.distanceMeters)}
+              distance={formatDist(route.distanceMeters, units)}
               eta={formatDur(route.adjustedDurationSeconds)}
-              climb={formatClimb(route.totalClimbMeters)}
+              climb={formatClimb(route.totalClimbMeters, units)}
               riskScore={avgRisk(route)}
               riskSegments={buildRiskBar(route)}
               recommended={route.id === recommended}

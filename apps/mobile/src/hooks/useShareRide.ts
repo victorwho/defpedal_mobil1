@@ -168,6 +168,7 @@ export function useShareRide(): UseShareRideReturn {
           destinationLabel: input.destinationLabel,
           dateIso: input.dateIso,
           dateLocale: useAppStore.getState().locale as Locale,
+          units: useAppStore.getState().measurementSystem,
         });
 
         const fileUri = await captureHost.capture(cardElement, {
@@ -188,7 +189,10 @@ export function useShareRide(): UseShareRideReturn {
           safetyScore: input.safetyScore,
           microlivesGained: input.microlivesGained,
         };
-        const caption = buildShareCaption(captionInput);
+        const caption = buildShareCaption(
+          captionInput,
+          useAppStore.getState().measurementSystem,
+        );
 
         const result = await shareImage(fileUri, caption);
         return result;

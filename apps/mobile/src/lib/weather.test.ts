@@ -324,7 +324,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 20,
       remainingTempMax: 24,
-    }));
+    }), 'metric');
 
     expect(warnings).toEqual([]);
   });
@@ -335,7 +335,7 @@ describe('getWeatherWarnings', () => {
       remainingPrecipMax: 70,
       remainingTempMin: 20,
       remainingTempMax: 23,
-    }));
+    }), 'metric');
 
     expect(warnings).toHaveLength(1);
     expect(warnings[0].type).toBe('rain');
@@ -344,7 +344,7 @@ describe('getWeatherWarnings', () => {
   });
 
   it('warns about freezing temperatures', () => {
-    const warnings = getWeatherWarnings(makeWeatherData({ remainingTempMin: -3 }));
+    const warnings = getWeatherWarnings(makeWeatherData({ remainingTempMin: -3 }), 'metric');
 
     expect(warnings.some((w) => w.type === 'freezing')).toBe(true);
     const freezing = warnings.find((w) => w.type === 'freezing')!;
@@ -356,7 +356,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 5,
       remainingTempMax: 20,
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'temp_drop')).toBe(true);
   });
@@ -366,7 +366,7 @@ describe('getWeatherWarnings', () => {
       remainingTempMin: 14,
       remainingTempMax: 32,
       remainingTempTrend: 'rising',
-    }));
+    }), 'metric');
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
@@ -379,7 +379,7 @@ describe('getWeatherWarnings', () => {
       remainingTempMin: 8,
       remainingTempMax: 24,
       remainingTempTrend: 'falling',
-    }));
+    }), 'metric');
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
@@ -394,7 +394,7 @@ describe('getWeatherWarnings', () => {
       remainingTempMin: 6,
       remainingTempMax: 22,
       remainingTempTrend: 'mixed',
-    }));
+    }), 'metric');
 
     const swing = warnings.find((w) => w.type === 'temp_drop');
     expect(swing).toBeDefined();
@@ -406,7 +406,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 18,
       remainingTempMax: 22,
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'temp_drop')).toBe(false);
   });
@@ -415,7 +415,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 10,
       remainingTempMax: 27,
-    }));
+    }), 'metric');
 
     const tempTypes: ReadonlyArray<string> = ['freezing', 'heat', 'temp_drop'];
     expect(warnings.some((w) => tempTypes.includes(w.type))).toBe(false);
@@ -428,7 +428,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 6,
       remainingTempMax: 12,
-    }));
+    }), 'metric');
 
     const tempTypes: ReadonlyArray<string> = ['freezing', 'heat', 'temp_drop'];
     expect(warnings.some((w) => tempTypes.includes(w.type))).toBe(false);
@@ -438,7 +438,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 4,
       remainingTempMax: 9,
-    }));
+    }), 'metric');
 
     const cold = warnings.find((w) => w.type === 'freezing');
     expect(cold).toBeDefined();
@@ -450,7 +450,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 25,
       remainingTempMax: 32,
-    }));
+    }), 'metric');
 
     const heat = warnings.find((w) => w.type === 'heat');
     expect(heat).toBeDefined();
@@ -462,7 +462,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingTempMin: 25,
       remainingTempMax: 30,
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'heat')).toBe(false);
   });
@@ -471,7 +471,7 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 19,
       remainingGustMax: 22,
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'wind')).toBe(false);
   });
@@ -480,37 +480,37 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 20,
       remainingGustMax: 22,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
     expect(wind!.messageKey).toBe('weatherWarning.windBreezy');
-    expect(wind!.messageParams).toEqual({ wind: 20, gust: 22 });
+    expect(wind!.messageParams).toEqual({ wind: '20 km/h', gust: '22 km/h' });
   });
 
   it('warns at the strong tier (30 km/h)', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 30,
       remainingGustMax: 22,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
     expect(wind!.messageKey).toBe('weatherWarning.windStrong');
-    expect(wind!.messageParams).toEqual({ wind: 30, gust: 22 });
+    expect(wind!.messageParams).toEqual({ wind: '30 km/h', gust: '22 km/h' });
   });
 
   it('warns at the hazardous tier (45 km/h) with cautionary wording', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 45,
       remainingGustMax: 50,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
     // gust 50 ≥ notable (35) → "…Gust" variant.
     expect(wind!.messageKey).toBe('weatherWarning.windHazardousGust');
-    expect(wind!.messageParams).toEqual({ wind: 45, gust: 50 });
+    expect(wind!.messageParams).toEqual({ wind: '45 km/h', gust: '50 km/h' });
   });
 
   it('elevates a low-mean / high-gust day into the strong tier', () => {
@@ -520,33 +520,33 @@ describe('getWeatherWarnings', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 18,
       remainingGustMax: 40,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
     // gust 40 elevates to strong AND ≥ notable (35) → "…Gust" variant.
     expect(wind!.messageKey).toBe('weatherWarning.windStrongGust');
-    expect(wind!.messageParams).toEqual({ wind: 18, gust: 40 });
+    expect(wind!.messageParams).toEqual({ wind: '18 km/h', gust: '40 km/h' });
   });
 
   it('elevates a calm-mean / extreme-gust day into the hazardous tier', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 22,
       remainingGustMax: 60,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
     // gust 60 ≥ hazardous-gust (55) → hazardous + "…Gust" variant.
     expect(wind!.messageKey).toBe('weatherWarning.windHazardousGust');
-    expect(wind!.messageParams).toEqual({ wind: 22, gust: 60 });
+    expect(wind!.messageParams).toEqual({ wind: '22 km/h', gust: '60 km/h' });
   });
 
   it('omits gust suffix when gusts are below the notable threshold', () => {
     const warnings = getWeatherWarnings(makeWeatherData({
       remainingWindMax: 30,
       remainingGustMax: 30,
-    }));
+    }), 'metric');
 
     const wind = warnings.find((w) => w.type === 'wind');
     expect(wind).toBeDefined();
@@ -566,7 +566,7 @@ describe('getWeatherWarnings', () => {
         no2: 50,
         ozone: 60,
       },
-    }));
+    }), 'metric');
 
     const aqWarning = warnings.find((w) => w.type === 'air_quality');
     expect(aqWarning).toBeDefined();
@@ -586,7 +586,7 @@ describe('getWeatherWarnings', () => {
         no2: 30,
         ozone: 40,
       },
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'air_quality')).toBe(true);
     const aq = warnings.find((w) => w.type === 'air_quality')!;
@@ -605,7 +605,7 @@ describe('getWeatherWarnings', () => {
         no2: 15,
         ozone: 40,
       },
-    }));
+    }), 'metric');
 
     expect(warnings.some((w) => w.type === 'pm25')).toBe(true);
     const pm = warnings.find((w) => w.type === 'pm25')!;
@@ -619,7 +619,7 @@ describe('getWeatherWarnings', () => {
       remainingWindMax: 30,
       remainingTempMin: -2,
       remainingTempMax: 10,
-    }));
+    }), 'metric');
 
     expect(warnings.length).toBeGreaterThanOrEqual(3);
     expect(warnings.some((w) => w.type === 'rain')).toBe(true);

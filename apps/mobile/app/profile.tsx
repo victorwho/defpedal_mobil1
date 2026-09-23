@@ -158,7 +158,7 @@ export default function ProfileScreen() {
   // State values - grouped by section with shallow comparison
   const {
     locale, bikeTypeId, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
-    shareTripsPublicly, themePreference, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
+    shareTripsPublicly, themePreference, measurementSystem, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
     pedalVoiceSassy, notifyStreak, notifyPedalNudges, weightKg,
@@ -172,6 +172,7 @@ export default function ProfileScreen() {
     showRouteComparison: state.showRouteComparison,
     shareTripsPublicly: state.shareTripsPublicly,
     themePreference: state.themePreference,
+    measurementSystem: state.measurementSystem,
     quizCountryPreference: state.quizCountryPreference,
     showMascot: state.showMascot,
     showBicycleLanes: state.showBicycleLanes,
@@ -195,7 +196,7 @@ export default function ProfileScreen() {
   // Actions - stable references, single selector with shallow comparison
   const {
     setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
-    setShowRouteComparison, setShareTripsPublicly, setThemePreference, setQuizCountryPreference, setShowMascot,
+    setShowRouteComparison, setShareTripsPublicly, setThemePreference, setMeasurementSystem, setQuizCountryPreference, setShowMascot,
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
@@ -210,6 +211,7 @@ export default function ProfileScreen() {
     setShowRouteComparison: state.setShowRouteComparison,
     setShareTripsPublicly: state.setShareTripsPublicly,
     setThemePreference: state.setThemePreference,
+    setMeasurementSystem: state.setMeasurementSystem,
     setQuizCountryPreference: state.setQuizCountryPreference,
     setShowMascot: state.setShowMascot,
     setShowBicycleLanes: state.setShowBicycleLanes,
@@ -821,6 +823,17 @@ export default function ProfileScreen() {
               description={showBicycleLanes ? t('profile.showBikeLanesOn') : t('profile.showBikeLanesOff')}
               checked={showBicycleLanes}
               onChange={setShowBicycleLanes}
+            />
+
+            <SettingRow
+              label={t('profile.useMiles')}
+              description={
+                measurementSystem === 'imperial'
+                  ? t('profile.useMilesOn')
+                  : t('profile.useMilesOff')
+              }
+              checked={measurementSystem === 'imperial'}
+              onChange={(on) => setMeasurementSystem(on ? 'imperial' : 'metric')}
             />
 
             <SettingRow

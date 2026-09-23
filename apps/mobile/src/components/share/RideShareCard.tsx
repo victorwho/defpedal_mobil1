@@ -11,6 +11,8 @@
  * Optional tiles (safetyScore, microlivesGained) are hidden entirely when
  * their props are undefined; remaining tiles flex to redistribute space.
  */
+import type { MeasurementSystem } from '@defensivepedal/core';
+import { formatDistance } from '@defensivepedal/core';
 import React, { forwardRef } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
@@ -34,7 +36,8 @@ const TILE_DIVIDER = 'rgba(255, 255, 255, 0.08)';
 const ACCENT = brandColors.accent; // #FACC15
 
 // Formatting helpers (pure)
-const formatDistanceKm = (km: number): string => `${(Math.round(km * 10) / 10).toFixed(1)} km`;
+const formatShareDistance = (km: number, units: MeasurementSystem): string =>
+  formatDistance(km * 1000, units);
 const formatCo2Kg = (kg: number): string => `${(Math.round(kg * 10) / 10).toFixed(1)} kg`;
 const formatDuration = (minutes: number): string => {
   const total = Math.max(0, Math.round(minutes));
@@ -56,6 +59,11 @@ const formatDateLabel = (iso: string | undefined, locale: Locale): string => {
 export interface RideShareCardProps {
   readonly mapImageUrl: string;
   readonly distanceKm: number;
+  /**
+   * Units for the distance tile. Defaults to metric so the card stays a pure
+   * component — every in-app caller passes the rider's own setting.
+   */
+  readonly units?: MeasurementSystem;
   readonly durationMinutes: number;
   readonly co2SavedKg: number;
   readonly safetyScore?: number;
@@ -104,6 +112,7 @@ export const RideShareCard = forwardRef<View, RideShareCardProps>(
     const {
       mapImageUrl,
       distanceKm,
+      units = 'metric',
       durationMinutes,
       co2SavedKg,
       safetyScore,
@@ -119,7 +128,7 @@ export const RideShareCard = forwardRef<View, RideShareCardProps>(
     const dateLabel = formatDateLabel(dateIso, dateLocale);
 
     const tiles: TileSpec[] = [
-      { key: 'distance', value: formatDistanceKm(distanceKm), label: 'Distance' },
+      { key: 'distance', value: formatShareDistance(distanceKm, units), label: 'Distance' },
       { key: 'duration', value: formatDuration(durationMinutes), label: 'Duration' },
       { key: 'co2', value: formatCo2Kg(co2SavedKg), label: 'CO2 saved', accent: true },
     ];
