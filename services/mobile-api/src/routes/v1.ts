@@ -44,6 +44,7 @@ import { getAuthenticatedUserFromRequest, requireAuthenticatedUser, requireFullU
 import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import { ACCEPTED_DEVICE_EVENTS, recordDeviceTelemetry } from '../lib/deviceTelemetry';
+import { rideElevationCoordinates } from '../lib/rideElevation';
 import {
   ACCEPTED_PLAN_MODES,
   recordPlannedRoute,
@@ -3125,16 +3126,22 @@ export const buildV1Routes = (
         // label ('Bicicletă electrică', 'Bicicleta eléctrica').
         let resolvedBikeType: string | null = bikeType ?? null;
         let durationSeconds = Math.max(0, Math.round((durationMinutes ?? 0) * 60));
+        let trackGpsTrail: unknown[] | null = null;
+        let trackPlannedPolyline6: string | null = null;
         try {
           const { data: trackMeta } = await supabaseAdmin
             .from('trip_tracks')
-            .select('bike_type, started_at, ended_at')
+            .select('bike_type, started_at, ended_at, gps_trail, planned_route_polyline6')
             .eq('trip_id', tripId)
             .single();
           resolvedBikeType = resolvedBikeType ?? (trackMeta?.bike_type as string | null) ?? null;
           if (durationSeconds <= 0) {
             durationSeconds = deriveTrackDurationSeconds(trackMeta?.started_at, trackMeta?.ended_at);
           }
+          trackGpsTrail = Array.isArray(trackMeta?.gps_trail)
+            ? (trackMeta.gps_trail as unknown[])
+            : null;
+          trackPlannedPolyline6 = (trackMeta?.planned_route_polyline6 as string | null) ?? null;
         } catch { /* non-fatal */ }
         const vehicleType: 'acoustic' | 'ebike' =
           isEbikeBikeTypeValue(resolvedBikeType) ? 'ebike' : 'acoustic';
@@ -3146,12 +3153,41 @@ export const buildV1Routes = (
           weightKg,
         );
 
+        // Elevation gain. No client has ever sent elevationGainM, so every
+        // ride_impacts row has stored 0 — the column has never held a real
+        // number. Rather than wait on an app release to capture GPS altitude
+        // (noisy to the tune of +/-10-20 m, which books phantom climb on flat
+        // ground), read it from the terrain dataset the route preview already
+        // uses, over the ride's own geometry. Server-side, accurate, works on
+        // rides that have already happened, and not forgeable by a client.
+        //
+        // A body value still wins when present: a future client that measures
+        // this properly should not be overridden by a DEM approximation.
+        // Non-fatal throughout — an impact write must not fail because an
+        // elevation lookup timed out.
+        let resolvedElevationGainM = elevationGainM;
+        if (resolvedElevationGainM == null) {
+          try {
+            const coordinates = rideElevationCoordinates(trackGpsTrail, trackPlannedPolyline6);
+            if (coordinates.length >= 2) {
+              const { elevationGain } = await dependencies.getElevationGain(coordinates);
+              if (Number.isFinite(elevationGain) && elevationGain >= 0) {
+                // Same ceiling the request schema enforces, so a bad DEM read
+                // cannot write a number the API would have rejected.
+                resolvedElevationGainM = Math.min(Math.round(elevationGain), 10_000);
+              }
+            }
+          } catch {
+            /* elevation is a nice-to-have; never fail the impact write for it */
+          }
+        }
+
         // Call record_ride_impact RPC with full ride metadata
         const { data, error } = await supabaseAdmin.rpc('record_ride_impact', {
           p_trip_id: tripId,
           p_user_id: user.id,
           p_distance_meters: distanceMeters,
-          p_elevation_gain_m:  elevationGainM  ?? 0,
+          p_elevation_gain_m:  resolvedElevationGainM ?? 0,
           p_weather_condition: weatherCondition ?? null,
           p_wind_speed_kmh:    windSpeedKmh    ?? null,
           p_temperature_c:     temperatureC    ?? null,
@@ -3430,7 +3466,7 @@ export const buildV1Routes = (
               destinationText: (tripRow.destination_text as string) ?? '',
               distanceMeters: Number(tripRow.distance_meters ?? distanceMeters),
               durationSeconds: Math.max(0, Math.round(durationSeconds)),
-              elevationGainMeters: elevationGainM ?? null,
+              elevationGainMeters: resolvedElevationGainM ?? null,
               averageSpeedMps: null,
               safetyRating: null,
               safetyTags: [],

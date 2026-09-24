@@ -6,6 +6,10 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vites
 // ---------------------------------------------------------------------------
 
 const mockRpc = vi.fn();
+// Named so the elevation tests below can assert on its arguments and simulate
+// a terrain-service outage. vi.clearAllMocks() clears call history but keeps
+// this default implementation, so it survives between tests.
+const mockGetElevationGain = vi.fn().mockResolvedValue({ elevationGain: 5, elevationLoss: 0 });
 const mockFrom = vi.fn();
 
 vi.mock('../lib/supabaseAdmin', () => ({
@@ -133,7 +137,7 @@ beforeAll(async () => {
         label: 'Bucharest',
       }),
       getElevationProfile: vi.fn().mockResolvedValue([10, 12, 15]),
-      getElevationGain: vi.fn().mockResolvedValue({ elevationGain: 5, elevationLoss: 0 }),
+      getElevationGain: mockGetElevationGain,
       fetchRiskSegments: vi.fn().mockResolvedValue([]),
       normalizeRoutePreviewResponse: vi.fn().mockReturnValue(mockRoutePreviewResponse),
       submitHazardReport: vi.fn().mockResolvedValue({
@@ -194,6 +198,10 @@ beforeEach(() => {
   // re-established below.
   mockRpc.mockReset();
   mockFrom.mockReset();
+  // Same reason: a queued rejection this file uses to simulate a terrain-service
+  // outage must not survive into the next test if the handler never consumes it.
+  mockGetElevationGain.mockReset();
+  mockGetElevationGain.mockResolvedValue({ elevationGain: 5, elevationLoss: 0 });
   // Default: RPC calls succeed, streak qualify is fire-and-forget
   mockRpc.mockResolvedValue({ data: null, error: null });
   // Permissive default for from(): a fresh empty chain per call. Handlers run
@@ -462,6 +470,128 @@ describe('POST /v1/rides/:tripId/impact', () => {
     });
   });
 
+  // Supabase from() mock keyed on TABLE NAME rather than call order.
+  //
+  // The queue form (mockReturnValueOnce) is unsafe for this endpoint: the
+  // handler runs fire-and-forget work (autoPublish) that keeps consuming
+  // from() AFTER inject() resolves, so a value queued by the NEXT test gets
+  // eaten — the leak this file's beforeEach already warns about, which
+  // beforeEach cannot prevent because the consumption happens later in
+  // wall-clock time. It surfaced as "derives elevation gain ... Number of
+  // calls: 0": green with the file run alone, red in the full suite, because
+  // the track row never reached the handler and so there was no geometry to
+  // look up. Keying by table makes these tests order-independent.
+  const impactFrom = (track: unknown, equivalents: unknown[] = []) => {
+    mockFrom.mockImplementation((table: string) =>
+      table === 'trip_tracks'
+        ? chainResult(track)
+        : table === 'reward_equivalents'
+          ? chainResult(equivalents)
+          : chainResult(null));
+  };
+
+  // Elevation gain was 0 on every ride_impacts row ever written, because no
+  // client sends elevationGainM. The server now derives it from the ride's own
+  // geometry via the terrain dataset instead of waiting on an app release.
+
+  it('derives elevation gain from the ridden trail when the client sends none', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 0.6, money_saved_eur: 1.75, hazards_warned_count: 0, distance_meters: 5000 }],
+      error: null,
+    });
+    impactFrom({
+          bike_type: 'acoustic',
+          started_at: null,
+          ended_at: null,
+          gps_trail: [
+            { lat: 45.6427, lon: 25.5887 },
+            { lat: 45.6431, lon: 25.5879 },
+            { lat: 45.6438, lon: 25.5861 },
+          ],
+          planned_route_polyline6: null,
+        });
+
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 5000 },
+    });
+
+    // GeoJSON [lon, lat] order — swapping these reads the wrong hemisphere.
+    expect(mockGetElevationGain).toHaveBeenCalledWith([
+      [25.5887, 45.6427],
+      [25.5879, 45.6431],
+      [25.5861, 45.6438],
+    ]);
+    expect(mockRpc).toHaveBeenCalledWith(
+      'record_ride_impact',
+      expect.objectContaining({ p_elevation_gain_m: 5 }),
+    );
+  });
+
+  it('keeps a client-supplied elevation gain instead of overriding it', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 0.6, money_saved_eur: 1.75, hazards_warned_count: 0, distance_meters: 5000 }],
+      error: null,
+    });
+    impactFrom({
+          bike_type: 'acoustic',
+          started_at: null,
+          ended_at: null,
+          gps_trail: [
+            { lat: 45.6427, lon: 25.5887 },
+            { lat: 45.6431, lon: 25.5879 },
+          ],
+          planned_route_polyline6: null,
+        });
+
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 5000, elevationGainM: 123 },
+    });
+
+    expect(mockGetElevationGain).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith(
+      'record_ride_impact',
+      expect.objectContaining({ p_elevation_gain_m: 123 }),
+    );
+  });
+
+  it('still records the impact when the elevation lookup fails', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 0.6, money_saved_eur: 1.75, hazards_warned_count: 0, distance_meters: 5000 }],
+      error: null,
+    });
+    impactFrom({
+          bike_type: 'acoustic',
+          started_at: null,
+          ended_at: null,
+          gps_trail: [
+            { lat: 45.6427, lon: 25.5887 },
+            { lat: 45.6431, lon: 25.5879 },
+          ],
+          planned_route_polyline6: null,
+        });
+    mockGetElevationGain.mockRejectedValueOnce(new Error('DEM upstream down'));
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 5000 },
+    });
+
+    // A terrain outage must cost the climb, not the whole impact row.
+    expect(response.statusCode).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith(
+      'record_ride_impact',
+      expect.objectContaining({ p_elevation_gain_m: 0 }),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // bikeType on the request body.
   //
@@ -475,10 +605,7 @@ describe('POST /v1/rides/:tripId/impact', () => {
   // same way.
   // -------------------------------------------------------------------------
   const impactMocks = (track: unknown) => {
-    mockFrom
-      .mockReturnValueOnce(chainResult(track)) // trip_tracks: bike_type + timestamps
-      .mockReturnValueOnce(chainResult([]))    // reward_equivalents
-      .mockReturnValueOnce(chainResult(null)); // trip_tracks: aqi_at_start
+    impactFrom(track);
     mockRpc
       .mockResolvedValueOnce({
         data: [{ co2_saved_kg: 1, money_saved_eur: 3, hazards_warned_count: 0, distance_meters: 9000 }],
