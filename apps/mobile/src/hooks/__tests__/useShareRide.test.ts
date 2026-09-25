@@ -12,15 +12,23 @@ import { act, renderHook } from '@testing-library/react';
 // Core module spies
 // ---------------------------------------------------------------------------
 
-const trimSpy = vi.fn<(coords: [number, number][], trim?: number) => [number, number][]>();
 const mapUrlSpy = vi.fn<(...args: unknown[]) => string>();
 const captionSpy = vi.fn<(input: unknown) => string>();
 
-vi.mock('@defensivepedal/core', () => ({
-  trimPrivacyZone: (...args: [[number, number][], number?]) => trimSpy(...args),
-  mapboxStaticImageUrl: (...args: unknown[]) => mapUrlSpy(...args),
-  buildShareCaption: (input: unknown) => captionSpy(input),
-}));
+// The privacy trim is deliberately NOT mocked. The previous version of this
+// file stubbed it and then asserted that its own stubbed output was passed
+// through — which passes identically whether or not the risk-segment overlay
+// is trimmed, and is exactly why the P0-4 leak survived review
+// (docs/plans/external-review-triage-2026-09-25.md). Only the URL and caption
+// builders are spied, so the assertions below run against REAL geometry.
+vi.mock('@defensivepedal/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@defensivepedal/core')>();
+  return {
+    ...actual,
+    mapboxStaticImageUrl: (...args: unknown[]) => mapUrlSpy(...args),
+    buildShareCaption: (input: unknown) => captionSpy(input),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Env
@@ -98,6 +106,22 @@ vi.mock('../../store/appStore', () => ({
 
 const { useShareRide } = await import('../useShareRide');
 
+// Real haversine (the core module is spread-preserved by the mock above), used
+// to assert the trim distance rather than trusting a stub.
+const { haversineDistance } = await import('@defensivepedal/core');
+
+/** True when `list` contains a coordinate equal to `target` (exact tuple match). */
+const containsCoord = (
+  list: readonly [number, number][],
+  target: readonly [number, number],
+): boolean => list.some(([lon, lat]) => lon === target[0] && lat === target[1]);
+
+/** Metres between two [lon, lat] tuples. */
+const metersApart = (
+  a: readonly [number, number],
+  b: readonly [number, number],
+): number => haversineDistance([a[1], a[0]], [b[1], b[0]]);
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -107,11 +131,6 @@ const ORIGINAL_COORDS: [number, number][] = [
   [26.11, 44.44],
   [26.12, 44.45],
 ];
-const TRIMMED_COORDS: [number, number][] = [
-  [26.105, 44.435],
-  [26.115, 44.445],
-];
-
 const MAP_URL = 'https://api.mapbox.com/styles/v1/mapbox/outdoors-v12/static/mocked';
 const CAPTION = 'I just rode 8 km in 30 min on Defensive Pedal. 1.0 kg CO₂ saved. #DefensivePedal #SaferCycling';
 const FILE_URI = 'file:///tmp/ride-share.png';
@@ -130,7 +149,6 @@ const baseInput = {
 beforeEach(() => {
   mockIsOnline = true;
 
-  trimSpy.mockReset().mockReturnValue(TRIMMED_COORDS);
   mapUrlSpy.mockReset().mockReturnValue(MAP_URL);
   captionSpy.mockReset().mockReturnValue(CAPTION);
   captureSpy.mockReset().mockResolvedValue(FILE_URI);
@@ -159,7 +177,8 @@ describe('useShareRide', () => {
       expect(result.current.toastMessage).toBe('No connection — try again when online');
       expect(captureSpy).not.toHaveBeenCalled();
       expect(shareImageSpy).not.toHaveBeenCalled();
-      expect(trimSpy).not.toHaveBeenCalled();
+      // Bailed before doing any work: no map image was built either.
+      expect(mapUrlSpy).not.toHaveBeenCalled();
     });
 
     it('consumeToast clears the offline message', async () => {
@@ -185,14 +204,21 @@ describe('useShareRide', () => {
         await result.current.share(baseInput);
       });
 
-      // Privacy trim called with 200m
-      expect(trimSpy).toHaveBeenCalledWith(ORIGINAL_COORDS, 200);
-
-      // Map URL gets TRIMMED coords, not originals
+      // Real trim: neither raw endpoint may reach the map image.
       expect(mapUrlSpy).toHaveBeenCalledTimes(1);
       const mapArgs = mapUrlSpy.mock.calls[0][0] as { coords: [number, number][] };
-      expect(mapArgs.coords).toBe(TRIMMED_COORDS);
-      expect(mapArgs.coords).not.toBe(ORIGINAL_COORDS);
+      expect(mapArgs.coords.length).toBeGreaterThanOrEqual(2);
+
+      const rawStart = ORIGINAL_COORDS[0];
+      const rawEnd = ORIGINAL_COORDS[ORIGINAL_COORDS.length - 1];
+      expect(containsCoord(mapArgs.coords, rawStart)).toBe(false);
+      expect(containsCoord(mapArgs.coords, rawEnd)).toBe(false);
+
+      // ...and the drawn line begins/ends roughly the trim radius inside them.
+      expect(metersApart(mapArgs.coords[0], rawStart)).toBeGreaterThan(150);
+      expect(
+        metersApart(mapArgs.coords[mapArgs.coords.length - 1], rawEnd),
+      ).toBeGreaterThan(150);
     });
 
     it('captures the share card and forwards the uri to shareImage', async () => {
@@ -217,23 +243,70 @@ describe('useShareRide', () => {
       expect(res).toEqual({ shared: true, savedToLibrary: true });
     });
 
-    it('passes risk segments and optional metadata to map URL builder', async () => {
+    it('passes optional metadata to the caption builder', async () => {
       const { result } = renderHook(() => useShareRide());
-      const riskSegments = [{ coords: TRIMMED_COORDS, color: '#FF0000' }];
 
       await act(async () => {
-        await result.current.share({ ...baseInput, riskSegments, safetyScore: 87 });
+        await result.current.share({ ...baseInput, safetyScore: 87 });
+      });
+
+      const captionArg = captionSpy.mock.calls[0][0] as { safetyScore?: number };
+      expect(captionArg.safetyScore).toBe(87);
+    });
+
+    // ---------------------------------------------------------------------
+    // P0-4 regression. `mapboxStaticImageUrl` draws ONLY the risk segments
+    // when any are present, so an untrimmed overlay put the rider's real
+    // start and end — their front door — into a PNG bound for Instagram,
+    // while the pins sat 200 m inside. Feed RAW segments (the planned route,
+    // which is what feedback.tsx actually supplies) and assert the raw
+    // endpoints do not survive.
+    // ---------------------------------------------------------------------
+    it('strips the raw endpoints from the risk-segment overlay', async () => {
+      const { result } = renderHook(() => useShareRide());
+
+      const rawStart = ORIGINAL_COORDS[0];
+      const rawEnd = ORIGINAL_COORDS[ORIGINAL_COORDS.length - 1];
+
+      // Spans the whole planned route, endpoints included.
+      const rawRiskSegments = [
+        {
+          color: '#FF0000',
+          coords: [
+            rawStart,
+            [26.103, 44.433],
+            [26.11, 44.44],
+            [26.115, 44.445],
+            rawEnd,
+          ] as [number, number][],
+        },
+      ];
+
+      await act(async () => {
+        await result.current.share({ ...baseInput, riskSegments: rawRiskSegments });
       });
 
       const args = mapUrlSpy.mock.calls[0][0] as {
         coords: [number, number][];
-        riskSegments?: unknown;
+        riskSegments?: { coords: [number, number][]; color: string }[];
       };
-      expect(args.riskSegments).toEqual(riskSegments);
 
-      // Caption input carries the safety score through
-      const captionArg = captionSpy.mock.calls[0][0] as { safetyScore?: number };
-      expect(captionArg.safetyScore).toBe(87);
+      // The overlay is what gets drawn, so it is what must be clean.
+      const emitted = args.riskSegments ?? [];
+      for (const seg of emitted) {
+        expect(containsCoord(seg.coords, rawStart)).toBe(false);
+        expect(containsCoord(seg.coords, rawEnd)).toBe(false);
+        for (const point of seg.coords) {
+          expect(metersApart(point, rawStart)).toBeGreaterThanOrEqual(200);
+          expect(metersApart(point, rawEnd)).toBeGreaterThanOrEqual(200);
+        }
+      }
+
+      // Interior geometry must survive — a trim that emptied the overlay would
+      // pass the assertions above while silently destroying the feature.
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0].coords.length).toBeGreaterThanOrEqual(2);
+      expect(emitted[0].color).toBe('#FF0000');
     });
   });
 

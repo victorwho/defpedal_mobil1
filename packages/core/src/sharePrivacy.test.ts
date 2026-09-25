@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { haversineDistance, polylineSegmentDistance } from './distance';
-import { trimPrivacyZone } from './sharePrivacy';
+import { trimPrivacyZone, trimShareGeometry } from './sharePrivacy';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,5 +137,118 @@ describe('trimPrivacyZone', () => {
     // Length should be ~4600m
     expect(totalLength(trimmed)).toBeGreaterThan(4580);
     expect(totalLength(trimmed)).toBeLessThan(4620);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trimShareGeometry — trail AND risk overlay, together
+//
+// Regression cover for the P0-4 share-image leak
+// (docs/plans/external-review-triage-2026-09-25.md): the overlay was forwarded
+// untrimmed while only the trail was trimmed, and mapboxStaticImageUrl draws
+// ONLY the overlay when one is present — so the rendered PNG showed the rider's
+// real start and end.
+// ---------------------------------------------------------------------------
+
+describe('trimShareGeometry', () => {
+  // 20 × 100 m = 2 km, comfortably longer than 2 × 200 m so a trim applies.
+  const trail = buildStraightLine(26.1, 44.43, 20, 100);
+  const rawStart = trail[0];
+  const rawEnd = trail[trail.length - 1];
+
+  const metersApart = (
+    a: readonly [number, number],
+    b: readonly [number, number],
+  ) => haversineDistance([a[1], a[0]], [b[1], b[0]]);
+
+  it('removes overlay vertices within the trim radius of either raw endpoint', () => {
+    const result = trimShareGeometry({
+      coords: trail,
+      riskSegments: [{ color: '#FF0000', coords: trail.map(([lon, lat]) => [lon, lat]) }],
+      trimMeters: 200,
+    });
+
+    expect(result.trimmed).toBe(true);
+    expect(result.riskSegments).toHaveLength(1);
+
+    for (const point of result.riskSegments[0].coords) {
+      expect(metersApart(point, rawStart)).toBeGreaterThanOrEqual(200);
+      expect(metersApart(point, rawEnd)).toBeGreaterThanOrEqual(200);
+    }
+  });
+
+  it('keeps the interior of the overlay rather than emptying it', () => {
+    const result = trimShareGeometry({
+      coords: trail,
+      riskSegments: [{ color: '#FF0000', coords: trail.map(([lon, lat]) => [lon, lat]) }],
+      trimMeters: 200,
+    });
+
+    // 2 km line, 200 m off each end -> ~1.6 km of geometry must survive.
+    expect(result.riskSegments[0].coords.length).toBeGreaterThan(10);
+    expect(result.riskSegments[0].color).toBe('#FF0000');
+  });
+
+  it('drops a segment that would be left with fewer than two points', () => {
+    // Entirely inside the start exclusion zone.
+    const hugStart: [number, number][] = [trail[0], trail[1]];
+
+    const result = trimShareGeometry({
+      coords: trail,
+      riskSegments: [{ color: '#00FF00', coords: hugStart }],
+      trimMeters: 200,
+    });
+
+    expect(result.riskSegments).toHaveLength(0);
+  });
+
+  it('trims the trail identically to trimPrivacyZone', () => {
+    const result = trimShareGeometry({ coords: trail, trimMeters: 200 });
+    expect(result.coords).toEqual(trimPrivacyZone(trail, 200));
+  });
+
+  it('trims NOTHING when the ride is too short, and says so', () => {
+    // 300 m total < 2 × 200 m, so trimPrivacyZone declines to trim; the overlay
+    // must follow the same policy or the two would disagree.
+    const shortTrail = buildStraightLine(26.1, 44.43, 3, 100);
+    const segment = shortTrail.map(([lon, lat]) => [lon, lat] as [number, number]);
+
+    const result = trimShareGeometry({
+      coords: shortTrail,
+      riskSegments: [{ color: '#0000FF', coords: segment }],
+      trimMeters: 200,
+    });
+
+    expect(result.trimmed).toBe(false);
+    expect(result.coords).toEqual(shortTrail);
+    expect(result.riskSegments[0].coords).toEqual(segment);
+  });
+
+  it('handles a missing or empty overlay without inventing one', () => {
+    expect(trimShareGeometry({ coords: trail }).riskSegments).toEqual([]);
+    expect(trimShareGeometry({ coords: trail, riskSegments: [] }).riskSegments).toEqual([]);
+  });
+
+  it('does not alias the caller arrays', () => {
+    const segment = trail.map(([lon, lat]) => [lon, lat] as [number, number]);
+    const input = [{ color: '#FF0000', coords: segment }];
+    const result = trimShareGeometry({ coords: trail, riskSegments: input, trimMeters: 200 });
+
+    expect(result.riskSegments[0].coords).not.toBe(segment);
+    result.riskSegments[0].coords[0][0] = 999;
+    expect(segment[0][0]).not.toBe(999);
+  });
+
+  it('degrades safely on empty or single-point input', () => {
+    expect(trimShareGeometry({ coords: [] })).toEqual({
+      coords: [],
+      riskSegments: [],
+      trimmed: false,
+    });
+
+    const single: [number, number][] = [[26.1, 44.43]];
+    const result = trimShareGeometry({ coords: single });
+    expect(result.coords).toEqual(single);
+    expect(result.trimmed).toBe(false);
   });
 });

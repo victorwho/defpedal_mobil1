@@ -25,7 +25,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import {
   buildShareCaption,
   mapboxStaticImageUrl,
-  trimPrivacyZone,
+  trimShareGeometry,
   type ShareCaptionInput,
 } from '@defensivepedal/core';
 
@@ -131,12 +131,23 @@ export function useShareRide(): UseShareRideReturn {
 
       try {
         // 1) Privacy trim — protects home/work endpoints.
-        const trimmed = trimPrivacyZone(input.coords, PRIVACY_TRIM_METERS);
+        //
+        // This MUST trim the risk-segment overlay as well as the trail, and
+        // both must come from the same call. `mapboxStaticImageUrl` draws ONLY
+        // the risk segments when any are present, so trimming the trail alone
+        // (which is what this did until 2026-09-25) rendered the full
+        // door-to-door planned route while the pins sat 200 m inside each end.
+        // See docs/plans/external-review-triage-2026-09-25.md P0-4.
+        const trimmed = trimShareGeometry({
+          coords: input.coords,
+          riskSegments: input.riskSegments,
+          trimMeters: PRIVACY_TRIM_METERS,
+        });
 
         // 2) Mapbox Static image URL for the map background.
         const mapImageUrl = mapboxStaticImageUrl({
-          coords: trimmed,
-          riskSegments: input.riskSegments,
+          coords: trimmed.coords,
+          riskSegments: trimmed.riskSegments,
           width: MAP_IMAGE_WIDTH,
           height: MAP_IMAGE_HEIGHT,
           retina: true,
