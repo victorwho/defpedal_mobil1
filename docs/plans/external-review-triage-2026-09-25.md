@@ -32,7 +32,15 @@ and its "Quick Wins" list contains items already done.
 | **P1-11** feed-reaction XP farm | ⚠️ **partially** fixed | `/feed/:id/like` and `/feed/:id/love` no longer award XP or notify on a duplicate (23505 guard) + 2 new tests, mutation-checked. The unlike→relike path and the `xp_events` constraint still need the per-action decision below |
 | **P1-4** notification prefs fail-closed | ✅ code done | Suppresses instead of sending when the prefs read errors; distinguishes `no_profile` from `prefs_unavailable`. 4 new tests, mutation-checked |
 | **P1-2 / P1-3** unbounded body reads | ✅ code done | Fixed in **three** files — `apiFetch.ts` (all ~80 `mobileApiFetch` call sites), `mapbox-routing.ts` (OSRM point-to-point, OSRM loop candidates, Mapbox Directions, canopy) and **`mapbox-search.ts`**, whose separate copy was found by chasing an unexplained bundle-grep result. Four bare fetches with no timeout at all routed through `mobileApiFetch`. 3 new tests, mutation-checked |
-| Everything else | ⬜ not started | P1-1, P1-5…P1-10, P1-12, all of P2 |
+| **P1-1** unreadable session ≠ sign-out | ✅ code done | Third state `isSessionUnreadable` threaded to both consumers, so a keystore failure no longer walls a signed-in rider behind the mandatory signup gate or resets their PostHog identity. 3 new tests, both guards mutation-checked |
+| **P1-6** silent auto-publish failures | ✅ code done | `v1.ts` trips/trip_tracks reads now log at error level (PGRST116 stays quiet); `autoPublish.getUserProfile` reports to Sentry while still failing closed |
+| **P1-9** first-ride budget fail-open | ✅ code done | Weekly budget and dedupe count now fail **closed**. 2 new tests, mutation-checked |
+| **P1-10** receipt sweep silent outage | ✅ code done | Throws instead of reporting `{polled:0}`; the route already turns that into a logged 500 the GCP policy pages on. 1 new test, mutation-checked |
+| Everything else | ⬜ not started | P1-5, P1-7, P1-8, P1-12, all of P2 |
+
+**Deploy state:** the four migrations are LIVE. Everything under "code done" is
+on `main` and **not deployed** — the API fixes need a Cloud Run deploy, the
+mobile fixes a client release.
 
 **Note on the body-read fix (worth keeping):** the load-bearing half is moving
 the body read INSIDE the helper's `try`, not the timer re-arm. Mutation-checking
