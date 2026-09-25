@@ -45,6 +45,7 @@ import { timingSafeStringEqual, verifyCronAuth } from '../lib/cronAuth';
 import { buildCacheKey } from '../lib/cache';
 import { ACCEPTED_DEVICE_EVENTS, recordDeviceTelemetry } from '../lib/deviceTelemetry';
 import { rideElevationCoordinates } from '../lib/rideElevation';
+import { resolveWithinDeadline } from '../lib/deadline';
 import {
   ACCEPTED_PLAN_MODES,
   recordPlannedRoute,
@@ -2984,6 +2985,13 @@ export const buildV1Routes = (
       },
     } as const;
 
+    /**
+     * How long ride-end will wait for the terrain lookup before giving up on
+     * the climb. Normal lookups land well inside this; the number exists to
+     * bound the pathological case, not the usual one.
+     */
+    const ELEVATION_DEADLINE_MS = 3_000;
+
     // POST /v1/rides/:tripId/impact — record ride impact and return with random equivalent + new badges
     app.post<{
       Params: { tripId: string };
@@ -3170,8 +3178,19 @@ export const buildV1Routes = (
           try {
             const coordinates = rideElevationCoordinates(trackGpsTrail, trackPlannedPolyline6);
             if (coordinates.length >= 2) {
-              const { elevationGain } = await dependencies.getElevationGain(coordinates);
-              if (Number.isFinite(elevationGain) && elevationGain >= 0) {
+              // Capped, because this sits on the POST the client awaits at the
+              // end of a ride. A per-tile timeout alone does not bound it: the
+              // lookup runs up to four chunks in sequence, so the worst case is
+              // a multiple of that. Past the deadline the climb is abandoned
+              // and the row stores 0 — the same outcome as before this derived
+              // anything, which is the right thing to trade for ride-end
+              // latency.
+              const gainResult = await resolveWithinDeadline(
+                dependencies.getElevationGain(coordinates),
+                ELEVATION_DEADLINE_MS,
+              );
+              const elevationGain = gainResult?.elevationGain;
+              if (elevationGain != null && Number.isFinite(elevationGain) && elevationGain >= 0) {
                 // Same ceiling the request schema enforces, so a bad DEM read
                 // cannot write a number the API would have rejected.
                 resolvedElevationGainM = Math.min(Math.round(elevationGain), 10_000);

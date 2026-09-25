@@ -592,6 +592,47 @@ describe('POST /v1/rides/:tripId/impact', () => {
     );
   });
 
+  it('does not let a hanging terrain lookup hold up the end of a ride', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: [{ co2_saved_kg: 0.6, money_saved_eur: 1.75, hazards_warned_count: 0, distance_meters: 5000 }],
+      error: null,
+    });
+    mockFrom.mockImplementation((table: unknown) =>
+      table === 'trip_tracks'
+        ? chainResult({
+            bike_type: 'acoustic',
+            started_at: null,
+            ended_at: null,
+            gps_trail: [
+              { lat: 45.6427, lon: 25.5887 },
+              { lat: 45.6431, lon: 25.5879 },
+            ],
+            planned_route_polyline6: null,
+          })
+        : chainResult(null),
+    );
+    // Never settles. Before the deadline this awaited forever, and the rider
+    // waited with it — the lookup sits on the POST the client fires at ride end.
+    mockGetElevationGain.mockImplementationOnce(() => new Promise(() => {}));
+
+    const startedAt = Date.now();
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 5000 },
+    });
+    const elapsed = Date.now() - startedAt;
+
+    expect(response.statusCode).toBe(200);
+    // Bounded by ELEVATION_DEADLINE_MS (3s), not by the upstream.
+    expect(elapsed).toBeLessThan(6_000);
+    expect(mockRpc).toHaveBeenCalledWith(
+      'record_ride_impact',
+      expect.objectContaining({ p_elevation_gain_m: 0 }),
+    );
+  }, 15_000);
+
   // -------------------------------------------------------------------------
   // bikeType on the request body.
   //

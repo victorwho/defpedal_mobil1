@@ -4,6 +4,19 @@ import { PNG } from 'pngjs';
 import { config } from '../config';
 
 const MAX_POINTS_PER_REQUEST = 50;
+
+/**
+ * Per-tile ceiling on the Mapbox Terrain-RGB fetch.
+ *
+ * It had none, so a hung socket hung the caller for as long as the platform's
+ * default allowed. That was survivable while this only served route preview,
+ * where the rider is already waiting; it stopped being survivable when ride-end
+ * started calling it. Same shape as OSRM_TIMEOUT_MS in clients/customOsrm.ts.
+ *
+ * Generous, because it is the backstop rather than the budget — the caller that
+ * cares about latency imposes its own deadline on top.
+ */
+const TERRAIN_TILE_TIMEOUT_MS = 5_000;
 const TARGET_POINTS_FOR_PROFILE = 400;
 const TARGET_POINTS_FOR_GAIN = 200;
 const MAPBOX_TERRAIN_ZOOM = 14;
@@ -103,7 +116,7 @@ const fetchTerrainRgbElevations = async (
   await Promise.all(
     Array.from(tilesToFetch.entries()).map(async ([key, tile]) => {
       const url = `https://api.mapbox.com/v4/mapbox.terrain-rgb/${tile.z}/${tile.x}/${tile.y}.pngraw?access_token=${config.mapboxAccessToken}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(TERRAIN_TILE_TIMEOUT_MS) });
 
       if (!response.ok) {
         throw new Error(`Mapbox Terrain-RGB request failed with ${response.status}`);
