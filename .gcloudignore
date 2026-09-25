@@ -3,6 +3,34 @@
 .kiro
 .agents
 node_modules
+
+# ── Secrets: MUST stay excluded ────────────────────────────────────────────────
+# `gcloud builds submit` uploads the working directory into a Cloud Build GCS
+# source bucket. Because a .gcloudignore FILE EXISTS, gcloud does NOT fall back
+# to .gitignore patterns at all, and there is no `#!include:.gitignore` directive
+# here -- so .env files were being uploaded despite being git-ignored.
+#
+# services/mobile-api/.env holds a live SUPABASE_SERVICE_ROLE_KEY, MAPBOX_ACCESS_TOKEN,
+# OPENAI_API_KEY and CRON_SECRET. The Dockerfile's `COPY services/mobile-api
+# services/mobile-api` (line 22) pulled it into the builder stage too; the runtime
+# stage only copies dist/, so the shipped IMAGE was clean, but the secret still
+# transited and is retained in the source bucket.
+#
+# The build does not need any of these: runtime config comes from Cloud Run env
+# vars. Found by the 2026-09-25 triage as P0-5
+# (docs/plans/external-review-triage-2026-09-25.md).
+.env
+.env.*
+**/.env
+**/.env.*
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
+*-service-account*.json
+*serviceaccount*.json
+# ──────────────────────────────────────────────────────────────────────────────
 # Mobile app source — Dockerfile only needs apps/mobile/package.json, but
 # excluding the whole directory breaks that COPY. Exclude heavy subtrees only.
 apps/mobile/android
