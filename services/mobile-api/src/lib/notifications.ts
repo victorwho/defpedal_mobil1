@@ -135,12 +135,34 @@ export const dispatchNotification = async (
   const supabase = getSupabaseAdmin();
   const priority = options?.priority ?? 'normal';
 
-  // Load user preferences
-  const { data: prefs } = await supabase
+  // Load user preferences.
+  //
+  // ⚠️ This read MUST fail CLOSED. The category gate and the quiet-hours gate
+  // both live inside `if (prefs)` below, so dropping the error (which is what
+  // this did until 2026-09-25) meant a Supabase blip produced `prefs === null`,
+  // skipped BOTH gates, and sent the push anyway — to a rider who had switched
+  // the category off, or at 03:00 inside their quiet hours.
+  //
+  // Contrast `isUnderDailyBudget` above, which fails OPEN with a comment
+  // explaining why: that one counts rows in a LOG table, so a failure there
+  // should not block a legitimate send. Preferences are the opposite — the
+  // harmful direction is sending. See
+  // docs/plans/external-review-triage-2026-09-25.md P1-4.
+  const { data: prefs, error: prefsError } = await supabase
     .from('profiles')
     .select('notify_weather, notify_hazard, notify_community, notify_mia, quiet_hours_start, quiet_hours_end, quiet_hours_timezone')
     .eq('id', userId)
     .single();
+
+  if (prefsError) {
+    // Keep the two cases distinct: `notification_log.status`/`suppression_reason`
+    // is alert-grade (see .claude/CLAUDE.md Notifications §9), and "this rider
+    // has no profile row" is a different operational problem from "the database
+    // did not answer". PGRST116 is PostgREST's no-rows-for-.single() code.
+    const reason = prefsError.code === 'PGRST116' ? 'no_profile' : 'prefs_unavailable';
+    await logNotification(supabase, userId, category, payload, 'suppressed', reason);
+    return;
+  }
 
   if (prefs) {
     // Check category preference
