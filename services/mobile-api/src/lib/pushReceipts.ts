@@ -79,12 +79,26 @@ export const processPushReceipts = async (
   const dueBefore = new Date(now.getTime() - RECEIPT_MIN_AGE_MS).toISOString();
   const expiredBefore = new Date(now.getTime() - RECEIPT_TTL_MS).toISOString();
 
-  const { data: rows } = await db
+  const { data: rows, error: rowsError } = await db
     .from('push_receipts')
     .select('ticket_id, user_id, expo_push_token')
     .lte('created_at', dueBefore)
     .order('created_at', { ascending: true })
     .limit(RECEIPT_BATCH_LIMIT);
+
+  // Dropping this error made an outage look like a clean sweep: `rows` came back
+  // undefined, `pending` became [], and the cron returned
+  // { polled: 0, resolved: 0, pruned: 0 } with a 200. Dead tokens then go
+  // unpruned indefinitely, and Expo deprioritises senders with high error rates
+  // — which is the reputational mechanism behind error-log #69, where Android
+  // delivery was ~zero for the app's entire history.
+  //
+  // Throwing is deliberate: the calling route logs at error level and returns
+  // 500, which the GCP "API 5xx response" alert policy actually pages on. A
+  // silent zero pages nobody.
+  if (rowsError) {
+    throw new Error(`push_receipts read failed: ${rowsError.message}`);
+  }
 
   const pending: Array<{ ticket_id: string; user_id: string; expo_push_token: string }> =
     rows ?? [];

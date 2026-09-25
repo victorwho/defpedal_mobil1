@@ -254,7 +254,13 @@ export const getWeeklyCount = async (
     .eq('status', 'sent')
     .gte('created_at', monday.toISOString());
 
-  if (error) return 0; // fail open
+  // Fail CLOSED. Returning 0 meant "nothing sent this week", so
+  // `isUnderWeeklyBudget` passed and a transient Supabase error VOIDED the
+  // weekly cap — rider-visible spam, against the documented "never repeat a
+  // phrase" rule. Reporting the budget as already spent suppresses this tick
+  // instead; the cron runs daily, so a real send is delayed, not lost.
+  // See docs/plans/external-review-triage-2026-09-25.md P1-9.
+  if (error) return WEEKLY_BUDGET;
   return count ?? 0;
 };
 
@@ -281,8 +287,13 @@ const localeOf = (profile: FirstRideProfile): FirstRideLocale =>
 
 /**
  * How many times this template already went out to the user, matched across
- * every locale's marker (see firstRideNotificationCopy.ts). Fails open with
- * 0 so a query error can't permanently mute a template.
+ * every locale's marker (see firstRideNotificationCopy.ts).
+ *
+ * Fails CLOSED on a query error (reports 1 prior send, suppressing this tick).
+ * It used to drop the error entirely and report 0, i.e. "never sent" — so a
+ * Supabase blip re-sent a template the rider had already received. The cron
+ * runs daily and the dedupe filter is durable, so failing closed delays a
+ * genuine first send by a day at worst; failing open duplicates one forever.
  */
 const priorSendCount = async (
   db: SupabaseClient,
@@ -294,13 +305,14 @@ const priorSendCount = async (
   if (!filter) return 0;
   if (index) return index.priorSends.get(priorKey(userId, template)) ?? 0;
 
-  const { count } = await db
+  const { count, error } = await db
     .from('notification_log')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('category', LOG_CATEGORY)
     .or(filter);
 
+  if (error) return 1;
   return count ?? 0;
 };
 

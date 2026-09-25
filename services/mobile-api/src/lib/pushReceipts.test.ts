@@ -22,6 +22,8 @@ let deletedTokens: Array<{ user_id: string; expo_push_token: string }> = [];
 let deletedReceiptIds: string[] = [];
 let upserted: unknown[] = [];
 let receiptDeleteFilter: 'in' | 'lt' | null = null;
+// Injectable failure for the pending-rows read (P1-10 regression below).
+let pendingReadError: { message: string } | null = null;
 
 const makeChain = (table: string) => {
   const chain: Record<string, unknown> = {};
@@ -55,7 +57,7 @@ const makeChain = (table: string) => {
     // delete-with-select is the expiry sweep
     const value = mode === 'delete' && receiptDeleteFilter === 'lt'
       ? { data: expiredRows, error: null }
-      : { data: pendingRows, error: null };
+      : { data: pendingRows, error: pendingReadError };
     return Promise.resolve(value).then(res, rej);
   };
   return chain;
@@ -71,7 +73,22 @@ describe('processPushReceipts', () => {
     deletedReceiptIds = [];
     upserted = [];
     receiptDeleteFilter = null;
+    pendingReadError = null;
     checkReceipts.mockReset();
+  });
+
+  // P1-10 regression (docs/plans/external-review-triage-2026-09-25.md).
+  // The pending-rows read dropped its `error`, so `rows` came back undefined,
+  // `pending` became [], and the cron returned {polled:0,resolved:0,pruned:0}
+  // with a 200 -- an outage was indistinguishable from a quiet night. Dead
+  // tokens then go unpruned, and Expo deprioritises senders with high error
+  // rates, which is the mechanism behind error-log #69.
+  it('THROWS when the pending-receipts read fails, rather than reporting a clean sweep', async () => {
+    pendingReadError = { message: 'statement timeout' };
+
+    await expect(processPushReceipts(db, new Date())).rejects.toThrow(/push_receipts read failed/);
+    // And it must not have silently proceeded to call Expo with an empty batch.
+    expect(checkReceipts).not.toHaveBeenCalled();
   });
 
   it('prunes a dead token scoped to its owner and clears the resolved row', async () => {

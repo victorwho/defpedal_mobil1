@@ -68,6 +68,7 @@ import {
   checkLapsedReengagement,
   checkWeatherInvitation,
   evaluateFirstRideNotifications,
+  isUnderWeeklyBudget,
   type FirstRideProfile,
 } from './firstRideNotifications';
 
@@ -325,5 +326,40 @@ describe('evaluateFirstRideNotifications', () => {
 
     expect(results[0]!.reason).toBe('weekly_budget_exceeded');
     expect(forecastSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P1-9: the weekly budget must fail CLOSED
+//
+// docs/plans/external-review-triage-2026-09-25.md. `getWeeklyCount` carried
+// `if (error) return 0; // fail open`, so a transient Supabase error reported
+// "nothing sent this week" and VOIDED the weekly cap -- rider-visible repeat
+// sends, against the documented "never repeat a phrase" rule. The sibling
+// dedupe count dropped its error entirely, with the same effect per template.
+// ---------------------------------------------------------------------------
+
+describe('weekly budget fails closed', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(resultsByTable)) delete resultsByTable[key];
+  });
+
+  it('reports the budget as SPENT when the count query errors', async () => {
+    resultsByTable.notification_log = {
+      data: null,
+      error: { message: 'canceling statement due to statement timeout' },
+      count: null,
+    };
+
+    // Fail-closed: suppress this tick. The cron runs daily, so a genuine send
+    // is delayed rather than lost -- whereas failing open duplicates forever.
+    await expect(isUnderWeeklyBudget(db, 'user-1')).resolves.toBe(false);
+  });
+
+  it('still allows a send when the count query succeeds and is under budget', async () => {
+    // The other direction: failing closed must not mean never sending.
+    resultsByTable.notification_log = { data: null, error: null, count: 0 };
+
+    await expect(isUnderWeeklyBudget(db, 'user-1')).resolves.toBe(true);
   });
 });

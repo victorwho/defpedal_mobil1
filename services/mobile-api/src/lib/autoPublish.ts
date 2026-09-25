@@ -12,6 +12,7 @@ import { trimPolylineEndpoints } from '@defensivepedal/core';
 
 import { parseGeographyPoint } from './nudges/userLocation';
 import { supabaseAdmin } from './supabaseAdmin';
+import { captureServerException } from './sentry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -95,11 +96,32 @@ const toPointWktOrNull = (lat: number, lon: number): string | null => {
 
 const getUserProfile = async (userId: string) => {
   if (!supabaseAdmin) return null;
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('auto_share_rides, trim_route_endpoints, is_private')
     .eq('id', userId)
     .single();
+
+  // Returning null stays correct on failure -- every caller reads
+  // `!profile?.auto_share_rides` and declines to publish, and publishing for
+  // someone who may have opted OUT is the one outcome that must never happen.
+  // What was wrong is that it was SILENT: a DB/RLS failure was indistinguishable
+  // from "opted out", so rides simply never appeared in the feed with nothing
+  // recorded anywhere. Every caller is fire-and-forget behind a `catch {}`, and
+  // nothing here returns a 5xx, so GCP's alert policy cannot see it either --
+  // Sentry is the only seam that can, which is what the first-seen-issue rule
+  // exists for. PGRST116 (no profile row) is a different, non-transient problem
+  // and is reported too, but not as a transport error.
+  // See docs/plans/external-review-triage-2026-09-25.md P1-6.
+  if (error) {
+    captureServerException(error, {
+      source: 'autoPublish.getUserProfile',
+      userId,
+      consequence: 'ride not auto-published (treated as opted out)',
+    });
+    return null;
+  }
+
   return data as { auto_share_rides: boolean; trim_route_endpoints: boolean; is_private: boolean } | null;
 };
 

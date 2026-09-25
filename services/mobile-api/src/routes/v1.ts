@@ -3447,21 +3447,49 @@ export const buildV1Routes = (
             const { autoPublishRide, autoPublishHazardBatch } = await import('../lib/autoPublish');
 
             // Fetch trip metadata for auto-publish
-            const { data: tripRow } = await supabaseAdmin
+            const { data: tripRow, error: tripRowError } = await supabaseAdmin
               .from('trips')
               .select('start_location_text, destination_text, start_location, distance_meters, started_at, ended_at')
               .eq('id', tripId)
               .eq('user_id', user.id)
               .single();
 
+            // A dropped `error` here made a DB/RLS failure indistinguishable
+            // from "no such trip", and this whole block is fire-and-forget with
+            // a `catch {}`, so nothing surfaced. PGRST116 (no rows) is the
+            // ordinary not-found and stays quiet; anything else is an outage.
+            if (tripRowError && tripRowError.code !== 'PGRST116') {
+              request.log.error(
+                { err: tripRowError, tripId, event: 'autopublish_trip_read_failed' },
+                'auto-publish skipped: trip read failed',
+              );
+              return;
+            }
+
             if (!tripRow) return;
 
             // Fetch trip track for geometry
-            const { data: trackRow } = await supabaseAdmin
+            const { data: trackRow, error: trackRowError } = await supabaseAdmin
               .from('trip_tracks')
               .select('planned_route_polyline6, final_route_polyline6, started_at, ended_at')
               .eq('trip_id', tripId)
               .single();
+
+            // ⚠️ This is the failure .claude/CLAUDE.md warns about under trip
+            // route provenance: PostgREST 400s on an unknown column, so if this
+            // select ever runs against an un-migrated database `trackRow` is
+            // null and EVERY ride publishes to the feed with empty geometry
+            // while nothing logs it. Publishing still proceeds (a feed card
+            // without a line beats no card), but it can no longer be silent.
+            //
+            // PGRST116 is expected and common — a discarded ride has no
+            // trip_tracks row at all — so only a real error is logged.
+            if (trackRowError && trackRowError.code !== 'PGRST116') {
+              request.log.error(
+                { err: trackRowError, tripId, event: 'autopublish_track_read_failed' },
+                'auto-publish continuing WITHOUT route geometry: trip_tracks read failed',
+              );
+            }
 
             // PostgREST returns geography columns as WKB hex (error-log
             // #70) — the old `.latitude ?? .lat ?? 0` read stamped
