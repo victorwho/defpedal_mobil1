@@ -238,16 +238,47 @@ const extractCategory = (
   return cat ?? undefined;
 };
 
+/** A completed request: status plus the body, already read as text. */
+interface FetchedBody {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly bodyText: string;
+}
+
+/**
+ * Fetch `url` and read its body, with BOTH phases inside the abort window.
+ *
+ * ⚠️ This used to return the bare `Response` and clear its timer in `finally`,
+ * which fires when the HEADERS arrive — so all eight callers parsed the body
+ * with no timer armed and the AbortController disarmed. A Mapbox endpoint that
+ * sent headers and then stalled hung FOREVER, and this is the destination
+ * autocomplete: the search spinner would never resolve and there was nothing to
+ * cancel it. Same defect as apiFetch and mapbox-routing had; see
+ * docs/plans/external-review-triage-2026-09-25.md P1-2 / P1-3.
+ *
+ * Returning the body as text (rather than a Response) is what makes the fix
+ * hold: there is no way for a caller to read it later, outside the window.
+ * Callers `JSON.parse` the text, which throws exactly as `.json()` did.
+ *
+ * The body gets its own budget rather than sharing the header one, so nothing
+ * that succeeds today gets less transfer time than before.
+ */
 const fetchWithTimeout = async (
   url: string,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
-): Promise<Response> => {
+): Promise<FetchedBody> => {
   const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+  let timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, { signal: controller.signal });
-    return response;
+
+    // Re-arm before touching the body. This is the line whose absence was the bug.
+    clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+    const bodyText = await response.text();
+    return { ok: response.ok, status: response.status, bodyText };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       throw new Error(`Mapbox request timed out after ${timeoutMs / 1000}s.`);
@@ -470,14 +501,14 @@ export const mapboxAutocomplete = async (
   const suggestResponse = await fetchWithTimeout(suggestUrl);
 
   if (!suggestResponse.ok) {
-    const errorText = await suggestResponse.text().catch(() => '');
+    const errorText = suggestResponse.bodyText;
     throw new Error(
       `Mapbox search failed (${suggestResponse.status}): ${errorText || 'Unknown error'}`,
     );
   }
 
   const suggestData =
-    (await suggestResponse.json()) as SearchBoxSuggestResponse;
+    JSON.parse(suggestResponse.bodyText) as SearchBoxSuggestResponse;
   const rawSuggestions = suggestData.suggestions ?? [];
 
   if (rawSuggestions.length === 0) {
@@ -503,7 +534,7 @@ export const mapboxAutocomplete = async (
       if (!retrieveResponse.ok) return null;
 
       const retrieveData =
-        (await retrieveResponse.json()) as SearchBoxRetrieveResponse;
+        JSON.parse(retrieveResponse.bodyText) as SearchBoxRetrieveResponse;
       const feature = retrieveData.features?.[0];
 
       if (!feature?.geometry?.coordinates) return null;
@@ -615,13 +646,13 @@ export const mapboxReverseGeocode = async (
   const response = await fetchWithTimeout(url);
 
   if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
+    const errorText = response.bodyText;
     throw new Error(
       `Mapbox reverse geocoding failed (${response.status}): ${errorText || 'Unknown error'}`,
     );
   }
 
-  const data = (await response.json()) as MapboxGeocodeV6Response;
+  const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
   const firstFeature = data.features?.[0];
 
   return {
@@ -661,7 +692,7 @@ export const reverseGeocodeLocality = async (
 
     if (!response.ok) return null;
 
-    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
     const feature = data.features?.[0];
 
     return feature?.properties.name ?? null;
@@ -711,7 +742,7 @@ export const reverseGeocodeUrbanEdgeMeters = async (
     );
     if (!response.ok) return null;
 
-    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
     const bbox = data.features?.[0]?.properties?.bbox;
     if (!bbox || bbox.length < 4) return null;
 
@@ -759,7 +790,7 @@ export const reverseGeocodeAddress = async (
     const response = await fetchWithTimeout(url);
     if (!response.ok) return null;
 
-    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
     const feature = data.features?.[0];
     if (!feature) return null;
 
@@ -817,7 +848,7 @@ export const reverseGeocodeAddressWithCountry = async (
     );
     if (!response.ok) return null;
 
-    const data = (await response.json()) as MapboxGeocodeV6Response;
+    const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
     const feature = data.features?.[0];
     if (!feature) return null;
 
@@ -870,7 +901,7 @@ const resolveCountryCode = async (
     return null;
   }
 
-  const data = (await response.json()) as MapboxGeocodeV6Response;
+  const data = JSON.parse(response.bodyText) as MapboxGeocodeV6Response;
   const feature = data.features?.[0];
 
   return (

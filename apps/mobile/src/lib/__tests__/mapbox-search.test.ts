@@ -569,3 +569,44 @@ describe('mapboxGetCoverage', () => {
     expect(() => new Date(result.generatedAt)).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stalled response body
+//
+// Regression cover for the P1-2/P1-3 defect in this file's `fetchWithTimeout`
+// (docs/plans/external-review-triage-2026-09-25.md). It cleared its timer in
+// `finally`, which fires when the HEADERS arrive, so all eight callers parsed
+// the body with no timer armed and the AbortController disarmed — and this is
+// the destination autocomplete, so the search spinner never resolved.
+//
+// The mock captures the internal AbortSignal handed to `fetch` and settles the
+// body only when it aborts, which is how real `fetch` behaves.
+// ---------------------------------------------------------------------------
+
+describe('mapbox-search — stalled response body', () => {
+  it('aborts a suggest body that never arrives instead of hanging forever', async () => {
+    let capturedSignal: AbortSignal | undefined;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((_url: string, init: RequestInit) => {
+      capturedSignal = init.signal as AbortSignal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ suggestions: [] }),
+        text: () =>
+          new Promise<string>((_resolve, reject) => {
+            capturedSignal?.addEventListener('abort', () => {
+              const err = new Error('The operation was aborted');
+              err.name = 'AbortError';
+              reject(err);
+            });
+          }),
+      } as unknown as Response);
+    }) as unknown as typeof fetch);
+
+    // Without the re-arm this promise never settles and the test times out.
+    await expect(
+      mapboxAutocomplete({ query: 'Bucharest', proximity: { lat: 44.43, lon: 26.1 } }),
+    ).rejects.toThrow(/timed out/i);
+  }, 20_000);
+});
