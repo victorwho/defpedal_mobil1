@@ -45,9 +45,25 @@ dedup and dropping the `rrd_capfix_*` tables are **not being done**. The capfix
 tables stay RLS-locked; the 73 duplicated `xp_events` rows and ~11k excess XP
 stay as they are. Do not re-open either as a task.
 
-**Deploy state:** the four migrations are LIVE. Everything under "code done" is
-on `main` and **not deployed** — the API fixes need a Cloud Run deploy, the
-mobile fixes a client release.
+**Deploy state (2026-09-25):** the four migrations are LIVE, and the API half is
+LIVE on Cloud Run **`defpedal-api-00173-kzc`** — deployed by image digest
+`sha256:59bed40b…`, verified equal to the digest Cloud Build produced, from a
+tree at `origin/main` (`972feeb`) with no modified tracked files before or after
+the build. That covers P1-4, P1-6, P1-9, P1-10 and the P1-11 half.
+
+⚠️ **This deploy is NOT content-verifiable from outside, and that is stated
+rather than glossed.** Every API fix in it changes internal error handling — a
+prefs read that suppresses instead of sending, a receipt sweep that throws
+instead of reporting zero, auto-publish that logs, budgets that fail closed —
+so no probe can distinguish the new revision from the old. The claim is digest
+provenance plus no regression: all 8 baseline probes captured before the deploy
+returned identical codes after (`/health` 200, `/health/deep` 200, like/love
+401, receipts/check 401, `/v1/profile` 401, trips/track bad-field 400, hazards
+400), and the error-log #96 anti-revert check passed — seven recently-shipped
+routes answer 400/401 while a nonexistent control route 404s.
+
+**The MOBILE half is still not shipped:** P0-4, P1-1, P1-2, P1-3, P1-7, P1-8 are
+on `main` only and need a client release.
 
 **Note on the body-read fix (worth keeping):** the load-bearing half is moving
 the body read INSIDE the helper's `try`, not the timer re-arm. Mutation-checking
