@@ -2997,6 +2997,7 @@ export const buildV1Routes = (
         durationMinutes?: number;
         hadDestination?: boolean;
         weightKg?: number;
+        bikeType?: string;
       };
       Reply: RideImpact | ErrorResponse;
     }>(
@@ -3029,6 +3030,12 @@ export const buildV1Routes = (
               routeType:        { type: 'string', enum: ['safe', 'fast'] },
               hadDestination:   { type: 'boolean' },
               weightKg:         { type: 'number', minimum: 10, maximum: 300 },
+              // ⚠️ Load-bearing declaration. ajv runs with removeAdditional,
+              // so an undeclared field is STRIPPED and the endpoint answers
+              // 200 having silently ignored it — error-log #122. A stable id
+              // ('ebike') or any legacy localized label; resolved through
+              // core, never compared here.
+              bikeType:         { type: 'string', maxLength: 50 },
             },
           },
           response: {
@@ -3094,6 +3101,7 @@ export const buildV1Routes = (
           rideStartHour,
           durationMinutes,
           weightKg,
+          bikeType,
         } = request.body;
 
         // Compute calories — fetch bike_type + timestamps from trip_tracks
@@ -3102,7 +3110,20 @@ export const buildV1Routes = (
         // impact stored 0 kcal (see 202607110001 backfill). When the body
         // omits duration, derive it from the track's own timestamps — same
         // derivation as the GET auto-compute path.
-        let vehicleType: 'acoustic' | 'ebike' = 'acoustic';
+        // ⚠️ The BODY is the preferred source for bike type, not trip_tracks.
+        // The client POSTs this endpoint the moment a ride ends, while the
+        // `trip_track` mutation that carries bike_type goes through the OFFLINE
+        // QUEUE and lands ~0.3 s later — so this lookup usually finds nothing
+        // and the old `?? 'acoustic'` fallback asserted a bike the rider may
+        // not ride. Measured before the fix: 0 of 351 ride_microlives rows were
+        // ever 'ebike', including rides whose trip_tracks row says 'E-bike';
+        // `record_ride_microlives` writes ON CONFLICT DO NOTHING, so the
+        // fallback was locked in permanently and calories were wrong the same
+        // way. trip_tracks stays as the fallback for clients that predate the
+        // body field. Both sources are resolved through core, never compared
+        // here — that is what handles the stable id AND every legacy localized
+        // label ('Bicicletă electrică', 'Bicicleta eléctrica').
+        let resolvedBikeType: string | null = bikeType ?? null;
         let durationSeconds = Math.max(0, Math.round((durationMinutes ?? 0) * 60));
         try {
           const { data: trackMeta } = await supabaseAdmin
@@ -3110,16 +3131,13 @@ export const buildV1Routes = (
             .select('bike_type, started_at, ended_at')
             .eq('trip_id', tripId)
             .single();
-          // Handles the stable id ('ebike') sent by current clients AND every
-          // legacy localized label already stored in trip_tracks. The previous
-          // English-only compare scored every RO/ES e-bike ride as acoustic.
-          if (isEbikeBikeTypeValue(trackMeta?.bike_type as string | null)) {
-            vehicleType = 'ebike';
-          }
+          resolvedBikeType = resolvedBikeType ?? (trackMeta?.bike_type as string | null) ?? null;
           if (durationSeconds <= 0) {
             durationSeconds = deriveTrackDurationSeconds(trackMeta?.started_at, trackMeta?.ended_at);
           }
         } catch { /* non-fatal */ }
+        const vehicleType: 'acoustic' | 'ebike' =
+          isEbikeBikeTypeValue(resolvedBikeType) ? 'ebike' : 'acoustic';
 
         const caloriesBurned = calculateCaloriesBurned(
           distanceMeters,
@@ -3194,10 +3212,13 @@ export const buildV1Routes = (
         let personalMicrolives = 0;
         let communitySeconds = 0;
         try {
-          // Fetch bike_type and aqi from the trip_track record
+          // AQI still comes from the track row (the body carries no AQI), but
+          // the bike type is the one already resolved above — body first, then
+          // trip_tracks. Re-reading bike_type here would reintroduce exactly
+          // the race this handler was fixed for.
           const { data: trackData } = await supabaseAdmin
             .from('trip_tracks')
-            .select('bike_type, aqi_at_start')
+            .select('aqi_at_start')
             .eq('trip_id', tripId)
             .single();
 
@@ -3205,7 +3226,7 @@ export const buildV1Routes = (
             p_trip_id: tripId,
             p_user_id: user.id,
             p_distance_meters: distanceMeters,
-            p_bike_type: (trackData?.bike_type as string) ?? 'acoustic',
+            p_bike_type: resolvedBikeType ?? 'acoustic',
             p_european_aqi: (trackData?.aqi_at_start as number) ?? null,
             p_validated: true,
           });

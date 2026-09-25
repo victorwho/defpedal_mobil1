@@ -570,6 +570,12 @@ export default function FeedbackScreen() {
                 hadDestination,
                 weightKg: storeState.weightKg,
                 ...(durationMinutes !== undefined ? { durationMinutes } : {}),
+                // Send the bike type rather than letting the server read it
+                // back from `trip_tracks`: that row is written by a queued
+                // mutation which lands after this POST, so the server used to
+                // fall back to 'acoustic' and lock it in. Omitted when unset,
+                // never defaulted — "unknown" must not be sent as a bike.
+                ...(storeState.bikeTypeId ? { bikeType: storeState.bikeTypeId } : {}),
               },
             );
           } catch {

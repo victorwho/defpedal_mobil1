@@ -462,6 +462,107 @@ describe('POST /v1/rides/:tripId/impact', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // bikeType on the request body.
+  //
+  // The client POSTs this endpoint the instant a ride ends, but bike_type
+  // reaches the server on `trip_tracks`, written by a QUEUED mutation that
+  // lands ~0.3 s later. So the lookup found nothing and the handler's
+  // `?? 'acoustic'` fallback won — measured in production, 0 of 351
+  // ride_microlives rows were ever 'ebike', including rides whose trip_tracks
+  // row says 'E-bike'. record_ride_microlives writes ON CONFLICT DO NOTHING,
+  // so that fallback was locked in permanently, and calories were wrong the
+  // same way.
+  // -------------------------------------------------------------------------
+  const impactMocks = (track: unknown) => {
+    mockFrom
+      .mockReturnValueOnce(chainResult(track)) // trip_tracks: bike_type + timestamps
+      .mockReturnValueOnce(chainResult([]))    // reward_equivalents
+      .mockReturnValueOnce(chainResult(null)); // trip_tracks: aqi_at_start
+    mockRpc
+      .mockResolvedValueOnce({
+        data: [{ co2_saved_kg: 1, money_saved_eur: 3, hazards_warned_count: 0, distance_meters: 9000 }],
+        error: null,
+      })                                                                                      // record_ride_impact
+      .mockResolvedValueOnce({ data: { personalMicrolives: 2, communitySeconds: 34 }, error: null }) // record_ride_microlives
+      .mockResolvedValueOnce({ data: [], error: null });                                      // check_and_award_badges
+  };
+  const bikeTypeSentToMicrolives = () =>
+    (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_microlives')?.[1] as
+      { p_bike_type?: string } | undefined)?.p_bike_type;
+  const caloriesRecorded = () =>
+    (mockRpc.mock.calls.find((c) => c[0] === 'record_ride_impact')?.[1] as
+      { p_calories_burned?: number } | undefined)?.p_calories_burned;
+
+  it('sends the body bikeType to record_ride_microlives when trip_tracks has not landed yet', async () => {
+    // ⚠️ Also the mutation check for the `bikeType` line in the body schema:
+    // ajv runs with removeAdditional, so deleting that declaration strips the
+    // field and this falls back to 'acoustic' (error-log #122).
+    impactMocks(null); // the queued trip_track mutation has not arrived
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, bikeType: 'ebike' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(bikeTypeSentToMicrolives()).toBe('ebike');
+  });
+
+  it('prefers the body bikeType over a stale trip_tracks row', async () => {
+    impactMocks({ bike_type: 'Road bike', started_at: null, ended_at: null });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, bikeType: 'ebike' },
+    });
+
+    expect(bikeTypeSentToMicrolives()).toBe('ebike');
+  });
+
+  it('still falls back to trip_tracks when the body omits bikeType (older clients)', async () => {
+    impactMocks({ bike_type: 'E-bike', started_at: null, ended_at: null });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000 },
+    });
+
+    expect(bikeTypeSentToMicrolives()).toBe('E-bike');
+  });
+
+  it('resolves a localized label from the body, not just the stable id', async () => {
+    // 'Bicicleta eléctrica' — the case the English-only compare missed. Goes
+    // through core, so the accent is folded before the lookup.
+    impactMocks(null);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, durationMinutes: 30, bikeType: 'Bicicleta eléctrica' },
+    });
+
+    expect(bikeTypeSentToMicrolives()).toBe('Bicicleta eléctrica');
+    // And it reached the calorie maths too: e-bike MET 4.9 x 70 kg x 0.5 h.
+    expect(caloriesRecorded()).toBe(172);
+  });
+
+  it('charges acoustic calories for the same ride on a regular bike', async () => {
+    // Control for the case above — 18 km/h on an acoustic bike is MET 6.8.
+    impactMocks(null);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/rides/${tripId}/impact`,
+      headers: authHeaders,
+      payload: { distanceMeters: 9000, durationMinutes: 30, bikeType: 'city' },
+    });
+
+    expect(caloriesRecorded()).toBe(238);
+  });
+
   it('returns 409 when impact already recorded (duplicate trip)', async () => {
     mockRpc.mockResolvedValueOnce({
       data: null,

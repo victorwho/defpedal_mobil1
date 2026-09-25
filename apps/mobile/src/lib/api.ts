@@ -451,6 +451,10 @@ export const mobileApi = {
       routeType?: 'safe' | 'fast';
       hadDestination?: boolean;
       weightKg?: number;
+      // Sent so the server does not have to read it back from `trip_tracks`,
+      // which is written by a QUEUED mutation that lands after this call and
+      // therefore is usually absent here. Stable id, e.g. 'ebike'.
+      bikeType?: string;
     },
   ) =>
     mobileApiFetch<RideImpact>(`/v1/rides/${tripId}/impact`, {
