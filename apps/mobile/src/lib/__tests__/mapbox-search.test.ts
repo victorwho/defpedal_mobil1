@@ -29,6 +29,8 @@ const createSuggestItem = (overrides: {
   maki?: string;
   poiCategory?: string[];
   countryCode?: string;
+  /** Full context override — postcode suggestions carry place/locality/region. */
+  context?: Record<string, unknown>;
 }) => ({
   mapbox_id: overrides.mapboxId ?? 'feature.1',
   name: overrides.name ?? 'Test Place',
@@ -37,7 +39,7 @@ const createSuggestItem = (overrides: {
   feature_type: overrides.featureType ?? 'poi',
   maki: overrides.maki,
   poi_category: overrides.poiCategory,
-  context: {
+  context: overrides.context ?? {
     country: {
       country_code: overrides.countryCode ?? 'BR',
     },
@@ -287,6 +289,63 @@ describe('mapboxAutocomplete', () => {
     // UK joined the supported set with the b47v1 routing generation
     // (2026-09-21) — a rider in Bucharest can autocomplete "Tower Bridge".
     expect(countries).toContain('GB');
+  });
+
+  // A postcode IS how an address is given in several covered countries, and
+  // Britain most of all. Measured against the live API before this landed:
+  // with the old type list 'SW1A 1AA' and 'EC3N 4AB' returned ZERO
+  // suggestions, and 'EH1 1BE' returned a car park in a different postcode
+  // (EH11) — a wrong answer with nothing to mark it wrong.
+  it('asks for postcodes as a searchable type', async () => {
+    mockFetchResponse({ suggestions: [] });
+
+    await mapboxAutocomplete({ query: 'SW1A 1AA', countryHint: 'GB', limit: 3 });
+
+    const fetchCall = vi.mocked(fetch).mock.calls[0][0] as string;
+    const types = (new URL(fetchCall).searchParams.get('types') ?? '').split(',');
+    expect(types).toContain('postcode');
+    // The pre-existing types must survive — this widened the list, it did not
+    // replace it.
+    expect(types).toEqual(
+      expect.arrayContaining(['poi', 'address', 'place', 'street', 'locality', 'neighborhood']),
+    );
+  });
+
+  it('renders a postcode suggestion as an address rather than an unknown type', async () => {
+    // Shape copied from a real Search Box response for 'SW1A 1AA': no
+    // full_address, maki 'marker', and place/locality/region in context.
+    const suggestItem = createSuggestItem({
+      mapboxId: 'postcode.1',
+      name: 'SW1A 1AA',
+      featureType: 'postcode',
+      maki: 'marker',
+      placeFormatted: 'London, Greater London, England, United Kingdom',
+      context: {
+        country: { country_code: 'GB', name: 'United Kingdom' },
+        region: { name: 'England' },
+        place: { name: 'London' },
+        locality: { name: 'City of Westminster' },
+      },
+    });
+    const retrieveResp = createRetrieveResponse({
+      mapboxId: 'postcode.1',
+      name: 'SW1A 1AA',
+      featureType: 'postcode',
+      lon: -0.141588,
+      lat: 51.501009,
+    });
+    mockAutocompleteFlow([suggestItem], [retrieveResp]);
+
+    const result = await mapboxAutocomplete({ query: 'SW1A 1AA', countryHint: 'GB' });
+
+    expect(result.suggestions).toHaveLength(1);
+    const [suggestion] = result.suggestions;
+    // 'unknown' has no entry in the search row's icon map and takes the empty
+    // default branch of buildSecondaryText, so the row would render bare.
+    expect(suggestion.featureType).toBe('address');
+    expect(suggestion.primaryText).toBe('SW1A 1AA');
+    expect(suggestion.secondaryText).toBe('City of Westminster, London');
+    expect(suggestion.coordinates).toEqual({ lat: 51.501009, lon: -0.141588 });
   });
 
   it('throws on non-OK response', async () => {

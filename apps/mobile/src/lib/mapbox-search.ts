@@ -2,7 +2,9 @@
  * Direct Mapbox API integration for search, reverse-geocode, and coverage.
  *
  * - Autocomplete uses the **Search Box API v1** (`/search/searchbox/v1/suggest` + `/retrieve`)
- *   which supports POI, address, place, locality, and neighborhood types.
+ *   which supports POI, address, place, locality, neighborhood, and postcode
+ *   types. Reverse geocoding deliberately does NOT ask for postcodes — there
+ *   the answer wanted is a street or place name, not the postal area.
  * - Reverse geocode uses **Geocoding API v6** (`/search/geocode/v6/reverse`).
  * - Coverage uses a local country allowlist (no external API call).
  */
@@ -216,7 +218,13 @@ const VALID_FEATURE_TYPES: ReadonlySet<string> = new Set([
 
 const toFeatureType = (raw: string | undefined): SuggestionFeatureType => {
   if (!raw) return 'unknown';
-  if (raw === 'street') return 'address';
+  // `postcode` collapses to `address` for the same reason `street` does: it is
+  // an address-level locator, and the alternative is 'unknown', which has no
+  // entry in the search row's icon map and falls to the default branch of
+  // `buildSecondaryText` — an empty second line. Measured on a real
+  // suggestion, the address branch reads well because a postcode carries the
+  // context it needs: 'SW1A 1AA' → "City of Westminster, London".
+  if (raw === 'street' || raw === 'postcode') return 'address';
   return VALID_FEATURE_TYPES.has(raw)
     ? (raw as SuggestionFeatureType)
     : 'unknown';
@@ -420,11 +428,25 @@ export const mapboxAutocomplete = async (
   const limit = Math.min(payload.limit ?? 5, 10);
 
   // Step 1: Suggest
+  //
+  // `postcode` is in the type list because in some covered countries a
+  // postcode IS how people give an address, and without it those queries
+  // returned NOTHING rather than a worse answer. Measured against the live
+  // API: 'SW1A 1AA' and 'EC3N 4AB' both returned 0 suggestions, and
+  // 'EH1 1BE' returned a car park in a different postcode (EH11) — a wrong
+  // answer offered with no sign it was wrong. A UK postcode identifies a
+  // handful of addresses, so it is a usable destination; the same held for
+  // NL ('1012 AB' returned London street addresses before).
+  //
+  // It cannot add noise to ordinary searches: Mapbox only returns a postcode
+  // feature when the query actually looks like one. Verified on five ordinary
+  // queries across GB/RO/ES/DE (including the deliberately generic "Main
+  // Street") — top results byte-identical with and without the type.
   const suggestParams = new URLSearchParams({
     q: query,
     access_token: token,
     session_token: sessionToken,
-    types: 'poi,address,place,street,locality,neighborhood',
+    types: 'poi,address,place,street,locality,neighborhood,postcode',
     limit: String(limit),
   });
 
