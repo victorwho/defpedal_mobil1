@@ -56,18 +56,6 @@ reproduces the defect is *disarm without re-arm*. Also: `fetchAndRead` in
 `mapbox-routing.ts` has **no direct test** (that file has no test file at all);
 it is covered only by typecheck and the full suite.
 
-**Not yet deployed:** P0-4 and P1-11 are code changes — they need an API deploy
-(P1-11) and a client release (P0-4). The four DB migrations are already live and
-reach the whole fielded fleet.
-
-⚠️ **Two decisions are waiting on the product owner, and I deliberately did not
-make them:**
-1. **`xp_events` dedup** — 73 genuinely-duplicated rows and ~11k excess XP exist.
-   Fixing them means deleting rows and decrementing `profiles.total_xp` on a live
-   gamification economy. Destructive; needs sign-off. See the corrected P1-11.
-2. **`rrd_capfix_*` tables** — locked with RLS, **not dropped**. Dropping is
-   irreversible and it is unclear whether the repair history is still wanted.
-
 ## Headline
 
 Five things matter. Everything else is either already tracked in `TODO.md`
@@ -192,8 +180,9 @@ the API has ever exposed. Nothing client-side reads it (mobile's only `.from()`
 is the `avatars` storage bucket); the API reads it via service role.
 
 Fix: drop the public-read policies on both the live and archived risk tables
-(`road_risk_data`, `road_risk_data_old_b47v1`), and drop `rrd_capfix_backup` /
-`rrd_capfix_progress` (or enable RLS with no policy). Confirm no client
+(`road_risk_data`, `road_risk_data_old_b47v1`), and enable RLS with no policy on
+`rrd_capfix_backup` / `rrd_capfix_progress` — **locked, NOT dropped; dropping was
+decided against on 2026-09-25**. Confirm no client
 regression on a preview build — the app routes client-side but fetches risk via
 `/v1/risk-segments`, which is service-role.
 
@@ -371,10 +360,11 @@ a poor conflict-inference target, because the statement must carry a matching
    whether `streak_day` / `quiz_*` should carry the date in `source_id`
    (`<questionId>:<date>`) so that a single global constraint becomes possible.
    Until that decision, constraining is guesswork.
-3. **Only then** dedup the 73 genuinely-duplicated rows and add a constraint
-   scoped to the once-only actions. Deduping means deleting `xp_events` rows and
-   decrementing `profiles.total_xp` on a live gamification economy — **destructive,
-   needs explicit sign-off**, and is not something to bundle into a security pass.
+3. ~~Dedup the 73 genuinely-duplicated rows and add a constraint scoped to the
+   once-only actions.~~ **DECIDED AGAINST, 2026-09-25 (product owner).** The 73
+   rows and ~11k excess XP stay. Deduping would mean deleting `xp_events` rows
+   and decrementing `profiles.total_xp` on a live gamification economy, and that
+   is not worth it for the amounts involved. Do not re-open this.
 
 The `ride_safe` replay (67 rows, the largest real duplication) is worth fixing at
 its call site the same way, via the `postedRef` + `tripId` dedup already listed
@@ -552,7 +542,7 @@ and it needs copy, not code.
 ## Sequencing
 
 1. **Now, DB-only, no release:** P0-1 (revoke, drop dead Mia functions), P0-2
-   (drop public-read on the risk tables, drop `rrd_capfix_*`), P0-3 (trigger
+   (drop public-read on the risk tables, RLS-lock `rrd_capfix_*`), P0-3 (trigger
    condition), **P1-11** (the `xp_events` unique index + `award_xp` gating — DB-only,
    and it closes an unbounded XP farm that is live in the shipped UI, so it earns
    its place in this step despite the P1 label). All four reach the entire fielded
