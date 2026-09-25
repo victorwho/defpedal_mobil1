@@ -27,7 +27,7 @@ import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 import { mobileEnv } from './env';
 import { SUPPORTED_LOCALES, type Locale } from '../i18n';
 import { buildManeuverInstruction } from './maneuverInstructions';
-import { getAccessToken } from './supabase';
+import { mobileApiFetch } from './mobileApiFetch';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -78,13 +78,33 @@ const MAPBOX_MAX_STRAIGHT_LINE_M = 400_000;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const fetchWithTimeout = async (
+/**
+ * Fetch `url` and consume its body via `read`, with BOTH phases inside the
+ * abort window.
+ *
+ * ⚠️ The `read` callback is why this takes one. Its predecessor returned the
+ * bare `Response` and cleared its timer in `finally`, which fires when the
+ * HEADERS arrive — so every caller then parsed the body with no timer armed and
+ * the AbortController disarmed. A router that sent headers and then stalled hung
+ * FOREVER on the rider's critical path: route preview showed a spinner that
+ * never resolved, and a loop search stalled mid-fan-out. Passing the reader in
+ * keeps the window open until the body is actually consumed, without this
+ * helper needing to know how each caller parses it (OSRM goes through
+ * `readOsrmResponse`, Mapbox reads `.text()` or `.json()` by status).
+ * See docs/plans/external-review-triage-2026-09-25.md P1-2 / P1-3.
+ *
+ * The body gets its own budget rather than sharing the header one, so no call
+ * that succeeds today gets less time to transfer than it had before — the
+ * defect was that the body was unbounded, not that it was slow.
+ */
+const fetchAndRead = async <T>(
   url: string,
+  read: (response: Response) => Promise<T>,
   timeoutMs: number = REQUEST_TIMEOUT_MS,
   callerSignal?: AbortSignal,
-): Promise<Response> => {
+): Promise<T> => {
   const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+  let timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
   // Loop generation fans out eight of these and lets the rider cancel; without
   // forwarding the caller's signal, a cancelled search keeps every in-flight
@@ -94,7 +114,12 @@ const fetchWithTimeout = async (
 
   try {
     const response = await fetch(url, { signal: controller.signal });
-    return response;
+
+    // Re-arm for the body read. This is the line whose absence was the bug.
+    clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+    return await read(response);
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       // Distinguish "the rider cancelled" from "the network was too slow" —
@@ -102,6 +127,8 @@ const fetchWithTimeout = async (
       if (callerSignal?.aborted) throw error;
       throw new Error(`Route request timed out after ${timeoutMs / 1000}s.`);
     }
+    // A reader's own error (OSRM InvalidValue, a Mapbox non-2xx, malformed
+    // JSON) propagates unchanged — it is not a transport failure.
     throw error;
   } finally {
     clearTimeout(timeoutHandle);
@@ -290,12 +317,17 @@ export const fetchCanopyComparison = async (
     `&to=${destination.lon},${destination.lat}`;
 
   try {
-    const response = await fetchWithTimeout(url, CANOPY_TIMEOUT_MS);
-    // 429 (rate limited), 400 and 502 all land here and all mean "show
-    // nothing" — there is no retry, because a second call is exactly what
-    // the 60/min budget is protecting against.
-    if (!response.ok) return undefined;
-    return parseCanopyCompareResponse(await response.json()) ?? undefined;
+    return await fetchAndRead(
+      url,
+      async (response) => {
+        // 429 (rate limited), 400 and 502 all land here and all mean "show
+        // nothing" — there is no retry, because a second call is exactly what
+        // the 60/min budget is protecting against.
+        if (!response.ok) return undefined;
+        return parseCanopyCompareResponse(await response.json()) ?? undefined;
+      },
+      CANOPY_TIMEOUT_MS,
+    );
   } catch {
     return undefined;
   }
@@ -334,8 +366,6 @@ const fetchOsrmRoutes = async (
     url += '&exclude=unpaved';
   }
 
-  const response = await fetchWithTimeout(url);
-
   // Body first, status second, and the order is the fix. OSRM reports "nothing
   // paved connects these points" as HTTP 400 with `code: NoRoute`, so a
   // status-first check threw straight past the fallback below. On this path
@@ -343,7 +373,9 @@ const fetchOsrmRoutes = async (
   // failed route preview rather than the paved route they asked for with a
   // note. It reproduces every time for a start that snaps to an unpaved edge.
   // See `osrmResponse.ts` for the measurements.
-  const answer = await readOsrmResponse<RouteResponse>(response);
+  const answer = await fetchAndRead(url, (response) =>
+    readOsrmResponse<RouteResponse>(response),
+  );
 
   if (answer.outcome === 'no_route') {
     // Nothing paved connects these points. Ask again without the constraint
@@ -426,16 +458,15 @@ const fetchMapboxRoutes = async (
   params.set('language', language);
 
   const url = `${MAPBOX_DIRECTIONS_BASE}/${coords}?${params.toString()}`;
-  const response = await fetchWithTimeout(url);
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    throw new Error(
-      `Mapbox routing failed (${response.status}): ${errorText || 'Unknown error'}`,
-    );
-  }
-
-  const data = (await response.json()) as RouteResponse;
+  const data = await fetchAndRead(url, async (response) => {
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new Error(
+        `Mapbox routing failed (${response.status}): ${errorText || 'Unknown error'}`,
+      );
+    }
+    return (await response.json()) as RouteResponse;
+  });
 
   if (data.code !== 'Ok' || !data.routes?.length) {
     if (data.code === 'NoSegment') {
@@ -533,15 +564,20 @@ export const enrichRouteWithElevation = async (
     // otherwise blow the server body limit (Sentry, 2026-07-12), and the
     // elevation chart is a uniform resample anyway.
     const bounded = downsampleCoordinates(coordinates, MAX_RISK_GEOMETRY_POINTS);
-    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/elevation-profile`, {
+
+    // Routed through mobileApiFetch rather than a bare fetch: this call had NO
+    // timeout at all and is awaited on the route-preview path, so a stalled
+    // server left the preview spinner up forever. `catch` degrades gracefully,
+    // but a hang never throws. See
+    // docs/plans/external-review-triage-2026-09-25.md P1-3.
+    //
+    // maxRetries: 0 on purpose — elevation is optional enrichment the rider is
+    // actively waiting on, so one bounded attempt beats three.
+    const data = await mobileApiFetch<ElevationResponse>('/v1/elevation-profile', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ coordinates: bounded }),
+      maxRetries: 0,
     });
-
-    if (!response.ok) return route;
-
-    const data = (await response.json()) as ElevationResponse;
 
     const elevationGain = data.elevationGain ?? 0;
     const adjustedDurationSeconds = options.durationIncludesClimbs
@@ -570,24 +606,21 @@ const fetchRouteRiskSegments = async (
   if (!mobileEnv.mobileApiUrl) return [];
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    const token = await getAccessToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/risk-segments`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ geometry }),
-    });
-
-    if (!response.ok) return [];
-
-    const data = (await response.json()) as { riskSegments: RiskSegment[] };
+    // Routed through mobileApiFetch rather than a bare fetch: this had NO
+    // timeout and is awaited on the route-preview path, so a stalled server
+    // left the preview spinner up forever (P1-3). mobileApiFetch also supplies
+    // the same `Authorization: Bearer <supabase-jwt>` this used to build by
+    // hand, plus the 401-refresh-and-retry it did not have.
+    //
+    // maxRetries: 0 — risk enrichment is optional and the rider is waiting.
+    const data = await mobileApiFetch<{ riskSegments: RiskSegment[] }>(
+      '/v1/risk-segments',
+      {
+        method: 'POST',
+        body: JSON.stringify({ geometry }),
+        maxRetries: 0,
+      },
+    );
     return data.riskSegments ?? [];
   } catch {
     return [];
@@ -1096,11 +1129,14 @@ export const fetchLoopRoute = async (
     url += '&exclude=unpaved';
   }
 
-  const response = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS, options.signal);
-
   // Body first, status second — see the note on the point-to-point fetcher
   // above, and `osrmResponse.ts` for why.
-  const answer = await readOsrmResponse<RouteResponse>(response);
+  const answer = await fetchAndRead(
+    url,
+    (response) => readOsrmResponse<RouteResponse>(response),
+    REQUEST_TIMEOUT_MS,
+    options.signal,
+  );
 
   if (answer.outcome === 'no_route') {
     // Same fallback as the point-to-point path, and it matters more here: a
@@ -1180,21 +1216,15 @@ export const fetchRouteScenicScore = async (
   };
 
   try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    const token = await getAccessToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const response = await fetch(`${mobileEnv.mobileApiUrl}/v1/scenic-segments`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ geometry }),
-    });
-    if (!response.ok) return 0;
-    const data = (await response.json()) as {
+    // Bare fetch with no timeout, same as elevation and risk segments (P1-3).
+    // mobileApiFetch supplies the Bearer token this built by hand.
+    const data = await mobileApiFetch<{
       scenicSegments?: { scenicScore: number; geometry: GeoJsonLineString }[];
-    };
+    }>('/v1/scenic-segments', {
+      method: 'POST',
+      body: JSON.stringify({ geometry }),
+      maxRetries: 0,
+    });
     const segments = data.scenicSegments ?? [];
     if (segments.length === 0) return 0;
 
@@ -1226,18 +1256,14 @@ export const fetchScenicVias = async (
 ): Promise<{ lat: number; lon: number; scenicScore: number; sector: number }[]> => {
   if (!mobileEnv.mobileApiUrl) return [];
   try {
-    const headers: Record<string, string> = {};
-    const token = await getAccessToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const url =
-      `${mobileEnv.mobileApiUrl}/v1/scenic-vias` +
+    // Bare fetch with no timeout (P1-3). This one is called during loop
+    // generation, which fans out, so a stalled response stalled the search.
+    const path =
+      `/v1/scenic-vias` +
       `?lat=${start.lat}&lon=${start.lon}&radius=${Math.round(ringRadiusMeters)}`;
-    const response = await fetch(url, { headers });
-    if (!response.ok) return [];
-    const data = (await response.json()) as {
+    const data = await mobileApiFetch<{
       vias?: { lat: number; lon: number; scenicScore: number; sector: number }[];
-    };
+    }>(path, { maxRetries: 0 });
     return data.vias ?? [];
   } catch {
     return [];

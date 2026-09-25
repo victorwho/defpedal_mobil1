@@ -54,8 +54,14 @@ export const isApiClientError = (error: unknown): error is ApiClientError =>
   error instanceof ApiClientError;
 
 export interface ApiFetchOptions extends RequestInit {
-  /** Per-request timeout in milliseconds. Default 8000. */
+  /** Timeout for receiving response HEADERS, in milliseconds. Default 8000. */
   timeoutMs?: number;
+  /**
+   * Timeout for reading the response BODY once headers have arrived, in
+   * milliseconds. Default 30000 — deliberately generous, because this exists to
+   * bound a hang rather than to police transfer time (see `performFetch`).
+   */
+  bodyTimeoutMs?: number;
   /** Retry attempts after the initial request. Default 2 (so 3 total tries). */
   maxRetries?: number;
   /** Base backoff in ms; doubles per attempt with ±20% jitter. Default 250. */
@@ -65,6 +71,7 @@ export interface ApiFetchOptions extends RequestInit {
 }
 
 const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_BODY_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_BACKOFF_BASE_MS = 250;
 const RESPONSE_BODY_TRUNCATE = 500;
@@ -97,17 +104,44 @@ const computeBackoff = (
   return Math.max(0, Math.round(base + jitter));
 };
 
+/** One completed attempt: the response plus its body, already read as text. */
+interface FetchAttempt {
+  response: Response;
+  bodyText: string;
+}
+
 /**
- * Single fetch attempt. Returns the Response on any HTTP status; only
- * throws on timeout / network failure (wrapped in ApiClientError), or
- * re-throws the caller's own AbortError so consumers can detect their
- * own abort separately from our internal timeout.
+ * Single fetch attempt. Reads the body as text INSIDE the abort window and
+ * returns it alongside the response; only throws on timeout / network failure
+ * (wrapped in ApiClientError), or re-throws the caller's own AbortError so
+ * consumers can detect their own abort separately from our internal timeout.
+ *
+ * ⚠️ The body read must happen here, not in the caller. Until 2026-09-25 this
+ * function returned the bare `Response` and cleared its timeout in `finally`,
+ * which fires as soon as `fetch` resolves — i.e. when the HEADERS arrive. The
+ * caller then did `await response.json()` / `.text()` with no timer armed and
+ * the AbortController already disarmed, so a server that sent headers and then
+ * stalled the body hung FOREVER: no timeout, no retry, across every one of the
+ * ~80 `mobileApiFetch` call sites. See
+ * docs/plans/external-review-triage-2026-09-25.md P1-2.
+ *
+ * The body gets its OWN generous budget rather than sharing the header timeout.
+ * The defect is that it was unbounded, and the fix is to bound it — not to
+ * impose a tight SLA on transfer time. `GET /v1/trips/history` still ships full
+ * GPS trails for every ride (TODO.md PERF-3 / SCALE-14), so a multi-megabyte
+ * body on a slow link is normal and must not start failing at the 8s header
+ * budget. Tightening that is a separate product decision.
+ *
+ * Reading once as text and parsing afterwards is also the pattern
+ * `packages/core/src/osrmResponse.ts` already uses, for the related reason that
+ * a body can only be consumed once.
  */
 const performFetch = async (
   url: string,
   init: RequestInit,
   timeoutMs: number,
-): Promise<Response> => {
+  bodyTimeoutMs: number,
+): Promise<FetchAttempt> => {
   const controller = new AbortController();
   const callerSignal = init.signal ?? null;
 
@@ -121,31 +155,71 @@ const performFetch = async (
   }
 
   let timedOut = false;
-  const timeoutHandle = setTimeout(() => {
+  let timeoutHandle = setTimeout(() => {
     timedOut = true;
     controller.abort();
   }, timeoutMs);
 
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } catch (error) {
-    if (timedOut) {
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, signal: controller.signal });
+    } catch (error) {
+      if (timedOut) {
+        throw new ApiClientError({
+          kind: 'timeout',
+          message: `Request timed out after ${timeoutMs}ms`,
+          cause: error,
+        });
+      }
+      if (callerSignal?.aborted) {
+        // Caller-initiated abort — propagate so the caller's signal contract
+        // (AbortError) is preserved. Not wrapped as ApiClientError.
+        throw error;
+      }
       throw new ApiClientError({
-        kind: 'timeout',
-        message: `Request timed out after ${timeoutMs}ms`,
+        kind: 'network',
+        message: error instanceof Error ? error.message : 'Network request failed',
         cause: error,
       });
     }
-    if (callerSignal?.aborted) {
-      // Caller-initiated abort — propagate so the caller's signal contract
-      // (AbortError) is preserved. Not wrapped as ApiClientError.
-      throw error;
+
+    // Re-arm before touching the body. This is the line whose absence was the bug.
+    clearTimeout(timeoutHandle);
+    timeoutHandle = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, bodyTimeoutMs);
+
+    try {
+      const bodyText = await response.text();
+      return { response, bodyText };
+    } catch (error) {
+      if (timedOut) {
+        throw new ApiClientError({
+          kind: 'timeout',
+          message: `Response body stalled after ${bodyTimeoutMs}ms`,
+          status: response.status,
+          cause: error,
+        });
+      }
+      if (callerSignal?.aborted) {
+        throw error;
+      }
+      // Deliberately 'http', not 'network': a body failure is NOT retried
+      // today (it surfaced as "Response body was not valid JSON"), and making
+      // it retryable would re-send non-idempotent POSTs whose request already
+      // reached the server — `hazard` submissions still have no idempotency
+      // key (triage P1-12). Preserving the existing retry semantics keeps this
+      // change to exactly one behavioural difference: a stalled body now aborts.
+      throw new ApiClientError({
+        kind: 'http',
+        message: 'Response body could not be read',
+        status: response.status,
+        body: '',
+        cause: error,
+      });
     }
-    throw new ApiClientError({
-      kind: 'network',
-      message: error instanceof Error ? error.message : 'Network request failed',
-      cause: error,
-    });
   } finally {
     clearTimeout(timeoutHandle);
     if (callerSignal) {
@@ -170,6 +244,7 @@ export const apiFetch = async <TResponse = unknown>(
 ): Promise<TResponse> => {
   const {
     timeoutMs = DEFAULT_TIMEOUT_MS,
+    bodyTimeoutMs = DEFAULT_BODY_TIMEOUT_MS,
     maxRetries = DEFAULT_MAX_RETRIES,
     backoffBaseMs = DEFAULT_BACKOFF_BASE_MS,
     random = Math.random,
@@ -180,9 +255,9 @@ export const apiFetch = async <TResponse = unknown>(
   let lastError: ApiClientError | null = null;
 
   for (let attempt = 1; attempt <= totalAttempts; attempt++) {
-    let response: Response;
+    let attemptResult: FetchAttempt;
     try {
-      response = await performFetch(url, init, timeoutMs);
+      attemptResult = await performFetch(url, init, timeoutMs, bodyTimeoutMs);
     } catch (error) {
       if (error instanceof ApiClientError) {
         // Network errors retry; timeouts do NOT (see file header).
@@ -197,21 +272,25 @@ export const apiFetch = async <TResponse = unknown>(
       throw error;
     }
 
+    const { response, bodyText } = attemptResult;
+
     if (response.ok) {
       try {
-        return (await response.json()) as TResponse;
+        return JSON.parse(bodyText) as TResponse;
       } catch (error) {
         throw new ApiClientError({
           kind: 'http',
           message: 'Response body was not valid JSON',
           status: response.status,
-          body: '',
+          // Now that the body is already in hand, include it — an HTML error
+          // page or a proxy notice is the usual cause and was previously
+          // discarded, leaving nothing to diagnose from.
+          body: bodyText.slice(0, RESPONSE_BODY_TRUNCATE),
           cause: error,
         });
       }
     }
 
-    const bodyText = await response.text().catch(() => '');
     const httpError = new ApiClientError({
       kind: 'http',
       message: `HTTP ${response.status}`,

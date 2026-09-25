@@ -314,3 +314,60 @@ describe('isApiClientError', () => {
     expect(isApiClientError('string')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stalled response body
+//
+// Regression cover for P1-2 (docs/plans/external-review-triage-2026-09-25.md).
+// `performFetch` used to clear its timeout in `finally`, which fires when the
+// HEADERS arrive, and the caller then read the body with no timer armed and the
+// AbortController already disarmed. A server that sent headers and then stalled
+// hung forever — no timeout, no retry — across every mobileApiFetch call site.
+//
+// These mocks capture the internal AbortSignal handed to `fetch` and settle the
+// body only when it aborts, which is how real `fetch` behaves.
+// ---------------------------------------------------------------------------
+
+describe('apiFetch — stalled response body', () => {
+  it('aborts a body that never arrives instead of hanging forever', async () => {
+    let capturedSignal: AbortSignal | undefined;
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((_url: string, init: RequestInit) => {
+      capturedSignal = init.signal as AbortSignal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        text: () =>
+          new Promise<string>((_resolve, reject) => {
+            capturedSignal?.addEventListener('abort', () =>
+              reject(new Error('The operation was aborted')),
+            );
+          }),
+      } as unknown as Response);
+    }) as unknown as typeof fetch);
+
+    // Without the re-arm this promise never settles and the test times out.
+    await expect(
+      apiFetch('https://example.com/x', { ...FAST_RETRY, bodyTimeoutMs: 25 }),
+    ).rejects.toMatchObject({ kind: 'timeout' });
+  });
+
+  it('still returns a slow body that arrives within its budget', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: 1 }),
+      text: () =>
+        new Promise<string>((resolve) => {
+          setTimeout(() => resolve(JSON.stringify({ ok: 1 })), 20);
+        }),
+    } as unknown as Response);
+
+    // The guard against over-correcting: bounding the body must not start
+    // failing the large-but-progressing responses that /v1/trips/history sends.
+    await expect(
+      apiFetch('https://example.com/x', { ...FAST_RETRY, bodyTimeoutMs: 500 }),
+    ).resolves.toEqual({ ok: 1 });
+  });
+});
