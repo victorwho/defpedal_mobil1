@@ -9,6 +9,11 @@ export interface OnboardingGateState {
   onboardingCompleted: boolean;
   storeHydrated: boolean;
   isLoading: boolean;
+  /**
+   * The saved session could not be READ (storage/keystore failure) -- which is
+   * not the same as being signed out. Treated exactly like `isLoading` below.
+   */
+  isSessionUnreadable: boolean;
   hasRealAccount: boolean;
 }
 
@@ -60,7 +65,16 @@ export const computeOnboardingGateTarget = (
   state: OnboardingGateState,
 ): string | null => {
   if (!state.storeHydrated) return null;
-  if (state.isLoading || state.hasRealAccount) return null;
+  // `isSessionUnreadable` short-circuits for the same reason `isLoading` does:
+  // auth has not given us an answer. Without it a transient secure-store
+  // failure presents as `isLoading:false` + no user, and rule 4 below walls a
+  // signed-in rider behind the MANDATORY signup prompt on every render for the
+  // length of the retry ladder -- telling them to create the account they
+  // already have, and where tapping "Sign in" defeats the whole point of
+  // having preserved the unreadable session. See triage P1-1.
+  if (state.isLoading || state.isSessionUnreadable || state.hasRealAccount) {
+    return null;
+  }
   if (isExemptPath(state.pathname)) return null;
 
   // `/onboarding` resolves to `app/onboarding/index.tsx`. Matching the path

@@ -32,7 +32,7 @@ import { useAuthSession } from './AuthSessionProvider';
  * docs/legal/consent-split-2026-05-25.md (superseded on the PostHog default).
  */
 export const TelemetryProvider = ({ children }: PropsWithChildren) => {
-  const { user, isLoading: authLoading } = useAuthSession();
+  const { user, isLoading: authLoading, isSessionUnreadable } = useAuthSession();
   const sentryConsent = useAppStore((s) => s.analyticsConsent.sentry);
   const posthogConsent = useAppStore((s) => s.analyticsConsent.posthog);
 
@@ -62,12 +62,20 @@ export const TelemetryProvider = ({ children }: PropsWithChildren) => {
    * `reset()` is a SIGN-OUT operation. "Auth has not answered yet" is not a
    * sign-out, and must not be treated as one.
    *
+   * ⚠️ `isSessionUnreadable` is here for exactly the same reason, and closes the
+   * same hole by a second route. When the saved session exists but cannot be
+   * READ (secure-store/keystore failure), the provider keeps it on disk and
+   * retries — but it reports `isLoading:false` with `user` still null. That
+   * passed the `authLoading` guard and called `identify(null)`, re-entering the
+   * DAU corruption above. "We could not open the session" is not a sign-out
+   * either. See triage P1-1.
+   *
    * telemetry.identify is still a no-op for clients that aren't enabled, so
    * this stays safe to call before consent. Anonymous users are identified by
    * id only (no email).
    */
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || isSessionUnreadable) return;
     telemetry.identify(
       user
         ? {
@@ -76,7 +84,7 @@ export const TelemetryProvider = ({ children }: PropsWithChildren) => {
           }
         : null,
     );
-  }, [authLoading, user?.email, user?.id]);
+  }, [authLoading, isSessionUnreadable, user?.email, user?.id]);
 
   return <>{children}</>;
 };

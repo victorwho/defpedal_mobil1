@@ -15,6 +15,7 @@ const fresh = (overrides: Partial<OnboardingGateState> = {}): OnboardingGateStat
   onboardingCompleted: false,
   storeHydrated: true,
   isLoading: false,
+  isSessionUnreadable: false,
   hasRealAccount: false,
   ...overrides,
 });
@@ -30,6 +31,28 @@ describe('computeOnboardingGateTarget', () => {
 
   it('returns null while auth is still loading', () => {
     expect(computeOnboardingGateTarget(fresh({ isLoading: true }))).toBeNull();
+  });
+
+  // P1-1 regression (docs/plans/external-review-triage-2026-09-25.md).
+  // A secure-store/keystore failure leaves the saved session on disk but
+  // unreadable, which the provider reports as isLoading:false with no user.
+  // Treating that as signed-out walled a fully signed-in rider behind the
+  // MANDATORY signup prompt for the length of the retry ladder (10s -> 300s),
+  // telling them to create the account they already have.
+  it('returns null when the saved session could not be READ (not signed out)', () => {
+    expect(
+      computeOnboardingGateTarget(fresh({ isSessionUnreadable: true })),
+    ).toBeNull();
+  });
+
+  it('still walls an unauthenticated rider once the session read succeeds', () => {
+    // The other direction: unreadable must not become a permanent bypass of
+    // the mandatory gate. With a definite answer and no account, wall them.
+    expect(
+      computeOnboardingGateTarget(
+        fresh({ isSessionUnreadable: false, onboardingCompleted: true }),
+      ),
+    ).toBe('/onboarding/signup-prompt');
   });
 
   it('returns null for users with a real (non-anonymous) account', () => {

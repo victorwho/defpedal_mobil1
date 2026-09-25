@@ -29,6 +29,7 @@ export const useOnboardingGate = (): OnboardingGateState => {
   const authCtx = useAuthSessionOptional();
 
   const isLoading = authCtx?.isLoading ?? true;
+  const isSessionUnreadable = authCtx?.isSessionUnreadable ?? false;
   const hasRealAccount = authCtx?.user != null && authCtx?.isAnonymous === false;
 
   return {
@@ -36,6 +37,7 @@ export const useOnboardingGate = (): OnboardingGateState => {
     onboardingCompleted,
     storeHydrated,
     isLoading,
+    isSessionUnreadable,
     hasRealAccount,
   };
 };

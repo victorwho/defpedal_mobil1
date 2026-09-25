@@ -16,7 +16,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 
 const authState = vi.hoisted(() => ({
-  value: { user: null as { id: string; email: string | null } | null, isLoading: true },
+  value: {
+    user: null as { id: string; email: string | null } | null,
+    isLoading: true,
+    isSessionUnreadable: false,
+  },
 }));
 const identify = vi.hoisted(() => vi.fn());
 const applyConsent = vi.hoisted(() => vi.fn());
@@ -44,7 +48,7 @@ describe('TelemetryProvider identity', () => {
   beforeEach(() => {
     identify.mockClear();
     applyConsent.mockClear();
-    authState.value = { user: null, isLoading: true };
+    authState.value = { user: null, isLoading: true, isSessionUnreadable: false };
   });
 
   it('does NOT touch identity while auth is still resolving', () => {
@@ -75,9 +79,25 @@ describe('TelemetryProvider identity', () => {
    * or a shared device keeps reporting the previous rider.
    */
   it('resets identity for a genuine signed-out state', () => {
-    authState.value = { user: null, isLoading: false };
+    authState.value = { user: null, isLoading: false, isSessionUnreadable: false };
     renderProvider();
     expect(identify).toHaveBeenCalledWith(null);
+  });
+
+  /**
+   * P1-1 regression (docs/plans/external-review-triage-2026-09-25.md).
+   *
+   * A secure-store/keystore failure leaves the saved session on disk but
+   * unreadable. The provider keeps it and retries, reporting isLoading:false
+   * with `user` still null — which slipped past the authLoading guard and
+   * called identify(null) → PostHog reset() → a brand-new anonymous
+   * distinct_id, re-entering the exact DAU corruption this file exists to
+   * prevent. "We could not open the session" is not a sign-out.
+   */
+  it('does NOT reset identity when the session is merely unreadable', () => {
+    authState.value = { user: null, isLoading: false, isSessionUnreadable: true };
+    renderProvider();
+    expect(identify).not.toHaveBeenCalled();
   });
 
   it('applies consent regardless of auth state', () => {

@@ -29,6 +29,18 @@ type AuthSessionContextValue = {
   session: MobileAuthSession | null;
   user: MobileAuthUser | null;
   isLoading: boolean;
+  /**
+   * True while the saved session exists on disk but could NOT be read (a
+   * secure-store/keystore failure), as opposed to "there is no session".
+   *
+   * Consumers must treat this like `isLoading`, not like signed-out. Without
+   * it, `isLoading:false` + `session:null` reads as "signed out" and the
+   * mandatory signup gate walls a fully signed-in rider for the length of the
+   * retry ladder (10s -> 300s), while TelemetryProvider calls identify(null)
+   * -> PostHog reset() and mints a fresh anonymous distinct_id. That is the
+   * same observable outcome as error-log #116, reached by a different route.
+   */
+  isSessionUnreadable: boolean;
   isAnonymous: boolean;
   isConfigured: boolean;
   isSupabaseConfigured: boolean;
@@ -63,6 +75,7 @@ const isAllowedOtpType = (value: string): value is AllowedOtpType =>
 export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<MobileAuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSessionUnreadable, setIsSessionUnreadable] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,6 +106,8 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
             setAuthError(
               `Could not read the saved sign-in (${describeSessionReadError(error)}). Keeping it and retrying.`,
             );
+            // Not signed out -- unreadable. See the field's doc comment.
+            setIsSessionUnreadable(true);
             setIsLoading(false);
           }
           return;
@@ -117,6 +132,8 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
 
       if (isMounted) {
         setSession(currentSession);
+        // We got an answer this time -- whatever it was.
+        setIsSessionUnreadable(false);
         setIsLoading(false);
       }
     };
@@ -333,6 +350,7 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       session,
       user: session?.user ?? null,
       isLoading,
+      isSessionUnreadable,
       isAnonymous: session?.isAnonymous === true,
       isConfigured: isSupabaseConfigured() || isDeveloperAuthBypassAvailable(),
       isSupabaseConfigured: isSupabaseConfigured(),
@@ -346,7 +364,7 @@ export const AuthSessionProvider = ({ children }: PropsWithChildren) => {
       signInWithDeveloperBypass: activateDeveloperBypassSession,
       signOut,
     }),
-    [isLoading, session, authError],
+    [isLoading, isSessionUnreadable, session, authError],
   );
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;

@@ -30,7 +30,17 @@ and its "Quick Wins" list contains items already done.
 | **P0-5** `.gcloudignore` | ✅ done | `gcloud meta list-files-for-upload` lists **zero** `.env`/keystore/service-account files, and still 186 `services/mobile-api` files |
 | **P0-4** share-image leak | ✅ code done | New `trimShareGeometry` in core + hook rewired; 8 new core tests, rewritten hook test; **mutation-checked** (breaking the trim fails 2 core tests + the hook test) |
 | **P1-11** feed-reaction XP farm | ⚠️ **partially** fixed | `/feed/:id/like` and `/feed/:id/love` no longer award XP or notify on a duplicate (23505 guard) + 2 new tests, mutation-checked. The unlike→relike path and the `xp_events` constraint still need the per-action decision below |
-| Everything else | ⬜ not started | P1-1…P1-10, P1-12, all of P2 |
+| **P1-4** notification prefs fail-closed | ✅ code done | Suppresses instead of sending when the prefs read errors; distinguishes `no_profile` from `prefs_unavailable`. 4 new tests, mutation-checked |
+| **P1-2 / P1-3** unbounded body reads | ✅ code done | Fixed in **three** files — `apiFetch.ts` (all ~80 `mobileApiFetch` call sites), `mapbox-routing.ts` (OSRM point-to-point, OSRM loop candidates, Mapbox Directions, canopy) and **`mapbox-search.ts`**, whose separate copy was found by chasing an unexplained bundle-grep result. Four bare fetches with no timeout at all routed through `mobileApiFetch`. 3 new tests, mutation-checked |
+| Everything else | ⬜ not started | P1-1, P1-5…P1-10, P1-12, all of P2 |
+
+**Note on the body-read fix (worth keeping):** the load-bearing half is moving
+the body read INSIDE the helper's `try`, not the timer re-arm. Mutation-checking
+proved it — removing the re-arm leaves the original header timer armed, so the
+read stays bounded and the test correctly still passes. The mutation that
+reproduces the defect is *disarm without re-arm*. Also: `fetchAndRead` in
+`mapbox-routing.ts` has **no direct test** (that file has no test file at all);
+it is covered only by typecheck and the full suite.
 
 **Not yet deployed:** P0-4 and P1-11 are code changes — they need an API deploy
 (P1-11) and a client release (P0-4). The four DB migrations are already live and
