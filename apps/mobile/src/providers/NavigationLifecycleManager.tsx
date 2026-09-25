@@ -23,6 +23,13 @@ export const NavigationLifecycleManager = () => {
     (state) => state.appState === 'NAVIGATING' && Boolean(state.navigationSession),
   );
 
+  // Start/stop are SERIALIZED inside backgroundNavigation.ts, so this effect can
+  // stay a plain fire-and-forget: a stop queued behind an in-flight start runs
+  // after it and really does stop the task. Do NOT add a generation counter or a
+  // "reverse it if the state changed" branch here — that compensates for a race
+  // the queue already removes, and two mechanisms would double-act. Do not add a
+  // cleanup that stops the task on unmount either: background recording is meant
+  // to outlive this component. See `serializeTaskOperation` and triage P1-8.
   useEffect(() => {
     const syncLifecycle = async () => {
       try {

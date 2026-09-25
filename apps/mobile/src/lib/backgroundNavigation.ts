@@ -176,7 +176,50 @@ const ensurePermissions = async () => {
   }
 };
 
-export const startBackgroundNavigationUpdates = async () => {
+/**
+ * Serializes every operation on the background location task.
+ *
+ * ⚠️ Without this, start and stop INTERLEAVE and the last one to *finish* wins
+ * rather than the last one requested. `startBackgroundNavigationUpdates` awaits
+ * a status write, then `ensurePermissions()` (which can put an OS permission
+ * dialog in front of the rider), then a bridge call, before it finally
+ * registers the task. If the ride ended anywhere inside that window,
+ * `stopBackgroundNavigationUpdates` ran first, asked
+ * `hasStartedLocationUpdatesAsync` -> false, correctly concluded there was
+ * nothing to stop, and wrote 'idle'. The start then completed and registered
+ * the task.
+ *
+ * At that point `isNavigating` is already false, so
+ * NavigationLifecycleManager's effect never fires again and NOTHING ever stops
+ * it: BestForNavigation GPS and the "recording your ride" foreground-service
+ * notification keep running after the ride is over — battery drain plus
+ * location collection outside a ride, until the app is killed or swiped away.
+ *
+ * Serializing is enough on its own and is why there is no generation counter
+ * here: with operations unable to overlap, a stop queued after a start sees the
+ * task actually registered and really does stop it. Reversing a stale result
+ * afterwards would risk double-acting; ordering removes the race instead of
+ * compensating for it.
+ *
+ * Module-level on purpose: the task is one global OS resource, so the invariant
+ * belongs to the resource rather than to any one caller. It holds across
+ * remounts and for any future caller.
+ *
+ * See docs/plans/external-review-triage-2026-09-25.md P1-8.
+ */
+let taskOperationQueue: Promise<unknown> = Promise.resolve();
+
+const serializeTaskOperation = <T>(operation: () => Promise<T>): Promise<T> => {
+  // `then(op, op)` runs the next operation whether the previous one resolved or
+  // rejected, so one denied permission cannot wedge every later stop.
+  const run = taskOperationQueue.then(operation, operation);
+  // The chain itself must never hold a rejection, or it would re-reject into
+  // every subsequent caller. The caller still sees the real result via `run`.
+  taskOperationQueue = run.catch(() => undefined);
+  return run;
+};
+
+const startBackgroundNavigationUpdatesUnsafe = async () => {
   await persistBackgroundNavigationStatus('starting');
 
   try {
@@ -225,7 +268,7 @@ export const startBackgroundNavigationUpdates = async () => {
   }
 };
 
-export const stopBackgroundNavigationUpdates = async () => {
+const stopBackgroundNavigationUpdatesUnsafe = async () => {
   try {
     const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
       BACKGROUND_NAVIGATION_TASK,
@@ -241,3 +284,17 @@ export const stopBackgroundNavigationUpdates = async () => {
     throw error;
   }
 };
+
+/**
+ * Register the background location task. Serialized against every other task
+ * operation — see `serializeTaskOperation`.
+ */
+export const startBackgroundNavigationUpdates = (): Promise<void> =>
+  serializeTaskOperation(startBackgroundNavigationUpdatesUnsafe);
+
+/**
+ * Unregister the background location task. Serialized against every other task
+ * operation — see `serializeTaskOperation`.
+ */
+export const stopBackgroundNavigationUpdates = (): Promise<void> =>
+  serializeTaskOperation(stopBackgroundNavigationUpdatesUnsafe);
