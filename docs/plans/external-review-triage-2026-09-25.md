@@ -37,7 +37,8 @@ and its "Quick Wins" list contains items already done.
 | **P1-9** first-ride budget fail-open | ✅ code done | Weekly budget and dedupe count now fail **closed**. 2 new tests, mutation-checked |
 | **P1-10** receipt sweep silent outage | ✅ code done | Throws instead of reporting `{polled:0}`; the route already turns that into a logged 500 the GCP policy pages on. 1 new test, mutation-checked |
 | **P1-8** background GPS after ride end | ✅ code done | Task operations serialized at the resource in `backgroundNavigation.ts`, so a stop queued behind an in-flight start actually stops it. 3 new tests, mutation-checked — bypassing the queue fails with `expected true to be false`, i.e. the leaked task reproduced |
-| Everything else | ⬜ not started | P1-5, P1-7, P1-12, all of P2 |
+| **P1-7** share-claim processor latched dead | ✅ code done | Cleanup now releases the in-flight lock for a scheduled-but-unstarted retry, so a navigation mid-backoff reschedules instead of killing the claim forever. 2 new tests (both directions), mutation-checked — removing the release fails with `expected "spy" to be called at least once` |
+| Everything else | ⬜ not started | P1-5, P1-12, all of P2 |
 
 **Closed by decision, not by code (product owner, 2026-09-25):** the `xp_events`
 dedup and dropping the `rrd_capfix_*` tables are **not being done**. The capfix

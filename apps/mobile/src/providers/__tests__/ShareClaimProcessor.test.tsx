@@ -14,6 +14,8 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 // ---------------------------------------------------------------------------
 
 const routerPushSpy = vi.fn();
+let mockPathname = '/';
+
 vi.mock('expo-router', () => ({
   router: {
     push: (...args: unknown[]) => routerPushSpy(...args),
@@ -22,7 +24,8 @@ vi.mock('expo-router', () => ({
   },
   // Non-onboarding path by default so the claim's navigation/celebration is
   // exercised. The onboarding-suppression branch is covered by its own test.
-  usePathname: () => '/',
+  // Mutable so a test can simulate the rider changing screen (P1-7).
+  usePathname: () => mockPathname,
 }));
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
@@ -236,6 +239,7 @@ describe('ShareClaimProcessor', () => {
     claimRouteShareSpy.mockReset();
     routerPushSpy.mockReset();
     telemetryCaptureSpy.mockReset();
+    mockPathname = '/';
   });
 
   afterEach(() => {
@@ -602,6 +606,74 @@ describe('ShareClaimProcessor', () => {
       const toast = screen.getByTestId('toast');
       expect(toast.getAttribute('data-message')).toMatch(/saved routes/i);
       expect(toast.getAttribute('data-message')).not.toMatch(/follow request/i);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // P1-7 regression (docs/plans/external-review-triage-2026-09-25.md).
+  //
+  // `isProcessingRef` is set BEFORE the retry `setTimeout`, and was only ever
+  // released by runClaim's `finally`. The effect re-runs on `pathname` (read
+  // above to decide navigation suppression), so any screen change during the
+  // 1s/2s backoff ran the cleanup, cancelled the scheduled runClaim — and left
+  // the lock held forever, because that `finally` never executed. The guard at
+  // the top of the effect then returned on every subsequent run: the rider
+  // tapped a shared-route link, the first attempt hit a flaky network, they
+  // navigated, and nothing happened ever again until a cold start.
+  // -------------------------------------------------------------------------
+
+  it('resumes the retry when a navigation cancels the scheduled attempt', async () => {
+    vi.useFakeTimers();
+    try {
+      claimRouteShareSpy.mockResolvedValue({ status: 'network_error', message: 'offline' });
+      // attempts=1 puts the next try behind the 1s backoff rather than firing
+      // immediately, which is the window the bug lived in.
+      useAppStore.setState({ pendingShareClaim: 'abcd1234', pendingShareClaimAttempts: 1 });
+
+      const { rerender } = render(<ShareClaimProcessor />);
+      expect(claimRouteShareSpy).not.toHaveBeenCalled();
+
+      // Rider changes screen mid-backoff.
+      mockPathname = '/route-planning';
+      rerender(<ShareClaimProcessor />);
+
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+
+      // Before the fix the lock stayed held and this was never called again.
+      expect(claimRouteShareSpy).toHaveBeenCalled();
+      // And the claim is still owned by the processor, not silently dropped.
+      expect(useAppStore.getState().pendingShareClaim).toBe('abcd1234');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not double-fire when a navigation lands while a claim is in flight', async () => {
+    // The other direction: the cleanup must release the lock ONLY for a
+    // scheduled-but-unstarted run. attempts=0 fires immediately, so the run is
+    // in flight and its own `finally` owns the release.
+    let resolveClaim: (v: unknown) => void = () => {};
+    claimRouteShareSpy.mockImplementation(
+      () => new Promise((resolve) => { resolveClaim = resolve; }),
+    );
+    useAppStore.setState({ pendingShareClaim: 'abcd1234', pendingShareClaimAttempts: 0 });
+
+    const { rerender } = render(<ShareClaimProcessor />);
+    await act(async () => { await Promise.resolve(); });
+    expect(claimRouteShareSpy).toHaveBeenCalledTimes(1);
+
+    mockPathname = '/route-planning';
+    rerender(<ShareClaimProcessor />);
+    await act(async () => { await Promise.resolve(); });
+
+    // Still exactly one in-flight claim — the lock was not released underneath it.
+    expect(claimRouteShareSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveClaim({ status: 'auth_required' });
+      await Promise.resolve();
     });
   });
 });

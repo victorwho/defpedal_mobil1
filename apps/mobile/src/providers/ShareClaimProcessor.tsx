@@ -271,7 +271,16 @@ export const ShareClaimProcessor = () => {
     };
 
     if (delayMs > 0) {
-      retryTimerRef.current = setTimeout(runClaim, delayMs);
+      retryTimerRef.current = setTimeout(() => {
+        // Clearing the handle as the run BEGINS keeps one invariant true:
+        // `retryTimerRef.current !== null` means "a scheduled run has not
+        // started yet". The cleanup below relies on exactly that to decide
+        // whether releasing the lock is safe. Leaving a stale handle here
+        // would let the cleanup release the lock while runClaim was in
+        // flight — which would admit a second, concurrent claim.
+        retryTimerRef.current = null;
+        void runClaim();
+      }, delayMs);
     } else {
       void runClaim();
     }
@@ -280,6 +289,29 @@ export const ShareClaimProcessor = () => {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
+        // ⚠️ Release the lock too. `isProcessingRef` is set before the timer is
+        // scheduled, and it is normally released by runClaim's `finally` — but
+        // we just cancelled runClaim, so that `finally` will never execute.
+        //
+        // This effect re-runs on `pathname`, `appState` and
+        // `onboardingCompleted` (all read above, to decide whether to
+        // suppress navigation), so ANY screen change during the 1s/2s retry
+        // backoff triggered this cleanup. Without releasing here, the guard at
+        // the top of the effect (`if (isProcessingRef.current) return`) latched
+        // the processor dead for the rest of the process: the rider tapped a
+        // shared-route link, the first attempt hit a flaky network, they
+        // navigated, and then nothing happened ever again — no route, no error
+        // toast, no retry, recovering only on the next cold start.
+        //
+        // Releasing makes the re-run reschedule the retry instead of killing
+        // it. The backoff restarts, which is a fair trade for not dying, and
+        // MAX_CLAIM_ATTEMPTS still bounds the whole thing.
+        //
+        // Only the scheduled-but-not-started case is released, per the
+        // invariant above — a run already in flight keeps the lock and
+        // releases it in its own `finally`.
+        // See docs/plans/external-review-triage-2026-09-25.md P1-7.
+        isProcessingRef.current = false;
       }
     };
   }, [
