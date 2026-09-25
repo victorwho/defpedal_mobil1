@@ -8,9 +8,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 // A module-level queue that tests can push results onto.
-const supabaseResultQueue: Array<{ data: unknown; error: null | { message: string } }> = [];
+const supabaseResultQueue: Array<{
+  data: unknown;
+  error: null | { message: string; code?: string };
+}> = [];
 
-const enqueueResult = (result: { data: unknown; error: null | { message: string } }) => {
+const enqueueResult = (result: {
+  data: unknown;
+  error: null | { message: string; code?: string };
+}) => {
   supabaseResultQueue.push(result);
 };
 
@@ -52,6 +58,7 @@ import { COMMUNITY_MIN_RIDES_PER_WINDOW as MIN_RIDES } from '@defensivepedal/cor
 
 import { buildApp } from '../app';
 import { createMemoryRouteResponseCache } from '../lib/cache';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import {
   createMemoryRateLimiter,
@@ -652,6 +659,70 @@ describe('POST /v1/feed/:id/like', () => {
       headers: authHeaders,
     });
     expect(response.statusCode).toBe(502);
+
+    await app.close();
+  });
+
+  // -------------------------------------------------------------------------
+  // P1-11 regression. The side effects below the insert used to fire
+  // unconditionally after an idempotent UPSERT, so re-liking an already-liked
+  // ride re-awarded XP every time — and this route has no rate limit, making it
+  // an unbounded XP farm. These two tests pin BOTH directions: a genuinely new
+  // like must still award, and a duplicate must not.
+  // See docs/plans/external-review-triage-2026-09-25.md P1-11.
+  // -------------------------------------------------------------------------
+
+  const flushFireAndForget = async () => {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+
+  const awardXpCalls = () =>
+    (supabaseAdmin!.rpc as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(
+      (call) => call[0] === 'award_xp',
+    );
+
+  it('awards XP for a genuinely new like', async () => {
+    enqueueResult({ data: null, error: null }); // insert succeeds
+    enqueueResult({ data: { user_id: 'owner-1' }, error: null }); // trip_shares lookup
+    enqueueResult({ data: null, error: null }); // award_xp
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/feed/00000000-0000-4000-8000-000000000001/like',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+
+    await flushFireAndForget();
+    expect(awardXpCalls().length).toBe(1);
+
+    await app.close();
+  });
+
+  it('awards NO XP when the ride was already liked (unique violation)', async () => {
+    enqueueResult({
+      data: null,
+      error: { message: 'duplicate key value violates unique constraint', code: '23505' },
+    });
+
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/feed/00000000-0000-4000-8000-000000000001/like',
+      headers: authHeaders,
+    });
+    // Still idempotently acknowledged — the client must not see an error.
+    expect(response.statusCode).toBe(200);
+    expect(response.json().acceptedAt).toBeDefined();
+
+    await flushFireAndForget();
+    expect(awardXpCalls().length).toBe(0);
 
     await app.close();
   });

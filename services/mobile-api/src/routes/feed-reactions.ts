@@ -42,12 +42,35 @@ export const buildFeedReactionRoutes = (
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
 
+        // A plain INSERT, so that a duplicate is reported as Postgres error
+        // 23505 (unique_violation) rather than being silently absorbed. That
+        // distinction is load-bearing: the side effects below (owner
+        // notification, XP) used to fire unconditionally after an idempotent
+        // UPSERT, so re-liking an already-liked ride re-awarded XP every time —
+        // an unbounded XP farm, since this route has no rate limit.
+        // See docs/plans/external-review-triage-2026-09-25.md P1-11.
+        //
+        // Deliberately NOT `.upsert(..., { ignoreDuplicates: true }).select()`:
+        // that would make "was this new?" depend on how PostgREST combines
+        // `Prefer: resolution=ignore-duplicates` with `return=representation`,
+        // which is a subtler contract than an error code. 23505 is unambiguous,
+        // and `routes/follow.ts:139` already relies on it here.
         const { error } = await db
           .from('feed_likes')
-          .upsert(
-            { trip_share_id: request.params.id, user_id: user.id },
-            { onConflict: 'trip_share_id,user_id' },
-          );
+          .insert({ trip_share_id: request.params.id, user_id: user.id });
+
+        // Already liked: acknowledge idempotently, award nothing, notify nobody.
+        //
+        // NOTE: this closes the re-like path only. Unlike-then-relike deletes the
+        // row and so inserts a genuinely new one, which still re-awards, because
+        // `award_xp` does not honour `p_source_id` (there is no unique key on
+        // xp_events). Closing that needs the per-action idempotency decision
+        // recorded under P1-11 — do NOT "fix" it by constraining xp_events, or
+        // streak and quiz XP stop working (measured: 258 of 331 apparent
+        // duplicates there are legitimate recurrences).
+        if (error?.code === '23505') {
+          return { acceptedAt: new Date().toISOString() };
+        }
 
         if (error) {
           throw new HttpError('Like failed.', {
@@ -163,10 +186,16 @@ export const buildFeedReactionRoutes = (
         // likes and trip_loves never refills (love_count stays 0).
         const user = await requireUser(request, dependencies);
         const db = ensureSupabase();
-        const { error } = await db.from('feed_likes').upsert(
-          { trip_share_id: request.params.id, user_id: user.id },
-          { onConflict: 'trip_share_id,user_id' },
-        );
+        // Same unconditional-XP-after-idempotent-write bug as /feed/:id/like had,
+        // and reachable by every OLD client still tapping love — so it gets the
+        // same 23505 treatment. See the long note on the like route above and
+        // docs/plans/external-review-triage-2026-09-25.md P1-11.
+        const { error } = await db
+          .from('feed_likes')
+          .insert({ trip_share_id: request.params.id, user_id: user.id });
+        if (error?.code === '23505') {
+          return { acceptedAt: new Date().toISOString() };
+        }
         if (error) throw new HttpError('Love failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
 
         // XP award (fire-and-forget)
