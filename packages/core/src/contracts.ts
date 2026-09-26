@@ -399,11 +399,36 @@ export interface HazardReportRequest {
    * Omitted / false means the ordinary per-type TTL applies.
    */
   isPermanent?: boolean;
+  /**
+   * Client-minted idempotency key: the offline queue's own mutation id, which
+   * `createQueuedMutation` stamps once at enqueue time and persists alongside
+   * the payload.
+   *
+   * `POST /v1/hazards` is delivered at-least-once, so a request that lands and
+   * then times out — or whose response is lost to an app kill — is retried.
+   * Without this key each retry created a second hazard pin at the same spot,
+   * splitting the community votes that decide whether the hazard is real, and
+   * refired the streak, the thank-you push, the XP award and the activity-feed
+   * card. Sending the MUTATION ID rather than a timestamp is deliberate: it is
+   * stable across retries by construction, and two genuine reports in the same
+   * millisecond stay distinct.
+   *
+   * Optional because an older client will not send it; the server then falls
+   * back to a plain insert and a duplicate remains possible.
+   */
+  clientHazardId?: string;
 }
 
 export interface HazardReportResponse {
   reportId: string;
   acceptedAt: string;
+  /**
+   * True when `clientHazardId` matched a hazard already on record, i.e. this
+   * was a retry of a delivery that had already succeeded. The report is still
+   * ACCEPTED (nothing is wrong from the rider's point of view) but nothing was
+   * written and no side effect fired.
+   */
+  duplicate?: boolean;
 }
 
 export interface NearbyHazard {

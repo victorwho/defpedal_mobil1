@@ -611,6 +611,16 @@ export const hazardReportRequestSchema = {
     isPermanent: {
       type: 'boolean',
     },
+    // Idempotency key for at-least-once delivery (P1-12). MUST be declared
+    // here: `additionalProperties: false` plus Fastify's `removeAdditional`
+    // means an undeclared field is stripped in silence and the endpoint
+    // answers 200 having ignored it (error-log #122 is that exact failure on
+    // /v1/trips/track).
+    clientHazardId: {
+      type: 'string',
+      minLength: 1,
+      maxLength: 128,
+    },
   },
 } as const;
 
@@ -619,6 +629,11 @@ export const hazardReportResponseSchema = {
   additionalProperties: false,
   required: ['reportId', 'acceptedAt'],
   properties: {
+    // Not required: an older client neither sends `clientHazardId` nor reads
+    // this back, and Fastify drops undeclared response fields (gotcha #9).
+    duplicate: {
+      type: 'boolean',
+    },
     reportId: {
       type: 'string',
       minLength: 1,
@@ -1083,6 +1098,7 @@ export const normalizeHazardReportRequest = (
   hazardType: body.hazardType,
   description: body.description,
   isPermanent: body.isPermanent === true,
+  clientHazardId: body.clientHazardId,
 });
 
 export const normalizeTripStartRequest = (body: TripStartBody): TripStartRequest => ({

@@ -60,10 +60,18 @@ const submitQueuedMutation = async (
   onResolved: (clientTripId: string, tripId: string) => void,
 ) => {
   switch (mutation.type) {
-    case 'hazard':
-      return mobileApi.reportHazard(
-        mutation.payload as QueuedMutationPayloadByType['hazard'],
-      );
+    case 'hazard': {
+      const payload = mutation.payload as QueuedMutationPayloadByType['hazard'];
+      // The mutation id IS the idempotency key (P1-12). Attached here rather
+      // than at enqueue time for two reasons: it cannot drift from the identity
+      // of the thing being retried, and reports already sitting in a device's
+      // persisted queue get it too — they were enqueued by a build that had no
+      // such field, but they already carry an id.
+      return mobileApi.reportHazard({
+        ...payload,
+        clientHazardId: payload.clientHazardId ?? mutation.id,
+      });
+    }
     case 'trip_start':
       return mobileApi.startTrip(
         mutation.payload as QueuedMutationPayloadByType['trip_start'],

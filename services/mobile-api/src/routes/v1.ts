@@ -1083,7 +1083,13 @@ export const buildV1Routes = (
             user?.id ?? null,
           );
           // Streak qualification (fire-and-forget)
-          if (user?.id) {
+          //
+          // ⚠️ Gated on `!result.duplicate` (P1-12). Deduplicating the hazard ROW
+          // alone would have fixed the visible double pin and left every side
+          // effect below still firing once per retry — the streak re-qualifying,
+          // a second thank-you push, another 50 XP, and a duplicate
+          // activity-feed card. The row and its consequences are one fix.
+          if (user?.id && !result.duplicate) {
             qualifyStreakAsync(user.id, 'hazard_report', getTimezone(request), request.log);
             // P0 nudge: thank-you push within seconds of submit.
             fireP0Event(user.id, 'post_hazard_thanks', {}, request.log);

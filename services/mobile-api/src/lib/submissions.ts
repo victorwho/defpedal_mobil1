@@ -101,25 +101,77 @@ export const submitHazardReport = async (
       ...(withType === baseInsert ? [] : [baseInsert]),
     ];
 
+    const idempotencyKey = request.clientHazardId;
     let error: { message: string } | null = null;
+    let duplicate = false;
 
-    for (const candidate of candidates) {
-      const result = await supabaseAdmin.from('hazards').insert([candidate]);
-      error = result.error;
-      if (!error) break;
-      if (!/is_permanent|hazard_type|schema cache|column/i.test(error.message)) break;
+    // Walks the degradation ladder above. `keyed` decides whether this pass
+    // carries the idempotency key — see the fallback below for why there are
+    // two passes rather than six candidates.
+    const attempt = async (keyed: boolean): Promise<void> => {
+      error = null;
+      for (const candidate of candidates) {
+        const row = keyed ? { ...candidate, client_hazard_id: idempotencyKey } : candidate;
+        // `ignoreDuplicates` is ON CONFLICT DO NOTHING, inferred on
+        // hazards_client_hazard_id_key. `.select('id')` is what makes the
+        // outcome observable: a conflict returns ZERO rows, which is the only
+        // way to tell a retry from a first delivery — and the caller needs
+        // that to decide whether the streak, the push, the XP award and the
+        // feed card fire. DO NOTHING rather than DO UPDATE so a caller
+        // presenting an id it does not own cannot alter the original row.
+        const result = keyed
+          ? await supabaseAdmin
+              .from('hazards')
+              .upsert([row], { onConflict: 'client_hazard_id', ignoreDuplicates: true })
+              .select('id')
+          : await supabaseAdmin.from('hazards').insert([row]).select('id');
+
+        error = result.error;
+        if (!error) {
+          duplicate = keyed && (result.data?.length ?? 0) === 0;
+          return;
+        }
+        // A missing idempotency column must ABANDON this pass rather than walk
+        // on down the ladder. Continuing would degrade `hazard_type` /
+        // `is_permanent` — the rider's actual report — while still carrying the
+        // key that is the thing the database cannot accept. Caught by
+        // `hazard-idempotency.test.ts`, which failed with ['upsert','upsert']
+        // and a hazard that had silently lost its category.
+        if (keyed && /client_hazard_id/i.test(error.message)) return;
+        if (!/is_permanent|hazard_type|schema cache|column/i.test(error.message)) return;
+      }
+    };
+
+    await attempt(idempotencyKey !== undefined);
+
+    // Progressive degradation for the KEY itself, one pass rather than
+    // interleaved candidates: if `client_hazard_id` is missing the whole ladder
+    // fails on the column, and retrying each rung with the key still attached
+    // would just spend a round-trip per rung on the same error. A duplicate pin
+    // is a better outcome than a lost hazard, so the key is what gets dropped —
+    // and it is dropped BEFORE `is_permanent` or `hazard_type` would be, since
+    // those are the rider's actual report.
+    if (error && idempotencyKey !== undefined && /client_hazard_id/i.test(error.message)) {
+      await attempt(false);
     }
 
     if (error) {
       throw new Error(error.message);
     }
-  } else {
-    memoryHazards.set(reportId, { request, userId });
+
+    return {
+      reportId,
+      acceptedAt: new Date().toISOString(),
+      duplicate,
+    };
   }
+
+  memoryHazards.set(reportId, { request, userId });
 
   return {
     reportId,
     acceptedAt: new Date().toISOString(),
+    duplicate: false,
   };
 };
 

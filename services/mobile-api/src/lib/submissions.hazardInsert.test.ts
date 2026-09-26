@@ -14,17 +14,35 @@ type InsertCall = Record<string, unknown>;
 
 const insertCalls: InsertCall[] = [];
 const insertErrors: Array<null | { message: string }> = [];
+/** Rows the write returned; [] is ON CONFLICT DO NOTHING (P1-12). */
+const insertData: Array<Array<{ id: string }>> = [];
 
-vi.mock('./supabaseAdmin', () => ({
-  supabaseAdmin: {
-    from: vi.fn().mockReturnValue({
-      insert: vi.fn().mockImplementation((rows: InsertCall[]) => {
-        insertCalls.push(rows[0]);
-        return Promise.resolve({ error: insertErrors.shift() ?? null });
+// The write terminates in `.select('id')` since P1-12 — that is what makes a
+// DO NOTHING conflict observable — so both `insert` and `upsert` must return a
+// chainable that is also awaitable.
+vi.mock('./supabaseAdmin', () => {
+  const capture = (rows: InsertCall[]) => {
+    insertCalls.push(rows[0]);
+    const result = {
+      data: insertData.shift() ?? [{ id: 'row-1' }],
+      error: insertErrors.shift() ?? null,
+    };
+    return {
+      select: vi.fn().mockReturnValue(Promise.resolve(result)),
+      then: (resolve: (v: unknown) => unknown, reject: (v: unknown) => unknown) =>
+        Promise.resolve(result).then(resolve, reject),
+    };
+  };
+
+  return {
+    supabaseAdmin: {
+      from: vi.fn().mockReturnValue({
+        insert: vi.fn().mockImplementation(capture),
+        upsert: vi.fn().mockImplementation(capture),
       }),
-    }),
-  },
-}));
+    },
+  };
+});
 
 import { submitHazardReport } from './submissions';
 
@@ -39,6 +57,7 @@ describe('submitHazardReport — is_permanent', () => {
   beforeEach(() => {
     insertCalls.length = 0;
     insertErrors.length = 0;
+    insertData.length = 0;
   });
 
   it('writes is_permanent=true when the reporter ticked the box', async () => {

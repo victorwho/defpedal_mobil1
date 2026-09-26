@@ -119,6 +119,80 @@ const buildTestApp = (overrides: Partial<MobileApiDependencies> = {}) =>
 
 // ─── POST /v1/hazards/:id/vote ──────────────────────────────────────────────
 
+describe('POST /v1/hazards — retry side effects (P1-12)', () => {
+  const body = {
+    coordinate: { lat: 44.43, lon: 26.1 },
+    reportedAt: '2026-09-26T10:00:00.000Z',
+    source: 'manual' as const,
+    hazardType: 'pothole' as const,
+    clientHazardId: 'hazard-abc',
+  };
+
+  // ⚠️ `authHeaders` is load-bearing on every inject here, not decoration.
+  // POST /v1/hazards uses OPTIONAL auth, so an unauthenticated request skips
+  // every side effect by a different route — which made the retry assertion
+  // below pass trivially, against a gate that was not being exercised at all.
+  beforeEach(() => {
+    supabaseResultQueue.length = 0;
+    vi.mocked(qualifyStreakAsync).mockClear();
+  });
+
+  it('declares clientHazardId, so the schema does not strip it', async () => {
+    // `additionalProperties: false` + Fastify's removeAdditional means an
+    // undeclared field is dropped in silence and the endpoint answers 200
+    // having ignored the idempotency key entirely — error-log #122.
+    const submitHazardReport = vi
+      .fn()
+      .mockResolvedValue({ reportId: 'h1', acceptedAt: '', duplicate: false });
+    const app = buildTestApp({ submitHazardReport });
+    await app.ready();
+
+    const res = await app.inject({ method: 'POST', url: '/v1/hazards', headers: authHeaders, payload: body });
+
+    expect(res.statusCode).toBe(200);
+    expect(submitHazardReport.mock.calls[0][0]).toMatchObject({ clientHazardId: 'hazard-abc' });
+
+    await app.close();
+  });
+
+  it('fires the streak qualifier on a FIRST delivery', async () => {
+    const app = buildTestApp({
+      submitHazardReport: vi
+        .fn()
+        .mockResolvedValue({ reportId: 'h1', acceptedAt: '', duplicate: false }),
+    });
+    await app.ready();
+
+    await app.inject({ method: 'POST', url: '/v1/hazards', headers: authHeaders, payload: body });
+
+    expect(qualifyStreakAsync).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
+  it('fires NOTHING when the report was a retry of a delivery already on record', async () => {
+    // The half a row-level dedup alone would miss. The pin stops duplicating,
+    // but without this gate the retry still re-qualifies the streak, sends a
+    // second thank-you push, awards another 50 XP and posts a duplicate
+    // activity-feed card.
+    const app = buildTestApp({
+      submitHazardReport: vi
+        .fn()
+        .mockResolvedValue({ reportId: 'h1', acceptedAt: '', duplicate: true }),
+    });
+    await app.ready();
+
+    const res = await app.inject({ method: 'POST', url: '/v1/hazards', headers: authHeaders, payload: body });
+
+    // Still a success from the rider's point of view — nothing is wrong.
+    expect(res.statusCode).toBe(200);
+    expect(res.json().duplicate).toBe(true);
+    expect(qualifyStreakAsync).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+});
+
 describe('POST /v1/hazards/:hazardId/vote', () => {
   beforeEach(() => {
     supabaseResultQueue.length = 0;

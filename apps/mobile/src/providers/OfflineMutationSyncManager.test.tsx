@@ -12,12 +12,14 @@ const mockEndTrip = vi.fn();
 const mockSaveTripTrack = vi.fn();
 const mockVoteHazard = vi.fn();
 const mockResolveTrip = vi.fn();
+const mockReportHazard = vi.fn();
 vi.mock('../lib/api', () => ({
   mobileApi: {
     startTrip: (...args: unknown[]) => mockStartTrip(...args),
     endTrip: (...args: unknown[]) => mockEndTrip(...args),
     saveTripTrack: (...args: unknown[]) => mockSaveTripTrack(...args),
     voteHazard: (...args: unknown[]) => mockVoteHazard(...args),
+    reportHazard: (...args: unknown[]) => mockReportHazard(...args),
     resolveTrip: (...args: unknown[]) => mockResolveTrip(...args),
   },
 }));
@@ -81,6 +83,7 @@ describe('OfflineMutationSyncManager — immediate drain on trip-critical enqueu
     mockEndTrip.mockResolvedValue({ status: 'ok' });
     mockSaveTripTrack.mockResolvedValue({ status: 'ok' });
     mockVoteHazard.mockResolvedValue({ status: 'ok' });
+    mockReportHazard.mockResolvedValue({ reportId: 'h1', acceptedAt: '' });
   });
 
   afterEach(() => {
@@ -188,5 +191,56 @@ describe('OfflineMutationSyncManager — immediate drain on trip-critical enqueu
       await vi.advanceTimersByTimeAsync(SYNC_INTERVAL_MS * 2);
     });
     expect(mockStartTrip).not.toHaveBeenCalled();
+  });
+});
+
+describe('OfflineMutationSyncManager — hazard idempotency key (P1-12)', () => {
+  const HAZARD_PAYLOAD = {
+    coordinate: { lat: 44.43, lon: 26.1 },
+    reportedAt: '2026-09-26T10:00:00.000Z',
+    source: 'manual' as const,
+    hazardType: 'pothole' as const,
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetQueueState();
+    mockReportHazard.mockResolvedValue({ reportId: 'h1', acceptedAt: '' });
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+    resetQueueState();
+  });
+
+  it('sends the queued mutation id as clientHazardId', async () => {
+    // `POST /v1/hazards` is at-least-once, so the server needs a key that is
+    // the SAME on every retry. The mutation id is minted once at enqueue time
+    // and persisted, which is exactly that; a fresh value per attempt (a new
+    // uuid, `Date.now()`) would defeat the whole mechanism silently.
+    const view = render(React.createElement(OfflineMutationSyncManager));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      useAppStore.getState().enqueueMutation('hazard', HAZARD_PAYLOAD);
+    });
+    const queued = useAppStore.getState().queuedMutations[0];
+    expect(queued.id).toBeTruthy();
+
+    // A hazard is NOT trip-critical, so it waits for the interval tick.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SYNC_INTERVAL_MS + 50);
+    });
+
+    expect(mockReportHazard).toHaveBeenCalledTimes(1);
+    expect(mockReportHazard.mock.calls[0][0]).toMatchObject({
+      clientHazardId: queued.id,
+      hazardType: 'pothole',
+    });
+    view.unmount();
   });
 });
