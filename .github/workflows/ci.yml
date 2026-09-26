@@ -8,6 +8,13 @@ on:
       - 'codex/**'
   pull_request:
 
+# Least privilege. Without an explicit block the GITHUB_TOKEN gets the
+# repository default, which for many repos is write-all — so a compromised
+# dependency in any build step could push commits or publish releases. This
+# workflow only ever needs to read the tree.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest

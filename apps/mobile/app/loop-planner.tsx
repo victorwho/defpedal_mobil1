@@ -616,12 +616,22 @@ export default function LoopPlannerScreen() {
           total: String(premium.limits.loopSessionsPerMonth ?? 0),
         });
 
+  // Double-tap guard for saving, the counterpart to `rideStartedRef` below.
+  // `savedIds` is only written AFTER the POST resolves, and the button is
+  // disabled on `!selected || !isOnline` — neither of which changes while the
+  // request is in flight — so a second tap created a SECOND `saved_loops` row,
+  // both charged against the rider's free-tier allowance for one loop.
+  const savingRef = useRef<string | null>(null);
+
   const handleSave = useCallback(() => {
     if (!selected || !start) return;
     if (savedIds[selected.id]) {
       setToast(t('loop.savedAlready'));
       return;
     }
+    // Set synchronously, before any await can yield.
+    if (savingRef.current === selected.id) return;
+    savingRef.current = selected.id;
 
     // Loops count against the same allowance as saved routes — the rider was
     // promised "saved like any route", and two separate quotas for two kinds
@@ -656,6 +666,10 @@ export default function LoopPlannerScreen() {
           unpavedShare: selected.unpavedShare,
         });
       } catch {
+        // Released so the rider can retry a failed save — a latch that only
+        // ever closed would turn one network blip into a permanently
+        // unsaveable loop.
+        savingRef.current = null;
         setToast(isOnline ? t('loop.errorSave') : t('loop.offline'));
         return;
       }
@@ -674,6 +688,9 @@ export default function LoopPlannerScreen() {
         createdAt: saved.createdAt,
       });
       setSavedIds((prev) => ({ ...prev, [selected.id]: saved.id }));
+      // `savedIds` now holds this loop, so the check above is what rejects a
+      // later tap; the in-flight latch has done its job.
+      savingRef.current = null;
       setToast(t('loop.saved'));
       telemetry.capture('loop_saved', {
         km: Math.round(selected.distanceMeters / 1000),

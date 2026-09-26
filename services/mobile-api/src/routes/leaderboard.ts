@@ -362,21 +362,22 @@ export const buildLeaderboardRoutes = (
             const periodStartStr = toDateStr(prd.start);
             const periodEndStr = toDateStr(prd.end);
 
-            // Idempotency: check if snapshot already exists for this period
-            const { count: existingCount } = await db
-              .from('leaderboard_snapshots')
-              .select('id', { count: 'exact', head: true })
-              .eq('period_type', prd.type)
-              .eq('metric', metric)
-              .eq('period_end', periodEndStr);
-
-            if ((existingCount ?? 0) > 0) {
-              request.log.info(
-                { event: 'leaderboard_settle_skip', periodType: prd.type, metric, periodEnd: periodEndStr },
-                'snapshot already exists — skipping',
-              );
-              continue;
-            }
+            // Idempotency lives in the UNIQUE (period_type, metric, period_end,
+            // user_id) index (migration 202609260004), NOT in a count read.
+            //
+            // ⚠️ The count-based skip that used to be here failed in both
+            // directions. It is a check-then-write, and the concurrency it had
+            // to survive is SCHEDULED — the weekly and monthly settle jobs hit
+            // this same endpoint and the loop above covers both periods, so any
+            // 1st-of-month Monday races all four combinations; the duplicate
+            // snapshot then inserted cleanly and `award_xp` fired twice. And
+            // when a run was truncated part-way it left `count > 0`, so the next
+            // run skipped the whole period and ranks 20-50 never settled, while
+            // the endpoint still answered `{ok:true}`.
+            //
+            // Not skipping is now the correct behaviour: an already-settled row
+            // fails with 23505 and is passed over per-row, so a truncated run
+            // RESUMES and fills in exactly the ranks it missed.
 
             // Query leaderboard for this period using RPC
             // We use a central point (0,0) with huge radius to get global results
@@ -426,10 +427,20 @@ export const buildLeaderboardRoutes = (
                 });
 
               if (insertError) {
-                request.log.warn(
-                  { event: 'leaderboard_snapshot_insert_error', userId, error: insertError.message },
-                  'failed to insert snapshot',
-                );
+                // 23505 = this rank was already settled, which is the ordinary
+                // outcome on a re-run and on the losing side of the scheduled
+                // race. It must not award XP (the `continue` is the whole point)
+                // and it must not look like a failure in the logs, or a healthy
+                // re-run would page someone. Anything else is a real problem.
+                const isAlreadySettled =
+                  (insertError as { code?: string }).code === '23505' ||
+                  /duplicate key/i.test(insertError.message);
+                if (!isAlreadySettled) {
+                  request.log.warn(
+                    { event: 'leaderboard_snapshot_insert_error', userId, error: insertError.message },
+                    'failed to insert snapshot',
+                  );
+                }
                 continue;
               }
 

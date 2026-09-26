@@ -757,19 +757,20 @@ export const es: TranslationKeys = {
   },
 
   // ── Onboarding analytics consent ──
+  // Remnant of the onboarding consent screen, which was DELETED on 2026-07-16
+  // (telemetry moved to a first-screen transparency notice plus Profile >
+  // Privacy & analytics). Only the riding-tips strings survive, because
+  // `profile.tsx` renders its "Riding tips & reminders" row from them; the block
+  // keeps its old name so that call site stays valid.
+  //
+  // The rest of the block was deleted rather than corrected: it described
+  // analytics as "off by default and opt-in", which stopped being true when the
+  // default flipped to ON on 2026-07-19. Live copy for that lives in
+  // `privacyAnalytics` below. Dead copy that contradicts shipped behaviour is
+  // worse than no copy — it reads as documentation.
   onboardingConsent: {
-    eyebrow: 'Defensive Pedal',
-    title: 'Ayúdanos a mejorar, en tus términos',
-    subtitle: 'Los reportes de fallos están activos por defecto — nos ayudan a corregir bugs más rápido. La analítica de producto está desactivada por defecto y es opcional.',
-    crashLabel: 'Enviar reportes de fallos',
-    crashDescription: 'Activo por defecto. Trazas de pila e información del dispositivo cuando la app falla — sin ubicación, sin datos personales. Nos ayuda a corregir errores más rápido. Puedes desactivarlo en cualquier momento.',
-    analyticsLabel: 'Enviar analíticas de producto',
-    analyticsDescription: 'Desactivado por defecto. Eventos de uso anónimos para entregar lo que importa. Sin seguimiento de ubicación. Actívalo si quieres ayudarnos a priorizar.',
     ridingTipsLabel: 'Consejos y recordatorios para pedalear',
     ridingTipsDescription: 'Notificaciones ocasionales que te ayudan a empezar a pedalear con seguridad. Puedes desactivarlas cuando quieras.',
-    assurance: 'Tú tienes el control.',
-    continue: 'Continuar',
-    changeLater: 'Puedes cambiarlo en cualquier momento desde Perfil → Privacidad y analítica.',
   },
 
   // ── Privacy & Analytics settings screen ──

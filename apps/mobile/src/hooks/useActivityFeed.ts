@@ -19,9 +19,21 @@ const ACTIVITY_COMMENTS_KEY = 'activity-comments';
 // Activity Feed (infinite scroll, ranked)
 // ---------------------------------------------------------------------------
 
+/**
+ * Coordinates are rounded into the query key at ~110 m.
+ *
+ * ⚠️ Keying on the RAW fix made the key change on essentially every GPS update,
+ * because the last decimals never settle. Each new value mints a fresh infinite
+ * query with no pages, so the feed silently jumped back to page 1 — most
+ * visibly when a rider tapped retry. The server ranks by locality, not by
+ * metres, so three decimals is already finer than the feed can distinguish.
+ */
+const roundForKey = (value: number | null): number | null =>
+  value === null ? null : Number(value.toFixed(3));
+
 export const useActivityFeedQuery = (lat: number | null, lon: number | null) =>
   useInfiniteQuery<ActivityFeedResponse>({
-    queryKey: [ACTIVITY_FEED_KEY, lat, lon],
+    queryKey: [ACTIVITY_FEED_KEY, roundForKey(lat), roundForKey(lon)],
     queryFn: ({ pageParam }) => {
       const cursor = pageParam as string | undefined;
       let cursorScore: number | undefined;

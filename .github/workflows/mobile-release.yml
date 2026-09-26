@@ -44,6 +44,11 @@ concurrency:
   group: mobile-release-${{ github.event.inputs.platform }}-${{ github.event.inputs.profile }}
   cancel-in-progress: false
 
+# Least privilege — see ci.yml. This workflow talks to EAS with its own
+# EXPO_TOKEN and needs nothing from the GITHUB_TOKEN but a checkout.
+permissions:
+  contents: read
+
 jobs:
   eas-build:
     runs-on: ubuntu-latest
@@ -62,14 +67,22 @@ jobs:
             exit 1
           fi
 
+      # ⚠️ Inputs arrive through `env:`, never interpolated into the script
+      # body. `${{ ... }}` is substituted as TEXT before bash ever sees it, so a
+      # free-text input containing a quote or a `;` becomes part of the script —
+      # `native_validation_ref` and `release_notes_ref` are both free text.
+      # Exploiting it needs write access, so this is hardening rather than an open
+      # hole, but the same shape in a workflow triggered by anything less
+      # privileged is a straightforward injection. Via env the value is data.
       - name: Release dispatch guardrails
+        env:
+          PLATFORM: ${{ github.event.inputs.platform }}
+          PROFILE: ${{ github.event.inputs.profile }}
+          AUTO_SUBMIT: ${{ github.event.inputs.auto_submit }}
+          NATIVE_VALIDATION_REF: ${{ github.event.inputs.native_validation_ref }}
+          RELEASE_NOTES_REF: ${{ github.event.inputs.release_notes_ref }}
+          STORE_READY: ${{ github.event.inputs.confirm_store_readiness }}
         run: |
-          PLATFORM="${{ github.event.inputs.platform }}"
-          PROFILE="${{ github.event.inputs.profile }}"
-          AUTO_SUBMIT="${{ github.event.inputs.auto_submit }}"
-          NATIVE_VALIDATION_REF="${{ github.event.inputs.native_validation_ref }}"
-          RELEASE_NOTES_REF="${{ github.event.inputs.release_notes_ref }}"
-          STORE_READY="${{ github.event.inputs.confirm_store_readiness }}"
 
           if [ "${AUTO_SUBMIT}" = "true" ] && [ "${STORE_READY}" != "true" ]; then
             echo "::error::Auto-submit requires confirm_store_readiness=true."
@@ -104,17 +117,29 @@ jobs:
         run: npm run validate
 
       - name: Validate mobile release configuration
+        env:
+          PLATFORM: ${{ github.event.inputs.platform }}
+          PROFILE: ${{ github.event.inputs.profile }}
+          AUTO_SUBMIT: ${{ github.event.inputs.auto_submit }}
+          NATIVE_VALIDATION_REF: ${{ github.event.inputs.native_validation_ref }}
+          RELEASE_NOTES_REF: ${{ github.event.inputs.release_notes_ref }}
+          STORE_READY: ${{ github.event.inputs.confirm_store_readiness }}
         run: >
           node ./scripts/check-mobile-release.mjs
-          --platform "${{ github.event.inputs.platform }}"
-          --profile "${{ github.event.inputs.profile }}"
-          --auto-submit "${{ github.event.inputs.auto_submit }}"
-          --native-validation-ref "${{ github.event.inputs.native_validation_ref }}"
-          --release-notes-ref "${{ github.event.inputs.release_notes_ref }}"
-          --confirm-store-readiness "${{ github.event.inputs.confirm_store_readiness }}"
+          --platform "$PLATFORM"
+          --profile "$PROFILE"
+          --auto-submit "$AUTO_SUBMIT"
+          --native-validation-ref "$NATIVE_VALIDATION_REF"
+          --release-notes-ref "$RELEASE_NOTES_REF"
+          --confirm-store-readiness "$STORE_READY"
 
+      # Pinned. An unpinned global install resolves to whatever `latest` is on
+      # the day the workflow runs, so a release build's toolchain could change
+      # without a single commit to this repo — and a release is the worst place
+      # to discover a breaking CLI change. Pinned to what `latest` resolves to
+      # today (24.8.0), so this freezes the toolchain without changing it.
       - name: Install EAS CLI
-        run: npm install --global eas-cli
+        run: npm install --global eas-cli@24.8.0
 
       - name: Trigger EAS build
         working-directory: apps/mobile

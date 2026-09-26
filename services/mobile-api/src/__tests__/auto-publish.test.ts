@@ -97,6 +97,8 @@ describe('autoPublishRide', () => {
   });
 
   it('returns activity ID on successful publish', async () => {
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     // getUserProfile: auto_share_rides=true, trim=false, is_private=false
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
@@ -110,6 +112,8 @@ describe('autoPublishRide', () => {
   });
 
   it('returns null when auto_share_rides is false', async () => {
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     enqueueResult({
       data: { auto_share_rides: false, trim_route_endpoints: false, is_private: false },
       error: null,
@@ -122,6 +126,8 @@ describe('autoPublishRide', () => {
   it('applies endpoint trimming when trim_route_endpoints is true', async () => {
     const { trimPolylineEndpoints } = await import('@defensivepedal/core');
 
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: true, is_private: false },
       error: null,
@@ -134,6 +140,8 @@ describe('autoPublishRide', () => {
   });
 
   it('returns null for private profile with 0 followers', async () => {
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     // getUserProfile: private profile
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: false, is_private: true },
@@ -147,6 +155,8 @@ describe('autoPublishRide', () => {
   });
 
   it('returns null when profile is not found', async () => {
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     enqueueResult({ data: null, error: null });
 
     const result = await autoPublishRide(baseRideParams);
@@ -154,6 +164,8 @@ describe('autoPublishRide', () => {
   });
 
   it('returns null when insert fails', async () => {
+    // Dedup pre-check (P2): no existing card for this trip.
+    enqueueResult({ data: null, error: null });
     enqueueResult({
       data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
       error: null,
@@ -163,8 +175,36 @@ describe('autoPublishRide', () => {
     const result = await autoPublishRide(baseRideParams);
     expect(result).toBeNull();
   });
-});
 
+  it('returns the existing card instead of publishing a second one', async () => {
+    // Measured in production 2026-09-26: 21 duplicate (user_id, tripId) groups
+    // holding 141 excess cards against 396 ride cards — 36% of the ride feed.
+    // A replayed impact POST used to add another card every time.
+    enqueueResult({ data: { id: 'activity-ride-existing' }, error: null });
+
+    const result = await autoPublishRide(baseRideParams);
+
+    expect(result).toBe('activity-ride-existing');
+    // And it stopped there: the profile was never read, so nothing downstream
+    // of the check ran either.
+    expect(supabaseResultQueue).toHaveLength(0);
+  });
+
+  it('still publishes when the ride carries no tripId, rather than matching on null', async () => {
+    // `tripId` is nullable. `.eq(field, null)` compares against the literal
+    // string, so an unguarded check could either match nothing or — worse —
+    // match another trip-less card and silently suppress a real ride.
+    enqueueResult({
+      data: { auto_share_rides: true, trim_route_endpoints: false, is_private: false },
+      error: null,
+    });
+    enqueueResult({ data: { id: 'activity-ride-no-trip' }, error: null });
+
+    const result = await autoPublishRide({ ...baseRideParams, tripId: null });
+
+    expect(result).toBe('activity-ride-no-trip');
+  });
+});
 // ---------------------------------------------------------------------------
 // autoPublishHazardBatch
 // ---------------------------------------------------------------------------

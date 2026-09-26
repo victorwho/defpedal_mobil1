@@ -757,19 +757,20 @@ export const ro: TranslationKeys = {
   },
 
   // ── Onboarding analytics consent ──
+  // Remnant of the onboarding consent screen, which was DELETED on 2026-07-16
+  // (telemetry moved to a first-screen transparency notice plus Profile >
+  // Privacy & analytics). Only the riding-tips strings survive, because
+  // `profile.tsx` renders its "Riding tips & reminders" row from them; the block
+  // keeps its old name so that call site stays valid.
+  //
+  // The rest of the block was deleted rather than corrected: it described
+  // analytics as "off by default and opt-in", which stopped being true when the
+  // default flipped to ON on 2026-07-19. Live copy for that lives in
+  // `privacyAnalytics` below. Dead copy that contradicts shipped behaviour is
+  // worse than no copy — it reads as documentation.
   onboardingConsent: {
-    eyebrow: 'Defensive Pedal',
-    title: 'Ajută-ne să ne îmbunătățim, în condițiile tale',
-    subtitle: 'Rapoartele de eroare sunt active implicit — ne ajută să remediem bug-urile mai rapid. Analiza produsului este dezactivată implicit și opt-in.',
-    crashLabel: 'Trimite rapoarte de eroare',
-    crashDescription: 'Activă implicit. Urme ale stivei și informații despre dispozitiv când aplicația se blochează — fără locație, fără date personale. Ne ajută să remediem erorile mai rapid. Poți dezactiva oricând.',
-    analyticsLabel: 'Trimite analize de produs',
-    analyticsDescription: 'Dezactivată implicit. Evenimente de utilizare anonime pentru a livra ce contează. Fără urmărire de locație. Activează dacă vrei să ne ajuți să prioritizăm.',
     ridingTipsLabel: 'Sfaturi de pedalat & memento-uri',
     ridingTipsDescription: 'Notificări ocazionale care te ajută să pedalezi în siguranță. Le poți opri oricând.',
-    assurance: 'Tu deții controlul.',
-    continue: 'Continuă',
-    changeLater: 'Poți schimba oricând din Profil → Confidențialitate & analiză.',
   },
 
   // ── Privacy & Analytics settings screen ──

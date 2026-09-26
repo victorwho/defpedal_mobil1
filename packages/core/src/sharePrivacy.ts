@@ -1,4 +1,5 @@
 import { haversineDistance, polylineSegmentDistance } from './distance';
+import { SHARE_TRIM_METERS } from './trimEndpointsForShare';
 import type { StaticImageRiskSegment } from './mapboxStaticImageUrl';
 
 /**
@@ -61,7 +62,7 @@ const walkForward = (
  */
 export function trimPrivacyZone(
   coords: readonly [number, number][],
-  trimMeters: number = 200,
+  trimMeters: number = SHARE_TRIM_METERS,
 ): [number, number][] {
   if (!coords || coords.length === 0) return [];
   if (coords.length === 1) return [[coords[0][0], coords[0][1]]];

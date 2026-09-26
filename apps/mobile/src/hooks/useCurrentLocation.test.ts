@@ -24,11 +24,16 @@ vi.mock('../lib/devMockLocation', () => ({
   getDevMockLocation: (...args: unknown[]) => mockGetDevMockLocation(...args),
 }));
 
-import { useCurrentLocation } from './useCurrentLocation';
+import { __resetCurrentLocationForTests, useCurrentLocation } from './useCurrentLocation';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetDevMockLocation.mockReturnValue(null);
+  // The hook is now ONE shared source, so its module state has to be cleared
+  // between tests like any singleton's. Without this the first test — which
+  // deliberately never resolves its permission promise — leaves an in-flight
+  // read that every later test would adopt.
+  __resetCurrentLocationForTests();
 });
 
 afterEach(() => {
@@ -187,5 +192,105 @@ describe('useCurrentLocation', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.location).toEqual({ lat: 51.5, lon: -0.12 });
     expect(result.current.accuracyMeters).toBe(5);
+  });
+});
+
+describe('useCurrentLocation — one shared read (P2)', () => {
+  it('wakes the GPS ONCE for many simultaneous consumers', async () => {
+    // The defect: this hook is mounted from 13 places, and a screen composing
+    // several of them ran a permission check and a position read per instance.
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    const a = renderHook(() => useCurrentLocation());
+    const b = renderHook(() => useCurrentLocation());
+    const c = renderHook(() => useCurrentLocation());
+
+    await waitFor(() => {
+      expect(a.result.current.isLoading).toBe(false);
+    });
+
+    expect(mockGetCurrentPositionAsync).toHaveBeenCalledTimes(1);
+    expect(mockGetForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+    // And all three see the answer, not just the one that triggered it.
+    for (const h of [a, b, c]) {
+      expect(h.result.current.location).toEqual({ lat: 44.43, lon: 26.1 });
+    }
+  });
+
+  it('reuses a fresh fix for a consumer mounting afterwards', async () => {
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    const first = renderHook(() => useCurrentLocation());
+    await waitFor(() => {
+      expect(first.result.current.isLoading).toBe(false);
+    });
+
+    const second = renderHook(() => useCurrentLocation());
+
+    expect(mockGetCurrentPositionAsync).toHaveBeenCalledTimes(1);
+    // The late arrival gets the value immediately rather than a loading state.
+    expect(second.result.current.location).toEqual({ lat: 44.43, lon: 26.1 });
+    expect(second.result.current.isLoading).toBe(false);
+  });
+
+  it('refreshLocation always reads again, even inside the freshness window', async () => {
+    // An explicit refresh answered from cache would make pull-to-refresh a no-op.
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    const { result } = renderHook(() => useCurrentLocation());
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 45.65, longitude: 25.6, accuracy: 8 },
+    });
+    await act(async () => {
+      await result.current.refreshLocation();
+    });
+
+    expect(mockGetCurrentPositionAsync).toHaveBeenCalledTimes(2);
+    expect(result.current.location).toEqual({ lat: 45.65, lon: 25.6 });
+  });
+
+  it('a hung read cannot wedge the source forever', async () => {
+    // ⚠️ The risk coalescing introduces. `requestForegroundPermissionsAsync`
+    // waits on a human and `getCurrentPositionAsync` can hang indoors, so a
+    // shared promise with no expiry would leave every consumer — and
+    // refreshLocation() — holding a dead promise for the rest of the session.
+    mockGetForegroundPermissionsAsync.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => useCurrentLocation());
+    expect(result.current.isLoading).toBe(true);
+
+    // Move the clock past the coalesce window. `Date.now` is spied rather than
+    // faked with timers: the assertion has to await a real promise, and fake
+    // timers would either hold that promise up or revert the clock before it
+    // settled.
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 6_000);
+
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    try {
+      await act(async () => {
+        await result.current.refreshLocation();
+      });
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    expect(result.current.location).toEqual({ lat: 44.43, lon: 26.1 });
   });
 });

@@ -23,6 +23,7 @@ import React, { useCallback, useState } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 
 import {
+  SHARE_TRIM_METERS,
   buildShareCaption,
   mapboxStaticImageUrl,
   trimShareGeometry,
@@ -72,7 +73,7 @@ export interface UseShareRideReturn {
 // Constants
 // ---------------------------------------------------------------------------
 
-const PRIVACY_TRIM_METERS = 200;
+const PRIVACY_TRIM_METERS = SHARE_TRIM_METERS;
 const CAPTURE_SIZE = 1080;
 // The card's map region is 1080 wide × 560 tall. Request matching pixels
 // @2x for retina crispness (Mapbox Static Images accepts 2160×1120).

@@ -100,9 +100,41 @@ export const pickGpxFile = async (): Promise<PickGpxResult> => {
   }
 };
 
-/** Read a picked file's text. Returns `null` on any failure. */
+/**
+ * Largest GPX we will read into memory, in bytes.
+ *
+ * A real course is small: a 4-hour ride recorded at 1 Hz is ~14,000 points,
+ * which is a couple of MB of XML at most. 20 MB is therefore generous for every
+ * legitimate file while still bounded — the point is that the SIZE IS CHECKED,
+ * because this reads a file the rider picked from anywhere on the device or from
+ * a cloud provider, straight into a JavaScript string.
+ */
+const MAX_GPX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * Read a picked file's text. Returns `null` on any failure.
+ *
+ * ⚠️ The size is checked BEFORE the read. `readAsStringAsync` materialises the
+ * whole file as one string, so an oversized pick (a mis-tapped video, a database
+ * dump, a zip bomb's expansion) was an out-of-memory crash rather than an error
+ * the screen could show — and this is a `content://` URI from an arbitrary
+ * provider, so nothing upstream had bounded it.
+ *
+ * An over-cap file returns `null`, which `course-import.tsx` renders as its
+ * generic `course.errorRead`. That is deliberately not a new dedicated message:
+ * "we could not read this file" is true, and it avoids three locales of copy for
+ * a case a real course never hits.
+ */
 export const readGpxFile = async (uri: string): Promise<string | null> => {
   try {
+    const info = await FileSystem.getInfoAsync(uri);
+    // The type says `size` is always present when the file exists, but this is a
+    // `content://` URI from an arbitrary provider, so the runtime guard stays:
+    // an UNKNOWN size is not a reason to refuse a file that is probably fine.
+    // Only a size we positively know is too big stops the read.
+    if (info.exists && typeof info.size === 'number' && info.size > MAX_GPX_BYTES) {
+      return null;
+    }
     return await FileSystem.readAsStringAsync(uri);
   } catch {
     return null;

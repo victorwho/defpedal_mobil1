@@ -53,7 +53,30 @@ export interface TrimEndpointsResult {
   readonly fullLengthMeters: number;
 }
 
-const DEFAULT_TRIM_METERS = 200;
+/**
+ * Metres trimmed from EACH end of a shared route to protect the rider's
+ * start and finish.
+ *
+ * ⚠️ THE single definition. It was written out as a literal `200` in six
+ * places — two in core, two in the API, two in the app — including a `400`
+ * derived by hand on the route-preview screen to decide whether the privacy
+ * toggle is even offered. That is error-log #20's shape exactly: a shared
+ * definition re-declared at its call sites, where changing the rule means
+ * finding every copy and nothing fails if you miss one. Import it; never
+ * retype it.
+ */
+export const SHARE_TRIM_METERS = 200;
+
+/**
+ * Shortest route worth trimming. Below this, removing `SHARE_TRIM_METERS` from
+ * both ends leaves either nothing or a stub that protects nobody, so the
+ * privacy toggle is disabled and `shortRouteFallback` is set instead.
+ *
+ * Derived, not restated, so the two can never disagree.
+ */
+export const SHARE_MIN_TRIMMABLE_METERS = SHARE_TRIM_METERS * 2;
+
+const DEFAULT_TRIM_METERS = SHARE_TRIM_METERS;
 
 export function trimEndpointsForShare(
   polyline: string,

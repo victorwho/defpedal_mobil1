@@ -209,7 +209,6 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
     // We intentionally depend on `input` as a whole — the caller is expected
     // to memoize inputs upstream (or accept that `label` re-computes when
     // props change, which is cheap — just string concatenation).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       t,
       units,

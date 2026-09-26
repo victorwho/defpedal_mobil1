@@ -1,6 +1,6 @@
 import type { RiskSegment } from '@defensivepedal/core';
 import type { MeasurementSystem } from '@defensivepedal/core';
-import { describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
+import { SHARE_MIN_TRIMMABLE_METERS, describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -474,11 +474,12 @@ function RoutePreviewScreen() {
   const [shareOptionsVisible, setShareOptionsVisible] = useState(false);
   const [shareHideEndpoints, setShareHideEndpoints] = useState(true);
 
-  // 400m safeguard threshold (PRD: 2 × 200m trim). Disables the toggle
-  // when trimming would produce an empty / degenerate polyline.
-  const SHORT_ROUTE_THRESHOLD_METERS = 400;
+  // Disables the privacy toggle when trimming would leave an empty or
+  // degenerate polyline. The threshold comes from core — it used to be a local
+  // `400` derived by hand from a `200` defined somewhere else entirely, so the
+  // screen could silently disagree with the trim it was describing.
   const shareShortRouteFallback =
-    (selectedRoute?.distanceMeters ?? 0) < SHORT_ROUTE_THRESHOLD_METERS;
+    (selectedRoute?.distanceMeters ?? 0) < SHARE_MIN_TRIMMABLE_METERS;
 
   const handleSharePress = useCallback(() => {
     if (!selectedRoute || !routeRequest) return;

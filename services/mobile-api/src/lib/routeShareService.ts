@@ -14,6 +14,7 @@
  */
 
 import {
+  SHARE_TRIM_METERS,
   decodePolyline,
   downsampleCoordinates,
   encodePolyline,
@@ -287,7 +288,7 @@ const computeRiskColorIndexes = async (
 
 const computeTrimmedPolyline6 = (fullPolyline6: string): string => {
   const lonLatPoints = decodePolyline(fullPolyline6) as [number, number][];
-  const trimmed = trimPrivacyZone(lonLatPoints, 200);
+  const trimmed = trimPrivacyZone(lonLatPoints, SHARE_TRIM_METERS);
   return encodePolyline(trimmed);
 };
 
@@ -402,6 +403,31 @@ export const createRouteShareService = (
       computeTrimmedEndpoints(trimmedPolyline);
 
     /*
+     * Whether the endpoints are ACTUALLY hidden is an observation, not the
+     * client's word for it.
+     *
+     * `trimPrivacyZone` returns the polyline UNCHANGED for a route shorter than
+     * `SHARE_MIN_TRIMMABLE_METERS` — there is nothing left to show if you remove
+     * 200 m from each end of a 300 m ride. So on a short route every "trimmed"
+     * key silently held the untrimmed value, `hide_endpoints` was still stored
+     * from `request.hideEndpoints`, and the public page reported
+     * `endpointsHidden: true` over the rider's real start and finish. The
+     * promise was in the flag; the privacy was not in the data.
+     *
+     * Deriving it here means the flag can only ever claim what the payload can
+     * back up. A short route now shares honestly as untrimmed — which is also
+     * what the app's own UI expects, since it disables the privacy toggle below
+     * that threshold (`shareShortRouteFallback`).
+     *
+     * ⚠️ Set UNCONDITIONALLY, not just when the client sent the field:
+     * `route_shares.hide_endpoints` DEFAULTS TO TRUE, so leaving it out on a
+     * short route would reintroduce exactly this mismatch via the default.
+     */
+    const endpointsActuallyTrimmed = trimmedPolyline !== fullPolyline;
+    const effectiveHideEndpoints =
+      (request.hideEndpoints ?? true) && endpointsActuallyTrimmed;
+
+    /*
      * Risk colouring for the public /r/<code> page.
      *
      * Computed HERE, server-side, rather than sent by the client — and that is
@@ -468,9 +494,7 @@ export const createRouteShareService = (
       payload,
       short_code: code,
     };
-    if (request.hideEndpoints !== undefined) {
-      insertRow.hide_endpoints = request.hideEndpoints;
-    }
+    insertRow.hide_endpoints = effectiveHideEndpoints;
 
     const { data, error } = await supabase
       .from('route_shares')

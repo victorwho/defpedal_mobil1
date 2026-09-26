@@ -793,19 +793,20 @@ export const en = {
   },
 
   // ── Onboarding analytics consent ──
+  // Remnant of the onboarding consent screen, which was DELETED on 2026-07-16
+  // (telemetry moved to a first-screen transparency notice plus Profile >
+  // Privacy & analytics). Only the riding-tips strings survive, because
+  // `profile.tsx` renders its "Riding tips & reminders" row from them; the block
+  // keeps its old name so that call site stays valid.
+  //
+  // The rest of the block was deleted rather than corrected: it described
+  // analytics as "off by default and opt-in", which stopped being true when the
+  // default flipped to ON on 2026-07-19. Live copy for that lives in
+  // `privacyAnalytics` below. Dead copy that contradicts shipped behaviour is
+  // worse than no copy — it reads as documentation.
   onboardingConsent: {
-    eyebrow: 'Defensive Pedal',
-    title: 'Help us improve, on your terms',
-    subtitle: 'Crash reports are on by default — they help us fix bugs faster. Product analytics is off by default and opt-in.',
-    crashLabel: 'Share crash reports',
-    crashDescription: 'On by default. Stack traces and device info when the app crashes — no location, no personal data. Helps us fix bugs faster. You can turn this off anytime.',
-    analyticsLabel: 'Share product analytics',
-    analyticsDescription: 'Off by default. Anonymous usage events so we can ship the right features. No location tracking. Turn on if you\'d like to help shape the roadmap.',
     ridingTipsLabel: 'Riding tips & reminders',
     ridingTipsDescription: 'Occasional notifications to help you start riding safely. You can turn this off anytime.',
-    assurance: 'You\'re in control.',
-    continue: 'Continue',
-    changeLater: 'You can change these anytime in Profile → Privacy & analytics.',
   },
 
   // ── Privacy & Analytics settings screen ──

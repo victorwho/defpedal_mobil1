@@ -8,7 +8,7 @@
  * - XP award (award_ride_xp result processing) → tier_up
  */
 
-import { trimPolylineEndpoints } from '@defensivepedal/core';
+import { SHARE_TRIM_METERS, trimPolylineEndpoints } from '@defensivepedal/core';
 
 import { parseGeographyPoint } from './nudges/userLocation';
 import { supabaseAdmin } from './supabaseAdmin';
@@ -184,6 +184,41 @@ const getShareableLocation = async (userId: string): Promise<string | null> => {
 export const autoPublishRide = async (params: AutoPublishRideParams): Promise<string | null> => {
   if (!supabaseAdmin) return null;
 
+  // One ride, one feed card.
+  //
+  // ⚠️ This was a plain INSERT keyed by nothing, and the triage plan ranked it
+  // "plausible but not demonstrated in production". It was demonstrated:
+  // measured 2026-09-26, 21 duplicate (user_id, tripId) groups holding 141
+  // EXCESS cards against 396 ride cards in total — 36% of the feed was
+  // duplicates. Two distinct patterns, and this check covers both: fast retries
+  // (spans of 0.2-5 s) and much later re-posts (spans of hours to days, which no
+  // transport-level retry explains). One account alone held 116 copies of a
+  // single ride, 82% of the excess.
+  //
+  // ⚠️ This NARROWS the window rather than closing it — two genuinely
+  // concurrent publishes can still both miss, and the 0.2 s pair suggests
+  // near-simultaneous delivery does happen. The airtight fix is a unique index
+  // on (user_id, (payload->>'tripId')) WHERE type = 'ride', which cannot be
+  // created until the 141 existing duplicates are removed; that deletes
+  // rider-visible cards and cascades their reactions, so it is a decision to
+  // take deliberately rather than a side effect of this repair.
+  // Guarded on a non-null tripId: the field is nullable on this type, and
+  // `.eq(..., null)` would compare against the literal string rather than mean
+  // "no trip". A card with no tripId is not identifiable, so it cannot be
+  // deduplicated and must not be suppressed by a bad match either.
+  if (params.tripId) {
+    const { data: existing } = await supabaseAdmin
+      .from('activity_feed')
+      .select('id')
+      .eq('user_id', params.userId)
+      .eq('type', 'ride')
+      .eq('payload->>tripId', params.tripId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) return (existing as { id: string }).id;
+  }
+
   const profile = await getUserProfile(params.userId);
   if (!profile) return null;
 
@@ -198,7 +233,7 @@ export const autoPublishRide = async (params: AutoPublishRideParams): Promise<st
 
   // Apply endpoint trimming if enabled
   const polyline = profile.trim_route_endpoints
-    ? trimPolylineEndpoints(params.geometryPolyline6, 200)
+    ? trimPolylineEndpoints(params.geometryPolyline6, SHARE_TRIM_METERS)
     : params.geometryPolyline6;
 
   const payload = {

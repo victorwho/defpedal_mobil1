@@ -97,6 +97,21 @@ const shortPolyline = encodePolyline([
   [26.1035, 44.4278],
 ]);
 
+/**
+ * A route long enough for the privacy trim to actually do something.
+ *
+ * ⚠️ `shortPolyline` above is ~140 m end to end, which is BELOW
+ * `SHARE_MIN_TRIMMABLE_METERS` — so `trimPrivacyZone` returns it unchanged and
+ * the endpoints cannot be hidden at all. Any test asserting hidden endpoints has
+ * to use this one, or it is asserting a promise the data cannot keep.
+ * ~0.05 degrees of latitude is ~5.5 km.
+ */
+const trimmablePolyline = encodePolyline([
+  [26.1025, 44.4268],
+  [26.1025, 44.4518],
+  [26.1025, 44.4768],
+]);
+
 const validCreateRequest: RouteShareCreateRequest = {
   source: 'planned',
   route: {
@@ -504,17 +519,62 @@ describe('routeShareService.createShare', () => {
     const service = createRouteShareService({ supabase, randomSource: det });
     await service.createShare({
       userId: 'user-1',
-      request: { ...validCreateRequest, hideEndpoints: true },
+      request: {
+        ...validCreateRequest,
+        hideEndpoints: true,
+        route: { ...validCreateRequest.route, geometryPolyline6: trimmablePolyline },
+      },
     });
 
     const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(firstCall.hide_endpoints).toBe(true);
   });
 
-  it('slice 6: omits hide_endpoints from the insert when caller does not specify (column default applies)', async () => {
-    // Backward-compat: every slice-1 caller omitted the flag. The service
-    // should let the DB default (true) apply — NOT inject hide_endpoints=true
-    // explicitly, so DB-side default changes remain authoritative.
+  it('stores hide_endpoints=false when the route is too SHORT to trim, whatever the caller asked', async () => {
+    // The flag may only claim what the payload can back up. `trimPrivacyZone`
+    // returns a sub-400 m route unchanged, so every "trimmed" key holds the
+    // untrimmed value — and storing `true` here made the public page report
+    // `endpointsHidden: true` over the rider's real start and finish.
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({
+      userId: 'user-1',
+      // shortPolyline, and the caller explicitly asking for privacy.
+      request: { ...validCreateRequest, hideEndpoints: true },
+    });
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall.hide_endpoints).toBe(false);
+  });
+
+  it('writes hide_endpoints EXPLICITLY when the caller omits it, rather than leaning on the DB default', async () => {
+    // ⚠️ This deliberately reverses the original expectation, which was that the
+    // service should stay silent and "let DB-side default changes remain
+    // authoritative". Leaning on that default is precisely how a short route
+    // became `hide_endpoints = true` with untrimmed data underneath it: the
+    // column defaults to TRUE, so omitting the field asserts privacy for a
+    // payload that has none. The flag has to be derived from what was actually
+    // trimmed, which means always writing it.
     const insertSpy = vi.fn(() => ({
       select: vi.fn(() => ({
         single: vi.fn(async () => ({
@@ -543,7 +603,46 @@ describe('routeShareService.createShare', () => {
     });
 
     const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(firstCall).not.toHaveProperty('hide_endpoints');
+    // Present, and false, because `validCreateRequest` carries `shortPolyline`.
+    expect(firstCall).toHaveProperty('hide_endpoints');
+    expect(firstCall.hide_endpoints).toBe(false);
+  });
+
+  it('defaults an omitted hideEndpoints to hidden on a route that CAN be trimmed', async () => {
+    // The other half: omitting the flag still means "hide", which is the
+    // product default — it just cannot survive a route with nothing to trim.
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 0, error: null })),
+        })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({
+      userId: 'user-1',
+      request: {
+        ...validCreateRequest,
+        route: { ...validCreateRequest.route, geometryPolyline6: trimmablePolyline },
+      },
+    });
+
+    const firstCall = insertSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(firstCall.hide_endpoints).toBe(true);
   });
 
   it('passes through riskSegments + safetyScore to the stored payload', async () => {

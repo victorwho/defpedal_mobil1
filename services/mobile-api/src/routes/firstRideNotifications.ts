@@ -91,13 +91,28 @@ export const buildFirstRideNotificationRoutes = (
         // Before this gate the query's notify_mia=true default (TRUE for every
         // profile) silently included all anonymous users — 285 consent-less
         // sends had gone out by 2026-07-16.
+        // ⚠️ MEASURED 2026-09-26: 899 candidates against this cap of 1000 — 90%
+        // of it, not the ~687 recorded when the cap was written. It is not
+        // truncating yet, but it is close, and the alert below is now what makes
+        // crossing it visible. Deliberately NOT raised in the same change: the
+        // per-candidate evaluation cost has not been measured, and this is the
+        // job that spent 8+ days returning 504 by doing too much per run
+        // (error-log #82). Raise it with a measurement, not a guess.
         const CANDIDATE_LIMIT = 1000;
         const runCandidateQuery = async (columns: string) => {
           let candidateQuery = db.from('profiles').select(columns).eq('notify_mia', true);
           candidateQuery = isAnonPushEnabled()
             ? candidateQuery.or('is_anonymous.eq.false,notify_riding_tips.eq.true')
             : candidateQuery.eq('is_anonymous', false);
-          return candidateQuery.limit(CANDIDATE_LIMIT);
+          // An unordered LIMIT leaves the window to the planner, so consecutive
+          // runs could evaluate different arbitrary subsets and a rider could
+          // sit outside every one of them indefinitely. DESCENDING is the
+          // deliberate direction: three of the four templates here
+          // (first_ride_nudge, post_first_ride, weather_invitation) are aimed at
+          // recent signups, so if the cap is ever hit the rows that must survive
+          // are the NEWEST. Ascending would have systematically dropped exactly
+          // the cohort this cron exists for.
+          return candidateQuery.order('created_at', { ascending: false }).limit(CANDIDATE_LIMIT);
         };
 
         let { data: profileRows, error: queryError } = await runCandidateQuery(
@@ -113,8 +128,14 @@ export const buildFirstRideNotificationRoutes = (
 
         if ((profileRows?.length ?? 0) >= CANDIDATE_LIMIT) {
           // PostgREST caps unpaginated reads — hitting the limit means users
-          // beyond row 1000 silently never get evaluated. Surface it loudly.
-          request.log.warn(
+          // beyond row 1000 silently never get evaluated.
+          //
+          // ⚠️ `error`, not `warn`. The GCP log-based alert policy fires on
+          // `severity >= ERROR`, so at warn level this "surface it loudly" was
+          // surfacing to nobody — it would have sat in the logs unread while the
+          // tail of the fleet went unevaluated. `nudges.ts` made the same call
+          // correctly in `reportIfTruncated`; this is the copy that drifted.
+          request.log.error(
             { event: 'firstride_candidate_limit_hit', limit: CANDIDATE_LIMIT },
             'first-ride candidate query hit its row limit — tail users skipped',
           );

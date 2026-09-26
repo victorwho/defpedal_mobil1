@@ -271,8 +271,9 @@ describe("POST /v1/leaderboard/settle", () => {
     expect(res.statusCode).toBe(401); await app.close();
   });
   it("returns 200 with correct shape and counts snapshots created", async () => {
-    // Combo 1 (weekly co2): new period, 2 rows (rank 1 and rank 2)
-    enqueueResult({ data: null, count: 0, error: null });    // idempotency check: no existing
+    // Combo 1 (weekly co2): 2 rows (rank 1 and rank 2).
+    // No idempotency count read any more — a settled rank is rejected by the
+    // UNIQUE index per row instead (migration 202609260004).
     enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2")], count: null, error: null }); // lb rpc
     // rank 1 row: snap + xp + badge + repeat-champion check
     enqueueResult({ data: null, count: null, error: null }); // snap insert
@@ -282,9 +283,8 @@ describe("POST /v1/leaderboard/settle", () => {
     // rank 2 row: snap + xp only
     enqueueResult({ data: null, count: null, error: null }); // snap insert
     enqueueResult({ data: null, count: null, error: null }); // award_xp
-    // Combos 2-4: idempotency=0, empty leaderboard
+    // Combos 2-4: empty leaderboard
     for (let i = 0; i < 3; i++) {
-      enqueueResult({ data: null, count: 0, error: null });
       enqueueResult({ data: [], count: null, error: null });
     }
     const app = buildTestApp(); await app.ready();
@@ -296,25 +296,52 @@ describe("POST /v1/leaderboard/settle", () => {
     expect(typeof body.xpAwarded).toBe("number");
     await app.close();
   });
-  it("skips all combos when snapshots already exist (idempotency fix verified)", async () => {
-    // All 4 combos return count > 0 meaning snapshots exist: handler must skip
-    // This test verifies the CRITICAL fix: using count not data.length
-    for (let i = 0; i < 4; i++) {
-      enqueueResult({ data: null, count: 5, error: null });
-    }
+  it("awards nothing for a rank that is already settled (23505), and still succeeds", async () => {
+    // Replaces the old count-read idempotency test. The count read was a
+    // check-then-write: the weekly and monthly settle crons hit this same
+    // endpoint and the handler loops over both periods, so a 1st-of-month
+    // Monday raced all four combinations and the duplicate snapshot inserted
+    // cleanly — awarding XP twice. Rejection now happens per row, at the
+    // UNIQUE (period_type, metric, period_end, user_id) index.
+    enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2")], count: null, error: null }); // lb rpc
+    enqueueResult({ data: null, count: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } });
+    enqueueResult({ data: null, count: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } });
+    for (let i = 0; i < 3; i++) enqueueResult({ data: [], count: null, error: null });
+
     const app = buildTestApp(); await app.ready();
     const res = await app.inject({ method: "POST", url: "/v1/leaderboard/settle", headers: cronHeaders });
+
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.ok).toBe(true);
+    // Nothing counted, and — the point of the fix — no XP awarded. A duplicate
+    // insert used to succeed, so award_xp ran a second time for the same rank.
     expect(body.snapshotsCreated).toBe(0);
     expect(body.xpAwarded).toBe(0);
     await app.close();
   });
 
+  it("settles the ranks a truncated run missed instead of skipping the period", async () => {
+    // The opposite failure of the old guard: a run that died part-way left
+    // count > 0, so the NEXT run skipped the whole period and ranks 20-50 never
+    // settled at all — while the endpoint still answered {ok:true}. Here rank 1
+    // is already settled and rank 2 is not; rank 2 must go through.
+    enqueueResult({ data: [makeRow(1, "u1"), makeRow(2, "u2")], count: null, error: null }); // lb rpc
+    enqueueResult({ data: null, count: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } }); // rank 1 already settled
+    enqueueResult({ data: null, count: null, error: null }); // rank 2 snapshot inserts
+    enqueueResult({ data: null, count: null, error: null }); // rank 2 award_xp
+    for (let i = 0; i < 3; i++) enqueueResult({ data: [], count: null, error: null });
+
+    const app = buildTestApp(); await app.ready();
+    const res = await app.inject({ method: "POST", url: "/v1/leaderboard/settle", headers: cronHeaders });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().snapshotsCreated).toBe(1);
+    await app.close();
+  });
+
   it("returns snapshotsCreated=0 when all leaderboards return empty rows", async () => {
     for (let i = 0; i < 4; i++) {
-      enqueueResult({ data: null, count: 0, error: null });
       enqueueResult({ data: [], count: null, error: null });
     }
     const app = buildTestApp(); await app.ready();

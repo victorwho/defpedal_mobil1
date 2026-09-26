@@ -132,7 +132,15 @@ export const useForegroundNavigationLocation = (
         void persistNavigationLocationSample(toNavigationSample(initialPosition));
         setIsLoading(false);
 
-        subscription = await Location.watchPositionAsync(
+        // ⚠️ Assigned via a local, then re-checked. Writing straight to
+        // `subscription` leaks the watch whenever the effect is torn down DURING
+        // this await: cleanup runs while the variable is still null, so
+        // `subscription?.remove()` removes nothing, and the watch that resolves a
+        // moment later is held by a closure nobody will ever call again — a GPS
+        // subscription live for the rest of the process, draining battery outside
+        // any ride. The window is small but it is exactly the fast
+        // mount/unmount a screen transition produces.
+        const nextSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.BestForNavigation,
             distanceInterval: 5,
@@ -151,6 +159,13 @@ export const useForegroundNavigationLocation = (
             setIsLoading(false);
           },
         );
+
+        if (!isMounted) {
+          nextSubscription.remove();
+          return;
+        }
+
+        subscription = nextSubscription;
       } catch (locationError) {
         if (!isMounted) {
           return;

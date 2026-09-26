@@ -1,29 +1,62 @@
+# Cloud Build for the mobile API image.
+#
+# ⚠️ Every build now carries an IMMUTABLE tag alongside `:latest`.
+#
+# `:latest` is a moving pointer. Two sessions building in the same window both
+# push it and the second silently overwrites the first — which is exactly how
+# error-log #96 happened: two parallel deploys, `POST /v1/sesizari` 404-ing in
+# production, and a git history that stayed linear and conflict-free throughout.
+# `gcloud builds submit` uploads the WORKING DIRECTORY with no git awareness at
+# all, so nothing upstream of here can tell two builds apart.
+#
+# `build-$BUILD_ID` gives every build a name that cannot be taken from it.
+# Deploy by DIGEST for the actual guarantee:
+#
+#   IMG=europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api
+#   DIGEST=$(gcloud artifacts docker images describe "$IMG:latest" \
+#             --format='value(image_summary.digest)' \
+#             --project gen-lang-client-0895796477)
+#   gcloud run deploy defpedal-api --image "$IMG@$DIGEST" \
+#     --region europe-central2 --platform managed --allow-unauthenticated \
+#     --project gen-lang-client-0895796477
+#
+# A digest names one set of bytes, so a revision deployed that way cannot be
+# quietly repointed by someone else's build. CLAUDE.md's "digest-verified"
+# deploys describe a human doing that by hand; the immutable tag is what makes
+# the same claim checkable AFTERWARDS rather than merely careful at the time.
+#
+# ⚠️ Deliberately no `$SHORT_SHA` and no bash. `$SHORT_SHA` is populated only
+# for trigger-based builds, and an unmatched substitution fails the whole build
+# rather than resolving to empty — every deploy here is a manual
+# `gcloud builds submit`. And inside a `bash -c` body Cloud Build substitutes
+# `$VAR` BEFORE the shell sees it, so a shell variable has to be written `$$VAR`;
+# using none at all removes that trap entirely. `$BUILD_ID` is a built-in and is
+# always set.
+substitutions:
+  _IMAGE: 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api'
+
 steps:
   - name: 'gcr.io/cloud-builders/docker'
+    id: 'build'
     args:
       - 'build'
       - '-t'
-      - 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest'
+      - '${_IMAGE}:build-$BUILD_ID'
+      - '-t'
+      - '${_IMAGE}:latest'
       - '-f'
       - 'services/mobile-api/Dockerfile'
       - '.'
-  # Uncomment the step below to auto-deploy to Cloud Run after build.
-  # Without this, you must manually run:
-  #   gcloud run deploy defpedal-api --image europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest --region europe-central2 --platform managed --allow-unauthenticated
-  #
-  # - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-  #   entrypoint: gcloud
-  #   args:
-  #     - 'run'
-  #     - 'deploy'
-  #     - 'defpedal-api'
-  #     - '--image'
-  #     - 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest'
-  #     - '--region'
-  #     - 'europe-central2'
-  #     - '--platform'
-  #     - 'managed'
-  #     - '--allow-unauthenticated'
+
+# Both tags are pushed by Cloud Build itself. They point at the same image, so
+# `:latest` stays the convenient handle while `build-<id>` is the one that can
+# still identify this build after someone else has pushed.
 images:
-  - 'europe-central2-docker.pkg.dev/gen-lang-client-0895796477/defpedal-api/mobile-api:latest'
+  - '${_IMAGE}:build-$BUILD_ID'
+  - '${_IMAGE}:latest'
+
+# Auto-deploy stays OFF, deliberately. A build is not a release: the API is
+# deployed by hand after confirming `HEAD == origin/main`, and wiring a deploy in
+# here would remove the one human gate that catches a build submitted from the
+# wrong working directory (error-log #96 again).
 timeout: '600s'

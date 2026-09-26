@@ -1,0 +1,31 @@
+-- P2 · `leaderboard_snapshots` had no unique key, so its settle cron guarded
+-- itself with a count read — which fails in both directions.
+--
+-- `POST /v1/leaderboard/settle` checks "does a snapshot already exist for this
+-- period?" and skips if so. That guard is a check-then-write, and the
+-- concurrency it has to survive is SCHEDULED: `leaderboard-settle-weekly` and
+-- `-monthly` hit the same endpoint, and the handler loops over BOTH periods, so
+-- any 1st-of-month Monday (~1.7x a year) races all four period/metric
+-- combinations against each other. When it loses, the duplicate snapshot
+-- INSERT SUCCEEDS — nothing rejects it — and `award_xp` fires a second time.
+-- (`award_xp` does pass a `p_source_id`, but it does not enforce one and
+-- `xp_events` has no unique index; closing that was declined by the product
+-- owner on 2026-09-25, so this table is where the duplication has to be stopped.)
+--
+-- The opposite failure shares the same guard: a run truncated part-way leaves
+-- `count > 0`, so the NEXT run skips the period entirely and ranks 20-50 never
+-- settle at all — while the endpoint still answers `{ok:true}`.
+--
+-- The unique key fixes both. A duplicate insert now raises 23505, which the
+-- handler already treats as "skip this row, award nothing", and because a
+-- duplicate is harmless the cron no longer needs to skip a whole period up
+-- front — so a truncated run RESUMES and fills in the ranks it missed.
+--
+-- ⚠️ `idx_leaderboard_period_metric` (202604140001:12-29) is NOT unique and is
+-- not a substitute; it exists for lookup. Verified before creating this one:
+-- 141 rows, 0 duplicate (period_type, metric, period_end, user_id) groups — so
+-- the race has never actually fired, and this is a latent defect being closed
+-- rather than damage being repaired. Nothing needs cleaning up first.
+
+CREATE UNIQUE INDEX IF NOT EXISTS leaderboard_snapshots_period_metric_user_key
+  ON public.leaderboard_snapshots (period_type, metric, period_end, user_id);

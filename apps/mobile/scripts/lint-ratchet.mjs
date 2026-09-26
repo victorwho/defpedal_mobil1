@@ -61,7 +61,7 @@ if (!eslintEntry) {
 
 const result = spawnSync(
   process.execPath,
-  [eslintEntry, '--format=json', '--ext=.ts,.tsx', 'app'],
+  [eslintEntry, '--format=json', '--ext=.ts,.tsx', 'app', 'src'],
   {
     cwd: root,
     encoding: 'utf8',

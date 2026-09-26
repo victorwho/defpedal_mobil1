@@ -5,9 +5,21 @@
  *   Enforce the design-system token rules in screen code. Specifically: no raw hex
  *   colours and no inline rgba()/rgb() values inside `apps/mobile/app/**`.
  *
- * This config is intentionally minimal — it is NOT a general RN/TS lint sweep.
- * Broader lint passes (react-hooks, react-native, import order) can be layered on
- * later without touching the color rules here.
+ * Extended 2026-09-26 (triage P2) to cover `src/**` as well, which had NO lint at
+ * all. It is still not a general RN/TS sweep — react-native and import-order
+ * passes can be layered on later without touching the colour rules here.
+ *
+ * ⚠️ Registering `@typescript-eslint` is load-bearing, not decoration. `src/**`
+ * already contains 22 `eslint-disable` comments naming `@typescript-eslint/*`
+ * rules — mostly `no-require-imports` on the lazy `require()` calls this codebase
+ * MANDATES for native modules (error-log #2b/#21b). With no plugin registered
+ * those comments referred to rules that did not exist, so ESLint reported each
+ * one as an error and the intent they documented was inert. That is error-log
+ * #35 from the other direction: #35 is about writing a directive for a rule you
+ * do not ship; this is about shipping code full of directives and then widening
+ * the lint scope onto them. The plugin is declared in `package.json` rather than
+ * borrowed from `apps/web`'s `eslint-config-next` transitive, which is where it
+ * happened to be resolving from (error #22b).
  *
  * See: docs/design-context.md §2 (Token rules) and §5 (Lint rules).
  */
@@ -24,6 +36,7 @@ const rgbaMessage =
 module.exports = {
   root: true,
   parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
@@ -45,7 +58,13 @@ module.exports = {
     '**/*.test.ts',
     '**/*.test.tsx',
   ],
-  rules: {},
+  rules: {
+    // Applies to app/** AND src/**. MEASURED before enabling: zero violations
+    // across all 539 files, so this locks in a property the codebase already
+    // has rather than opening a cleanup. `null: 'ignore'` keeps the idiomatic
+    // `x == null` null-and-undefined check, which is used deliberately here.
+    eqeqeq: ['error', 'always', { null: 'ignore' }],
+  },
   overrides: [
     // -------------------------------------------------------------------------
     // Screen code — hex + rgba() banned + Toggle atom must go through SettingRow
