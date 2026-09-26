@@ -1,4 +1,4 @@
-import type { Coordinate, HazardType, NearbyHazard, RouteOption } from '@defensivepedal/core';
+import type { Coordinate, HazardType, NearbyHazard, RiskSegment, RouteOption } from '@defensivepedal/core';
 import type { BicycleParkingLocation } from '../../lib/bicycle-parking';
 import type { BicycleRentalLocation } from '../../lib/bicycle-rental';
 import type { BikeShopLocation } from '../../lib/bicycle-shops';
@@ -75,6 +75,13 @@ export type RouteMapProps = {
   plannedRouteCoordinates?: readonly [number, number][];
   /** Color for the planned route line (default: green) */
   plannedRouteColor?: string;
+  /**
+   * Risk-scored stretches of the planned route (historical trips). When
+   * non-empty these REPLACE the flat `plannedRouteColor` line. Empty is a
+   * supported state — no coverage, or the fetch failed — and keeps the flat
+   * line rather than inventing a colour.
+   */
+  plannedRouteRiskSegments?: readonly RiskSegment[];
   /** Called when user taps the map (used for hazard placement) */
   onMapTap?: (coordinate: Coordinate) => void;
   /** Called when user long-presses the map (used for armchair hazard reporting) */

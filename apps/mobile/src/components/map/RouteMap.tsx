@@ -93,6 +93,7 @@ export const RouteMap = ({
   trailCoordinates,
   plannedRouteCoordinates,
   plannedRouteColor = safetyColors.safe,
+  plannedRouteRiskSegments,
   onMapTap,
   onMapLongPress,
   crosshairMode = null,
@@ -135,6 +136,7 @@ export const RouteMap = ({
     hazardZoneFeatureCollection,
     trailFeatureCollection,
     plannedRouteFeatureCollection,
+    plannedRouteRiskCollection,
     markerFeatureCollection,
     offRouteFeatureCollection,
   } = useFeatureCollections({
@@ -153,6 +155,7 @@ export const RouteMap = ({
     nearbyHazards,
     trailCoordinates,
     plannedRouteCoordinates,
+    plannedRouteRiskSegments,
   });
 
   const cameraCoordinate = useCameraConfig({
@@ -343,6 +346,7 @@ export const RouteMap = ({
           trailFeatureCollection={trailFeatureCollection}
           plannedRouteFeatureCollection={plannedRouteFeatureCollection}
           plannedRouteColor={plannedRouteColor}
+          plannedRouteRiskCollection={plannedRouteRiskCollection}
           historyTrails={historyTrails}
         />
 

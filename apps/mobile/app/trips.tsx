@@ -5,7 +5,7 @@ import {
   decodePolyline,
 } from '@defensivepedal/core';
 import { router, useFocusEffect } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -27,6 +27,7 @@ import { mobileApi } from '../src/lib/api';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useShareRide } from '../src/hooks/useShareRide';
+import { resolveTripShareRiskSegments } from '../src/hooks/useTripRiskSegments';
 import { useT } from '../src/hooks/useTranslation';
 
 function TripsScreen() {
@@ -37,6 +38,7 @@ function TripsScreen() {
   const [compareMode, setCompareMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const shareRide = useShareRide();
+  const queryClient = useQueryClient();
 
   const handleShareTrip = useCallback((trip: TripHistoryItem) => {
     // Prefer GPS trail; fall back to planned route polyline for trips that
@@ -66,14 +68,29 @@ function TripsScreen() {
         )
       : 0;
 
-    void shareRide.share({
-      coords,
-      distanceKm,
-      durationMinutes,
-      co2SavedKg: calculateCo2SavedKg(distanceMeters),
-      dateIso: trip.startedAt,
-    });
-  }, [shareRide]);
+    // Risk colouring for the shared image. Without this the static map fell
+    // back to its single DEFAULT_ROUTE_COLOR line — the "homogenous orange"
+    // reported from the device on preview 0.2.174. Resolved through the same
+    // cached query the trip map uses, so opening a trip and then sharing it
+    // costs one request rather than two. Fails soft: undefined keeps the plain
+    // line, which is also the honest result outside the covered countries.
+    void (async () => {
+      const riskSegments = await resolveTripShareRiskSegments(
+        queryClient,
+        trip.id,
+        coords,
+      );
+
+      await shareRide.share({
+        coords,
+        riskSegments,
+        distanceKm,
+        durationMinutes,
+        co2SavedKg: calculateCo2SavedKg(distanceMeters),
+        dateIso: trip.startedAt,
+      });
+    })();
+  }, [shareRide, queryClient]);
 
   const { data: trips, isLoading, error, refetch } = useQuery({
     queryKey: ['trip-history'],

@@ -11,7 +11,7 @@ import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { StatsDashboard } from '../src/components/StatsDashboard';
 import { BrandLogo } from '../src/components/BrandLogo';
@@ -31,6 +31,7 @@ import { handleTabPress } from '../src/lib/navigation-helpers';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
 import { useShareRide } from '../src/hooks/useShareRide';
+import { resolveTripShareRiskSegments } from '../src/hooks/useTripRiskSegments';
 import { Toast } from '../src/design-system/molecules/Toast';
 
 // ---------------------------------------------------------------------------
@@ -124,6 +125,7 @@ export default function HistoryScreen() {
   }, []);
 
   const shareRide = useShareRide();
+  const queryClient = useQueryClient();
 
   const handleShareTrip = useCallback((trip: TripHistoryItem) => {
     // Same data-shape extraction as trips.tsx — prefer GPS trail, fall back
@@ -153,14 +155,29 @@ export default function HistoryScreen() {
         )
       : 0;
 
-    void shareRide.share({
-      coords,
-      distanceKm,
-      durationMinutes,
-      co2SavedKg: calculateCo2SavedKg(distanceMeters),
-      dateIso: trip.startedAt,
-    });
-  }, [shareRide]);
+    // Risk colouring for the shared image. Without this the static map fell
+    // back to its single DEFAULT_ROUTE_COLOR line — the "homogenous orange"
+    // reported from the device on preview 0.2.174. Resolved through the same
+    // cached query the trip map uses, so opening a trip and then sharing it
+    // costs one request rather than two. Fails soft: undefined keeps the plain
+    // line, which is also the honest result outside the covered countries.
+    void (async () => {
+      const riskSegments = await resolveTripShareRiskSegments(
+        queryClient,
+        trip.id,
+        coords,
+      );
+
+      await shareRide.share({
+        coords,
+        riskSegments,
+        distanceKm,
+        durationMinutes,
+        co2SavedKg: calculateCo2SavedKg(distanceMeters),
+        dateIso: trip.startedAt,
+      });
+    })();
+  }, [shareRide, queryClient]);
 
   const renderTripItem = useCallback(
     ({ item, index }: { item: TripHistoryItem; index: number }) => (

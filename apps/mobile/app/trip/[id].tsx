@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { RouteMap } from '../../src/components/map';
+import { useTripRiskSegments } from '../../src/hooks/useTripRiskSegments';
 import { BadgeVisual } from '../../src/design-system/atoms/BadgeVisual';
 import { ScreenHeader } from '../../src/design-system/atoms/ScreenHeader';
 import { Toast } from '../../src/design-system/molecules/Toast';
@@ -142,6 +143,12 @@ export default function TripDetailScreen() {
     if (plannedCoords && plannedCoords.length >= 2) return plannedCoords;
     return null;
   }, [trailCoords, plannedCoords]);
+
+  // Risk colouring for the drawn planned line. The GPS trail is rendered ON TOP
+  // of the planned route and is deliberately blue (it is the recorded track, a
+  // different thing), so the line risk colouring is visible on — and fetched
+  // for — the PLANNED geometry. Fails soft: [] keeps today's flat colour.
+  const plannedRiskSegments = useTripRiskSegments(tripId, plannedCoords);
 
   // Elevation profile — async, fails soft (chart simply hides).
   // Long stale time: a ride's elevation never changes.
@@ -432,6 +439,7 @@ export default function TripDetailScreen() {
               trailCoordinates={hasTrail ? trailCoords : undefined}
               plannedRouteCoordinates={plannedCoords}
               plannedRouteColor={plannedColor}
+              plannedRouteRiskSegments={plannedRiskSegments}
               showRouteOverlay={false}
               containerStyle={styles.mapInner}
               a11yContext={{ mode: 'historical' }}

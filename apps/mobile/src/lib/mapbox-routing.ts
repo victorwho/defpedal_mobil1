@@ -636,19 +636,44 @@ const fetchRouteRiskSegments = async (
 // chart needs.
 const MAX_RISK_GEOMETRY_POINTS = 12_000;
 
-export const enrichRouteWithRisk = async (
-  route: RouteOption,
-  coordinates: [number, number][],
-): Promise<RouteOption> => {
+/**
+ * Risk segments for a bare coordinate array.
+ *
+ * Exported for surfaces that have geometry but no `RouteOption` to enrich —
+ * historical trips are the live case: a past ride keeps its polyline but the
+ * `routePreview` that carried its risk segments is long gone, so the trip map
+ * and the trip share image had nothing to colour with and fell back to a single
+ * flat line (reported from the device on preview 0.2.174).
+ *
+ * Returns `[]` rather than throwing on any failure, and `[]` is also the honest
+ * answer outside the covered countries — the server gates that, so there is no
+ * client-side country check here and no reverse-geocode round-trip. Every
+ * consumer must treat an empty result as "draw the plain line", never as an
+ * excuse to invent a colour.
+ */
+export const fetchRiskSegmentsForCoordinates = async (
+  coordinates: readonly [number, number][],
+): Promise<RiskSegment[]> => {
+  if (coordinates.length < 2) return [];
+
   const geometry: GeoJsonLineString = {
     type: 'LineString',
     coordinates: downsampleCoordinates(
-      coordinates,
+      coordinates as [number, number][],
       MAX_RISK_GEOMETRY_POINTS,
     ) as [number, number][],
   };
 
-  const riskSegments = await fetchRouteRiskSegments(geometry);
+  return fetchRouteRiskSegments(geometry);
+};
+
+export const enrichRouteWithRisk = async (
+  route: RouteOption,
+  coordinates: [number, number][],
+): Promise<RouteOption> => {
+  // Shares the downsample + 12k cap with every other caller, so the limit that
+  // exists to stop FST_ERR_CTP_BODY_TOO_LARGE has exactly one owner.
+  const riskSegments = await fetchRiskSegmentsForCoordinates(coordinates);
   if (riskSegments.length === 0) return route;
 
   return { ...route, riskSegments };

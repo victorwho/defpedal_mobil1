@@ -1,4 +1,4 @@
-import type { Coordinate, NearbyHazard, RouteOption } from '@defensivepedal/core';
+import type { Coordinate, NearbyHazard, RiskSegment, RouteOption } from '@defensivepedal/core';
 import {
   decodePolyline,
   dedupeRouteFeaturesAgainstHazards,
@@ -27,6 +27,12 @@ type UseFeatureCollectionsParams = {
   nearbyHazards: readonly NearbyHazard[];
   trailCoordinates?: readonly [number, number][];
   plannedRouteCoordinates?: readonly [number, number][];
+  /**
+   * Risk-scored stretches of the planned route, for historical trips. Empty is
+   * a supported state (no coverage, or the fetch failed) and falls back to the
+   * flat planned line.
+   */
+  plannedRouteRiskSegments?: readonly RiskSegment[];
 };
 
 export const useFeatureCollections = ({
@@ -45,6 +51,7 @@ export const useFeatureCollections = ({
   nearbyHazards,
   trailCoordinates,
   plannedRouteCoordinates,
+  plannedRouteRiskSegments,
 }: UseFeatureCollectionsParams) => {
   const decodedRoutes = useMemo<DecodedRoute[]>(
     () =>
@@ -316,6 +323,47 @@ export const useFeatureCollections = ({
     [plannedRouteCoordinates],
   );
 
+  /**
+   * One feature per risk-scored stretch, carrying its colour in `properties` so
+   * a single ShapeSource can paint a multi-coloured line (`['get','color']`).
+   *
+   * The colour is the SERVER's — `RiskSegment.color` — never re-derived here.
+   * Score thresholds are server-side IP (see `.claude/CLAUDE.md` § Risk Display
+   * Bands); the palette may be bundled, the cuts may not, and the legend tokens
+   * exist precisely so nobody maps a score to a colour on the client.
+   *
+   * MultiLineString is flattened rather than skipped: dropping a stretch would
+   * leave an uncoloured gap in the line, which reads as a rendering fault.
+   */
+  const plannedRouteRiskCollection = useMemo(() => {
+    if (!plannedRouteRiskSegments || plannedRouteRiskSegments.length === 0) return null;
+
+    const features: unknown[] = [];
+    for (const segment of plannedRouteRiskSegments) {
+      const geometry = segment.geometry;
+      if (!geometry) continue;
+
+      const lines: [number, number][][] =
+        geometry.type === 'LineString'
+          ? [geometry.coordinates as [number, number][]]
+          : geometry.type === 'MultiLineString'
+            ? (geometry.coordinates as [number, number][][])
+            : [];
+
+      for (const line of lines) {
+        if (line.length < 2) continue;
+        features.push({
+          type: 'Feature' as const,
+          properties: { color: segment.color },
+          geometry: { type: 'LineString' as const, coordinates: line },
+        });
+      }
+    }
+
+    if (features.length === 0) return null;
+    return { type: 'FeatureCollection' as const, features };
+  }, [plannedRouteRiskSegments]);
+
   const markerFeatureCollection = useMemo(() => {
     const fallbackOrigin =
       origin ??
@@ -393,6 +441,7 @@ export const useFeatureCollections = ({
     hazardZoneFeatureCollection,
     trailFeatureCollection,
     plannedRouteFeatureCollection,
+    plannedRouteRiskCollection,
     markerFeatureCollection,
     offRouteFeatureCollection,
   };

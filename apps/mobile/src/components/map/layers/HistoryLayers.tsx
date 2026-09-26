@@ -26,6 +26,18 @@ const gpsTrailStyle = {
   lineEmissiveStrength: 1,
 };
 
+// Risk-coloured planned route. Same `['get','color']` technique as
+// historyOverlayStyle above — the colour travels on each feature so one
+// ShapeSource can draw a multi-coloured line.
+const plannedRouteRiskStyle = {
+  lineColor: ['get', 'color'] as any,
+  lineWidth: 4,
+  lineOpacity: 0.85,
+  lineJoin: 'round' as const,
+  lineCap: 'round' as const,
+  lineEmissiveStrength: 1,
+};
+
 // Base style for planned route (lineColor is dynamic, applied via useMemo)
 const plannedRouteBaseStyle = {
   lineWidth: 4,
@@ -48,6 +60,13 @@ type HistoryLayersProps = {
   trailFeatureCollection: any | null;
   plannedRouteFeatureCollection: any | null;
   plannedRouteColor: string;
+  /**
+   * Risk-coloured stretches of the planned route. When non-empty these REPLACE
+   * the flat `plannedRouteColor` line; when empty the flat line is drawn as
+   * before. Empty is the honest state outside the covered countries and on any
+   * fetch failure, so it must stay a supported case rather than a bug.
+   */
+  plannedRouteRiskCollection?: any | null;
   /** Past ride GPS trails for personal safety overlay */
   historyTrails?: readonly HistoryTrail[];
 };
@@ -60,6 +79,7 @@ export const HistoryLayers = React.memo(({
   trailFeatureCollection,
   plannedRouteFeatureCollection,
   plannedRouteColor,
+  plannedRouteRiskCollection,
   historyTrails,
 }: HistoryLayersProps) => {
   const historyOverlayCollection = useMemo(() => {
@@ -94,7 +114,17 @@ export const HistoryLayers = React.memo(({
       </Mapbox.ShapeSource>
     ) : null}
 
-    {plannedRouteFeatureCollection ? (
+    {/*
+      Risk colouring wins when it exists, otherwise the flat line. Rendered as
+      an either/or rather than stacked: drawing both would leave the flat colour
+      showing through wherever risk data is missing mid-route, which reads as a
+      rendering fault rather than as absent data.
+    */}
+    {plannedRouteRiskCollection ? (
+      <Mapbox.ShapeSource id="history-planned-route-risk" shape={plannedRouteRiskCollection}>
+        <Mapbox.LineLayer id="history-planned-route-risk-layer" style={plannedRouteRiskStyle} />
+      </Mapbox.ShapeSource>
+    ) : plannedRouteFeatureCollection ? (
       <Mapbox.ShapeSource id="history-planned-route" shape={plannedRouteFeatureCollection}>
         <Mapbox.LineLayer id="history-planned-route-layer" style={plannedRouteStyle} />
       </Mapbox.ShapeSource>
