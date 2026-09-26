@@ -18,6 +18,7 @@ import {
 
 import type { RiderTierName } from '@defensivepedal/core';
 
+import { hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../ThemeContext';
 import { HoloMedallion } from '../atoms/HoloMedallion';
 import { TierPill } from '../atoms/TierPill';
@@ -137,13 +138,41 @@ export const RankUpOverlay = React.memo(function RankUpOverlay({
       Animated.timing(dismissOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]);
 
-    // Haptic feedback
-    try {
-      const { hapticImpact } = require('../../lib/haptics');
-      setTimeout(() => hapticImpact('heavy'), 500);
-    } catch { /* no haptics available */ }
+    /*
+     * Haptic punctuation as the medallion lands.
+     *
+     * ⚠️ This called `hapticImpact('heavy')`, which has NEVER existed —
+     * lib/haptics exports hapticLight/Medium/Success/Warning/Error, and this was
+     * the only reference to that name anywhere in the repo. Three things had to
+     * line up for it to reach riders, and all three are worth remembering:
+     *
+     *   1. `require()` returns `any`, so TypeScript could not see the missing
+     *      property. A static import would have failed the build immediately.
+     *   2. Destructuring a real module object does not throw — you just get
+     *      `undefined` — so the try/catch was guarding a failure that never
+     *      happens.
+     *   3. The try/catch wrapped the SCHEDULING, not the callback. 500ms later
+     *      the timer fired outside the guard and called `undefined('heavy')`.
+     *
+     * Result: an unhandled fatal `undefined is not a function` on EVERY tier
+     * promotion, on every platform (Sentry 939de541, production 0.2.170+173).
+     * It looked sporadic only because promotions are rare per rider. Same family
+     * as error-log #45.
+     *
+     * The static import is the actual fix: a future rename now fails the build
+     * instead of shipping. Importing lib/haptics statically is safe — it lazily
+     * requires expo-haptics inside getHaptics(), so nothing native is touched at
+     * module load, and every helper no-ops when the native module is absent.
+     * `hapticSuccess` is the right one by its own definition ("ride complete,
+     * badge unlock").
+     */
+    const hapticTimer = setTimeout(hapticSuccess, 500);
 
     sequence.start();
+
+    // Without this the haptic still fires after a rider has dismissed the
+    // overlay inside the first 500ms.
+    return () => clearTimeout(hapticTimer);
   }, [bgOpacity, oldPillScale, oldPillOpacity, mascotScale, newPillScale, tierNameY, tierNameOpacity, taglineOpacity, perkOpacity, dismissOpacity, particles]);
 
   const tierKey = newTier as RiderTierKey;

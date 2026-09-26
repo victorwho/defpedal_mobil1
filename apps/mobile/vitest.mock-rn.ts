@@ -123,6 +123,12 @@ const createAnimationResult = () => ({
 
 export const Animated = {
   View,
+  // `Animated.Text` is as ordinary as `Animated.View`, but it was missing here —
+  // so any component rendering one failed with React's unhelpful "Element type
+  // is invalid ... got: undefined" rather than anything naming the gap. It went
+  // unnoticed because the components that use it had no tests (RankUpOverlay was
+  // the first, TODO.md QUAL-4).
+  Text,
   Value: AnimatedValue,
   timing: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
   spring: (_value: AnimatedValue, _config: unknown) => createAnimationResult(),
