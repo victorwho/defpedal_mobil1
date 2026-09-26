@@ -1,8 +1,35 @@
 import type { CSSProperties } from 'react';
+import { headers } from 'next/headers';
+import { SUPPORTED_APP_COUNTRIES, appStoreUrl } from '@defensivepedal/core';
 
 interface ShareCtasProps {
   code: string;
 }
+
+/**
+ * The visitor's App Store storefront.
+ *
+ * ⚠️ A country segment is not optional here. The app is deliberately not sold in
+ * the United States, which is exactly where a country-less Apple URL resolves —
+ * so `https://apps.apple.com/app/id<id>` 404s for EVERY visitor, not just
+ * American ones (verified against Apple's iTunes lookup and by following the
+ * redirects, 2026-09-26). Vercel gives us the visitor's country for free, so use
+ * it and fall back to a supported English-language storefront.
+ */
+const resolveStorefront = (country: string | null): string => {
+  const code = country?.trim().toUpperCase();
+  if (code && SUPPORTED_APP_COUNTRIES.has(code)) return code.toLowerCase();
+  return 'gb';
+};
+
+/**
+ * Whether the request came from a phone or tablet that could actually open the
+ * app. Deliberately coarse: the only decision it drives is whether the primary
+ * CTA is a universal link (which the OS intercepts) or a plain web link.
+ * Guessing wrong on an exotic UA costs a redundant navigation, not a broken page.
+ */
+const isMobileUserAgent = (ua: string | null): boolean =>
+  /android|iphone|ipad|ipod|windows phone|mobile safari/i.test(ua ?? '');
 
 const COLORS = {
   bgSurface: 'rgba(31, 41, 55, 0.92)',
@@ -54,27 +81,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 14,
     textDecoration: 'none',
   },
-  downloadBtnDisabled: {
-    flex: '1 1 160px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-    padding: '10px 14px',
-    background: 'transparent',
-    color: COLORS.textSecondary,
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 10,
-    fontWeight: 600,
-    fontSize: 14,
-    textDecoration: 'none',
-    opacity: 0.6,
-    cursor: 'not-allowed',
-    // Backstop for the span render — without this a user could still highlight
-    // or click-drag; keep the disabled look consistent.
-    pointerEvents: 'none',
-    userSelect: 'none',
-  },
   helpText: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -85,10 +91,22 @@ const styles: Record<string, CSSProperties> = {
   },
 };
 
-export function ShareCtas({ code }: ShareCtasProps) {
-  // Self-referencing universal-link href — the OS intercepts and opens the app if installed.
-  // When the app is NOT installed, this href just reloads the same page (harmless).
-  const appUrl = `https://routes.defensivepedal.com/r/${encodeURIComponent(code)}`;
+export async function ShareCtas({ code }: ShareCtasProps) {
+  const requestHeaders = await headers();
+  const isMobile = isMobileUserAgent(requestHeaders.get('user-agent'));
+  const storefront = resolveStorefront(requestHeaders.get('x-vercel-ip-country'));
+
+  /*
+   * On a phone this is a self-referencing universal link: the OS intercepts it
+   * and opens the app if installed.
+   *
+   * On a DESKTOP there is no app to intercept it, so the old behaviour was to
+   * reload the very page the visitor was already looking at — a button that
+   * visibly did nothing. Desktop now goes to the site instead.
+   */
+  const appUrl = isMobile
+    ? `https://routes.defensivepedal.com/r/${encodeURIComponent(code)}`
+    : 'https://routes.defensivepedal.com/';
   // Play Store CTA carries two distinct attribution params:
   //   - utm_source/medium/campaign: consumed by PostHog/web analytics (slice 7)
   //   - referrer: the Play Store's native com.android.installreferrer pickup value,
@@ -128,23 +146,23 @@ export function ShareCtas({ code }: ShareCtasProps) {
         >
           Get it on Google Play
         </a>
-        {/* Non-interactive span (not <a> + onClick) so this file stays a
-            server component — Next.js 15 rejects event handlers passed from a
-            Server Component. `role="button"` + `aria-disabled` keep screen
-            readers informed; `pointer-events: none` on the style prevents
-            accidental clicks. */}
-        <span
-          style={styles.downloadBtnDisabled}
-          role="button"
-          aria-disabled="true"
-          aria-label="Defensive Pedal is not yet available on the App Store"
+        {/* Live since iOS 1.17 (2026-08-29); the placeholder that used to sit
+            here outlived the release by a month. The storefront segment is
+            load-bearing — see `resolveStorefront`. */}
+        <a
+          href={appStoreUrl(storefront)}
+          style={styles.downloadBtn}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Download Defensive Pedal on the App Store"
+          data-share-cta="install_cta_click_ios"
         >
-          Coming to iOS
-        </span>
+          Get it on iOS
+        </a>
       </div>
       <p style={styles.helpText}>
         Already have the app? The button above opens the route directly. No app yet? Install from
-        Google Play and the route loads on first launch.
+        Google Play or the App Store — on Android the route loads on first launch.
       </p>
     </nav>
   );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildShareCaption } from './shareCaption';
+import { IOS_APP_STORE_ID, appStoreUrl, buildShareCaption } from './shareCaption';
 
 describe('buildShareCaption — ride', () => {
   it('produces the baseline ride caption with required fields', () => {
@@ -199,5 +199,37 @@ describe('buildShareCaption — English-only', () => {
       badgeName: 'x',
     });
     expect(badge).toContain(expectedUrl);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// appStoreUrl
+//
+// The web share page's iOS button was a disabled "Coming to iOS" placeholder
+// that outlived the actual release by a month. Replacing it turned up something
+// worth pinning: the app is deliberately NOT sold in the United States, and a
+// country-less Apple URL resolves to the US storefront — so the obvious
+// `https://apps.apple.com/app/id<id>` 404s for EVERY visitor. Verified against
+// Apple's iTunes lookup (`country=us` -> resultCount 0) and by following
+// redirects: bare and /us/ both 404, /ro/ and /gb/ both 200 (2026-09-26).
+// ---------------------------------------------------------------------------
+
+describe('appStoreUrl', () => {
+  it('always includes a storefront segment — the bare form 404s', () => {
+    // This is the assertion that matters: never emit apps.apple.com/app/id...
+    expect(appStoreUrl('ro')).toBe(
+      `https://apps.apple.com/ro/app/defensive-pedal/id${IOS_APP_STORE_ID}`,
+    );
+    expect(appStoreUrl('ro')).not.toMatch(/apple\.com\/app\//);
+  });
+
+  it('lowercases the storefront, since Apple paths are lowercase', () => {
+    expect(appStoreUrl('GB')).toContain('/gb/app/');
+  });
+
+  it('defaults to a supported English-language storefront', () => {
+    // Must never default to 'us': the app is not available there.
+    expect(appStoreUrl()).toContain('/gb/app/');
+    expect(appStoreUrl()).not.toContain('/us/');
   });
 });

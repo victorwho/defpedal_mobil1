@@ -35,6 +35,27 @@ const RIDE_HASHTAGS = `${BASE_HASHTAGS} #SaferCycling`;
 export const PLAY_STORE_URL =
   'https://play.google.com/store/apps/details?id=com.defensivepedal.mobile&pcampaignid=web_share';
 
+/** App Store numeric id (ASC "Apple ID") for the iOS app. */
+export const IOS_APP_STORE_ID = '6778694757';
+
+/**
+ * Canonical App Store listing URL for a given storefront.
+ *
+ * ⚠️ The country segment is REQUIRED, and that is measured rather than stylistic.
+ * The app's availability matches its supported markets (EU-27 + EEA + CH + UK)
+ * and it is deliberately NOT sold in the United States — Apple's iTunes lookup
+ * returns `resultCount: 0` for `country=us`. A country-less
+ * `https://apps.apple.com/app/id<id>` resolves to the US storefront and
+ * therefore **404s**, verified 2026-09-26, as does an explicit `/us/` path.
+ * `/ro/` and `/gb/` both return 200.
+ *
+ * So never link to the bare form: it is broken for every visitor, not just
+ * American ones. Pass the visitor's storefront, falling back to a supported
+ * English-language one.
+ */
+export const appStoreUrl = (countryCode = 'gb'): string =>
+  `https://apps.apple.com/${countryCode.toLowerCase()}/app/defensive-pedal/id${IOS_APP_STORE_ID}`;
+
 /**
  * Rounds to 1 decimal place, returning a string without a trailing ".0"
  * unless the input has a fractional part. Keeps output compact in captions.
