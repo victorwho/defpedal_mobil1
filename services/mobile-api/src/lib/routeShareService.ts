@@ -15,10 +15,13 @@
 
 import {
   decodePolyline,
+  downsampleCoordinates,
   encodePolyline,
   generateUniqueShareCode,
+  mapRiskSegmentsToIndexRanges,
   trimPrivacyZone,
 } from '@defensivepedal/core';
+import { fetchRiskSegments } from './risk';
 import type {
   AmbassadorStatsApi,
   MyShareRowApi,
@@ -226,6 +229,62 @@ export type CreateRouteShareServiceOptions = {
  * 400m (returns them unchanged), matching the 400m threshold baked into
  * the migration.
  */
+/**
+ * Same 12k cap the mobile client applies before POSTing geometry to
+ * /v1/risk-segments — a long EU-wide route otherwise blows the body limit and
+ * inflates the PostGIS cost (Sentry FST_ERR_CTP_BODY_TOO_LARGE, 2026-07-12).
+ */
+const RISK_GEOMETRY_POINT_CAP = 12_000;
+
+/**
+ * Risk colour ranges for both the full and the trimmed polyline.
+ *
+ * Risk is fetched ONCE, against the full geometry (downsampled to the same 12k
+ * cap the rider-facing endpoints use, so a cross-country route cannot blow the
+ * PostGIS cost or the body limit). The returned segments are road-snapped
+ * 2-point pieces of the submitted line, so the same segment list maps cleanly
+ * onto both polylines: stretches that the privacy trim removed simply fail to
+ * match the trimmed vertex set and are dropped, which is the correct outcome.
+ *
+ * Never throws: risk colouring is decoration on a share that must still be
+ * created. An empty result means "draw the plain line".
+ */
+const computeRiskColorIndexes = async (
+  fullPolyline6: string,
+  trimmedPolyline6: string,
+): Promise<{
+  full: { startIndex: number; endIndex: number; color: string }[];
+  trimmed: { startIndex: number; endIndex: number; color: string }[];
+}> => {
+  const empty = { full: [], trimmed: [] };
+
+  try {
+    const fullCoords = decodePolyline(fullPolyline6) as [number, number][];
+    if (fullCoords.length < 2) return empty;
+
+    const segments = await fetchRiskSegments({
+      type: 'LineString',
+      coordinates: downsampleCoordinates(
+        fullCoords,
+        RISK_GEOMETRY_POINT_CAP,
+      ) as [number, number][],
+    });
+    if (segments.length === 0) return empty;
+
+    const trimmedCoords =
+      trimmedPolyline6 === fullPolyline6
+        ? fullCoords
+        : (decodePolyline(trimmedPolyline6) as [number, number][]);
+
+    return {
+      full: mapRiskSegmentsToIndexRanges(fullCoords, segments),
+      trimmed: mapRiskSegmentsToIndexRanges(trimmedCoords, segments),
+    };
+  } catch {
+    return empty;
+  }
+};
+
 const computeTrimmedPolyline6 = (fullPolyline6: string): string => {
   const lonLatPoints = decodePolyline(fullPolyline6) as [number, number][];
   const trimmed = trimPrivacyZone(lonLatPoints, 200);
@@ -342,6 +401,30 @@ export const createRouteShareService = (
     const { trimmedOrigin, trimmedDestination } =
       computeTrimmedEndpoints(trimmedPolyline);
 
+    /*
+     * Risk colouring for the public /r/<code> page.
+     *
+     * Computed HERE, server-side, rather than sent by the client — and that is
+     * the whole reason it works. The RPC serves the TRIMMED polyline whenever
+     * `hide_endpoints` is true, which is the DB default and therefore what every
+     * trip share gets. Indices into the full line are simply wrong for the
+     * trimmed one, and only this function knows both. Doing it here also fixes
+     * every existing client version without a store release.
+     *
+     * BOTH index sets are stored because the polyline actually served is chosen
+     * at READ time from `hide_endpoints`; the consumer picks by `endpointsHidden`.
+     * Storing one set and guessing which would paint real colours onto the wrong
+     * stretches of road, which is worse than painting none.
+     *
+     * Best-effort by construction: `fetchRiskSegments` already returns [] on any
+     * failure and outside the covered countries, so a share is never blocked and
+     * an uncoloured share stays the honest fallback.
+     */
+    const riskColorIndexes = await computeRiskColorIndexes(
+      fullPolyline,
+      trimmedPolyline,
+    );
+
     // Payload mirrors the shape documented in migration 2026041801_route_shares.sql
     // The RPC picks geometryPolyline6 vs trimmedGeometryPolyline6 based on hide_endpoints.
     //
@@ -364,6 +447,8 @@ export const createRouteShareService = (
       routingMode: request.route.routingMode,
       riskSegments: request.route.riskSegments ?? [],
       safetyScore: request.route.safetyScore ?? null,
+      riskColorSegments: riskColorIndexes.full,
+      trimmedRiskColorSegments: riskColorIndexes.trimmed,
     };
 
     // Slice 5a: `source_ref_id` tracks which saved_route this share was

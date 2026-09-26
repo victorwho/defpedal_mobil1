@@ -29,6 +29,56 @@ const RISK_COLORS: Record<RouteShareRiskCategory, string> = {
 };
 const FALLBACK_ROUTE_COLOR = '#22C55E';
 
+/**
+ * Stretches with no risk rating. Deliberately the "no data" blue rather than a
+ * risk colour: absence of a rating is not a level, and a trimmed share genuinely
+ * has no data for the stretches the privacy trim removed.
+ */
+const NO_DATA_COLOR = '#3B82F6';
+
+/**
+ * Features from server-supplied colour ranges, filling the gaps between them
+ * with NO_DATA_COLOR.
+ *
+ * Gaps are filled rather than left undrawn: a privacy-trimmed share has no risk
+ * data for its cut head and tail, and an undrawn gap would read as a broken map
+ * rather than as missing data. The colours come from the payload and are never
+ * derived here — the score cuts behind them are server-side IP.
+ */
+function buildColorRangeFeatures(
+  coords: Array<[number, number]>,
+  ranges: RouteSharePublicView['route']['riskColorSegments'],
+): Feature[] {
+  const features: Feature[] = [];
+  let cursor = 0;
+
+  const push = (from: number, to: number, color: string) => {
+    const slice = coords.slice(from, to + 1);
+    if (slice.length < 2) return;
+    features.push({
+      type: 'Feature',
+      properties: { color },
+      geometry: { type: 'LineString', coordinates: slice },
+    });
+  };
+
+  for (const range of ranges) {
+    const start = Math.max(0, Math.min(range.startIndex, coords.length - 1));
+    const end = Math.max(0, Math.min(range.endIndex, coords.length - 1));
+    if (end <= start) continue;
+
+    // Overlapping ranges would double-draw; keep the first that covers a stretch.
+    if (start > cursor) push(cursor, start, NO_DATA_COLOR);
+    if (end > cursor) {
+      push(Math.max(cursor, start), end, range.color);
+      cursor = end;
+    }
+  }
+
+  if (cursor < coords.length - 1) push(cursor, coords.length - 1, NO_DATA_COLOR);
+  return features;
+}
+
 function computeBounds(coords: Array<[number, number]>): mapboxgl.LngLatBounds {
   const bounds = new mapboxgl.LngLatBounds(coords[0], coords[0]);
   for (const c of coords) bounds.extend(c);
@@ -85,7 +135,26 @@ export function ShareMap({ share }: ShareMapProps) {
     // producing latitudes in the millions that LngLat rejects.
     const coords: Array<[number, number]> = decodePolyline(geometryPolyline6);
     const bounds = computeBounds(coords);
-    const features = buildSegmentFeatures(coords, riskSegments);
+    /*
+     * Prefer the colour ranges when the payload carries them.
+     *
+     * They index the polyline AS SERVED, so the set must match what we actually
+     * received: the RPC serves the TRIMMED polyline when endpoints are hidden,
+     * and applying full-line indices to it would paint real colours onto the
+     * wrong roads. `endpointsHidden` is the discriminator.
+     *
+     * `riskSegments` (the older five-level category shape) stays as the fallback
+     * so shares created before this existed keep rendering exactly as they did.
+     */
+    const colorRanges = share.endpointsHidden
+      ? share.route.trimmedRiskColorSegments
+      : share.route.riskColorSegments;
+
+    const features =
+      colorRanges.length > 0
+        ? buildColorRangeFeatures(coords, colorRanges)
+        : buildSegmentFeatures(coords, riskSegments);
+    const usingColorRanges = colorRanges.length > 0;
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -111,16 +180,18 @@ export function ShareMap({ share }: ShareMapProps) {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
           'line-width': 6,
-          'line-color': [
-            'match',
-            ['get', 'riskCategory'],
-            'very_safe', RISK_COLORS.very_safe,
-            'safe', RISK_COLORS.safe,
-            'moderate', RISK_COLORS.moderate,
-            'dangerous', RISK_COLORS.dangerous,
-            'extreme', RISK_COLORS.extreme,
-            FALLBACK_ROUTE_COLOR,
-          ],
+          'line-color': usingColorRanges
+            ? ['get', 'color']
+            : [
+                'match',
+                ['get', 'riskCategory'],
+                'very_safe', RISK_COLORS.very_safe,
+                'safe', RISK_COLORS.safe,
+                'moderate', RISK_COLORS.moderate,
+                'dangerous', RISK_COLORS.dangerous,
+                'extreme', RISK_COLORS.extreme,
+                FALLBACK_ROUTE_COLOR,
+              ],
           // Matches mobile overlay convention — immune to day/night basemap lighting.
           'line-emissive-strength': 1,
         },

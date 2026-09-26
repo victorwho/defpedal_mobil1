@@ -32,6 +32,28 @@ const riskSegmentSchema = z.object({
 });
 
 export type RouteShareRiskSegment = z.infer<typeof riskSegmentSchema>;
+
+/**
+ * Colour-carrying risk range over the SERVED polyline's indices.
+ *
+ * Additive and separate from `riskSegmentSchema` above on purpose. That older
+ * shape names a five-level category vocabulary (`very_safe`..`extreme`) which
+ * the 2026-09-04 b46v1 re-anchoring retired and which `.claude/CLAUDE.md` says
+ * must not reappear — so new data carries the SERVER's colour instead of any
+ * label. Colours are safe to ship (they are painted in front of the rider
+ * anyway); the score cuts behind them are the IP and stay server-side.
+ *
+ * The colour is regex-validated because it is interpolated straight into a map
+ * paint property on the public web page. Anything that reaches a style value
+ * from a stored payload gets checked.
+ */
+const riskColorSegmentSchema = z.object({
+  startIndex: z.number().int().nonnegative(),
+  endIndex: z.number().int().positive(),
+  color: z.string().regex(/^#[0-9a-fA-F]{3,8}$/),
+});
+
+export type RouteShareRiskColorSegment = z.infer<typeof riskColorSegmentSchema>;
 export type RouteShareRiskCategory = RouteShareRiskSegment['riskCategory'];
 
 const plannedRoutePayloadSchema = z.object({
@@ -43,6 +65,19 @@ const plannedRoutePayloadSchema = z.object({
   routingMode: z.enum(ROUTING_DISPLAY_MODES),
   /** Per-segment risk category for safety-colored rendering. Optional — may be empty for unscored routes. */
   riskSegments: z.array(riskSegmentSchema).default([]),
+  /**
+   * Risk ranges indexed against `geometryPolyline6` AS SERVED, carrying server
+   * colours. Computed server-side at share creation — see `createShare`.
+   *
+   * ⚠️ Two sets are stored because the RPC serves a TRIMMED polyline when
+   * `hide_endpoints` is true (which is the DB default), and indices into the
+   * full line are wrong for the trimmed one. The consumer picks by
+   * `endpointsHidden`; getting this wrong paints the right colours in the wrong
+   * places, which is worse than painting none.
+   */
+  riskColorSegments: z.array(riskColorSegmentSchema).default([]),
+  /** As `riskColorSegments`, but indexed against the trimmed polyline. */
+  trimmedRiskColorSegments: z.array(riskColorSegmentSchema).default([]),
   /** Aggregate 0-100 safety score. Null when the route wasn't safety-scored. */
   safetyScore: z.number().min(0).max(100).nullable().default(null),
 });

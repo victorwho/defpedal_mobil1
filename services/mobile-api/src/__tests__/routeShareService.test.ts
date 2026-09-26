@@ -1,6 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
 
+// Risk lookup is mocked so the colour-range mapping can be exercised. Defaults to
+// [] — which is what the real one returns without a Supabase admin client — so
+// every pre-existing test in this file behaves exactly as before.
+const riskSegmentsResult = vi.fn(async () => [] as unknown[]);
+vi.mock('../lib/risk', () => ({
+  fetchRiskSegments: () => riskSegmentsResult(),
+}));
+
 import {
   createRouteShareService,
   type SupabaseLike,
@@ -202,6 +210,96 @@ describe('routeShareService.createShare', () => {
     // Normalized defaults for the extended contract (riskSegments + safetyScore)
     expect(payload.riskSegments).toEqual([]);
     expect(payload.safetyScore).toBeNull();
+    // No risk data available -> no colour ranges, and the web keeps its plain line.
+    expect(payload.riskColorSegments).toEqual([]);
+    expect(payload.trimmedRiskColorSegments).toEqual([]);
+  });
+
+  it('stores colour ranges for BOTH the full and the trimmed polyline', async () => {
+    // The RPC serves the trimmed polyline whenever hide_endpoints is true, which
+    // is the DB default — so a single index set would be wrong for exactly the
+    // shares riders actually create. Both must be present.
+    riskSegmentsResult.mockResolvedValueOnce([
+      {
+        color: '#EF4444',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [26.1025, 44.4268],
+            [26.1035, 44.4278],
+          ],
+        },
+      },
+    ]);
+
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn((_table: string) => ({
+        select: vi.fn(() => ({ eq: vi.fn(async () => ({ count: 0, error: null })) })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await service.createShare({ userId: 'user-1', request: validCreateRequest });
+
+    const payload = (insertSpy.mock.calls[0]?.[0] as Record<string, unknown>)
+      .payload as Record<string, unknown>;
+
+    // Colour comes from the server's segment, never re-derived here.
+    expect(payload.riskColorSegments).toEqual([
+      { startIndex: 0, endIndex: 1, color: '#EF4444' },
+    ]);
+    // This route is under the 400 m trim threshold, so the trimmed polyline is
+    // the same two points and the ranges match. The point of the assertion is
+    // that the key is POPULATED, not silently absent.
+    expect(payload.trimmedRiskColorSegments).toEqual([
+      { startIndex: 0, endIndex: 1, color: '#EF4444' },
+    ]);
+  });
+
+  it('still creates the share when the risk lookup throws', async () => {
+    // Colouring is decoration; a share that cannot be created is a broken feature.
+    riskSegmentsResult.mockRejectedValueOnce(new Error('risk RPC down'));
+
+    const insertSpy = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: {
+            id: 'x', code: 'abcd1234', source: 'planned',
+            created_at: 't1', expires_at: 't2',
+          },
+          error: null,
+        })),
+      })),
+    }));
+    const supabase = {
+      from: vi.fn((_table: string) => ({
+        select: vi.fn(() => ({ eq: vi.fn(async () => ({ count: 0, error: null })) })),
+        insert: insertSpy,
+      })),
+      rpc: vi.fn(),
+    } as unknown as SupabaseLike;
+
+    const service = createRouteShareService({ supabase, randomSource: det });
+    await expect(
+      service.createShare({ userId: 'user-1', request: validCreateRequest }),
+    ).resolves.toBeDefined();
+
+    const payload = (insertSpy.mock.calls[0]?.[0] as Record<string, unknown>)
+      .payload as Record<string, unknown>;
+    expect(payload.riskColorSegments).toEqual([]);
   });
 
   // ──────────────────────────────────────────────────────────────────────

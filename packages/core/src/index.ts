@@ -51,4 +51,5 @@ export * from './solarTime';
 export * from './streakTiers';
 export * from './trimEndpointsForShare';
 export * from './routeShareContract';
+export * from './routeShareRiskIndex';
 export * from './types';
