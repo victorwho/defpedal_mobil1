@@ -11,6 +11,11 @@ type UseCameraConfigParams = {
   followUser: boolean;
   selectedRoute: DecodedRoute | null;
   trailCoordinates?: readonly [number, number][];
+  /**
+   * The planned/recorded route line, for callers that draw a route WITHOUT a
+   * GPS trail — historical trips (`trip/[id]`, `TripCard`) are the live case.
+   */
+  plannedRouteCoordinates?: readonly [number, number][];
   destination?: Coordinate;
   focusCoordinate?: Coordinate | null;
 };
@@ -25,6 +30,7 @@ export const useCameraConfig = ({
   followUser,
   selectedRoute,
   trailCoordinates,
+  plannedRouteCoordinates,
   destination,
   focusCoordinate,
 }: UseCameraConfigParams): [number, number] => {
@@ -33,6 +39,26 @@ export const useCameraConfig = ({
     const mid = trailCoordinates[Math.floor(trailCoordinates.length / 2)];
     return mid ?? null;
   }, [trailCoordinates]);
+
+  /**
+   * ⚠️ Without this the camera had no idea where a trail-less trip WAS.
+   *
+   * `trip/[id]` and `TripCard` draw a historical ride via
+   * `plannedRouteCoordinates`, and pass no route, no trail, no destination and
+   * no user location. Every one of those is a miss, so the chain below fell
+   * through to the region fallback or `DEFAULT_CENTER` — which is Bucharest.
+   * A rider in Brașov opening a ride they took in Brașov was shown Bucharest,
+   * with their route drawn somewhere off-screen. It only looked correct for
+   * trips that happened to have a GPS trail, which is why it survived.
+   *
+   * Placed after `trailMidpoint` deliberately: when both exist the trail is
+   * what the rider actually rode, and it is the line drawn on top.
+   */
+  const plannedMidpoint = useMemo<[number, number] | null>(() => {
+    if (!plannedRouteCoordinates || plannedRouteCoordinates.length < 2) return null;
+    const mid = plannedRouteCoordinates[Math.floor(plannedRouteCoordinates.length / 2)];
+    return mid ?? null;
+  }, [plannedRouteCoordinates]);
 
   // Cold-start fallback: before the first GPS fix (or forever, if location
   // permission is denied) there is no route/trail/destination/user location.
@@ -61,6 +87,7 @@ export const useCameraConfig = ({
         ? ([userLocation.lon, userLocation.lat] as [number, number])
         : selectedRoute?.coordinates[Math.floor(selectedRoute.coordinates.length / 2)] ??
           trailMidpoint ??
+          plannedMidpoint ??
           (destination ? ([destination.lon, destination.lat] as [number, number]) : null) ??
           (userLocation ? ([userLocation.lon, userLocation.lat] as [number, number]) : null) ??
           regionFallback ??

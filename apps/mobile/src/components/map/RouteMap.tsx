@@ -161,6 +161,7 @@ export const RouteMap = ({
     followUser,
     selectedRoute,
     trailCoordinates,
+    plannedRouteCoordinates,
     destination,
     focusCoordinate,
   });
