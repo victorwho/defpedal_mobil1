@@ -1,7 +1,12 @@
 import type { QueuedMutation, HazardVoteQueuePayload } from '@defensivepedal/core';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { castHazardVote, createQueuedMutation, createClientTripId } from './offlineQueue';
+import {
+  castHazardVote,
+  createQueuedMutation,
+  createClientTripId,
+  createFallbackId,
+} from './offlineQueue';
 
 describe('offlineQueue', () => {
   beforeEach(() => {
@@ -109,6 +114,35 @@ describe('offlineQueue', () => {
       const mutation = createQueuedMutation('hazard', {} as any);
 
       expect(mutation.id).toBe(`hazard-${mockUuid}`);
+    });
+  });
+
+  describe('id entropy — the ON-DEVICE fallback (idempotency keys)', () => {
+    // ⚠️ Tests `createFallbackId` DIRECTLY, not `createQueuedMutation`. Under
+    // vitest `crypto.randomUUID` exists, so going through the public factory
+    // takes the UUID branch and never reaches the code a phone actually runs —
+    // confirmed from production, where the first hazard through this path carried
+    // `hazard-1790529134544-2912`, the fallback shape.
+    it('does not collide across many ids minted in the same millisecond', () => {
+      // These ids ARE idempotency keys: `hazard` sends one as `clientHazardId`
+      // and `hazards_client_hazard_id_key` is unique on that value ALONE, so a
+      // collision means a rider's hazard is silently dropped as a duplicate.
+      //
+      // The clock is frozen so entropy is the only thing separating the ids.
+      // Mutation-checked: with the old `Math.round(Math.random() * 10000)` this
+      // fails at once — 5,000 draws from 10,001 values.
+      const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_790_529_134_544);
+      try {
+        const ids = new Set<string>();
+        for (let i = 0; i < 5_000; i += 1) ids.add(createFallbackId('hazard'));
+        expect(ids.size).toBe(5_000);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
+    it('keeps the prefix, which is the only part anything reads', () => {
+      expect(createFallbackId('hazard').startsWith('hazard-')).toBe(true);
     });
   });
 
