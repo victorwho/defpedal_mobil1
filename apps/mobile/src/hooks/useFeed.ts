@@ -54,14 +54,20 @@ export const useFeedQuery = (lat: number | null, lon: number | null) =>
  * Look up a feed item by id across ALL cached feed pages, regardless of
  * which `[FEED_KEY, lat, lon]` cache key holds them.
  *
- * Why we need this: `useCurrentLocation` reads fresh GPS on every screen
- * mount, so navigating from `/community-feed` to `/community-trip?id=…`
- * usually produces a slightly different lat/lon and therefore a fresh
- * `useFeedQuery` cache entry that doesn't yet contain the item the user
- * just tapped. Searching the full feed-cache space lets the destination
- * screen render immediately from cached data instead of stalling on
- * "Loading trip details..." while the new query refetches (and possibly
- * paginates past the requested item).
+ * Why we need this: navigating from `/community-feed` to `/community-trip?id=…`
+ * can land on a different `[FEED_KEY, lat, lon]` cache entry than the one the
+ * list was rendered from, and that entry will not contain the item the rider
+ * just tapped. Searching the full feed-cache space lets the destination screen
+ * render immediately from cached data instead of stalling on
+ * "Loading trip details..." while a new query refetches (and possibly paginates
+ * past the requested item).
+ *
+ * ⚠️ This used to be justified by `useCurrentLocation` reading fresh GPS on
+ * every screen mount, which made a different key the NORMAL case. Since the hook
+ * became one shared read with a short freshness window, two consecutive screens
+ * usually share a key — so this is now the uncommon path rather than the
+ * expected one. Still worth keeping: a mount past the freshness window with the
+ * rider having moved still diverges, and reading from cache is cheap.
  */
 export const useFeedItemFromCache = (id: string | null): FeedItem | null => {
   const queryClient = useQueryClient();

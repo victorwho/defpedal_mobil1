@@ -132,10 +132,19 @@ export const useActivityReaction = () => {
 /**
  * Look up an activity-feed item by id across ALL cached
  * `[ACTIVITY_FEED_KEY, lat, lon]` pages, not just the current screen's
- * location-keyed query. Same motivation as `useFeedItemFromCache`:
- * `useCurrentLocation` re-reads GPS on every screen mount, producing a
- * fresh cache key that may not yet contain the item the caller's feed
- * already had.
+ * location-keyed query. Same motivation as `useFeedItemFromCache`.
+ *
+ * ⚠️ This used to say `useCurrentLocation` re-reads GPS on every screen mount,
+ * so each mount minted a fresh cache key. That is no longer true — the hook is
+ * one shared read with a short freshness window, and this query key is rounded
+ * to ~110 m on top. Two consecutive screens will usually now land on the SAME
+ * key, which is the point.
+ *
+ * The lookup stays because "usually" is not "always": crossing the rounding
+ * boundary, or a mount after the freshness window with the rider having moved,
+ * still produces a different key. It is a cheap read from cache either way, and
+ * the cost of being wrong is the screen stalling on a spinner while a refetch
+ * paginates toward an item the caller already had.
  */
 export const useActivityFeedItemFromCache = (
   id: string | null,

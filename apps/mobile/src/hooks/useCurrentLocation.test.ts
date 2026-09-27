@@ -262,6 +262,103 @@ describe('useCurrentLocation — one shared read (P2)', () => {
     expect(result.current.location).toEqual({ lat: 45.65, lon: 25.6 });
   });
 
+  it('re-reads for a screen mounted AFTER the freshness window — the rider moved', async () => {
+    // The case the freshness window must not break. Reusing a fix forever would
+    // mean route planning showed a stale origin for a rider who had cycled on.
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    const first = renderHook(() => useCurrentLocation());
+    await waitFor(() => {
+      expect(first.result.current.isLoading).toBe(false);
+    });
+    first.unmount();
+
+    // Past the window, and the rider is now somewhere else.
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 20_000);
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 45.65, longitude: 25.6, accuracy: 9 },
+    });
+
+    try {
+      const second = renderHook(() => useCurrentLocation());
+      await waitFor(() => {
+        expect(second.result.current.location).toEqual({ lat: 45.65, lon: 25.6 });
+      });
+      expect(mockGetCurrentPositionAsync).toHaveBeenCalledTimes(2);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('gives every consumer the same permission verdict when it is DENIED', async () => {
+    // Six hooks and six screens branch on `permissionStatus`, and several render
+    // an explicit "we need location" state from it. One shared read must deliver
+    // the refusal to all of them, not just the one that happened to ask.
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    mockRequestForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
+
+    const a = renderHook(() => useCurrentLocation());
+    const b = renderHook(() => useCurrentLocation());
+
+    await waitFor(() => {
+      expect(a.result.current.isLoading).toBe(false);
+    });
+
+    for (const h of [a, b]) {
+      expect(h.result.current.permissionStatus).toBe('denied');
+      expect(h.result.current.location).toBeNull();
+      expect(h.result.current.error).toBeTruthy();
+    }
+    // And it asked ONCE. Prompting per consumer is what a rider would notice.
+    expect(mockRequestForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('survives a screen navigation cycle: unmount, remount, still resolves', async () => {
+    // Expo Router keeps screens mounted under pushed routes and tears them down
+    // on pop, so mount/unmount churn is the normal case rather than an edge one.
+    // A stale subscriber left behind would update a dead component.
+    mockGetForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    mockGetCurrentPositionAsync.mockResolvedValue({
+      coords: { latitude: 44.43, longitude: 26.1, accuracy: 10 },
+    });
+
+    for (let i = 0; i < 3; i += 1) {
+      const view = renderHook(() => useCurrentLocation());
+      await waitFor(() => {
+        expect(view.result.current.location).toEqual({ lat: 44.43, lon: 26.1 });
+      });
+      view.unmount();
+    }
+
+    // Three mounts inside the freshness window: one GPS read between them.
+    expect(mockGetCurrentPositionAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('still honours the dev fake-GPS tool through the shared read', async () => {
+    // Diagnostics > Fake GPS is how the region gate and quiz country get tested
+    // on a preview build. A freshness window that cached over it would make the
+    // tool look broken.
+    mockGetDevMockLocation.mockReturnValue({ lat: 52.52, lon: 13.405 });
+
+    const a = renderHook(() => useCurrentLocation());
+    await waitFor(() => {
+      expect(a.result.current.isLoading).toBe(false);
+    });
+    expect(a.result.current.location).toEqual({ lat: 52.52, lon: 13.405 });
+
+    // Move the pin and mount another screen: it must see the NEW mock, not the
+    // cached one, and must never touch the OS.
+    mockGetDevMockLocation.mockReturnValue({ lat: 41.39, lon: 2.17 });
+    const b = renderHook(() => useCurrentLocation());
+    await waitFor(() => {
+      expect(b.result.current.location).toEqual({ lat: 41.39, lon: 2.17 });
+    });
+    expect(mockGetCurrentPositionAsync).not.toHaveBeenCalled();
+  });
+
   it('a hung read cannot wedge the source forever', async () => {
     // ⚠️ The risk coalescing introduces. `requestForegroundPermissionsAsync`
     // waits on a human and `getCurrentPositionAsync` can hang indoors, so a
