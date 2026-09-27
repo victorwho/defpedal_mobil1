@@ -72,6 +72,30 @@ routes answer 400/401 while a nonexistent control route 404s.
 **The MOBILE half is still not shipped:** P0-4, P1-1, P1-2, P1-3, P1-7, P1-8 are
 on `main` only and need a client release.
 
+**UPDATE 2026-09-27 — everything in this plan is now deployed or distributed.**
+Cloud Run **`defpedal-api-00175-sjs`**, deployed by digest
+`sha256:679ed21a…` from a clean tree at `cb0651c`, with the digest cross-checked
+against the new immutable `build-…` tag, `:latest` and the build log before
+deploying. Preview **0.2.176 (179)** is with `early-access-preview`
+(Firebase `74poabmph77jg`).
+
+⚠️ **Unlike the 00173 deploy, this one IS content-verifiable, and was verified.**
+P1-12 declares `clientHazardId` on the hazard-report schema, so an over-length
+key now returns `body.clientHazardId: must NOT have more than 128 characters` —
+and the old server demonstrably could not, because a request with and without
+that field returned byte-identical errors when probed before the build. Fifteen
+baseline probes are identical before and after, and the error-log #96
+anti-revert control holds (nine shipped routes 401/400, unknown paths 404).
+
+⚠️ **The probe set was broken until it was fixed.** Bodyless POSTs answered 411
+*before route matching*, so they could not distinguish a live route from a
+deleted one — the single thing the anti-revert check is for. Anyone reusing
+`scripts`-style probes should send a body and keep a POST-to-unknown control, or
+the 401s prove nothing (error-log #94).
+
+⚠️ **Nothing is on a store track.** Production riders remain on 0.2.173 and still
+crash on every tier promotion until a store release carries the fix.
+
 **Note on the body-read fix (worth keeping):** the load-bearing half is moving
 the body read INSIDE the helper's `try`, not the timer re-arm. Mutation-checking
 proved it — removing the re-arm leaves the original header timer armed, so the
