@@ -7,6 +7,7 @@ import { Screen } from '../src/components/Screen';
 import { Badge } from '../src/design-system/atoms';
 import { Button } from '../src/design-system/atoms';
 import { HoloSticker } from '../src/design-system/atoms';
+import { tierColors } from '../src/design-system/tokens/badgeColors';
 import type { BadgeTier } from '../src/design-system/tokens/badgeColors';
 import { useTheme } from '../src/design-system/ThemeContext';
 import { radii } from '../src/design-system/tokens/radii';
@@ -1018,6 +1019,42 @@ function DiagnosticsContent() {
             </Button>
           </View>
         </DiagnosticCard>
+      ) : null}
+
+      {mobileEnv.appEnv !== 'production' ? (
+      <DiagnosticCard title="Tier promotion (dev)">
+        <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 8 }]}>
+          Queues a rank-up so RankUpOverlay renders. It exists because the
+          overlay is otherwise only reachable by genuinely crossing a tier, which
+          is exactly why a crash in it went unnoticed: it threw an unhandled
+          TypeError 500ms in, on EVERY promotion, and promotions are rare per
+          rider (Sentry 939de541, production 0.2.170+173). Expect the medallion
+          to land, one haptic buzz, and no crash.
+        </Text>
+        <View style={styles.buttonRow}>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              useAppStore.getState().setTierPromotion({
+                xpAwarded: 120,
+                totalXp: 1_200,
+                oldTier: 'spoke',
+                newTier: 'pedaler',
+                promoted: true,
+                tierDisplayName: 'Pedaler',
+                tierTagline: 'Finding your rhythm',
+                tierColor: tierColors.gold.primary,
+                tierLevel: 3,
+                tierPerk: 'Unlocked: rider tier badge on your feed cards',
+              });
+            }}
+          >
+            Trigger rank-up overlay
+          </Button>
+        </View>
+      </DiagnosticCard>
       ) : null}
 
       {mobileEnv.appEnv !== 'production' ? (
