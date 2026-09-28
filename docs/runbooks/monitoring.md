@@ -269,3 +269,43 @@ foreground transitions.
 - `ApiClientError: Request timed out` — mobile network conditions.
 - Single-user Android `WorkManager "job with no constraints"` crash — on the
   watchlist; investigate only if it grows with rollout percentage.
+- **`hazard-imports-cron` 502 with `UPSTREAM_ERROR` naming ONE source** — a
+  third-party civic API had a bad minute. The runner is deliberately loud: if any
+  enabled source fails, `/v1/imports/run` returns 502 even when the others
+  imported fine. Observed 2026-09-27: `open311:zaragoza` returned HTTP 500,
+  while civia (9), Köln (84) and Amsterdam (1,017) published 1,110 hazards
+  between them, and the same Zaragoza URL returned 200 the next morning.
+
+  ⚠️ **It pages TWICE for one event, and that is the two policies overlapping,
+  not two faults.** *Cloud Scheduler job failed* matches `severity>=ERROR` on
+  scheduler executions; *API 5xx response* matches `httpRequest.status>=500` on
+  Cloud Run. One 502 satisfies both. Do not go looking for a second cause.
+
+  **Triage in this order, because the obvious read is wrong:** it will look like
+  the most recent API deploy, since this may be the ONLY 5xx in a fortnight and
+  it will sit on the newest revision. Read the
+  `hazard_import_run_failed` payload FIRST — it names the failing source in
+  `failed[]` and carries the upstream HTTP status — then curl that source's URL
+  yourself. A transient upstream is self-healing and needs nothing.
+
+  **Nothing is lost, and this is checkable:** a failed source does NOT advance
+  its cursor (`recordRunOutcome` writes `last_items_at` only when
+  `sawItems`), so the next run re-fetches the missed window. Confirm with
+  `select id, last_items_at, cursor from hazard_import_sources` — the failing
+  source's `cursor.since` should still be the window it could not read.
+
+  ⚠️ **The job has `retryCount: 0` and runs weekly** (`0 2 * * 1`
+  Europe/Bucharest), so the gap closes only on the next Monday. Combined with
+  `stale_after_days = 8`, a weekly cadence leaves barely a day of slack: one
+  missed run consumes the whole margin, so if that source then legitimately
+  returns zero items the following week it is reported as
+  "Likely a changed or dead endpoint" when it is neither. Unlikely for a busy
+  source (Zaragoza publishes ~30–50/day) and quite possible for a quiet one like
+  civia. Raising `stale_after_days` to ~16 for weekly sources would buy two
+  missed runs at the cost of slower genuine dead-endpoint detection — a
+  monitoring-sensitivity decision, not a bug.
+
+  **Capacity note from the same run:** 192 s of the 300 s attempt deadline (64%),
+  with Amsterdam `truncated: true`. Truncation is normal there — it
+  quadtree-subdivides and resumes from `cursor.tiles` — but the headroom is worth
+  watching, since error-log #82 is what a truncated cron without a cursor does.
