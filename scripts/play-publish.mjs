@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { Agent } from 'undici';
 
 const DEFAULT_KEY =
   'C:/dev/adminInfo/google_play_publisher/play-publisher-gen-lang-client-0895796477.json';
@@ -98,11 +99,34 @@ const tokRes = await fetch('https://oauth2.googleapis.com/token', {
 if (!tokRes.ok) { console.error('token request failed:', await tokRes.text()); process.exit(1); }
 const { access_token } = await tokRes.json();
 
+/**
+ * Dispatcher for the AAB upload.
+ *
+ * ⚠️ Bare `fetch` cannot upload this bundle. undici defaults `headersTimeout` and
+ * `bodyTimeout` to 300 s, and Google sends no response headers until the whole
+ * body is in — so on 2026-09-28 a 127.9 MB AAB failed twice with
+ * `UND_ERR_HEADERS_TIMEOUT`, identically, which is systematic rather than flaky:
+ * 128 MB needs more than 300 s on any uplink below ~3.5 Mbps, so it could never
+ * have succeeded on a slow line no matter how many times it was retried. The
+ * bundle only grows, so this is a floor that would keep rising.
+ *
+ * 30 minutes, and `connect.timeout` left alone — a genuinely unreachable host
+ * must still fail fast rather than hang for half an hour.
+ */
+const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000;
+const uploadDispatcher = new Agent({
+  headersTimeout: UPLOAD_TIMEOUT_MS,
+  bodyTimeout: UPLOAD_TIMEOUT_MS,
+});
+
 const api = async (method, urlPath, { body, headers = {}, raw } = {}) => {
   const r = await fetch(`${API}${urlPath}`, {
     method,
     headers: { Authorization: `Bearer ${access_token}`, ...headers },
     body: raw ?? (body ? JSON.stringify(body) : undefined),
+    // Only the upload needs it, but applying it to every call here is harmless:
+    // the JSON calls answer in milliseconds and never approach the limit.
+    dispatcher: uploadDispatcher,
   });
   const text = await r.text();
   if (!r.ok) throw new Error(`${method} ${urlPath} -> HTTP ${r.status}\n${text}`);
