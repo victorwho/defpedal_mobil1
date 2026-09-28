@@ -100,6 +100,116 @@ Plan + full implementation record: **`docs/plans/hazard-import-pipeline.md`**.
 - **Publishing is BATCHED, never per-item.** Supabase is `us-east-1`, Cloud Run `europe-central2` (~100 ms/round-trip). Amsterdam publishes ~2,000 hazards per sweep; at two round-trips each that is ~400 s against a 240 s budget — a run that could never finish. `publishImports()` chunks 200 rows per statement. Do not reintroduce a per-item publish loop.
 - **Rollback is two statements:** `UPDATE hazard_import_sources SET enabled=false;` then `DELETE FROM hazards WHERE import_source IS NOT NULL;`. Do NOT roll back `202608270001` with them — it fixes a pre-existing rider-facing bug.
 
+## Idempotency, privacy scoping and shared reads (triage batch, 2026-09-25/27)
+
+Plan + full record: **`docs/plans/external-review-triage-2026-09-25.md`**. Five
+migrations (`202609260001`–`05`) are LIVE; the code shipped on API revision
+`defpedal-api-00175-sjs` and preview v0.2.176. Each bullet below is load-bearing —
+these are the things that will look like tidy-ups to a future reader.
+
+- ⚠️ **`record_ride_microlives` gates its accumulation on `RETURNING id`, not on
+  `trip_id`.** The ride insert is `ON CONFLICT (trip_id) DO NOTHING`; the
+  `profiles` totals and the `community_seconds_daily` upsert underneath it MUST
+  stay inside `IF v_inserted_id IS NOT NULL`. Without it every replayed impact
+  POST re-added the same ride to a rider's lifetime totals (measured: 10 riders,
+  2,108 excess microlives against 715 legitimate). `trip_id` is NULLABLE under a
+  NULLS DISTINCT index, so a NULL-trip row inserts while returning a NULL
+  trip_id — testing that column reads a real insert as "already present" and
+  stops accumulating for good. A replay also reports the STORED row rather than
+  recomputing, because `DO NOTHING` means the first write wins.
+- ⚠️ **`hazards.client_hazard_id` is the offline queue's own mutation id, and its
+  unique index is deliberately NOT partial and NOT user-scoped.** Not partial
+  because PostgREST emits no `WHERE`, so Postgres cannot infer a partial unique
+  index for `ON CONFLICT` (error-prevention #27); a plain unique index is already
+  NULLS DISTINCT, which leaves all pre-existing and imported rows unconstrained.
+  Not `(user_id, …)` because `user_id` is NULLABLE on `POST /v1/hazards` — the
+  endpoint accepts unauthenticated reports, and a NULL in a composite NULLS
+  DISTINCT index would leave exactly those undeduplicated. The write is
+  `DO NOTHING`, never `DO UPDATE`, so a caller presenting someone else's key
+  changes nothing — verified live: replaying a rider's key with a different
+  `hazard_type` left their report untouched.
+  **The row and its four side effects are ONE fix**: `routes/v1.ts` gates the
+  streak, the `post_hazard_thanks` push, `award_xp('hazard_report')` and
+  `autoPublishHazardStandalone` on `!result.duplicate`. Deduplicating the row
+  alone leaves every one of them firing once per retry.
+  ⚠️ Because the index is on the id alone, that id's ENTROPY is a data-integrity
+  property — see error-log #130. `crypto.randomUUID` does not exist in this RN
+  runtime, so `createFallbackId` is what actually runs.
+- ⚠️ **`profiles` / `activity_feed` / `user_follows` / `feed_likes` /
+  `activity_reactions` SELECT is scoped to own rows.** They carried
+  `USING (true) TO authenticated`, and Supabase anonymous sign-in mints
+  `role = authenticated` — which this app does on every new install — so a full
+  dump cost one free call: 3,485 profiles and 783 `activity_feed` rows, 396 of
+  them carrying `geometryPolyline6` with `startLocationText`/`destinationText`.
+  Safe to scope because `service_role` has `rolbypassrls` and every rider-facing
+  read goes through the API on that key; no client reads these tables directly
+  (the only `.from(` in the app is Storage `avatars`) and no Realtime
+  subscription exists on them — **Realtime WOULD enforce RLS, so check that
+  before scoping any other table.**
+  ⚠️ **Consequence:** the Supabase Table Editor runs as `authenticated`, so these
+  tables now look EMPTY there. Use the SQL editor or switch the role — the same
+  surprise this file already documents for `city_suggestions`.
+- ⚠️ **The route-share RPCs fail CLOSED, and `hide_endpoints` is DERIVED.** Both
+  `get_public_route_share` and `claim_route_share` used `COALESCE(trimmed, raw)`,
+  serving the full route and real origin when a trimmed variant was missing; they
+  now `RAISE EXCEPTION 'SHARE_NOT_FOUND'`. And `hide_endpoints` is computed from
+  whether trimming actually happened, written UNCONDITIONALLY because the column
+  DEFAULTS TO TRUE — a route below `SHARE_MIN_TRIMMABLE_METERS` comes back
+  untrimmed, so storing the client's request claimed privacy the data did not
+  have (error-log #132).
+- **`SHARE_TRIM_METERS` / `SHARE_MIN_TRIMMABLE_METERS` (core,
+  `trimEndpointsForShare.ts`) are THE definition of the 200 m share trim.** It was
+  written out as a literal in six places across four files, including a
+  hand-derived `400` on the route-preview screen. Import it; never retype it
+  (error-log #20's shape).
+- ⚠️ **`useCurrentLocation` is ONE shared, refcounted read — do not "simplify" it
+  back to per-instance state.** It is mounted from 13 places, and each instance
+  used to run its own permission check and GPS wake-up, so a screen composing
+  several of these hooks prompted the rider repeatedly. Two mechanisms, both
+  needed: in-flight coalescing (concurrent mounts share one read) and a 15 s
+  freshness window (a slightly later mount reuses the fix). ⚠️ The
+  `COALESCE_WINDOW_MS = 5000` bound is what makes coalescing safe — a permission
+  dialog waits on a human, so an unbounded shared promise would let ONE hung read
+  wedge the location source for the whole session, which is strictly worse than
+  what it replaced. `refreshLocation()` always forces a real read, and the dev
+  fake-GPS tool bypasses the freshness window so Diagnostics stays responsive.
+  Turn-by-turn is unaffected — it uses `useForegroundNavigationLocation`, which
+  keeps its own continuous watch.
+- **`leaderboard_snapshots` has `UNIQUE (period_type, metric, period_end,
+  user_id)` and the settle cron no longer skips a period up front.** The count
+  read it replaced failed both ways: the weekly and monthly jobs hit the same
+  endpoint and the handler loops over both periods, so a 1st-of-month Monday
+  raced all four combinations and awarded XP twice; and a truncated run left
+  `count > 0`, so the next run skipped the period and ranks 20–50 never settled
+  while the endpoint answered `{ok:true}`. A duplicate now raises 23505, which is
+  passed over per row — so a truncated run RESUMES.
+- **`autoPublishRide` returns the existing card for a `tripId` it has already
+  published.** Measured before the fix: 21 duplicate groups, 141 excess cards of
+  396 — 36% of the ride feed. ⚠️ This narrows the race rather than closing it; the
+  airtight fix is a unique index on `(user_id, (payload->>'tripId'))`, which
+  cannot be created until those 141 rider-visible rows are deleted (cascading
+  their reactions) — a product decision, deliberately not taken.
+- **Two measured problems were deliberately NOT repaired, and must not be
+  "fixed" silently:** the 2,108 excess microlives across 10 riders, and the 141
+  duplicate feed cards. Both are rider-visible history; recomputing lifetime
+  totals downward or deleting feed cards is a product call. The numbers live in
+  the migration headers so the decision can be made with them.
+- **ESLint now covers `apps/mobile/src/**` as well as `app/**`**, with `eqeqeq`
+  (measured clean across all 539 files before enabling) and
+  `@typescript-eslint` registered as a DECLARED devDependency rather than
+  borrowed from `apps/web`'s `eslint-config-next` transitive (error #22b). That
+  registration is load-bearing: `src/**` already held 22 `@typescript-eslint/*`
+  disable directives documenting the lazy `require()` calls this codebase
+  mandates, and with no plugin registered each was an error and the intent was
+  inert. The ratchet lints `app src`; it was verified to discriminate.
+- **`cloudbuild.yaml` tags every build `build-$BUILD_ID` alongside `:latest`.**
+  Deploy BY DIGEST and cross-check it against that immutable tag before
+  deploying — it is what makes a "digest-verified" claim checkable afterwards
+  rather than merely careful at the time (error-log #96). No `$SHORT_SHA` and no
+  `bash` in that file on purpose: `$SHORT_SHA` is empty for a manual
+  `gcloud builds submit` and an unmatched substitution fails the build, and inside
+  a `bash -c` body Cloud Build substitutes `$VAR` before the shell sees it.
+
 ## Permanent Hazards (opt-in at report time)
 
 Migration `202609020001`. A reporter may tick "This hazard is permanent" in the hazard quick-report card (both `route-planning.tsx` and in-ride `navigation.tsx`; shared `PermanentHazardCheckbox` molecule). A permanent hazard has **no TTL** — the only thing that expires it is reaching **10 downvotes** (`hazard_permanent_deny_threshold()`, mirrored in core as `PERMANENT_HAZARD_DENY_THRESHOLD`; change both together).
