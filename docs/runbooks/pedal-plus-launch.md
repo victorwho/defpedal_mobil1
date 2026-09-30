@@ -32,6 +32,17 @@ What the offering actually is: `docs/pedal-plus-offering.md`.
 >
 > Riders gain a day relative to what they were told; nobody loses one.
 
+> ✅ **Done 2026-09-30:** the API is deployed on the new date (`defpedal-api-00176-647`,
+> digest `sha256:07a76061…`, built from `d112d45`). **The go-live migration is
+> SCHEDULED**, not applied: Windows Task Scheduler task
+> `DefensivePedal-PedalPlusGoLive` runs `C:\Users\Victor\defpedal-ops\pedal-plus-go-live.ps1`
+> once at **2026-10-02 03:05 local (00:05 UTC)**. It must run on this PC — the
+> Supabase token is in its Credential Manager — and only while Victor is logged
+> on (it runs at next logon if missed). The script refuses to run before the
+> cutoff, skips if already live, and verifies default=true with zero rows false.
+> Log: `C:\Users\Victor\defpedal-ops\pedal-plus-go-live.log`. **To cancel:**
+> `Unregister-ScheduledTask -TaskName DefensivePedal-PedalPlusGoLive -Confirm:$false`.
+
 ---
 
 ## Step 0 — decide by 27 September
