@@ -42,16 +42,17 @@ import {
   buildOfflineRegionFromRoute,
   downloadOfflineRegion,
 } from '../src/lib/offlinePacks';
-import { PaywallSheet } from '../src/design-system/organisms/PaywallSheet';
 import {
   PremiumLimitCard,
   type PremiumLimitKind,
 } from '../src/design-system/organisms/PremiumLimitCard';
-import { awaitPremiumActivation, refreshPremiumEntitlement } from '../src/lib/premiumRefresh';
-import { usePaywallOffer } from '../src/hooks/usePaywallOffer';
+import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
+import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
 import { usePremium } from '../src/hooks/usePremium';
 import { mobileApi } from '../src/lib/api';
 import { telemetry } from '../src/lib/telemetry';
+import { ModeTogglePill } from '../src/components/ModeTogglePill';
+import { isLastAllowedAddition } from '../src/lib/plus-nudges';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -137,8 +138,16 @@ function RoutePreviewScreen() {
   });
   useLockOrientation();
   const premium = usePremium();
-  const [paywallVisible, setPaywallVisible] = useState(false);
-  const paywallOffer = usePaywallOffer(paywallVisible);
+  // What opened the paywall, or null when closed. The source is telemetry;
+  // the focus decides which benefit the sheet leads with.
+  const [paywall, setPaywall] = useState<{
+    source: PaywallSource;
+    focus?: PaywallFocus;
+  } | null>(null);
+  const openLockedMode = useCallback((mode: 'ebike' | 'cool') => {
+    telemetry.capture('plus_locked_mode_tapped', { mode, screen: 'preview' });
+    setPaywall({ source: 'locked_mode_preview', focus: mode });
+  }, []);
   const [premiumLimit, setPremiumLimit] = useState<PremiumLimitKind | null>(null);
   const routeRequest = useAppStore((state) => state.routeRequest);
   const poiVisibility = useAppStore((state) => state.poiVisibility);
@@ -276,12 +285,21 @@ function RoutePreviewScreen() {
    * Cool additionally needs shade-graph coverage; e-bike is one hostname for
    * every supported country and needs none.
    */
-  const coolAvailable =
+  //
+  // `coolCovered` answers "may Cool be SHOWN or sold here?" (coverage only);
+  // `coolAvailable` answers "may this rider ROUTE on it?" (coverage AND
+  // entitlement). Only the second may reach the request.
+  const coolCovered =
     isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
-    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
-    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+  const coolAvailable =
+    coolCovered && !premium.blockCoolRouting(resolvedCountry.destinationCountry);
   const ebikeAvailable = !premium.blockEbikeRouting();
+  // Locked = offered for sale. Both `block*` predicates fold in the
+  // dark-launch gate, so neither can be true before the paywall is live.
+  const coolLocked = coolCovered && !coolAvailable;
+  const ebikeLocked = !ebikeAvailable;
 
   const effectiveRequest = {
     ...routeRequest,
@@ -722,6 +740,16 @@ function RoutePreviewScreen() {
   const [savingRoute, setSavingRoute] = useState(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
 
+  // N7: say so when this save is the last one the free tier allows, BEFORE
+  // the rider hits the wall. Same cache read as the gate below, and silent on
+  // a cache miss or for anyone the gate does not apply to.
+  const saveIsLastFreeSlot = (() => {
+    const cached = queryClient.getQueryData(['saved-routes']);
+    return Array.isArray(cached)
+      ? isLastAllowedAddition(premium.blockSaveRoute, cached.length)
+      : false;
+  })();
+
   const handleSaveRoute = useCallback(async () => {
     if (!saveRouteName.trim()) return;
 
@@ -1066,6 +1094,40 @@ function RoutePreviewScreen() {
 
           </View>
         </View>
+        {/*
+          The cycle pill skips modes this rider cannot route on, so without
+          this row a free rider on a Plus mode's route would never learn it
+          exists (docs/plans/pedal-plus-nudges.md N1). Tapping sells; it never
+          switches the route.
+        */}
+        {ebikeLocked || coolLocked ? (
+          <View style={styles.lockedModesRow}>
+            {ebikeLocked ? (
+              <ModeTogglePill
+                iconName="battery-charging-outline"
+                label={t('planning.ebike')}
+                isActive={false}
+                activeBgColor={safetyTints.ebikeLight}
+                activeFgColor={colors.ebikeText}
+                locked
+                onPress={() => openLockedMode('ebike')}
+                accessibilityLabel={t('premium.lockedModeA11y', { mode: t('planning.ebike') })}
+              />
+            ) : null}
+            {coolLocked ? (
+              <ModeTogglePill
+                iconName="partly-sunny-outline"
+                label={t('planning.cool')}
+                isActive={false}
+                activeBgColor={colors.cool}
+                activeFgColor={colors.coolOnFill}
+                locked
+                onPress={() => openLockedMode('cool')}
+                accessibilityLabel={t('premium.lockedModeA11y', { mode: t('planning.cool') })}
+              />
+            ) : null}
+          </View>
+        ) : null}
         </FadeSlideIn>
       ) : null}
 
@@ -1283,6 +1345,9 @@ function RoutePreviewScreen() {
             autoFocus
             maxLength={100}
           />
+          {saveIsLastFreeSlot ? (
+            <Text style={styles.modalHint}>{t('premium.nearLimitRoutes')}</Text>
+          ) : null}
           <View style={styles.modalButtonRow}>
             <Button variant="ghost" size="md" onPress={() => setSaveModalVisible(false)}>
               {t('common.cancel')}
@@ -1315,47 +1380,25 @@ function RoutePreviewScreen() {
           }
           onUpgrade={() => {
             setPremiumLimit(null);
-            setPaywallVisible(true);
+            setPaywall({
+              source: 'limit_card',
+              focus: premiumLimit === 'offlinePacks' ? 'offlinePacks' : 'savedRoutes',
+            });
           }}
           onDismiss={() => setPremiumLimit(null)}
         />
       </View>
     ) : null}
 
-    <PaywallSheet
-      visible={paywallVisible}
-      onDismiss={() => setPaywallVisible(false)}
-      limits={premium.limits}
-      coolRoutingAvailable={coolAvailable}
-      monthlyPrice={paywallOffer.monthlyPrice}
-      annualPrice={paywallOffer.annualPrice}
-      trialDays={paywallOffer.trialDays}
-      busy={paywallOffer.busy}
-      isSubscribed={premium.isPlus}
-      expiresAt={premium.entitlement.expiresAt}
-      isInBillingRetry={premium.entitlement.isInBillingRetry}
-      onSubscribe={(plan) => {
-        void paywallOffer.subscribe(plan).then((outcome) => {
-          if (outcome.kind === 'cancelled') {
-            setPaywallVisible(false);
-            return;
-          }
-          if (outcome.kind === 'purchased') {
-            setPaywallVisible(false);
-            // Entitlement arrives via webhook a moment after the store
-            // returns; poll so the rider sees Plus without a restart.
-            void awaitPremiumActivation();
-          }
-        });
-      }}
-      onRestore={() => {
-        void paywallOffer.restore().then((outcome) => {
-          if (outcome.kind === 'restored') {
-            setPaywallVisible(false);
-            void refreshPremiumEntitlement();
-          }
-        });
-      }}
+    <PlusPaywallHost
+      visible={paywall !== null}
+      onDismiss={() => setPaywall(null)}
+      source={paywall?.source ?? 'limit_card'}
+      focus={paywall?.focus}
+      // Coverage only, never entitlement. `coolAvailable` folds in
+      // `blockCoolRouting`, so passing it here hid the Cool benefit from
+      // exactly the free riders the sheet is selling it to.
+      coolRoutingAvailable={coolCovered}
     />
 
     {/* Save toast */}
@@ -1450,6 +1493,11 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       ...textSm,
       color: colors.textSecondary,
       lineHeight: 20,
+    },
+    lockedModesRow: {
+      flexDirection: 'row',
+      gap: space[2],
+      marginTop: space[2],
     },
     summaryStrip: {
       flexDirection: 'row',
@@ -1661,6 +1709,12 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       fontSize: 15,
       fontFamily: fontFamily.body.regular,
       color: colors.textPrimary,
+    },
+    modalHint: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontFamily: fontFamily.body.regular,
+      color: colors.textSecondary,
     },
     modalButtonRow: {
       flexDirection: 'row',

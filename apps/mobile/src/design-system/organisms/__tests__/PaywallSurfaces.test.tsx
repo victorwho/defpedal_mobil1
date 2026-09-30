@@ -51,12 +51,77 @@ describe('PaywallSheet — honesty about coverage', () => {
     // Selling a Romania-only feature to a rider elsewhere is a lie the moment
     // they pay for it.
     wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable={false} />);
-    expect(screen.queryByText('Cool routing')).toBeNull();
+    expect(screen.queryByText('Cool mode')).toBeNull();
   });
 
   it('advertises cool routing where the shade graph exists', () => {
     wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable />);
-    expect(screen.getByText('Cool routing')).toBeTruthy();
+    expect(screen.getByText('Cool mode')).toBeTruthy();
+  });
+});
+
+describe('PaywallSheet — the routing modes lead the offer', () => {
+  // For every grandfathered account the ceilings are waived, so E-bike and
+  // Cool are the whole reason to subscribe. They must not sit under the limits.
+  const precedes = (first: string, second: string) =>
+    Boolean(
+      screen.getByText(first).compareDocumentPosition(screen.getByText(second)) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+  it('names both modes explicitly', () => {
+    wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable />);
+    expect(screen.getByText('E-bike mode')).toBeTruthy();
+    expect(screen.getByText('Cool mode')).toBeTruthy();
+  });
+
+  it('lists E-bike and Cool before any quantity ceiling', () => {
+    wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable />);
+    expect(precedes('E-bike mode', 'Unlimited saved routes')).toBe(true);
+    expect(precedes('Cool mode', 'Unlimited saved routes')).toBe(true);
+  });
+
+  it('says in the subtitle that Plus includes both modes', () => {
+    wrap(<PaywallSheet {...sheetProps} />);
+    expect(screen.getByText(/E-bike and Cool modes/)).toBeTruthy();
+  });
+
+  it('reassures that the safety core stays free', () => {
+    wrap(<PaywallSheet {...sheetProps} />);
+    expect(screen.getByText(/stay free for everyone/)).toBeTruthy();
+  });
+});
+
+describe('PaywallSheet — focus', () => {
+  // Exact-text element lookups, ordered by DOM position. A substring search
+  // over the whole body would match "Cool modes" in the subtitle first.
+  const titles = () =>
+    ['E-bike mode', 'Cool mode', 'Unlimited saved routes', 'Offline maps that stay']
+      .map((title) => screen.getByText(title))
+      .sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+      )
+      .map((el) => el.textContent);
+
+  it('leads with the benefit the rider tapped', () => {
+    wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable focus="cool" />);
+    expect(titles()[0]).toBe('Cool mode');
+  });
+
+  it('keeps the default order without a focus', () => {
+    wrap(<PaywallSheet {...sheetProps} coolRoutingAvailable />);
+    expect(titles()[0]).toBe('E-bike mode');
+  });
+
+  it('shows course and loop rows only when that is what was tapped', () => {
+    const { unmount } = wrap(<PaywallSheet {...sheetProps} />);
+    expect(screen.queryByText('Unlimited imported courses')).toBeNull();
+    expect(screen.queryByText('Unlimited loop searches')).toBeNull();
+    unmount();
+
+    wrap(<PaywallSheet {...sheetProps} focus="importedCourses" />);
+    expect(screen.getByText('Unlimited imported courses')).toBeTruthy();
+    expect(screen.getByText(`Keep every GPX course on your phone. Free keeps ${FREE_LIMITS.importedCourses}.`)).toBeTruthy();
   });
 });
 
@@ -135,7 +200,7 @@ describe('PaywallSheet — plans', () => {
 
   it('states the trial terms plainly', () => {
     wrap(<PaywallSheet {...sheetProps} monthlyPrice="3,00 €" trialDays={7} />);
-    expect(screen.getByText('7-day free trial, then 3,00 €.')).toBeTruthy();
+    expect(screen.getByText('7-day free trial, then 3,00 € / month.')).toBeTruthy();
   });
 
   it('reports the chosen plan to the caller', () => {
@@ -149,7 +214,51 @@ describe('PaywallSheet — plans', () => {
       />,
     );
     fireEvent.click(screen.getByText(/\/ month/));
+    fireEvent.click(screen.getByText('Subscribe'));
     expect(onSubscribe).toHaveBeenCalledWith('monthly');
+  });
+
+  it('pre-selects annual when it is priced', () => {
+    const onSubscribe = vi.fn();
+    wrap(
+      <PaywallSheet
+        {...sheetProps}
+        onSubscribe={onSubscribe}
+        monthlyPrice="3,00 €"
+        annualPrice="30,00 €"
+      />,
+    );
+    fireEvent.click(screen.getByText('Subscribe'));
+    expect(onSubscribe).toHaveBeenCalledWith('annual');
+  });
+
+  it('quotes the trial terms for the SELECTED plan', () => {
+    wrap(
+      <PaywallSheet {...sheetProps} monthlyPrice="3,00 €" annualPrice="30,00 €" trialDays={7} />,
+    );
+    expect(screen.getByText('7-day free trial, then 30,00 € / year.')).toBeTruthy();
+    fireEvent.click(screen.getByText(/3,00 € \/ month/));
+    expect(screen.getByText('7-day free trial, then 3,00 € / month.')).toBeTruthy();
+  });
+
+  it('shows the annual saving and per-month equivalent only when given', () => {
+    const { unmount } = wrap(
+      <PaywallSheet
+        {...sheetProps}
+        monthlyPrice="3,59 €"
+        annualPrice="35,99 €"
+        annualPerMonth="2,99 €"
+        annualSavingsPercent={16}
+      />,
+    );
+    expect(screen.getByText('Save 16%')).toBeTruthy();
+    expect(screen.getByText('2,99 € / month, billed yearly')).toBeTruthy();
+    unmount();
+
+    // Without store numbers the sheet never guesses a saving.
+    wrap(<PaywallSheet {...sheetProps} monthlyPrice="3,59 €" annualPrice="35,99 €" />);
+    expect(screen.queryByText(/Save \d+%/)).toBeNull();
+    expect(screen.getByText('Best value')).toBeTruthy();
   });
 
   it('always offers restore — required by both stores', () => {

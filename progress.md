@@ -1,11 +1,18 @@
 # Implementation Progress
 
-Last updated: 2026-09-27 (session 131b - sessions 130-131 SHIPPED: preview 0.2.176 (179) with testers (Firebase 74poabmph77jg) and API LIVE on defpedal-api-00175-sjs, deployed by digest sha256:679ed21a and CONTENT-verified via the newly declared clientHazardId schema field. Five migrations live. NOT on any store track - production riders still crash on tier promotion)
+Last updated: 2026-09-30 (session 132 - Pedal Plus nudges implemented, launch moved to 2026-10-02 00:00 UTC; preview 0.2.178 (181) with testers, Firebase release 18d0kuq05brsg)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **Session 132 (2026-09-29/30): Pedal Plus nudge plan written AND implemented; launch moved to 2026-10-02 00:00 UTC.** Plan + implementation record: `docs/plans/pedal-plus-nudges.md` (§8).
+  ✅ **Paywall copy rewritten** (EN/RO/ES): E-bike and Cool lead, titles match the pill names, "safety stays free" line. **Bug fixed:** the route-preview paywall hid the Cool benefit from every non-subscriber (it passed an entitlement-gated flag as coverage).
+  ✅ **Locked pills** (E-bike/Cool stay visible with a PLUS tag instead of vanishing), **one-time "moved to Plus" notice**, **post-ride e-bike card**, **hot-day Cool chip**, **last-free-slot hints**, loop quota + loop save limit now lead to the paywall, **plan cards** with annual pre-selected and saving/per-month derived from store prices. One `PlusPaywallHost` now serves every entry point (telemetry, nudge retirement, platform-correct manage link). Caps: one unsolicited Plus surface per session, 14-day spacing, two dismissals retire, subscribing retires all; `plus` is the lowest `claimPromptSlot` ask.
+  ⚠️ **Date moved 2026-10-01 → 2026-10-02 in core, but fielded builds (<= 0.2.177, iOS 1.21) still carry 10-01.** Deploy the API BEFORE the paywall flip (grandfathering is server-side), and apply `202610010001_pedal_plus_go_live.sql` no earlier than 2026-10-02 00:00 UTC. Written into the runbook and the migration header.
+  ⚠️ **Two of my own tests were vacuous and caught by mutation:** a body-text `indexOf` matched "Cool modes" in the subtitle, and an `aria-selected` check could never fail because the RN test renderer emits no accessibilityState. Both rewritten and re-mutated.
+  **Green:** typecheck 0; mobile 2,176 · core 1,420 · API 1,212; lint ratchet clean; bundle HTTP 200 and content-verified from `C:\dev\defpedal`. **Preview 0.2.178 (181)** built (R8 keep check + leak audit passed), APK content-verified (versionCode/Name, new strings in the Hermes bundle), distributed to `early-access-preview`. NOT device-tested. NOT deployed.
 
 - **Session 128 (2026-09-25): triaged an external LLM's 10-item code review, then fixed what survived. Four security migrations are LIVE on production; three code fixes are on main and NOT deployed.** Full triage + the re-verification queries: [`docs/plans/external-review-triage-2026-09-25.md`](docs/plans/external-review-triage-2026-09-25.md).
   ⚠️ **The review was directionally useful and specifically unreliable, and the plan records which.** Its #1 and #2 pointed at real neighbourhoods but stated the mechanism wrongly; ~10 items were already tracked in `TODO.md` §issuestofix; several were the OPPOSITE of true (`gpx-parse.ts` is the best-validated boundary in the repo; `polyline.ts` cannot emit NaN — every branch is bitwise, which coerces the past-end `charCodeAt` NaN to 0; `retention.ts`/`usageMeters.ts` handle errors exemplarily). **Two of the five P0s were not in the review at all.** Every finding now carries a LIVE / SOURCE / FILES-ONLY tag.

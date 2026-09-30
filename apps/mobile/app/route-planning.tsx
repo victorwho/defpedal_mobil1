@@ -58,6 +58,11 @@ import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { usePremium } from '../src/hooks/usePremium';
+import { usePlusNudge } from '../src/hooks/usePlusNudge';
+import { isHotDayForCool } from '../src/lib/plus-nudges';
+import { telemetry } from '../src/lib/telemetry';
+import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
+import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
 import { pickGpxFile } from '../src/lib/gpx-import';
 import { deleteCourseGeometry, pruneOrphanedCourses } from '../src/lib/courseStorage';
 import { deleteSavedLoop, pruneOrphanedLoops } from '../src/lib/loopStorage';
@@ -204,11 +209,19 @@ export default function RoutePlanningScreen() {
   // into the SAME predicate so the heal-effect below also clears a stale
   // avoidHeat preference, rather than needing a second one — which is how a
   // rider ends up routing on a graph the pill says they are not using.
-  const coolAvailable =
+  //
+  // Two questions, deliberately kept apart (docs/plans/pedal-plus-nudges.md N1):
+  //   - `coolCovered`: may the pill be SHOWN? Coverage only.
+  //   - `coolAvailable`: may the rider ROUTE on it? Coverage AND entitlement.
+  // The heal effect and the dispatcher read only the second. A locked pill
+  // is the difference: shown, never lit, and a tap sells rather than routes.
+  const coolCovered =
     isCoolModeEnabled() &&
     resolvedCountry.routeSupported &&
-    isHeatRoutingAvailable(resolvedCountry.destinationCountry) &&
-    !premium.blockCoolRouting(resolvedCountry.destinationCountry);
+    isHeatRoutingAvailable(resolvedCountry.destinationCountry);
+  const coolAvailable =
+    coolCovered && !premium.blockCoolRouting(resolvedCountry.destinationCountry);
+  const coolLocked = coolCovered && !coolAvailable;
   useEffect(() => {
     if (!hasDestination) return;
     if (!resolvedCountry.routeSupported) return; // force-fast effect owns this case
@@ -218,9 +231,22 @@ export default function RoutePlanningScreen() {
   // E-bike needs no country gate — one graph serves every supported
   // country — so entitlement is the only thing that can withdraw it.
   const ebikeAvailable = !premium.blockEbikeRouting();
+  // `blockEbikeRouting` already folds in the dark-launch gate, so a locked
+  // pill can only ever appear once the paywall is live.
+  const ebikeLocked = !ebikeAvailable;
   useEffect(() => {
     if (isEbike && !ebikeAvailable) selectRoutingMode('safe');
   }, [isEbike, ebikeAvailable, selectRoutingMode]);
+
+  // ── Pedal Plus paywall (docs/plans/pedal-plus-nudges.md) ──
+  const [paywall, setPaywall] = useState<{
+    source: PaywallSource;
+    focus?: PaywallFocus;
+  } | null>(null);
+  const openLockedMode = useCallback((mode: 'ebike' | 'cool') => {
+    telemetry.capture('plus_locked_mode_tapped', { mode, screen: 'planning' });
+    setPaywall({ source: 'locked_mode_planning', focus: mode });
+  }, []);
   // Which mode pill is lit. Same precedence as the dispatcher's graph choice
   // (`resolveSafeRoutingProfile`), so the highlighted pill is always the one
   // that computes the route.
@@ -309,6 +335,13 @@ export default function RoutePlanningScreen() {
     planningOrigin?.lon ?? null,
   );
   const { hazards: nearbyHazards } = useNearbyHazards(planningOrigin, true, 2000);
+
+  // N6: Cool is pitched when it is hot, never on a calendar — and only to a
+  // rider who has a destination in shade coverage and does not have Cool.
+  const hotDayNudge = usePlusNudge(
+    'cool_hot_day',
+    coolLocked && isHotDayForCool(weather?.dailyTempMax),
+  );
 
   const [startOverrideQuery, setStartOverrideQuery] = useState('');
   const [destinationQuery, setDestinationQuery] = useState(
@@ -1594,31 +1627,67 @@ export default function RoutePlanningScreen() {
                   are Plus-only and this rider has neither, rendering it would
                   leave an empty gap under the first row.
                 */}
-                {ebikeAvailable || coolAvailable ? (
+                {ebikeAvailable || ebikeLocked || coolCovered ? (
                 <View style={[styles.modeToggleRow, styles.modeToggleRowSecondary]}>
-                  {ebikeAvailable ? (
-                    <ModeTogglePill
-                      iconName="battery-charging-outline"
-                      label={t('planning.ebike')}
-                      isActive={routingDisplayMode === 'ebike'}
-                      activeBgColor={safetyTints.ebikeLight}
-                      activeFgColor={colors.ebikeText}
-                      onPress={() => selectRoutingMode('ebike')}
-                      accessibilityLabel={t('planning.ebikeA11y')}
-                    />
-                  ) : null}
-                  {coolAvailable ? (
+                  <ModeTogglePill
+                    iconName="battery-charging-outline"
+                    label={t('planning.ebike')}
+                    isActive={routingDisplayMode === 'ebike'}
+                    activeBgColor={safetyTints.ebikeLight}
+                    activeFgColor={colors.ebikeText}
+                    locked={ebikeLocked}
+                    onPress={() =>
+                      ebikeLocked ? openLockedMode('ebike') : selectRoutingMode('ebike')
+                    }
+                    accessibilityLabel={
+                      ebikeLocked
+                        ? t('premium.lockedModeA11y', { mode: t('planning.ebike') })
+                        : t('planning.ebikeA11y')
+                    }
+                  />
+                  {coolCovered ? (
                     <ModeTogglePill
                       iconName="partly-sunny-outline"
                       label={t('planning.cool')}
                       isActive={routingDisplayMode === 'cool'}
                       activeBgColor={colors.cool}
                       activeFgColor={colors.coolOnFill}
-                      onPress={() => selectRoutingMode('cool')}
-                      accessibilityLabel="Cool routing — least heat"
+                      locked={coolLocked}
+                      onPress={() =>
+                        coolLocked ? openLockedMode('cool') : selectRoutingMode('cool')
+                      }
+                      accessibilityLabel={
+                        coolLocked
+                          ? t('premium.lockedModeA11y', { mode: t('planning.cool') })
+                          : 'Cool routing — least heat'
+                      }
                     />
                   ) : null}
                 </View>
+                ) : null}
+                {hotDayNudge.visible ? (
+                  <View style={styles.hotDayChip}>
+                    <Pressable
+                      style={styles.hotDayChipBody}
+                      onPress={() => {
+                        hotDayNudge.accept();
+                        setPaywall({ source: 'cool_hot_day', focus: 'cool' });
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('premium.hotDayChip')}
+                    >
+                      <Ionicons name="partly-sunny-outline" size={16} color={colors.cool} />
+                      <Text style={styles.hotDayChipText}>{t('premium.hotDayChip')}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={hotDayNudge.dismiss}
+                      hitSlop={12}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('premium.notNow')}
+                    >
+                      <Ionicons name="close" size={16} color={gray[500]} />
+                    </Pressable>
+                  </View>
                 ) : null}
                 {/* Supported country WITHOUT road_risk_data: unreachable
                     since the b36v1 EU-wide dataset (2026-08-01) put risk
@@ -2240,6 +2309,13 @@ export default function RoutePlanningScreen() {
         </Pressable>
       </Pressable>
     ) : null}
+    <PlusPaywallHost
+      visible={paywall !== null}
+      onDismiss={() => setPaywall(null)}
+      source={paywall?.source ?? 'locked_mode_planning'}
+      focus={paywall?.focus}
+      coolRoutingAvailable={coolCovered}
+    />
     </View>
   );
 }
@@ -2327,6 +2403,32 @@ const createThemedStyles = (colors: ThemeColors) =>
     },
     modeToggleRowSecondary: {
       marginTop: space[2],
+    },
+    hotDayChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: space[2],
+      marginTop: space[2],
+      backgroundColor: surfaceTints.glassLight,
+      borderRadius: radii.full,
+      paddingLeft: space[3],
+      paddingRight: space[2],
+      minHeight: 36,
+      ...shadows.sm,
+    },
+    hotDayChipBody: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      flexShrink: 1,
+      paddingVertical: space[2],
+    },
+    hotDayChipText: {
+      ...textXs,
+      fontFamily: fontFamily.body.semiBold,
+      color: gray[800],
+      flexShrink: 1,
     },
     coverageNotice: {
       flexDirection: 'row',

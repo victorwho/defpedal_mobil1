@@ -9,7 +9,7 @@
  * the sheet renders its benefits with no purchase button, and nothing throws.
  * That is the current state everywhere until store products exist.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   getStoreOffers,
@@ -20,11 +20,18 @@ import {
   type RestoreOutcome,
   type StoreOffers,
 } from '../lib/purchases';
+import { annualPerMonthString, annualSavingsPercent } from '../lib/planPricing';
+import { intlLocaleTag } from '../lib/dateFormat';
 import { useAuthSession } from '../providers/AuthSessionProvider';
+import { useLocale } from './useTranslation';
 
 export interface UsePaywallOfferResult {
   readonly monthlyPrice?: string;
   readonly annualPrice?: string;
+  /** Annual price over twelve months — secondary copy only. */
+  readonly annualPerMonth?: string;
+  /** Whole-percent saving of annual over monthly, when worth advertising. */
+  readonly annualSavingsPercent?: number;
   readonly trialDays?: number;
   /** True while a store call is in flight — drives the CTA's disabled state. */
   readonly busy: boolean;
@@ -41,6 +48,7 @@ const EMPTY: StoreOffers = { monthly: null, annual: null };
 export const usePaywallOffer = (active: boolean): UsePaywallOfferResult => {
   const { user } = useAuthSession();
   const userId = user?.id ?? null;
+  const { locale } = useLocale();
 
   const [offers, setOffers] = useState<StoreOffers>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -82,9 +90,19 @@ export const usePaywallOffer = (active: boolean): UsePaywallOfferResult => {
     }
   }, [userId]);
 
+  const derived = useMemo(
+    () => ({
+      perMonth: annualPerMonthString(offers.annual, intlLocaleTag(locale)) ?? undefined,
+      savings: annualSavingsPercent(offers.monthly, offers.annual) ?? undefined,
+    }),
+    [offers, locale],
+  );
+
   return {
     monthlyPrice: offers.monthly?.priceString,
     annualPrice: offers.annual?.priceString,
+    annualPerMonth: derived.perMonth,
+    annualSavingsPercent: derived.savings,
     // The trial is a property of the offer, not of the tier — read it from
     // whichever plan carries one rather than hardcoding 7 days, so the copy can
     // never disagree with what the store will actually charge.

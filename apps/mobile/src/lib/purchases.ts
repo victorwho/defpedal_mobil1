@@ -35,6 +35,14 @@ export interface StoreOffer {
   readonly plan: PurchasePlan;
   /** Localised, store-formatted price string (e.g. "3,00 €"). Never computed. */
   readonly priceString: string;
+  /**
+   * Numeric price and ISO currency, as the store reports them. Used ONLY to
+   * derive secondary figures (the annual plan's per-month equivalent and its
+   * saving); the billed amount on screen is always `priceString`. Null when
+   * the store did not send them, and then those figures are simply omitted.
+   */
+  readonly price: number | null;
+  readonly currencyCode: string | null;
   /** Free-trial length in days, when the offer carries an intro offer. */
   readonly trialDays: number | null;
   /** Opaque handle passed back to `purchase`. */
@@ -206,9 +214,19 @@ const toOffer = (pkg: Record<string, unknown> | null, plan: PurchasePlan): Store
   const product = pkg.product as Record<string, unknown> | undefined;
   const priceString = typeof product?.priceString === 'string' ? product.priceString : '';
   if (!priceString) return null;
+  const price =
+    typeof product?.price === 'number' && Number.isFinite(product.price) && product.price > 0
+      ? product.price
+      : null;
+  const currencyCode =
+    typeof product?.currencyCode === 'string' && /^[A-Z]{3}$/.test(product.currencyCode)
+      ? product.currencyCode
+      : null;
   return {
     plan,
     priceString,
+    price,
+    currencyCode,
     trialDays: trialDaysOf(pkg as never),
     packageRef: pkg,
   };

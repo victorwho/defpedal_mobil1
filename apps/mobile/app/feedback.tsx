@@ -54,6 +54,12 @@ import {
   type AnalyticsPromptId,
 } from '../src/lib/analytics-optin';
 import { claimPromptSlot } from '../src/lib/prompt-arbitration';
+import { PlusSuggestionCard } from '../src/design-system/organisms/PlusSuggestionCard';
+import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
+import { usePlusNudge } from '../src/hooks/usePlusNudge';
+import { usePremium } from '../src/hooks/usePremium';
+import { shouldSuggestEbikeAfterRide } from '../src/lib/plus-nudges';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { shouldShowSaveRidePrompt } from '../src/lib/save-ride-prompt';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useShareCard } from '../src/hooks/useShareCard';
@@ -225,6 +231,31 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
   // when the rider leaves this screen.
   const sessionHazardReports = useAppStore((state) => state.sessionHazardReports);
 
+  // ── Pedal Plus: E-bike suggestion (docs/plans/pedal-plus-nudges.md N5) ──
+  // Lowest-priority ask on this screen. It is only WANTED once the review and
+  // sesizare cards have both declined, and `usePlusNudge` additionally yields
+  // to any ask that already claimed a slot this session.
+  const bikeTypeId = useAppStore((s) => s.bikeTypeId);
+  const rodeEbikeMode = useAppStore((s) => s.isEbike);
+  const premium = usePremium();
+  const ebikeNudge = usePlusNudge(
+    'ebike_post_ride',
+    submitted &&
+      !showReviewCard &&
+      !showSesizareCard &&
+      premium.blockEbikeRouting() &&
+      shouldSuggestEbikeAfterRide({
+        bikeTypeId,
+        rodeEbikeMode,
+        completedRideCount,
+        rating,
+      }),
+  );
+  const [ebikePaywallOpen, setEbikePaywallOpen] = useState(false);
+  const riderCountry = useAppStore((s) => s.regionGate.countryCode);
+  const coolCovered =
+    isCoolModeEnabled() && premium.coolRouting(riderCountry as never) !== 'country_unavailable';
+
   const selectedRoute =
     routePreview?.routes.find((r) => r.id === selectedRouteId) ??
     routePreview?.routes[0] ??
@@ -334,6 +365,28 @@ const RatingStep = ({ onDone, onCancel, styles, colors, reviewTrigger }: RatingS
               <SesizarePostRideCard reports={sessionHazardReports} />
             </View>
           ) : null}
+          {ebikeNudge.visible ? (
+            <View style={styles.reviewPromptSlot}>
+              <PlusSuggestionCard
+                icon="battery-charging-outline"
+                title={t('premium.ebikeCardTitle')}
+                body={t('premium.ebikeCardBody')}
+                ctaLabel={t('premium.ebikeCardCta')}
+                onCta={() => {
+                  ebikeNudge.accept();
+                  setEbikePaywallOpen(true);
+                }}
+                onDismiss={ebikeNudge.dismiss}
+              />
+            </View>
+          ) : null}
+          <PlusPaywallHost
+            visible={ebikePaywallOpen}
+            onDismiss={() => setEbikePaywallOpen(false)}
+            source="ebike_post_ride"
+            focus="ebike"
+            coolRoutingAvailable={coolCovered}
+          />
           <Pressable
             style={[styles.button, styles.doneButton]}
             onPress={onDone}

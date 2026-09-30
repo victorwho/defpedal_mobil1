@@ -178,13 +178,13 @@ export const limitsForTier = (tier: PremiumTier): TierLimits =>
  * `profiles.premium_ui_enabled` is false for every account.
  *
  * ⚠️ This date is a COMMITMENT, not a default. Set to 2026-10-01 on
- * 2026-09-18, which means the paywall must be switched on by then: a rider
+ * 2026-09-18 and moved to 2026-10-02 on 2026-09-29, which means the paywall must be switched on by then: a rider
  * who signs up after this instant while the paywall is still dark would be
  * capped retroactively the day it is flipped, which is precisely what
  * grandfathering exists to prevent. If the paywall is not ready, move this
  * date forward in the same change that extends `PLUS_MODES_FREE_UNTIL`.
  */
-export const PLUS_LAUNCH_AT_ISO = '2026-10-01T00:00:00.000Z';
+export const PLUS_LAUNCH_AT_ISO = '2026-10-02T00:00:00.000Z';
 
 // ---------------------------------------------------------------------------
 // Offline entitlement grace

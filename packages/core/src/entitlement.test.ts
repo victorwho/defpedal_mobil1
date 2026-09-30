@@ -30,7 +30,7 @@ import {
 
 const NOW = '2026-08-15T12:00:00.000Z';
 /** An instant after the cool-routing launch promotion has ended. */
-const AFTER_COOL_PROMO = new Date('2026-10-02T00:00:00.000Z');
+const AFTER_COOL_PROMO = new Date('2026-10-03T00:00:00.000Z');
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const daysBefore = (iso: string, days: number): string =>
@@ -367,7 +367,7 @@ describe('cool routing availability', () => {
    *
    * Without it they read the wall clock, so they failed the day cool routing
    * went free to everyone and would have started passing again by themselves
-   * on 2026-10-01 — a test that changes its answer depending on the day it is
+   * on 2026-10-02 — a test that changes its answer depending on the day it is
    * run is worse than one that fails, because the failure is at least visible.
    * `AFTER_COOL_PROMO` is the post-promotion contract; the promotion itself is
    * covered in its own describe block below.
@@ -460,9 +460,9 @@ describe('canImportAnotherCourse', () => {
 // ---------------------------------------------------------------------------
 
 describe('cool routing promotion', () => {
-  const dayBefore = new Date('2026-09-30T23:59:59Z');
-  const atCutoff = new Date('2026-10-01T00:00:00Z');
-  const afterCutoff = new Date('2026-10-01T00:00:01Z');
+  const dayBefore = new Date('2026-10-01T23:59:59Z');
+  const atCutoff = new Date('2026-10-02T00:00:00Z');
+  const afterCutoff = new Date('2026-10-02T00:00:01Z');
 
   const freeRider = resolveEntitlement({
     server: freeSnapshot(NOW),
@@ -520,6 +520,15 @@ describe('cool routing promotion', () => {
    * gate. One constant so they cannot drift apart.
    */
   it('exposes the cutoff as a single UTC instant', () => {
-    expect(PLUS_MODES_FREE_UNTIL.toISOString()).toBe('2026-10-01T00:00:00.000Z');
+    expect(PLUS_MODES_FREE_UNTIL.toISOString()).toBe('2026-10-02T00:00:00.000Z');
+  });
+
+  /*
+   * The modes going paid and new accounts losing grandfathering are ONE
+   * launch. If they drift apart, a rider could sign up after the modes went
+   * paid but still be grandfathered from the ceilings, or the reverse.
+   */
+  it('shares its instant with PLUS_LAUNCH_AT_ISO', () => {
+    expect(new Date(PLUS_LAUNCH_AT_ISO).getTime()).toBe(PLUS_MODES_FREE_UNTIL.getTime());
   });
 });

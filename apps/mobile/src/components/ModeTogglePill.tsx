@@ -15,6 +15,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { PlusBadge } from '../design-system/atoms/PlusBadge';
 import { PressableScale } from '../design-system/atoms/PressableScale';
 import { useTheme } from '../design-system';
 import { useReducedMotion } from '../design-system/hooks/useReducedMotion';
@@ -36,8 +37,19 @@ export interface ModeTogglePillProps {
   activeFgColor: string;
   onPress: () => void;
   accessibilityLabel: string;
+  /**
+   * A Pedal Plus mode this rider is not entitled to. The pill stays on screen
+   * — a mode that silently disappears is a feature the rider is never told
+   * they can get back — but it never renders as active, carries a PLUS tag,
+   * and the caller's `onPress` opens the paywall instead of switching modes.
+   */
+  locked?: boolean;
   style?: StyleProp<ViewStyle>;
 }
+
+/** A locked Plus mode is never shown, or announced, as the mode in use. */
+export const resolvePillActive = (isActive: boolean, locked: boolean): boolean =>
+  isActive && !locked;
 
 export const ModeTogglePill: React.FC<ModeTogglePillProps> = ({
   iconName,
@@ -47,20 +59,22 @@ export const ModeTogglePill: React.FC<ModeTogglePillProps> = ({
   activeFgColor,
   onPress,
   accessibilityLabel,
+  locked = false,
   style,
 }) => {
+  const active = resolvePillActive(isActive, locked);
   useTheme(); // subscribe so the inactive resting tone tracks the theme
   const reduced = useReducedMotion();
-  const progress = useRef(new Animated.Value(isActive ? 1 : 0)).current;
+  const progress = useRef(new Animated.Value(active ? 1 : 0)).current;
 
   useEffect(() => {
     Animated.timing(progress, {
-      toValue: isActive ? 1 : 0,
+      toValue: active ? 1 : 0,
       duration: reduced ? 0 : duration.fast,
       easing: easing.default,
       useNativeDriver: false, // bg + text color interpolation
     }).start();
-  }, [isActive, reduced, progress]);
+  }, [active, reduced, progress]);
 
   const animatedBg = progress.interpolate({
     inputRange: [0, 1],
@@ -73,14 +87,14 @@ export const ModeTogglePill: React.FC<ModeTogglePillProps> = ({
 
   // Icon color snaps (Ionicons doesn't play well with Animated color interpolation).
   // The bg + text fade carry the visual transition.
-  const iconColor = isActive ? activeFgColor : gray[400];
+  const iconColor = active ? activeFgColor : gray[400];
 
   return (
     <PressableScale
       onPress={onPress}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      accessibilityState={{ selected: isActive }}
+      accessibilityState={{ selected: active }}
       hapticOnPress="snap"
       style={style}
       pressedScale={0.94}
@@ -90,6 +104,7 @@ export const ModeTogglePill: React.FC<ModeTogglePillProps> = ({
         <Animated.Text style={[styles.label, { color: animatedFg }]}>
           {label}
         </Animated.Text>
+        {locked ? <PlusBadge size="sm" muted /> : null}
       </Animated.View>
     </PressableScale>
   );

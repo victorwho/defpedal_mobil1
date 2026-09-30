@@ -33,8 +33,8 @@ part of Plus that is a feature rather than a quantity.
 | **Cool** | Routes under tree canopy where it can, and reports how much of the ride is shaded | 31 covered countries (widened from Romania on 2026-09-17) |
 | **E-bike** | Prices climbs for a motor rather than legs — different routes and materially different ETAs | 31 covered countries, one graph |
 
-Both are **free to every rider until `PLUS_MODES_FREE_UNTIL` (2026-10-01,
-exclusive)**, then Plus-only. The promotion is announced in-app by a one-time
+Both are **free to every rider until `PLUS_MODES_FREE_UNTIL` (2026-10-02,
+exclusive — moved from 2026-10-01 on 2026-09-29)**, then Plus-only. The promotion is announced in-app by a one-time
 notice naming both modes.
 
 ⚠️ **Neither is grandfathered.** Every ceiling below is waived for pre-launch
@@ -46,7 +46,7 @@ either away.
 ### The seven ceilings
 
 These apply **only to accounts created on or after `PLUS_LAUNCH_AT_ISO`
-(2026-10-01)**.
+(2026-10-02)**.
 
 | | Free | Plus |
 |---|---|---|
@@ -82,7 +82,7 @@ Two properties worth stating plainly:
 
 **Nothing, except the two routing modes.**
 
-Accounts created before 2026-10-01 are grandfathered and exempt from all seven
+Accounts created before 2026-10-02 are grandfathered and exempt from all seven
 ceilings — unlimited saved routes, courses, packs, history and loop searches,
 with no pack expiry. That was a deliberate decision on 2026-09-18: the previous
 rule ("content stays, additions are capped") produced a rider with twelve saved
@@ -244,8 +244,12 @@ Android has no remaining billing blockers.
 
 | Date | What |
 |---|---|
-| **2026-10-01** | `PLUS_MODES_FREE_UNTIL` — Cool and E-bike become Plus-only |
-| **2026-10-01** | `PLUS_LAUNCH_AT_ISO` — accounts created from here are not grandfathered |
+| **2026-10-02** | `PLUS_MODES_FREE_UNTIL` — Cool and E-bike become Plus-only |
+| **2026-10-02** | `PLUS_LAUNCH_AT_ISO` — accounts created from here are not grandfathered |
+
+Moved from 2026-10-01 on 2026-09-29. Fielded builds up to 0.2.177 still carry
+2026-10-01 — see the runbook for why that is safe only if the API is deployed
+first and the paywall is flipped no earlier than 2026-10-02 00:00 UTC.
 
 These are the same instant on purpose. It also means **the paywall must be live
 by then**: a rider who signs up after it while the paywall is still dark would

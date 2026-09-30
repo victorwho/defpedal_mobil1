@@ -17,7 +17,16 @@
  * restart, which is the session boundary every other prompt latch uses).
  */
 
-export type PromptSurface = 'save_ride' | 'review' | 'sesizare' | 'analytics';
+export type PromptSurface = 'save_ride' | 'review' | 'sesizare' | 'analytics' | 'plus';
+
+/*
+ * `plus` (docs/plans/pedal-plus-nudges.md) is the LOWEST priority ask: a sale
+ * never displaces a rider's own ride, a review, a civic report or a consent
+ * question. It yields to every other surface, and once it has shown, the
+ * analytics ask — the only one ranked below the rest — yields to it for the
+ * session. Save-ride and review still render after it: they carry the rider's
+ * own data and the review quota, and a Plus card is inline and dismissible.
+ */
 
 let shownThisSession = new Set<PromptSurface>();
 
@@ -26,11 +35,14 @@ let shownThisSession = new Set<PromptSurface>();
  * render (and records the claim); false when arbitration blocks it.
  */
 export const claimPromptSlot = (surface: PromptSurface): boolean => {
-  if (surface === 'analytics') {
+  if (surface === 'plus') {
+    if (shownThisSession.size > 0 && !shownThisSession.has('plus')) return false;
+  } else if (surface === 'analytics') {
     if (
       shownThisSession.has('save_ride') ||
       shownThisSession.has('review') ||
-      shownThisSession.has('sesizare')
+      shownThisSession.has('sesizare') ||
+      shownThisSession.has('plus')
     ) {
       return false;
     }
@@ -57,11 +69,15 @@ export const claimPromptSlot = (surface: PromptSurface): boolean => {
 
 /** Read-only check (no claim) — for eligibility previews. */
 export const isPromptSlotAvailable = (surface: PromptSurface): boolean => {
+  if (surface === 'plus') {
+    return shownThisSession.size === 0 || (shownThisSession.size === 1 && shownThisSession.has('plus'));
+  }
   if (surface === 'analytics') {
     return (
       !shownThisSession.has('save_ride') &&
       !shownThisSession.has('review') &&
-      !shownThisSession.has('sesizare')
+      !shownThisSession.has('sesizare') &&
+      !shownThisSession.has('plus')
     );
   }
   if (surface === 'sesizare') {

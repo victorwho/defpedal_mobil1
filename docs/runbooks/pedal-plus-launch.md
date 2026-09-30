@@ -2,8 +2,8 @@
 
 Everything still unfinished, in the order it has to happen.
 
-**Deadline: 2026-10-01** — 11 days from writing. Three things land on that date
-and they are the same instant on purpose:
+**Deadline: 2026-10-02 00:00 UTC** (moved from 2026-10-01 on 2026-09-29).
+Three things land on that instant and they are the same instant on purpose:
 
 - `PLUS_MODES_FREE_UNTIL` — Cool and E-bike stop being free
 - `PLUS_LAUNCH_AT_ISO` — accounts created from here are not grandfathered
@@ -13,9 +13,24 @@ and they are the same instant on purpose:
 What the offering actually is: `docs/pedal-plus-offering.md`.
 
 > **If you are going to miss the date, act on [Step 0](#step-0--decide-by-27-september)
-> rather than letting it pass.** The app has told riders in three languages that
-> these modes become Plus on 30 September. Silently not doing it is the option
-> that costs trust; extending the promotion costs one release.
+> rather than letting it pass.** Silently not doing it is the option that costs
+> trust; extending the promotion costs one release.
+
+> ⚠️ **The 2026-09-29 move is NOT in any fielded build.** Production 0.2.177 and
+> the iOS 1.21 submission still compile in 2026-10-01, and their one-time promo
+> notice told riders "free until 30 September". Two consequences:
+>
+> 1. **Deploy the API before flipping the paywall.** Grandfathering is decided
+>    server-side from `PLUS_LAUNCH_AT_ISO` (`services/mobile-api/src/lib/entitlements.ts`
+>    → core `isGrandfatheredAccount`), so an API still on the old date would
+>    treat every account created on 1 October as NOT grandfathered.
+> 2. **Do not apply `202610010001_pedal_plus_go_live.sql` before
+>    2026-10-02 00:00 UTC.** The mode gates fail open while the paywall is dark,
+>    so old and new builds agree as long as the flip comes after both cutoffs.
+>    Flipping on 1 October would withdraw E-bike and Cool on old builds a day
+>    before new builds and before this runbook's date.
+>
+> Riders gain a day relative to what they were told; nobody loses one.
 
 ---
 
@@ -257,7 +272,7 @@ no undo that gives a rider back the moment they first saw a price.
 
 Immediately after, verify a grandfathered account is still exempt:
 ```sql
--- expect premium_ui_enabled = true AND created_at < '2026-10-01'
+-- expect premium_ui_enabled = true AND created_at < '2026-10-02'
 SELECT premium_ui_enabled, created_at FROM profiles WHERE id = '<an-old-user-id>';
 ```
 That rider should see the paywall and still be able to save a 6th route.

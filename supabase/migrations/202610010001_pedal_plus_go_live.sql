@@ -18,7 +18,7 @@
 --
 -- WHAT IT DOES NOT DO
 --   It does not take anything away from anyone who is already here. Accounts
---   created before `PLUS_LAUNCH_AT_ISO` (2026-10-01) are grandfathered in
+--   created before `PLUS_LAUNCH_AT_ISO` (2026-10-02) are grandfathered in
 --   `packages/core/src/entitlement.ts` and stay exempt from every ceiling and
 --   every meter. They see the paywall so they can buy Cool routing; they are
 --   not capped by it.
@@ -30,10 +30,16 @@
 --     the subscribe button does nothing.
 --   - A build carrying the Cool entitlement gate is LIVE in both stores. The
 --     gate ships in the client, so an older build ignores it.
---   - `PLUS_LAUNCH_AT_ISO` still reads 2026-10-01. If the launch slipped, that
---     constant and `COOL_ROUTING_FREE_UNTIL` must move together, in a shipped
---     release, BEFORE this runs — otherwise riders who joined in the gap are
---     capped retroactively, which is the thing grandfathering exists to stop.
+--   - `PLUS_LAUNCH_AT_ISO` reads 2026-10-02 (moved from 2026-10-01 on
+--     2026-09-29) AND the API serving production was deployed from a commit
+--     carrying it — grandfathering is decided server-side. If the launch
+--     slips again, that constant and `PLUS_MODES_FREE_UNTIL` move together, in
+--     a shipped release, BEFORE this runs — otherwise riders who joined in the
+--     gap are capped retroactively, which is the thing grandfathering exists
+--     to stop.
+--   - It is on or after 2026-10-02 00:00 UTC. Fielded builds up to 0.2.177
+--     still compile in the old 2026-10-01 cutoff; applying this after both
+--     cutoffs keeps old and new builds in agreement.
 --
 -- ROLLBACK (cosmetic only — it cannot unsee a paywall):
 --   ALTER TABLE public.profiles ALTER COLUMN premium_ui_enabled SET DEFAULT false;

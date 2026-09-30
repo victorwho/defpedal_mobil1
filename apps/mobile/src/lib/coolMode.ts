@@ -35,7 +35,7 @@
  * Now unconditional. The remaining gates on Cool are real ones, not build
  * flags: `isHeatRoutingAvailable(country)` for shade-graph coverage, and
  * `resolveCoolRoutingAvailability` for entitlement (see
- * `PLUS_MODES_FREE_UNTIL` — free to everyone through 2026-09-30, Plus
+ * `PLUS_MODES_FREE_UNTIL` — free to everyone through 2026-10-01, Plus
  * thereafter).
  */
 export const isCoolModeEnabled = (): boolean => true;

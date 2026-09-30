@@ -403,7 +403,7 @@ export type CoolRoutingAvailability =
  * The Plus routing modes — Cool and E-bike — are free to every rider until
  * this instant, then Plus-only.
  *
- * Exclusive: free THROUGH 2026-09-30, chargeable from 2026-10-01. UTC because
+ * Exclusive: free THROUGH 2026-10-01, chargeable from 2026-10-02. UTC because
  * a device clock in another zone must not move the boundary by a day, in
  * either direction — a rider in Auckland should not lose the promotion a day
  * early, and one in Honolulu should not keep it a day late.
@@ -419,7 +419,7 @@ export type CoolRoutingAvailability =
  * ⚠️ TWO THINGS THIS DOES NOT DO.
  *  - It does not enforce anything on the routing REQUEST. Nothing checks this
  *    entitlement before dispatching to the shade graph; `usePremium().coolRouting`
- *    is read only for paywall copy. So on 2026-10-01 a free rider whose stored
+ *    is read only for paywall copy. So on 2026-10-02 a free rider whose stored
  *    `avoidHeat` is already true keeps getting shade routes. Closing that is
  *    separate work and must land before the date, or the promise lapses in
  *    name only.
@@ -427,7 +427,12 @@ export type CoolRoutingAvailability =
  *    keeps the preference; what changes is whether the product is willing to
  *    keep serving it.
  */
-export const PLUS_MODES_FREE_UNTIL = new Date('2026-10-01T00:00:00Z');
+/*
+ * Moved from 2026-10-01 to 2026-10-02 on 2026-09-29, together with
+ * `PLUS_LAUNCH_AT_ISO` — the two are the same instant on purpose, and a test
+ * pins that they stay so.
+ */
+export const PLUS_MODES_FREE_UNTIL = new Date('2026-10-02T00:00:00Z');
 
 /** True while cool routing is free to everyone regardless of tier. */
 export const isPlusModesPromoActive = (now: Date = new Date()): boolean =>

@@ -87,3 +87,29 @@ describe('isPromptSlotAvailable', () => {
     expect(isPromptSlotAvailable('analytics')).toBe(false);
   });
 });
+
+describe('plus — the lowest-priority ask', () => {
+  it('may claim a fresh session', () => {
+    expect(claimPromptSlot('plus')).toBe(true);
+  });
+
+  it('yields to every other surface', () => {
+    for (const other of ['save_ride', 'review', 'sesizare', 'analytics'] as const) {
+      resetPromptArbitrationForTest();
+      claimPromptSlot(other);
+      expect(isPromptSlotAvailable('plus')).toBe(false);
+      expect(claimPromptSlot('plus')).toBe(false);
+    }
+  });
+
+  it('keeps the analytics ask out of a session it already used', () => {
+    claimPromptSlot('plus');
+    expect(claimPromptSlot('analytics')).toBe(false);
+  });
+
+  it('never starves the rider’s own ride or the review card', () => {
+    claimPromptSlot('plus');
+    expect(claimPromptSlot('save_ride')).toBe(true);
+    expect(claimPromptSlot('review')).toBe(true);
+  });
+});

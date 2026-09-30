@@ -1,7 +1,7 @@
 import type { RouteOption, RoutePreviewResponse } from '@defensivepedal/core';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { useAppStore } from './appStore';
+import { plusModesUsedFromPersisted, useAppStore } from './appStore';
 
 const createRoute = (id: string): RouteOption => ({
   id,
@@ -1488,5 +1488,58 @@ describe('measurementSystem — units the rider reads', () => {
     useAppStore.getState().setRegionGate({ status: 'passed', countryCode: 'GB' });
     useAppStore.getState().setMeasurementSystem('metric');
     expect(useAppStore.getState().measurementSystem).toBe('metric');
+  });
+});
+
+describe('Pedal Plus mode usage stamp', () => {
+  afterEach(() => {
+    useAppStore.setState({ plusModesUsed: {}, hasSeenPlusModesMovedNotice: false });
+  });
+
+  it('stamps E-bike the first time it is selected', () => {
+    useAppStore.getState().selectRoutingMode('ebike');
+    expect(useAppStore.getState().plusModesUsed.ebike).toEqual(expect.any(String));
+    expect(useAppStore.getState().plusModesUsed.cool).toBeUndefined();
+  });
+
+  it('stamps Cool through every setter that can turn it on', () => {
+    useAppStore.getState().setAvoidHeat(true);
+    expect(useAppStore.getState().plusModesUsed.cool).toEqual(expect.any(String));
+  });
+
+  it('keeps the FIRST use, not the latest', () => {
+    useAppStore.setState({ plusModesUsed: { ebike: '2026-09-01T00:00:00.000Z' } });
+    useAppStore.getState().setIsEbike(true);
+    expect(useAppStore.getState().plusModesUsed.ebike).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('stamps nothing for Safe, Fast or Flat', () => {
+    for (const mode of ['safe', 'fast', 'flat'] as const) {
+      useAppStore.getState().selectRoutingMode(mode);
+    }
+    expect(useAppStore.getState().plusModesUsed).toEqual({});
+  });
+
+  it('survives an account switch — the stamp belongs to the device', () => {
+    useAppStore.getState().selectRoutingMode('ebike');
+    useAppStore.getState().resetUserScopedState();
+    expect(useAppStore.getState().plusModesUsed.ebike).toEqual(expect.any(String));
+  });
+});
+
+describe('plusModesUsedFromPersisted — riders upgrading from an older build', () => {
+  it('reads E-bike and Cool from the persisted mode flags', () => {
+    const used = plusModesUsedFromPersisted(undefined, true, true);
+    expect(used.ebike).toEqual(expect.any(String));
+    expect(used.cool).toEqual(expect.any(String));
+  });
+
+  it('stamps nothing when the last mode was not a Plus mode', () => {
+    expect(plusModesUsedFromPersisted(undefined, false, false)).toEqual({});
+  });
+
+  it('never overwrites an existing stamp', () => {
+    const existing = { ebike: '2026-09-01T00:00:00.000Z' };
+    expect(plusModesUsedFromPersisted(existing, true, false)).toEqual(existing);
   });
 });

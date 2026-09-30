@@ -57,6 +57,16 @@ import { getDeviceLocale, type Locale } from '../i18n';
 import type { ImportedCourseMeta } from '../lib/courseStorage';
 import type { SavedLoopMeta } from '../lib/loopStorage';
 import { DEFAULT_ANALYTICS_PROMPT_STATE } from '../lib/analytics-optin';
+import {
+  EMPTY_PLUS_NUDGE_STATE,
+  withPlusNudgeDismissed,
+  withPlusNudgeShown,
+  withPlusNudgesRetired,
+  type PlusModesUsed,
+  type PlusNudgeState,
+  type PlusNudgeSurface,
+  type PlusRoutingMode,
+} from '../lib/plus-nudges';
 import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
   INITIAL_CELEBRATION_WANTS,
@@ -454,6 +464,21 @@ export type AppStore = QueueSlice & PremiumSlice & {
   hasSeenPlusModesNotice: boolean;
   setHasSeenMeetPedalCard: (seen: boolean) => void;
   setHasSeenPlusModesNotice: (seen: boolean) => void;
+  // ── Pedal Plus nudges (docs/plans/pedal-plus-nudges.md) ──
+  // All DEVICE-scoped — NOT reset by resetUserScopedState. The usage stamp
+  // describes what this handset's rider did, and the caps describe what this
+  // handset has already been shown; neither restarts on an account switch.
+  /** First time each Plus routing mode was selected on this device, ISO. */
+  plusModesUsed: PlusModesUsed;
+  /** Caps state for the unsolicited Plus surfaces (see lib/plus-nudges.ts). */
+  plusNudgeState: PlusNudgeState;
+  /** One-time "your mode is now part of Plus" notice, shown after the promo. */
+  hasSeenPlusModesMovedNotice: boolean;
+  markPlusNudgeShown: (surface: PlusNudgeSurface) => void;
+  markPlusNudgeDismissed: (surface: PlusNudgeSurface) => void;
+  /** Subscribing or restoring retires every unsolicited Plus surface. */
+  retirePlusNudges: () => void;
+  setHasSeenPlusModesMovedNotice: (seen: boolean) => void;
   // ── Anonymous Activation Ladder (spec: docs/plans/anonymous-activation-ladder.md) ──
   /** Device-scoped like regionGate — NOT reset by resetUserScopedState
    * (sign-out must not restart the ladder). Max 3 local notifications ever;
@@ -609,6 +634,32 @@ export const defaultMeasurementSystemFor = (
   countryCode: string | null | undefined,
 ): MeasurementSystem =>
   normalizeCountryCode(countryCode) === 'GB' ? 'imperial' : 'metric';
+
+/**
+ * First-use stamp for a Plus routing mode. Returns a partial state update, or
+ * an empty object when the mode is already stamped — the FIRST use is kept.
+ */
+const stampPlusModeUsed = (
+  used: PlusModesUsed,
+  mode: PlusRoutingMode,
+): { plusModesUsed?: PlusModesUsed } =>
+  used[mode] ? {} : { plusModesUsed: { ...used, [mode]: new Date().toISOString() } };
+
+/**
+ * Rehydrate-time stamp. A persisted `isEbike` / `avoidHeat` means the rider's
+ * last routing mode was a Plus mode — for a build older than the usage stamp
+ * it is the only evidence that they used one at all.
+ */
+export const plusModesUsedFromPersisted = (
+  used: PlusModesUsed | undefined,
+  isEbike: boolean | undefined,
+  avoidHeat: boolean | undefined,
+): PlusModesUsed => {
+  let next: PlusModesUsed = used ?? {};
+  if (isEbike) next = stampPlusModeUsed(next, 'ebike').plusModesUsed ?? next;
+  if (avoidHeat) next = stampPlusModeUsed(next, 'cool').plusModesUsed ?? next;
+  return next;
+};
 
 export const migratePersistedAppState = (
   persistedState: unknown,
@@ -826,6 +877,9 @@ export const useAppStore = create<AppStore>()(
       notifyStreak: true,
       hasSeenMeetPedalCard: false,
       hasSeenPlusModesNotice: false,
+      plusModesUsed: {},
+      plusNudgeState: EMPTY_PLUS_NUDGE_STATE,
+      hasSeenPlusModesMovedNotice: false,
       // Anonymous Activation Ladder defaults (device-scoped)
       notifyActivationLadder: true,
       activationLadder: {
@@ -1210,6 +1264,24 @@ export const useAppStore = create<AppStore>()(
       setHasSeenMeetPedalCard: (seen) => set(() => ({ hasSeenMeetPedalCard: seen })),
       setHasSeenPlusModesNotice: (seen) =>
         set(() => ({ hasSeenPlusModesNotice: seen })),
+      markPlusNudgeShown: (surface) =>
+        set((state) => ({
+          plusNudgeState: withPlusNudgeShown(
+            state.plusNudgeState,
+            surface,
+            new Date().toISOString(),
+          ),
+        })),
+      markPlusNudgeDismissed: (surface) =>
+        set((state) => ({
+          plusNudgeState: withPlusNudgeDismissed(state.plusNudgeState, surface),
+        })),
+      retirePlusNudges: () =>
+        set((state) => ({
+          plusNudgeState: withPlusNudgesRetired(state.plusNudgeState, new Date().toISOString()),
+        })),
+      setHasSeenPlusModesMovedNotice: (seen) =>
+        set(() => ({ hasSeenPlusModesMovedNotice: seen })),
       showBicycleLanes: true,
       poiVisibility: {
         hydration: false,
@@ -1264,14 +1336,23 @@ export const useAppStore = create<AppStore>()(
       // avoidHeat on — pill, preview cycle-pill, shared-route claim, saved
       // route, and persisted state.
       setAvoidHeat: (enabled) =>
-        set(() => {
+        set((state) => {
           const avoidHeat = resolveAvoidHeat(enabled);
-          return { avoidHeat, ...(avoidHeat ? { isEbike: false } : {}) };
+          return {
+            avoidHeat,
+            ...(avoidHeat ? { isEbike: false } : {}),
+            ...(avoidHeat ? stampPlusModeUsed(state.plusModesUsed, 'cool') : {}),
+          };
         }),
       setIsEbike: (enabled) =>
-        set(() =>
+        set((state) =>
           enabled
-            ? { isEbike: true, avoidHills: false, avoidHeat: false }
+            ? {
+                isEbike: true,
+                avoidHills: false,
+                avoidHeat: false,
+                ...stampPlusModeUsed(state.plusModesUsed, 'ebike'),
+              }
             : { isEbike: false },
         ),
       setVoiceGuidanceEnabled: (enabled) =>
@@ -1291,12 +1372,15 @@ export const useAppStore = create<AppStore>()(
       selectRoutingMode: (displayMode) =>
         set((state) => {
           const next = fromRoutingDisplayMode(displayMode);
+          const avoidHeat = resolveAvoidHeat(next.avoidHeat);
           return {
             avoidHills: next.avoidHills,
             // Same production gate as setAvoidHeat — 'cool' degrades to Safe.
-            avoidHeat: resolveAvoidHeat(next.avoidHeat),
+            avoidHeat,
             isEbike: next.isEbike,
             routeRequest: { ...state.routeRequest, mode: next.mode },
+            ...(next.isEbike ? stampPlusModeUsed(state.plusModesUsed, 'ebike') : {}),
+            ...(avoidHeat ? stampPlusModeUsed(state.plusModesUsed, 'cool') : {}),
           };
         }),
       lastLoadedSavedRouteId: null,
@@ -1773,7 +1857,17 @@ export const useAppStore = create<AppStore>()(
       // in; no version bump needed, because this must re-apply on EVERY launch
       // rather than once.
       onRehydrateStorage: () => (state) => {
-        if (state && state.avoidHeat) {
+        if (!state) return;
+        // A persisted mode flag is the ONLY usage signal that exists for a
+        // rider upgrading from a build older than the usage stamp: their last
+        // routing mode was saved. Read it before the Cool coercion below can
+        // clear it, so the "moved to Plus" notice can name the right mode.
+        state.plusModesUsed = plusModesUsedFromPersisted(
+          state.plusModesUsed,
+          state.isEbike,
+          state.avoidHeat,
+        );
+        if (state.avoidHeat) {
           state.avoidHeat = resolveAvoidHeat(state.avoidHeat);
         }
       },
@@ -1812,6 +1906,9 @@ export const useAppStore = create<AppStore>()(
         notifyPedalNudges: state.notifyPedalNudges,
         hasSeenMeetPedalCard: state.hasSeenMeetPedalCard,
         hasSeenPlusModesNotice: state.hasSeenPlusModesNotice,
+        plusModesUsed: state.plusModesUsed,
+        plusNudgeState: state.plusNudgeState,
+        hasSeenPlusModesMovedNotice: state.hasSeenPlusModesMovedNotice,
         // Anonymous activation ladder — device-scoped; intentionally NOT in
         // resetUserScopedState (sign-out must not restart the ladder).
         activationLadder: state.activationLadder,

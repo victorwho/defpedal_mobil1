@@ -57,6 +57,10 @@ import { Badge } from '../src/design-system/atoms/Badge';
 import { Button } from '../src/design-system/atoms/Button';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { Toast } from '../src/design-system/molecules/Toast';
+import { PremiumLimitCard } from '../src/design-system/organisms/PremiumLimitCard';
+import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
+import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { radii } from '../src/design-system/tokens/radii';
@@ -246,6 +250,12 @@ export default function LoopPlannerScreen() {
 
   // ── Save / share ────────────────────────────────────────────────────────
   const [toast, setToast] = useState<string | null>(null);
+  // Pedal Plus: the save-limit card, and the paywall with what opened it.
+  const [saveLimitHit, setSaveLimitHit] = useState(false);
+  const [paywall, setPaywall] = useState<{
+    source: PaywallSource;
+    focus: PaywallFocus;
+  } | null>(null);
 
   /**
    * Where the sheet rests, driven by the screen rather than by drags alone.
@@ -435,6 +445,7 @@ export default function LoopPlannerScreen() {
   );
 
   const sessionsLeft = premium.loopSessionsLeft();
+  const riderCountry = useAppStore((s) => s.regionGate.countryCode);
   const sessionOpenMs = loopSessionRemainingMs(
     loopMeter,
     new Date().toISOString(),
@@ -638,11 +649,8 @@ export default function LoopPlannerScreen() {
     // of saved thing is a distinction only the code cares about.
     const total = savedLoops.length;
     if (premium.blockSaveRoute(total)) {
-      setToast(
-        t('loop.saveLimit', {
-          count: String(premium.limits.savedRoutes ?? 0),
-        }),
-      );
+      // A card with a way forward, not a toast that only says no.
+      setSaveLimitHit(true);
       return;
     }
 
@@ -1241,6 +1249,15 @@ export default function LoopPlannerScreen() {
               total: String(premium.limits.loopSessionsPerMonth ?? 0),
             })}
           </Text>
+          {/* The quota only exists while the paywall is live, so an upgrade
+              path is always sellable here. */}
+          <Button
+            variant="secondary"
+            size="md"
+            onPress={() => setPaywall({ source: 'loop_quota', focus: 'loopSearches' })}
+          >
+            {t('premium.upgrade')}
+          </Button>
         </View>
       ) : null}
 
@@ -1487,7 +1504,30 @@ export default function LoopPlannerScreen() {
 
 
 
+      {saveLimitHit ? (
+        <PremiumLimitCard
+          kind="savedRoutes"
+          limitValue={premium.limits.savedRoutes ?? 0}
+          onUpgrade={() => {
+            setSaveLimitHit(false);
+            setPaywall({ source: 'loop_save_limit', focus: 'savedRoutes' });
+          }}
+          onDismiss={() => setSaveLimitHit(false)}
+        />
+      ) : null}
+
       {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
+
+      <PlusPaywallHost
+        visible={paywall !== null}
+        onDismiss={() => setPaywall(null)}
+        source={paywall?.source ?? 'loop_quota'}
+        focus={paywall?.focus}
+        coolRoutingAvailable={
+          isCoolModeEnabled() &&
+          premium.coolRouting(riderCountry as never) !== 'country_unavailable'
+        }
+      />
     </MapStageScreen>
   );
 }

@@ -35,6 +35,9 @@ import { Button } from '../src/design-system/atoms/Button';
 import { ElevationChart } from '../src/design-system/organisms/ElevationChart';
 import { RiskDistributionCard } from '../src/design-system/organisms/RiskDistributionCard';
 import { PremiumLimitCard } from '../src/design-system/organisms/PremiumLimitCard';
+import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { isLastAllowedAddition } from '../src/lib/plus-nudges';
 import { Toast } from '../src/design-system/molecules/Toast';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { radii } from '../src/design-system/tokens/radii';
@@ -244,6 +247,13 @@ export default function CourseImportScreen() {
   const [savedCourseId, setSavedCourseId] = useState<string | null>(courseId ?? null);
   const [saving, setSaving] = useState(false);
   const [limitVisible, setLimitVisible] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const riderCountry = useAppStore((s) => s.regionGate.countryCode);
+  // N7: warn on the last free slot, before the wall. Folds in every
+  // exemption `blockImportCourse` already knows (Plus, grandfathered, dark).
+  const courseIsLastFreeSlot =
+    savedCourseId === null &&
+    isLastAllowedAddition(premium.blockImportCourse, importedCourses.length);
 
   const handleSaveCourse = useCallback(async () => {
     if (state.status !== 'ready' || saving || savedCourseId !== null) return;
@@ -474,6 +484,9 @@ export default function CourseImportScreen() {
           >
             {savedCourseId !== null ? t('course.savedAlready') : t('course.saveCourse')}
           </Button>
+          {courseIsLastFreeSlot ? (
+            <Text style={styles.lastSlotHint}>{t('premium.nearLimitCourses')}</Text>
+          ) : null}
         </>
       }
     >
@@ -620,12 +633,24 @@ export default function CourseImportScreen() {
             limitValue={premium.limits.importedCourses ?? 0}
             onUpgrade={() => {
               setLimitVisible(false);
-              router.push('/profile');
+              // In place: navigating to Profile dropped the rider's course.
+              setPaywallOpen(true);
             }}
             onDismiss={() => setLimitVisible(false)}
           />
         </View>
       ) : null}
+
+      <PlusPaywallHost
+        visible={paywallOpen}
+        onDismiss={() => setPaywallOpen(false)}
+        source="course_limit"
+        focus="importedCourses"
+        coolRoutingAvailable={
+          isCoolModeEnabled() &&
+          premium.coolRouting(riderCountry as never) !== 'country_unavailable'
+        }
+      />
 
       {saveToast ? (
         <View style={styles.toastContainer}>
@@ -748,6 +773,12 @@ const createThemedStyles = (colors: ThemeColors) =>
     busyTextColumn: { flex: 1, gap: 2 },
     busyDistance: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
     busyMeta: { color: colors.textSecondary, fontSize: 12 },
+    lastSlotHint: {
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: 'center',
+      color: colors.textSecondary,
+    },
     limitContainer: {
       position: 'absolute',
       left: space[4],

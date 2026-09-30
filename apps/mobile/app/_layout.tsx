@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Sentry from '@sentry/react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState as RNAppState, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,6 +35,12 @@ import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { isPlusModesPromoActive } from '@defensivepedal/core';
 import { PlusModesPromoNotice } from '../src/design-system/molecules/PlusModesPromoNotice';
+import { PlusModesMovedNotice } from '../src/design-system/molecules/PlusModesMovedNotice';
+import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
+import { usePlusNudge } from '../src/hooks/usePlusNudge';
+import { usePremium } from '../src/hooks/usePremium';
+import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { modesMovedToPlusFor, type PlusRoutingMode } from '../src/lib/plus-nudges';
 import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
@@ -405,6 +411,7 @@ const RootLayoutInner = () => {
       <WeatherNoticeManager />
       <MeetPedalCardManager />
       <PlusModesPromoNoticeManager />
+      <PlusModesMovedNoticeManager />
       <RideLossBannerManager />
       <RouteShareDeepLinkHandler />
       <GpxOpenHandler />
@@ -508,6 +515,68 @@ const PlusModesPromoNoticeManager = () => {
   if (!show) return null;
 
   return <PlusModesPromoNotice visible onDismiss={() => setHasSeen(true)} />;
+};
+
+/**
+ * One-time "your mode is now part of Plus" notice, AFTER the free period
+ * (docs/plans/pedal-plus-nudges.md N2).
+ *
+ * Targets riders who used E-bike or Cool on this device, or who told us they
+ * ride an e-bike — see `modesMovedToPlusFor`. Everything else is the shared
+ * nudge rulebook via `usePlusNudge`: paywall live, not a subscriber, not
+ * mid-ride, and this session's one unsolicited Plus surface. Never during
+ * onboarding, for the same reason as the promo notice above.
+ *
+ * "Keep riding Safe" and "See Pedal Plus" BOTH mark it seen: it is a notice,
+ * and it is told once. Only the first counts as a dismissal for the caps.
+ */
+const PlusModesMovedNoticeManager = () => {
+  const hasSeen = useAppStore((s) => s.hasSeenPlusModesMovedNotice);
+  const setHasSeen = useAppStore((s) => s.setHasSeenPlusModesMovedNotice);
+  const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const used = useAppStore((s) => s.plusModesUsed);
+  const bikeTypeId = useAppStore((s) => s.bikeTypeId);
+  const countryCode = useAppStore((s) => s.regionGate.countryCode);
+  const premium = usePremium();
+
+  const coolCovered =
+    isCoolModeEnabled() && premium.coolRouting(countryCode as never) !== 'country_unavailable';
+  const modes = useMemo(
+    () => modesMovedToPlusFor({ used, bikeTypeId, coolCovered }),
+    [used, bikeTypeId, coolCovered],
+  );
+
+  const wanted =
+    !hasSeen && onboardingCompleted && !isPlusModesPromoActive() && modes.length > 0;
+  const nudge = usePlusNudge('modes_moved', wanted);
+  const [paywallFocus, setPaywallFocus] = useState<PlusRoutingMode | null>(null);
+
+  return (
+    <>
+      {nudge.visible ? (
+        <PlusModesMovedNotice
+          visible
+          modes={modes}
+          onSeePlus={() => {
+            setHasSeen(true);
+            nudge.accept();
+            setPaywallFocus(modes[0] ?? 'ebike');
+          }}
+          onDismiss={() => {
+            setHasSeen(true);
+            nudge.dismiss();
+          }}
+        />
+      ) : null}
+      <PlusPaywallHost
+        visible={paywallFocus !== null}
+        onDismiss={() => setPaywallFocus(null)}
+        source="modes_moved_notice"
+        focus={paywallFocus ?? undefined}
+        coolRoutingAvailable={coolCovered}
+      />
+    </>
+  );
 };
 
 const MeetPedalCardManager = () => {
