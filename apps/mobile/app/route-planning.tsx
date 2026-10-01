@@ -2414,12 +2414,15 @@ const createThemedStyles = (colors: ThemeColors) =>
       borderRadius: radii.full,
       paddingLeft: space[3],
       paddingRight: space[2],
-      minHeight: 36,
+      // 44 = the touch-target minimum. The body below stretches to fill it,
+      // so the TAP area is 44 tall, not just the pill around it.
+      minHeight: 44,
       ...shadows.sm,
     },
     hotDayChipBody: {
       flexDirection: 'row',
       alignItems: 'center',
+      alignSelf: 'stretch',
       gap: space[2],
       flexShrink: 1,
       paddingVertical: space[2],
