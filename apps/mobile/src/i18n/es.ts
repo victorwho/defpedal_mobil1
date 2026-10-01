@@ -217,6 +217,14 @@ export const es: TranslationKeys = {
 
   // ── Risk Score ──
   loop: {
+    intro: {
+      title: 'Haz una ruta circular',
+      body: 'Elige cuánto quieres pedalear. Planificamos una ruta que te trae de vuelta a donde empezaste.',
+      pointPlacement: 'Sal de la ciudad o quédate cerca. Tú eliges.',
+      pointSafety: 'Planificada con el mismo enrutamiento centrado en la seguridad que todas tus rutas.',
+      pointGuidance: 'Indicaciones paso a paso hasta la vuelta.',
+      cta: 'Pruébalo',
+    },
     fabLabel: 'Buscar una ruta circular',
     title: 'Buscar una ruta circular',
     subtitle: 'Una ruta que te trae de vuelta aquí.',

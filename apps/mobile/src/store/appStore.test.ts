@@ -1543,3 +1543,35 @@ describe('plusModesUsedFromPersisted — riders upgrading from an older build', 
     expect(plusModesUsedFromPersisted(existing, true, false)).toEqual(existing);
   });
 });
+
+describe('Loop intro state', () => {
+  afterEach(() => {
+    useAppStore.setState({
+      hasOpenedLoopPlanner: false,
+      loopIntro: { lastShownAt: null, closes: 0, retired: false },
+    });
+  });
+
+  it('records that the rider opened the loop planner', () => {
+    useAppStore.getState().markLoopPlannerOpened();
+    expect(useAppStore.getState().hasOpenedLoopPlanner).toBe(true);
+  });
+
+  it('records a showing, a close and a try', () => {
+    const s = useAppStore.getState();
+    s.markLoopIntroShown();
+    s.markLoopIntroClosed();
+    expect(useAppStore.getState().loopIntro.lastShownAt).toEqual(expect.any(String));
+    expect(useAppStore.getState().loopIntro.closes).toBe(1);
+    useAppStore.getState().markLoopIntroTried();
+    expect(useAppStore.getState().loopIntro.retired).toBe(true);
+  });
+
+  it('survives an account switch — it describes this device', () => {
+    useAppStore.getState().markLoopPlannerOpened();
+    useAppStore.getState().markLoopIntroClosed();
+    useAppStore.getState().resetUserScopedState();
+    expect(useAppStore.getState().hasOpenedLoopPlanner).toBe(true);
+    expect(useAppStore.getState().loopIntro.closes).toBe(1);
+  });
+});

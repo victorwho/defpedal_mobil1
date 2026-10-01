@@ -134,6 +134,18 @@ export const ROUTING_COVERED_COUNTRIES: readonly SupportedCountry[] = Object.key
   COUNTRY_BBOXES,
 ) as SupportedCountry[];
 
+/**
+ * Is this ISO-3166 alpha-2 code a country the routing graph covers?
+ *
+ * For callers that know a COUNTRY but not a coordinate — e.g. the region
+ * gate's answer — and must decide whether a routing-backed feature (loops,
+ * Safe/Flat/E-bike) can work there. Callers holding a coordinate should keep
+ * using `isRouteSupported`, which is the authority for an actual ride.
+ */
+export const isRoutingCountry = (code: string | null | undefined): boolean =>
+  typeof code === 'string' &&
+  (ROUTING_COVERED_COUNTRIES as readonly string[]).includes(code.toUpperCase());
+
 const isInBbox = (coord: Coordinate, bbox: Bbox): boolean => {
   const [minLon, minLat, maxLon, maxLat] = bbox;
   return (

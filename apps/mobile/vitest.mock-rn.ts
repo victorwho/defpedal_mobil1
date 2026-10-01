@@ -376,18 +376,33 @@ export const PanResponder = {
 
 // Modal renders its children inline (in a div) when visible, else nothing —
 // enough for tests to query the sheet content without a portal.
+// `onRequestClose` is what Android's back button calls on a real Modal; here
+// Escape stands in for it (as on react-native-web), so a test can prove the
+// back button closes a modal: fireEvent.keyDown(getByRole('dialog'), { key: 'Escape' }).
 export const Modal = ({
   children,
   visible,
   testID,
+  onRequestClose,
 }: {
   children?: React.ReactNode;
   visible?: boolean;
   testID?: string;
+  onRequestClose?: () => void;
 }) =>
   visible === false
     ? null
-    : React.createElement('div', { 'data-testid': testID ?? 'modal', role: 'dialog' }, children);
+    : React.createElement(
+        'div',
+        {
+          'data-testid': testID ?? 'modal',
+          role: 'dialog',
+          onKeyDown: (e: { key?: string }) => {
+            if (e.key === 'Escape') onRequestClose?.();
+          },
+        },
+        children,
+      );
 
 // ViewStyle / TextStyle type exports (runtime no-ops)
 export type ViewStyle = Record<string, unknown>;

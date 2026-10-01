@@ -217,6 +217,14 @@ export const ro: TranslationKeys = {
 
   // ── Risk Score ──
   loop: {
+    intro: {
+      title: 'Fă o tură în buclă',
+      body: 'Alege cât vrei să pedalezi. Planificăm un traseu care te aduce înapoi de unde ai plecat.',
+      pointPlacement: 'Ieși din oraș sau rămâi prin apropiere. Tu alegi.',
+      pointSafety: 'Planificat cu aceeași rutare care pune siguranța pe primul loc, ca orice traseu.',
+      pointGuidance: 'Ghidaj pas cu pas până înapoi la start.',
+      cta: 'Încearcă',
+    },
     fabLabel: 'Găsește un tur',
     title: 'Găsește un tur',
     subtitle: 'O tură care te aduce înapoi aici.',

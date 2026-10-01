@@ -243,6 +243,14 @@ export const en = {
 
   // ── Risk Score ──
   loop: {
+    intro: {
+      title: 'Ride a loop',
+      body: 'Pick how far you want to ride. We plan a route that brings you back to where you started.',
+      pointPlacement: 'Head out of town or stay close by. Your choice.',
+      pointSafety: 'Planned on the same safety-first routing as every route.',
+      pointGuidance: 'Turn-by-turn guidance all the way back.',
+      cta: 'Try it',
+    },
     fabLabel: 'Find a loop',
     title: 'Find a loop',
     subtitle: 'A ride that brings you back here.',

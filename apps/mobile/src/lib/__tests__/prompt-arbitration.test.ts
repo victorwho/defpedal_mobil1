@@ -113,3 +113,32 @@ describe('plus — the lowest-priority ask', () => {
     expect(claimPromptSlot('review')).toBe(true);
   });
 });
+
+describe('feature_intro — the app-open feature explainer', () => {
+  it('may claim a fresh session', () => {
+    expect(claimPromptSlot('feature_intro')).toBe(true);
+  });
+
+  it('yields to any ask already shown this session', () => {
+    for (const other of ['save_ride', 'review', 'sesizare', 'analytics', 'plus'] as const) {
+      resetPromptArbitrationForTest();
+      claimPromptSlot(other);
+      expect(isPromptSlotAvailable('feature_intro')).toBe(false);
+      expect(claimPromptSlot('feature_intro')).toBe(false);
+    }
+  });
+
+  it('keeps the Plus nudges and the analytics ask out of its session', () => {
+    claimPromptSlot('feature_intro');
+    expect(claimPromptSlot('plus')).toBe(false);
+    expect(claimPromptSlot('analytics')).toBe(false);
+  });
+
+  it('never blocks the rider’s own ride, the review card or a civic report', () => {
+    claimPromptSlot('feature_intro');
+    expect(claimPromptSlot('save_ride')).toBe(true);
+    resetPromptArbitrationForTest();
+    claimPromptSlot('feature_intro');
+    expect(claimPromptSlot('review')).toBe(true);
+  });
+});

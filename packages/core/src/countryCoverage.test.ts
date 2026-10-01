@@ -9,6 +9,7 @@ import {
   isRiskDataAvailable,
   getCountryCenter,
   isRouteSupported,
+  isRoutingCountry,
   resolveCountryFromCoord,
 } from './countryCoverage';
 
@@ -336,5 +337,21 @@ describe('isRouteSupported', () => {
       destinationCountry: null,
       reason: 'origin_unsupported',
     });
+  });
+});
+
+describe('isRoutingCountry', () => {
+  it('accepts every covered country, case-insensitively', () => {
+    for (const code of ROUTING_COVERED_COUNTRIES) {
+      expect(isRoutingCountry(code)).toBe(true);
+      expect(isRoutingCountry(code.toLowerCase())).toBe(true);
+    }
+  });
+
+  it('rejects countries outside the routing graph, and no answer at all', () => {
+    expect(isRoutingCountry('US')).toBe(false);
+    expect(isRoutingCountry('RS')).toBe(false);
+    expect(isRoutingCountry(null)).toBe(false);
+    expect(isRoutingCountry('')).toBe(false);
   });
 });

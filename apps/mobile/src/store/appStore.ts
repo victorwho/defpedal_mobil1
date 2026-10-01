@@ -67,6 +67,13 @@ import {
   type PlusNudgeSurface,
   type PlusRoutingMode,
 } from '../lib/plus-nudges';
+import {
+  EMPTY_LOOP_INTRO_STATE,
+  withLoopIntroClosed,
+  withLoopIntroShown,
+  withLoopIntroTried,
+  type LoopIntroState,
+} from '../lib/loop-intro';
 import { flushPersistedWrites, zustandStorage } from '../lib/storage';
 import {
   INITIAL_CELEBRATION_WANTS,
@@ -479,6 +486,16 @@ export type AppStore = QueueSlice & PremiumSlice & {
   /** Subscribing or restoring retires every unsolicited Plus surface. */
   retirePlusNudges: () => void;
   setHasSeenPlusModesMovedNotice: (seen: boolean) => void;
+  // ── Loop feature intro (lib/loop-intro.ts) ──
+  // DEVICE-scoped, NOT reset by resetUserScopedState: whether this handset's
+  // rider has found loops, and how often this handset has been told about them.
+  /** Stamped by /loop-planner on mount. */
+  hasOpenedLoopPlanner: boolean;
+  loopIntro: LoopIntroState;
+  markLoopPlannerOpened: () => void;
+  markLoopIntroShown: () => void;
+  markLoopIntroClosed: () => void;
+  markLoopIntroTried: () => void;
   // ── Anonymous Activation Ladder (spec: docs/plans/anonymous-activation-ladder.md) ──
   /** Device-scoped like regionGate — NOT reset by resetUserScopedState
    * (sign-out must not restart the ladder). Max 3 local notifications ever;
@@ -880,6 +897,8 @@ export const useAppStore = create<AppStore>()(
       plusModesUsed: {},
       plusNudgeState: EMPTY_PLUS_NUDGE_STATE,
       hasSeenPlusModesMovedNotice: false,
+      hasOpenedLoopPlanner: false,
+      loopIntro: EMPTY_LOOP_INTRO_STATE,
       // Anonymous Activation Ladder defaults (device-scoped)
       notifyActivationLadder: true,
       activationLadder: {
@@ -1282,6 +1301,16 @@ export const useAppStore = create<AppStore>()(
         })),
       setHasSeenPlusModesMovedNotice: (seen) =>
         set(() => ({ hasSeenPlusModesMovedNotice: seen })),
+      markLoopPlannerOpened: () =>
+        set((state) => (state.hasOpenedLoopPlanner ? {} : { hasOpenedLoopPlanner: true })),
+      markLoopIntroShown: () =>
+        set((state) => ({
+          loopIntro: withLoopIntroShown(state.loopIntro, new Date().toISOString()),
+        })),
+      markLoopIntroClosed: () =>
+        set((state) => ({ loopIntro: withLoopIntroClosed(state.loopIntro) })),
+      markLoopIntroTried: () =>
+        set((state) => ({ loopIntro: withLoopIntroTried(state.loopIntro) })),
       showBicycleLanes: true,
       poiVisibility: {
         hydration: false,
@@ -1909,6 +1938,8 @@ export const useAppStore = create<AppStore>()(
         plusModesUsed: state.plusModesUsed,
         plusNudgeState: state.plusNudgeState,
         hasSeenPlusModesMovedNotice: state.hasSeenPlusModesMovedNotice,
+        hasOpenedLoopPlanner: state.hasOpenedLoopPlanner,
+        loopIntro: state.loopIntro,
         // Anonymous activation ladder — device-scoped; intentionally NOT in
         // resetUserScopedState (sign-out must not restart the ladder).
         activationLadder: state.activationLadder,

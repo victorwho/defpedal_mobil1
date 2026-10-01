@@ -36,6 +36,8 @@ import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
 import { isPlusModesPromoActive } from '@defensivepedal/core';
 import { PlusModesPromoNotice } from '../src/design-system/molecules/PlusModesPromoNotice';
 import { PlusModesMovedNotice } from '../src/design-system/molecules/PlusModesMovedNotice';
+import { LoopIntroSheet } from '../src/design-system/organisms/LoopIntroSheet';
+import { useLoopIntro } from '../src/hooks/useLoopIntro';
 import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
 import { usePlusNudge } from '../src/hooks/usePlusNudge';
 import { usePremium } from '../src/hooks/usePremium';
@@ -412,6 +414,7 @@ const RootLayoutInner = () => {
       <MeetPedalCardManager />
       <PlusModesPromoNoticeManager />
       <PlusModesMovedNoticeManager />
+      <LoopIntroManager />
       <RideLossBannerManager />
       <RouteShareDeepLinkHandler />
       <GpxOpenHandler />
@@ -577,6 +580,19 @@ const PlusModesMovedNoticeManager = () => {
       />
     </>
   );
+};
+
+/**
+ * App-open intro to recreational loops for riders who have never used them.
+ * All of the when/who lives in `useLoopIntro` + `lib/loop-intro.ts`.
+ *
+ * Mounted after the other app-open notice managers on purpose: sibling effects
+ * run in mount order, so a Plus notice that wants this session claims its
+ * prompt slot first and this one yields.
+ */
+const LoopIntroManager = () => {
+  const intro = useLoopIntro();
+  return <LoopIntroSheet visible={intro.visible} onClose={intro.close} onTry={intro.tryIt} />;
 };
 
 const MeetPedalCardManager = () => {

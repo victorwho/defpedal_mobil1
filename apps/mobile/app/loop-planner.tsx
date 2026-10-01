@@ -191,6 +191,12 @@ export default function LoopPlannerScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   useLockOrientation();
+  // Any visit counts as having found loops: it retires the app-open Loop
+  // intro (lib/loop-intro.ts), whichever path brought the rider here.
+  const markLoopPlannerOpened = useAppStore((s) => s.markLoopPlannerOpened);
+  useEffect(() => {
+    markLoopPlannerOpened();
+  }, [markLoopPlannerOpened]);
 
   const { isOnline } = useConnectivity();
   const premium = usePremium();
