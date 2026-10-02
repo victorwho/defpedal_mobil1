@@ -374,7 +374,7 @@ export type AppStore = QueueSlice & PremiumSlice & {
     home: import('@defensivepedal/core').AutocompleteSuggestion | null;
     work: import('@defensivepedal/core').AutocompleteSuggestion | null;
   };
-  setSavedPlace: (type: 'home' | 'work', place: import('@defensivepedal/core').AutocompleteSuggestion | null) => void;
+  setSavedPlace: (type: 'home' | 'work', place: import('@defensivepedal/core').ResolvedSuggestion | null) => void;
   pendingBadgeUnlocks: readonly import('@defensivepedal/core').BadgeUnlockEvent[];
   enqueueBadgeUnlocks: (badges: readonly import('@defensivepedal/core').BadgeUnlockEvent[]) => void;
   shiftBadgeUnlock: () => import('@defensivepedal/core').BadgeUnlockEvent | undefined;

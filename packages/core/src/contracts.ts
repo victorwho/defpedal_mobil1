@@ -287,7 +287,13 @@ export interface AutocompleteSuggestion {
   primaryText: string;
   /** Concise local address (street + neighborhood), NOT full country-level */
   secondaryText?: string;
-  coordinates: Coordinate;
+  /**
+   * Absent on live search results: they are listed from Search Box /suggest
+   * alone, and the location is fetched once, for the place the rider picks
+   * (`resolveSuggestion` in apps/mobile/src/lib/mapbox-search.ts) — every
+   * /retrieve is a billed session. Present on recents and saved places.
+   */
+  coordinates?: Coordinate;
   distanceMeters?: number;
   /** Pre-formatted distance: "350 m" or "1.2 km" */
   distanceLabel?: string;
@@ -297,8 +303,13 @@ export interface AutocompleteSuggestion {
   maki?: string;
 }
 
+/** A suggestion whose location is known — what a route can be built from. */
+export type ResolvedSuggestion = AutocompleteSuggestion & { coordinates: Coordinate };
+
 /** A recent destination stored for quick re-selection */
 export interface RecentDestination extends AutocompleteSuggestion {
+  /** A recent is always a place that was resolved and routed to. */
+  coordinates: Coordinate;
   /** ISO timestamp when this destination was last selected */
   selectedAt: string;
 }

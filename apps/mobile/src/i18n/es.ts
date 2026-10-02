@@ -46,6 +46,7 @@ export const es: TranslationKeys = {
 
   // ── Route Planning ──
   planning: {
+    placeNotFound: 'No encontramos ese lugar en el mapa. Prueba con otro resultado.',
     searchDestination: '¿A dónde vas?',
     addStop: 'Añadir parada',
     previewRoute: 'Vista previa',

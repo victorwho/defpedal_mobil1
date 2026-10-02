@@ -46,6 +46,7 @@ export const en = {
 
   // ── Route Planning ──
   planning: {
+    placeNotFound: 'We could not find that place on the map. Try another result.',
     searchDestination: 'Where are you going?',
     addStop: 'Add stop',
     previewRoute: 'Preview route',

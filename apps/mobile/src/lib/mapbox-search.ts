@@ -13,6 +13,7 @@ import type {
   AutocompleteRequest,
   AutocompleteResponse,
   AutocompleteSuggestion,
+  ResolvedSuggestion,
   Coordinate,
   CoverageRegion,
   CoverageResponse,
@@ -294,9 +295,19 @@ const fetchWithTimeout = async (
 // Session token for Search Box API
 // ---------------------------------------------------------------------------
 
+/*
+ * One token = one billed Search Box session. Mapbox ends a session at a
+ * /retrieve, or after 60 minutes. So the token lives until the rider picks a
+ * place (`endSearchSession`), or for just under Mapbox's hour. It used to
+ * rotate every 60 s, which split one slow search into several sessions.
+ */
 let _sessionToken: string | null = null;
 let _sessionTokenCreatedAt = 0;
-const SESSION_TOKEN_TTL_MS = 60_000; // refresh every 60s
+const SESSION_TOKEN_TTL_MS = 55 * 60_000;
+
+const endSearchSession = (): void => {
+  _sessionToken = null;
+};
 
 const getSessionToken = (): string => {
   const now = Date.now();
@@ -515,83 +526,48 @@ export const mapboxAutocomplete = async (
     return { suggestions: [], generatedAt: new Date().toISOString() };
   }
 
-  // Step 2: Retrieve coordinates for each suggestion
-  // The retrieve endpoint fetches full details (incl. geometry) for a mapbox_id
-  const suggestions: AutocompleteSuggestion[] = [];
+  // Step 2: build the list from /suggest ALONE.
+  //
+  // ⚠️ BILLING. Every /retrieve ends a billed Search Box session. This used to
+  // retrieve all five suggestions on every keystroke to get coordinates, which
+  // billed ~29,000 sessions in Sep 2026 against ~1,000 route requests (≈ $85
+  // for one month, 58x the free tier). Nothing in the list needs coordinates:
+  // /suggest returns the name, address and — when proximity is sent — the
+  // distance. Coordinates are fetched ONCE, for the place the rider picks, by
+  // `resolveSuggestion`.
+  const suggestions: AutocompleteSuggestion[] = rawSuggestions.map((raw) => {
+    const primaryText = raw.name_preferred ?? raw.name ?? query;
+    const rawLabel = raw.full_address ?? raw.place_formatted ?? primaryText;
+    const featureType = toFeatureType(raw.feature_type);
+    const category = extractCategory(raw.poi_category, raw.maki);
+    const ctx = raw.context;
+    const label = stripAddressNoise(rawLabel, ctx);
+    const secondaryText = buildSecondaryText(
+      featureType,
+      ctx,
+      raw.full_address,
+      raw.place_formatted,
+    );
 
-  // Batch retrieve — one call per suggestion (Search Box API requires individual retrieves)
-  const retrievePromises = rawSuggestions.map(async (raw) => {
-    const retrieveParams = new URLSearchParams({
-      access_token: token,
-      session_token: sessionToken,
-    });
+    // Mapbox measures `distance` from the proximity point it was sent.
+    const distanceMeters =
+      payload.proximity && typeof raw.distance === 'number'
+        ? Math.round(raw.distance)
+        : undefined;
 
-    const retrieveUrl = `${MAPBOX_SEARCHBOX_BASE}/retrieve/${raw.mapbox_id}?${retrieveParams.toString()}`;
-
-    try {
-      const retrieveResponse = await fetchWithTimeout(retrieveUrl, 5_000);
-
-      if (!retrieveResponse.ok) return null;
-
-      const retrieveData =
-        JSON.parse(retrieveResponse.bodyText) as SearchBoxRetrieveResponse;
-      const feature = retrieveData.features?.[0];
-
-      if (!feature?.geometry?.coordinates) return null;
-
-      const coords: Coordinate = {
-        lat: feature.geometry.coordinates[1],
-        lon: feature.geometry.coordinates[0],
-      };
-
-      const primaryText = raw.name_preferred ?? raw.name ?? query;
-      const rawLabel =
-        raw.full_address ?? raw.place_formatted ?? primaryText;
-      const featureType = toFeatureType(raw.feature_type);
-      const category = extractCategory(raw.poi_category, raw.maki);
-
-      // Build concise secondaryText from context
-      const ctx = raw.context;
-      const label = stripAddressNoise(rawLabel, ctx);
-      const secondaryText = buildSecondaryText(featureType, ctx, raw.full_address, raw.place_formatted);
-
-      // Build distance label
-      let distanceMeters: number | undefined;
-      let distanceLabel: string | undefined;
-      if (payload.proximity) {
-        distanceMeters = Math.round(
-          haversineDistanceMeters(payload.proximity, coords),
-        );
-        distanceLabel = formatDistanceLabel(distanceMeters, units);
-      }
-
-      const suggestion: AutocompleteSuggestion = {
-        id: raw.mapbox_id,
-        label,
-        primaryText,
-        secondaryText,
-        coordinates: coords,
-        distanceMeters,
-        distanceLabel,
-        featureType,
-        maki: raw.maki ?? undefined,
-        ...(category ? { category } : {}),
-      };
-
-      return suggestion;
-    } catch {
-      // Individual retrieve failed — skip this suggestion
-      return null;
-    }
+    return {
+      id: raw.mapbox_id,
+      label,
+      primaryText,
+      secondaryText,
+      distanceMeters,
+      distanceLabel:
+        distanceMeters !== undefined ? formatDistanceLabel(distanceMeters, units) : undefined,
+      featureType,
+      maki: raw.maki ?? undefined,
+      ...(category ? { category } : {}),
+    };
   });
-
-  const results = await Promise.all(retrievePromises);
-
-  for (const result of results) {
-    if (result) {
-      suggestions.push(result);
-    }
-  }
 
   // Sort by distance (closest first) when proximity is available
   if (payload.proximity) {
@@ -602,6 +578,46 @@ export const mapboxAutocomplete = async (
     suggestions,
     generatedAt: new Date().toISOString(),
   };
+};
+
+// ---------------------------------------------------------------------------
+// Resolve the picked suggestion (one /retrieve = one billed session)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the coordinates of the ONE suggestion the rider picked.
+ *
+ * Suggestions from `mapboxAutocomplete` carry no coordinates; recents and
+ * saved places already do and cost nothing here. The /retrieve uses the same
+ * session token as the typing that found it, then ends that session, so a
+ * whole search — every keystroke plus the pick — bills as one session.
+ *
+ * Returns null when Mapbox has no location for the place, so the caller can
+ * tell the rider rather than route to nowhere.
+ */
+export const resolveSuggestion = async (
+  suggestion: AutocompleteSuggestion,
+): Promise<ResolvedSuggestion | null> => {
+  if (suggestion.coordinates) return suggestion as ResolvedSuggestion;
+
+  const params = new URLSearchParams({
+    access_token: ensureMapboxToken(),
+    session_token: getSessionToken(),
+  });
+  const url = `${MAPBOX_SEARCHBOX_BASE}/retrieve/${encodeURIComponent(suggestion.id)}?${params.toString()}`;
+
+  try {
+    const response = await fetchWithTimeout(url, 5_000);
+    if (!response.ok) return null;
+    const data = JSON.parse(response.bodyText) as SearchBoxRetrieveResponse;
+    const coordinates = data.features?.[0]?.geometry?.coordinates;
+    if (!coordinates) return null;
+    return { ...suggestion, coordinates: { lat: coordinates[1], lon: coordinates[0] } };
+  } finally {
+    // The retrieve ended this session at Mapbox whether or not it found a
+    // location; the next search must not reuse the token.
+    endSearchSession();
+  }
 };
 
 // ---------------------------------------------------------------------------

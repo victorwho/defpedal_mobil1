@@ -46,6 +46,7 @@ export const ro: TranslationKeys = {
 
   // ── Route Planning ──
   planning: {
+    placeNotFound: 'Nu am găsit locul pe hartă. Încearcă alt rezultat.',
     searchDestination: 'Unde mergi?',
     addStop: 'Adaugă oprire',
     previewRoute: 'Previzualizare traseu',

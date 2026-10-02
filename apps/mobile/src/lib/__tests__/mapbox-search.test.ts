@@ -10,6 +10,7 @@ import {
   mapboxAutocomplete,
   mapboxReverseGeocode,
   mapboxGetCoverage,
+  resolveSuggestion,
 } from '../mapbox-search';
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,10 @@ const createSuggestItem = (overrides: {
   countryCode?: string;
   /** Full context override — postcode suggestions carry place/locality/region. */
   context?: Record<string, unknown>;
+  /** Metres from the proximity point, as /suggest reports it. */
+  distance?: number;
 }) => ({
+  distance: overrides.distance,
   mapbox_id: overrides.mapboxId ?? 'feature.1',
   name: overrides.name ?? 'Test Place',
   full_address: overrides.fullAddress ?? '123 Test St, Test City',
@@ -223,29 +227,29 @@ describe('mapboxAutocomplete', () => {
       expect.objectContaining({
         id: 'poi.123',
         primaryText: 'Paulista Avenue',
-        coordinates: { lat: -23.5614, lon: -46.6558 },
         featureType: 'poi',
       }),
     );
+    // Coordinates arrive only when the rider picks it (resolveSuggestion).
+    expect(result.suggestions[0].coordinates).toBeUndefined();
   });
 
-  it('includes distanceMeters when proximity is provided', async () => {
-    const suggestItem = createSuggestItem({});
-    const retrieveResp = createRetrieveResponse({
-      lat: -23.5614,
-      lon: -46.6558,
-    });
-
-    mockAutocompleteFlow([suggestItem], [retrieveResp]);
+  it('shows the distance /suggest reports when proximity is provided', async () => {
+    mockAutocompleteFlow([createSuggestItem({ distance: 1234.4 })], []);
 
     const result = await mapboxAutocomplete({
       query: 'Paulista',
       proximity: { lat: -23.5505, lon: -46.6333 },
     });
 
-    expect(result.suggestions[0].distanceMeters).toBeDefined();
-    expect(typeof result.suggestions[0].distanceMeters).toBe('number');
-    expect(result.suggestions[0].distanceMeters).toBeGreaterThan(0);
+    expect(result.suggestions[0].distanceMeters).toBe(1234);
+    expect(result.suggestions[0].distanceLabel).toBeDefined();
+  });
+
+  it('shows no distance without a proximity point', async () => {
+    mockAutocompleteFlow([createSuggestItem({ distance: 1234 })], []);
+    const result = await mapboxAutocomplete({ query: 'Paulista' });
+    expect(result.suggestions[0].distanceMeters).toBeUndefined();
   });
 
   it('constructs correct URL with all parameters', async () => {
@@ -345,7 +349,11 @@ describe('mapboxAutocomplete', () => {
     expect(suggestion.featureType).toBe('address');
     expect(suggestion.primaryText).toBe('SW1A 1AA');
     expect(suggestion.secondaryText).toBe('City of Westminster, London');
-    expect(suggestion.coordinates).toEqual({ lat: 51.501009, lon: -0.141588 });
+    // Located when picked — a postcode is a usable destination.
+    expect((await resolveSuggestion(suggestion))?.coordinates).toEqual({
+      lat: 51.501009,
+      lon: -0.141588,
+    });
   });
 
   it('throws on non-OK response', async () => {
@@ -356,21 +364,18 @@ describe('mapboxAutocomplete', () => {
     ).rejects.toThrow('Mapbox search failed (401)');
   });
 
-  it('skips suggestions where retrieve has no geometry', async () => {
+  it('lists every suggestion; one with no location is caught when picked', async () => {
     const goodItem = createSuggestItem({ mapboxId: 'good' });
     const badItem = createSuggestItem({ mapboxId: 'bad' });
-
-    const goodRetrieve = createRetrieveResponse({ mapboxId: 'good' });
-    const badRetrieve = createRetrieveResponse({
-      mapboxId: 'bad',
-      hasGeometry: false,
-    });
-
-    mockAutocompleteFlow([goodItem, badItem], [goodRetrieve, badRetrieve]);
+    mockAutocompleteFlow(
+      [goodItem, badItem],
+      [createRetrieveResponse({ mapboxId: 'bad', hasGeometry: false })],
+    );
 
     const result = await mapboxAutocomplete({ query: 'test' });
-    expect(result.suggestions).toHaveLength(1);
-    expect(result.suggestions[0].id).toBe('good');
+
+    expect(result.suggestions.map((s) => s.id)).toEqual(['good', 'bad']);
+    expect(await resolveSuggestion(result.suggestions[1]!)).toBeNull();
   });
 
   it('maps feature_type to featureType field', async () => {
@@ -453,6 +458,98 @@ describe('mapboxAutocomplete', () => {
 
     expect(result.suggestions[0].category).toBeUndefined();
     expect(result.suggestions[0].featureType).toBe('address');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Search Box billing: one session per destination CHOSEN, not per keystroke
+// ---------------------------------------------------------------------------
+// Every /retrieve ends a billed Search Box session. Retrieving all five
+// suggestions on every keystroke billed ~29,000 sessions in Sep 2026 against
+// ~1,000 route requests. Suggestions must render from /suggest alone, and
+// /retrieve must run once — for the place the rider actually picks.
+
+describe('mapboxAutocomplete — billing', () => {
+  it('lists suggestions with a single request and no retrieve', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        suggestions: [
+          createSuggestItem({ mapboxId: 'a', name: 'Piata Unirii' }),
+          createSuggestItem({ mapboxId: 'b', name: 'Piata Romana' }),
+        ],
+      }),
+      text: async () =>
+        JSON.stringify({
+          suggestions: [
+            createSuggestItem({ mapboxId: 'a', name: 'Piata Unirii' }),
+            createSuggestItem({ mapboxId: 'b', name: 'Piata Romana' }),
+          ],
+        }),
+    } as Response);
+
+    const result = await mapboxAutocomplete({ query: 'Piata' });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('/suggest');
+    expect(result.suggestions.map((s) => s.primaryText)).toEqual(['Piata Unirii', 'Piata Romana']);
+  });
+});
+
+const respond = (data: unknown) =>
+  ({ ok: true, status: 200, json: async () => data, text: async () => JSON.stringify(data) }) as Response;
+
+const sessionOf = (url: unknown) => new URL(String(url)).searchParams.get('session_token');
+
+describe('resolveSuggestion — one retrieve per place picked', () => {
+  it('retrieves the picked place once, in the same session as the typing', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(respond({ suggestions: [createSuggestItem({ mapboxId: 'a' })] }))
+      .mockResolvedValueOnce(respond(createRetrieveResponse({ mapboxId: 'a', lon: 26.1, lat: 44.43 })));
+
+    const { suggestions } = await mapboxAutocomplete({ query: 'Unirii' });
+    const resolved = await resolveSuggestion(suggestions[0]!);
+
+    expect(resolved?.coordinates).toEqual({ lat: 44.43, lon: 26.1 });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(String(fetchSpy.mock.calls[1][0])).toContain('/retrieve/a');
+    expect(sessionOf(fetchSpy.mock.calls[1][0])).toBe(sessionOf(fetchSpy.mock.calls[0][0]));
+  });
+
+  it('starts a new session for the next search, because retrieve ended the last one', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(respond({ suggestions: [createSuggestItem({ mapboxId: 'a' })] }))
+      .mockResolvedValueOnce(respond(createRetrieveResponse({ mapboxId: 'a' })))
+      .mockResolvedValueOnce(respond({ suggestions: [] }));
+
+    const { suggestions } = await mapboxAutocomplete({ query: 'Unirii' });
+    await resolveSuggestion(suggestions[0]!);
+    await mapboxAutocomplete({ query: 'Romana' });
+
+    expect(sessionOf(fetchSpy.mock.calls[2][0])).not.toBe(sessionOf(fetchSpy.mock.calls[0][0]));
+  });
+
+  it('makes no request for a place that already has coordinates', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const recent = {
+      id: 'recent-1',
+      label: 'Home',
+      primaryText: 'Home',
+      coordinates: { lat: 44.4, lon: 26.1 },
+    };
+    expect(await resolveSuggestion(recent)).toEqual(recent);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the place has no location, so the UI can say so', async () => {
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(respond({ suggestions: [createSuggestItem({ mapboxId: 'a' })] }))
+      .mockResolvedValueOnce(respond(createRetrieveResponse({ hasGeometry: false })));
+    const { suggestions } = await mapboxAutocomplete({ query: 'Unirii' });
+    expect(await resolveSuggestion(suggestions[0]!)).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import type { AutocompleteSuggestion, Coordinate, HazardType, SavedRoute } from '@defensivepedal/core';
+import type { AutocompleteSuggestion, Coordinate, HazardType, ResolvedSuggestion, SavedRoute } from '@defensivepedal/core';
 import type { MeasurementSystem } from '@defensivepedal/core';
 import { formatDistance, formatElevation, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, toRoutingDisplayMode } from '@defensivepedal/core';
 import { router } from 'expo-router';
@@ -61,6 +61,8 @@ import { usePremium } from '../src/hooks/usePremium';
 import { usePlusNudge } from '../src/hooks/usePlusNudge';
 import { isHotDayForCool } from '../src/lib/plus-nudges';
 import { telemetry } from '../src/lib/telemetry';
+import { resolveSuggestion } from '../src/lib/mapbox-search';
+import { mergeRecentsWithResults } from '../src/lib/search-merge';
 import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
 import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
 import { pickGpxFile } from '../src/lib/gpx-import';
@@ -952,32 +954,17 @@ export default function RoutePlanningScreen() {
       !isSavedPlaceKeyword(deferredDestinationQuery, savedPlaces),
   });
 
-  // Merge matching recent ride destinations into autocomplete results.
-  // When user has typed >= 2 chars, matching recents appear first (clock icon),
-  // then Mapbox results (deduplicated by proximity to recent coordinates).
-  const mergedDestinationSuggestions = useMemo(() => {
-    const mapboxResults = destinationAutocompleteQuery.data?.suggestions ?? [];
-    const query = deferredDestinationQuery.toLowerCase();
-    if (query.length < 2) return mapboxResults;
-
-    // Find recents whose label contains the query
-    const matchingRecents = recentRideDestinations.filter((r) =>
-      r.label.toLowerCase().includes(query),
-    );
-    if (matchingRecents.length === 0) return mapboxResults;
-
-    // Deduplicate: drop Mapbox results within 200m of a matching recent
-    const isNearRecent = (s: AutocompleteSuggestion) =>
-      matchingRecents.some((r) => {
-        const dlat = s.coordinates.lat - r.coordinates.lat;
-        const dlon = s.coordinates.lon - r.coordinates.lon;
-        // ~200m threshold (rough degree approximation)
-        return Math.abs(dlat) < 0.002 && Math.abs(dlon) < 0.003;
-      });
-
-    const dedupedMapbox = mapboxResults.filter((s) => !isNearRecent(s));
-    return [...matchingRecents, ...dedupedMapbox];
-  }, [destinationAutocompleteQuery.data, deferredDestinationQuery, recentRideDestinations]);
+  // Matching recent ride destinations first, then live results; a result that
+  // is the same place as a recent is hidden. See lib/search-merge.ts.
+  const mergedDestinationSuggestions = useMemo(
+    () =>
+      mergeRecentsWithResults(
+        recentRideDestinations,
+        destinationAutocompleteQuery.data?.suggestions ?? [],
+        deferredDestinationQuery,
+      ),
+    [destinationAutocompleteQuery.data, deferredDestinationQuery, recentRideDestinations],
+  );
 
   // Waypoint autocomplete (shared query for whichever waypoint field is active)
   const waypointAutocompleteQuery = useQuery({
@@ -1030,7 +1017,26 @@ export default function RoutePlanningScreen() {
 
   // --- Handlers ---
 
-  const handleStartOverrideSelect = (suggestion: AutocompleteSuggestion) => {
+  // Search results arrive WITHOUT a location (Search Box /suggest only — every
+  // /retrieve is a billed session). The location is fetched here, once, for
+  // the place the rider picks; recents and saved places already have one and
+  // cost nothing. A place Mapbox cannot locate is reported, not routed to.
+  const [searchToast, setSearchToast] = useState<string | null>(null);
+  const withResolvedPick = useCallback(
+    (then: (resolved: ResolvedSuggestion) => void) =>
+      async (suggestion: AutocompleteSuggestion): Promise<void> => {
+        const resolved = await resolveSuggestion(suggestion).catch(() => null);
+        if (!resolved) {
+          setSearchToast(t('planning.placeNotFound'));
+          return;
+        }
+        then(resolved);
+      },
+    [t],
+  );
+
+
+  const handleStartOverrideSelect = (suggestion: ResolvedSuggestion) => {
     setRouteRequest({ startOverride: suggestion.coordinates });
     setStartOverrideQuery(suggestion.label);
     setStartOverrideDisplay({
@@ -1040,7 +1046,7 @@ export default function RoutePlanningScreen() {
     setActiveField(null);
   };
 
-  const handleDestinationSelect = (suggestion: AutocompleteSuggestion) => {
+  const handleDestinationSelect = (suggestion: ResolvedSuggestion) => {
     Keyboard.dismiss();
     setRouteRequest({ destination: suggestion.coordinates });
     setDestinationQuery(suggestion.label);
@@ -1084,7 +1090,7 @@ export default function RoutePlanningScreen() {
     setActiveField(`waypoint-${waypoints.length}` as ActiveField);
   };
 
-  const handleWaypointSelect = (index: number, suggestion: AutocompleteSuggestion) => {
+  const handleWaypointSelect = (index: number, suggestion: ResolvedSuggestion) => {
     Keyboard.dismiss();
     addWaypoint(suggestion.coordinates);
     setWaypointQueries((prev) => {
@@ -1325,12 +1331,16 @@ export default function RoutePlanningScreen() {
                   setActiveField(null);
                 }}
                 onSelectSuggestion={(suggestion) => {
-                  handleStartOverrideSelect(suggestion);
-                  setActiveField(null);
+                  void withResolvedPick((resolved) => {
+                    handleStartOverrideSelect(resolved);
+                    setActiveField(null);
+                  })(suggestion);
                 }}
                 onSelectCurrentLocation={clearStartOverride}
                 savedPlaces={savedPlaces}
-                onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
+                onSavePlace={(suggestion, type) =>
+                  void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
+                }
               />
               <Pressable
                 style={styles.cancelButton}
@@ -1392,9 +1402,11 @@ export default function RoutePlanningScreen() {
                   setDestinationHydrated(true);
                   setActiveField('destination');
                 }}
-                onSelectSuggestion={handleDestinationSelect}
+                onSelectSuggestion={(s) => void withResolvedPick(handleDestinationSelect)(s)}
                 savedPlaces={savedPlaces}
-                onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
+                onSavePlace={(suggestion, type) =>
+                  void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
+                }
               />
               {hasValidDestination ? (
                 <Pressable
@@ -1439,9 +1451,13 @@ export default function RoutePlanningScreen() {
                       setActiveField(`waypoint-${index}` as ActiveField);
                     }}
                     onClear={() => handleRemoveWaypoint(index)}
-                    onSelectSuggestion={(s) => handleWaypointSelect(index, s)}
+                    onSelectSuggestion={(s) =>
+                      void withResolvedPick((resolved) => handleWaypointSelect(index, resolved))(s)
+                    }
                     savedPlaces={savedPlaces}
-                    onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
+                    onSavePlace={(suggestion, type) =>
+                  void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
+                }
                   />
                 </View>
               ) : (
@@ -1555,9 +1571,15 @@ export default function RoutePlanningScreen() {
                     setWaypointQueries((prev) => prev.slice(0, -1));
                     setActiveField(null);
                   }}
-                  onSelectSuggestion={(s) => handleWaypointSelect(waypoints.length, s)}
+                  onSelectSuggestion={(s) =>
+                    void withResolvedPick((resolved) =>
+                      handleWaypointSelect(waypoints.length, resolved),
+                    )(s)
+                  }
                   savedPlaces={savedPlaces}
-                  onSavePlace={(suggestion, type) => setSavedPlace(type, suggestion)}
+                  onSavePlace={(suggestion, type) =>
+                  void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
+                }
                 />
               </View>
             </View>
@@ -2081,6 +2103,13 @@ export default function RoutePlanningScreen() {
           variant="info"
           onDismiss={consumeGpxToast}
         />
+      </View>
+    ) : null}
+
+    {/* A picked search result Mapbox could not locate */}
+    {searchToast ? (
+      <View style={styles.hazardToastContainer}>
+        <Toast message={searchToast} variant="error" onDismiss={() => setSearchToast(null)} />
       </View>
     ) : null}
 
