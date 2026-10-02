@@ -5,13 +5,14 @@
 //   - an older one still counts, inside the grace window, so a paying rider
 //     out of coverage keeps what they paid for
 //   - past the grace window it decays to free rather than granting forever
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 import type { ProfilePremium } from '@defensivepedal/core';
 import {
   FREE_LIMITS,
   PLUS_OFFLINE_GRACE_DAYS,
+  PLUS_MODES_FREE_UNTIL,
   isPlusModesPromoActive,
 } from '@defensivepedal/core';
 
@@ -147,17 +148,34 @@ describe('usePremium — gates', () => {
   });
 
   /*
-   * Cool routing is free to everyone until PLUS_MODES_FREE_UNTIL, so a free
-   * rider in a covered country is currently 'available', not 'requires_plus'.
-   * `usePremium` reads the wall clock, so this asserts the promotion is in
-   * force rather than hard-coding the post-promotion answer — and it will fail
-   * loudly on the day the promotion ends, which is the reminder that the
-   * request-level enforcement still has to be built by then.
+   * Cool routing was free to everyone until PLUS_MODES_FREE_UNTIL. This used
+   * to read the wall clock and fail on the day the promotion ended, as a
+   * reminder that request-level enforcement had to exist by then. It does
+   * (route-planning/route-preview only send avoidHeat when `coolAvailable`,
+   * which folds in `blockCoolRouting`), and the test failed as designed on
+   * 2026-10-02. It now pins both sides of the cutoff instead of the calendar.
    */
   it('gives a free rider cool routing while the launch promotion runs', () => {
-    expect(isPlusModesPromoActive()).toBe(true);
-    expect(read().coolRouting('ES')).toBe('available');
-    expect(read().coolRouting('RO')).toBe('available');
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(PLUS_MODES_FREE_UNTIL.getTime() - 60_000));
+      expect(isPlusModesPromoActive()).toBe(true);
+      expect(read().coolRouting('ES')).toBe('available');
+      expect(read().coolRouting('RO')).toBe('available');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks a free rider for Plus once the promotion has ended', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(PLUS_MODES_FREE_UNTIL.getTime() + 60_000));
+      expect(isPlusModesPromoActive()).toBe(false);
+      expect(read().coolRouting('RO')).toBe('requires_plus');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('unlocks cool routing for plus in a covered country only', () => {
