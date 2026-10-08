@@ -4,19 +4,24 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 //
 // Supabase auth email links are forced to be https://. Mobile deep-link
 // schemes (defensivepedal://) cannot be opened directly from email clients.
-// This function bounces the browser into the app:
-//   - Android browser → intent:// URI (Chrome handles natively, no JS)
-//   - iOS browser → HTML intermediate page; JS opens the app or shows App Store link
+// This function finishes the journey per platform:
+//   - Android browser → intent:// URI (Chrome handles natively, no JS); the
+//     app then calls verifyOtp with the forwarded token_hash
+//   - iOS browser, signup link → the email is confirmed HERE (server-side
+//     verify) and the browser lands on a web page telling the rider to sign
+//     in. The iPhone app cannot be opened from a link — see the iOS block.
+//   - iOS browser, anything else → 302 to the custom scheme (best effort)
 //   - Desktop/other → 302 to a state-appropriate page on the web app
 //
 // Two link generations arrive here (2026-08-11 rework, see README):
 //
 //   NEW (signup + recovery emails since 2026-08-11): the email links point
 //   DIRECTLY at this function with `token_hash=...&type=...`. Nothing has
-//   been consumed when we run — the app calls verifyOtp with the forwarded
-//   token_hash. This makes the link immune to mail-scanner prefetch and
-//   double-clicks (a GET here has no side effects), and works cross-device
-//   (verifyOtp needs no PKCE verifier).
+//   been consumed when we run. On Android and desktop a GET here still has
+//   no side effects, so the link is immune to mail-scanner prefetch and
+//   double-clicks, and works cross-device (verifyOtp needs no PKCE
+//   verifier). The one exception is an iPhone user agent on a signup link,
+//   where this function consumes the token itself (iOS block below).
 //
 //   LEGACY (emails sent before the rework, valid up to 24h): the link went
 //   through /auth/v1/verify first, which consumed the one-time token and
@@ -35,17 +40,92 @@ const PACKAGE_MAP: Record<string, string> = {
   defensivepedal: 'com.defensivepedal.mobile',
 };
 
-// Desktop visitors get redirected to static pages on the web app because
-// Supabase's edge runtime wraps non-redirect responses in CSP sandbox +
-// text/plain (anti-phishing) — see error-log #31. Three states:
-//   - legacy ?code= link: /verify already confirmed the email → success page
-//   - token_hash link: NOT confirmed yet (needs the app) → "open on phone"
-//   - ?error_code= from a failed legacy /verify → expired/used-link page
-const DESKTOP_SUCCESS_URL = 'https://routes.defensivepedal.com/email-confirmed';
-const DESKTOP_OPEN_ON_PHONE_URL = 'https://routes.defensivepedal.com/email-open-on-phone';
-const DESKTOP_LINK_EXPIRED_URL = 'https://routes.defensivepedal.com/email-link-expired';
+// Browsers that cannot be handed to the app get redirected to static pages
+// on the web app, because Supabase's edge runtime wraps non-redirect
+// responses in CSP sandbox + text/plain (anti-phishing) — see error-log #31.
+//   - email is confirmed (legacy ?code= on desktop, or the iOS server-side
+//     verify succeeded) → success page
+//   - desktop token_hash link: NOT confirmed yet (needs the app) → "open on
+//     phone"
+//   - failed verify (legacy ?error_code=, or the iOS server-side verify was
+//     rejected) → expired/used-link page
+const WEB_SUCCESS_URL = 'https://routes.defensivepedal.com/email-confirmed';
+const WEB_OPEN_ON_PHONE_URL = 'https://routes.defensivepedal.com/email-open-on-phone';
+const WEB_LINK_EXPIRED_URL = 'https://routes.defensivepedal.com/email-link-expired';
 
-Deno.serve((req: Request): Response => {
+// Stored confirmation tokens are hex, optionally prefixed `pkce_`. Anything
+// else is not worth a round trip to GoTrue.
+const TOKEN_HASH_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
+
+const redirect = (location: string): Response =>
+  new Response(null, {
+    status: 302,
+    headers: {
+      location,
+      'cache-control': 'no-store',
+    },
+  });
+
+// Confirms a signup the same way the app's verifyOtp({ token_hash, type })
+// does. Returns true only when GoTrue accepted the token. Never logs the
+// token or the session.
+async function confirmSignupOnServer(tokenHash: string): Promise<boolean> {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+
+  if (!supabaseUrl || !anonKey) {
+    console.error(
+      '[email-confirm] SUPABASE_URL / SUPABASE_ANON_KEY missing — cannot confirm on the server',
+    );
+    return false;
+  }
+
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/verify`, {
+      method: 'POST',
+      headers: {
+        apikey: anonKey,
+        authorization: `Bearer ${anonKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ type: 'signup', token_hash: tokenHash }),
+    });
+    const body = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      const errorCode = typeof body?.error_code === 'string' ? body.error_code : '';
+      console.warn(
+        `[email-confirm] ios server-side verify rejected: status=${res.status} error_code=${errorCode}`,
+      );
+      return false;
+    }
+
+    // A successful verify also mints a session that nobody will ever use (the
+    // rider signs in from the app afterwards). Revoke it, best effort.
+    const accessToken = typeof body?.access_token === 'string' ? body.access_token : '';
+    if (accessToken) {
+      await fetch(`${supabaseUrl}/auth/v1/logout?scope=local`, {
+        method: 'POST',
+        headers: {
+          apikey: anonKey,
+          authorization: `Bearer ${accessToken}`,
+        },
+      })
+        .then((logoutRes) => logoutRes.body?.cancel())
+        .catch(() => undefined);
+    }
+
+    console.log('[email-confirm] ios server-side verify ok');
+    return true;
+  } catch (error) {
+    console.error(
+      `[email-confirm] ios server-side verify threw: ${error instanceof Error ? error.message : 'unknown error'}`,
+    );
+    return false;
+  }
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
   const url = new URL(req.url);
   const userAgent = req.headers.get('user-agent') ?? '';
 
@@ -62,23 +142,19 @@ Deno.serve((req: Request): Response => {
   const isIOS = /iphone|ipad|ipod/i.test(userAgent);
   const isMobile = isAndroid || isIOS;
 
+  const hasError = url.searchParams.has('error') || url.searchParams.has('error_code');
+  const tokenHash = url.searchParams.get('token_hash') ?? '';
+
   // Desktop / unknown user agent: the app isn't reachable from here, so
-  // redirect to the state-appropriate branded page on the web app.
+  // redirect to the state-appropriate branded page on the web app. Nothing
+  // is consumed — mail scanners land in this branch.
   if (!isMobile) {
-    const hasError = url.searchParams.has('error') || url.searchParams.has('error_code');
-    const hasTokenHash = url.searchParams.has('token_hash');
     const location = hasError
-      ? DESKTOP_LINK_EXPIRED_URL
-      : hasTokenHash
-        ? DESKTOP_OPEN_ON_PHONE_URL
-        : DESKTOP_SUCCESS_URL;
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location,
-        'cache-control': 'no-store',
-      },
-    });
+      ? WEB_LINK_EXPIRED_URL
+      : tokenHash
+        ? WEB_OPEN_ON_PHONE_URL
+        : WEB_SUCCESS_URL;
+    return redirect(location);
   }
 
   // Forward every query param except `scheme` itself.
@@ -93,79 +169,45 @@ Deno.serve((req: Request): Response => {
       `intent://${targetPath}` +
       `#Intent;scheme=${scheme};package=${androidPackage};end`;
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location: intentUri,
-        'cache-control': 'no-store',
-      },
-    });
+    return redirect(intentUri);
   }
 
-  // iOS: serve an HTML intermediate page instead of a bare custom-scheme 302.
-  // A bare 302 to defensivepedal:// causes SFSafariViewController (used by
-  // Gmail and other iOS apps) to show "Safari cannot open the page because the
-  // address is invalid" when the Defensive Pedal app is not installed, because
-  // iOS treats an unrecognised URL scheme as a navigation error. The HTML page
-  // triggers the same window.location redirect via JavaScript so the app opens
-  // if it is installed, while showing a helpful download button otherwise.
-  const customSchemeUrl = `${scheme}://${targetPath}`;
-  const appStoreUrl = 'https://apps.apple.com/app/id6778694757';
-  // Two separate escape contexts:
-  // - HTML attributes (href): & → &amp;  " → &quot;
-  // - JS string literal inside <script>: \ → \\  " → \"  < → <
-  //   (HTML entities are NOT decoded inside <script> raw-text elements)
-  const htmlAttrUrl = customSchemeUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  const jsStringUrl = customSchemeUrl
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/</g, '\\u003c');
+  // ── iOS ──────────────────────────────────────────────────────────────────
+  //
+  // The iPhone app cannot be opened from these links (found 2026-10-08,
+  // error-log #134). app.config.ts sets ios.infoPlist.CFBundleURLTypes for
+  // native Google Sign-In, and when that key is set explicitly Expo ignores
+  // the top-level `scheme`, so iOS builds do not register defensivepedal://.
+  // That is read from app.config.ts and the @expo/config-plugins source and
+  // matches production (iPhone taps reach this function, the app never calls
+  // /auth/v1/verify); it has not been checked against a built Info.plist.
+  // Until an iOS build registers the scheme, neither a bare 302 to it (the
+  // 2026-10-07 hotfix) nor an HTML/JS bounce page (which Supabase serves as
+  // text/plain anyway, error-log #31) can reach the app.
+  //
+  // So a signup link is confirmed right here — POST /auth/v1/verify with the
+  // token_hash, exactly what the app's verifyOtp does — and the browser lands
+  // on a web page telling the rider to go back to the app and sign in.
+  //
+  // Trade-off against the 2026-08-11 rework: for an iPhone user agent a GET
+  // now consumes the token. Mail scanners overwhelmingly present desktop
+  // user agents and take the branch above. If one does get here first, the
+  // email still ends up confirmed and the rider's own tap lands on
+  // /email-link-expired, whose copy already says "just sign in".
+  //
+  // Recovery links cannot be finished here (the app needs the session to set
+  // a new password), so everything that is not a signup token_hash keeps the
+  // custom-scheme 302 and only works once an iOS build registers the scheme.
 
-  const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Opening Defensive Pedal…</title>
-<style>
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0b0d10;
-     color:#f9fafb;display:flex;align-items:center;justify-content:center;
-     min-height:100vh;margin:0;padding:20px;box-sizing:border-box}
-.card{text-align:center;max-width:320px}
-h1{font-size:18px;font-weight:700;margin:0 0 8px}
-p{font-size:14px;color:#9ca3af;margin:0 0 24px;line-height:1.5}
-.btn{display:inline-block;padding:14px 28px;background:#d4a843;color:#0b0d10;
-     border-radius:12px;font-weight:700;text-decoration:none;font-size:15px}
-#store{margin-top:20px}
-</style>
-</head>
-<body>
-<div class="card">
-  <h1>Opening Defensive Pedal…</h1>
-  <p>Tap the button below if the app does not open automatically.</p>
-  <a class="btn" href="${htmlAttrUrl}">Open in app</a>
-  <div id="store" style="display:none">
-    <p style="margin-top:20px">App not installed? Download it first, then tap the link in your email again.</p>
-    <a class="btn" href="${appStoreUrl}">Download on the App Store</a>
-  </div>
-</div>
-<script>
-(function(){
-  try { window.location = "${jsStringUrl}"; } catch(e) {}
-  setTimeout(function(){
-    var s = document.getElementById('store');
-    if (s) s.style.display = 'block';
-  }, 2000);
-})();
-</script>
-</body>
-</html>`;
+  if (hasError) {
+    return redirect(WEB_LINK_EXPIRED_URL);
+  }
 
-  return new Response(html, {
-    status: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'no-store',
-    },
-  });
+  if (tokenHash && url.searchParams.get('type') === 'signup') {
+    const confirmed =
+      TOKEN_HASH_PATTERN.test(tokenHash) && (await confirmSignupOnServer(tokenHash));
+    return redirect(confirmed ? WEB_SUCCESS_URL : WEB_LINK_EXPIRED_URL);
+  }
+
+  return redirect(`${scheme}://${targetPath}`);
 });

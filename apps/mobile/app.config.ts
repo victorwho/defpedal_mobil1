@@ -134,12 +134,13 @@ const googleIosUrlScheme = (() => {
 
 // iOS-only Info.plist block for native Google Sign-In, gated on the iOS client
 // id being present. Lives under expo.ios.infoPlist exclusively — the Android
-// build graph never sees it.
+// build graph never sees it. The reversed-client-id URL scheme that goes with
+// it is registered in iosUrlTypesInfoPlist further down, together with the
+// app's own scheme.
 const iosGoogleSignInInfoPlist =
   googleIosClientId && googleIosUrlScheme
     ? {
         GIDClientID: googleIosClientId,
-        CFBundleURLTypes: [{ CFBundleURLSchemes: [googleIosUrlScheme] }],
       }
     : {};
 
@@ -235,6 +236,38 @@ const appIdentifierByVariant: Record<AppVariant, string> = {
   production: 'com.defensivepedal.mobile',
   test: 'com.defensivepedal.mobile.test',
 };
+
+// URL schemes the iOS app registers (Info.plist CFBundleURLTypes).
+//
+// Setting ios.infoPlist.CFBundleURLTypes explicitly makes Expo SKIP its own
+// scheme plugin (@expo/config-plugins createInfoPlistPluginWithPropertyGuard:
+// "If the user explicitly sets a value in the infoPlist, we should respect
+// that") — prebuild only prints `Ignoring abstract property "scheme"`. From
+// 2026-06-09 to 2026-10-08 this key listed the Google scheme alone, so iOS
+// builds did not register defensivepedal:// and no email link (signup
+// confirmation, password recovery) could open the iPhone app — error-log #134.
+//
+// So the list must be COMPLETE: the app scheme and the bundle identifier (the
+// two entries Expo would have generated itself) plus the Google
+// reversed-client-id. When the Google iOS client is not configured the block
+// is omitted and Expo derives the first two from `scheme` as usual. The
+// "Ignoring abstract property" warning still prints while this block is
+// present; with the app scheme listed here it is harmless. Android is
+// unaffected (ios-only key).
+const iosUrlTypesInfoPlist =
+  googleIosClientId && googleIosUrlScheme
+    ? {
+        CFBundleURLTypes: [
+          {
+            CFBundleURLSchemes: [
+              appSchemeByVariant[appVariant],
+              appIdentifierByVariant[appVariant],
+              googleIosUrlScheme,
+            ],
+          },
+        ],
+      }
+    : {};
 
 export default () => ({
   expo: {
@@ -417,9 +450,12 @@ export default () => ({
         // exactly the shape the existing code already expects, and matches
         // CFBundleTypeRole: 'Viewer' — we read courses, we never edit them.
         LSSupportsOpeningDocumentsInPlace: false,
-        // Native Google Sign-In keys (GIDClientID + reversed-client-id URL
-        // scheme), present only once the iOS OAuth client id is configured.
+        // Native Google Sign-In key (GIDClientID), present only once the iOS
+        // OAuth client id is configured.
         ...iosGoogleSignInInfoPlist,
+        // URL schemes: app scheme + bundle id + Google reversed-client-id.
+        // Must stay complete — see iosUrlTypesInfoPlist (error-log #134).
+        ...iosUrlTypesInfoPlist,
       },
     },
     android: {

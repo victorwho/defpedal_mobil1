@@ -1,11 +1,17 @@
 # Implementation Progress
 
-Last updated: 2026-09-30 (session 132 - Pedal Plus nudges implemented, launch moved to 2026-10-02 00:00 UTC; preview 0.2.178 (181) with testers, Firebase release 18d0kuq05brsg)
+Last updated: 2026-10-08 (unnumbered cloud session - iPhone email sign-up fixed server-side, iOS URL-scheme config corrected; working tree UNCOMMITTED and unbuilt)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-07/08 (cloud session, unnumbered): iPhone email sign-up had been broken since the 2026-08-11 link rework — fixed server-side; the root cause was in `app.config.ts`. None of the repo changes are committed, built or deployed.** error-log #134.
+  ✅ **Live:** `email-confirm` edge fn v16 confirms iPhone signup links itself and lands on `/email-confirmed`. Verified end to end on production with a throwaway account (sign-in refused → desktop GET consumes nothing → iPhone GET confirms → second GET "already used" → password sign-in OK; account deleted). 16 stuck email accounts confirmed by hand.
+  ✅ **In the working tree, uncommitted:** `supabase/functions/email-confirm/{index.ts,README.md}` (repo copy of the live fn), `apps/mobile/app.config.ts` (`CFBundleURLTypes` now carries app scheme + bundle id + Google scheme; evaluated config diffed before/after for every variant — only those two entries added; approved by Victor 2026-10-08), `apps/web/app/email-confirmed/page.tsx` (hint reworded, needs a web deploy), `.claude/CLAUDE.md`, `.claude/error-log.md`, `TODO.md`.
+  ⚠️ **Not run:** typecheck, lint, bundle check, tests — the session had no usable toolchain on this checkout. Run them before committing.
+  ⚠️ **Still broken:** password-reset emails on iPhone, until riders are on an iOS build that registers the scheme. The config fix is untested on a device (TODO.md §Device / manual QA).
 
 - **Session 132 (2026-09-29/30): Pedal Plus nudge plan written AND implemented; launch moved to 2026-10-02 00:00 UTC.** Plan + implementation record: `docs/plans/pedal-plus-nudges.md` (§8).
   ✅ **Paywall copy rewritten** (EN/RO/ES): E-bike and Cool lead, titles match the pill names, "safety stays free" line. **Bug fixed:** the route-preview paywall hid the Cool benefit from every non-subscriber (it passed an entitlement-gated flag as coverage).

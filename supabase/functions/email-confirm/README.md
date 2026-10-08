@@ -15,8 +15,10 @@ dead-ended (Chrome refuses to launch `intent://` from typed navigations) while
 still consuming the token. See error-log #77.
 
 **Current flow:** the email templates link DIRECTLY at this edge function with
-a `token_hash` — no server-side verify happens on GET, so the link cannot be
-consumed by a browser or scanner. Only the app's `verifyOtp` call consumes it.
+a `token_hash` — no server-side verify happens on GET for Android or desktop,
+so the link cannot be consumed by a browser or scanner there; only the app's
+`verifyOtp` call consumes it. **iPhone signup links are the exception since
+2026-10-08** — this function verifies them itself (see the iOS section below).
 
 ```
 email link:
@@ -25,7 +27,11 @@ email link:
 
 edge function (this dir):
   Android  → 302 intent://auth/callback?token_hash=...&type=...
-  iOS      → HTML page; JS opens <scheme>://auth/callback?token_hash=...
+  iOS      → signup: this function calls POST /auth/v1/verify itself, then
+             302 to routes.defensivepedal.com/email-confirmed (or
+             /email-link-expired when GoTrue rejects the token)
+             recovery / anything else: 302 <scheme>://auth/callback?...
+             (cannot open the app on current builds — see the iOS section)
   Desktop  → 302 to routes.defensivepedal.com/email-open-on-phone
              (token untouched — user is told to open the email on the phone)
 
@@ -34,10 +40,45 @@ app (AuthSessionProvider deep-link handler, shipped since v0.2.9x 2026-04-20):
   works cross-device and after reinstall.
 ```
 
-Properties: scanner-prefetch immune, double-click immune, repeat-signup emails
+Properties (Android + desktop): scanner-prefetch immune, double-click immune, repeat-signup emails
 only die when GoTrue rotates the token (resend gets a fresh one), and the
 sign-in screen now has a "Resend confirmation email" affordance
 (`resendSignupConfirmation` in `apps/mobile/src/lib/supabase.ts`).
+
+### iOS: signup is confirmed by this function (2026-10-08)
+
+No iOS build made before 2026-10-08 can be opened from an email link.
+`app.config.ts` set `ios.infoPlist.CFBundleURLTypes` to the Google
+reversed-client-id alone (native Google Sign-In), and when that key is set
+explicitly Expo's `withScheme` is skipped, so those builds do not register
+`defensivepedal://`. This is read from the evaluated config and the
+`@expo/config-plugins` source, and matches production logs (iPhone taps reach
+this function; no `POST /auth/v1/verify` ever follows). It has not been
+confirmed against a built `Info.plist`. See error-log #134.
+
+`app.config.ts` now lists the app scheme and bundle identifier next to the
+Google scheme, so the first iOS build after 2026-10-08 should register it.
+That stays unproven until a link is tapped on a real iPhone running that build.
+
+Current behaviour, and what is still broken:
+
+- **Signup** — for an iPhone user agent this function does the one-time
+  `POST /auth/v1/verify` itself, revokes the session that call mints, and
+  redirects to `/email-confirmed` (or `/email-link-expired` if the token was
+  rejected). The rider then signs in from the app with email + password.
+- **Trade-off** — an iPhone-UA GET consumes the token, so the scanner-proof
+  property above does not hold for that one case. Scanners overwhelmingly use
+  desktop user agents; if one with an iPhone UA gets there first the email is
+  still confirmed and the rider's own tap shows the "expired or already used —
+  just sign in" page.
+- **Recovery** — cannot be finished server-side (the app needs the session to
+  set the new password). The link still 302s to the custom scheme, so password
+  reset by email does **not** work on iPhone for anyone on a build made before
+  2026-10-08.
+- **When to revisit** — once a build that registers the scheme is live and
+  tap-tested, the iOS branch could hand signup links to the app again, like
+  Android. Riders still on older builds would break again if it did, so keep
+  the server-side confirm until those have aged out. It works on every build.
 
 **Legacy links** (emails sent before the switch, valid ≤24h) still route
 through `/auth/v1/verify` and arrive here with `?code=` (success) or
@@ -104,10 +145,16 @@ defensivepedal-preview://auth/callback
 1. In the app: Account → Sign up with a `+tag` email you control.
 2. Open the email on the SAME phone → tap the button → browser bounces to
    `defensivepedal://auth/callback?token_hash=...` → app signs in.
+   On iPhone the browser lands on the "Email confirmed" page instead — go
+   back to the app and sign in with email + password.
 3. Negative checks: open the link on desktop FIRST → "open on your phone" page,
    then the phone tap must STILL work (token not consumed).
 4. `resend` path: sign-in with an unconfirmed account → "Resend confirmation
    email" appears under the error.
+5. The test only passes when the server log shows the confirmation itself:
+   Android → `POST /auth/v1/verify` from `okhttp` in `edge_logs`; iPhone →
+   `ios server-side verify ok` in `function_logs`. A 302 seen in curl proves
+   the redirect, not that the phone could follow it (error-log #134).
 
 ## Rollback
 

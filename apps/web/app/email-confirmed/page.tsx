@@ -97,8 +97,8 @@ export default function EmailConfirmedPage() {
         </p>
         <p style={styles.body}>Open the app on your phone to start riding safer.</p>
         <p style={styles.hint}>
-          Looks like you opened this link on a desktop browser. The app lives on your phone — tap
-          the Defensive Pedal icon there to sign in.
+          Next step: open the Defensive Pedal app on your phone and sign in with the email and
+          password you chose.
         </p>
       </div>
     </main>
