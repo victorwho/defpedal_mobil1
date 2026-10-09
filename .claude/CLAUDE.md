@@ -686,6 +686,26 @@ rider feedback; three rounds of device testing (preview v0.2.161 → 163).
   hardcode `streetName: ''` (`core/courseSteps.ts`) because synthesized geometry
   cannot know street names. Reserving the row leaves a blank gap under every
   maneuver of an imported course.
+- **The recenter button is ADAPTIVE (2026-10-09, preview v0.2.183).** Following
+  and untouched: tap = route overview, tap again = back to the rider. If the
+  rider has dragged/pinched the map (which stops Mapbox's native follow while
+  `isFollowing` stays true), the button shows the outline icon and one tap
+  re-engages follow by bumping `followResumeKey`, which re-keys the follow
+  `Camera` — an unchanged `followUserLocation` prop cannot restart it.
+  ⚠️ The drag is detected from **raw touches** (`map/mapDragGesture.ts`, a
+  wrapper `View` around the `MapView`), NOT from `Camera.onUserTrackingModeChange`:
+  that event never reached JS on the bridgeless preview build (error-log #135).
+  Do not "simplify" back to the library event.
+- **A session the rider never moved on ends without any dialog (2026-10-09).**
+  End Ride / hardware back with `hasMovedSinceStart(gpsBreadcrumbs)` false (core,
+  farthest point < `RIDE_MOVEMENT_THRESHOLD_METERS` = 50 m from the first
+  sanitised fix) skips Save/Discard, the early-end reason modal and feedback:
+  the trip is closed as `discarded` (so the stale-trip reaper does not stamp it
+  `abandoned`), `resetFlow()`, back to `/route-planning`. Telemetry
+  `navigation_stopped` carries `outcome: 'not_started'`. Displacement, not trail
+  length, on purpose: a stationary phone's jitter summed over minutes of route
+  browsing grows without bound. 50 m is reasoned, not measured. The
+  app-kill → resume-prompt path is unchanged.
 - **End Ride lives ONLY in the footer.** The control rail's red stop button was
   removed; the footer button plus the Android hardware-back handler are the only
   two paths, both through the same confirm-gated `Alert`. Do not re-add a rail

@@ -1,11 +1,16 @@
 # Implementation Progress
 
-Last updated: 2026-10-08 (unnumbered cloud session - iPhone email sign-up fixed server-side, iOS URL-scheme config corrected; working tree UNCOMMITTED and unbuilt)
+Last updated: 2026-10-09 (navigation: adaptive recenter button + no-dialog exit for unridden sessions; preview 0.2.183 device-confirmed)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-09: two navigation UX changes, both device-confirmed on preview 0.2.183 (186), Firebase release `48utr0d24rn1o`.**
+  ✅ **Adaptive recenter button.** If the rider moved the map by hand, the arrow button now recenters on them in one tap instead of jumping to the route overview. `followResumeKey` re-keys the follow `Camera`; the button's icon/label reflect whether the camera really follows. ⚠️ **0.2.182 shipped this DEAD** — it relied on `Camera.onUserTrackingModeChange`, which never reached JS on the bridgeless build, while the code was verifiably in the APK (error-log #135; root cause not established, no device for logcat). 0.2.183 detects the drag from raw touches (`src/components/map/mapDragGesture.ts`, 10 dp / second finger), keeping the library event as a secondary signal.
+  ✅ **Unridden sessions exit silently.** End Ride / back with no movement (`hasMovedSinceStart` in core `breadcrumbs.ts`, farthest point < 50 m from the first sanitised fix) skips Save/Discard, the early-end reason and feedback, closes the trip as `discarded`, and returns to route planning — riders were only looking at routes. Threshold reasoned, not measured.
+  **Green:** typecheck 0; core 1,427 · mobile 2,220 + 4 new; new tests mutation-checked; R8 keep check + release audit passed; APK content-verified (new symbols present, nonsense control absent, manifest 0.2.183 with 0.2.182 absent). Preview 0.2.182 (185, release `4elcgbo73rceo`) carried the dead button and is superseded.
 
 - **2026-10-07/08 (cloud session, unnumbered): iPhone email sign-up had been broken since the 2026-08-11 link rework — fixed server-side; the root cause was in `app.config.ts`. None of the repo changes are committed, built or deployed.** error-log #134.
   ✅ **Live:** `email-confirm` edge fn v16 confirms iPhone signup links itself and lands on `/email-confirmed`. Verified end to end on production with a throwaway account (sign-in refused → desktop GET consumes nothing → iPhone GET confirms → second GET "already used" → password sign-in OK; account deleted). 16 stuck email accounts confirmed by hand.
