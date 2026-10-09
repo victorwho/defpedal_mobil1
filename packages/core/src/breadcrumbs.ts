@@ -117,3 +117,33 @@ export const thinBreadcrumbTrail = <T>(trail: readonly T[]): T[] => {
   const lastIndex = trail.length - 1;
   return trail.filter((_, index) => index % 2 === 0 || index === lastIndex);
 };
+
+/**
+ * How far (metres) a rider must get from their first fix before a navigation
+ * session counts as a ride. Measured as DISPLACEMENT, not trail length: a
+ * phone lying still scatters its fixes by a few to a few tens of metres, and
+ * summing that scatter over minutes of looking at a route grows without bound,
+ * whereas the farthest point from the start stays inside the scatter radius.
+ * 50 m clears typical stationary scatter while still being under a block.
+ */
+export const RIDE_MOVEMENT_THRESHOLD_METERS = 50;
+
+/**
+ * True when the rider got at least `RIDE_MOVEMENT_THRESHOLD_METERS` away from
+ * their first (sanitised) fix at any point. No fixes, or one, means no movement.
+ * Uses the farthest point rather than the last one, so a rider who rode a
+ * loop back to where they began still counts as having moved.
+ */
+export const hasMovedSinceStart = <T extends SanitisableCrumb>(
+  crumbs: readonly T[],
+  startedAtMs?: number,
+): boolean => {
+  const clean = sanitizeBreadcrumbs(crumbs, startedAtMs);
+  const first = clean[0];
+  if (!first) return false;
+  return clean.some(
+    (crumb) =>
+      haversineDistance([first.lat, first.lon], [crumb.lat, crumb.lon]) >=
+      RIDE_MOVEMENT_THRESHOLD_METERS,
+  );
+};

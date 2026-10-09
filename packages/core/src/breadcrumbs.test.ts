@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  hasMovedSinceStart,
   isPlausibleStep,
   MAX_CYCLING_SPEED_MPS,
   MAX_SEGMENT_METERS,
@@ -114,5 +115,38 @@ describe('thinBreadcrumbTrail', () => {
     for (let i = 1; i < result.length; i += 1) {
       expect(result[i].id).toBeGreaterThan(result[i - 1].id);
     }
+  });
+});
+
+describe('hasMovedSinceStart', () => {
+  // 1e-5 deg latitude ~= 1.11 m.
+  const at = (northMeters: number, ts: number) => ({
+    lat: MADRID.lat + northMeters / 111_195,
+    lon: MADRID.lon,
+    ts,
+  });
+
+  it('is false with no fixes or a single fix', () => {
+    expect(hasMovedSinceStart([])).toBe(false);
+    expect(hasMovedSinceStart([at(0, 1000)])).toBe(false);
+  });
+
+  it('is false for a stationary phone whose fixes jitter within the threshold', () => {
+    // Ten minutes of scatter: the summed trail is ~1.5 km, displacement < 30 m.
+    const crumbs = Array.from({ length: 120 }, (_, i) => at(i % 2 === 0 ? 0 : 25, 1000 + i * 5000));
+    expect(hasMovedSinceStart(crumbs)).toBe(false);
+  });
+
+  it('is true once the rider gets 50 m from the first fix', () => {
+    expect(hasMovedSinceStart([at(0, 1000), at(20, 6000), at(60, 11_000)])).toBe(true);
+  });
+
+  it('counts a loop that ends back at the start', () => {
+    expect(hasMovedSinceStart([at(0, 1000), at(300, 61_000), at(5, 121_000)])).toBe(true);
+  });
+
+  it('ignores a stale cached fix from another city at the head of the trail', () => {
+    const stale = { ...BUCHAREST, ts: 500 };
+    expect(hasMovedSinceStart([stale, at(0, 1000), at(10, 6000)], 900)).toBe(false);
   });
 });

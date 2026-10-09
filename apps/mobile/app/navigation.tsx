@@ -3,6 +3,7 @@ import {
   AUTO_REROUTE_DELAY_MS,
   buildRerouteRequest,
   calculateTrailDistanceMeters,
+  hasMovedSinceStart,
   getNavigationProgress,
   getPreviewOrigin,
   computeNextStopProgress,
@@ -175,6 +176,14 @@ function NavigationScreen() {
   const resetFlow = useAppStore((state) => state.resetFlow);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setFollowing = useAppStore((state) => state.setFollowing);
+  // A pan/zoom stops Mapbox's native follow but leaves `isFollowing` true, so
+  // the camera button must know follow was interrupted: then a tap recenters
+  // on the rider instead of jumping to the route overview.
+  const [followInterrupted, setFollowInterrupted] = useState(false);
+  const [followResumeKey, setFollowResumeKey] = useState(0);
+  const handleFollowUserChange = useCallback((following: boolean) => {
+    setFollowInterrupted(!following);
+  }, []);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
 
@@ -657,7 +666,33 @@ function NavigationScreen() {
   // on the dialog) aborts without ending — review 2026-06-12 P1 #1: dismiss
   // used to be mapped to Save, making an accidental brush of the 40px stop
   // button irreversibly end the ride.
+  // A session the rider never moved on was route browsing, not a ride: close
+  // the trip as discarded and go home without the Save/Discard dialog, the
+  // reason question or the feedback screen.
+  const endUnstartedRide = useCallback(() => {
+    queueTripEnd('stopped', { discard: true });
+    telemetry.capture('navigation_stopped', {
+      route_id: selectedRoute?.id ?? 'unknown',
+      session_id: navigationSession?.sessionId ?? 'unknown',
+      outcome: 'not_started',
+    });
+    void clearCachedRoute();
+    resetFlow();
+    router.replace('/route-planning');
+  }, [queueTripEnd, selectedRoute, navigationSession, resetFlow]);
+
   const confirmEndRide = useCallback(() => {
+    const session = useAppStore.getState().navigationSession;
+    const startedAtMs = session ? Date.parse(session.startedAt) : Number.NaN;
+    if (
+      !hasMovedSinceStart(
+        session?.gpsBreadcrumbs ?? [],
+        Number.isFinite(startedAtMs) ? startedAtMs : undefined,
+      )
+    ) {
+      endUnstartedRide();
+      return;
+    }
     const saveAndEnd = () => {
       setEndActionPending('save');
       setEarlyEndPromptOpen(true);
@@ -676,7 +711,7 @@ function NavigationScreen() {
       ],
       { cancelable: true },
     );
-  }, [t]);
+  }, [t, endUnstartedRide]);
 
   // Android hardware back during a ride opens the End Ride dialog instead of
   // popping the stack. Without this there was no BackHandler anywhere: back
@@ -1308,6 +1343,8 @@ function NavigationScreen() {
     return closest;
   })();
 
+  const cameraFollowsRider = Boolean(navigationSession.isFollowing) && !followInterrupted;
+
   return (
     <View style={styles.screen}>
       <RouteMap
@@ -1318,6 +1355,8 @@ function NavigationScreen() {
         waypoints={routeRequest.waypoints}
         userLocation={mapUserCoordinate}
         followUser={navigationSession.isFollowing}
+        followResumeKey={followResumeKey}
+        onFollowUserChange={handleFollowUserChange}
         offRouteDetails={offRouteDetails}
         fullBleed
         showRouteOverlay={false}
@@ -1420,20 +1459,25 @@ function NavigationScreen() {
             style={styles.roundButton}
             accessible
             accessibilityRole="button"
-            accessibilityLabel={navigationSession.isFollowing ? t('nav.freeMap') : t('nav.recenter')}
+            accessibilityLabel={cameraFollowsRider ? t('nav.freeMap') : t('nav.recenter')}
           >
             <IconButton
               icon={
                 <Ionicons
-                  name={navigationSession.isFollowing ? 'navigate' : 'navigate-outline'}
+                  name={cameraFollowsRider ? 'navigate' : 'navigate-outline'}
                   size={22}
-                  color={navigationSession.isFollowing ? colors.accent : gray[300]}
+                  color={cameraFollowsRider ? colors.accent : gray[300]}
                 />
               }
               onPress={() => {
+                setFollowInterrupted(false);
+                if (navigationSession.isFollowing && followInterrupted) {
+                  setFollowResumeKey((key) => key + 1);
+                  return;
+                }
                 setFollowing(!(navigationSession.isFollowing ?? true));
               }}
-              accessibilityLabel={navigationSession.isFollowing ? t('nav.freeMap') : t('nav.recenter')}
+              accessibilityLabel={cameraFollowsRider ? t('nav.freeMap') : t('nav.recenter')}
               variant="secondary"
             />
           </View>

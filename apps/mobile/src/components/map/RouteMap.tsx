@@ -18,7 +18,7 @@
 import type { NearbyHazard } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import { brandColors, safetyColors } from '../../design-system/tokens/colors';
 import { radii } from '../../design-system/tokens/radii';
 import { space } from '../../design-system/tokens/spacing';
@@ -28,6 +28,7 @@ import { useHazardVote } from '../../hooks/useHazardVote';
 import { useT } from '../../hooks/useTranslation';
 import { mobileEnv } from '../../lib/env';
 import { STANDARD_STYLE_URL } from './constants';
+import { isMapDragGesture, type TouchPoint } from './mapDragGesture';
 import { HazardLayers } from './layers/HazardLayers';
 import { HistoryLayers } from './layers/HistoryLayers';
 import { MarkerLayers } from './layers/MarkerLayers';
@@ -79,6 +80,8 @@ export const RouteMap = ({
   waypoints,
   userLocation,
   followUser = false,
+  followResumeKey = 0,
+  onFollowUserChange,
   offRouteDetails,
   fullBleed = false,
   showRouteOverlay = true,
@@ -197,6 +200,38 @@ export const RouteMap = ({
     [onCenterChange],
   );
 
+  const handleUserTrackingModeChange = useCallback(
+    (event: any) => {
+      const following = event?.nativeEvent?.payload?.followUserLocation;
+      if (typeof following === 'boolean') onFollowUserChange?.(following);
+    },
+    [onFollowUserChange],
+  );
+
+  // Follow is broken by the rider's own gesture; report it from raw touches
+  // (see mapDragGesture.ts for why the tracking-mode event is not enough).
+  const touchStartRef = useRef<TouchPoint | null>(null);
+  const dragReportedRef = useRef(false);
+  const handleMapTouchStart = useCallback((event: GestureResponderEvent) => {
+    const { pageX, pageY, touches } = event.nativeEvent;
+    if (touches.length <= 1) {
+      touchStartRef.current = { x: pageX, y: pageY };
+      dragReportedRef.current = false;
+    }
+  }, []);
+  const handleMapTouchMove = useCallback(
+    (event: GestureResponderEvent) => {
+      if (dragReportedRef.current) return;
+      const { pageX, pageY, touches } = event.nativeEvent;
+      if (isMapDragGesture(touchStartRef.current, { x: pageX, y: pageY }, touches.length)) {
+        dragReportedRef.current = true;
+        onFollowUserChange?.(false);
+      }
+    },
+    [onFollowUserChange],
+  );
+  const trackDrag = followUser && onFollowUserChange != null;
+
   const handleMapTap = useCallback(
     (event: any) => {
       const coords = event?.geometry?.coordinates;
@@ -288,6 +323,11 @@ export const RouteMap = ({
       accessibilityElementsHidden={isDecorative}
       importantForAccessibility={isDecorative ? 'no-hide-descendants' : 'auto'}
     >
+      <View
+        style={StyleSheet.absoluteFill}
+        onTouchStart={trackDrag ? handleMapTouchStart : undefined}
+        onTouchMove={trackDrag ? handleMapTouchMove : undefined}
+      >
       <Mapbox.MapView
         ref={mapViewRef as any}
         style={StyleSheet.absoluteFill}
@@ -305,6 +345,8 @@ export const RouteMap = ({
         {followUser && userLocation ? (
           <Mapbox.Camera
             ref={cameraRef as any}
+            key={`follow-${followResumeKey}`}
+            onUserTrackingModeChange={handleUserTrackingModeChange}
             followUserLocation
             followUserMode={'course' as Mapbox.UserTrackingMode}
             followZoomLevel={17.5}
@@ -401,6 +443,7 @@ export const RouteMap = ({
           offRouteFeatureCollection={offRouteFeatureCollection}
         />
       </Mapbox.MapView>
+      </View>
 
       {resolvedCrosshairMode !== null ? <CrosshairOverlay /> : null}
 

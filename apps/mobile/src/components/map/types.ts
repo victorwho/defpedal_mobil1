@@ -54,6 +54,14 @@ export type RouteMapProps = {
   waypoints?: readonly Coordinate[];
   userLocation?: Coordinate | null;
   followUser?: boolean;
+  /**
+   * Bumped to re-engage native follow while `followUser` is already true.
+   * A pan/zoom gesture stops Mapbox's follow without changing `followUser`,
+   * and an unchanged prop cannot restart it — the follow camera is keyed on this.
+   */
+  followResumeKey?: number;
+  /** Native follow started (true) or was broken by a map gesture (false). */
+  onFollowUserChange?: (following: boolean) => void;
   offRouteDetails?: {
     user: Coordinate;
     snapped: Coordinate;
