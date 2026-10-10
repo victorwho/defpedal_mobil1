@@ -8,8 +8,16 @@
  * (supabase.auth.updateUser) is all that's needed.
  */
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import {
+  Keyboard,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type TextInput as RNTextInput,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -20,6 +28,7 @@ import { space } from '../src/design-system/tokens/spacing';
 import { textLg, textSm } from '../src/design-system/tokens/typography';
 import { updatePassword } from '../src/lib/supabase';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useRevealAboveKeyboard } from '../src/hooks/useRevealAboveKeyboard';
 import { useT } from '../src/hooks/useTranslation';
 
 const MIN_PASSWORD_LENGTH = 6; // matches the Supabase project minimum + signup hint
@@ -36,11 +45,24 @@ export default function ResetPasswordScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  // iOS keyboard handling — same fix as /auth (rider report 2026-10-10): the
+  // card is vertically centred, so the keyboard covered the confirm field and
+  // the submit button, and the ScrollView had nothing to scroll.
+  const {
+    scrollRef,
+    targetRef: formRef,
+    onScroll: trackScrollOffset,
+  } = useRevealAboveKeyboard();
+  const confirmInputRef = useRef<RNTextInput>(null);
+
   // No recovery session (link expired before the exchange, or the user
   // navigated here manually) — nothing to update against.
   const hasSession = Boolean(authCtx?.session);
 
   const submit = async () => {
+    // Also reachable from the keyboard's Go key — one request at a time.
+    if (isSubmitting) return;
+    Keyboard.dismiss();
     if (password.length < MIN_PASSWORD_LENGTH) {
       setErrorMessage(t('auth.resetPasswordTooShort'));
       return;
@@ -70,8 +92,15 @@ export default function ResetPasswordScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScreenHeader variant="close" title={t('auth.resetPasswordTitle')} onBack={() => router.replace('/')} />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
+        // iOS only (no-op on Android): make room for the keyboard and keep
+        // the focused field in view. See useRevealAboveKeyboard.
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+        onScroll={Platform.OS === 'ios' ? trackScrollOffset : undefined}
+        scrollEventThrottle={16}
       >
         <Surface style={styles.card}>
           {done ? (
@@ -87,33 +116,43 @@ export default function ResetPasswordScreen() {
             <>
               <Text style={styles.title}>{t('auth.resetPasswordTitle')}</Text>
               <Text style={styles.subtitle}>{t('auth.resetPasswordSubtitle')}</Text>
-              <TextInput
-                label={t('auth.resetPasswordNew')}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                leftIcon={<Ionicons name="lock-closed-outline" size={18} color={gray[400]} />}
-              />
-              <TextInput
-                label={t('auth.resetPasswordConfirm')}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                leftIcon={<Ionicons name="lock-closed-outline" size={18} color={gray[400]} />}
-              />
-              {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                disabled={isSubmitting}
-                loading={isSubmitting}
-                onPress={() => void submit()}
-              >
-                {t('auth.resetPasswordSubmit')}
-              </Button>
+              {/* Fields + submit button are ONE measured block so the iOS
+                  keyboard handling can lift both above the keyboard. */}
+              <View ref={formRef} collapsable={false} style={styles.formBlock}>
+                <TextInput
+                  label={t('auth.resetPasswordNew')}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => confirmInputRef.current?.focus()}
+                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={gray[400]} />}
+                />
+                <TextInput
+                  label={t('auth.resetPasswordConfirm')}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  ref={confirmInputRef}
+                  returnKeyType="go"
+                  onSubmitEditing={() => void submit()}
+                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={gray[400]} />}
+                />
+                {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  disabled={isSubmitting}
+                  loading={isSubmitting}
+                  onPress={() => void submit()}
+                >
+                  {t('auth.resetPasswordSubmit')}
+                </Button>
+              </View>
             </>
           ) : (
             <>
@@ -147,6 +186,11 @@ const createThemedStyles = (colors: ThemeColors) =>
       gap: space[4],
       padding: space[5],
       alignItems: 'stretch',
+    },
+    // Fields + submit button, measured together for the iOS keyboard handling.
+    // Same gap as the card, so wrapping them changes nothing visually.
+    formBlock: {
+      gap: space[4],
     },
     title: {
       ...textLg,

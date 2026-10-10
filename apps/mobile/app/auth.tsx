@@ -1,12 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type TextInput as RNTextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -41,6 +44,7 @@ import {
 } from '../src/lib/supabase';
 import { telemetry } from '../src/lib/telemetry';
 import { useAuthSessionOptional } from '../src/providers/AuthSessionProvider';
+import { useRevealAboveKeyboard } from '../src/hooks/useRevealAboveKeyboard';
 import { useT } from '../src/hooks/useTranslation';
 
 type AuthMode = 'sign-in' | 'sign-up';
@@ -80,6 +84,20 @@ export default function AuthScreen() {
   // skew breaks native Google sign-in (AppAuth `iat` validation) — we warn the
   // user proactively. See lib/clockSkew.ts + App Store 2.1(a) note.
   const [clockSkewSeconds, setClockSkewSeconds] = useState<number | null>(null);
+
+  // iOS keyboard handling for the email form. Rider report 2026-10-10: the
+  // keyboard covered the Sign up button and it could not be tapped at all —
+  // iOS never resizes the window for the keyboard, and this ScrollView had no
+  // inset for it, so the button could not even be scrolled into reach.
+  // `automaticallyAdjustKeyboardInsets` (on the ScrollView below) adds that
+  // inset natively; this hook then scrolls the fields + submit button to sit
+  // just above the keyboard. See src/hooks/useRevealAboveKeyboard.ts.
+  const {
+    scrollRef,
+    targetRef: emailFormRef,
+    onScroll: trackScrollOffset,
+  } = useRevealAboveKeyboard();
+  const passwordInputRef = useRef<RNTextInput>(null);
 
   // Merge context-level auth errors (e.g. from cold-start deep link failures)
   // into the local error state.
@@ -121,6 +139,12 @@ export default function AuthScreen() {
 
   const submit = async () => {
     if (!authCtx) return;
+    // Also reachable from the keyboard's Go key, which a disabled button
+    // cannot block — never start a second request while one is in flight.
+    if (isSubmitting) return;
+    // Close the keyboard: the result message renders ABOVE the form and
+    // would otherwise be left scrolled out of sight behind it.
+    Keyboard.dismiss();
     if (!email.trim() || !password) {
       setErrorMessage(t('auth.enterBoth'));
       return;
@@ -195,6 +219,8 @@ export default function AuthScreen() {
   // that lets AuthSessionProvider recognize the returning auth/callback deep
   // link as a recovery (the PKCE redirect carries no type discriminator).
   const handleForgotPassword = async () => {
+    // Same reason as submit(): the outcome message sits above the form.
+    Keyboard.dismiss();
     if (!email.trim()) {
       setErrorMessage(t('auth.resetEnterEmailFirst'));
       return;
@@ -302,9 +328,18 @@ export default function AuthScreen() {
       <ScreenHeader variant="close" title={t('settings.account')} onBack={handleClose} />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        // iOS only (no-op on Android): pad the bottom of the scroll area by
+        // the keyboard's height and keep the focused field in view. Without
+        // it the email form sits underneath the keyboard, out of reach.
+        automaticallyAdjustKeyboardInsets
+        // iOS has no "hide keyboard" key — let a downward drag dismiss it.
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
+        onScroll={Platform.OS === 'ios' ? trackScrollOffset : undefined}
+        scrollEventThrottle={16}
       >
         {/* Avatar + branding */}
         <View style={styles.avatarSection}>
@@ -475,57 +510,73 @@ export default function AuthScreen() {
                   </Pressable>
                 </View>
 
-                {/* Email field */}
-                <View style={styles.fieldStack}>
-                  <TextInput
-                    label={t('auth.email')}
-                    value={email}
-                    onChangeText={setEmail}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    placeholder="you@example.com"
-                    disabled={!isSupabaseConfigured}
-                    leftIcon={
-                      <Ionicons name="mail-outline" size={18} color={gray[400]} />
-                    }
-                  />
-                  <TextInput
-                    label={t('auth.password')}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    placeholder="Minimum 6 characters"
-                    disabled={!isSupabaseConfigured}
-                    leftIcon={
-                      <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
-                    }
-                  />
-                  {mode === 'sign-in' ? (
-                    <Pressable
-                      onPress={() => void handleForgotPassword()}
-                      disabled={isSubmitting || !isSupabaseConfigured}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('auth.forgotPassword')}
-                      style={styles.forgotRow}
-                    >
-                      <Text style={styles.toggleLink}>{t('auth.forgotPassword')}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
+                {/* Fields + submit button are ONE measured block so the iOS
+                    keyboard handling can lift both above the keyboard
+                    together (useRevealAboveKeyboard). `collapsable={false}`
+                    keeps it a real native view, so it can be measured. */}
+                <View ref={emailFormRef} collapsable={false} style={styles.emailFormBlock}>
+                  {/* Email field */}
+                  <View style={styles.fieldStack}>
+                    <TextInput
+                      label={t('auth.email')}
+                      value={email}
+                      onChangeText={setEmail}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="email-address"
+                      // Keyboard "next" jumps to the password field without
+                      // closing the keyboard in between.
+                      returnKeyType="next"
+                      submitBehavior="submit"
+                      onSubmitEditing={() => passwordInputRef.current?.focus()}
+                      placeholder="you@example.com"
+                      disabled={!isSupabaseConfigured}
+                      leftIcon={
+                        <Ionicons name="mail-outline" size={18} color={gray[400]} />
+                      }
+                    />
+                    <TextInput
+                      label={t('auth.password')}
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry
+                      // Keyboard "go" submits the form — signing up no
+                      // longer depends on reaching the button at all.
+                      ref={passwordInputRef}
+                      returnKeyType="go"
+                      onSubmitEditing={() => void submit()}
+                      placeholder="Minimum 6 characters"
+                      disabled={!isSupabaseConfigured}
+                      leftIcon={
+                        <Ionicons name="lock-closed-outline" size={18} color={gray[400]} />
+                      }
+                    />
+                    {mode === 'sign-in' ? (
+                      <Pressable
+                        onPress={() => void handleForgotPassword()}
+                        disabled={isSubmitting || !isSupabaseConfigured}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('auth.forgotPassword')}
+                        style={styles.forgotRow}
+                      >
+                        <Text style={styles.toggleLink}>{t('auth.forgotPassword')}</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
 
-                {/* Submit button */}
-                <Button
-                  variant="primary"
-                  size="lg"
-                  fullWidth
-                  disabled={isSubmitting || !isSupabaseConfigured}
-                  loading={isSubmitting}
-                  onPress={() => void submit()}
-                >
-                  {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
-                </Button>
+                  {/* Submit button */}
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    fullWidth
+                    disabled={isSubmitting || !isSupabaseConfigured}
+                    loading={isSubmitting}
+                    onPress={() => void submit()}
+                  >
+                    {mode === 'sign-in' ? t('auth.signIn') : t('auth.signUp')}
+                  </Button>
+                </View>
 
                 {/* Mode toggle text */}
                 <View style={styles.toggleRow}>
@@ -744,6 +795,11 @@ const createThemedStyles = (colors: ThemeColors) =>
     // Fields
     fieldStack: {
       gap: space[3],
+    },
+    // Fields + submit button, measured together for the iOS keyboard handling.
+    // Same gap as the card, so wrapping them changes nothing visually.
+    emailFormBlock: {
+      gap: space[4],
     },
     // Messages
     successText: {

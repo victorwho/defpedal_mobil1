@@ -1,6 +1,15 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Surface } from '../../src/design-system/atoms';
@@ -63,6 +72,8 @@ export default function ChooseUsernameScreen() {
   }, []);
 
   const handleSubmit = async () => {
+    // Also reachable from the keyboard's Go key — one request at a time.
+    if (isSubmitting) return;
     if (!isValid) {
       setError('Username must be 3-30 characters: letters, numbers, underscore only.');
       return;
@@ -102,58 +113,81 @@ export default function ChooseUsernameScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
-      <View style={styles.headerSection}>
-        <Text style={styles.eyebrow}>{t('onboarding.oneMoreThing')}</Text>
-        <Text style={styles.title}>{t('onboarding.chooseUsername')}</Text>
-        <Text style={styles.subtitle}>{t('onboarding.usernameCommunitySub')}</Text>
-      </View>
-
-      <Surface style={{ gap: space[2] }}>
-        <View style={styles.inputRow}>
-          <Text style={styles.atSign}>@</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={(text) => {
-              setUsername(text.replace(/[^a-zA-Z0-9_]/g, ''));
-              setError(null);
-            }}
-            placeholder={t('onboarding.usernamePlaceholder')}
-            placeholderTextColor={gray[500]}
-            autoCapitalize="none"
-            autoCorrect={false}
-            maxLength={30}
-            autoFocus
-          />
+    // iOS does not resize the window when the keyboard opens, and this screen
+    // auto-focuses its field — so the keyboard was up from the first frame,
+    // sitting on top of BOTH Continue and Skip (rider report 2026-10-10: could
+    // not finish signing up). The avoiding view shrinks the screen to the
+    // space above the keyboard, so the footer rides up with it.
+    //
+    // The screen's own padding stays on the INNER view on purpose:
+    // `behavior="padding"` overwrites the avoiding view's own paddingBottom
+    // (with 0 while the keyboard is closed), so padding placed there is lost.
+    // Android is left exactly as it was — no behavior means a plain View.
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoider}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={[styles.root, { paddingTop: insets.top + space[4], paddingBottom: insets.bottom + space[6] }]}>
+        <View style={styles.headerSection}>
+          <Text style={styles.eyebrow}>{t('onboarding.oneMoreThing')}</Text>
+          <Text style={styles.title}>{t('onboarding.chooseUsername')}</Text>
+          <Text style={styles.subtitle}>{t('onboarding.usernameCommunitySub')}</Text>
         </View>
-        {username.length > 0 && !isValid ? (
-          <Text style={styles.hintText}>{t('onboarding.usernameHint')}</Text>
-        ) : null}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      </Surface>
 
-      <View style={styles.footer}>
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          loading={isSubmitting}
-          onPress={() => void handleSubmit()}
-          disabled={!isValid || isSubmitting}
-        >
-          {t('onboarding.continue')}
-        </Button>
-        <Pressable onPress={navigateToApp} hitSlop={12}>
-          <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
-        </Pressable>
+        <Surface style={{ gap: space[2] }}>
+          <View style={styles.inputRow}>
+            <Text style={styles.atSign}>@</Text>
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={(text) => {
+                setUsername(text.replace(/[^a-zA-Z0-9_]/g, ''));
+                setError(null);
+              }}
+              placeholder={t('onboarding.usernamePlaceholder')}
+              placeholderTextColor={gray[500]}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={30}
+              autoFocus
+              // Keyboard "go" submits — continuing never depends on reaching
+              // the button underneath.
+              returnKeyType="go"
+              onSubmitEditing={() => void handleSubmit()}
+            />
+          </View>
+          {username.length > 0 && !isValid ? (
+            <Text style={styles.hintText}>{t('onboarding.usernameHint')}</Text>
+          ) : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </Surface>
+
+        <View style={styles.footer}>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={isSubmitting}
+            onPress={() => void handleSubmit()}
+            disabled={!isValid || isSubmitting}
+          >
+            {t('onboarding.continue')}
+          </Button>
+          <Pressable onPress={navigateToApp} hitSlop={12}>
+            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const createThemedStyles = (colors: ThemeColors) =>
   StyleSheet.create({
+    keyboardAvoider: {
+      flex: 1,
+      backgroundColor: colors.bgDeep,
+    },
     root: {
       flex: 1,
       backgroundColor: colors.bgDeep,

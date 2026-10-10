@@ -38,6 +38,13 @@ export interface TextInputProps extends Omit<RNTextInputProps, 'style'> {
   error?: string | null;
   disabled?: boolean;
   label?: string;
+  /**
+   * Forwarded to the native input (React 19 hands `ref` to function
+   * components as an ordinary prop, so it rides along in `...inputProps`).
+   * Lets a screen move focus to this field, e.g. from the previous field's
+   * keyboard "next" key.
+   */
+  ref?: React.Ref<RNTextInput>;
 }
 
 // ---------------------------------------------------------------------------
