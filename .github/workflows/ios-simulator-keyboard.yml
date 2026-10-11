@@ -1,0 +1,77 @@
+# Runs the iPhone keyboard check (.maestro/ios-keyboard.yaml) on an iOS
+# simulator, on a free macOS runner (the repo is public).
+#
+# The app is NOT built here: pass the download URL of an EAS simulator build
+# (`eas build -p ios --profile ios-simulator`, a .tar.gz). That keeps this job
+# free of Expo credentials and lets one run compare two builds — e.g. the
+# commit before a fix as a control, and the fix itself.
+name: iOS simulator keyboard check
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: EAS simulator build URL (.tar.gz)
+        required: true
+      label:
+        description: Name for the artifact (e.g. fix, control)
+        required: true
+        default: build
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Download the simulator build
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: |
+          curl -fsSL "$APP_URL" -o app.tar.gz
+          mkdir -p app && tar -xzf app.tar.gz -C app
+          APP_PATH="$(find app -maxdepth 4 -name '*.app' -type d | head -1)"
+          test -n "$APP_PATH" || { echo "no .app in the archive"; exit 1; }
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Boot an iPhone with the on-screen keyboard enabled
+        run: |
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = [d for runtime in json.load(sys.stdin)["devices"].values() for d in runtime]
+          phones = [d for d in devices if d["name"].startswith("iPhone 16")] or [d for d in devices if d["name"].startswith("iPhone")]
+          print(phones[0]["udid"])')"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          # A connected hardware keyboard hides the software one; force it off
+          # both globally and for this device, before it boots.
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          /usr/libexec/PlistBuddy -c "Add :DevicePreferences:$UDID:ConnectHardwareKeyboard bool false" \
+            ~/Library/Preferences/com.apple.iphonesimulator.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :DevicePreferences:$UDID:ConnectHardwareKeyboard false" \
+            ~/Library/Preferences/com.apple.iphonesimulator.plist
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Run the keyboard flow
+        run: |
+          mkdir -p out
+          cd out
+          maestro test ../.maestro/ios-keyboard.yaml --debug-output debug 2>&1 | tee maestro.log
+
+      - name: Upload screenshots, recording and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-keyboard-${{ inputs.label }}
+          path: out

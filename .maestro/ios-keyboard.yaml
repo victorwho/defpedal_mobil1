@@ -1,0 +1,71 @@
+# iPhone keyboard check (error-log #137): on the three signup-funnel screens
+# the primary button must stay above the on-screen keyboard.
+#
+# Run by .github/workflows/ios-simulator-keyboard.yml on a macOS runner. The
+# flow only TYPES — it never submits — so it creates or changes nothing in
+# production. The verdict is in the screenshots: each is taken with a field
+# focused and the keyboard up.
+#
+# `assertVisible: "space"` is the guard that the SOFTWARE keyboard is showing.
+# Simulators often treat a hardware keyboard as connected and then show no
+# on-screen keyboard at all, which would make every screenshot pass without
+# testing anything.
+appId: com.defensivepedal.mobile
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- startRecording: ios-keyboard
+# Let the anonymous session settle before deep-linking.
+- waitForAnimationToEnd:
+    timeout: 15000
+
+# ── 1. Sign in / sign up (auth.tsx) ────────────────────────────────────────
+- openLink: defensivepedal://auth?email=1
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "you@example.com"
+    timeout: 45000
+- tapOn: "you@example.com"
+- inputText: "keyboard-test@example.com"
+- assertVisible: "space"
+- tapOn: "Minimum 6 characters"
+- waitForAnimationToEnd
+- takeScreenshot: 01-auth-sign-in-password-focused
+- tapOn:
+    text: "Sign up"
+    index: 0
+- tapOn: "Minimum 6 characters"
+- waitForAnimationToEnd
+- takeScreenshot: 02-auth-sign-up-password-focused
+
+# ── 2. Choose username (onboarding/choose-username.tsx) ────────────────────
+- openLink: defensivepedal://onboarding/choose-username
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "your_username"
+    timeout: 30000
+- tapOn: "your_username"
+- inputText: "keyboard_test"
+- waitForAnimationToEnd
+- takeScreenshot: 03-choose-username-focused
+
+# ── 3. Reset password (reset-password.tsx) ─────────────────────────────────
+- openLink: defensivepedal://reset-password
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Confirm password"
+    timeout: 30000
+- tapOn:
+    below: "Confirm password"
+- waitForAnimationToEnd
+- takeScreenshot: 04-reset-password-confirm-focused
+
+- stopRecording
