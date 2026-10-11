@@ -64,10 +64,23 @@ jobs:
           xcrun simctl list devices | grep "$UDID"
 
       - name: Run the keyboard flow
+        # `shell: bash` turns on pipefail: without it `| tee` reports tee's
+        # exit code and a failed flow shows as a green job.
+        shell: bash
         run: |
           mkdir -p out
           cd out
           maestro test ../.maestro/ios-keyboard.yaml --debug-output debug 2>&1 | tee maestro.log
+
+      - name: Collect screenshots and the recording
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out/screens
+          # Maestro writes them next to the flow or the working directory
+          # depending on version; gather from anywhere in the checkout.
+          find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/out/screens" -prune -o             -path "$GITHUB_WORKSPACE/app" -prune -o             \( -name '0*.png' -o -name 'ios-keyboard*.mp4' \) -type f -print             -exec cp {} out/screens/ \;
+          ls -la out/screens
 
       - name: Upload screenshots, recording and logs
         if: always()
@@ -75,3 +88,5 @@ jobs:
         with:
           name: ios-keyboard-${{ inputs.label }}
           path: out
+          # The debug output lives under `.maestro/`, which is skipped by default.
+          include-hidden-files: true

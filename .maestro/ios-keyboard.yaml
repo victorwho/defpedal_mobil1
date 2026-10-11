@@ -60,12 +60,18 @@ appId: com.defensivepedal.mobile
 - tapOn:
     text: "Open"
     optional: true
-- extendedWaitUntil:
-    visible: "Confirm password"
-    timeout: 30000
-- tapOn:
-    below: "Confirm password"
-- waitForAnimationToEnd
-- takeScreenshot: 04-reset-password-confirm-focused
+- waitForAnimationToEnd:
+    timeout: 10000
+# Whatever the screen shows, record it: with no usable session it renders an
+# "expired link" state instead of the form, which is a different screen.
+- takeScreenshot: 04a-reset-password-opened
+- runFlow:
+    when:
+      visible: "Confirm password"
+    commands:
+      - tapOn:
+          below: "Confirm password"
+      - waitForAnimationToEnd
+      - takeScreenshot: 04-reset-password-confirm-focused
 
 - stopRecording
