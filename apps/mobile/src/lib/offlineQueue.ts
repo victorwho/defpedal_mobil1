@@ -21,6 +21,21 @@ export type QueuedTripTrackPayload = Omit<TripTrackRequest, 'tripId'> & {
   tripId?: string;
 };
 
+/**
+ * Records a ride's impact (XP, badges, CO2, calories, microlives) without the
+ * post-ride screen, which is otherwise the only caller of `recordRideImpact`.
+ * Resolved against the trip's server id like trip_end / trip_track.
+ */
+export type QueuedRideImpactPayload = {
+  clientTripId: string;
+  tripId?: string;
+  distanceMeters: number;
+  hadDestination: boolean;
+  weightKg: number;
+  durationMinutes?: number;
+  bikeType?: string;
+};
+
 export type QueuedMutationPayloadByType = {
   hazard: HazardReportRequest;
   hazard_vote: HazardVoteQueuePayload;
@@ -31,6 +46,7 @@ export type QueuedMutationPayloadByType = {
   feedback: NavigationFeedbackRequest;
   city_suggestion: CitySuggestionRequest;
   sesizare: SesizareRequest;
+  ride_impact: QueuedRideImpactPayload;
 };
 
 /**

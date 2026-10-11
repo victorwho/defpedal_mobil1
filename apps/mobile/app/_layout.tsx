@@ -33,7 +33,10 @@ import { RideLossBanner } from '../src/design-system/molecules/RideLossBanner';
 import { BadgeUnlockOverlayManager } from '../src/design-system/organisms/BadgeUnlockOverlay';
 import { MeetPedalCard } from '../src/design-system/organisms/MeetPedalCard';
 import { RankUpOverlay } from '../src/design-system/organisms/RankUpOverlay';
-import { isPlusModesPromoActive } from '@defensivepedal/core';
+import { formatDistance, isPlusModesPromoActive } from '@defensivepedal/core';
+import { Toast } from '../src/design-system/molecules/Toast';
+import { useUnits } from '../src/hooks/useUnits';
+import { RIDE_SAVED_UNDO_MS } from '../src/lib/postRideScreens';
 import { PlusModesPromoNotice } from '../src/design-system/molecules/PlusModesPromoNotice';
 import { PlusModesMovedNotice } from '../src/design-system/molecules/PlusModesMovedNotice';
 import { LoopIntroSheet } from '../src/design-system/organisms/LoopIntroSheet';
@@ -416,6 +419,7 @@ const RootLayoutInner = () => {
       <PlusModesMovedNoticeManager />
       <LoopIntroManager />
       <RideLossBannerManager />
+      <RideSavedToastManager />
       <RouteShareDeepLinkHandler />
       <GpxOpenHandler />
     </>
@@ -640,6 +644,70 @@ const RankUpOverlayManager = () => {
   );
 };
 
+/**
+ * "Ride saved" toast after a quiet ride — one of a rider's first rides, which
+ * skip the post-ride screens (src/lib/postRideScreens.ts). An early stop is
+ * saved on hold, so the toast offers Discard until its undo window closes;
+ * discarding re-queues the trip_end as discarded and drops the ride's uploads.
+ */
+const RideSavedToastManager = () => {
+  const notice = useAppStore((s) => s.rideSavedNotice);
+  const setNotice = useAppStore((s) => s.setRideSavedNotice);
+  const discardHeldRide = useAppStore((s) => s.discardHeldRide);
+  const releaseHeldMutations = useAppStore((s) => s.releaseHeldMutations);
+  const appState = useAppStore((s) => s.appState);
+  const insets = useSafeAreaInsets();
+  const units = useUnits();
+  const t = useT();
+  const [discarded, setDiscarded] = useState(false);
+
+  useEffect(() => {
+    setDiscarded(false);
+  }, [notice]);
+
+  if (!notice || appState === 'NAVIGATING') return null;
+
+  // Once the toast is gone Discard is unreachable, so the save goes now.
+  const clear = () => {
+    releaseHeldMutations();
+    setNotice(null);
+  };
+  const remainingUndoMs = notice.discardableUntil ? notice.discardableUntil - Date.now() : 0;
+  const canDiscard = !discarded && notice.holdKey != null && remainingUndoMs > 0;
+  const message = discarded
+    ? t('nav.rideDiscarded')
+    : notice.distanceMeters > 0
+      ? t('nav.rideSaved', { distance: formatDistance(notice.distanceMeters, units) })
+      : t('nav.rideSavedShort');
+
+  return (
+    // Above the bottom tab bar on the planning screen the rider lands on.
+    <View
+      style={[styles.rideSavedToast, { bottom: insets.bottom + 88 }]}
+      pointerEvents="box-none"
+    >
+      <Toast
+        key={discarded ? 'discarded' : 'saved'}
+        message={message}
+        variant={discarded ? 'info' : 'success'}
+        durationMs={canDiscard ? Math.min(remainingUndoMs, RIDE_SAVED_UNDO_MS) : 3_500}
+        onDismiss={clear}
+        action={canDiscard ? t('nav.endRideDiscard') : undefined}
+        onAction={
+          canDiscard
+            ? () => {
+                const done = discardHeldRide(notice.holdKey as string);
+                telemetry.capture('ride_saved_toast_discard', { discarded: done });
+                if (done) setDiscarded(true);
+                else clear();
+              }
+            : undefined
+        }
+      />
+    </View>
+  );
+};
+
 /** Re-shows the daily weather notification content after the user taps it. */
 const WeatherNoticeManager = () => {
   const notice = useAppStore((s) => s.weatherNotice);
@@ -691,6 +759,13 @@ function RootLayout() {
 export default Sentry.wrap(RootLayout);
 
 const styles = StyleSheet.create({
+  rideSavedToast: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: zIndex.toast,
+  },
   root: {
     flex: 1,
     backgroundColor: darkTheme.bgDeep,

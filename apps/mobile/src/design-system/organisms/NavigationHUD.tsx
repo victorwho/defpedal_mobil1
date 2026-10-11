@@ -9,7 +9,7 @@
  * Redesigned 2026-09-12 — docs/plans/navigation-hud-redesign.md.
  * Dark-only (forced during navigation per spec rule).
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { NavigationStep } from '@defensivepedal/core';
 import {
   formatDistance,
@@ -27,6 +27,7 @@ import { radii } from '../tokens/radii';
 import { shadows } from '../tokens/shadows';
 import {
   fontFamily,
+  textBase,
   textDataSm,
   textSm,
   textXs,
@@ -36,6 +37,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { useT } from '../../hooks/useTranslation';
 import { useUnits } from '../../hooks/useUnits';
+import { cueIconName, cueShortLabel, cueText, isCueOnlyStep } from '../../lib/walkCues';
 
 /** Translator function shape returned by `useT()`. */
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
@@ -219,8 +221,14 @@ export const ManeuverCard: React.FC<{
 }) => {
   const t = useT();
   const units = useUnits();
-  const iconName = getManeuverIcon(currentStep);
-  const description = getManeuverDescription(currentStep, t);
+  // Walk-the-bike cues (lib/walkCues.ts). A step that exists only because the
+  // travel mode changed shows the cue as its headline; a real maneuver keeps
+  // its own headline and gets the cue as an extra line beneath it.
+  const cueOnly = currentStep != null && isCueOnlyStep(currentStep);
+  const iconName = (cueOnly && currentStep ? cueIconName(currentStep) : null) ?? getManeuverIcon(currentStep);
+  const description =
+    (cueOnly && currentStep ? cueShortLabel(currentStep, t) : null) ?? getManeuverDescription(currentStep, t);
+  const walkLine = currentStep ? cueText(currentStep, t, units) : null;
 
   const distanceMeters =
     distanceToManeuverMeters !== null
@@ -240,14 +248,20 @@ export const ManeuverCard: React.FC<{
   // synthesized geometry cannot know street names. The row COLLAPSES rather
   // than reserving a line — a blank gap under every maneuver is how an
   // imported course ends up looking broken.
-  const streetName = currentStep?.streetName?.trim();
+  // On a cue-only step the second line is the cue itself ("…walk the bike for 120 m").
+  const streetName = cueOnly ? walkLine : currentStep?.streetName?.trim();
 
   const gpsColor = getGpsSignalColor(gpsAccuracyMeters);
   const poor = isGpsPoor(gpsAccuracyMeters);
 
-  const nextIconName = nextStep ? getManeuverIcon(nextStep) : null;
+  const nextCueOnly = nextStep != null && isCueOnlyStep(nextStep);
+  const nextIconName = nextStep
+    ? ((nextCueOnly ? cueIconName(nextStep) : null) ?? getManeuverIcon(nextStep))
+    : null;
   const nextLabel = nextStep
-    ? (nextStep.streetName?.trim() || getManeuverDescription(nextStep, t))
+    ? ((nextCueOnly ? cueShortLabel(nextStep, t) : null) ||
+        nextStep.streetName?.trim() ||
+        getManeuverDescription(nextStep, t))
     : null;
 
   const Wrapper = onPress ? Pressable : View;
@@ -258,7 +272,9 @@ export const ManeuverCard: React.FC<{
       testID="maneuver-card"
       style={[styles.maneuverCard, shadows.lg]}
       accessibilityRole="summary"
-      accessibilityLabel={t('nav.maneuverA11y', { description, distance: spokenDistance })}
+      accessibilityLabel={`${t('nav.maneuverA11y', { description, distance: spokenDistance })}${
+        walkLine ? `. ${walkLine}` : ''
+      }`}
       accessibilityLiveRegion="assertive"
       accessibilityHint={onPress ? t('nav.tapReplay') : undefined}
     >
@@ -278,9 +294,17 @@ export const ManeuverCard: React.FC<{
             {description}
           </Text>
           {streetName ? (
-            <Text testID="maneuver-street" style={styles.maneuverStreet} numberOfLines={1}>
+            <Text testID="maneuver-street" style={styles.maneuverStreet} numberOfLines={cueOnly ? 2 : 1}>
               {streetName}
             </Text>
+          ) : null}
+          {!cueOnly && walkLine ? (
+            <View testID="maneuver-walk-cue" style={styles.walkCueRow}>
+              <Ionicons name="walk" size={16} color={darkTheme.accent} />
+              <Text style={styles.walkCueText} numberOfLines={2}>
+                {walkLine}
+              </Text>
+            </View>
           ) : null}
         </View>
         <View
@@ -397,9 +421,12 @@ export const FooterCard: React.FC<{
    * back button is the sole remaining fallback, so if this stops firing a
    * rider on iOS has no way to finish a ride.
    *
-   * Already confirm-gated by the caller's Alert — do NOT add a second
-   * confirmation, and do NOT make it a long-press. A rider stopping at a
-   * junction gets one tap.
+   * Fired by a PRESS-AND-HOLD of `END_RIDE_HOLD_MS` (2026-10-09), not a tap.
+   * A rider's first rides end with no confirmation dialog at all
+   * (src/lib/postRideScreens.ts), so the hold is what stops a brushed tap from
+   * ending the ride. A short tap only shows a "hold to end" hint. Screen-reader
+   * users end it with the standard double-tap (the `activate` action), since
+   * they cannot see the fill.
    */
   onEndRide: () => void;
 }> = ({
@@ -416,6 +443,7 @@ export const FooterCard: React.FC<{
   const t = useT();
   const units = useUnits();
   const haptics = useHaptics();
+  const endHold = useEndRideHold(onEndRide);
 
   // Retarget the primary metrics to the next stop when one is ahead.
   const targetingStop = nextStop != null;
@@ -477,18 +505,32 @@ export const FooterCard: React.FC<{
             edge-flush block reads wrong anyway — opacity is the right feedback. */}
         <Pressable
           testID="footer-end-ride"
-          onPress={onEndRide}
-          onPressIn={() => haptics.destructiveConfirm()}
+          onPress={endHold.showHint}
+          onPressIn={endHold.start}
+          onPressOut={endHold.cancel}
+          onLongPress={() => {
+            haptics.destructiveConfirm();
+            endHold.complete();
+          }}
+          delayLongPress={END_RIDE_HOLD_MS}
           style={({ pressed }) => [
             styles.endRideColumn,
             pressed ? styles.endRideColumnPressed : null,
           ]}
           accessibilityRole="button"
           accessibilityLabel={t('nav.endRide')}
+          accessibilityActions={[{ name: 'activate', label: t('nav.endRide') }]}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === 'activate') onEndRide();
+          }}
         >
+          {/* Fills bottom-up while held, so the hold reads as progress. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.endRideFill, { transform: [{ scaleY: endHold.progress }] }]}
+          />
           <View style={styles.endRideGlyph} />
         </Pressable>
-
         <View style={styles.footerBody}>
           <View style={styles.heroRow}>
             <View style={styles.heroTime}>
@@ -535,6 +577,23 @@ export const FooterCard: React.FC<{
               }
             />
           </View>
+
+          {/* The "hold to end" hint covers THIS panel for its two seconds —
+              right beside the button it explains, over no other control, and
+              without changing the card's size. Above the card it would land on
+              the Steep pill (above-left) or the route-feature alerts
+              (above-right). */}
+          {endHold.hintVisible ? (
+            <View
+              testID="footer-end-ride-hint"
+              style={styles.endRideHint}
+              pointerEvents="none"
+              accessibilityLiveRegion="polite"
+            >
+              <Ionicons name="arrow-back" size={20} color={darkTheme.danger} />
+              <Text style={styles.endRideHintText}>{t('nav.holdToEndRide')}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -648,6 +707,64 @@ const MetricCell: React.FC<{ label: string; value: string; testID?: string }> = 
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
+
+/** How long End Ride must be held. */
+export const END_RIDE_HOLD_MS = 1_000;
+const END_RIDE_HINT_MS = 2_000;
+
+/**
+ * Press-and-hold state for End Ride: a 0→1 fill over the hold, reset if the
+ * finger lifts early, and a short-lived hint after a plain tap.
+ */
+const useEndRideHold = (onEndRide: () => void) => {
+  const progress = useRef(new Animated.Value(0)).current;
+  const completedRef = useRef(false);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [hintVisible, setHintVisible] = useState(false);
+
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
+
+  const start = () => {
+    completedRef.current = false;
+    setHintVisible(false);
+    progress.setValue(0);
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: END_RIDE_HOLD_MS,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const cancel = () => {
+    if (completedRef.current) return;
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const complete = () => {
+    completedRef.current = true;
+    onEndRide();
+  };
+
+  const showHint = () => {
+    if (completedRef.current) return;
+    setHintVisible(true);
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHintVisible(false), END_RIDE_HINT_MS);
+  };
+
+  return { progress, start, cancel, complete, showHint, hintVisible };
+};
 
 const styles = StyleSheet.create({
   root: {
@@ -806,7 +923,39 @@ const styles = StyleSheet.create({
     borderRightColor: darkTheme.borderDefault,
   },
   endRideColumnPressed: {
-    opacity: 0.75,
+    opacity: 0.9,
+  },
+  walkCueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[1],
+    marginTop: space[1],
+  },
+  walkCueText: {
+    ...textSm,
+    flexShrink: 1,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.accent,
+  },
+  endRideFill: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: gray[50],
+    opacity: 0.35,
+    transformOrigin: 'bottom',
+  },
+  endRideHint: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[3],
+    backgroundColor: darkTheme.bgPrimary,
+  },
+  endRideHintText: {
+    ...textBase,
+    flex: 1,
+    fontFamily: fontFamily.body.semiBold,
+    color: darkTheme.textPrimary,
   },
   endRideGlyph: {
     width: 26,

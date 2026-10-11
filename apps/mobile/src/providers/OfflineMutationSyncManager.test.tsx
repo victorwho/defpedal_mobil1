@@ -13,8 +13,10 @@ const mockSaveTripTrack = vi.fn();
 const mockVoteHazard = vi.fn();
 const mockResolveTrip = vi.fn();
 const mockReportHazard = vi.fn();
+const mockRecordRideImpact = vi.fn();
 vi.mock('../lib/api', () => ({
   mobileApi: {
+    recordRideImpact: (...args: unknown[]) => mockRecordRideImpact(...args),
     startTrip: (...args: unknown[]) => mockStartTrip(...args),
     endTrip: (...args: unknown[]) => mockEndTrip(...args),
     saveTripTrack: (...args: unknown[]) => mockSaveTripTrack(...args),
@@ -52,6 +54,8 @@ vi.mock('./AuthSessionProvider', () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 
+import { AppState } from 'react-native';
+import { ApiClientError } from '../lib/apiFetch';
 import { ENQUEUE_FLUSH_DEBOUNCE_MS, SYNC_INTERVAL_MS } from '../lib/offlineSyncHelpers';
 import { useAppStore } from '../store/appStore';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
@@ -241,6 +245,96 @@ describe('OfflineMutationSyncManager — hazard idempotency key (P1-12)', () => 
       clientHazardId: queued.id,
       hazardType: 'pothole',
     });
+    view.unmount();
+  });
+});
+
+describe('OfflineMutationSyncManager — ride_impact (quiet rides)', () => {
+  const IMPACT = { clientTripId: 'cli-q', distanceMeters: 900, hadDestination: true, weightKg: 70 };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetQueueState();
+    useAppStore.setState({ tripServerIds: { 'cli-q': 'srv-q' }, pendingBadgeUnlocks: [], pendingTierPromotion: null });
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    vi.clearAllMocks();
+    resetQueueState();
+  });
+
+  const mountAndSettle = async () => {
+    const view = render(React.createElement(OfflineMutationSyncManager));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    return view;
+  };
+
+  it('records the impact against the server trip and queues the celebrations', async () => {
+    mockRecordRideImpact.mockResolvedValue({
+      newBadges: [{ badgeKey: 'first_ride' }],
+      tierPromotion: { promoted: true },
+    });
+    useAppStore.getState().enqueueMutation('ride_impact', IMPACT);
+    const view = await mountAndSettle();
+
+    expect(mockRecordRideImpact).toHaveBeenCalledWith('srv-q', 900, { hadDestination: true, weightKg: 70 });
+    expect(useAppStore.getState().queuedMutations).toHaveLength(0);
+    expect(useAppStore.getState().pendingBadgeUnlocks).toHaveLength(1);
+    expect(useAppStore.getState().pendingTierPromotion).toEqual({ promoted: true });
+    view.unmount();
+  });
+
+  it('treats 409 (impact already recorded) as done, not dead', async () => {
+    mockRecordRideImpact.mockRejectedValue(
+      new ApiClientError({ kind: 'http', message: 'HTTP 409', status: 409 }),
+    );
+    useAppStore.getState().enqueueMutation('ride_impact', IMPACT);
+    const view = await mountAndSettle();
+
+    expect(useAppStore.getState().queuedMutations).toHaveLength(0);
+    view.unmount();
+  });
+
+  it('sends a held upload straight away when the app leaves the foreground', async () => {
+    mockRecordRideImpact.mockResolvedValue({ newBadges: [], tierPromotion: null });
+    let onAppStateChange: ((next: string) => void) | undefined;
+    const spy = vi.spyOn(AppState, 'addEventListener').mockImplementation(((_type: string, cb: (next: string) => void) => {
+      onAppStateChange = cb;
+      return { remove: () => {} };
+    }) as never);
+    useAppStore.getState().enqueueMutation('ride_impact', IMPACT, {
+      holdKey: 'cli-q',
+      holdUntil: new Date(Date.now() + 8_000).toISOString(),
+    });
+    const view = await mountAndSettle();
+    expect(mockRecordRideImpact).not.toHaveBeenCalled();
+
+    await act(async () => {
+      onAppStateChange?.('background');
+      await vi.advanceTimersByTimeAsync(ENQUEUE_FLUSH_DEBOUNCE_MS + 50);
+    });
+    expect(mockRecordRideImpact).toHaveBeenCalledTimes(1);
+    view.unmount();
+    spy.mockRestore();
+  });
+
+  it('does not send a held upload until its undo window has passed', async () => {
+    mockRecordRideImpact.mockResolvedValue({ newBadges: [], tierPromotion: null });
+    useAppStore.getState().enqueueMutation('ride_impact', IMPACT, {
+      holdKey: 'cli-q',
+      holdUntil: new Date(Date.now() + 8_000).toISOString(),
+    });
+    const view = await mountAndSettle();
+    expect(mockRecordRideImpact).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(SYNC_INTERVAL_MS + 8_000);
+    });
+    expect(mockRecordRideImpact).toHaveBeenCalledTimes(1);
     view.unmount();
   });
 });

@@ -22,6 +22,7 @@
  *    derive it per country — there is no `osrm-es-ebike` and a country-suffixed
  *    host fails TLS in exactly the country that suffix names.
  */
+import type { BikeTypeId } from './bikeTypes';
 import type { RoutingMode } from './contracts';
 
 /** The OSRM instance a Safe-family request is dispatched to. */
@@ -105,3 +106,13 @@ export const fromRoutingDisplayMode = (
   avoidHeat: displayMode === 'cool',
   isEbike: displayMode === 'ebike',
 });
+
+/**
+ * The mode a new planning session starts on. Safe for everyone, except an
+ * e-bike rider who may use the e-bike graph — they start on E-bike. A locked
+ * rider stays on Safe so the planner never opens on a mode they cannot use.
+ */
+export const defaultRoutingDisplayMode = (
+  bikeTypeId: BikeTypeId | null,
+  ebikeAvailable: boolean,
+): RoutingDisplayMode => (bikeTypeId === 'ebike' && ebikeAvailable ? 'ebike' : 'safe');

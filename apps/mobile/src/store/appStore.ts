@@ -126,6 +126,21 @@ export type WeatherNotice = {
   tone: 'good' | 'caution';
 };
 
+export type PostRidePrompts = {
+  ratingLastRide: number | null;
+  ratingLastAt: string | null;
+  earlyStops: number;
+};
+
+export type RideSavedNotice = {
+  /** Ridden distance, metres (GPS trail). */
+  distanceMeters: number;
+  /** Set when the save is held and can still be discarded. */
+  holdKey: string | null;
+  /** When the undo window closes (epoch ms); null when not discardable. */
+  discardableUntil: number | null;
+};
+
 export type AppStore = QueueSlice & PremiumSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
@@ -307,6 +322,13 @@ export type AppStore = QueueSlice & PremiumSlice & {
   // out and back in on the same handset should not reopen the prompt window.
   reviewPromptState: ReviewPromptState;
   completedRideCount: number;
+  // Post-ride prompt frequency from ride 4 on (src/lib/postRideScreens.ts):
+  // when the rating was last asked, and how many early stops there have been.
+  // DEVICE-scoped like completedRideCount, which it is measured against.
+  postRidePrompts: PostRidePrompts;
+  markRatingPrompted: (rideNumber: number) => void;
+  /** Counts an early stop; returns how many there were BEFORE this one. */
+  countEarlyStop: () => number;
   // ── Imported GPX courses (metadata only; geometry lives on disk) ──
   // DEVICE-scoped, like reviewPromptState: the geometry files belong to
   // this handset, so signing out must not orphan them by clearing the
@@ -401,6 +423,18 @@ export type AppStore = QueueSlice & PremiumSlice & {
   weatherNotice: WeatherNotice | null;
   setWeatherNotice: (notice: WeatherNotice | null) => void;
   clearWeatherNotice: () => void;
+  // Transient: the "Ride saved" toast shown after a quiet ride (one of the
+  // first rides, which skip the post-ride screens). `holdKey` is set when the
+  // save is held for an undo window, and enables its Discard action. Not
+  // persisted: after an app kill the held save simply goes through.
+  rideSavedNotice: RideSavedNotice | null;
+  setRideSavedNotice: (notice: RideSavedNotice | null) => void;
+  /**
+   * Ends a quiet ride: counts it as completed (the same device counter
+   * `finishNavigation` bumps) and returns straight to IDLE instead of
+   * AWAITING_FEEDBACK. The ride's uploads must already be queued.
+   */
+  finishRideQuietly: () => void;
   // Session-scoped: true once the route-preview weather-warning modal has been
   // shown once. Gates the modal so it appears at most once per app session
   // instead of on every route calculation (route-preview remounts per calc,
@@ -573,6 +607,8 @@ export type AppStore = QueueSlice & PremiumSlice & {
   markApproachAnnouncement: (stepId: string | null) => void;
   recordNavigationReroute: (requestedAt?: string) => void;
   syncNavigationRoute: (routeId: string) => void;
+  /** Records a mid-ride destination change on the session (see NavigationSession.changedDestination). */
+  markDestinationChanged: (destination: Coordinate) => void;
   appendGpsBreadcrumb: (sample: NavigationLocationSample) => void;
   finishNavigation: () => void;
   setMuted: (isMuted: boolean) => void;
@@ -980,6 +1016,22 @@ export const useAppStore = create<AppStore>()(
       showMascot: true,
       ratingSkipCount: 0,
       reviewPromptState: DEFAULT_REVIEW_PROMPT_STATE,
+      postRidePrompts: { ratingLastRide: null, ratingLastAt: null, earlyStops: 0 },
+      markRatingPrompted: (rideNumber) =>
+        set((state) => ({
+          postRidePrompts: {
+            ...state.postRidePrompts,
+            ratingLastRide: rideNumber,
+            ratingLastAt: new Date().toISOString(),
+          },
+        })),
+      countEarlyStop: () => {
+        const before = get().postRidePrompts.earlyStops;
+        set((state) => ({
+          postRidePrompts: { ...state.postRidePrompts, earlyStops: before + 1 },
+        }));
+        return before;
+      },
       completedRideCount: 0,
       importedCourses: [],
       savedLoops: [],
@@ -1141,6 +1193,16 @@ export const useAppStore = create<AppStore>()(
           };
         }),
       weatherNotice: null,
+      rideSavedNotice: null,
+      setRideSavedNotice: (notice) => set(() => ({ rideSavedNotice: notice })),
+      finishRideQuietly: () => {
+        if (get().navigationSession?.state !== 'navigating') return;
+        set((state) => ({ completedRideCount: state.completedRideCount + 1 }));
+        // Reaching the end of a saved ride starts the review-prompt install
+        // clock, exactly as the post-ride screen does on mount.
+        get().seedReviewInstallAtIfMissing();
+        get().resetFlow();
+      },
       setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
       clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
       weatherWarningSeenThisSession: false,
@@ -1624,6 +1686,12 @@ export const useAppStore = create<AppStore>()(
             ? syncSessionToRoute(state.navigationSession, routeId)
             : state.navigationSession,
         })),
+      markDestinationChanged: (destination) =>
+        set((state) => ({
+          navigationSession: state.navigationSession
+            ? { ...state.navigationSession, changedDestination: destination }
+            : state.navigationSession,
+        })),
       appendGpsBreadcrumb: (sample) =>
         set((state) => {
           if (!state.navigationSession) return state;
@@ -1847,6 +1915,7 @@ export const useAppStore = create<AppStore>()(
           pendingBadgeUnlocks: [],
           pendingTierPromotion: null,
           weatherNotice: null,
+          rideSavedNotice: null,
           homeLocation: null,
           // Audit 2026-07-05 STATE-3: Home/Work full addresses are the most
           // sensitive locations we hold — they must never survive a sign-out /
@@ -1969,6 +2038,7 @@ export const useAppStore = create<AppStore>()(
         notificationPermissionAsked: state.notificationPermissionAsked,
         ratingSkipCount: state.ratingSkipCount,
         reviewPromptState: state.reviewPromptState,
+        postRidePrompts: state.postRidePrompts,
         importedCourses: state.importedCourses,
         savedLoops: state.savedLoops,
         completedRideCount: state.completedRideCount,

@@ -43,6 +43,29 @@ export interface NavigationStep {
   maneuver: Maneuver;
   geometry?: GeoJsonLineString;
   mode: string;
+  /**
+   * A walk-the-bike cue carried by this step (see walkSections.ts). Absent on
+   * almost every step, and on every route served before the routing graph
+   * marked walked sections.
+   */
+  walkCue?: WalkCue;
+  /** Length of the walk section a `dismount` cue starts. */
+  walkMeters?: number;
+}
+
+/**
+ * - `dismount`: a walk section of at least SHORT_WALK_MAX_METERS starts here.
+ * - `ride_again`: such a section ended here.
+ * - `cross_on_foot`: a short walk (one crossing) lies before this maneuver.
+ */
+export type WalkCue = 'dismount' | 'ride_again' | 'cross_on_foot';
+
+/** A run of consecutive "pushing bike" steps, merged. */
+export interface WalkSection {
+  distanceMeters: number;
+  durationSeconds: number;
+  /** [lon, lat] pairs. */
+  coordinates: [number, number][];
 }
 
 /**
@@ -139,6 +162,12 @@ export interface RouteOption {
   steps: NavigationStep[];
   riskSegments: RiskSegment[];
   routeFeatures: RouteFeature[];
+  /**
+   * Where the rider must walk the bike (cemeteries, dismount-tagged ways,
+   * pedestrian crossings in some countries…). Computed from the raw steps
+   * before cue folding; absent on routes from before this existed.
+   */
+  walkSections?: WalkSection[];
   warnings: string[];
 }
 
@@ -790,6 +819,13 @@ export interface NavigationSession {
   /** Distance of that original route, frozen with it. */
   initialRouteDistanceMeters?: number;
   /**
+   * Set when the rider changed destination mid-ride (2026-10-10). The trip_end
+   * then carries it, so the trip's stored destination is the place they rode
+   * to, not the one they set out for. Absent = never changed; a course or loop
+   * keeps its own name.
+   */
+  changedDestination?: Coordinate;
+  /**
    * How many reroutes happened during this session.
    *
    * Distinct from `lastRerouteAt`, which only says whether one ever did.
@@ -815,7 +851,7 @@ export interface OfflineRegion {
   error?: string | null;
 }
 
-export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote' | 'city_suggestion' | 'sesizare';
+export type QueuedMutationType = 'hazard' | 'trip_start' | 'trip_end' | 'trip_track' | 'trip_share' | 'feedback' | 'hazard_vote' | 'city_suggestion' | 'sesizare' | 'ride_impact';
 export type QueuedMutationStatus = 'queued' | 'syncing' | 'failed' | 'dead';
 
 export interface QueuedMutation {
@@ -827,6 +863,14 @@ export interface QueuedMutation {
   status?: QueuedMutationStatus;
   lastAttemptAt?: string;
   lastError?: string | null;
+  /**
+   * Not sent before this time (ISO). Holds a ride's uploads for the length of
+   * an undo window, so "Discard" can still cancel them; a held mutation left
+   * in the queue past the window (app killed, say) simply sends as normal.
+   */
+  holdUntil?: string;
+  /** Groups the mutations of one held save, so they can be cancelled together. */
+  holdKey?: string;
 }
 
 // ── City Suggestions ──

@@ -1575,3 +1575,90 @@ describe('Loop intro state', () => {
     expect(useAppStore.getState().loopIntro.closes).toBe(1);
   });
 });
+
+describe('quiet rides (first rides skip the post-ride screens)', () => {
+  const holdUntil = () => new Date(Date.now() + 8_000).toISOString();
+
+  it('discardHeldRide drops the held uploads and re-queues the trip_end as discarded', () => {
+    const store = useAppStore.getState();
+    const hold = { holdKey: 'cli-9', holdUntil: holdUntil() };
+    store.enqueueMutation('hazard', { coordinate: { lat: 1, lon: 1 }, reportedAt: 'x', source: 'manual' } as never);
+    store.enqueueMutation('trip_end', { clientTripId: 'cli-9', endedAt: 'x', reason: 'stopped', endAction: 'saved' }, hold);
+    store.enqueueMutation('trip_track', { clientTripId: 'cli-9' } as never, hold);
+    store.enqueueMutation('ride_impact', { clientTripId: 'cli-9', distanceMeters: 900, hadDestination: true, weightKg: 70 }, hold);
+
+    expect(useAppStore.getState().discardHeldRide('cli-9')).toBe(true);
+
+    const queue = useAppStore.getState().queuedMutations;
+    expect(queue.map((m) => m.type)).toEqual(['hazard', 'trip_end']);
+    const end = queue[1];
+    expect((end.payload as { endAction: string }).endAction).toBe('discarded');
+    expect(end.holdUntil).toBeUndefined();
+  });
+
+  it('discardHeldRide does nothing once the trip_end has started sending', () => {
+    const store = useAppStore.getState();
+    const hold = { holdKey: 'cli-10', holdUntil: holdUntil() };
+    const endId = store.enqueueMutation('trip_end', { clientTripId: 'cli-10', endedAt: 'x', reason: 'stopped', endAction: 'saved' }, hold);
+    store.enqueueMutation('trip_track', { clientTripId: 'cli-10' } as never, hold);
+    store.markMutationSyncing(endId);
+
+    expect(useAppStore.getState().discardHeldRide('cli-10')).toBe(false);
+    expect(useAppStore.getState().queuedMutations).toHaveLength(2);
+  });
+
+  it('releaseHeldMutations ends every hold so the uploads can send', () => {
+    const store = useAppStore.getState();
+    store.enqueueMutation('trip_end', { clientTripId: 'cli-11', endedAt: 'x', reason: 'stopped', endAction: 'saved' }, { holdKey: 'cli-11', holdUntil: holdUntil() });
+    useAppStore.getState().releaseHeldMutations();
+    expect(useAppStore.getState().queuedMutations[0].holdUntil).toBeUndefined();
+  });
+
+  it('finishRideQuietly counts the ride and returns to IDLE without AWAITING_FEEDBACK', () => {
+    useAppStore.setState({ completedRideCount: 1 });
+    useAppStore.getState().startNavigation(createRoute('quiet-1'));
+    expect(useAppStore.getState().appState).toBe('NAVIGATING');
+
+    useAppStore.getState().finishRideQuietly();
+
+    const state = useAppStore.getState();
+    expect(state.completedRideCount).toBe(2);
+    expect(state.appState).toBe('IDLE');
+  });
+
+  it('finishRideQuietly is a no-op when no ride is in progress', () => {
+    useAppStore.setState({ completedRideCount: 1 });
+    useAppStore.getState().finishRideQuietly();
+    expect(useAppStore.getState().completedRideCount).toBe(1);
+  });
+});
+
+describe('post-ride prompt history', () => {
+  it('countEarlyStop returns the count before this stop and increments it', () => {
+    useAppStore.setState({ postRidePrompts: { ratingLastRide: null, ratingLastAt: null, earlyStops: 0 } });
+    expect(useAppStore.getState().countEarlyStop()).toBe(0);
+    expect(useAppStore.getState().countEarlyStop()).toBe(1);
+    expect(useAppStore.getState().postRidePrompts.earlyStops).toBe(2);
+  });
+
+  it('markRatingPrompted records the ride number and time', () => {
+    useAppStore.setState({ postRidePrompts: { ratingLastRide: null, ratingLastAt: null, earlyStops: 3 } });
+    useAppStore.getState().markRatingPrompted(9);
+    const prompts = useAppStore.getState().postRidePrompts;
+    expect(prompts.ratingLastRide).toBe(9);
+    expect(prompts.ratingLastAt).not.toBeNull();
+    expect(prompts.earlyStops).toBe(3);
+  });
+});
+
+describe('mid-ride destination change', () => {
+  it('records the new destination on the session and keeps it through a reroute', () => {
+    useAppStore.getState().startNavigation(createRoute('dest-1'));
+    expect(useAppStore.getState().navigationSession?.changedDestination).toBeUndefined();
+
+    useAppStore.getState().markDestinationChanged({ lat: 44.427, lon: 26.103 });
+    useAppStore.getState().syncNavigationRoute('dest-2');
+
+    expect(useAppStore.getState().navigationSession?.changedDestination).toEqual({ lat: 44.427, lon: 26.103 });
+  });
+});

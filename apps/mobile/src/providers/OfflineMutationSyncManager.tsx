@@ -1,8 +1,10 @@
 import type { NavigationFeedbackRequest, QueuedMutation, ShareTripRequest } from '@defensivepedal/core';
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 
 import type { QueuedMutationPayloadByType, QueuedTripEndPayload, QueuedTripTrackPayload } from '../lib/offlineQueue';
 import { mobileApi } from '../lib/api';
+import { ApiClientError } from '../lib/apiFetch';
 import { mobileEnv } from '../lib/env';
 import {
   ENQUEUE_FLUSH_DEBOUNCE_MS,
@@ -133,6 +135,33 @@ const submitQueuedMutation = async (
     case 'sesizare': {
       const payload = mutation.payload as QueuedMutationPayloadByType['sesizare'];
       return mobileApi.submitSesizare(payload);
+    }
+    case 'ride_impact': {
+      const payload = mutation.payload as QueuedMutationPayloadByType['ride_impact'];
+      const tripId = await resolveServerTripId(payload, tripServerIds, onResolved);
+
+      if (!tripId) {
+        return null;
+      }
+
+      try {
+        const result = await mobileApi.recordRideImpact(tripId, payload.distanceMeters, {
+          hadDestination: payload.hadDestination,
+          weightKg: payload.weightKg,
+          ...(payload.durationMinutes !== undefined ? { durationMinutes: payload.durationMinutes } : {}),
+          ...(payload.bikeType ? { bikeType: payload.bikeType } : {}),
+        });
+        // The same celebrations the post-ride screen would have queued; both
+        // overlays are root-level and wait out NAVIGATING on their own.
+        const store = useAppStore.getState();
+        if (result.newBadges.length > 0) store.enqueueBadgeUnlocks(result.newBadges);
+        if (result.tierPromotion?.promoted) store.setTierPromotion(result.tierPromotion);
+        return result;
+      } catch (error) {
+        // 409 = this ride's impact is already recorded. Done, not failed.
+        if (error instanceof ApiClientError && error.status === 409) return null;
+        throw error;
+      }
     }
     default:
       return null;
@@ -445,15 +474,27 @@ export const OfflineMutationSyncManager = () => {
       const hasNewTripCritical = state.queuedMutations.some(
         (mutation) => TRIP_CRITICAL_TYPES.has(mutation.type) && !prevIds.has(mutation.id),
       );
-      if (hasNewTripCritical) {
+      // A released hold (undo toast closed, app backgrounded) is a ride that
+      // just became sendable — same urgency as a fresh trip-critical enqueue.
+      const countHeld = (queue: typeof state.queuedMutations) =>
+        queue.reduce((n, mutation) => (mutation.holdUntil ? n + 1 : n), 0);
+      const holdReleased = countHeld(state.queuedMutations) < countHeld(prevState.queuedMutations);
+      if (hasNewTripCritical || holdReleased) {
         kickTimer = setTimeout(kickFlush, ENQUEUE_FLUSH_DEBOUNCE_MS);
       }
+    });
+
+    // Leaving the foreground ends any undo window: release held ride uploads so
+    // the kick above sends them while the process is still alive.
+    const appStateSubscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') useAppStore.getState().releaseHeldMutations();
     });
 
     return () => {
       cancelled = true;
       clearInterval(intervalHandle);
       unsubscribe();
+      appStateSubscription.remove();
       if (kickTimer !== null) {
         clearTimeout(kickTimer);
       }

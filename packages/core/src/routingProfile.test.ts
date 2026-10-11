@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ROUTING_DISPLAY_MODES,
+  defaultRoutingDisplayMode,
   fromRoutingDisplayMode,
   isRoutingDisplayMode,
   resolveSafeRoutingProfile,
@@ -81,5 +82,21 @@ describe('isRoutingDisplayMode', () => {
     expect(isRoutingDisplayMode('cool')).toBe(true);
     expect(isRoutingDisplayMode('e-bike')).toBe(false);
     expect(isRoutingDisplayMode(undefined)).toBe(false);
+  });
+});
+
+describe('defaultRoutingDisplayMode', () => {
+  it('starts an e-bike rider on E-bike when they may use it', () => {
+    expect(defaultRoutingDisplayMode('ebike', true)).toBe('ebike');
+  });
+
+  it('falls back to Safe when e-bike routing is locked', () => {
+    expect(defaultRoutingDisplayMode('ebike', false)).toBe('safe');
+  });
+
+  it('keeps Safe for every other bike type, and for no answer', () => {
+    for (const bike of ['road', 'city', 'mountain', 'recumbent', 'other', null] as const) {
+      expect(defaultRoutingDisplayMode(bike, true)).toBe('safe');
+    }
   });
 });

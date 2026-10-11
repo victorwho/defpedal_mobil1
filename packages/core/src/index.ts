@@ -53,3 +53,4 @@ export * from './trimEndpointsForShare';
 export * from './routeShareContract';
 export * from './routeShareRiskIndex';
 export * from './types';
+export * from './walkSections';

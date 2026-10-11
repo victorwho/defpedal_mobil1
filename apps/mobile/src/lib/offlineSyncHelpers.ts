@@ -58,6 +58,7 @@ export const MUTATION_SYNC_TIMEOUT_MS_BY_TYPE: Record<QueuedMutation['type'], nu
   feedback: 10_000,
   city_suggestion: 10_000,
   sesizare: 10_000,
+  ride_impact: 15_000,
 };
 
 const DEFAULT_MUTATION_SYNC_TIMEOUT_MS = 10_000;
@@ -171,7 +172,11 @@ export const isMutationReady = (
   tripServerIds: Record<string, string>,
   queue: readonly QueuedMutation[] = [],
 ): boolean => {
-  if (mutation.type === 'trip_end' || mutation.type === 'trip_track') {
+  if (
+    mutation.type === 'trip_end' ||
+    mutation.type === 'trip_track' ||
+    mutation.type === 'ride_impact'
+  ) {
     const payload = mutation.payload as QueuedTripEndPayload;
 
     // Local clientTripId→serverId mapping present → ready immediately.
@@ -196,6 +201,7 @@ export const isMutationReady = (
 export const TRIP_DEPENDENT_TYPES: ReadonlySet<QueuedMutation['type']> = new Set([
   'trip_end',
   'trip_track',
+  'ride_impact',
 ]);
 
 /**
@@ -203,6 +209,13 @@ export const TRIP_DEPENDENT_TYPES: ReadonlySet<QueuedMutation['type']> = new Set
  * flush cycle. Reasons: backoff not elapsed, dependency not ready, already
  * dead or syncing.
  */
+/** True while a mutation is inside its undo window (see `QueuedMutation.holdUntil`). */
+export const isHeld = (mutation: QueuedMutation, now: number = Date.now()): boolean => {
+  if (!mutation.holdUntil) return false;
+  const until = Date.parse(mutation.holdUntil);
+  return Number.isFinite(until) && until > now;
+};
+
 export const shouldSkipMutation = (
   mutation: QueuedMutation,
   tripServerIds: Record<string, string>,
@@ -214,6 +227,10 @@ export const shouldSkipMutation = (
   }
 
   if (!isBackoffElapsed(mutation, now)) {
+    return true;
+  }
+
+  if (isHeld(mutation, now)) {
     return true;
   }
 

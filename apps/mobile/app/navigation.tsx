@@ -1,4 +1,4 @@
-import type { Coordinate, EarlyEndReason, HazardType } from '@defensivepedal/core';
+import type { Coordinate, EarlyEndReason, HazardType, ResolvedSuggestion } from '@defensivepedal/core';
 import {
   AUTO_REROUTE_DELAY_MS,
   buildRerouteRequest,
@@ -12,6 +12,7 @@ import {
   computeCurrentGrade,
   decodePolyline,
   formatDistance,
+  formatDuration,
   haversineDistance,
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
@@ -42,9 +43,11 @@ import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
 import { spokenDistance } from '../src/lib/spokenDistance';
+import { spokenInstruction } from '../src/lib/walkCues';
 import { RouteMap } from '../src/components/map';
 import { Screen } from '../src/components/Screen';
 import { VoiceGuidanceButton } from '../src/components/VoiceGuidanceButton';
+import { ChangeDestinationSheet } from '../src/components/ChangeDestinationSheet';
 import { useBackgroundNavigationSnapshot } from '../src/hooks/useBackgroundNavigationSnapshot';
 import { useBicycleParking } from '../src/hooks/useBicycleParking';
 // Bike lanes use Mapbox vector tiles directly
@@ -62,6 +65,14 @@ import { telemetry } from '../src/lib/telemetry';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAppStore } from '../src/store/appStore';
+import type { EnqueueOptions } from '../src/store/queueSlice';
+import {
+  isEarlyEndReasonDue,
+  isNearDestination,
+  isQuietRide,
+  RIDE_SAVED_HOLD_MS,
+  RIDE_SAVED_UNDO_MS,
+} from '../src/lib/postRideScreens';
 import { useShallow } from 'zustand/shallow';
 
 // Design system imports
@@ -174,6 +185,8 @@ function NavigationScreen() {
   const syncNavigationRoute = useAppStore((state) => state.syncNavigationRoute);
   const finishNavigation = useAppStore((state) => state.finishNavigation);
   const resetFlow = useAppStore((state) => state.resetFlow);
+  const finishRideQuietly = useAppStore((state) => state.finishRideQuietly);
+  const setRideSavedNotice = useAppStore((state) => state.setRideSavedNotice);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const setFollowing = useAppStore((state) => state.setFollowing);
   // A pan/zoom stops Mapbox's native follow but leaves `isFollowing` true, so
@@ -185,6 +198,9 @@ function NavigationScreen() {
     setFollowInterrupted(!following);
   }, []);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
+  const setRouteRequest = useAppStore((state) => state.setRouteRequest);
+  const addRecentDestination = useAppStore((state) => state.addRecentDestination);
+  const markDestinationChanged = useAppStore((state) => state.markDestinationChanged);
   const enqueueMutation = useAppStore((state) => state.enqueueMutation);
 
   const { isOnline } = useConnectivity();
@@ -438,9 +454,12 @@ function NavigationScreen() {
         }
       : null;
   const pendingQueueCount = queuedMutations.length;
+  // The screen's one transient toast: hazard-report results, and the
+  // confirmation after a mid-ride destination change.
   const [hazardBanner, setHazardBanner] = useState<{
     tone: 'success' | 'warning' | 'error';
     message: string;
+    durationMs: number;
   } | null>(null);
   const [hazardPickerOpen, setHazardPickerOpen] = useState(false);
   const [hazardDescribeMode, setHazardDescribeMode] = useState(false);
@@ -458,18 +477,16 @@ function NavigationScreen() {
   const keyboardHeight = useKeyboardHeight();
   const [showElevationProgress, setShowElevationProgress] = useState(false);
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false);
-  // Open when the rider chose "Save" from the End Ride dialog while ending the
-  // route early — collects an optional early-end reason before finishing.
+  // Open on the early stops that ask why the ride ended (one in
+  // EARLY_END_REASON_EVERY, from ride 4 on) — collects an optional reason
+  // before the ride is saved.
   const [earlyEndPromptOpen, setEarlyEndPromptOpen] = useState(false);
-  // Tracks which End Ride action the rider chose before the reason modal —
-  // saved rides go to /feedback (XP/badges), discarded rides skip feedback
-  // and trip_track but still record the reason on the trip itself.
-  const [endActionPending, setEndActionPending] = useState<'save' | 'discard' | null>(null);
   const hazardBannerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showHazardBanner = (
     tone: 'success' | 'warning' | 'error',
     message: string,
+    durationMs = 3000,
   ) => {
     if (hazardBannerTimeoutRef.current) {
       clearTimeout(hazardBannerTimeoutRef.current);
@@ -478,12 +495,13 @@ function NavigationScreen() {
     setHazardBanner({
       tone,
       message,
+      durationMs,
     });
 
     hazardBannerTimeoutRef.current = setTimeout(() => {
       setHazardBanner(null);
       hazardBannerTimeoutRef.current = null;
-    }, 3000);
+    }, durationMs);
   };
 
   const queueTripEnd = useCallback((
@@ -492,9 +510,18 @@ function NavigationScreen() {
       readonly discard?: boolean;
       readonly earlyEndReason?: EarlyEndReason | null;
       readonly earlyEndReasonNote?: string | null;
+      /**
+       * Quiet rides only (the first rides, which skip the post-ride screen):
+       * also queue the `ride_impact` upload that screen would have made, so
+       * XP, badges and impact totals are still recorded.
+       */
+      readonly recordImpact?: boolean;
+      /** Holds every upload of this save for an undo window (see discardHeldRide). */
+      readonly hold?: EnqueueOptions;
     },
   ) => {
     const discard = options?.discard === true;
+    const hold = options?.hold;
     const earlyEndReason = options?.earlyEndReason ?? null;
     const earlyEndReasonNote = options?.earlyEndReasonNote ?? null;
     const store = useAppStore.getState();
@@ -533,7 +560,15 @@ function NavigationScreen() {
       // deliberate discards from lost rides. Arrival auto-complete counts as
       // 'saved' — reason='completed' already marks it.
       endAction: discard ? 'discarded' : 'saved',
-    });
+      // Only after a mid-ride destination change, and in trip_start's own
+      // "lat, lon" format, so the stored destination is where the ride went.
+      ...(currentSession?.changedDestination
+        ? {
+            finalDestinationText: `${currentSession.changedDestination.lat.toFixed(4)}, ${currentSession.changedDestination.lon.toFixed(4)}`,
+            finalDestinationCoordinate: currentSession.changedDestination,
+          }
+        : {}),
+    }, hold);
 
     // Discarded rides skip the trip_track + trip_share writes. The trip lifecycle
     // is closed server-side (above), but with no trip_tracks row the ride never
@@ -592,7 +627,7 @@ function NavigationScreen() {
         aqiAtStart: null, // TODO: capture AQI at navigation start
         earlyEndReason,
         earlyEndReasonNote,
-      });
+      }, hold);
     }
 
     // Auto-share to community feed if enabled
@@ -612,7 +647,31 @@ function NavigationScreen() {
         geometryPolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
         safetyTags: [],
         startCoordinate: { lat: currentRouteRequest.origin.lat, lon: currentRouteRequest.origin.lon },
-      });
+      }, hold);
+    }
+
+    if (options?.recordImpact && currentSession) {
+      const breadcrumbs = currentSession.gpsBreadcrumbs;
+      const startedAtMs = Date.parse(currentSession.startedAt);
+      const destination = currentRouteRequest.destination;
+      enqueueMutation('ride_impact', {
+        clientTripId: currentActiveTripClientId,
+        // GPS trail only, never the planned distance — the post-ride screen's
+        // rule, so a rider who barely moved is not credited the whole route.
+        distanceMeters: breadcrumbs.length >= 2 ? calculateTrailDistanceMeters(breadcrumbs) : 0,
+        hadDestination: destination.lat !== 0 || destination.lon !== 0,
+        weightKg: store.weightKg,
+        // Clamped to the request schema's 1..1440 range, as the screen does.
+        ...(Number.isFinite(startedAtMs)
+          ? {
+              durationMinutes: Math.min(
+                1_440,
+                Math.max(1, Math.round((Date.now() - startedAtMs) / 60_000)),
+              ),
+            }
+          : {}),
+        ...(store.bikeTypeId ? { bikeType: store.bikeTypeId } : {}),
+      }, hold);
     }
 
     telemetry.capture('trip_end_queued', {
@@ -625,93 +684,129 @@ function NavigationScreen() {
     void telemetry.flush();
   }, [enqueueMutation, selectedRoute, user]);
 
-  // Completes the End Ride flow after the rider answered (or skipped) the
-  // reason question. Branches on endActionPending: 'save' goes to /feedback
-  // (XP/badges/trip_track written); 'discard' routes back to /route-planning
-  // and skips trip_track + feedback. In both cases the reason is recorded on
-  // the trip via the trip_end payload so analytics covers both outcomes.
+  // Saves the ride and goes straight home with a "Ride saved" toast — no
+  // post-ride screen. Used for every ride that is not a completed ride from
+  // ride 4 on (src/lib/postRideScreens.ts): a quiet first ride, and any early
+  // stop. The impact (XP, badges, totals) is recorded in the background. An
+  // early stop is held for the toast's undo window so its Discard can still
+  // cancel it; the hold ends the moment the toast closes or the app backgrounds.
+  const saveRideAndGoHome = useCallback((
+    reason: 'completed' | 'stopped',
+    early?: { readonly earlyEndReason: EarlyEndReason | null; readonly earlyEndReasonNote: string | null },
+  ) => {
+    const store = useAppStore.getState();
+    const clientTripId = store.activeTripClientId;
+    const crumbs = store.navigationSession?.gpsBreadcrumbs ?? [];
+    const distanceMeters = crumbs.length >= 2 ? calculateTrailDistanceMeters(crumbs) : 0;
+    const hold: EnqueueOptions | undefined =
+      reason === 'stopped' && clientTripId
+        ? { holdKey: clientTripId, holdUntil: new Date(Date.now() + RIDE_SAVED_HOLD_MS).toISOString() }
+        : undefined;
+
+    queueTripEnd(reason, {
+      recordImpact: true,
+      hold,
+      earlyEndReason: early?.earlyEndReason ?? null,
+      earlyEndReasonNote: early?.earlyEndReasonNote ?? null,
+    });
+    telemetry.capture(reason === 'completed' ? 'navigation_completed' : 'navigation_stopped', {
+      route_id: selectedRoute?.id ?? 'unknown',
+      session_id: store.navigationSession?.sessionId ?? 'unknown',
+      outcome: 'auto_saved',
+      quiet_ride: isQuietRide(store.completedRideCount),
+      ...(reason === 'stopped' ? { early_end_reason: early?.earlyEndReason ?? 'not_asked' } : {}),
+    });
+    void clearCachedRoute();
+    setRideSavedNotice({
+      distanceMeters,
+      holdKey: hold?.holdKey ?? null,
+      discardableUntil: hold ? Date.now() + RIDE_SAVED_UNDO_MS : null,
+    });
+    finishRideQuietly();
+    router.replace('/route-planning');
+    // ⚠️ No `navigationSession` in these deps — read it from the store above.
+    // The per-GPS-fix effect depends on `completeRide`, which depends on this,
+    // and that effect rewrites the session on every fix: a session dep made a
+    // new callback per fix, re-ran the effect, and looped until React gave up
+    // ("Maximum update depth exceeded" on preview 0.2.184, error-log #136).
+  }, [queueTripEnd, selectedRoute, setRideSavedNotice, finishRideQuietly]);
+
+  // A completed ride: arrival, or End Ride within ARRIVAL_RADIUS_METERS of the
+  // destination. From ride 4 on it always opens the impact summary (the
+  // rating step after it is sampled on /feedback); a quiet first ride saves
+  // and goes home like any other.
+  const completeRide = useCallback((how: 'arrived' | 'near_destination') => {
+    if (isQuietRide(useAppStore.getState().completedRideCount)) {
+      saveRideAndGoHome('completed');
+      return;
+    }
+    queueTripEnd('completed');
+    telemetry.capture('navigation_completed', {
+      route_id: selectedRoute?.id ?? 'unknown',
+      session_id: useAppStore.getState().navigationSession?.sessionId ?? 'unknown',
+      how,
+    });
+    void clearCachedRoute();
+    finishNavigation();
+    router.replace('/feedback');
+    // Same rule as saveRideAndGoHome: never depend on `navigationSession`.
+  }, [saveRideAndGoHome, queueTripEnd, selectedRoute, finishNavigation]);
+
+  // The rider answered (or skipped) the early-stop reason question.
   const finalizeEarlyEnd = useCallback((
     earlyEndReason: EarlyEndReason | null,
     earlyEndReasonNote: string | null,
   ) => {
     setEarlyEndPromptOpen(false);
-    const action = endActionPending;
-    setEndActionPending(null);
+    saveRideAndGoHome('stopped', { earlyEndReason, earlyEndReasonNote });
+  }, [saveRideAndGoHome]);
 
-    const isDiscard = action === 'discard';
-    queueTripEnd('stopped', { discard: isDiscard, earlyEndReason, earlyEndReasonNote });
-    telemetry.capture('navigation_stopped', {
-      route_id: selectedRoute?.id ?? 'unknown',
-      session_id: navigationSession?.sessionId ?? 'unknown',
-      outcome: isDiscard ? 'discarded' : 'saved',
-      early_end_reason: earlyEndReason ?? 'skipped',
-    });
-    void clearCachedRoute();
-    if (isDiscard) {
-      // Discard must NOT go through finishNavigation: that transitions to
-      // AWAITING_FEEDBACK and bumps completedRideCount (review-prompt /
-      // MeetPedal gates), so a discarded ride would count as completed and
-      // leave AWAITING_FEEDBACK persisted with no feedback screen to clear
-      // it. resetFlow returns straight to IDLE (review 2026-06-12, P1 #5).
-      resetFlow();
-    } else {
-      finishNavigation();
-    }
-    router.replace(isDiscard ? '/route-planning' : '/feedback');
-  }, [endActionPending, queueTripEnd, selectedRoute, navigationSession, finishNavigation, resetFlow]);
-
-  // End Ride confirmation. Both Save and Discard route through
-  // finalizeEarlyEnd via the reason modal; endActionPending tells finalize
-  // which outcome to apply. "Keep riding" (and tapping outside / system back
-  // on the dialog) aborts without ending — review 2026-06-12 P1 #1: dismiss
-  // used to be mapped to Save, making an accidental brush of the 40px stop
-  // button irreversibly end the ride.
   // A session the rider never moved on was route browsing, not a ride: close
-  // the trip as discarded and go home without the Save/Discard dialog, the
-  // reason question or the feedback screen.
+  // the trip as discarded and go home without any toast, question or screen.
   const endUnstartedRide = useCallback(() => {
     queueTripEnd('stopped', { discard: true });
     telemetry.capture('navigation_stopped', {
       route_id: selectedRoute?.id ?? 'unknown',
-      session_id: navigationSession?.sessionId ?? 'unknown',
+      session_id: useAppStore.getState().navigationSession?.sessionId ?? 'unknown',
       outcome: 'not_started',
     });
     void clearCachedRoute();
     resetFlow();
     router.replace('/route-planning');
-  }, [queueTripEnd, selectedRoute, navigationSession, resetFlow]);
+  }, [queueTripEnd, selectedRoute, resetFlow]);
 
+  // End Ride (press-and-hold) and Android back. There is no Save/Discard
+  // dialog any more (2026-10-09): the ride is saved and the toast offers
+  // Discard instead. In order:
+  //   never moved            -> closed as discarded, home, nothing shown
+  //   near the destination   -> a completed ride (completeRide)
+  //   a quiet first ride     -> saved, home, toast
+  //   otherwise (early stop) -> saved, home, toast; on one early stop in
+  //                             EARLY_END_REASON_EVERY the reason question first
   const confirmEndRide = useCallback(() => {
-    const session = useAppStore.getState().navigationSession;
+    const store = useAppStore.getState();
+    const session = store.navigationSession;
+    const crumbs = session?.gpsBreadcrumbs ?? [];
     const startedAtMs = session ? Date.parse(session.startedAt) : Number.NaN;
-    if (
-      !hasMovedSinceStart(
-        session?.gpsBreadcrumbs ?? [],
-        Number.isFinite(startedAtMs) ? startedAtMs : undefined,
-      )
-    ) {
+    if (!hasMovedSinceStart(crumbs, Number.isFinite(startedAtMs) ? startedAtMs : undefined)) {
       endUnstartedRide();
       return;
     }
-    const saveAndEnd = () => {
-      setEndActionPending('save');
+    const lastFix = crumbs[crumbs.length - 1];
+    if (isNearDestination(lastFix, store.routeRequest.destination)) {
+      completeRide('near_destination');
+      return;
+    }
+    if (isQuietRide(store.completedRideCount)) {
+      saveRideAndGoHome('stopped');
+      return;
+    }
+    if (isEarlyEndReasonDue(store.countEarlyStop())) {
       setEarlyEndPromptOpen(true);
-    };
-    const discardAndEnd = () => {
-      setEndActionPending('discard');
-      setEarlyEndPromptOpen(true);
-    };
-    Alert.alert(
-      t('nav.endRideSaveTitle'),
-      t('nav.endRideSaveMessage'),
-      [
-        { text: t('nav.endRideKeepRiding'), style: 'cancel' },
-        { text: t('nav.endRideDiscard'), style: 'destructive', onPress: discardAndEnd },
-        { text: t('nav.endRideSave'), style: 'default', onPress: saveAndEnd },
-      ],
-      { cancelable: true },
-    );
-  }, [t, endUnstartedRide]);
+      return;
+    }
+    saveRideAndGoHome('stopped');
+  }, [endUnstartedRide, completeRide, saveRideAndGoHome]);
 
   // Android hardware back during a ride opens the End Ride dialog instead of
   // popping the stack. Without this there was no BackHandler anywhere: back
@@ -840,7 +935,7 @@ function NavigationScreen() {
     // once the rider is back on the route.
     const session = useAppStore.getState().navigationSession;
     if (currentStep && session?.offRouteSince == null) {
-      Speech.speak(currentStep.instruction, {
+      Speech.speak(spokenInstruction(currentStep, t, units), {
         language: routeRequest.locale,
       });
     }
@@ -957,6 +1052,86 @@ function NavigationScreen() {
     },
   });
 
+  // ── Change destination mid-ride (src/components/ChangeDestinationSheet.tsx) ──
+  // The new destination is routed from where the rider is, in their current
+  // mode, and only committed to the store once a route comes back — a failed
+  // pick leaves the ride on its old route with the sheet still open. Remaining
+  // stops are dropped: the rider is heading somewhere else now. Fixed-line
+  // routes (an imported course, a generated loop) never offer this — see
+  // `isCourse` above. The trip itself carries on; its final route is recorded
+  // at ride end like any reroute.
+  const [changeDestinationOpen, setChangeDestinationOpen] = useState(false);
+  const [changeDestinationError, setChangeDestinationError] = useState<string | null>(null);
+  const changeDestinationMutation = useMutation({
+    mutationFn: ({ origin, place }: { origin: Coordinate; place: ResolvedSuggestion }) => {
+      const s = useAppStore.getState();
+      // Routed in the rider's mode as chosen — including Flat, unlike an
+      // off-route reroute (which takes Fast for speed): this is a whole new
+      // route, and a rider who wanted no hills still wants none.
+      return mobileApi.reroute(
+        buildRerouteRequest(
+          {
+            ...s.routeRequest,
+            destination: place.coordinates,
+            waypoints: [],
+            avoidUnpaved: s.avoidUnpaved,
+            avoidHeat: s.avoidHeat,
+            isEbike: s.isEbike,
+            avoidHills: s.avoidHills,
+          },
+          selectedRoute?.id,
+          origin,
+        ),
+      );
+    },
+    onSuccess: (response, { place }) => {
+      const nextRouteId = response.routes[0]?.id ?? null;
+      if (!nextRouteId) {
+        setChangeDestinationError(t('nav.changeDestinationFailed'));
+        return;
+      }
+      recordNavigationReroute();
+      setRouteRequest({ destination: place.coordinates, waypoints: [] });
+      setRoutePreview(response, { preferredRouteId: nextRouteId });
+      syncNavigationRoute(nextRouteId);
+      markDestinationChanged(place.coordinates);
+      addRecentDestination({ ...place, selectedAt: new Date().toISOString() });
+      setChangeDestinationOpen(false);
+      // Say it on screen as well as aloud: voice guidance is often muted, and
+      // a redrawn line alone is easy to miss at a glance. Longer than a hazard
+      // toast because it carries a place name and two numbers to read. No
+      // haptic — mid-ride only safety-critical haptics fire (docs/haptic-map.md).
+      const nextRoute = response.routes[0];
+      showHazardBanner(
+        'success',
+        t('nav.routeUpdatedTo', {
+          place: place.primaryText,
+          distance: formatDistance(nextRoute?.distanceMeters ?? 0, units),
+          duration: formatDuration(nextRoute?.durationSeconds ?? 0),
+        }),
+        5_000,
+      );
+      speak(t('nav.newDestinationSpoken'), { allowWhenOffRoute: true });
+      telemetry.capture('destination_changed', {
+        session_id: navigationSession?.sessionId ?? 'unknown',
+        next_route_id: nextRouteId,
+      });
+    },
+    onError: (error) => {
+      setChangeDestinationError(t('nav.changeDestinationFailed'));
+      telemetry.captureError(error, { feature: 'change_destination' });
+    },
+  });
+  const pickNewDestination = (place: ResolvedSuggestion) => {
+    const origin = locationState.sample?.coordinate ?? mapUserCoordinate;
+    if (!origin) {
+      setChangeDestinationError(t('nav.changeDestinationNoGps'));
+      return;
+    }
+    setChangeDestinationError(null);
+    changeDestinationMutation.mutate({ origin, place });
+  };
+
   useEffect(() => {
     return () => {
       if (hazardBannerTimeoutRef.current) {
@@ -1057,7 +1232,7 @@ function NavigationScreen() {
     }
 
     introAnnouncementKeyRef.current = announcementKey;
-    speak(firstStep.instruction);
+    speak(spokenInstruction(firstStep, t, units));
   }, [
     navigationSession?.sessionId,
     navigationSession?.isMuted,
@@ -1096,7 +1271,7 @@ function NavigationScreen() {
       speak(
         t('nav.inMeters', {
           distance: spokenDistance(dist, units, t),
-          instruction: activeStep.instruction,
+          instruction: spokenInstruction(activeStep, t, units),
         }),
       );
     }
@@ -1106,13 +1281,13 @@ function NavigationScreen() {
       speak(
         t('nav.inMeters', {
           distance: spokenDistance(50, units, t),
-          instruction: activeStep.instruction,
+          instruction: spokenInstruction(activeStep, t, units),
         }),
       );
     }
 
     if (progress.shouldAdvanceStep && activeStep) {
-      speak(activeStep.instruction);
+      speak(spokenInstruction(activeStep, t, units));
       advanceNavigation(selectedRoute.steps.length);
     }
 
@@ -1132,19 +1307,13 @@ function NavigationScreen() {
     }
 
     if (progress.shouldCompleteNavigation) {
-      queueTripEnd('completed');
-      telemetry.capture('navigation_completed', {
-        route_id: selectedRoute.id,
-        session_id: navigationSession?.sessionId ?? 'unknown',
-      });
       speak(t('nav.arrived'));
-      void clearCachedRoute();
-      finishNavigation();
-      router.replace('/feedback');
+      completeRide('arrived');
     }
   }, [
     advanceNavigation,
     appendGpsBreadcrumb,
+    completeRide,
     finishNavigation,
     locationState.sample,
     markPreAnnouncement,
@@ -1391,7 +1560,7 @@ function NavigationScreen() {
               if (currentStep) {
                 const dist = Math.round(navigationSession.distanceToManeuverMeters ?? 0);
                 // Explicit tap — repeat the instruction even while off-route.
-                speak(t('nav.inMeters', { distance: spokenDistance(dist, units, t), instruction: currentStep.instruction }), {
+                speak(t('nav.inMeters', { distance: spokenDistance(dist, units, t), instruction: spokenInstruction(currentStep, t, units) }), {
                   allowWhenOffRoute: true,
                 });
               }
@@ -1489,6 +1658,23 @@ function NavigationScreen() {
               compact
             />
           </View>
+
+          {/* Change destination — not offered on a fixed-line route, and needs
+              the network for both the search and the new route. */}
+          {!isCourse ? (
+            <View style={styles.roundButton}>
+              <IconButton
+                icon={<Ionicons name="flag-outline" size={22} color={isOnline ? gray[300] : gray[600]} />}
+                onPress={() => {
+                  setChangeDestinationError(null);
+                  setChangeDestinationOpen(true);
+                }}
+                disabled={!isOnline}
+                accessibilityLabel={t('nav.changeDestination')}
+                variant="secondary"
+              />
+            </View>
+          ) : null}
 
           <View style={styles.hazardFab}>
             <IconButton
@@ -1590,7 +1776,7 @@ function NavigationScreen() {
           <Toast
             message={hazardBanner.message}
             variant={hazardBanner.tone}
-            durationMs={3000}
+            durationMs={hazardBanner.durationMs}
             onDismiss={() => {
               setHazardBanner(null);
               if (hazardBannerTimeoutRef.current) {
@@ -1766,20 +1952,26 @@ function NavigationScreen() {
       ) : null}
 
       {/* Early-end reason — shown after the rider chose Save or Discard */}
+      <ChangeDestinationSheet
+        visible={changeDestinationOpen}
+        proximity={locationState.sample?.coordinate ?? mapUserCoordinate ?? null}
+        routing={changeDestinationMutation.isPending}
+        errorText={changeDestinationError}
+        onPick={pickNewDestination}
+        onClose={() => setChangeDestinationOpen(false)}
+      />
       <EarlyEndReasonModal
         visible={earlyEndPromptOpen}
         title={t('nav.earlyEndTitle')}
         options={earlyEndReasonOptions}
-        saveLabel={t(endActionPending === 'discard' ? 'nav.earlyEndDiscard' : 'nav.earlyEndSave')}
+        saveLabel={t('nav.earlyEndSave')}
         skipLabel={t('nav.earlyEndSkip')}
         otherPlaceholder={t('nav.earlyEndOtherPlaceholder')}
         onSubmit={finalizeEarlyEnd}
         cancelLabel={t('nav.endRideKeepRiding')}
         onCancel={() => {
-          // Rider changed their mind after Save/Discard — abort the whole
-          // End Ride flow and keep navigating.
+          // Rider changed their mind — keep navigating.
           setEarlyEndPromptOpen(false);
-          setEndActionPending(null);
         }}
       />
 

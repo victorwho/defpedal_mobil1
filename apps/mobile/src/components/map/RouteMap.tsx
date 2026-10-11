@@ -35,6 +35,7 @@ import { MarkerLayers } from './layers/MarkerLayers';
 import { OverpassPoiLayers } from './layers/OverpassPoiLayers';
 import { RouteFeatureLayer } from './layers/RouteFeatureLayer';
 import { RouteLayers } from './layers/RouteLayers';
+import { WalkSectionLayer } from './layers/WalkSectionLayer';
 import { SearchedPoiLayer } from './layers/SearchedPoiLayer';
 import { VectorTileLayers } from './layers/VectorTileLayers';
 import { CrosshairOverlay } from './overlays/CrosshairOverlay';
@@ -413,6 +414,8 @@ export const RouteMap = ({
           routeFeatureCollection={routeFeatureCollection}
           riskFeatureCollection={riskFeatureCollection}
         />
+
+        <WalkSectionLayer walkSections={selectedRoute?.route.walkSections} />
 
         <RouteFeatureLayer featureCollection={routeFeatureMarkerCollection} />
 

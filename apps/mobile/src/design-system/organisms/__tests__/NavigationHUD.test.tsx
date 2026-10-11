@@ -322,11 +322,20 @@ describe('FooterCard — no "then" content', () => {
 // ---------------------------------------------------------------------------
 
 describe('FooterCard — End Ride', () => {
-  it('fires onEndRide, the only on-screen way off this screen', () => {
+  it('fires onEndRide on a press-and-hold, the only on-screen way off this screen', () => {
     const onEndRide = vi.fn();
     renderFooter({ onEndRide });
-    fireEvent.click(screen.getByTestId('footer-end-ride'));
+    fireEvent.contextMenu(screen.getByTestId('footer-end-ride'));
     expect(onEndRide).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not end the ride on a plain tap, and says to hold instead', () => {
+    const onEndRide = vi.fn();
+    renderFooter({ onEndRide });
+    expect(screen.queryByTestId('footer-end-ride-hint')).toBeNull();
+    fireEvent.click(screen.getByTestId('footer-end-ride'));
+    expect(onEndRide).not.toHaveBeenCalled();
+    expect(screen.getByTestId('footer-end-ride-hint').textContent).toBe('nav.holdToEndRide');
   });
 
   it('carries the End Ride accessibility label', () => {
@@ -390,5 +399,36 @@ describe('FooterCard — multi-stop', () => {
     renderFooter();
     expect(screen.queryByTestId('footer-stop-header')).toBeNull();
     expect(screen.queryByTestId('footer-to-finish')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ManeuverCard — walk-the-bike cues (lib/walkCues.ts)
+// ---------------------------------------------------------------------------
+
+describe('ManeuverCard — walk-the-bike cues', () => {
+  it('heads a mode-change step with the cue itself and shows the walk distance', () => {
+    renderManeuver({
+      currentStep: makeStep({
+        walkCue: 'dismount',
+        walkMeters: 120,
+        maneuver: { type: 'notification', location: [26.1, 44.43] },
+      }),
+    });
+    expect(screen.getByText('nav.walkDismountShort')).toBeTruthy();
+    expect(screen.getByTestId('maneuver-street').textContent).toContain('nav.walkDismount');
+    expect(screen.queryByTestId('maneuver-walk-cue')).toBeNull();
+  });
+
+  it('keeps a real turn as the headline and adds the cue as an extra line', () => {
+    renderManeuver({ currentStep: makeStep({ walkCue: 'cross_on_foot' }) });
+    expect(screen.getByText('nav.maneuverShort.turnRight')).toBeTruthy();
+    expect(screen.getByTestId('maneuver-street').textContent).toBe('Strada Traian');
+    expect(screen.getByTestId('maneuver-walk-cue').textContent).toContain('nav.walkCrossOnFoot');
+  });
+
+  it('shows nothing extra on an ordinary step', () => {
+    renderManeuver();
+    expect(screen.queryByTestId('maneuver-walk-cue')).toBeNull();
   });
 });

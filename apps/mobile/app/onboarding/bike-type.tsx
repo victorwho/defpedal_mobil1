@@ -38,6 +38,9 @@ import {
 import { useT } from '../../src/hooks/useTranslation';
 import { useAppStore } from '../../src/store/appStore';
 import { finishPostSignupSteps } from '../../src/lib/post-onboarding-nav';
+import { PlusPaywallHost } from '../../src/components/PlusPaywallHost';
+import { usePremium } from '../../src/hooks/usePremium';
+import { telemetry } from '../../src/lib/telemetry';
 
 /**
  * Row metadata, positionally aligned with `BIKE_TYPE_IDS`.
@@ -69,6 +72,21 @@ export default function OnboardingBikeTypeScreen() {
   const markBikeTypePromptSeen = useAppStore((s) => s.markBikeTypePromptSeen);
 
   const [selected, setSelected] = useState<BikeTypeId | null>(null);
+
+  // E-bike is a Pedal Plus option, gated like the E-bike routing mode. A
+  // locked rider tapping it is shown Plus instead of selecting it.
+  const premium = usePremium();
+  const ebikeLocked = premium.blockEbikeRouting();
+  const riderCountry = useAppStore((s) => s.regionGate.countryCode);
+  const [paywallVisible, setPaywallVisible] = useState(false);
+  const handleRowPress = (id: BikeTypeId) => {
+    if (id === 'ebike' && ebikeLocked) {
+      telemetry.capture('plus_locked_mode_tapped', { mode: 'ebike', screen: 'onboarding_bike_type' });
+      setPaywallVisible(true);
+      return;
+    }
+    setSelected(id);
+  };
 
   /**
    * The live consequence line. `avoidUnpavedForBikeType` returns null for
@@ -122,6 +140,10 @@ export default function OnboardingBikeTypeScreen() {
         <View style={styles.list}>
           {ROWS.map((row, index) => {
             const isSelected = selected === row.id;
+            const isLocked = row.id === 'ebike' && ebikeLocked;
+            const label = isLocked
+              ? t('premium.plusOnlyOption', { label: t(row.labelKey) })
+              : t(row.labelKey);
             return (
               <FadeSlideIn
                 key={row.id}
@@ -130,10 +152,14 @@ export default function OnboardingBikeTypeScreen() {
                 <PressableScale
                   style={[styles.row, isSelected && styles.rowSelected]}
                   hapticOnPress="confirm"
-                  onPress={() => setSelected(row.id)}
+                  onPress={() => handleRowPress(row.id)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${t(row.labelKey)}. ${t(row.descKey)}`}
+                  accessibilityLabel={
+                    isLocked
+                      ? t('premium.lockedModeA11y', { mode: t(row.labelKey) })
+                      : `${label}. ${t(row.descKey)}`
+                  }
                 >
                   <View style={[styles.rowIcon, isSelected && styles.rowIconSelected]}>
                     <Ionicons
@@ -143,14 +169,14 @@ export default function OnboardingBikeTypeScreen() {
                     />
                   </View>
                   <View style={styles.rowText}>
-                    <Text style={styles.rowLabel}>{t(row.labelKey)}</Text>
+                    <Text style={styles.rowLabel}>{label}</Text>
                     <Text style={styles.rowDesc}>{t(row.descKey)}</Text>
                   </View>
                   {/* Selection is never signalled by colour alone — the
                       checkmark carries it for colour-blind riders and for
                       anyone in a high-contrast mode. */}
                   <Ionicons
-                    name={isSelected ? 'checkmark-circle' : 'ellipse-outline'}
+                    name={isLocked ? 'lock-closed-outline' : isSelected ? 'checkmark-circle' : 'ellipse-outline'}
                     size={22}
                     color={isSelected ? colors.accent : colors.borderDefault}
                   />
@@ -181,6 +207,14 @@ export default function OnboardingBikeTypeScreen() {
           <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
         </Pressable>
       </View>
+
+      <PlusPaywallHost
+        visible={paywallVisible}
+        onDismiss={() => setPaywallVisible(false)}
+        source="bike_type"
+        focus="ebike"
+        coolRoutingAvailable={premium.coolRouting(riderCountry as never) !== 'country_unavailable'}
+      />
     </View>
   );
 }

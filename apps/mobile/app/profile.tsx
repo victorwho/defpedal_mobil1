@@ -17,14 +17,16 @@ import { BottomNav } from '../src/design-system/organisms/BottomNav';
 import { SettingRow } from '../src/design-system/molecules/SettingRow';
 import { Mascot } from '../src/design-system/atoms/Mascot';
 import { SectionTitle } from '../src/design-system/atoms/SectionTitle';
-import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
+import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
+import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
+import { telemetry } from '../src/lib/telemetry';
 import { usePremium } from '../src/hooks/usePremium';
 import { useTheme, type ThemeColors } from '../src/design-system';
 import { gray } from '../src/design-system/tokens/colors';
 import { fontFamily, textBase, textSm, textXs } from '../src/design-system/tokens/typography';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
-import { PLAY_STORE_URL, resolveQuizCountry, BIKE_TYPE_IDS, type QuizCountryPreference } from '@defensivepedal/core';
+import { PLAY_STORE_URL, resolveQuizCountry, BIKE_TYPE_IDS, type BikeTypeId, type QuizCountryPreference } from '@defensivepedal/core';
 import { getDeviceRegion } from '../src/i18n';
 import { mobileApi } from '../src/lib/api';
 import {
@@ -78,7 +80,7 @@ export default function ProfileScreen() {
   // entry point has no destination, and over-promising coverage is worse
   // than omitting a benefit.
   const riderCountry = useAppStore((state) => state.regionGate.countryCode);
-  const [paywallVisible, setPaywallVisible] = useState(false);
+  const [paywall, setPaywall] = useState<{ source: PaywallSource; focus?: PaywallFocus } | null>(null);
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -147,6 +149,13 @@ export default function ProfileScreen() {
   });
 
   const t = useT();
+  // E-bike is Plus-only in the bike-type picker, gated exactly like the
+  // E-bike routing mode (folds in the dark-launch gate).
+  const ebikeLocked = premium.blockEbikeRouting();
+  const bikeTypeLabel = (id: BikeTypeId): string => {
+    const label = t(BIKE_TYPE_KEYS[BIKE_TYPE_IDS.indexOf(id)]);
+    return id === 'ebike' && ebikeLocked ? t('premium.plusOnlyOption', { label }) : label;
+  };
 
   // ---------------------------------------------------------------------------
   // Consolidated store selectors (batched for performance)
@@ -192,7 +201,7 @@ export default function ProfileScreen() {
 
   // Actions - stable references, single selector with shallow comparison
   const {
-    setLocale, setBikeType, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
+    setLocale, setBikeType, selectRoutingMode, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
     setShowRouteComparison, setShareTripsPublicly, setThemePreference, setMeasurementSystem, setQuizCountryPreference, setShowMascot,
     setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
@@ -202,6 +211,7 @@ export default function ProfileScreen() {
   } = useAppStore(useShallow((state) => ({
     setLocale: state.setLocale,
     setBikeType: state.setBikeType,
+    selectRoutingMode: state.selectRoutingMode,
     setCyclingFrequency: state.setCyclingFrequency,
     setAvoidUnpaved: state.setAvoidUnpaved,
     setAvoidHills: state.setAvoidHills,
@@ -470,7 +480,7 @@ export default function ProfileScreen() {
     const active = premium.isPlus;
     return (
       <Pressable
-        onPress={() => setPaywallVisible(true)}
+        onPress={() => setPaywall({ source: 'profile' })}
         style={styles.helpFaqRow}
         accessible={true}
         accessibilityRole="button"
@@ -665,14 +675,24 @@ export default function ProfileScreen() {
 
             <DropdownPicker
               label={t('profile.bikeType')}
-              value={bikeTypeId ? t(BIKE_TYPE_KEYS[BIKE_TYPE_IDS.indexOf(bikeTypeId)]) : null}
-              options={BIKE_TYPE_KEYS.map((k) => t(k))}
+              value={bikeTypeId ? bikeTypeLabel(bikeTypeId) : null}
+              options={BIKE_TYPE_IDS.map(bikeTypeLabel)}
               onSelect={(label) => {
-                // Positional: the options array is built from BIKE_TYPE_KEYS,
-                // which is ordered to match BIKE_TYPE_IDS. Resolving by index
-                // keeps the stored value locale-independent.
-                const index = BIKE_TYPE_KEYS.findIndex((k) => t(k) === label);
-                if (index >= 0) setBikeType(BIKE_TYPE_IDS[index]);
+                // Resolved back to an id through the same labels, so the
+                // stored value stays locale-independent.
+                const id = BIKE_TYPE_IDS.find((candidate) => bikeTypeLabel(candidate) === label);
+                if (!id) return;
+                // E-bike is a Pedal Plus option: a locked rider is shown Plus
+                // instead, and their bike type is left as it was.
+                if (id === 'ebike' && ebikeLocked) {
+                  telemetry.capture('plus_locked_mode_tapped', { mode: 'ebike', screen: 'profile_bike_type' });
+                  setPaywall({ source: 'bike_type', focus: 'ebike' });
+                  return;
+                }
+                setBikeType(id);
+                // A Plus e-bike rider starts on E-bike from now on — switch
+                // straight away rather than at the next planning session.
+                if (id === 'ebike') selectRoutingMode('ebike');
               }}
               placeholder={t('profile.selectBikeType')}
             />
@@ -1264,9 +1284,10 @@ export default function ProfileScreen() {
           sheet renders its benefits without any purchase button. It is
           unreachable anyway while premium.uiEnabled is false. */}
       <PlusPaywallHost
-        visible={paywallVisible}
-        onDismiss={() => setPaywallVisible(false)}
-        source="profile"
+        visible={paywall !== null}
+        onDismiss={() => setPaywall(null)}
+        source={paywall?.source ?? 'profile'}
+        focus={paywall?.focus}
         coolRoutingAvailable={premium.coolRouting(riderCountry as never) !== 'country_unavailable'}
       />
     </View>

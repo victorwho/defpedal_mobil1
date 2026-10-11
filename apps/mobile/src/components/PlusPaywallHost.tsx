@@ -32,6 +32,7 @@ import { useAppStore } from '../store/appStore';
 /** Where the sheet was opened from. Telemetry only — never changes behaviour. */
 export type PaywallSource =
   | 'profile'
+  | 'bike_type'
   | 'locked_mode_planning'
   | 'locked_mode_preview'
   | 'modes_moved_notice'

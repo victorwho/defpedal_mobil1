@@ -61,6 +61,7 @@ import { usePremium } from '../src/hooks/usePremium';
 import { shouldSuggestEbikeAfterRide } from '../src/lib/plus-nudges';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { shouldShowSaveRidePrompt } from '../src/lib/save-ride-prompt';
+import { isRatingDue } from '../src/lib/postRideScreens';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useShareCard } from '../src/hooks/useShareCard';
 import { useShareRide } from '../src/hooks/useShareRide';
@@ -537,6 +538,30 @@ export default function FeedbackScreen() {
   }, [seedReviewInstallAtIfMissing]);
 
   const [step, setStep] = useState<FeedbackStep>('impact');
+
+  // The impact summary shows on every completed ride from ride 4 on; the
+  // rating step after it only when due (src/lib/postRideScreens.ts). Decided
+  // once on mount — `finishNavigation` has already counted this ride, so the
+  // counter IS this ride's number.
+  const markRatingPrompted = useAppStore((s) => s.markRatingPrompted);
+  const [ratingDue] = useState(() => {
+    const { completedRideCount: rideNumber, postRidePrompts } = useAppStore.getState();
+    return {
+      rideNumber,
+      due: isRatingDue(rideNumber, {
+        lastRide: postRidePrompts.ratingLastRide,
+        lastAt: postRidePrompts.ratingLastAt,
+      }),
+    };
+  });
+  const continueFromImpact = () => {
+    if (!ratingDue.due) {
+      navigateAway();
+      return;
+    }
+    markRatingPrompted(ratingDue.rideNumber);
+    setStep('rating');
+  };
   const [rideImpact, setRideImpact] = useState<RideImpact>(initialImpact);
   const [dashboard, setDashboard] = useState<ImpactDashboard | null>(null);
 
@@ -854,7 +879,7 @@ export default function FeedbackScreen() {
         {step === 'impact' ? (
           <ImpactStep
             rideImpact={rideImpact}
-            onContinue={() => setStep('rating')}
+            onContinue={continueFromImpact}
             onShare={() => void handleShareRide()}
             isSharing={shareRide.isSharing}
             styles={styles}

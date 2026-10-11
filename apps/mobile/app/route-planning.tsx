@@ -1,6 +1,6 @@
 import type { AutocompleteSuggestion, Coordinate, HazardType, ResolvedSuggestion, SavedRoute } from '@defensivepedal/core';
 import type { MeasurementSystem } from '@defensivepedal/core';
-import { formatDistance, formatElevation, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, toRoutingDisplayMode } from '@defensivepedal/core';
+import { formatDistance, formatElevation, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, isSesizareEligible, matchSavedPlaceKeyword, PERMANENT_HAZARD_DENY_THRESHOLD, PLAY_STORE_URL, defaultRoutingDisplayMode, toRoutingDisplayMode } from '@defensivepedal/core';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -57,6 +57,7 @@ import { IconButton } from '../src/design-system/atoms/IconButton';
 import { Spinner } from '../src/design-system/atoms/Spinner';
 import { PressableScale } from '../src/design-system/atoms/PressableScale';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
+import { useStoreHydrated } from '../src/hooks/useStoreHydrated';
 import { usePremium } from '../src/hooks/usePremium';
 import { usePlusNudge } from '../src/hooks/usePlusNudge';
 import { isHotDayForCool } from '../src/lib/plus-nudges';
@@ -239,6 +240,30 @@ export default function RoutePlanningScreen() {
   useEffect(() => {
     if (isEbike && !ebikeAvailable) selectRoutingMode('safe');
   }, [isEbike, ebikeAvailable, selectRoutingMode]);
+
+  // A Plus e-bike rider starts every new planning session on E-bike instead of
+  // Safe. A session starts whenever there is no destination (cold start, after
+  // a ride, after clearing it); the default is applied ONCE per session, so a
+  // mode the rider picks before choosing a destination is not overridden.
+  // Only an E-bike default is applied: everyone else keeps today's behaviour,
+  // including a persisted Flat preference.
+  const bikeTypeId = useAppStore((state) => state.bikeTypeId);
+  // Waits for the persisted store: before it loads, bike type and the Plus
+  // snapshot read as defaults and the session's one turn would be wasted.
+  const storeHydrated = useStoreHydrated();
+  const sessionDefaultAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!storeHydrated) return;
+    if (hasDestination) {
+      sessionDefaultAppliedRef.current = false;
+      return;
+    }
+    if (sessionDefaultAppliedRef.current) return;
+    sessionDefaultAppliedRef.current = true;
+    if (defaultRoutingDisplayMode(bikeTypeId, ebikeAvailable) === 'ebike') {
+      selectRoutingMode('ebike');
+    }
+  }, [storeHydrated, hasDestination, bikeTypeId, ebikeAvailable, selectRoutingMode]);
 
   // ── Pedal Plus paywall (docs/plans/pedal-plus-nudges.md) ──
   const [paywall, setPaywall] = useState<{

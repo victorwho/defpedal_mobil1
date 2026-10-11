@@ -24,6 +24,7 @@ export const Pressable = React.forwardRef(
       onPress,
       onPressIn,
       onPressOut,
+      onLongPress,
       disabled,
       accessibilityRole,
       accessibilityState,
@@ -36,6 +37,7 @@ export const Pressable = React.forwardRef(
       onPress?: () => void;
       onPressIn?: () => void;
       onPressOut?: () => void;
+      onLongPress?: () => void;
       disabled?: boolean;
       accessibilityRole?: string;
       accessibilityState?: { checked?: boolean; disabled?: boolean };
@@ -52,6 +54,8 @@ export const Pressable = React.forwardRef(
         onClick: disabled ? undefined : onPress,
         onMouseDown: disabled ? undefined : onPressIn,
         onMouseUp: disabled ? undefined : onPressOut,
+        // A long press has no DOM equivalent; tests fire it as a context menu.
+        onContextMenu: disabled ? undefined : onLongPress,
         disabled,
         role: accessibilityRole,
         'aria-checked': accessibilityState?.checked,
@@ -411,3 +415,8 @@ export type TextStyle = Record<string, unknown>;
 export type GestureResponderEvent = unknown;
 export type PanResponderGestureState = unknown;
 export type ImageSourcePropType = unknown;
+
+export const AppState = {
+  currentState: 'active',
+  addEventListener: () => ({ remove: () => {} }),
+};

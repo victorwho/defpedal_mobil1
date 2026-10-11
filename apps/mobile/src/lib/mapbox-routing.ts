@@ -21,7 +21,7 @@ import type {
   RoutePreviewResponse,
   SafeRoutingProfile,
 } from '@defensivepedal/core';
-import { describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, busyRoadMeters, isRouteSupported, parseCanopyCompareResponse, readOsrmResponse, resolveSafeRoutingProfile, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
+import { applyWalkCues, findWalkSections, toWalkSections, describeOsrmFailure, downsampleCoordinates, encodePolyline, extractRouteFeatures, haversineDistance, isHeatRoutingAvailable, isRingOutAndBack, isRiskDataAvailable, busyRoadMeters, isRouteSupported, parseCanopyCompareResponse, readOsrmResponse, resolveSafeRoutingProfile, retracedShare, ringRetracedShare, routeEdgeKeys, spurShare, splitStemAndRing, unpavedShare, usesFlatProfile, excludesUnpaved } from '@defensivepedal/core';
 import type { RouteResponse, Route, Step } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
@@ -175,6 +175,10 @@ const mapRoute = (
   locale: Locale,
 ): RouteOption => {
   const allSteps = route.legs.flatMap((leg) => leg.steps);
+  // Walk-the-bike sections come from the RAW steps, before cue folding merges
+  // the mode-change steps away (see core walkSections.ts).
+  const mappedSteps = allSteps.map((step, stepIndex) => mapStep(step, stepIndex, locale));
+  const walkSections = toWalkSections(findWalkSections(mappedSteps));
 
   return {
     id: generateRouteId(source, index),
@@ -188,7 +192,8 @@ const mapRoute = (
     durationSeconds: route.duration,
     adjustedDurationSeconds: route.duration,
     totalClimbMeters: null,
-    steps: allSteps.map((step, stepIndex) => mapStep(step, stepIndex, locale)),
+    steps: applyWalkCues(mappedSteps),
+    ...(walkSections.length > 0 ? { walkSections } : {}),
     riskSegments: [],
     // Route-feature awareness markers (tunnels, bridges, unprotected lefts).
     // OSRM safe profile populates `annotation.classes` so tunnel/bridge runs

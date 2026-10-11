@@ -1,6 +1,6 @@
 import type { RiskSegment } from '@defensivepedal/core';
 import type { MeasurementSystem } from '@defensivepedal/core';
-import { SHARE_MIN_TRIMMABLE_METERS, describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, type RoutingDisplayMode } from '@defensivepedal/core';
+import { SHARE_MIN_TRIMMABLE_METERS, describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1094,6 +1094,18 @@ function RoutePreviewScreen() {
 
           </View>
         </View>
+        {/* Walked sections (core walkSections.ts): stated, never hidden. The
+            ETA above already includes them, so nothing is added to it. */}
+        {totalWalkMeters(selectedRoute.walkSections) > 0 ? (
+          <View style={styles.walkRow}>
+            <Ionicons name="walk" size={16} color={colors.textSecondary} />
+            <Text style={styles.walkText}>
+              {t('preview.includesOnFoot', {
+                distance: formatDistance(totalWalkMeters(selectedRoute.walkSections), units),
+              })}
+            </Text>
+          </View>
+        ) : null}
         {/*
           The cycle pill skips modes this rider cannot route on, so without
           this row a free rider on a Plus mode's route would never learn it
@@ -1498,6 +1510,16 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       flexDirection: 'row',
       gap: space[2],
       marginTop: space[2],
+    },
+    walkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[1],
+      marginTop: space[2],
+    },
+    walkText: {
+      ...textSm,
+      color: colors.textSecondary,
     },
     summaryStrip: {
       flexDirection: 'row',

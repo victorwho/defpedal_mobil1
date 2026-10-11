@@ -27,6 +27,7 @@ import {
   getResolvedTripId,
   hasPendingTripStart,
   isBackoffElapsed,
+  isHeld,
   isMutationReady,
   isPermanentError,
   MAX_RETRY_COUNT,
@@ -289,6 +290,27 @@ describe('shouldSkipMutation', () => {
 
   it('does NOT skip a fresh queued hazard', () => {
     expect(shouldSkipMutation(makeMutation({ type: 'hazard' }), {}, now)).toBe(false);
+  });
+
+  it('holds a mutation until its undo window closes, then sends it', () => {
+    const held = makeMutation({ type: 'hazard', holdUntil: new Date(now + 5_000).toISOString() });
+    expect(isHeld(held, now)).toBe(true);
+    expect(shouldSkipMutation(held, {}, now)).toBe(true);
+    expect(isHeld(held, now + 5_001)).toBe(false);
+    expect(shouldSkipMutation(held, {}, now + 5_001)).toBe(false);
+  });
+
+  it('treats an unparseable hold as no hold, so a ride is never stuck', () => {
+    expect(isHeld(makeMutation({ holdUntil: 'not-a-date' }), now)).toBe(false);
+  });
+});
+
+describe('ride_impact readiness', () => {
+  it('waits for its trip_start like trip_end, and goes once the trip is mapped', () => {
+    const impact = makeMutation({ type: 'ride_impact', payload: { clientTripId: 'cli-1' } });
+    const start = makeMutation({ id: 'start-1', type: 'trip_start', payload: { clientTripId: 'cli-1' } });
+    expect(isMutationReady(impact, {}, [start, impact])).toBe(false);
+    expect(isMutationReady(impact, { 'cli-1': 'srv-1' }, [start, impact])).toBe(true);
   });
 });
 

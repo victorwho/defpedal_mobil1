@@ -1,5 +1,5 @@
 import type { QueuedMutation, QueuedMutationType } from '@defensivepedal/core';
-import type { QueuedMutationPayloadByType } from '../lib/offlineQueue';
+import type { QueuedMutationPayloadByType, QueuedTripEndPayload } from '../lib/offlineQueue';
 import { flushPersistedWrites } from '../lib/storage';
 
 export const MAX_QUEUE_SIZE = 500;
@@ -37,7 +37,22 @@ export type QueueSliceActions = {
   enqueueMutation: <TType extends QueuedMutationType>(
     type: TType,
     payload: QueuedMutationPayloadByType[TType],
+    options?: EnqueueOptions,
   ) => string;
+  /**
+   * Cancels a held ride save (see `QueuedMutation.holdUntil`): drops every
+   * not-yet-sent mutation carrying `holdKey` and re-queues the trip_end as
+   * discarded, so the trip is still closed server-side. Returns false, doing
+   * nothing, once the trip_end has started sending — too late to undo.
+   */
+  discardHeldRide: (holdKey: string) => boolean;
+  /**
+   * Ends every hold now, so held uploads send on the next flush. Called when
+   * the undo toast closes and when the app leaves the foreground — riders
+   * swipe the app away at ride end, and a hold must never outlive the moment
+   * Discard stopped being reachable.
+   */
+  releaseHeldMutations: () => void;
   markMutationSyncing: (mutationId: string) => void;
   resolveMutation: (mutationId: string) => void;
   failMutation: (mutationId: string, errorMessage: string) => void;
@@ -52,6 +67,13 @@ export type QueueSliceActions = {
     mutationIds: string[];
     queuedAt: string;
   };
+};
+
+export type EnqueueOptions = {
+  /** ISO time before which the mutation is not sent. */
+  holdUntil?: string;
+  /** Groups a held save's mutations for `discardHeldRide`. */
+  holdKey?: string;
 };
 
 export type QueueSlice = QueueSliceState & QueueSliceActions;
@@ -170,8 +192,8 @@ export const createQueueSlice = (
     };
   },
 
-  enqueueMutation: (type, payload) => {
-    const mutation = createQueuedMutationRecord(type, payload);
+  enqueueMutation: (type, payload, options) => {
+    const mutation = { ...createQueuedMutationRecord(type, payload), ...options };
 
     set((state) => {
       let nextQueue = [...state.queuedMutations, mutation];
@@ -222,6 +244,53 @@ export const createQueueSlice = (
     flushPersistedWrites();
 
     return mutation.id;
+  },
+
+  discardHeldRide: (holdKey) => {
+    const NOT_SENT = new Set(['queued', 'failed']);
+    let discarded = false;
+
+    set((state) => {
+      const held = state.queuedMutations.filter((mutation) => mutation.holdKey === holdKey);
+      const tripEnd = held.find((mutation) => mutation.type === 'trip_end');
+      if (!tripEnd || !NOT_SENT.has(tripEnd.status ?? 'queued')) return {};
+
+      const dropIds = new Set(
+        held
+          .filter((mutation) => NOT_SENT.has(mutation.status ?? 'queued'))
+          .map((mutation) => mutation.id),
+      );
+      const discardedEnd = createQueuedMutationRecord('trip_end', {
+        ...(tripEnd.payload as QueuedTripEndPayload),
+        endAction: 'discarded',
+      });
+      discarded = true;
+      return {
+        queuedMutations: [
+          ...state.queuedMutations.filter((mutation) => !dropIds.has(mutation.id)),
+          discardedEnd,
+        ],
+      };
+    });
+
+    if (discarded) flushPersistedWrites();
+    return discarded;
+  },
+
+  releaseHeldMutations: () => {
+    let released = false;
+    set((state) => {
+      if (!state.queuedMutations.some((mutation) => mutation.holdUntil)) return {};
+      released = true;
+      return {
+        queuedMutations: state.queuedMutations.map((mutation) => {
+          if (!mutation.holdUntil) return mutation;
+          const { holdUntil: _released, ...rest } = mutation;
+          return rest;
+        }),
+      };
+    });
+    if (released) flushPersistedWrites();
   },
 
   markMutationSyncing: (mutationId) =>

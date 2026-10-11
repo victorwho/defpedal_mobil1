@@ -44,6 +44,7 @@ import type {
   RouteOption,
   Step,
 } from '@defensivepedal/core';
+import { applyWalkCues, findWalkSections, toWalkSections } from '@defensivepedal/core';
 
 import { mobileEnv } from './env';
 import { hasExpoNativeModule } from './expoNativeModule';
@@ -97,10 +98,17 @@ const localiseStep = (step: NavigationStep, locale: Locale): NavigationStep => (
   ),
 });
 
-const localiseRoute = (route: RouteOption, locale: Locale): RouteOption => ({
-  ...route,
-  steps: route.steps.map((step) => localiseStep(step, locale)),
-});
+const localiseRoute = (route: RouteOption, locale: Locale): RouteOption => {
+  const steps = route.steps.map((step) => localiseStep(step, locale));
+  // Walk sections and cues are derived here, not by the server, so loops get
+  // them from the same core code as A-to-B routes without an API deploy.
+  const walkSections = route.walkSections ?? toWalkSections(findWalkSections(steps));
+  return {
+    ...route,
+    steps: applyWalkCues(steps),
+    ...(walkSections.length > 0 ? { walkSections } : {}),
+  };
+};
 
 const localiseLoop = (loop: GeneratedLoop, locale: Locale): GeneratedLoop => ({
   ...loop,
