@@ -736,6 +736,28 @@ rider feedback; three rounds of device testing (preview v0.2.161 → 163).
   contains its own street line and "then" strip — it reads like a second HUD.
   Deleting it is its own change.
 
+## Ride end, post-ride screens and walk cues (2026-10-09/11)
+
+Records: `progress.md` 2026-10-09/11, error-log #136.
+
+- ⚠️ **Skipping the post-ride screen must still record the ride's impact.**
+  `/feedback` was the only caller of `recordRideImpact`; quiet rides and early
+  stops queue a `ride_impact` mutation instead (`queueTripEnd({ recordImpact })`).
+  Any new path that ends a ride without `/feedback` needs the same, or XP,
+  badges and impact totals silently stop.
+- ⚠️ **Held uploads (`QueuedMutation.holdUntil` / `holdKey`) must be released
+  when Discard stops being reachable** — the toast closing, or the app leaving
+  the foreground (`OfflineMutationSyncManager`'s AppState listener). Riders swipe
+  the app away at ride end; a hold that outlives that reopens the ride-loss gap
+  the 2026-07-29 GPS audit closed.
+- ⚠️ **Nothing reachable from the per-GPS-fix effect in `navigation.tsx` may
+  depend on `navigationSession`** — that effect rewrites the session every fix
+  (error-log #136). Read it from `useAppStore.getState()` at call time.
+- **Walk cues fold mode-change `notification` steps into the step before them**
+  (`applyWalkCues`). Distances and geometry are summed, so navigation totals do
+  not move; do not "restore" those steps — every step is announced twice and a
+  city route can carry dozens.
+
 ## App Variants
 
 | Variant | Package | Name | How it gets JS | New Arch |

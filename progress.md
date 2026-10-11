@@ -1,11 +1,20 @@
 # Implementation Progress
 
-Last updated: 2026-10-09 (navigation: adaptive recenter button + no-dialog exit for unridden sessions; preview 0.2.183 device-confirmed)
+Last updated: 2026-10-11 (post-ride screens, change destination, E-bike as Plus, dismount guidance; 0.2.188 to Play as a draft; iOS 1.26 in review)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-09/11: five rider-facing changes, shipped to testers as preview 0.2.184 → 0.2.188 (Firebase), committed together for the next Play release.**
+  ✅ **E-bike is a Pedal Plus option** in Profile › Bike type and the onboarding bike step (locked rows open the Plus sheet, gated by `blockEbikeRouting` like the routing mode). Plus e-bike riders start every new planning session on E-bike (`defaultRoutingDisplayMode`, applied once per no-destination session after store hydration).
+  ✅ **Fewer post-ride screens** (`src/lib/postRideScreens.ts`). First 3 rides: no screen at all — saved quietly, "Ride saved" toast. From ride 4: a completed ride (arrival, or End Ride within 150 m of the destination) always shows the impact summary, the rating only when due (ride 4, then ≥5 rides AND ≥14 days apart); an early stop saves with a "Ride saved · Discard" toast and asks the reason on every 3rd early stop. The Save/Discard dialog is gone; End Ride is press-and-hold. Measured basis: 14 of 119 riders reach a 3rd saved ride; 50 of 65 ratings were 5★, 4 had text.
+  ⚠️ **The impact summary was the ONLY caller of `recordRideImpact`** (XP, badges, CO2, kcal, microlives). Skipping it required the new `ride_impact` queue mutation; early-stop saves are HELD (`holdUntil`/`holdKey`) for the Discard window and released when the toast closes or the app backgrounds.
+  ✅ **Change destination mid-ride** (flag button on the rail, `ChangeDestinationSheet`): recents/Home/Work first, search second; routed from the rider's position in their mode (Flat stays Flat), committed only on success, remaining stops dropped, green "New route to …" toast. The trip's stored destination is rewritten via trip_end `finalDestination*` — API side LIVE since 2026-10-11 (`defpedal-api-00177-nfs`, verified: a bad coordinate now 400s where the old revision 401'd).
+  ✅ **Dismount guidance** (`core/walkSections.ts`, `lib/walkCues.ts`, `WalkSectionLayer`): white dashes over walked sections, a marker on sections ≥ 40 m, "Includes X m on foot" in preview, dismount / ride-again / crossing cues on the turn card and voice. Mode-change `notification` steps are folded so 20 zebras on a route make one cue. INERT until the OSRM rebuild serves `mode: "pushing bike"` (OSRM_Server ef105ca); tests use hand-built steps until a live response can be captured.
+  ⚠️ **0.2.184 crashed on starting navigation** ("Maximum update depth exceeded") — error-log #136; fixed in 0.2.185, device-confirmed.
+  **Green at commit:** typecheck 0; core 1,438 · mobile 2,277 · API 1,214; lint ratchet clean; new logic mutation-checked.
 
 - **2026-10-09: two navigation UX changes, both device-confirmed on preview 0.2.183 (186), Firebase release `48utr0d24rn1o`.**
   ✅ **Adaptive recenter button.** If the rider moved the map by hand, the arrow button now recenters on them in one tap instead of jumping to the route overview. `followResumeKey` re-keys the follow `Camera`; the button's icon/label reflect whether the camera really follows. ⚠️ **0.2.182 shipped this DEAD** — it relied on `Camera.onUserTrackingModeChange`, which never reached JS on the bridgeless build, while the code was verifiably in the APK (error-log #135; root cause not established, no device for logcat). 0.2.183 detects the drag from raw touches (`src/components/map/mapDragGesture.ts`, 10 dp / second finger), keeping the library event as a secondary signal.
