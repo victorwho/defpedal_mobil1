@@ -748,6 +748,10 @@ export const tripEndRequestSchema = {
         null,
       ],
     },
+    // Sent only after a mid-ride destination change. The handler writes
+    // them only as a pair (submissions.ts finishTripRecord).
+    finalDestinationText: { type: 'string', minLength: 1, maxLength: 500 },
+    finalDestinationCoordinate: coordinateSchema,
   },
 } as const;
 
@@ -1123,6 +1127,13 @@ export const normalizeTripEndRequest = (body: TripEndBody): TripEndRequest => ({
   earlyEndReason: body.earlyEndReason ?? null,
   earlyEndReasonNote: body.earlyEndReasonNote ?? null,
   endAction: body.endAction ?? null,
+  // Carried only as a pair; finishTripRecord writes nothing unless both arrive.
+  ...(body.finalDestinationText && body.finalDestinationCoordinate
+    ? {
+        finalDestinationText: body.finalDestinationText.trim(),
+        finalDestinationCoordinate: body.finalDestinationCoordinate,
+      }
+    : {}),
 });
 
 export const normalizeNavigationFeedbackRequest = (

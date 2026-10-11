@@ -300,6 +300,18 @@ export const finishTripRecord = async (
         // 'abandoned' stamp when a genuinely late trip_end arrives from a
         // device that came back online.
         end_action: request.endAction ?? null,
+        // A mid-ride destination change: the trip's destination becomes the
+        // place the ride went to. Untouched otherwise — a course or loop keeps
+        // the name it started with.
+        ...(request.finalDestinationText && request.finalDestinationCoordinate
+          ? {
+              destination_text: request.finalDestinationText,
+              destination_location: toPointWkt(
+                request.finalDestinationCoordinate.lat,
+                request.finalDestinationCoordinate.lon,
+              ),
+            }
+          : {}),
       })
       .eq('id', request.tripId)
       .eq('user_id', userId);

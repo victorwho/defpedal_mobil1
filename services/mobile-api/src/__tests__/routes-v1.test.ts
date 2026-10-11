@@ -613,6 +613,53 @@ describe('POST /v1/trips/end', () => {
     await app.close();
   });
 
+  it('passes a mid-ride destination change through to finishTripRecord', async () => {
+    const finishTripRecord = vi.fn().mockResolvedValue({
+      clientTripId: 'client-trip-001',
+      tripId: 'server-trip-1',
+      acceptedAt: new Date().toISOString(),
+    });
+    const app = buildTestApp({ finishTripRecord });
+    await app.ready();
+
+    const finalDestination = {
+      finalDestinationText: '44.4270, 26.1030',
+      finalDestinationCoordinate: { lat: 44.427, lon: 26.103 },
+    };
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/end',
+      headers: authHeaders,
+      payload: { ...validTripEndBody, ...finalDestination },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(finishTripRecord).toHaveBeenCalledWith(
+      expect.objectContaining(finalDestination),
+      expect.any(String),
+    );
+
+    await app.close();
+  });
+
+  it('rejects a final destination with an invalid coordinate', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/end',
+      headers: authHeaders,
+      payload: {
+        ...validTripEndBody,
+        finalDestinationText: 'x',
+        finalDestinationCoordinate: { lat: 999, lon: 26.1 },
+      },
+    });
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
   it('rejects the server-only end action "abandoned"', async () => {
     // 'abandoned' is stamped exclusively by the stale-trip reaper — a client
     // sending it must be rejected, or a buggy build could fake reaped trips.

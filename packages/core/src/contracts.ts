@@ -593,6 +593,14 @@ export interface TripEndRequest {
    * pre-endAction clients keep working; null persists as "unknown".
    */
   endAction?: TripEndAction | null;
+  /**
+   * The destination the ride ended up heading to, sent ONLY when the rider
+   * changed destination mid-ride. Overwrites the trip's destination text and
+   * location, which feed the recent-destinations list and the feed card title.
+   * An older server strips both (removeAdditional), so a client may ship first.
+   */
+  finalDestinationText?: string;
+  finalDestinationCoordinate?: Coordinate;
 }
 
 /**
