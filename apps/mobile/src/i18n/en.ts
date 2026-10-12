@@ -60,6 +60,8 @@ export const en = {
     searchPlaceholder: 'Where to?',
     searchPlaceholderOffline: 'Connect to internet to search',
     searchStartPlaceholder: 'Search a different start point',
+    longPressSetStart: 'Or long-press the map to set your start',
+    droppedPin: 'Dropped pin',
     searchStopPlaceholder: 'Search for a stop',
     customStartLabel: 'Custom start',
     hazardDescribeTitle: 'Describe the hazard',

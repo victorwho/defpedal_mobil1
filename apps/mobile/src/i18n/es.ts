@@ -60,6 +60,8 @@ export const es: TranslationKeys = {
     searchPlaceholder: '¿A dónde vamos?',
     searchPlaceholderOffline: 'Conéctate a internet para buscar',
     searchStartPlaceholder: 'Busca otro punto de partida',
+    longPressSetStart: 'O mantén pulsado el mapa para fijar el inicio',
+    droppedPin: 'Punto en el mapa',
     searchStopPlaceholder: 'Busca una parada',
     customStartLabel: 'Salida personalizada',
     hazardDescribeTitle: 'Describe el peligro',

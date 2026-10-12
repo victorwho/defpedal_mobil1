@@ -63,6 +63,7 @@ import { usePlusNudge } from '../src/hooks/usePlusNudge';
 import { isHotDayForCool } from '../src/lib/plus-nudges';
 import { telemetry } from '../src/lib/telemetry';
 import { resolveSuggestion } from '../src/lib/mapbox-search';
+import { mapLongPressTarget } from '../src/lib/mapLongPress';
 import { mergeRecentsWithResults } from '../src/lib/search-merge';
 import { PlusPaywallHost, type PaywallSource } from '../src/components/PlusPaywallHost';
 import type { PaywallFocus } from '../src/design-system/organisms/PaywallSheet';
@@ -657,13 +658,43 @@ export default function RoutePlanningScreen() {
     }).start();
   }, [hazardPlacementMode, suggestionPlacementMode, uiCollapsed, uiOpacity]);
 
+  // A long-press drops the destination, or — while the start field is open —
+  // the start (src/lib/mapLongPress.ts). Same shape as the destination drop:
+  // a coordinate label at once, the street address when the lookup returns.
+  const setStartFromMap = async (coordinate: Coordinate) => {
+    Keyboard.dismiss();
+    setRouteRequest({ startOverride: coordinate });
+    const fallbackLabel = `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
+    setStartOverrideQuery(fallbackLabel);
+    setStartOverrideDisplay({ primary: t('planning.droppedPin'), secondary: fallbackLabel });
+    setActiveField(null);
+
+    const nonce = ++geocodeNonceRef.current;
+    try {
+      const { reverseGeocodeAddress } = await import('../src/lib/mapbox-search');
+      const result = await reverseGeocodeAddress(coordinate.lat, coordinate.lon);
+      if (result && geocodeNonceRef.current === nonce) {
+        setStartOverrideQuery(result.label);
+        setStartOverrideDisplay({
+          primary: result.primaryText,
+          secondary: result.secondaryText || splitDisplayLabel(result.label).secondary,
+        });
+      }
+    } catch {
+      // Keep the coordinate label as the fallback.
+    }
+  };
+
   const handleMapLongPress = async (coordinate: Coordinate) => {
-    // Suppress long-press shortcuts during suggestion placement
-    if (suggestionPlacementMode) return;
-    // If hazard placement FAB is active, open hazard picker
-    if (hazardPlacementMode) {
+    const target = mapLongPressTarget({ hazardPlacementMode, suggestionPlacementMode, activeField });
+    if (target === 'none') return;
+    if (target === 'hazard') {
       setPendingHazardCoordinate(coordinate);
       setHazardPickerOpen(true);
+      return;
+    }
+    if (target === 'start') {
+      await setStartFromMap(coordinate);
       return;
     }
 
@@ -1285,7 +1316,8 @@ export default function RoutePlanningScreen() {
             }
             a11yContext={{ mode: 'planning' }}
           />
-          {showLongPressHint ? (
+          {/* Wrong while the start field is open — a long-press sets the start then. */}
+          {showLongPressHint && activeField !== 'startOverride' ? (
             <View style={styles.longPressHint} pointerEvents="none">
               <Ionicons name="hand-left-outline" size={14} color="white" />
               <Text style={styles.longPressHintText}>Longpress to set as destination</Text>
@@ -1367,6 +1399,12 @@ export default function RoutePlanningScreen() {
                   void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
                 }
               />
+              {/* Inside the card, not over the map: the keyboard covers the
+                  bottom of the map while this field is open. */}
+              <View style={styles.startMapHint}>
+                <Ionicons name="hand-left-outline" size={14} color={colors.textSecondary} />
+                <Text style={styles.startMapHintText}>{t('planning.longPressSetStart')}</Text>
+              </View>
               <Pressable
                 style={styles.cancelButton}
                 onPress={() => setActiveField(null)}
@@ -2821,6 +2859,18 @@ const createThemedStyles = (colors: ThemeColors) =>
     longPressHintText: {
       ...textXs,
       color: 'white',
+      fontFamily: fontFamily.body.medium,
+    },
+    startMapHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      marginTop: space[2],
+    },
+    startMapHintText: {
+      ...textXs,
+      flex: 1,
+      color: colors.textSecondary,
       fontFamily: fontFamily.body.medium,
     },
 

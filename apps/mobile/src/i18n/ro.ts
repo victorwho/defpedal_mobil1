@@ -60,6 +60,8 @@ export const ro: TranslationKeys = {
     searchPlaceholder: 'Unde mergem?',
     searchPlaceholderOffline: 'Conectează-te la internet pentru a căuta',
     searchStartPlaceholder: 'Caută alt punct de plecare',
+    longPressSetStart: 'Sau ține apăsat pe hartă pentru a seta punctul de plecare',
+    droppedPin: 'Punct pe hartă',
     searchStopPlaceholder: 'Caută o oprire',
     customStartLabel: 'Plecare personalizată',
     hazardDescribeTitle: 'Descrie pericolul',
