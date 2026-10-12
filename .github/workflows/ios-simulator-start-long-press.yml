@@ -1,0 +1,98 @@
+# Runs the start-point long-press check (.maestro/start-long-press.yaml) on an
+# iOS simulator, on a free macOS runner (the repo is public). Same shape as
+# ios-simulator-keyboard.yml; this one signs in, with the App Review demo
+# account held in the DEMO_EMAIL / DEMO_PASSWORD repository secrets.
+#
+# The app is NOT built here: pass the download URL of an EAS simulator build
+# (`eas build -p ios --profile ios-simulator`, a .tar.gz). That keeps this job
+# free of Expo credentials.
+name: iOS simulator start long-press check
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: EAS simulator build URL (.tar.gz)
+        required: true
+      label:
+        description: Name for the artifact (e.g. fix, control)
+        required: true
+        default: build
+
+permissions:
+  contents: read
+
+jobs:
+  simulator:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Download the simulator build
+        env:
+          APP_URL: ${{ inputs.app_url }}
+        run: |
+          curl -fsSL "$APP_URL" -o app.tar.gz
+          mkdir -p app && tar -xzf app.tar.gz -C app
+          APP_PATH="$(find app -maxdepth 4 -name '*.app' -type d | head -1)"
+          test -n "$APP_PATH" || { echo "no .app in the archive"; exit 1; }
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Boot an iPhone with the on-screen keyboard enabled
+        run: |
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = [d for runtime in json.load(sys.stdin)["devices"].values() for d in runtime]
+          phones = [d for d in devices if d["name"].startswith("iPhone 16")] or [d for d in devices if d["name"].startswith("iPhone")]
+          print(phones[0]["udid"])')"
+          echo "UDID=$UDID" >> "$GITHUB_ENV"
+          # A connected hardware keyboard hides the software one; force it off
+          # both globally and for this device, before it boots.
+          defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool false
+          /usr/libexec/PlistBuddy -c "Add :DevicePreferences:$UDID:ConnectHardwareKeyboard bool false" \
+            ~/Library/Preferences/com.apple.iphonesimulator.plist 2>/dev/null || \
+          /usr/libexec/PlistBuddy -c "Set :DevicePreferences:$UDID:ConnectHardwareKeyboard false" \
+            ~/Library/Preferences/com.apple.iphonesimulator.plist
+          xcrun simctl boot "$UDID"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP_PATH"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Run the start long-press flow
+        # `shell: bash` turns on pipefail: without it `| tee` reports tee's
+        # exit code and a failed flow shows as a green job.
+        shell: bash
+        env:
+          DEMO_EMAIL: ${{ secrets.DEMO_EMAIL }}
+          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+        run: |
+          mkdir -p out
+          cd out
+          maestro test ../.maestro/start-long-press.yaml             -e DEMO_EMAIL="$DEMO_EMAIL" -e DEMO_PASSWORD="$DEMO_PASSWORD"             --debug-output debug 2>&1 | tee maestro.log
+
+      - name: Collect screenshots and the recording
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p out/screens
+          # Maestro writes them next to the flow or the working directory
+          # depending on version; gather from anywhere in the checkout.
+          find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/out/screens" -prune -o             -path "$GITHUB_WORKSPACE/app" -prune -o             \( -name '0*.png' -o -name 'start-long-press*.mp4' \) -type f -print             -exec cp {} out/screens/ \;
+          ls -la out/screens
+
+      # Screenshots and the recording ONLY. Maestro's log and debug output can
+      # carry the typed password in clear, and artifacts of a public repo are
+      # downloadable by anyone — Actions masks secrets in the job log, never
+      # inside an uploaded file.
+      - name: Upload screenshots and recording
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: start-long-press-${{ inputs.label }}
+          path: out/screens
