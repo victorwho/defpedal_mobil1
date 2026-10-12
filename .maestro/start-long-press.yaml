@@ -97,8 +97,10 @@ appId: com.defensivepedal.mobile
 - takeScreenshot: 06-start-field-open
 
 # ── 3. Long-press now drops the START ──────────────────────────────────────
+# The open start card and the mode pills cover most of the map; this band
+# sits between the pills and the Preview route button.
 - longPressOn:
-    point: "30%,80%"
+    point: "45%,78%"
 - extendedWaitUntil:
     visible: "(?i)from · custom start"
     timeout: 20000

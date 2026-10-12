@@ -14,6 +14,14 @@ on:
       app_url:
         description: EAS simulator build URL (.tar.gz)
         required: true
+  # Dispatch only works once a workflow is on main; until then a push to the
+  # feature branch runs it, against the build in the START_LONG_PRESS_APP_URL
+  # repository variable.
+  push:
+    branches: [feat/start-long-press]
+    paths:
+      - .maestro/start-long-press.yaml
+      - .github/workflows/ios-simulator-start-long-press.yml
       label:
         description: Name for the artifact (e.g. fix, control)
         required: true
@@ -36,7 +44,7 @@ jobs:
 
       - name: Download the simulator build
         env:
-          APP_URL: ${{ inputs.app_url }}
+          APP_URL: ${{ inputs.app_url || vars.START_LONG_PRESS_APP_URL }}
         run: |
           curl -fsSL "$APP_URL" -o app.tar.gz
           mkdir -p app && tar -xzf app.tar.gz -C app
@@ -94,5 +102,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: start-long-press-${{ inputs.label }}
+          name: start-long-press-${{ inputs.label || github.sha }}
           path: out/screens
