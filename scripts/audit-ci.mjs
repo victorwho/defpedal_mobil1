@@ -36,6 +36,10 @@ const ALLOWLIST = {
     'postcss — arbitrary file read via attacker-controlled sourceMappingURL in CSS comments. next pins postcss EXACTLY at 8.4.31 (no in-range fix; npm suggests a next downgrade to 9.x, nonsense). PostCSS runs at BUILD time processing only our own first-party CSS — the advisory requires processing attacker-controlled CSS, which never happens; the compiled site ships no postcss. Re-review when next is bumped past its exact pin.',
   'GHSA-r28c-9q8g-f849':
     'postcss — path traversal via previous-source-map auto-loading (sourceMappingURL). Same pinned next->postcss@8.4.31 build-time path and same reasoning as GHSA-6g55-p6wh-862q: only first-party CSS is ever processed, nothing ships. Re-review when next is bumped past its exact pin.',
+  'GHSA-86w9-cpqp-85rv':
+    'node-forge — lenient RSA PKCS#1 v1.5 signature verification (extra nested DigestAlgorithm). No fixed release exists (1.4.0 is the latest, 2026-10-12). Pulled only by Node-side Expo tooling: @expo/cli and expo-updates -> @expo/code-signing-certificates, which sign and check update manifests at build/publish time. This app configures no update code signing, and on-device verification would be native code, not node-forge. Verified absent from both shipped bundles (Android index.android.bundle and iOS main.jsbundle of 2026-10-12: zero "node-forge"/"forge.pki"). Re-review when a fixed node-forge or the next Expo SDK lands.',
+  'GHSA-vfj7-8cjw-p6xm':
+    'braces — stack-exhaustion DoS on deeply nested brace patterns. No fixed release exists (3.0.3 is the latest, 2026-10-12). Sole path is patch-package -> find-yarn-workspace-root -> micromatch -> braces, run at INSTALL time over our own committed patch files; nothing ships and no untrusted pattern ever reaches it. ("braces" strings in the shipped bundles are icon-font glyph names such as code-braces, not this package.) Re-review when braces publishes a fix.',
 };
 
 // Use a shell command string so npm resolves on every platform (npm vs
