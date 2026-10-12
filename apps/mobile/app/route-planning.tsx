@@ -664,7 +664,7 @@ export default function RoutePlanningScreen() {
   const setStartFromMap = async (coordinate: Coordinate) => {
     Keyboard.dismiss();
     setRouteRequest({ startOverride: coordinate });
-    const fallbackLabel = `${coordinate.lat.toFixed(4)}, ${coordinate.lon.toFixed(4)}`;
+    const fallbackLabel = formatCoordinateLabel(coordinate);
     setStartOverrideQuery(fallbackLabel);
     setStartOverrideDisplay({ primary: t('planning.droppedPin'), secondary: fallbackLabel });
     setActiveField(null);
@@ -1265,11 +1265,16 @@ export default function RoutePlanningScreen() {
   // when the screen re-enters with an existing override (e.g. after returning
   // from route-preview). Without this, the edit input would render empty when
   // the user taps the pencil, even though the override is active.
+  // The coordinate placeholder is replaced too: on a relaunch it is seeded
+  // before the address lookup returns, and left there it is what the field
+  // searches — /suggest rejects coordinates with a 400.
   useEffect(() => {
-    if (customStartLabel && startOverrideQuery === '') {
+    if (!customStartLabel || !routeRequest.startOverride) return;
+    const placeholder = formatCoordinateLabel(routeRequest.startOverride);
+    if (startOverrideQuery === '' || (startOverrideQuery === placeholder && customStartLabel !== placeholder)) {
       setStartOverrideQuery(customStartLabel);
     }
-  }, [customStartLabel, startOverrideQuery]);
+  }, [customStartLabel, routeRequest.startOverride, startOverrideQuery]);
 
   const handleTabPress = (tab: TabKey) => {
     if (tab === 'history') router.push('/history');
@@ -1400,19 +1405,22 @@ export default function RoutePlanningScreen() {
                 }
               />
               {/* Inside the card, not over the map: the keyboard covers the
-                  bottom of the map while this field is open. */}
+                  bottom of the map while this field is open. Shares Cancel's
+                  row so the card grows no taller, and Cancel leads the row:
+                  the open card reaches down into the map's button column,
+                  which covered a right-aligned Cancel. */}
               <View style={styles.startMapHint}>
+                <Pressable
+                  style={styles.cancelButton}
+                  onPress={() => setActiveField(null)}
+                  accessibilityLabel="Cancel editing start point"
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.cancelButtonLabel}>Cancel</Text>
+                </Pressable>
                 <Ionicons name="hand-left-outline" size={14} color={colors.textSecondary} />
                 <Text style={styles.startMapHintText}>{t('planning.longPressSetStart')}</Text>
               </View>
-              <Pressable
-                style={styles.cancelButton}
-                onPress={() => setActiveField(null)}
-                accessibilityLabel="Cancel editing start point"
-                accessibilityRole="button"
-              >
-                <Text style={styles.cancelButtonLabel}>Cancel</Text>
-              </Pressable>
             </View>
           ) : (
             /* Normal origin display — collapsed pill */

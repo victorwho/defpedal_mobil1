@@ -796,7 +796,9 @@ export const reverseGeocodeAddress = async (
     longitude: String(lon),
     latitude: String(lat),
     access_token: token,
-    types: 'address,poi,place',
+    // Geocoding v6 has no 'poi' type: asking for it is a 422, which left every
+    // long-pressed pin labelled "Dropped pin" since the feature shipped.
+    types: 'address,street,place',
     limit: '1',
   });
 

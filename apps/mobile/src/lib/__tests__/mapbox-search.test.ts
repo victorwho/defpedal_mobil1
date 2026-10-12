@@ -10,6 +10,8 @@ import {
   mapboxAutocomplete,
   mapboxReverseGeocode,
   mapboxGetCoverage,
+  reverseGeocodeAddress,
+  reverseGeocodeAddressWithCountry,
   resolveSuggestion,
 } from '../mapbox-search';
 
@@ -602,6 +604,27 @@ describe('mapboxReverseGeocode', () => {
     const fetchCall = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(fetchCall).toContain('language=pt');
     expect(fetchCall).toContain('country=BR');
+  });
+});
+
+// Geocoding v6 answers an unknown type with HTTP 422 (verified live
+// 2026-10-12: "Type \"poi\" is not a known type"), which callers read as
+// "no address" — so a bad type fails silently.
+const GEOCODE_V6_TYPES = new Set([
+  'country', 'region', 'postcode', 'district', 'place', 'locality',
+  'neighborhood', 'street', 'block', 'address', 'secondary_address',
+]);
+
+describe('geocoding v6 reverse requests use only v6 types', () => {
+  it.each([
+    ['reverseGeocodeAddress', reverseGeocodeAddress],
+    ['reverseGeocodeAddressWithCountry', reverseGeocodeAddressWithCountry],
+  ])('%s', async (_name, fn) => {
+    mockFetchResponse({ type: 'FeatureCollection', features: [] });
+    await fn(44.3993, 26.0925);
+    const url = new URL(vi.mocked(fetch).mock.calls[0][0] as string);
+    const types = (url.searchParams.get('types') ?? '').split(',');
+    expect(types.filter((type) => !GEOCODE_V6_TYPES.has(type))).toEqual([]);
   });
 });
 
