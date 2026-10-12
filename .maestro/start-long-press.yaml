@@ -90,7 +90,9 @@ appId: com.defensivepedal.mobile
 - takeScreenshot: 05-destination-dropped
 
 # ── 2. Open the start field: the hint shows, Cancel is reachable ───────────
-- tapOn: "(?i)from · current location"
+# The pencil on the origin card (it has no accessibility label to tap by).
+- tapOn:
+    point: "89%,11%"
 - extendedWaitUntil:
     visible: "Or long-press the map to set your start"
     timeout: 10000
