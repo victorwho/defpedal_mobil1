@@ -14,6 +14,10 @@ on:
       app_url:
         description: EAS simulator build URL (.tar.gz)
         required: true
+      label:
+        description: Name for the artifact (e.g. fix, control)
+        required: true
+        default: build
   # Dispatch only works once a workflow is on main; until then a push to the
   # feature branch runs it, against the build in the START_LONG_PRESS_APP_URL
   # repository variable.
@@ -22,10 +26,6 @@ on:
     paths:
       - .maestro/start-long-press.yaml
       - .github/workflows/ios-simulator-start-long-press.yml
-      label:
-        description: Name for the artifact (e.g. fix, control)
-        required: true
-        default: build
 
 permissions:
   contents: read
