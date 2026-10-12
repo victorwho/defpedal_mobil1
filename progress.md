@@ -7,6 +7,8 @@ Update it at the end of each implementation slice.
 
 ## Snapshot
 
+- **2026-10-12: dependency security fixes LIVE on the API — Cloud Run `defpedal-api-00178-2xr`** (main `3122da4`, image `sha256:bdb972eb…` cross-checked against tag `build-ad854f85…`, fastify 5.12.5 read from the image itself; previous revision `00177-nfs` is the rollback). CI security audit red since 2026-10-11 from 14 newly published advisories, four of them in fastify (auth bypass via malformed URLs, validation bypasses). Fixed by in-range bumps (fastify, undici, compression, source-map-js, brace-expansion), raising the `shell-quote` override 1.10.0 -> 1.12.0 and `sharp` to ^0.35.5; node-forge and braces have no fixed release and are allowlisted in `scripts/audit-ci.mjs` with verified reasons (build/install tooling only, absent from both shipped bundles). Smoke-tested every recent route post-deploy; CI green.
+
 - **2026-10-12: long-press the map to set the START** (route-planning, `lib/mapLongPress.ts`). With the start field open, a long-press drops the start instead of the destination; a hint in the start card says so. Tested on an Android 15 emulator and an iPhone simulator (GitHub macOS runner, `.github/workflows/ios-simulator-start-long-press.yml`, demo account from the `DEMO_EMAIL`/`DEMO_PASSWORD` secrets).
   ⚠️ **Testing found that NO dropped pin had ever resolved to an address**: `reverseGeocodeAddress` asked Geocoding v6 for type `poi`, which v6 rejects with HTTP 422, so every long-pressed destination since `7067f93` stayed "Dropped pin". Fixed, with a test against v6's type list.
   Also fixed: after a relaunch the start field kept the coordinate placeholder and searched it, printing Mapbox's raw 400 to the rider; Cancel was hidden behind the map's button column.
