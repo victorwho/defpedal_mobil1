@@ -7,6 +7,11 @@ Update it at the end of each implementation slice.
 
 ## Snapshot
 
+- **2026-10-12: long-press the map to set the START** (route-planning, `lib/mapLongPress.ts`). With the start field open, a long-press drops the start instead of the destination; a hint in the start card says so. Tested on an Android 15 emulator and an iPhone simulator (GitHub macOS runner, `.github/workflows/ios-simulator-start-long-press.yml`, demo account from the `DEMO_EMAIL`/`DEMO_PASSWORD` secrets).
+  ⚠️ **Testing found that NO dropped pin had ever resolved to an address**: `reverseGeocodeAddress` asked Geocoding v6 for type `poi`, which v6 rejects with HTTP 422, so every long-pressed destination since `7067f93` stayed "Dropped pin". Fixed, with a test against v6's type list.
+  Also fixed: after a relaunch the start field kept the coordinate placeholder and searched it, printing Mapbox's raw 400 to the rider; Cancel was hidden behind the map's button column.
+  **Open:** on Android the email sign-in/signup form sits under the keyboard — the `71ab6e0` keyboard fix is iOS-only (`automaticallyAdjustKeyboardInsets`), and edge-to-edge makes `adjustResize` inert (error-log #105).
+
 - **2026-10-09/11: five rider-facing changes, shipped to testers as preview 0.2.184 → 0.2.188 (Firebase), committed together for the next Play release.**
   ✅ **E-bike is a Pedal Plus option** in Profile › Bike type and the onboarding bike step (locked rows open the Plus sheet, gated by `blockEbikeRouting` like the routing mode). Plus e-bike riders start every new planning session on E-bike (`defaultRoutingDisplayMode`, applied once per no-destination session after store hydration).
   ✅ **Fewer post-ride screens** (`src/lib/postRideScreens.ts`). First 3 rides: no screen at all — saved quietly, "Ride saved" toast. From ride 4: a completed ride (arrival, or End Ride within 150 m of the destination) always shows the impact summary, the rating only when due (ride 4, then ≥5 rides AND ≥14 days apart); an early stop saves with a "Ride saved · Discard" toast and asks the reason on every 3rd early stop. The Save/Discard dialog is gone; End Ride is press-and-hold. Measured basis: 14 of 119 riders reach a 3rd saved ride; 50 of 65 ratings were 5★, 4 had text.
