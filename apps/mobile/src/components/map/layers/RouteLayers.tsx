@@ -29,7 +29,11 @@ const selectedFilter: any = ['==', ['get', 'selected'], true];
 type RouteLayersProps = {
   routeFeatureCollection: any;
   riskFeatureCollection: any;
+  /** Tapping a risk-coloured stretch: the legend lives on the line it explains. */
+  onRiskSegmentPress?: () => void;
 };
+
+const RISK_HITBOX = { width: 28, height: 28 };
 
 /**
  * Renders route alternative lines (unselected gray, selected accent) and
@@ -44,6 +48,7 @@ type RouteLayersProps = {
 const RouteLayersInner = ({
   routeFeatureCollection,
   riskFeatureCollection,
+  onRiskSegmentPress,
 }: RouteLayersProps) => {
   const reducedMotion = useReducedMotion();
   const [opacityRamp, setOpacityRamp] = useState(reducedMotion ? 1 : 0);
@@ -117,7 +122,13 @@ const RouteLayersInner = ({
       ) : null}
 
       {riskFeatureCollection.features.length > 0 ? (
-        <Mapbox.ShapeSource id="risk-segments" shape={riskFeatureCollection}>
+        <Mapbox.ShapeSource
+          id="risk-segments"
+          shape={riskFeatureCollection}
+          onPress={onRiskSegmentPress}
+          // The line is 5 px wide; a finger is not.
+          hitbox={onRiskSegmentPress ? RISK_HITBOX : undefined}
+        >
           <Mapbox.LineLayer id="risk-segments-layer" style={riskSegmentStyle} />
         </Mapbox.ShapeSource>
       ) : null}

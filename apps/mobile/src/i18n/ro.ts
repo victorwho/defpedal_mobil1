@@ -60,7 +60,8 @@ export const ro: TranslationKeys = {
     searchPlaceholder: 'Unde mergem?',
     searchPlaceholderOffline: 'Conectează-te la internet pentru a căuta',
     searchStartPlaceholder: 'Caută alt punct de plecare',
-    longPressSetStart: 'Sau ține apăsat pe hartă pentru a seta punctul de plecare',
+    chooseOnMap: 'Alege pe hartă',
+    setStartHere: 'Pornește de aici',
     droppedPin: 'Punct pe hartă',
     searchStopPlaceholder: 'Caută o oprire',
     customStartLabel: 'Plecare personalizată',
@@ -1166,7 +1167,7 @@ export const ro: TranslationKeys = {
   weatherWarning: {
     title: 'Avertizare meteo',
     subtitle: 'Fii atent și pedalează cu grijă.',
-    startAnyway: 'Pornește oricum',
+    dismiss: 'Am înțeles',
     rain: 'Probabilitate mare de ploaie mai târziu ({{percent}}%) — ia echipament și pedalează cu grijă',
     cold: 'Frig: {{temp}}°C — îmbracă-te gros și pedalează cu grijă',
     hot: 'Cald: {{temp}}°C — hidratează-te și pedalează cu grijă',

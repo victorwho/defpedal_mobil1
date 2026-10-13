@@ -60,7 +60,8 @@ export const es: TranslationKeys = {
     searchPlaceholder: '¿A dónde vamos?',
     searchPlaceholderOffline: 'Conéctate a internet para buscar',
     searchStartPlaceholder: 'Busca otro punto de partida',
-    longPressSetStart: 'O mantén pulsado el mapa para fijar el inicio',
+    chooseOnMap: 'Elegir en el mapa',
+    setStartHere: 'Empezar aquí',
     droppedPin: 'Punto en el mapa',
     searchStopPlaceholder: 'Busca una parada',
     customStartLabel: 'Salida personalizada',
@@ -1166,7 +1167,7 @@ export const es: TranslationKeys = {
   weatherWarning: {
     title: 'Aviso meteorológico',
     subtitle: 'Mantente alerta y rueda con precaución.',
-    startAnyway: 'Empezar de todos modos',
+    dismiss: 'Entendido',
     rain: 'Alta probabilidad de lluvia más tarde ({{percent}}%) — lleva ropa de lluvia y rueda con precaución',
     cold: 'Frío: {{temp}}°C — abrígate y rueda con precaución',
     hot: 'Calor: {{temp}}°C — hidrátate y rueda con precaución',

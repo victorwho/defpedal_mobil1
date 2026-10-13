@@ -234,10 +234,9 @@ function RoutePreviewScreen() {
     routeRequest ? { lat: routeRequest.destination.lat, lon: routeRequest.destination.lon } : null,
     poiVisibility,
   );
-  const { warnings: weatherWarnings } = useWeather(
-    routeRequest.origin.lat,
-    routeRequest.origin.lon,
-  );
+  // Weather where the ride STARTS: a custom start can be far from the rider's GPS.
+  const weatherOrigin = getPreviewOrigin(routeRequest);
+  const { warnings: weatherWarnings } = useWeather(weatherOrigin.lat, weatherOrigin.lon);
   const [weatherWarningDismissed, setWeatherWarningDismissed] = useState(false);
   const weatherWarningSeenThisSession = useAppStore((state) => state.weatherWarningSeenThisSession);
   const markWeatherWarningSeen = useAppStore((state) => state.markWeatherWarningSeen);
@@ -961,6 +960,7 @@ function RoutePreviewScreen() {
           showBicycleLanes
           poiVisibility={poiVisibility}
           a11yContext={{ mode: 'planning' }}
+          onRiskSegmentPress={() => setRiskExplainerVisible(true)}
         />
       }
       topOverlay={topOverlay}

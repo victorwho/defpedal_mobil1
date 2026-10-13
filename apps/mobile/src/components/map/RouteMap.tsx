@@ -99,6 +99,7 @@ export const RouteMap = ({
   plannedRouteColor = safetyColors.safe,
   plannedRouteRiskSegments,
   onMapTap,
+  onRiskSegmentPress,
   onMapLongPress,
   crosshairMode = null,
   hazardPlacementMode = false,
@@ -413,6 +414,7 @@ export const RouteMap = ({
         <RouteLayers
           routeFeatureCollection={routeFeatureCollection}
           riskFeatureCollection={riskFeatureCollection}
+          onRiskSegmentPress={onRiskSegmentPress}
         />
 
         <WalkSectionLayer walkSections={selectedRoute?.route.walkSections} />

@@ -78,7 +78,7 @@ import { gray } from '../src/design-system/tokens/colors';
 import { layout, space } from '../src/design-system/tokens/spacing';
 import { radii } from '../src/design-system/tokens/radii';
 import { shadows } from '../src/design-system/tokens/shadows';
-import { fontFamily, textXs } from '../src/design-system/tokens/typography';
+import { fontFamily, textSm, textXs } from '../src/design-system/tokens/typography';
 import { duration, easing } from '../src/design-system/tokens/motion';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
 import { zIndex } from '../src/design-system/tokens/zIndex';
@@ -434,6 +434,9 @@ export default function RoutePlanningScreen() {
   // toggle handlers below force-off the other mode). Shares mapCenterCoordinate
   // since both crosshair modes track the same camera center.
   const [suggestionPlacementMode, setSuggestionPlacementMode] = useState(false);
+  // "Choose on map" for the start: the open start editor leaves too little map
+  // to aim a long-press, so this hides the chrome and pins the map centre.
+  const [startPickMode, setStartPickMode] = useState(false);
   const [suggestionDialogVisible, setSuggestionDialogVisible] = useState(false);
   const [pendingSuggestionCoordinate, setPendingSuggestionCoordinate] =
     useState<Coordinate | null>(null);
@@ -647,7 +650,7 @@ export default function RoutePlanningScreen() {
 
   const handleMapTap = useCallback(() => {
     // Don't toggle UI while in any crosshair placement mode
-    if (hazardPlacementMode || suggestionPlacementMode) return;
+    if (hazardPlacementMode || suggestionPlacementMode || startPickMode) return;
     const next = !uiCollapsed;
     setUiCollapsed(next);
     Animated.timing(uiOpacity, {
@@ -656,7 +659,7 @@ export default function RoutePlanningScreen() {
       easing: easing.default,
       useNativeDriver: true,
     }).start();
-  }, [hazardPlacementMode, suggestionPlacementMode, uiCollapsed, uiOpacity]);
+  }, [hazardPlacementMode, suggestionPlacementMode, startPickMode, uiCollapsed, uiOpacity]);
 
   // A long-press drops the destination, or — while the start field is open —
   // the start (src/lib/mapLongPress.ts). Same shape as the destination drop:
@@ -686,6 +689,7 @@ export default function RoutePlanningScreen() {
   };
 
   const handleMapLongPress = async (coordinate: Coordinate) => {
+    if (startPickMode) return;
     const target = mapLongPressTarget({ hazardPlacementMode, suggestionPlacementMode, activeField });
     if (target === 'none') return;
     if (target === 'hazard') {
@@ -1308,14 +1312,16 @@ export default function RoutePlanningScreen() {
             onMapTap={handleMapTap}
             onMapLongPress={handleMapLongPress}
             crosshairMode={
-              suggestionPlacementMode
+              startPickMode
+                ? 'start'
+                : suggestionPlacementMode
                 ? 'suggestion'
                 : hazardPlacementMode
                   ? 'hazard'
                   : null
             }
             onCenterChange={
-              hazardPlacementMode || suggestionPlacementMode
+              hazardPlacementMode || suggestionPlacementMode || startPickMode
                 ? setMapCenterCoordinate
                 : undefined
             }
@@ -1331,6 +1337,7 @@ export default function RoutePlanningScreen() {
         </View>
       }
       topOverlay={
+        startPickMode ? null : (
         <View style={styles.topContainer}>
           {/* Offline banner — shown when not connected */}
           <OfflineBanner
@@ -1418,8 +1425,20 @@ export default function RoutePlanningScreen() {
                 >
                   <Text style={styles.cancelButtonLabel}>Cancel</Text>
                 </Pressable>
-                <Ionicons name="hand-left-outline" size={14} color={colors.textSecondary} />
-                <Text style={styles.startMapHintText}>{t('planning.longPressSetStart')}</Text>
+                <Pressable
+                  style={styles.chooseOnMapButton}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setActiveField(null);
+                    // A centre left over from a hazard placement would be stale.
+                    setMapCenterCoordinate(null);
+                    setStartPickMode(true);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="map-outline" size={16} color={colors.accent} />
+                  <Text style={styles.chooseOnMapLabel}>{t('planning.chooseOnMap')}</Text>
+                </Pressable>
               </View>
             </View>
           ) : (
@@ -1811,8 +1830,10 @@ export default function RoutePlanningScreen() {
             )
           ) : null}
         </View>
+        )
       }
       rightOverlay={
+        startPickMode ? null : (
         <Animated.View style={[styles.fabColumn, { opacity: uiOpacity }]} pointerEvents={uiCollapsed ? 'none' : 'auto'}>
           <PressableScale
             style={styles.fabButton}
@@ -1903,9 +1924,29 @@ export default function RoutePlanningScreen() {
             </PressableScale>
           ) : null}
         </Animated.View>
+        )
       }
       footer={
-        suggestionPlacementMode ? (
+        startPickMode ? (
+          <View style={styles.hazardPlacementFooter}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={!mapCenterCoordinate}
+              onPress={() => {
+                if (!mapCenterCoordinate) return;
+                setStartPickMode(false);
+                void setStartFromMap(mapCenterCoordinate);
+              }}
+            >
+              {t('planning.setStartHere')}
+            </Button>
+            <Button variant="ghost" size="md" onPress={() => setStartPickMode(false)}>
+              {t('common.cancel')}
+            </Button>
+          </View>
+        ) : suggestionPlacementMode ? (
           <View style={styles.hazardPlacementFooter}>
             <Button
               variant="primary"
@@ -1965,7 +2006,7 @@ export default function RoutePlanningScreen() {
         ) : null
       }
     />
-    <BottomNav activeTab="map" onTabPress={handleTabPress} hidden={uiCollapsed} />
+    <BottomNav activeTab="map" onTabPress={handleTabPress} hidden={uiCollapsed || startPickMode} />
 
     {/* "Show nearby" quick-pick sheet */}
     <NearbySheet
@@ -2874,6 +2915,18 @@ const createThemedStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       gap: space[2],
       marginTop: space[2],
+    },
+    chooseOnMapButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      minHeight: 44,
+    },
+    chooseOnMapLabel: {
+      ...textSm,
+      color: colors.accent,
+      fontFamily: fontFamily.body.bold,
     },
     startMapHintText: {
       ...textXs,

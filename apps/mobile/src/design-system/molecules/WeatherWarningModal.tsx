@@ -49,7 +49,7 @@ export const WeatherWarningModal = ({
           <Text style={styles.subtitle}>{t('weatherWarning.subtitle')}</Text>
 
           <Pressable style={styles.button} onPress={onDismiss}>
-            <Text style={styles.buttonText}>{t('weatherWarning.startAnyway')}</Text>
+            <Text style={styles.buttonText}>{t('weatherWarning.dismiss')}</Text>
           </Pressable>
         </View>
       </View>

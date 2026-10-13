@@ -60,7 +60,8 @@ export const en = {
     searchPlaceholder: 'Where to?',
     searchPlaceholderOffline: 'Connect to internet to search',
     searchStartPlaceholder: 'Search a different start point',
-    longPressSetStart: 'Or long-press the map to set your start',
+    chooseOnMap: 'Choose on map',
+    setStartHere: 'Set start here',
     droppedPin: 'Dropped pin',
     searchStopPlaceholder: 'Search for a stop',
     customStartLabel: 'Custom start',
@@ -1207,7 +1208,7 @@ export const en = {
   weatherWarning: {
     title: 'Weather Warning',
     subtitle: 'Stay alert and ride with caution.',
-    startAnyway: 'Start anyway',
+    dismiss: 'Got it',
     // Individual warning messages
     rain: 'High chance of rain later today ({{percent}}%) — pack rain gear and ride with caution',
     cold: 'Cold conditions: {{temp}}°C — dress warmly and ride with caution',

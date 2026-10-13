@@ -35,7 +35,7 @@ export type RouteMapA11yContext =
       suppressHazardLive?: boolean;
     };
 
-export type CrosshairMode = 'hazard' | 'suggestion' | null;
+export type CrosshairMode = 'hazard' | 'suggestion' | 'start' | null;
 
 export type PoiVisibility = {
   hydration: boolean;
@@ -92,6 +92,8 @@ export type RouteMapProps = {
   plannedRouteRiskSegments?: readonly RiskSegment[];
   /** Called when user taps the map (used for hazard placement) */
   onMapTap?: (coordinate: Coordinate) => void;
+  /** Called when the user taps a risk-coloured route stretch (opens the legend). */
+  onRiskSegmentPress?: () => void;
   /** Called when user long-presses the map (used for armchair hazard reporting) */
   onMapLongPress?: (coordinate: Coordinate) => void;
   /**
