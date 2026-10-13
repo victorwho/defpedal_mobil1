@@ -14,7 +14,8 @@ import {
   fixMyStreetExpiresAt,
   resolveFixMyStreetMapping,
 } from './mappings/fixmystreet';
-import { planReseenClosures } from './run';
+import { fixMyStreetAdapter } from './adapters/fixmystreet';
+import { partitionUnpublishable, planReseenClosures } from './run';
 import { AdapterFetchError, type ImportSourceRow, type RawReport } from './types';
 
 const HOUR = 60 * 60 * 1000;
@@ -420,5 +421,27 @@ describe('planReseenClosures', () => {
       ]),
     );
     expect(plan).toEqual({ closedExternalIds: [], hazardIdsToExpire: [] });
+  });
+});
+
+describe('partitionUnpublishable', () => {
+  const now = Date.parse('2026-10-13T12:00:00Z');
+  const items = [
+    report({ category: 'Potholes', id: 'open-recent', reportedAt: '2026-10-10T09:00:00.000Z' }),
+    report({ category: 'Potholes', id: 'closed', status: 'closed' }),
+    // Silent council, reported 6 weeks ago: past its 4-week timer.
+    report({ category: 'Potholes', id: 'too-old', council: 'Essex County Council', reportedAt: '2026-09-01T09:00:00.000Z' }),
+  ];
+
+  it('leaves every report to classification for sources that stage everything', () => {
+    const result = partitionUnpublishable(items, { stageUnpublishable: undefined }, now);
+    expect(result.candidates.map((r) => r.externalId)).toEqual(['open-recent', 'closed', 'too-old']);
+  });
+
+  it('drops closed and expired reports before classification for FixMyStreet', () => {
+    const result = partitionUnpublishable(items, fixMyStreetAdapter, now);
+    expect(result.candidates.map((r) => r.externalId)).toEqual(['open-recent']);
+    expect(result.closed).toBe(1);
+    expect(result.expired).toBe(1);
   });
 });

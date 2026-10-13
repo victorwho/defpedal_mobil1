@@ -192,13 +192,15 @@ export interface HazardSourceAdapter {
    */
   readonly dedicatedSchedule?: boolean;
   /**
-   * Whether reports the category map rejects are written to `hazard_imports`.
-   * Default true. A source that re-reads its feed and is mostly off-topic
-   * (FixMyStreet: ~25,000 fly-tipping, graffiti and lighting reports a week)
-   * sets false; such a report is re-classified for free when seen again.
-   * Model verdicts are ALWAYS staged, so the model is never asked twice.
+   * Default true. A source that re-reads its feed in sweeps (FixMyStreet) sets
+   * false, and then reports that can never be published are neither staged
+   * nor sent to the model: ones the category map rejects (~25,000 fly-tipping,
+   * graffiti and lighting reports a week), ones already closed at the source,
+   * and ones already past their per-report expiry. Such a report costs only a
+   * regex when the next sweep sees it again. Model verdicts are ALWAYS staged,
+   * so the model is never asked about the same report twice.
    */
-  readonly stageCategoryIrrelevant?: boolean;
+  readonly stageUnpublishable?: boolean;
   /**
    * Per-report expiry (ISO), overriding the source's backstop TTL. Null falls
    * back to the backstop. A value already in the past means the report is too
@@ -330,6 +332,8 @@ export interface ImportRunCounters {
   expiredByStatus: number;
   /** Approved, but already past the adapter's per-report expiry: not published. */
   expiredOnArrival: number;
+  /** Already closed at the source when first seen: not classified or published. */
+  closedAtSource: number;
 }
 
 export const emptyCounters = (): ImportRunCounters => ({
@@ -351,6 +355,7 @@ export const emptyCounters = (): ImportRunCounters => ({
   statusChecked: 0,
   expiredByStatus: 0,
   expiredOnArrival: 0,
+  closedAtSource: 0,
 });
 
 export interface ImportSourceRunResult {

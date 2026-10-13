@@ -253,7 +253,7 @@ export const fetchFixMyStreetPage = async (
 export const fixMyStreetAdapter: HazardSourceAdapter = {
   id: 'fixmystreet',
   dedicatedSchedule: true,
-  stageCategoryIrrelevant: false,
+  stageUnpublishable: false,
 
   fetchPage(source, cursor, signal) {
     return fetchFixMyStreetPage(source, cursor, signal);

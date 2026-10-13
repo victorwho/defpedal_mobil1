@@ -31,6 +31,7 @@ import {
   AdapterFetchError,
   emptyCounters,
   type ClassificationResult,
+  type HazardSourceAdapter,
   type ImportCursor,
   type ImportRunCounters,
   type ImportSourceRow,
@@ -718,6 +719,40 @@ const processBatch = async (
 };
 
 /**
+ * Split off reports that can never be published, BEFORE classification.
+ *
+ * Only for adapters that opt out of staging them (FixMyStreet). The first live
+ * FixMyStreet run spent its whole budget asking the model about reports the
+ * council had already closed or that were too old to show: a sweep starts with
+ * its oldest windows, where nearly everything is closed.
+ */
+export const partitionUnpublishable = (
+  items: readonly RawReport[],
+  adapter: Pick<HazardSourceAdapter, 'stageUnpublishable' | 'expiresAt'> | null,
+  nowMs: number,
+): { candidates: RawReport[]; closed: number; expired: number } => {
+  if (!adapter || adapter.stageUnpublishable !== false) {
+    return { candidates: [...items], closed: 0, expired: 0 };
+  }
+  const candidates: RawReport[] = [];
+  let closed = 0;
+  let expired = 0;
+  for (const item of items) {
+    if (item.status === 'closed') {
+      closed += 1;
+      continue;
+    }
+    const expiresAt = adapter.expiresAt?.(item) ?? null;
+    if (expiresAt && Date.parse(expiresAt) <= nowMs) {
+      expired += 1;
+      continue;
+    }
+    candidates.push(item);
+  }
+  return { candidates, closed, expired };
+};
+
+/**
  * Classify a set of reports, stage them, and publish the approved ones.
  *
  * Shared by the fetch path and the stalled-item retry path, so a retried item
@@ -727,16 +762,28 @@ const processBatch = async (
 const processClassified = async (
   db: SupabaseClient,
   source: ImportSourceRow,
-  fresh: readonly RawReport[],
+  reports: readonly RawReport[],
   counters: ImportRunCounters,
   options: RunOptions,
   log: FastifyBaseLogger,
   { restage }: { restage: boolean },
 ): Promise<void> => {
+  let fresh: readonly RawReport[] = reports;
   if (fresh.length === 0) return;
 
   const adapter = getAdapter(source.adapter);
-  const stageCategoryIrrelevant = adapter?.stageCategoryIrrelevant ?? true;
+  const stageUnpublishable = adapter?.stageUnpublishable ?? true;
+
+  // A retried (restaged) row always goes through classification, so it leaves
+  // the pending queue instead of being retried every run.
+  if (!restage) {
+    const { candidates, closed, expired } = partitionUnpublishable(fresh, adapter, Date.now());
+    counters.closedAtSource += closed;
+    counters.expiredOnArrival += expired;
+    fresh = candidates;
+    if (fresh.length === 0) return;
+  }
+
   const rows: StagedRow[] = [];
   const publishable: PublishCandidate[] = [];
 
@@ -805,7 +852,7 @@ const processClassified = async (
     // A retried row is always re-staged, so a row that now maps irrelevant
     // leaves the pending queue instead of being retried every run.
     const skipStaging =
-      !restage && !stageCategoryIrrelevant && result.rejectReason === 'category_mapped_irrelevant';
+      !restage && !stageUnpublishable && result.rejectReason === 'category_mapped_irrelevant';
     if (!skipStaging) {
       rows.push({
         source_id: source.id,
