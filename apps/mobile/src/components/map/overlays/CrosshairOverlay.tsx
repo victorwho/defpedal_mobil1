@@ -6,10 +6,23 @@ import { radii } from '../../../design-system/tokens/radii';
 import { space } from '../../../design-system/tokens/spacing';
 import { fontFamily, textSm } from '../../../design-system/tokens/typography';
 
+const ICON_SIZE = 40;
+
+/**
+ * The icon's CENTRE must sit on the map's centre: callers place the hazard,
+ * suggestion or start at the camera centre (onCenterChange). It used to sit
+ * 40% of the width above the bottom edge, so everything landed about half a
+ * screen away from where the pin pointed. The label hangs below, out of flow,
+ * so it cannot shift the icon.
+ */
 export const CrosshairOverlay = React.memo(() => (
   <View style={styles.crosshairOverlay} pointerEvents="none">
-    <Ionicons name="add-circle-outline" size={40} color={darkTheme.accent} />
-    <Text style={styles.crosshairLabel}>Move map to position</Text>
+    <View style={styles.anchor}>
+      <Ionicons name="add-circle-outline" size={ICON_SIZE} color={darkTheme.accent} />
+      <View style={styles.labelSlot}>
+        <Text style={styles.crosshairLabel}>Move map to position</Text>
+      </View>
+    </View>
   </View>
 ));
 
@@ -18,10 +31,19 @@ CrosshairOverlay.displayName = 'CrosshairOverlay';
 const styles = StyleSheet.create({
   crosshairOverlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: '40%',
-    gap: space[2],
+  },
+  anchor: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+  },
+  labelSlot: {
+    position: 'absolute',
+    top: ICON_SIZE + space[2],
+    left: -150,
+    right: -150,
+    alignItems: 'center',
   },
   crosshairLabel: {
     ...textSm,
