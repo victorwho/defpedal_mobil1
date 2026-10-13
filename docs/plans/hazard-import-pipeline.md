@@ -967,3 +967,61 @@ LLM calls fell from 74 to 7 (spend $0.0074 → $0.0007 per run).
 **Follow-ups:** the licence is still UNVERIFIED (see the migration header), and
 `alert_eligible` should stay false until someone spot-checks a few geocodes
 against reality.
+
+## 19. FixMyStreet (UK) — built and enabled 2026-10-13
+
+**Source.** FixMyStreet (mySociety) takes street-problem reports for every UK
+council and publishes them on a public Open311 feed,
+`https://www.fixmystreet.com/open311/v2/requests.json?jurisdiction_id=fixmystreet`.
+No key. **No stated licence or reuse terms**; enabled by explicit product-owner
+direction after that gap was raised, recorded as
+`UNCONFIRMED-OWNER-OVERRIDE-2026-10-13` (the Amsterdam convention).
+
+**Measured before building** (local download, 2026-10-12/13; data and scripts in
+`C:\Users\Victor\defpedal-ops\fixmystreet-2026-08-13_to_10-11\`):
+
+| | |
+|---|---|
+| Reports, 13 Aug – 11 Oct | 193,988 (~3,100/day; weekends ~2,000) |
+| Cycling-relevant | 39,333 |
+| Still open, 4+ weeks old, councils that close reports | 24% → 17% by 8 weeks |
+| Median days to close | pothole 6.8, surface 3.5, signals 1.5 |
+| Councils with ≥10 relevant reports 4+ weeks old | 36 close reliably, 23 partly, 4 never |
+| Backlog the rules publish directly (8 weeks, open) | ~10,500; ~7,600 to the model |
+
+The first category rules were wrong in ways only reading samples revealed:
+abandoned hire bikes matched "bike", the "narrowing" categories were mostly
+garden hedges, one council codes footway potholes `FW6`, and street names made
+pavement reports look like road ones. Each is now a test.
+
+**Design** (why it is not the generic `open311` adapter):
+
+1. *1,000-result cap, newest first* → 6-hour windows, a full window split in
+   half and re-fetched until it fits; a window at the 2-minute floor that is
+   still full is accepted with a logged warning.
+2. *Status sync by id does not scale* (~13,000 live) → closures come from
+   re-reading windows. The runner expires a published hazard when a re-seen
+   report comes back closed — new generic behaviour, a no-op for Amsterdam.
+3. *Volume* → its own Cloud Scheduler job (`fixmystreet-imports-cron`, 15 min)
+   and `dedicatedSchedule`, so it never runs in the shared weekly job. A new
+   sweep starts at most every 6 h: full (8 weeks) weekly, otherwise incremental
+   (12 h overlap). Sweep state lives in the cursor; `idleCursor` keeps it when a
+   run ends between sweeps.
+4. *Per-council trust* → expiry from the report date: 8 weeks at councils that
+   close reports, 4 weeks elsewhere (incl. Dumfries & Galloway, which closes on
+   receipt). Too-old reports are counted `expiredOnArrival`, not published.
+5. *Cost and throughput* → reports that can never be published (category
+   irrelevant, closed, expired) are neither classified nor staged
+   (`stageUnpublishable: false`). First live run without it: 5 pages, 200 model
+   calls, 33 published. With it: 14 pages, 6,082 reports per run.
+6. *Resilience* → a window that keeps failing is skipped after 3 attempts;
+   every failure still fails the run (alerting unchanged).
+
+**First runs** (API `defpedal-api-00179-wvz`, then `00180-gx5`): both ok,
+2–3 US cents of model spend each; 221 hazards live after two runs, from the
+oldest (mid-August) windows. Backfill completes in ~24 runs (~6 h).
+
+**Open:** model summaries sometimes include addresses despite the prompt —
+affects all model-classified sources; reopened reports stay expired (rare,
+safe direction); the closing-council list is a 2026-10-12 measurement and
+should be re-measured if a council changes how it uses FixMyStreet.
