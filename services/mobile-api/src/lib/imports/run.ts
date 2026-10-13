@@ -28,6 +28,7 @@ import { config } from '../../config';
 import { getAdapter } from './adapters';
 import { classifyReport, resolveMapping, type ClassifyDeps } from './classify';
 import {
+  AdapterFetchError,
   emptyCounters,
   type ClassificationResult,
   type ImportCursor,
@@ -172,24 +173,90 @@ interface StagedRow {
   updated_at: string;
 }
 
-/** Which of these external ids do we already have staged? */
+export interface StagedState {
+  readonly hazardId: string | null;
+  readonly sourceStatus: string | null;
+}
+
+/** Which of these external ids do we already have staged, and in what state? */
 const findExistingExternalIds = async (
   db: SupabaseClient,
   sourceId: string,
   externalIds: readonly string[],
-): Promise<Set<string>> => {
-  const found = new Set<string>();
+): Promise<Map<string, StagedState>> => {
+  const found = new Map<string, StagedState>();
   for (let i = 0; i < externalIds.length; i += STAGING_CHUNK) {
     const chunk = externalIds.slice(i, i + STAGING_CHUNK);
     const { data, error } = await db
       .from('hazard_imports')
-      .select('external_id')
+      .select('external_id, hazard_id, source_status')
       .eq('source_id', sourceId)
       .in('external_id', chunk);
     if (error) throw new Error(`Dedup lookup failed: ${error.message}`);
-    for (const row of data ?? []) found.add((row as { external_id: string }).external_id);
+    for (const row of (data ?? []) as {
+      external_id: string;
+      hazard_id: string | null;
+      source_status: string | null;
+    }[]) {
+      found.set(row.external_id, { hazardId: row.hazard_id, sourceStatus: row.source_status });
+    }
   }
   return found;
+};
+
+/**
+ * Re-seen reports that the source has CLOSED since we staged them.
+ *
+ * A source re-read in sweeps (FixMyStreet) delivers status changes as
+ * re-seen reports, which used to be counted as duplicates and discarded, so
+ * a pothole the council fixed stayed on the map until its timer ran out.
+ * Returns the staging rows to mark closed and the published hazards to expire.
+ * Reopened reports are not handled: rare, and expiring is the safe direction.
+ */
+export const planReseenClosures = (
+  items: readonly RawReport[],
+  existing: ReadonlyMap<string, StagedState>,
+): { closedExternalIds: string[]; hazardIdsToExpire: string[] } => {
+  const closedExternalIds: string[] = [];
+  const hazardIdsToExpire: string[] = [];
+  for (const item of items) {
+    const staged = existing.get(item.externalId);
+    if (!staged || item.status !== 'closed' || staged.sourceStatus === 'closed') continue;
+    closedExternalIds.push(item.externalId);
+    if (staged.hazardId) hazardIdsToExpire.push(staged.hazardId);
+  }
+  return { closedExternalIds, hazardIdsToExpire };
+};
+
+const applyReseenClosures = async (
+  db: SupabaseClient,
+  source: ImportSourceRow,
+  plan: { closedExternalIds: string[]; hazardIdsToExpire: string[] },
+  counters: ImportRunCounters,
+): Promise<void> => {
+  const nowIso = new Date().toISOString();
+  for (let i = 0; i < plan.closedExternalIds.length; i += STAGING_CHUNK) {
+    const chunk = plan.closedExternalIds.slice(i, i + STAGING_CHUNK);
+    const { error } = await db
+      .from('hazard_imports')
+      .update({ source_status: 'closed', updated_at: nowIso })
+      .eq('source_id', source.id)
+      .in('external_id', chunk);
+    if (error) throw new Error(`Closing staged imports failed: ${error.message}`);
+  }
+  for (let i = 0; i < plan.hazardIdsToExpire.length; i += STAGING_CHUNK) {
+    const chunk = plan.hazardIdsToExpire.slice(i, i + STAGING_CHUNK);
+    // Only hazards still live: an already-expired one keeps its timestamp, so
+    // a later closure cannot pull it back inside the 45-day hard-delete window.
+    const { data, error } = await db
+      .from('hazards')
+      .update({ expires_at: nowIso })
+      .in('id', chunk)
+      .gt('expires_at', nowIso)
+      .select('id');
+    if (error) throw new Error(`Expiring closed imports failed: ${error.message}`);
+    counters.expiredByStatus += (data ?? []).length;
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -219,6 +286,8 @@ export interface PublishCandidate {
   mapped_type: string;
   summary: string | null;
   reported_at: string | null;
+  /** Adapter-decided expiry; null means the source's backstop TTL. */
+  expires_at?: string | null;
 }
 
 const PUBLISH_CHUNK = 200;
@@ -266,7 +335,7 @@ export const publishImports = async (
       import_external_id: c.external_id,
       alert_eligible: source.alert_eligible,
       reported_at: c.reported_at ?? nowIso,
-      expires_at: expiresAt,
+      expires_at: c.expires_at ?? expiresAt,
     }));
 
     const { data, error } = await db
@@ -467,7 +536,14 @@ export const runSource = async (
         break;
       }
 
-      const { items, nextCursor } = await adapter.fetchPage(source, cursor, options.signal);
+      const { items, nextCursor, idleCursor, warnings } = await adapter.fetchPage(
+        source,
+        cursor,
+        options.signal,
+      );
+      for (const warning of warnings ?? []) {
+        log.warn({ event: 'hazard_import_adapter_warning', sourceId: source.id, warning }, warning);
+      }
       pagesFetched += 1;
       counters.fetched += items.length;
 
@@ -475,7 +551,7 @@ export const runSource = async (
 
       // Persist AFTER the batch is durably staged, so a crash re-processes at
       // most one page rather than skipping it.
-      cursor = nextCursor ?? { since: new Date().toISOString(), page: 1 };
+      cursor = nextCursor ?? idleCursor ?? { since: new Date().toISOString(), page: 1 };
       await persistCursor(db, source.id, cursor);
 
       if (!nextCursor) break;
@@ -499,7 +575,10 @@ export const runSource = async (
     return { sourceId: source.id, ok: true, error: null, counters, pagesFetched, truncated };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown error';
-    await recordRunOutcome(db, source, false, message, cursor, counters.fetched > 0);
+    // An adapter can hand back state worth keeping even when the fetch failed
+    // (FixMyStreet's per-window failure count), so it is not lost with the run.
+    const kept = error instanceof AdapterFetchError ? error.cursor : cursor;
+    await recordRunOutcome(db, source, false, message, kept, counters.fetched > 0);
     return { sourceId: source.id, ok: false, error: message, counters, pagesFetched, truncated };
   }
 };
@@ -609,6 +688,8 @@ const processBatch = async (
     items.map((item) => item.externalId),
   );
 
+  await applyReseenClosures(db, source, planReseenClosures(items, existing), counters);
+
   const fresh: RawReport[] = [];
   for (const item of items) {
     if (existing.has(item.externalId)) {
@@ -654,6 +735,8 @@ const processClassified = async (
 ): Promise<void> => {
   if (fresh.length === 0) return;
 
+  const adapter = getAdapter(source.adapter);
+  const stageCategoryIrrelevant = adapter?.stageCategoryIrrelevant ?? true;
   const rows: StagedRow[] = [];
   const publishable: PublishCandidate[] = [];
 
@@ -719,27 +802,38 @@ const processClassified = async (
     if (result.reviewState === 'pending') counters.queuedForReview += 1;
     if (result.reviewState === 'auto_approved') counters.autoApproved += 1;
 
-    rows.push({
-      source_id: source.id,
-      external_id: item.externalId,
-      raw: item.raw,
-      lat: item.lat,
-      lon: item.lon,
-      source_status: item.status,
-      reported_at: item.reportedAt,
-      updated_at_src: item.updatedAt,
-      media_url: item.mediaUrl,
-      mapped_type: result.hazardType,
-      llm_verdict: result.verdict,
-      review_state: result.reviewState,
-      reject_reason: result.rejectReason,
-      updated_at: new Date().toISOString(),
-    });
+    // A retried row is always re-staged, so a row that now maps irrelevant
+    // leaves the pending queue instead of being retried every run.
+    const skipStaging =
+      !restage && !stageCategoryIrrelevant && result.rejectReason === 'category_mapped_irrelevant';
+    if (!skipStaging) {
+      rows.push({
+        source_id: source.id,
+        external_id: item.externalId,
+        raw: item.raw,
+        lat: item.lat,
+        lon: item.lon,
+        source_status: item.status,
+        reported_at: item.reportedAt,
+        updated_at_src: item.updatedAt,
+        media_url: item.mediaUrl,
+        mapped_type: result.hazardType,
+        llm_verdict: result.verdict,
+        review_state: result.reviewState,
+        reject_reason: result.rejectReason,
+        updated_at: new Date().toISOString(),
+      });
+    }
 
     // Only publish items the source still considers open. Importing an
     // already-closed report would put a hazard on the map that the city has
     // already fixed.
     if (result.reviewState === 'auto_approved' && result.hazardType && item.status !== 'closed') {
+      const expiresAt = adapter?.expiresAt?.(item) ?? null;
+      if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+        counters.expiredOnArrival += 1;
+        continue;
+      }
       publishable.push({
         external_id: item.externalId,
         lat: item.lat,
@@ -747,6 +841,7 @@ const processClassified = async (
         mapped_type: result.hazardType,
         summary: result.summaryEn,
         reported_at: item.reportedAt,
+        expires_at: expiresAt,
       });
     }
   }

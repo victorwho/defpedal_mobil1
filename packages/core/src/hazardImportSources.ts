@@ -40,6 +40,10 @@ export const HAZARD_IMPORT_SOURCE_DISPLAY: Readonly<
     label: 'Ayuntamiento de Zaragoza',
     url: 'https://www.zaragoza.es/sede/portal/datos-abiertos/',
   },
+  'fixmystreet:uk': {
+    label: 'FixMyStreet',
+    url: 'https://www.fixmystreet.com',
+  },
 };
 
 /** Neutral label for a source we have display metadata for. */

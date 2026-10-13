@@ -19,6 +19,7 @@
 import { config } from '../../config';
 import { resolveAmsterdamMapping } from './mappings/amsterdam';
 import { resolveCiviaMapping } from './mappings/civia';
+import { resolveFixMyStreetMapping } from './mappings/fixmystreet';
 import { resolveKolnMapping } from './mappings/koln';
 import { resolveZaragozaMapping } from './mappings/zaragoza';
 import {
@@ -53,6 +54,9 @@ export const resolveMapping = (
   source: ImportSourceRow,
   report: RawReport,
 ): MappingOutcome => {
+  // FixMyStreet is keyed by adapter, not source id: its rules read the
+  // category name AND the text, because every council names categories its own way.
+  if (source.adapter === 'fixmystreet') return resolveFixMyStreetMapping(report);
   switch (source.id) {
     case 'open311:koln':
       return resolveKolnMapping(report.categoryKey);

@@ -12,6 +12,7 @@
  */
 import { amsterdamAdapter } from './amsterdam';
 import { civiaAdapter } from './civia';
+import { fixMyStreetAdapter } from './fixmystreet';
 import { open311Adapter } from './open311';
 import type { HazardSourceAdapter } from '../types';
 
@@ -19,6 +20,7 @@ const ADAPTERS: Readonly<Record<string, HazardSourceAdapter>> = {
   open311: open311Adapter,
   signalen: amsterdamAdapter,
   civia: civiaAdapter,
+  fixmystreet: fixMyStreetAdapter,
 };
 
 export const getAdapter = (name: string): HazardSourceAdapter | null =>
@@ -26,4 +28,4 @@ export const getAdapter = (name: string): HazardSourceAdapter | null =>
 
 export const registeredAdapterNames = (): string[] => Object.keys(ADAPTERS);
 
-export { amsterdamAdapter, civiaAdapter, open311Adapter };
+export { amsterdamAdapter, civiaAdapter, fixMyStreetAdapter, open311Adapter };

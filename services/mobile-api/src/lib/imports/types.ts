@@ -43,7 +43,7 @@ export const isImportableHazardType = (
 
 export interface ImportSourceRow {
   readonly id: string;
-  readonly adapter: 'open311' | 'civia' | 'signalen';
+  readonly adapter: 'open311' | 'civia' | 'signalen' | 'fixmystreet';
   readonly endpoint: string;
   readonly jurisdiction: string | null;
   readonly country_code: string;
@@ -106,6 +106,25 @@ export interface ImportCursor {
    * adapter has switched to polling the feed.
    */
   readonly pendingIds?: readonly string[];
+  /**
+   * Pending [startMs, endMs) time windows of the current sweep (FixMyStreet).
+   * Its feed caps a query at 1,000 results, so a full window is split in two
+   * in place and both halves re-fetched.
+   */
+  readonly windows?: readonly (readonly number[])[];
+  /** 'full' re-reads the last 8 weeks (to catch closures); 'incremental' does not. */
+  readonly sweepKind?: 'full' | 'incremental';
+  readonly sweepStartedAt?: string;
+  /** End of the current sweep's last window, ms since epoch. */
+  readonly sweepEndMs?: number;
+  /** End of the last COMPLETED sweep's data window. */
+  readonly lastSweepEndedAt?: string;
+  /** When the last completed FULL sweep began. */
+  readonly lastFullSweepAt?: string;
+  /** Consecutive failed fetches of the current first window. */
+  readonly windowFailures?: number;
+  /** Windows given up on after repeated failures, all-time. */
+  readonly skippedWindowCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,10 +158,53 @@ export interface FetchPageResult {
   readonly items: readonly RawReport[];
   /** null signals end-of-data for this run. */
   readonly nextCursor: ImportCursor | null;
+  /**
+   * Cursor to persist when `nextCursor` is null. Without it the runner resets
+   * the cursor to `{ since: now, page: 1 }`, which suits a since/page source
+   * but would erase a sweep source's state (when its last sweeps ran).
+   */
+  readonly idleCursor?: ImportCursor;
+  /** Conditions worth a log line that are not failures (e.g. possible truncation). */
+  readonly warnings?: readonly string[];
+}
+
+/**
+ * A failed fetch that still has state worth keeping (e.g. a per-window failure
+ * count). The runner persists `cursor` before recording the run as failed, so
+ * a window that always errors is eventually skipped instead of blocking the
+ * source forever, and every failure still fails the run (and pages).
+ */
+export class AdapterFetchError extends Error {
+  constructor(
+    message: string,
+    readonly cursor: ImportCursor,
+  ) {
+    super(message);
+    this.name = 'AdapterFetchError';
+  }
 }
 
 export interface HazardSourceAdapter {
   readonly id: string;
+  /**
+   * Runs only when POST /v1/imports/run names it by id, never in the shared
+   * all-sources run, whose single time budget it would otherwise consume.
+   */
+  readonly dedicatedSchedule?: boolean;
+  /**
+   * Whether reports the category map rejects are written to `hazard_imports`.
+   * Default true. A source that re-reads its feed and is mostly off-topic
+   * (FixMyStreet: ~25,000 fly-tipping, graffiti and lighting reports a week)
+   * sets false; such a report is re-classified for free when seen again.
+   * Model verdicts are ALWAYS staged, so the model is never asked twice.
+   */
+  readonly stageCategoryIrrelevant?: boolean;
+  /**
+   * Per-report expiry (ISO), overriding the source's backstop TTL. Null falls
+   * back to the backstop. A value already in the past means the report is too
+   * old to publish at all.
+   */
+  expiresAt?(report: RawReport): string | null;
   /** Fetch one page. Adapters must not retry internally; the runner decides. */
   fetchPage(
     source: ImportSourceRow,
@@ -266,6 +328,8 @@ export interface ImportRunCounters {
   publishFailed: number;
   statusChecked: number;
   expiredByStatus: number;
+  /** Approved, but already past the adapter's per-report expiry: not published. */
+  expiredOnArrival: number;
 }
 
 export const emptyCounters = (): ImportRunCounters => ({
@@ -286,6 +350,7 @@ export const emptyCounters = (): ImportRunCounters => ({
   publishFailed: 0,
   statusChecked: 0,
   expiredByStatus: 0,
+  expiredOnArrival: 0,
 });
 
 export interface ImportSourceRunResult {

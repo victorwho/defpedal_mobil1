@@ -20,6 +20,7 @@ import type { MobileApiDependencies } from '../lib/dependencies';
 import { errorResponseSchema } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
 import { estimateCostUsd, isLlmConfigured } from '../lib/imports/classify';
+import { getAdapter } from '../lib/imports/adapters';
 import { loadEnabledSources, runSource } from '../lib/imports/run';
 import type { ImportSourceRunResult } from '../lib/imports/types';
 import { ensureSupabase } from './feed-helpers';
@@ -179,8 +180,14 @@ export const buildImportRoutes = (
           );
         }
 
+        // A source with its own schedule (FixMyStreet) runs only when named;
+        // in the shared run it would consume the budget the others need.
+        const toRun = request.query.sourceId
+          ? sources
+          : sources.filter((source) => !getAdapter(source.adapter)?.dedicatedSchedule);
+
         const results: ImportSourceRunResult[] = [];
-        for (const source of sources) {
+        for (const source of toRun) {
           const result = await runSource(db, source, request.log, {
             deadline,
             signal: controller.signal,
