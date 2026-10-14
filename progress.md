@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-11 (post-ride screens, change destination, E-bike as Plus, dismount guidance; 0.2.188 to Play as a draft; iOS 1.26 in review)
+Last updated: 2026-10-14 (Supabase security lockdown Batch A; legacy web app retired)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-14: Supabase security lockdown, Batch A LIVE** (migration `202610140001`, DB-only, no app/API release). Closed client write paths nothing uses: anonymous sessions could PATCH their own `profiles` (XP, tier, Plus paywall flag); 7 RLS-off `iasi_*` risk backups (anon read/write) moved to private `archive` schema; three "service role" insert policies that were really PUBLIC `WITH CHECK (true)` dropped; anon NULL-owner inserts into hazards/navigation_feedback closed; TRUNCATE/REFERENCES/TRIGGER revoked. Every attack replayed as anon/authenticated before (succeeded) and after (42501); API health + hazards nearby verified. Legacy AI Studio web app (`beta.defensivepedal.com`, Cloud Run `copy-of-pedala-deploy` + `pedala-deploy`) deleted — it wrote trips/hazards from the browser with the anon key; traffic was scanners. Error-log #138 has Batch B/C + open items (auth `site_url` still the deleted domain, GDPR decision, OSRM nginx limits).
 
 - **2026-10-13: 0.2.190 RELEASED to both stores** (main `f6b95ff`). Play: versionCode 193 on production at a **20% staged rollout** (replaced 0.2.188's 20% rollout; 0.2.180/183 stays on the rest), en-GB notes, verified on a fresh read; AAB signer = upload key, archived `apkreleases/DefensivePedal-Production-v0.2.190.aab`. iOS: EAS build 40 (from a clean `origin/main` worktree) VALID, version **1.27** created with build 40 attached (verified on its own endpoint), `WAITING_FOR_REVIEW`, `AFTER_APPROVAL` — publishes automatically on approval. Contents: start on the map ("Choose on map" + long-press), street addresses for dropped pins, crosshair placement fix, risk legend from the route line, weather warning at the chosen start. Next: watch Sentry for new issues before widening Play to 50%/100% (session volume is too low for the crash-free gate to mean much).
 
