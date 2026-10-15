@@ -41,7 +41,7 @@ import {
 } from '../lib/feedSchemas';
 import { HttpError } from '../lib/http';
 import { fetchCyclingForecast } from '../lib/clients/openMeteo';
-import { ensureSupabase, mapFeedRow, requireUser, type ChampionLookup } from './feed-helpers';
+import { enforceUserRateLimit, ensureSupabase, mapFeedRow, requireUser, type ChampionLookup } from './feed-helpers';
 import { buildFeedCommentRoutes } from './feed-comments';
 import { buildFeedProfileRoutes } from './feed-profile';
 import { buildFeedReactionRoutes } from './feed-reactions';
@@ -80,8 +80,9 @@ export const buildFeedRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'leaderboard', user.id);
         const db = ensureSupabase();
 
         const { lat, lon, cursor, limit: rawLimit, radiusKm: rawRadius, scope: requestedScope } = request.query;
@@ -195,8 +196,9 @@ export const buildFeedRoutes = (
           },
         },
       },
-      async (request) => {
-        await requireUser(request, dependencies);
+      async (request, reply) => {
+        const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'leaderboard', user.id);
         const db = ensureSupabase();
 
         const { lat, lon, radiusKm: rawRadius } = request.query;
@@ -245,8 +247,9 @@ export const buildFeedRoutes = (
           },
         },
       },
-      async (request) => {
-        await requireUser(request, dependencies);
+      async (request, reply) => {
+        const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'leaderboard', user.id);
         const db = ensureSupabase();
 
         const { lat, lon, radiusKm: rawRadius, days: rawDays } = request.query;

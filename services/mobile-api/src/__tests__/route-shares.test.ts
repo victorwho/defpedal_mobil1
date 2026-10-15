@@ -72,6 +72,7 @@ const makeDependencies = (
   ({
     authenticateUser: fakeAuthenticateUser,
     rateLimiter: noopRateLimiter,
+    rateLimitPolicies: { write: { limit: 100, windowMs: 60_000 } } as MobileApiDependencies['rateLimitPolicies'],
     ...overrides,
   }) as MobileApiDependencies;
 
@@ -332,6 +333,33 @@ describe('POST /v1/route-shares', () => {
     });
 
     expect(res.statusCode).toBe(502);
+    await app.close();
+  });
+
+  it('returns 429 when the caller is over the write budget', async () => {
+    const service = happyService();
+    const deniedLimiter = {
+      ...noopRateLimiter,
+      consume: vi.fn().mockResolvedValue({
+        allowed: false,
+        limit: 20,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+        retryAfterMs: 30_000,
+      }),
+    };
+    const app = buildTestApp(service, { rateLimiter: deniedLimiter });
+    await app.ready();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/route-shares',
+      headers: authHeaders,
+      payload: validBody,
+    });
+
+    expect(res.statusCode).toBe(429);
+    expect(service.createShare).not.toHaveBeenCalled();
     await app.close();
   });
 });

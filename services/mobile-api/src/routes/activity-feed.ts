@@ -39,7 +39,7 @@ import { checkContentAgainstFilter } from '../lib/moderationFilter';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { XP_VALUES } from '../lib/xp';
-import { ensureSupabase, requireUser } from './feed-helpers';
+import { enforceUserRateLimit, ensureSupabase, requireUser } from './feed-helpers';
 
 const DEFAULT_FEED_LIMIT = 20;
 
@@ -93,8 +93,9 @@ export const buildActivityFeedRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'leaderboard', user.id);
         const db = ensureSupabase();
 
         const { lat, lon, cursorScore, cursorId, limit: rawLimit } = request.query;

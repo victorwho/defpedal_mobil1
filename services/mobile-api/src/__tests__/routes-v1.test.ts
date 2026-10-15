@@ -1207,6 +1207,54 @@ describe('POST /v1/elevation-profile', () => {
     await app.close();
   });
 
+  // Cloud Run's proxy is the socket peer for EVERY request, so before
+  // trustProxy every IP-keyed bucket was one bucket shared by all callers and
+  // /elevation-profile 429'd real riders (audit 2026-10-15, error-log #138).
+  it('keys its IP rate limit on the client address the proxy appended', async () => {
+    const app = buildTestApp({
+      rateLimiter: createMemoryRateLimiter(),
+      rateLimitPolicies: {
+        ...generousRateLimitPolicies,
+        routePreview: { limit: 1, windowMs: 60_000 },
+      },
+    });
+    await app.ready();
+    const post = (forwardedFor: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/elevation-profile',
+        payload: { coordinates: [[26.1, 44.4], [26.2, 44.5]] },
+        headers: { 'x-forwarded-for': forwardedFor },
+      });
+
+    expect((await post('1.1.1.1')).statusCode).toBe(200);
+    // A different rider behind the same proxy has their own bucket.
+    expect((await post('2.2.2.2')).statusCode).toBe(200);
+    // The same rider again is limited...
+    expect((await post('1.1.1.1')).statusCode).toBe(429);
+    // ...and cannot escape by prepending a forged entry of their own.
+    expect((await post('9.9.9.9, 1.1.1.1')).statusCode).toBe(429);
+
+    await app.close();
+  });
+
+  it('rejects anonymous sessions on POST /v1/hazards/:id/validate', async () => {
+    const app = buildTestApp({
+      authenticateUser: vi.fn().mockResolvedValue({ id: 'anon-1', email: null }),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/hazards/00000000-0000-4000-8000-000000000001/validate',
+      headers: { authorization: 'Bearer anon-token' },
+      payload: { response: 'deny' },
+    });
+    expect(response.statusCode).toBe(403);
+
+    await app.close();
+  });
+
   it('returns 400 when coordinates has fewer than 2 points', async () => {
     const app = buildTestApp();
     await app.ready();

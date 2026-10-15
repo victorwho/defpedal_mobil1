@@ -12,7 +12,7 @@ import { HttpError } from '../lib/http';
 import { getTimezone, qualifyStreakAsync } from '../lib/streaks';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { XP_VALUES } from '../lib/xp';
-import { ensureSupabase, requireUser, toPointWkt } from './feed-helpers';
+import { enforceUserRateLimit, ensureSupabase, requireUser, toPointWkt } from './feed-helpers';
 
 export const buildFeedShareRoutes = (
   dependencies: MobileApiDependencies,
@@ -42,8 +42,9 @@ export const buildFeedShareRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
         const db = ensureSupabase();
         const req: ShareTripRequest = normalizeShareTripRequest(request.body);
 

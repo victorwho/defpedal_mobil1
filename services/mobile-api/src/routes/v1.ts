@@ -1305,18 +1305,10 @@ export const buildV1Routes = (
         },
       },
     }, async (request, reply) => {
-      const user = await getAuthenticatedUserFromRequest(
-        request,
-        dependencies.authenticateUser,
-      );
-
-      if (!user) {
-        return reply.status(401).send({
-          error: 'Authentication required.',
-          code: 'UNAUTHORIZED',
-          details: ['You must be signed in to validate hazards.'],
-        });
-      }
+      // Full account only, same as /vote: both write hazard_validations, and
+      // anonymous sessions are free to mint, so a per-user throttle alone let
+      // throwaway sessions down-vote hazards off the map (audit 2026-10-15).
+      const user = await requireOAuthUser(request, dependencies);
 
       // Use the dedicated hazardVote bucket (same as /vote). Both endpoints
       // write to the same hazard_validations table — sharing 'write' would let

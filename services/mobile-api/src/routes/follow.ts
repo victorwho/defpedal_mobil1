@@ -16,7 +16,7 @@ import {
   type UserIdParams,
 } from '../lib/followSchemas';
 import { HttpError } from '../lib/http';
-import { ensureSupabase, requireFullUser, requireUser } from './feed-helpers';
+import { enforceUserRateLimit, ensureSupabase, requireFullUser, requireUser } from './feed-helpers';
 
 // ---------------------------------------------------------------------------
 // Rate limiting — follow-graph writes share the dedicated `follow` bucket so
@@ -403,8 +403,9 @@ export const buildFollowRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'leaderboard', user.id);
         const db = ensureSupabase();
 
         const { lat, lon, limit: rawLimit } = request.query;

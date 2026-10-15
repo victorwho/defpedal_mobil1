@@ -30,6 +30,13 @@ export const buildApp = (options: {
   dependencies?: Partial<MobileApiDependencies>;
 } = {}) => {
   const app = Fastify({
+    // Cloud Run's proxy is the socket peer (169.254.169.126 for every request,
+    // measured 2026-10-15), so without this every IP-keyed rate limit was ONE
+    // bucket shared by all callers — /elevation-profile 429'd real riders.
+    // Trust exactly one hop: the address Google's front end appends. `true`
+    // would trust the leftmost X-Forwarded-For entry, which the client controls.
+    // (Function form of `trustProxy: 1` — Fastify's types reject a hop count.)
+    trustProxy: (_address: string, hop: number) => hop === 0,
     logger: {
       level: config.logLevel,
       // Safety net (audit 2026-07-05 SEC-7): no current call site logs full

@@ -1,9 +1,12 @@
 import type { FeedItem, SafetyTag } from '@defensivepedal/core';
 import { calculateCo2SavedKg } from '@defensivepedal/core';
 
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
 import { requireAuthenticatedUser, requireFullUser as requireFullUserAuth } from '../lib/auth';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
+import { buildRateLimitIdentity } from '../lib/rateLimit';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 export const requireUser = (
@@ -19,6 +22,41 @@ export const requireFullUser = (
   request: Parameters<typeof requireFullUserAuth>[0],
   dependencies: MobileApiDependencies,
 ) => requireFullUserAuth(request, dependencies.authenticateUser);
+
+/**
+ * Per-user throttle for social/community routes. Anonymous sessions are free to
+ * mint, so these routes were unbounded write paths and unbounded spatial-RPC
+ * fan-out (security audit 2026-10-15, error-log #138). Keyed by user id.
+ */
+export const enforceUserRateLimit = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+  dependencies: MobileApiDependencies,
+  bucket: keyof MobileApiDependencies['rateLimitPolicies'],
+  userId: string,
+) => {
+  const policy = dependencies.rateLimitPolicies[bucket];
+  const decision = await dependencies.rateLimiter.consume({
+    bucket,
+    key: buildRateLimitIdentity({ ip: request.ip, userId }),
+    limit: policy.limit,
+    windowMs: policy.windowMs,
+  });
+  reply.header('x-ratelimit-limit', decision.limit);
+  reply.header('x-ratelimit-remaining', decision.remaining);
+  reply.header('x-ratelimit-reset', Math.ceil(decision.resetAt / 1000));
+  if (!decision.allowed) {
+    request.log.warn(
+      { event: 'mobile_api_rate_limited', policy: bucket, ip: request.ip, userId },
+      'request rate limited',
+    );
+    throw new HttpError('Rate limit exceeded.', {
+      statusCode: 429,
+      code: 'RATE_LIMITED',
+      details: [`Retry after ${Math.max(1, Math.ceil(decision.retryAfterMs / 1000))} seconds.`],
+    });
+  }
+};
 
 export const ensureSupabase = () => {
   if (!supabaseAdmin) {

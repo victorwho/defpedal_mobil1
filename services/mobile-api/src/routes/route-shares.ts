@@ -20,6 +20,7 @@ import {
   dispatchFirstViewNotification,
 } from '../lib/ambassadorRewards';
 import { requireAuthenticatedUser } from '../lib/auth';
+import { enforceUserRateLimit } from './feed-helpers';
 import type { MobileApiDependencies } from '../lib/dependencies';
 import { HttpError } from '../lib/http';
 import { buildRateLimitIdentity } from '../lib/rateLimit';
@@ -146,11 +147,12 @@ export const buildRouteShareRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireAuthenticatedUser(
           request,
           dependencies.authenticateUser,
         );
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
 
         const service = buildService();
 

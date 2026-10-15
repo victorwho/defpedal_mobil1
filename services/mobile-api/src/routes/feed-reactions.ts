@@ -9,7 +9,7 @@ import {
 import { HttpError } from '../lib/http';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { XP_VALUES } from '../lib/xp';
-import { ensureSupabase, requireUser } from './feed-helpers';
+import { enforceUserRateLimit, ensureSupabase, requireUser } from './feed-helpers';
 
 export const buildFeedReactionRoutes = (
   dependencies: MobileApiDependencies,
@@ -38,8 +38,9 @@ export const buildFeedReactionRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
         const db = ensureSupabase();
 
         // A plain INSERT, so that a duplicate is reported as Postgres error
@@ -136,8 +137,9 @@ export const buildFeedReactionRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
         const db = ensureSupabase();
 
         const { error } = await db
@@ -180,11 +182,12 @@ export const buildFeedReactionRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         // Reactions consolidated to a single "like" (review P3): /love is now an
         // alias that writes feed_likes, so old app versions tapping love create
         // likes and trip_loves never refills (love_count stays 0).
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
         const db = ensureSupabase();
         // Same unconditional-XP-after-idempotent-write bug as /feed/:id/like had,
         // and reachable by every OLD client still tapping love — so it gets the
@@ -235,9 +238,10 @@ export const buildFeedReactionRoutes = (
           },
         },
       },
-      async (request) => {
+      async (request, reply) => {
         // Alias to feed_likes (reactions consolidated — see POST /love above).
         const user = await requireUser(request, dependencies);
+        await enforceUserRateLimit(request, reply, dependencies, 'write', user.id);
         const db = ensureSupabase();
         const { error } = await db.from('feed_likes').delete().eq('trip_share_id', request.params.id).eq('user_id', user.id);
         if (error) throw new HttpError('Unlove failed.', { statusCode: 502, code: 'UPSTREAM_ERROR', details: [error.message] });
