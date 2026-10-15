@@ -219,6 +219,14 @@ these are the things that will look like tidy-ups to a future reader.
   `gcloud builds submit` and an unmatched substitution fails the build, and inside
   a `bash -c` body Cloud Build substitutes `$VAR` before the shell sees it.
 
+## Supabase client access (locked down 2026-10-14/15) — error-log #138
+
+- ⚠️ **Clients have NO direct table access.** No public table has a client write policy or write grant; `hazards` is not client-readable; `trip_shares` is owner-only; the route-share definer functions are service-role only. Every rider read and write goes through mobile-api on the service-role key. The mobile app's only direct Supabase use is auth + Storage `avatars` (2 MB, images only). Migrations `202610140001` (A), `202610150001` (B), `202610150002` (C); prior state snapshotted in `archive.lockdown_snapshot_2026101*`.
+- ⚠️ **New objects are born closed (Batch C).** A `postgres`-owned table/sequence/function in `public` gets `service_role` only — no anon/authenticated, no PUBLIC EXECUTE. Anything a client must reach directly needs an explicit GRANT; the failure is "permission denied". The `supabase_admin` default ACL could NOT be changed (postgres is not a member) — only PostGIS objects are created under it.
+- **Scratch/backup tables go in the `archive` schema** (not exposed by PostgREST). The `iasi_*` Iasi lane-edit backups live there — OSRM_Server's rollback, do not drop without asking.
+- **Supabase Table Editor runs as `authenticated`**, so `hazards`, other riders' `trip_shares` and other locked tables look EMPTY there — use the SQL editor (same surprise as `city_suggestions` / `profiles`).
+- The old AI Studio web app (`beta.defensivepedal.com`, Cloud Run `copy-of-pedala-deploy`) wrote to these tables from the browser with the anon key; it was deleted 2026-10-14. Auth `site_url` is `https://routes.defensivepedal.com`.
+
 ## Permanent Hazards (opt-in at report time)
 
 Migration `202609020001`. A reporter may tick "This hazard is permanent" in the hazard quick-report card (both `route-planning.tsx` and in-ride `navigation.tsx`; shared `PermanentHazardCheckbox` molecule). A permanent hazard has **no TTL** — the only thing that expires it is reaching **10 downvotes** (`hazard_permanent_deny_threshold()`, mirrored in core as `PERMANENT_HAZARD_DENY_THRESHOLD`; change both together).

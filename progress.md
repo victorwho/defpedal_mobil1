@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-15 (Supabase security lockdown Batch B)
+Last updated: 2026-10-15 (Supabase security lockdown Batches B + C)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-15: Supabase security lockdown, Batch C LIVE** (migration `202610150002`). New tables/sequences/functions created by `postgres` in `public` are now born service-role-only (no anon/authenticated, no PUBLIC EXECUTE) — probe-verified before/after in a rolled-back transaction. Risk-data runbooks fixed in both repos (OSRM_Server pipeline doc granted anon on staging; defpedal swap template renamed a non-existent policy). Prevention rule 52 + CLAUDE.md section "Supabase client access". Lockdown complete except: DNS removal of beta.defensivepedal.com and the GDPR decision (owner).
 
 - **2026-10-15: Supabase security lockdown, Batch B LIVE** (migration `202610150001`, DB-only). Applied after a clean Batch A soak (hazards-expire 200 at 00:00Z, 699 FixMyStreet imports, 0 API 5xx / 0 permission errors; no rider trip/hazard writes occurred in the window — evidence is the cron path + 31 app-opens). Clients can no longer write ANY public table (55 own-row write policies dropped — self-awarded XP/badges/streaks, direct hazard votes, trips bypassing validation), cannot read `hazards` (was 21,902 rows to the anon key) or other riders' `trip_shares` (530 rows to any anonymous session), cannot call the route-share definer functions; avatars capped at 2 MB images. Before/after probes replayed as anon/authenticated with service-role controls; API smoke test green. Also 2026-10-14: auth Site URL → routes.defensivepedal.com, stale beta/v0/vercel redirect entries removed. Remaining: Batch C (default privileges), DNS removal, GDPR decision — error-log #138.
 

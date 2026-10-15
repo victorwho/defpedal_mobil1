@@ -274,15 +274,17 @@ Apply the swap migration. Inside one transaction:
 alter table road_risk_data rename to road_risk_data_v<N-1>_old;
 alter index if exists road_risk_data_pkey rename to road_risk_data_v<N-1>_old_pkey;
 alter index if exists road_risk_data_geom_idx rename to road_risk_data_v<N-1>_old_geom_idx;
-alter policy "Allow public read access to road_risk_data" on road_risk_data_v<N-1>_old
-  rename to "Allow public read access to road_risk_data_v<N-1>_old";
 
 alter table road_risk_data_v<N> rename to road_risk_data;
 alter index road_risk_data_v<N>_pkey rename to road_risk_data_pkey;
 alter index road_risk_data_v<N>_geom_idx rename to road_risk_data_geom_idx;
-alter policy "Allow public read access to road_risk_data_v<N>" on road_risk_data
-  rename to "Allow public read access to road_risk_data";
 ```
+
+⚠️ **No policy renames.** The live `road_risk_data` has RLS on and **no policies**
+(only mobile-api reads it, with the service-role key, which bypasses RLS). The
+v22 template above renamed a public-read policy; running that today aborts the
+swap transaction on a policy that does not exist. Never give the staging table
+a policy (see gotcha 2).
 
 See `supabase/migrations/202605270004_road_risk_data_v22_swap.sql` for the
 canonical template.
@@ -368,12 +370,16 @@ on Pro plans.
    `statement_timeout = 0` for the session before COPYing 6M rows.
    `idle_in_transaction_session_timeout = 0` too, defensively.
 
-2. **Supabase default ACL is too permissive on new tables.** `CREATE TABLE`
-   grants ALL privileges to `anon`/`authenticated`/`service_role` by
-   default. The live `road_risk_data` only has SELECT for those roles.
-   Always `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER`
-   on a fresh staging table before the swap. See migration
-   `202605270003_road_risk_data_v22_revoke_excess_grants.sql`.
+2. **Staging table: RLS on, no policies, service_role only.** Until
+   2026-10-15 Supabase's default ACL granted ALL to `anon`/`authenticated` on
+   every new table, so v22 had to REVOKE by hand
+   (`202605270003_road_risk_data_v22_revoke_excess_grants.sql`). Since
+   migration `202610150002` a new `postgres`-owned table in `public` gets
+   `service_role` only — but VERIFY rather than assume:
+   `select has_table_privilege('anon', 'road_risk_data_v<N>', 'SELECT')` must
+   be false, and `ENABLE ROW LEVEL SECURITY` with no `CREATE POLICY`. Raw
+   scores are the IP the API quantizes; never make them client-readable
+   (error-log #138). Scratch/backup copies go in the `archive` schema.
 
 3. **`get_neighborhood_safety_score` polarity bug.** The original migration
    had `safest_count` filter as `>= 70` (wrong — that's risk, not safety).
