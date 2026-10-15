@@ -265,6 +265,11 @@ export const buildRouteShareRoutes = (
     // not the request body. Anonymous Supabase sessions are accepted (same
     // pattern as POST /v1/route-shares) since the Habit Engine flow can
     // activate the invitee before they sign up for a full account.
+    // Since 2026-10-15 the claim_route_share RPC gives an ANONYMOUS invitee the
+    // route only — no follow edge, sign-up count, feed card, or sharer XP/badges
+    // (migration 202610150003). Do not gate this route on a full account: every
+    // fielded app silently drops a claim refused with 401/403, so a fresh
+    // install (anonymous until the signup wall) would lose the shared route.
     // -----------------------------------------------------------------------
     app.post<{
       Params: RouteShareClaimParams;
