@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-14 (Supabase security lockdown Batch A; legacy web app retired)
+Last updated: 2026-10-15 (Supabase security lockdown Batch B)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-15: Supabase security lockdown, Batch B LIVE** (migration `202610150001`, DB-only). Applied after a clean Batch A soak (hazards-expire 200 at 00:00Z, 699 FixMyStreet imports, 0 API 5xx / 0 permission errors; no rider trip/hazard writes occurred in the window — evidence is the cron path + 31 app-opens). Clients can no longer write ANY public table (55 own-row write policies dropped — self-awarded XP/badges/streaks, direct hazard votes, trips bypassing validation), cannot read `hazards` (was 21,902 rows to the anon key) or other riders' `trip_shares` (530 rows to any anonymous session), cannot call the route-share definer functions; avatars capped at 2 MB images. Before/after probes replayed as anon/authenticated with service-role controls; API smoke test green. Also 2026-10-14: auth Site URL → routes.defensivepedal.com, stale beta/v0/vercel redirect entries removed. Remaining: Batch C (default privileges), DNS removal, GDPR decision — error-log #138.
 
 - **2026-10-14: Supabase security lockdown, Batch A LIVE** (migration `202610140001`, DB-only, no app/API release). Closed client write paths nothing uses: anonymous sessions could PATCH their own `profiles` (XP, tier, Plus paywall flag); 7 RLS-off `iasi_*` risk backups (anon read/write) moved to private `archive` schema; three "service role" insert policies that were really PUBLIC `WITH CHECK (true)` dropped; anon NULL-owner inserts into hazards/navigation_feedback closed; TRUNCATE/REFERENCES/TRIGGER revoked. Every attack replayed as anon/authenticated before (succeeded) and after (42501); API health + hazards nearby verified. Legacy AI Studio web app (`beta.defensivepedal.com`, Cloud Run `copy-of-pedala-deploy` + `pedala-deploy`) deleted — it wrote trips/hazards from the browser with the anon key; traffic was scanners. Error-log #138 has Batch B/C + open items (auth `site_url` still the deleted domain, GDPR decision, OSRM nginx limits).
 
