@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-15 (Supabase security lockdown Batches B + C)
+Last updated: 2026-10-15 (security lockdown complete; API per-client rate limiting)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-15: API rate limiting actually per-client — Cloud Run `defpedal-api-00181-dzd`** (main `e40a859`, deployed by digest from a clean worktree). Every IP-keyed limit had been one global bucket because Cloud Run's proxy was `request.ip` (elevation-profile 429'd riders 38×/30d); now trusts one proxy hop, verified live against a forged X-Forwarded-For. Added per-user limits to likes/loves, feed share, route-share creation and the five feed/community reads; `/hazards/:id/validate` now full-account only. 1,260 API tests (3 new, each mutation-checked). Also: OSRM_Server docs corrected to the real serving box 144.76.3.230 (`5d53b8e`); Sentry DEFENSIVE-PEDAL-MOBILE-1E diagnosed as the already-fixed #136 loop (preview 0.2.184 only).
 
 - **2026-10-15: Supabase security lockdown, Batch C LIVE** (migration `202610150002`). New tables/sequences/functions created by `postgres` in `public` are now born service-role-only (no anon/authenticated, no PUBLIC EXECUTE) — probe-verified before/after in a rolled-back transaction. Risk-data runbooks fixed in both repos (OSRM_Server pipeline doc granted anon on staging; defpedal swap template renamed a non-existent policy). Prevention rule 52 + CLAUDE.md section "Supabase client access". Lockdown complete except: DNS removal of beta.defensivepedal.com and the GDPR decision (owner).
 
