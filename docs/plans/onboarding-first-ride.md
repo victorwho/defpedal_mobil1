@@ -229,7 +229,10 @@ to be more serious".
 
 ## Build order
 
-1. ✅ Baseline query + kill switch, server half (2026-10-16, not yet deployed).
+1. ✅ Baseline query + kill switch, server half — LIVE 2026-10-17 on Cloud Run
+   `defpedal-api-00182-km7` (main `0407a10`, deployed by digest
+   `sha256:b777f781…`; verified with a throwaway anonymous session: field
+   present, `false`). Switch is OFF.
    The client read + per-install persistence lands with step 2, where it has
    a consumer.
 2. Device-scoped route stash + `onboarding/ride-intent` + `onboarding/route-reveal`

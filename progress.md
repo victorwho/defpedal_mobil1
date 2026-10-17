@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-15 (security lockdown complete; API per-client rate limiting)
+Last updated: 2026-10-17 (onboarding first-ride: spec + kill switch live)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-17: Onboarding → first ride, step 1 LIVE — Cloud Run `defpedal-api-00182-km7`** (main `0407a10`, deployed by digest from a clean worktree). Spec `docs/plans/onboarding-first-ride.md` (13 product decisions from a grill-me session): value-first flow — ride intent (commute / short loop / specific + bike type incl. new `none`) → the rider's own route painted by risk with 3 Pedal coachmarks → signup "keep this route" → Start ride or Ride it later (local reminder with forecast). Shipped now: `GET /v1/profile` returns `onboardingFirstRideEnabled` (env `ONBOARDING_FIRST_RIDE_ENABLED`, OFF; client will fail closed), verified live with a throwaway anonymous session (deleted after); baseline query `scripts/onboarding/first-ride-baseline.sql` — Aug 3–Sep 28: 356 sign-ups, 121 started a ride ≤24 h, **25 saved a ride ≤7 d**. Spec traps: signup wipes `routePreview` via `resetUserScopedState` (needs a device-scoped stash); the reveal must live under `/onboarding/*` (gate walls anonymous sessions elsewhere); e-bike is Plus-gated (no paywall in onboarding). Next: step 2 (route stash + ride-intent + route-reveal screens, client half of the switch).
 
 - **2026-10-15: anonymous route-share claims get the route, not the social credit** (migration `202610150003`, DB-only, owner decision "strip credit, keep route"). `claim_route_share` made every anonymous claimant a follower of the sharer, bumped `signup_count`, posted a feed card and awarded referral XP/badges (5 of the first 8 claimants are still anonymous). Anonymous invitees now get the claim row, saved route, payload and their own +50 XP only; conversion count reads `auth.users` so a later-merged account counts. Blocking the claim was rejected — fresh installs claim before the signup wall and fielded apps silently drop a 401/403 claim. Verified in rolled-back transactions against a control (old 1/1/1/1 → new 0/0/0/0 for an anonymous claim; full-account claim unchanged). Post-Batch-B production evidence: 1 real trip end + 10 app opens written, 0 API 5xx/permission errors; a ride START and GPS track upload not yet observed. Open (optional): Redis/Memorystore for shared rate-limit counters, disabling `/graphql/v1`, the 5 legacy anonymous claims (rider-visible history, left as is), resolve Sentry DEFENSIVE-PEDAL-MOBILE-1E in the UI (token lacks `event:write`).
 
