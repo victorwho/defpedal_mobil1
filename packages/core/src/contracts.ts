@@ -1380,6 +1380,12 @@ export interface ProfileResponse {
    * months.
    */
   loopServerEnabled?: boolean;
+  /**
+   * Rollout switch for the value-first onboarding flow
+   * (docs/plans/onboarding-first-ride.md [D12]). Read by the anonymous
+   * session before signup. Absent means OFF — the client keeps today's flow.
+   */
+  onboardingFirstRideEnabled?: boolean;
   /** Pedal Plus entitlement + paywall visibility. Server-owned. */
   premium: ProfilePremium;
 }
