@@ -57,6 +57,7 @@ import { brandTints, safetyTints, surfaceTints } from '../src/design-system/toke
 const BIKE_TYPE_KEYS = [
   'profile.bikeRoad', 'profile.bikeCity', 'profile.bikeMountain',
   'profile.bikeEbike', 'profile.bikeRecumbent', 'profile.bikeOther',
+  'profile.bikeNone',
 ] as const;
 
 const CYCLING_FREQUENCY_KEYS = [

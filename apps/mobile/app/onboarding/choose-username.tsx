@@ -28,6 +28,7 @@ import {
 } from '../../src/design-system/tokens/typography';
 import { mobileApi } from '../../src/lib/api';
 import { navigateAfterOnboarding } from '../../src/lib/post-onboarding-nav';
+import { suggestUsername } from '../../src/lib/suggestUsername';
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
 
@@ -60,6 +61,8 @@ export default function ChooseUsernameScreen() {
           navigateAfterOnboarding();
           return;
         }
+        // One tap to continue [D5]: start from a name built off the account.
+        if (!cancelled) setUsername(suggestUsername(profile.displayName, null));
       } catch {
         // Network/profile failure → show the prompt rather than block the user.
       }

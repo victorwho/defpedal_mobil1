@@ -20,6 +20,7 @@ const ctx = (overrides: Partial<LoopIntroContext> = {}): LoopIntroContext => ({
   hasUsedLoops: false,
   countryCode: 'RO',
   onboardingCompleted: true,
+  appOpenCount: 3,
   appState: 'IDLE',
   now: NOW,
   ...overrides,
@@ -28,6 +29,12 @@ const ctx = (overrides: Partial<LoopIntroContext> = {}): LoopIntroContext => ({
 describe('shouldShowLoopIntro', () => {
   it('shows to a rider who never used loops, where loops work', () => {
     expect(shouldShowLoopIntro(ctx())).toBe(true);
+  });
+
+  it('waits for the third app open — never on the first two', () => {
+    expect(shouldShowLoopIntro(ctx({ appOpenCount: 1 }))).toBe(false);
+    expect(shouldShowLoopIntro(ctx({ appOpenCount: 2 }))).toBe(false);
+    expect(shouldShowLoopIntro(ctx({ appOpenCount: 3 }))).toBe(true);
   });
 
   it('never shows to someone who has already used loops', () => {

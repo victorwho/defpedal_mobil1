@@ -60,6 +60,7 @@ const ROWS: ReadonlyArray<{
   { id: 'ebike', icon: 'flash-outline', labelKey: 'profile.bikeEbike', descKey: 'onboarding.bikeEbikeDesc' },
   { id: 'recumbent', icon: 'body-outline', labelKey: 'profile.bikeRecumbent', descKey: 'onboarding.bikeRecumbentDesc' },
   { id: 'other', icon: 'bicycle-outline', labelKey: 'profile.bikeOther', descKey: 'onboarding.bikeOtherDesc' },
+  { id: 'none', icon: 'help-circle-outline', labelKey: 'profile.bikeNone', descKey: 'onboarding.bikeNoneDesc' },
 ];
 
 export default function OnboardingBikeTypeScreen() {

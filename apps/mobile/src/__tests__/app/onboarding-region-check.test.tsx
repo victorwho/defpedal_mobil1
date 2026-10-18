@@ -28,9 +28,10 @@ vi.mock('expo-router', () => ({
   router: { push: vi.fn(), replace: vi.fn() },
 }));
 
-const { mockDetectCountryCode, mockJoinCountryWaitlist } = vi.hoisted(() => ({
+const { mockDetectCountryCode, mockJoinCountryWaitlist, mockGetProfile } = vi.hoisted(() => ({
   mockDetectCountryCode: vi.fn(),
   mockJoinCountryWaitlist: vi.fn(),
+  mockGetProfile: vi.fn(),
 }));
 
 vi.mock('../../lib/regionGate', () => ({
@@ -38,7 +39,7 @@ vi.mock('../../lib/regionGate', () => ({
 }));
 
 vi.mock('../../lib/api', () => ({
-  mobileApi: { joinCountryWaitlist: mockJoinCountryWaitlist },
+  mobileApi: { joinCountryWaitlist: mockJoinCountryWaitlist, getProfile: mockGetProfile },
 }));
 
 // Echo translation keys so assertions can match on the key string.
@@ -86,8 +87,11 @@ beforeEach(() => {
     // 2026-07-16) — start each test from a fresh install's state.
     onboardingCompleted: false,
     anonymousOpenCount: 1,
+    onboardingFlow: null,
   });
   mockJoinCountryWaitlist.mockResolvedValue({ status: 'joined' });
+  // Server switch off by default: today's flow.
+  mockGetProfile.mockResolvedValue({ onboardingFirstRideEnabled: false });
 });
 
 describe('Region gate — GPS detection', () => {
@@ -173,7 +177,9 @@ describe('Region gate — country picker', () => {
       status: 'passed',
       countryCode: 'RO',
     });
-    expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt');
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
+    );
   });
 
   it('moves to the waitlist when an unsupported country is picked', async () => {
@@ -247,7 +253,9 @@ describe('Region gate — waitlist', () => {
       status: 'waitlisted',
       countryCode: 'US',
     });
-    expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt');
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
+    );
   });
 
   it('Change country returns to the picker', async () => {
@@ -257,5 +265,58 @@ describe('Region gate — waitlist', () => {
     fireEvent.click(screen.getByText('onboarding.regionChangeCountry'));
 
     await screen.findByText('onboarding.regionPickerTitle');
+  });
+});
+
+describe('Region gate — which onboarding runs (docs/plans/onboarding-first-ride.md [D12])', () => {
+  beforeEach(() => {
+    mockDetectCountryCode.mockResolvedValue('FR');
+  });
+
+  it('sends a fresh install to the first-ride flow when the server switch is on, without completing onboarding', async () => {
+    mockGetProfile.mockResolvedValue({ onboardingFirstRideEnabled: true });
+    render(<OnboardingRegionCheckScreen />);
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/ride-intent'),
+    );
+    expect(useAppStore.getState().onboardingFlow).toBe('first_ride');
+    // Completion waits for the account; a hard-close before signup must
+    // re-enter this flow, not land on the bare wall.
+    expect(useAppStore.getState().onboardingCompleted).toBe(false);
+    expect(router.replace).not.toHaveBeenCalledWith('/onboarding/signup-prompt');
+  });
+
+  it('fails closed to today’s flow when the profile read fails, without persisting it', async () => {
+    mockGetProfile.mockRejectedValue(new Error('401'));
+    render(<OnboardingRegionCheckScreen />);
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
+    );
+    // Not a server answer, so the question stays open for the next pass —
+    // a slow first launch must not lock the install out of the new flow.
+    expect(useAppStore.getState().onboardingFlow).toBeNull();
+  });
+
+  it('persists a definitive "off" from the server', async () => {
+    render(<OnboardingRegionCheckScreen />);
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/signup-prompt'),
+    );
+    expect(useAppStore.getState().onboardingFlow).toBe('legacy');
+  });
+
+  it('keeps a persisted decision and does not ask the server again', async () => {
+    useAppStore.setState({ onboardingFlow: 'first_ride' });
+    // Switch now OFF server-side — the install must stay on its flow.
+    mockGetProfile.mockResolvedValue({ onboardingFirstRideEnabled: false });
+    render(<OnboardingRegionCheckScreen />);
+
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith('/onboarding/ride-intent'),
+    );
+    expect(mockGetProfile).not.toHaveBeenCalled();
   });
 });

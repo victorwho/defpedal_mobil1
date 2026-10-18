@@ -55,7 +55,7 @@ Existing installs mid-flow are unaffected.
   Keeps `source: 'generated_loop'` so reroute stays suppressed.
 - **Somewhere specific** → search.
 
-**What do you ride?** Regular bike · E-bike · **I don't have one yet**.
+**What do you ride?** Mountain bike · Road or city bike · E-bike · **I don't have one yet** (split from a single "regular bike" on 2026-10-17, owner request). Only **Road or city** turns "Avoid unpaved roads" ON; every other answer sets it OFF explicitly, so changing the answer after going back cannot leave the previous setting behind.
 `setBikeType` applies the routing default (`avoidUnpavedForBikeType`) before
 the route is computed. "I don't have one yet" is recorded as the new
 bike-type id `none` ([D11]) for the near-cyclist cohort.
@@ -111,12 +111,17 @@ framing, never in the safety claim.
 
 ## Engineering traps found while specifying
 
-1. **Signup wipes the route.** `resetUserScopedState` (`appStore.ts` ~1848)
-   resets `routePreview`, `selectedRouteId` and `routeRequest`, and it runs on
-   user-id change — which the anonymous → real account transition is. The
-   reveal's route must be stashed in a **device-scoped** slot that reset does
-   not touch (pattern: `pendingCourseImport`), restored at #8, then cleared.
-   Verify on a device: Google, Apple and email signups each change the id.
+1. ~~**Signup wipes the route.**~~ **Wrong — corrected 2026-10-17 while
+   building step 2.** `UserCacheResetBridge` deliberately skips
+   `resetUserScopedState` on the anonymous → real-account transition, so
+   `routePreview` survives signup and `finishPostSignupSteps` already opens
+   `/route-preview` with it. No device-scoped stash was needed. The real gap
+   was narrower: EMAIL signups land on `/`, where `app/index.tsx` clears a
+   real account's ROUTE_PREVIEW as stale. The non-persisted
+   `onboardingRouteFresh` flag now exempts the onboarding route there. Loops
+   never live in `routePreview`, so they are handed over in the (also
+   non-persisted) `onboardingLoop` field and started from
+   `onboarding/ride-loop` through `beginLoopRide`.
 2. **E-bike is Plus-gated.** `bike-type.tsx` opens the paywall when
    `premium.blockEbikeRouting()`. A paywall before the signup wall would be
    the worst possible first impression. Resolved by [D10].
@@ -164,9 +169,10 @@ spikes), so read signup rate with care.
 - PostHog events, all prefixed `onb_`: `onb_intent_selected {intent,
   bikeType}`, `onb_route_shown {mode, riskAvailable, isLoop, ms}`,
   `onb_coachmark {step, action: next|skip}`, `onb_route_failed {reason}`,
-  `onb_cta_save_tapped`, existing `signup_wall_shown` / `signup_completed`
-  (add `source: 'route_reveal'`), `onb_ride_now`, `onb_ride_later {slot}`,
-  `onb_reminder_tapped`.
+  `onb_cta_save_tapped`, existing `signup_wall_shown` (now with `source: route_reveal|intro`) /
+  `signup_completed` (keeps `source: 'wall'` so the registration-funnel
+  dashboard is unchanged, adds `from: route_reveal|intro`), `onb_ride_now`, `onb_ride_later {slot}`,
+  `onb_reminder_tapped`, `onb_route_skipped {reason: no_location|route_failed}`.
 
 ## Copy (EN draft — RO/ES after approval)
 
@@ -218,8 +224,13 @@ to be more serious".
      several seconds.
    - **Fails closed**: profile not loaded, request failed, or field absent
      (older server) → today's flow.
-   - The answer is **persisted per install** once taken, so flipping the
-     switch mid-flow never strands a rider between two flows.
+   - The answer is **persisted per install** once the server has actually
+     answered, so flipping the switch mid-flow never strands a rider between
+     two flows. A timeout or failed read runs today's flow for that pass and
+     is NOT persisted (code review 2026-10-17): a slow first launch must not
+     lock the install out of the new flow for good.
+   - Cost of the decision: region-check now waits up to 2.5 s for the profile
+     read on a fresh install, on BOTH flows (normally well under that).
    - Add the field to the Fastify response schema or it is stripped
      (CLAUDE.md gotcha #9), and test that an anonymous session receives it.
    - PostHog feature flags were rejected: analytics can be switched off by the
@@ -235,8 +246,28 @@ to be more serious".
    present, `false`). Switch is OFF.
    The client read + per-install persistence lands with step 2, where it has
    a consumer.
-2. Device-scoped route stash + `onboarding/ride-intent` + `onboarding/route-reveal`
-   without coachmarks; device-verify the stash survives all three signup methods.
+2. ✅ Built 2026-10-17 (not yet device-tested, not released): client half of
+   the switch (decided once at the end of region-check, persisted per install,
+   fails closed — including when the profile read throws synchronously),
+   `onboarding/ride-intent`, `onboarding/route-reveal` (no coachmarks yet),
+   `onboarding/ride-loop`, "keep this route" copy on the wall, prefilled
+   username, bike type `none` (Profile picker + legacy bike-type screen too),
+   comparison copy extracted to `src/lib/routeComparisonCopy.ts` and shared
+   with `/route-preview`. Deviations from the spec, deliberately:
+   - **Location denied hides BOTH ways to route**, not only the loop: an A-to-B
+     route needs a start too. The screen explains and offers **Skip for now**
+     to the wall.
+   - **A failed route offers "Try another" AND "Skip for now" at once**,
+     rather than skip only after a second failure.
+   - Bike answers map to ids: Mountain → `mountain`, Road/City → `city`
+     (shows the existing "we'll turn on Avoid unpaved" line), E-bike → `ebike`,
+     none → `none`.
+   - The loop screen (#8) has **Maybe later**, which drops the hand-off and
+     opens the planner. Until step 4's "Ride it later" exists, a rider who
+     does not want to ride now would otherwise be bounced back to it.
+   Still to verify on a device: Google, Apple and email signups each reach the
+   kept route (A-to-B and loop); a hard-close between signup and #8 lands on
+   the planner (expected — the hand-off is in memory only).
 3. `Coachmark` organism + the three steps.
 4. #8 Ride it later + reminder notification (preview build — dev's bridge mode
    hides bridgeless notification failures).

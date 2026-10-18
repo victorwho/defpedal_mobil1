@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -33,6 +33,7 @@ import {
 import { mobileApi } from '../../src/lib/api';
 import { ALL_COUNTRIES, findCountryName } from '../../src/lib/countries';
 import { detectCountryCode } from '../../src/lib/regionGate';
+import { decideOnboardingFlow } from '../../src/lib/onboardingFlow';
 import { useAppStore } from '../../src/store/appStore';
 import { useT } from '../../src/hooks/useTranslation';
 
@@ -83,7 +84,41 @@ export default function OnboardingRegionCheckScreen() {
     null,
   );
 
+  // The flow decision awaits a network read, so guard against a second tap
+  // starting a second decision and against navigating after the rider left.
+  const proceedingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const proceedToSignupPrompt = () => {
+    if (proceedingRef.current) return;
+    proceedingRef.current = true;
+    void proceed();
+  };
+
+  const proceed = async () => {
+    // Which onboarding this install runs [D12]. Only a definitive server
+    // answer is persisted (see decideOnboardingFlow). The new flow defers
+    // "onboarding complete" until the rider has an account
+    // (UserCacheResetBridge marks it), so a hard-close before signup
+    // re-enters the flow here rather than landing on the bare wall.
+    let flow = useAppStore.getState().onboardingFlow;
+    if (flow === null) {
+      const decision = await decideOnboardingFlow(() => mobileApi.getProfile());
+      if (!mountedRef.current) return;
+      flow = decision.flow;
+      if (decision.definitive) useAppStore.getState().setOnboardingFlow(flow);
+    }
+    if (flow === 'first_ride' && !useAppStore.getState().onboardingCompleted) {
+      router.replace('/onboarding/ride-intent' as any);
+      return;
+    }
+
     const store = useAppStore.getState();
     const wasInitialOnboarding = !store.onboardingCompleted;
     store.setOnboardingCompleted(true);

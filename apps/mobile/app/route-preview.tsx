@@ -1,6 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import type { MeasurementSystem } from '@defensivepedal/core';
-import { SHARE_MIN_TRIMMABLE_METERS, describeBusyRoadSaving, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
+import { SHARE_MIN_TRIMMABLE_METERS, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -53,6 +52,7 @@ import { mobileApi } from '../src/lib/api';
 import { telemetry } from '../src/lib/telemetry';
 import { ModeTogglePill } from '../src/components/ModeTogglePill';
 import { isLastAllowedAddition } from '../src/lib/plus-nudges';
+import { describeRouteComparison, formatStretchDistance } from '../src/lib/routeComparisonCopy';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -103,15 +103,6 @@ const formatDuration = (seconds: number): string => {
 /** Minimum contiguous high-risk stretch (m) before the busy-road callout shows. */
 const BUSY_STRETCH_MIN_M = 150;
 
-/**
- * Busy-stretch distances round to the nearest 10 m (or the formatter's 10 ft)
- * — a callout that says "183 m on a busy road" implies a precision the
- * risk-segment geometry does not have.
- */
-const formatStretchDistance = (meters: number, units: MeasurementSystem): string =>
-  meters >= 1000
-    ? formatDistance(meters, units)
-    : formatDistance(Math.round(meters / 10) * 10, units);
 const formatCoordinateLabel = (lat: number, lon: number) => `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
 
 function RoutePreviewScreen() {
@@ -155,6 +146,15 @@ function RoutePreviewScreen() {
   const routePreview = useAppStore((state) => state.routePreview);
   const selectedRouteId = useAppStore((state) => state.selectedRouteId);
   const setRoutePreview = useAppStore((state) => state.setRoutePreview);
+  // First-ride onboarding hand-off: remember it for the Start event, and
+  // consume the flag on arrival so `/` treats a later preview as stale again
+  // (app/index.tsx).
+  const fromOnboardingRef = useRef(useAppStore.getState().onboardingRouteFresh);
+  useEffect(() => {
+    if (useAppStore.getState().onboardingRouteFresh) {
+      useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
+    }
+  }, []);
   const setSelectedRouteId = useAppStore((state) => state.setSelectedRouteId);
   const setVoiceGuidanceEnabled = useAppStore((state) => state.setVoiceGuidanceEnabled);
   const startNavigation = useAppStore((state) => state.startNavigation);
@@ -412,74 +412,12 @@ function RoutePreviewScreen() {
     return longestHighRiskStretchMeters(selectedRoute.riskSegments);
   }, [selectedRoute, routePreview?.selectedMode]);
 
-  // Safe-vs-fast comparison badge content. Prefers the structured
-  // `comparison` (localized copy); falls back to the legacy free-text
-  // `comparisonLabel` for previews persisted by pre-2026-08 builds.
-  const comparisonContent = useMemo(() => {
-    const comparison = routePreview?.comparison;
-    if (comparison) {
-      let title: string;
-      let subtitle: string | null = null;
-      if (comparison.against === 'fast') {
-        if (comparison.verdict === 'safer') {
-          /*
-           * Quantify "calmer" where we honestly can.
-           *
-           * The saving is metres on HIGH-RISK roads — length-weighted, and a
-           * tier-level figure rather than the score-level `diffPercent` that
-           * this comparison has always carried and never rendered. That older
-           * number is an unweighted mean over segments (a 20 m junction counts
-           * as much as a 2 km arterial) and a percentage off it reads as a
-           * likelihood claim, which the risk model does not validate.
-           *
-           * Falls back to the generic line when there is no saving to quote —
-           * including when the safe route uses MORE busy road, which happens.
-           */
-          const saving = comparison.busyRoadMeters
-            ? describeBusyRoadSaving(
-                comparison.busyRoadMeters.current,
-                comparison.busyRoadMeters.comparison,
-              )
-            : { kind: 'none' as const };
-          const savingLine =
-            saving.kind === 'saves'
-              ? t('preview.comparison.busySaving', {
-                  distance: formatStretchDistance(saving.metersSaved, units),
-                })
-              : null;
-
-          if (comparison.extraMinutes) {
-            title = t('preview.comparison.calmerCost', { minutes: comparison.extraMinutes });
-            subtitle = savingLine ?? t('preview.comparison.calmerCostSub');
-          } else {
-            title = t('preview.comparison.calmerFree');
-            subtitle = savingLine;
-          }
-        } else if (comparison.verdict === 'similar') {
-          title = t('preview.comparison.similarFast');
-        } else {
-          title = t('preview.comparison.sameFast');
-        }
-      } else if (comparison.verdict === 'less_safe') {
-        title = comparison.diffPercent >= 1
-          ? t('preview.comparison.lessSafe', { percent: comparison.diffPercent })
-          : t('preview.comparison.slightlyLessSafe');
-      } else if (comparison.verdict === 'similar') {
-        title = t('preview.comparison.similarSafe');
-      } else {
-        title = t('preview.comparison.sameSafe');
-      }
-      return { title, subtitle, isWarning: comparison.verdict === 'less_safe' };
-    }
-    if (routePreview?.comparisonLabel) {
-      return {
-        title: routePreview.comparisonLabel,
-        subtitle: null,
-        isWarning: routePreview.comparisonLabel.includes('less safe'),
-      };
-    }
-    return null;
-  }, [routePreview?.comparison, routePreview?.comparisonLabel, t]);
+  // Safe-vs-fast comparison badge content — shared with the onboarding
+  // route reveal (src/lib/routeComparisonCopy.ts).
+  const comparisonContent = useMemo(
+    () => describeRouteComparison(routePreview, t, units),
+    [routePreview, t, units],
+  );
 
 
   // Slice 6: the share button no longer jumps straight to the native
@@ -663,6 +601,12 @@ function RoutePreviewScreen() {
       return;
     }
     navigationStartedRef.current = true;
+
+    // Goal event of the first-ride onboarding (docs/plans/onboarding-first-ride.md).
+    if (fromOnboardingRef.current) {
+      fromOnboardingRef.current = false;
+      telemetry.capture('onb_ride_now', { isLoop: false });
+    }
 
     // Flat-route quota is consumed HERE — when a ride actually begins — not
     // when a route is previewed. The preview mode pill refetches on every

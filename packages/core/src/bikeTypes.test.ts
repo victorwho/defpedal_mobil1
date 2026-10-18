@@ -30,11 +30,12 @@ const LABELS: Record<BikeTypeId, readonly string[]> = {
   ebike: ['E-bike', 'Bicicletă electrică', 'Bicicleta eléctrica'],
   recumbent: ['Recumbent', 'Bicicletă recumbent', 'Bicicleta reclinada'],
   other: ['Other', 'Altele', 'Otra'],
+  none: ['No bike yet', 'Încă nu am bicicletă', 'Aún no tengo bici'],
 };
 
 describe('bike type ids', () => {
   it('exposes every id exactly once, in picker order', () => {
-    expect(BIKE_TYPE_IDS).toEqual(['road', 'city', 'mountain', 'ebike', 'recumbent', 'other']);
+    expect(BIKE_TYPE_IDS).toEqual(['road', 'city', 'mountain', 'ebike', 'recumbent', 'other', 'none']);
     expect(new Set(BIKE_TYPE_IDS).size).toBe(BIKE_TYPE_IDS.length);
   });
 
@@ -69,6 +70,7 @@ describe('routing implications', () => {
     // would silently reset a preference the rider had chosen.
     expect(avoidUnpavedForBikeType('ebike')).toBeNull();
     expect(avoidUnpavedForBikeType('other')).toBeNull();
+    expect(avoidUnpavedForBikeType('none')).toBeNull();
     expect(avoidUnpavedForBikeType('road')).toBe(true);
     expect(avoidUnpavedForBikeType('mountain')).toBe(false);
   });

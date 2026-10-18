@@ -56,6 +56,9 @@ import { create } from 'zustand';
 import { getDeviceLocale, type Locale } from '../i18n';
 import type { ImportedCourseMeta } from '../lib/courseStorage';
 import type { SavedLoopMeta } from '../lib/loopStorage';
+import type { GeneratedLoop } from '../lib/loop-generator';
+
+export type OnboardingFlow = 'legacy' | 'first_ride';
 import { DEFAULT_ANALYTICS_PROMPT_STATE } from '../lib/analytics-optin';
 import {
   EMPTY_PLUS_NUDGE_STATE,
@@ -240,6 +243,30 @@ export type AppStore = QueueSlice & PremiumSlice & {
   loopServerEnabled: boolean;
   setLoopServerEnabled: (enabled: boolean) => void;
   /**
+   * Which onboarding this install runs (docs/plans/onboarding-first-ride.md
+   * [D12]). `null` until decided at the end of region-check from the server's
+   * `onboardingFirstRideEnabled`; failing closed means `'legacy'`. Persisted
+   * and device-scoped (NOT reset on account change) so flipping the server
+   * switch mid-flow never strands a rider between the two flows.
+   */
+  onboardingFlow: OnboardingFlow | null;
+  setOnboardingFlow: (flow: OnboardingFlow) => void;
+  /**
+   * Hand-off from the onboarding route reveal to the post-signup "ride it"
+   * screen. Deliberately NOT persisted: a cold start drops it, so a stale
+   * onboarding route can never resurface later.
+   *
+   * - `onboardingRouteFresh`: an A-to-B route is sitting in `routePreview`
+   *   because the rider just built it. `app/index.tsx` normally clears a
+   *   real account's ROUTE_PREVIEW on arrival; this is what stops it doing
+   *   so for the email-signup path, which lands on `/`.
+   * - `onboardingLoop`: the loop branch's route, which never goes through
+   *   `routePreview` (loops start from their own screen).
+   */
+  onboardingRouteFresh: boolean;
+  onboardingLoop: GeneratedLoop | null;
+  setOnboardingRideHandoff: (handoff: { fresh: boolean; loop: GeneratedLoop | null }) => void;
+  /**
    * Hazards this rider reported during the CURRENT ride, so the post-ride
    * screen can offer to escalate them. Persisted because AWAITING_FEEDBACK
    * survives an app kill and the feedback screen is reached after it.
@@ -372,6 +399,13 @@ export type AppStore = QueueSlice & PremiumSlice & {
   showHistoryOverlay: boolean;
   notificationPermissionAsked: boolean;
   anonymousOpenCount: number;
+  /**
+   * Every app open on this device, account or not: a launch, or a return
+   * after 5+ minutes in the background (same rule as `anonymousOpenCount`).
+   * Device-scoped and never reset. Gates the Loop intro so a new rider does
+   * not get it straight after onboarding.
+   */
+  appOpenCount: number;
   earnedMilestones: readonly string[];
   recentDestinations: readonly RecentDestination[];
   addRecentDestination: (destination: RecentDestination) => void;
@@ -460,6 +494,7 @@ export type AppStore = QueueSlice & PremiumSlice & {
   setOnboardingCompleted: (completed: boolean) => void;
   incrementAnonymousOpenCount: () => void;
   resetAnonymousOpenCount: () => void;
+  incrementAppOpenCount: () => void;
   setCyclingGoal: (goal: CyclingGoal | null) => void;
   setCachedCityHeartbeat: (heartbeat: CityHeartbeat) => void;
   setCachedStreak: (streak: StreakState | null) => void;
@@ -982,6 +1017,9 @@ export const useAppStore = create<AppStore>()(
       regionGate: { status: 'unchecked', countryCode: null },
       sesizariConfig: { enabled: true, baseUrl: DEFAULT_CIVIA_BASE_URL },
       loopServerEnabled: false,
+      onboardingFlow: null,
+      onboardingRouteFresh: false,
+      onboardingLoop: null,
       sessionHazardReports: [],
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
@@ -1091,6 +1129,7 @@ export const useAppStore = create<AppStore>()(
       showHistoryOverlay: false,
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
+      appOpenCount: 0,
       earnedMilestones: [],
       recentDestinations: [],
       recentCitySuggestions: [],
@@ -1296,6 +1335,9 @@ export const useAppStore = create<AppStore>()(
         })),
       setLoopServerEnabled: (enabled) =>
         set(() => ({ loopServerEnabled: enabled })),
+      setOnboardingFlow: (flow) => set(() => ({ onboardingFlow: flow })),
+      setOnboardingRideHandoff: ({ fresh, loop }) =>
+        set(() => ({ onboardingRouteFresh: fresh, onboardingLoop: loop })),
       setAnalyticsConsent: (consent) =>
         set(() => ({
           analyticsConsent: {
@@ -1308,6 +1350,8 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ anonymousOpenCount: state.anonymousOpenCount + 1 })),
       resetAnonymousOpenCount: () =>
         set(() => ({ anonymousOpenCount: 0 })),
+      incrementAppOpenCount: () =>
+        set((state) => ({ appOpenCount: state.appOpenCount + 1 })),
       setCyclingGoal: (goal) =>
         set(() => ({ cyclingGoal: goal })),
       setCachedCityHeartbeat: (heartbeat) =>
@@ -2029,6 +2073,9 @@ export const useAppStore = create<AppStore>()(
         // Persisted so a cold start with no signal keeps the last known
         // routing decision rather than silently switching path mid-rollout.
         loopServerEnabled: state.loopServerEnabled,
+        // Per-install onboarding decision [D12] — must survive a cold start
+        // mid-flow, or a switch flip would move the rider to the other flow.
+        onboardingFlow: state.onboardingFlow,
         sessionHazardReports: state.sessionHazardReports,
         analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,
@@ -2050,6 +2097,7 @@ export const useAppStore = create<AppStore>()(
         quizCountryPreference: state.quizCountryPreference,
         showMascot: state.showMascot,
         anonymousOpenCount: state.anonymousOpenCount,
+        appOpenCount: state.appOpenCount,
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
         recentCitySuggestions: state.recentCitySuggestions,

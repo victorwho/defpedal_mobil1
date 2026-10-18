@@ -16,8 +16,17 @@ export default function Index() {
   const resetFlow = useAppStore((state) => state.resetFlow);
   const bikeTypeId = useAppStore((state) => state.bikeTypeId);
   const bikeTypePromptSeen = useAppStore((state) => state.bikeTypePromptSeen);
+  // Set by the first-ride onboarding when the rider built a route just before
+  // signing up. Email signups land HERE (auth.tsx does not navigate), so this
+  // is what keeps their route instead of clearing it as stale.
+  const onboardingRouteFresh = useAppStore((state) => state.onboardingRouteFresh);
+  const onboardingLoop = useAppStore((state) => state.onboardingLoop);
   const gate = useOnboardingGate();
   const hasClearedPreviewRef = useRef(false);
+  // An onboarding route seen once keeps this mount from ever clearing it:
+  // /route-preview consumes the flag on arrival, and the preview it is
+  // showing must not then be reset as "stale" underneath it.
+  if (onboardingRouteFresh) hasClearedPreviewRef.current = true;
 
   // Gate the initial-route redirect so an anonymous user on a fresh install
   // lands on /onboarding/index instead of /route-planning. This evaluation
@@ -49,6 +58,7 @@ export default function Index() {
     gate.storeHydrated &&
     !gate.isLoading &&
     gate.hasRealAccount &&
+    !onboardingRouteFresh &&
     (appState === 'ROUTE_PREVIEW' || appState === 'AWAITING_FEEDBACK');
 
   useEffect(() => {
@@ -86,6 +96,11 @@ export default function Index() {
   // protected-path rule the signup gate uses.
   if (postSignupStepTarget) {
     return <Redirect href={postSignupStepTarget as never} />;
+  }
+
+  // First-ride onboarding, loop branch, email signup path (see above).
+  if (gate.hasRealAccount && onboardingLoop && appState !== 'NAVIGATING') {
+    return <Redirect href={'/onboarding/ride-loop' as never} />;
   }
 
   if (appState === 'NAVIGATING' && navigationSession && routePreview?.routes.length) {

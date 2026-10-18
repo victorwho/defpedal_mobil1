@@ -14,6 +14,10 @@
  * Loops are generated on our OSRM graph with no degraded mode, so elsewhere
  * "Try it" would land on a planner that can only explain why it cannot run.
  *
+ * Not on the first two opens (product decision 2026-10-18): a new rider has
+ * just been through onboarding and their first ride, and the intro straight
+ * after that was one ask too many. It waits for the third app open.
+ *
  * Only when the app is IDLE: never during onboarding (a fresh install has a
  * mandatory signup wall to get through first), mid-ride, over a route preview,
  * or over the post-ride feedback screen.
@@ -34,6 +38,8 @@ export const EMPTY_LOOP_INTRO_STATE: LoopIntroState = {
 
 export const LOOP_INTRO_SPACING_DAYS = 7;
 export const LOOP_INTRO_MAX_CLOSES = 3;
+/** App opens that must already have happened before the intro may show. */
+export const LOOP_INTRO_MIN_PREVIOUS_OPENS = 2;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -43,6 +49,8 @@ export interface LoopIntroContext {
   /** The region gate's country (ISO alpha-2), or null when unknown. */
   readonly countryCode: string | null;
   readonly onboardingCompleted: boolean;
+  /** App opens on this device so far, INCLUDING the current one. */
+  readonly appOpenCount: number;
   readonly appState: AppState;
   readonly now: Date;
 }
@@ -59,6 +67,7 @@ export const shouldShowLoopIntro = (ctx: LoopIntroContext): boolean =>
   !ctx.state.retired &&
   ctx.state.closes < LOOP_INTRO_MAX_CLOSES &&
   ctx.onboardingCompleted &&
+  ctx.appOpenCount > LOOP_INTRO_MIN_PREVIOUS_OPENS &&
   // IDLE only: never over a ride, a route being previewed, or the post-ride
   // feedback screen a rider lands on when reopening right after a ride.
   ctx.appState === 'IDLE' &&

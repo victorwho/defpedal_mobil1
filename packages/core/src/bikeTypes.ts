@@ -23,7 +23,11 @@ export type BikeTypeId =
   | 'mountain'
   | 'ebike'
   | 'recumbent'
-  | 'other';
+  | 'other'
+  // "I don't have one yet" (onboarding, 2026-10-16 [D11]). A prospect, not a
+  // bike: implies no surface preference, and any ride they do record is on a
+  // borrowed or rental bike, so calories/microlives treat it as acoustic.
+  | 'none';
 
 /** Display order — shared by the Profile picker and the onboarding screen. */
 export const BIKE_TYPE_IDS = [
@@ -33,6 +37,7 @@ export const BIKE_TYPE_IDS = [
   'ebike',
   'recumbent',
   'other',
+  'none',
 ] as const satisfies readonly BikeTypeId[];
 
 export const isBikeTypeId = (value: unknown): value is BikeTypeId =>
@@ -104,7 +109,7 @@ const normalizeLabel = (raw: string): string =>
 const LEGACY_LABEL_TO_ID: Record<string, BikeTypeId> = {
   // ids (idempotent)
   road: 'road', city: 'city', mountain: 'mountain',
-  ebike: 'ebike', recumbent: 'recumbent', other: 'other',
+  ebike: 'ebike', recumbent: 'recumbent', other: 'other', none: 'none',
   // en
   'road bike': 'road',
   'city bike': 'city',
@@ -124,6 +129,11 @@ const LEGACY_LABEL_TO_ID: Record<string, BikeTypeId> = {
   'bicicleta de montana': 'mountain',
   'bicicleta reclinada': 'recumbent',
   otra: 'other',
+  // "none" labels (2026-10-16). Ids are what is stored now; listed so the
+  // map stays complete for every picker label in every locale.
+  'no bike yet': 'none',
+  'inca nu am bicicleta': 'none',
+  'aun no tengo bici': 'none',
 };
 
 /**

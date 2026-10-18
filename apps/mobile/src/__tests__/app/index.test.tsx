@@ -338,3 +338,81 @@ describe('Index route — signup gate (GH issue #23 regression coverage)', () =>
     expect(lastRedirectHref).toBe('/navigation');
   });
 });
+
+describe('Index route — first-ride onboarding hand-off (email signup lands here)', () => {
+  const preview = {
+    routes: [
+      {
+        id: 'onb-route',
+        source: 'custom_osrm',
+        routingEngineVersion: 'safe-osrm-v1',
+        routingProfileVersion: 'safety-profile-v1',
+        mapDataVersion: 'osm-europe-current',
+        riskModelVersion: 'risk-model-v1',
+        geometryPolyline6: '_o~iF~ps|U_ulLnnqC',
+        distanceMeters: 1200,
+        durationSeconds: 420,
+        adjustedDurationSeconds: 450,
+        totalClimbMeters: 24,
+        steps: [],
+        riskSegments: [],
+        routeFeatures: [],
+        warnings: [],
+      },
+    ],
+    selectedMode: 'safe',
+    coverage: { countryCode: 'RO', status: 'supported', safeRouting: true, fastRouting: true },
+    generatedAt: new Date().toISOString(),
+  } as const;
+
+  afterEach(() => {
+    useAppStore.setState({ onboardingRouteFresh: false, onboardingLoop: null });
+  });
+
+  it('keeps the route the rider just built and opens it, instead of clearing it as stale', () => {
+    useAppStore.setState({
+      appState: 'ROUTE_PREVIEW',
+      routePreview: preview as never,
+      onboardingRouteFresh: true,
+    });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/route-preview');
+    expect(useAppStore.getState().routePreview?.routes[0]?.id).toBe('onb-route');
+  });
+
+  it('does not clear the route once /route-preview has consumed the flag', () => {
+    useAppStore.setState({
+      appState: 'ROUTE_PREVIEW',
+      routePreview: preview as never,
+      onboardingRouteFresh: true,
+    });
+    const { rerender } = render(<Index />);
+
+    // /route-preview mounts and consumes the hand-off flag.
+    useAppStore.setState({ onboardingRouteFresh: false });
+    rerender(<Index />);
+
+    expect(useAppStore.getState().routePreview?.routes[0]?.id).toBe('onb-route');
+  });
+
+  it('still clears a stale preview when it did not come from onboarding (control)', () => {
+    useAppStore.setState({ appState: 'ROUTE_PREVIEW', routePreview: preview as never });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/route-planning');
+  });
+
+  it('sends a rider holding an onboarding loop to the loop ride screen', () => {
+    useAppStore.setState({
+      appState: 'IDLE',
+      onboardingLoop: { id: 'loop-1' } as never,
+    });
+
+    render(<Index />);
+
+    expect(lastRedirectHref).toBe('/onboarding/ride-loop');
+  });
+});

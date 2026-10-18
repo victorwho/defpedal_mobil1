@@ -102,11 +102,20 @@ const SESSION_IDLE_THRESHOLD_MS = 5 * 60 * 1000;
 const OnboardingGuard = () => {
   const state = useOnboardingGate();
   const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
+  const incrementAppOpenCount = useAppStore((s) => s.incrementAppOpenCount);
   const hasIncrementedRef = useRef(false);
+  const hasCountedAppOpenRef = useRef(false);
   // Tracks when the app last went to background so we can decide if a
   // foreground transition should count as a new session.
   const lastBackgroundAtRef = useRef<number | null>(null);
   const { storeHydrated, isLoading, hasRealAccount } = state;
+
+  // Every open, any account — the Loop intro waits for the third one.
+  useEffect(() => {
+    if (!storeHydrated || hasCountedAppOpenRef.current) return;
+    hasCountedAppOpenRef.current = true;
+    incrementAppOpenCount();
+  }, [storeHydrated, incrementAppOpenCount]);
 
   // Increment anonymous open count once per app launch.
   // Gated on storeHydrated so the increment isn't clobbered by late hydration.
@@ -137,11 +146,12 @@ const OnboardingGuard = () => {
       lastBackgroundAtRef.current = null;
       if (idleMs < SESSION_IDLE_THRESHOLD_MS) return;
 
+      if (storeHydrated) incrementAppOpenCount();
       if (!storeHydrated || hasRealAccount || isLoading) return;
       incrementAnonymousOpenCount();
     });
     return () => subscription.remove();
-  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount]);
+  }, [storeHydrated, hasRealAccount, isLoading, incrementAnonymousOpenCount, incrementAppOpenCount]);
 
   // Imperative enforcement of the gate. Previously this rendered a
   // declarative `<Redirect>` that REPLACED the `<Stack>` while active —

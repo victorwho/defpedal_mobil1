@@ -67,6 +67,7 @@ describe('Loop planner visit', () => {
         }),
         countryCode: 'RO',
         onboardingCompleted: true,
+        appOpenCount: 3,
         appState: 'IDLE',
         now: new Date(),
       });

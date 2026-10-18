@@ -20,6 +20,7 @@ const eligible = () =>
     hasOpenedLoopPlanner: false,
     savedLoops: [],
     onboardingCompleted: true,
+    appOpenCount: 3,
     appState: 'IDLE',
     regionGate: { status: 'passed', countryCode: 'RO' },
     // No other app-open notice pending.
@@ -34,6 +35,13 @@ beforeEach(() => {
 });
 
 describe('useLoopIntro', () => {
+  it('stays hidden on the first two opens after install', () => {
+    useAppStore.setState({ appOpenCount: 2 });
+    const { result } = renderHook(() => useLoopIntro());
+    expect(result.current.visible).toBe(false);
+    expect(useAppStore.getState().loopIntro.lastShownAt).toBeNull();
+  });
+
   it('shows to an eligible rider and records the showing', () => {
     const { result } = renderHook(() => useLoopIntro());
     expect(result.current.visible).toBe(true);

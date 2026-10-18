@@ -56,11 +56,18 @@ export default function OnboardingSignupPromptScreen() {
   const resetAnonymousOpenCount = useAppStore((s) => s.resetAnonymousOpenCount);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // The rider arrived from the onboarding route reveal with a route in hand
+  // (docs/plans/onboarding-first-ride.md #6): the ask is "keep this route".
+  const hasRouteToKeep = useAppStore((s) => s.onboardingRouteFresh || s.onboardingLoop !== null);
 
   // Registration-funnel top: one event per wall mount. Pairs with
   // signup_completed below (PostHog "Registration funnel" dashboard).
   useEffect(() => {
-    telemetry.capture('signup_wall_shown');
+    telemetry.capture('signup_wall_shown', {
+      source: useAppStore.getState().onboardingRouteFresh || useAppStore.getState().onboardingLoop
+        ? 'route_reveal'
+        : 'intro',
+    });
   }, []);
 
   // Shared post-sign-in bookkeeping for every provider (Google, Apple).
@@ -68,7 +75,11 @@ export default function OnboardingSignupPromptScreen() {
     // Fired only after the provider session exists, so every event is a real
     // wall conversion (anonymous session → account) regardless of whether the
     // account itself is new or returning.
-    telemetry.capture('signup_completed', { method, source: 'wall' });
+    telemetry.capture('signup_completed', {
+      method,
+      source: 'wall',
+      from: hasRouteToKeep ? 'route_reveal' : 'intro',
+    });
     setOnboardingCompleted(true);
     resetAnonymousOpenCount();
 
@@ -165,8 +176,12 @@ export default function OnboardingSignupPromptScreen() {
               data needs real riders, and the account saves their progress.
               The anonymous→account merge is live (merge_anonymous_account +
               AnonMergeManager), so the copy can promise continuity. */}
-          <Text style={styles.title}>{t('onboarding.signupPromptTitle')}</Text>
-          <Text style={styles.subtitle}>{t('onboarding.signupSubMandatory')}</Text>
+          <Text style={styles.title}>
+            {t(hasRouteToKeep ? 'onboardingRide.signupTitleRoute' : 'onboarding.signupPromptTitle')}
+          </Text>
+          <Text style={styles.subtitle}>
+            {t(hasRouteToKeep ? 'onboardingRide.signupSubRoute' : 'onboarding.signupSubMandatory')}
+          </Text>
         </View>
 
         {/* Primary actions — directly under the benefit copy so they sit above

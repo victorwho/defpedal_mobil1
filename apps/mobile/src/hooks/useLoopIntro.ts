@@ -39,6 +39,7 @@ export const useLoopIntro = (): UseLoopIntroResult => {
   const hasOpenedLoopPlanner = useAppStore((s) => s.hasOpenedLoopPlanner);
   const savedLoopCount = useAppStore((s) => s.savedLoops.length);
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
+  const appOpenCount = useAppStore((s) => s.appOpenCount);
   const appState = useAppStore((s) => s.appState);
   const countryCode = useAppStore((s) => s.regionGate.countryCode);
   const promoNoticePending = useAppStore(
@@ -62,6 +63,7 @@ export const useLoopIntro = (): UseLoopIntroResult => {
       hasUsedLoops: hasUsedLoops({ hasOpenedLoopPlanner, savedLoopCount }),
       countryCode,
       onboardingCompleted,
+      appOpenCount,
       appState,
       now: new Date(),
     });
@@ -81,6 +83,7 @@ export const useLoopIntro = (): UseLoopIntroResult => {
     savedLoopCount,
     countryCode,
     onboardingCompleted,
+    appOpenCount,
     appState,
     markShown,
   ]);

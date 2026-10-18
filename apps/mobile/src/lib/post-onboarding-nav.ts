@@ -23,6 +23,13 @@ import { computePostSignupStepTarget } from '../hooks/computePostSignupStepTarge
  */
 export function finishPostSignupSteps(): void {
   const state = useAppStore.getState();
+
+  // A loop from the first-ride onboarding never lives in `routePreview`
+  // (loops start from their own screen), so it is handed over separately.
+  if (state.onboardingLoop) {
+    router.replace('/onboarding/ride-loop' as never);
+    return;
+  }
   const hasFreshPreview =
     state.appState === 'ROUTE_PREVIEW' && (state.routePreview?.routes.length ?? 0) > 0;
 
