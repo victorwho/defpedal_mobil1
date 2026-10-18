@@ -1,12 +1,14 @@
 import { formatDistance } from '@defensivepedal/core';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RouteMap } from '../../src/components/map';
 import { Button } from '../../src/design-system/atoms';
 import { PedalSays } from '../../src/design-system/molecules/PedalSays';
+import { RideLaterSheet } from '../../src/design-system/organisms/RideLaterSheet';
+import { useRideLater } from '../../src/hooks/useRideLater';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { space } from '../../src/design-system/tokens/spacing';
 import { fontFamily, textBase } from '../../src/design-system/tokens/typography';
@@ -37,6 +39,19 @@ export default function OnboardingRideLoopScreen() {
   const units = useUnits();
   const loop = useAppStore((s) => s.onboardingLoop);
   const startedRef = useRef(false);
+  const [rideLaterOpen, setRideLaterOpen] = useState(false);
+  const rideLater = useRideLater(
+    loop
+      ? {
+          kind: 'loop',
+          start: { lat: loop.coordinates[0]?.[1] ?? 0, lon: loop.coordinates[0]?.[0] ?? 0 },
+          route: loop.route,
+          distanceMeters: loop.distanceMeters,
+          climbMeters: loop.climbMeters,
+          unpavedShare: loop.unpavedShare,
+        }
+      : null,
+  );
 
   useEffect(() => {
     if (!loop && !startedRef.current) router.replace('/route-planning');
@@ -73,13 +88,23 @@ export default function OnboardingRideLoopScreen() {
     router.replace('/navigation');
   }, [loop, t, units]);
 
-  // Never a dead end: "Ride it later" (step 4) is not built yet, so the way
-  // out drops the hand-off — otherwise `/` would bounce the rider straight back.
+  // The way out drops the hand-off — otherwise `/` would bounce the rider
+  // straight back here.
   const handleNotNow = useCallback(() => {
-    telemetry.capture('onb_ride_later', { isLoop: true, slot: null });
+    telemetry.capture('onb_ride_dismissed', { isLoop: true });
     useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
     router.replace('/route-planning');
   }, []);
+
+  const closeRideLater = useCallback(() => {
+    setRideLaterOpen(false);
+    // Once the loop is saved (with or without a reminder), this screen's job
+    // is done.
+    if (rideLater.status.kind === 'set' || rideLater.status.kind === 'no_permission') {
+      useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
+      router.replace('/route-planning');
+    }
+  }, [rideLater.status.kind]);
 
   if (!loop) return null;
   const [startLon, startLat] = loop.coordinates[0] ?? [0, 0];
@@ -109,6 +134,23 @@ export default function OnboardingRideLoopScreen() {
         <Button variant="primary" size="lg" fullWidth onPress={handleStart}>
           {t('onboardingRide.startRide')}
         </Button>
+        <Button
+          variant="ghost"
+          size="md"
+          fullWidth
+          onPress={() => {
+            if (rideLater.status.kind !== 'set') rideLater.reset();
+            setRideLaterOpen(true);
+          }}
+        >
+          {t('onboardingRide.rideLater')}
+        </Button>
+        <RideLaterSheet
+          visible={rideLaterOpen}
+          status={rideLater.status}
+          onChoose={(slot) => void rideLater.choose(slot)}
+          onClose={closeRideLater}
+        />
         <Pressable onPress={handleNotNow} accessibilityRole="button" hitSlop={8}>
           <Text style={styles.link}>{t('onboarding.maybeLater')}</Text>
         </Pressable>

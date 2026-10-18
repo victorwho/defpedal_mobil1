@@ -245,3 +245,51 @@ describe('shouldRegisterPushToken (consent-gated anonymous push, 2026-07-16)', (
     ).toBe(true);
   });
 });
+
+describe('handleNotificationResponse — first-ride reminder', () => {
+  const tap = (data: Record<string, unknown>) =>
+    handleNotificationResponse({ notification: { request: { content: { data } } } });
+
+  const routeData = {
+    type: 'first_ride_reminder',
+    kind: 'route',
+    savedRouteId: 'saved-1',
+    origin: { lat: 44.43, lon: 26.1 },
+    destination: { lat: 44.45, lon: 26.08 },
+    mode: 'safe',
+    avoidUnpaved: true,
+    isEbike: false,
+  };
+
+  beforeEach(() => {
+    vi.mocked(router.push).mockClear();
+    useAppStore.setState({ appState: 'IDLE', lastLoadedSavedRouteId: null });
+  });
+
+  it('reopens the saved route in preview', () => {
+    tap(routeData);
+
+    const request = useAppStore.getState().routeRequest;
+    expect(request.origin).toEqual({ lat: 44.43, lon: 26.1 });
+    expect(request.destination).toEqual({ lat: 44.45, lon: 26.08 });
+    expect(useAppStore.getState().lastLoadedSavedRouteId).toBe('saved-1');
+    expect(router.push).toHaveBeenCalledWith('/route-preview');
+  });
+
+  it('reopens a saved loop in the loop planner', () => {
+    tap({ type: 'first_ride_reminder', kind: 'loop', savedLoopId: 'loop-9' });
+    expect(router.push).toHaveBeenCalledWith({ pathname: '/loop-planner', params: { loopId: 'loop-9' } });
+  });
+
+  it('ignores a malformed payload instead of routing to it', () => {
+    tap({ ...routeData, destination: { lat: 999, lon: 0 } });
+    expect(router.push).toHaveBeenCalledWith('/route-planning');
+    expect(router.push).not.toHaveBeenCalledWith('/route-preview');
+  });
+
+  it('never interrupts a ride in progress', () => {
+    useAppStore.setState({ appState: 'NAVIGATING' });
+    tap(routeData);
+    expect(router.push).not.toHaveBeenCalled();
+  });
+});

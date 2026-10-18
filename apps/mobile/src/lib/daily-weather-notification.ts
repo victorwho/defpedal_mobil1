@@ -12,6 +12,7 @@ import {
   buildWeatherSchedule,
   forecastDayIndex,
 } from './daily-weather-schedule';
+import { isSameLocalDay } from './firstRideReminder';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
 
 // Legacy builds scheduled a single one-shot under exactly this id; the new
@@ -82,6 +83,21 @@ const fetchForecastRows = async (
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+/**
+ * The forecast row for one calendar day, for the first-ride reminder's body.
+ * Null when the fetch fails or the day is beyond the forecast.
+ */
+export const fetchForecastForDate = async (
+  lat: number,
+  lon: number,
+  date: Date,
+  now: Date = new Date(),
+): Promise<GoodWeatherForecast | null> => {
+  const rows = await fetchForecastRows(lat, lon);
+  if (!rows) return null;
+  return rows[forecastDayIndex(date, now)] ?? null;
 };
 
 /**
@@ -174,7 +190,14 @@ export const scheduleDailyWeatherNotifications = async (
   // design and never enter the memory.
   const previousTitles = store.getState().dailyWeatherRecentTitles ?? [];
   const usedTitles: string[] = [];
+  // A day the rider already has a ride reminder for gets no weather ping too:
+  // two nudges about riding on one day is one too many.
+  const reminderAtIso = store.getState().firstRideReminderAt;
+  const reminderAt = reminderAtIso ? new Date(reminderAtIso) : null;
   const plans = fires.map((fireAt, index) => {
+    if (reminderAt && Number.isFinite(reminderAt.getTime()) && isSameLocalDay(fireAt, reminderAt)) {
+      return null;
+    }
     const forecast = rows[Math.min(forecastDayIndex(fireAt, now), rows.length - 1)];
     if (!forecast) return null;
     const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';

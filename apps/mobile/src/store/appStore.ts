@@ -406,6 +406,12 @@ export type AppStore = QueueSlice & PremiumSlice & {
    * not get it straight after onboarding.
    */
   appOpenCount: number;
+  /**
+   * When the first-ride reminder ("Ride it later") fires, ISO. The weather
+   * ping skips that calendar day. Device-scoped, like the notification itself.
+   */
+  firstRideReminderAt: string | null;
+  setFirstRideReminderAt: (iso: string | null) => void;
   earnedMilestones: readonly string[];
   recentDestinations: readonly RecentDestination[];
   addRecentDestination: (destination: RecentDestination) => void;
@@ -1130,6 +1136,7 @@ export const useAppStore = create<AppStore>()(
       notificationPermissionAsked: false,
       anonymousOpenCount: 0,
       appOpenCount: 0,
+      firstRideReminderAt: null,
       earnedMilestones: [],
       recentDestinations: [],
       recentCitySuggestions: [],
@@ -1352,6 +1359,7 @@ export const useAppStore = create<AppStore>()(
         set(() => ({ anonymousOpenCount: 0 })),
       incrementAppOpenCount: () =>
         set((state) => ({ appOpenCount: state.appOpenCount + 1 })),
+      setFirstRideReminderAt: (iso) => set(() => ({ firstRideReminderAt: iso })),
       setCyclingGoal: (goal) =>
         set(() => ({ cyclingGoal: goal })),
       setCachedCityHeartbeat: (heartbeat) =>
@@ -2098,6 +2106,7 @@ export const useAppStore = create<AppStore>()(
         showMascot: state.showMascot,
         anonymousOpenCount: state.anonymousOpenCount,
         appOpenCount: state.appOpenCount,
+        firstRideReminderAt: state.firstRideReminderAt,
         earnedMilestones: state.earnedMilestones,
         recentDestinations: state.recentDestinations,
         recentCitySuggestions: state.recentCitySuggestions,

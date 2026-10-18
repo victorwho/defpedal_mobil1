@@ -4,7 +4,13 @@ import { Platform } from 'react-native';
 import { router } from 'expo-router';
 
 import { mobileApi } from './api';
+import {
+  REMINDER_NOTIFICATION_TYPE,
+  markReminderTapped,
+  parseReminderTarget,
+} from './firstRideReminder';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
+import { telemetry } from './telemetry';
 import { useAppStore } from '../store/appStore';
 
 let _notifications: typeof import('expo-notifications') | null | undefined;
@@ -232,6 +238,39 @@ export const handleNotificationResponse = (
     // these as type 'nudge' (handled below, ride-asking else-branch → route
     // planning); this explicit case covers the plan's declared payload type
     // if the dispatcher ever sets per-trigger types.
+    // First-ride reminder ("Ride it later", docs/plans/onboarding-first-ride.md
+    // step 4): reopen exactly the route or loop the rider saved. The payload
+    // is validated, since it is replayed into routing.
+    case REMINDER_NOTIFICATION_TYPE: {
+      const target = parseReminderTarget(data);
+      telemetry.capture('onb_reminder_tapped', { kind: target?.kind ?? 'invalid' });
+      if (!target) {
+        router.push('/route-planning');
+        break;
+      }
+      // Never pull a rider out of a ride in progress.
+      if (useAppStore.getState().appState === 'NAVIGATING') break;
+      markReminderTapped();
+      if (target.kind === 'loop') {
+        router.push({ pathname: '/loop-planner', params: { loopId: target.savedLoopId } } as never);
+        break;
+      }
+      useAppStore.getState().setRouteRequest({
+        origin: target.origin,
+        destination: target.destination,
+        waypoints: [],
+        startOverride: undefined,
+        mode: target.mode,
+        avoidUnpaved: target.avoidUnpaved,
+        avoidHills: false,
+        avoidHeat: false,
+        isEbike: target.isEbike,
+      });
+      // After setRouteRequest, which clears the saved-route lineage.
+      if (target.savedRouteId) useAppStore.getState().setLastLoadedSavedRouteId(target.savedRouteId);
+      router.push('/route-preview');
+      break;
+    }
     case 'city_riders_pulse':
       router.push('/route-planning');
       break;

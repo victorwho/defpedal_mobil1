@@ -24,6 +24,7 @@ import {
   cancelDailyWeatherNotifications,
   scheduleDailyWeatherNotifications,
 } from '../daily-weather-notification';
+import { isSameLocalDay } from '../firstRideReminder';
 import { useAppStore } from '../../store/appStore';
 
 // Injected through the module's test seam — the SUT's lazy require() calls
@@ -107,6 +108,25 @@ describe('scheduleDailyWeatherNotifications (behavioral)', () => {
     expect(state.dailyWeatherChain.length).toBeGreaterThan(0);
     expect(state.dailyWeatherGeneration).toMatch(/^g[0-9a-z]+$/);
     expect(h.scheduled[0]!.identifier).toContain(`-${state.dailyWeatherGeneration}-`);
+  });
+
+  it('skips weather pings on the day of a first-ride reminder', async () => {
+    const fireDates = () =>
+      h.scheduled.map(
+        (s) => new Date(Date.now() + (s as unknown as { trigger: { seconds: number } }).trigger.seconds * 1000),
+      );
+    useAppStore.setState({ firstRideReminderAt: null });
+    await scheduleDailyWeatherNotifications(45.0, 25.0);
+    // Control: without a reminder, this day has a ping.
+    const reminderDay = fireDates()[0]!;
+
+    h.scheduled.length = 0;
+    useAppStore.setState({ firstRideReminderAt: reminderDay.toISOString() });
+    await scheduleDailyWeatherNotifications(45.0, 25.0);
+
+    expect(h.scheduled.length).toBeGreaterThan(0);
+    expect(fireDates().some((d) => isSameLocalDay(d, reminderDay))).toBe(false);
+    useAppStore.setState({ firstRideReminderAt: null });
   });
 
   it('schedules the NEW generation before cancelling stale ids, and never cancels its own set', async () => {

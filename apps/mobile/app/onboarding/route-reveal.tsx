@@ -1,4 +1,6 @@
 import {
+  decodePolyline,
+  describeBusyRoadSaving,
   formatDistance,
   isRiskDataAvailable,
   resolveCountryFromCoord,
@@ -7,7 +9,7 @@ import {
 } from '@defensivepedal/core';
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -15,6 +17,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { RouteMap } from '../../src/components/map';
 import { Button, FadeSlideIn, Spinner } from '../../src/design-system/atoms';
 import { PedalSays } from '../../src/design-system/molecules/PedalSays';
+import { Coachmark, type CoachmarkStep } from '../../src/design-system/organisms/Coachmark';
 import { RiskDistributionCard } from '../../src/design-system/organisms/RiskDistributionCard';
 import { useTheme, type ThemeColors } from '../../src/design-system';
 import { radii } from '../../src/design-system/tokens/radii';
@@ -29,7 +32,14 @@ import { mobileApi } from '../../src/lib/api';
 import { searchLoops, type GeneratedLoop } from '../../src/lib/loop-generator';
 import { searchLoopsRemote } from '../../src/lib/loop-generator-remote';
 import { isLoopServerEnabled } from '../../src/lib/loopServerFlag';
+import { hasShownOnboardingTour, markOnboardingTourShown } from '../../src/lib/onboardingTour';
 import { describeRouteComparison } from '../../src/lib/routeComparisonCopy';
+import {
+  HAZARD_COUNT_TIMEOUT_MS,
+  HAZARD_QUERY_RADIUS_METERS,
+  countHazardsFromBatches,
+  hazardQueryCentres,
+} from '../../src/lib/routeHazards';
 import { telemetry } from '../../src/lib/telemetry';
 import { useAppStore } from '../../src/store/appStore';
 import type { RideIntent } from './ride-intent';
@@ -188,6 +198,97 @@ export default function OnboardingRouteRevealScreen() {
     [isLoop, previewQuery.data, t, units],
   );
 
+  // ── Hazards on the route (coachmark 3) ──
+  // Covered by up to four nearby-hazard reads along the line; a route too long
+  // to cover gets no hazard claim at all, rather than a "none" we did not check.
+  const routePoints = useMemo(
+    () => (route?.geometryPolyline6 ? decodePolyline(route.geometryPolyline6) : []),
+    [route],
+  );
+  const hazardCentres = useMemo(() => hazardQueryCentres(routePoints), [routePoints]);
+  const hazardsQuery = useQuery({
+    queryKey: ['onboarding-route-hazards', route?.id],
+    // Null (no claim) when a read was truncated or slow — see routeHazards.ts.
+    queryFn: async (): Promise<number | null> => {
+      const reads = Promise.all(
+        (hazardCentres ?? []).map((c) =>
+          mobileApi.getNearbyHazards(c.lat, c.lon, HAZARD_QUERY_RADIUS_METERS),
+        ),
+      ).then((batches) => countHazardsFromBatches(batches, routePoints));
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HAZARD_COUNT_TIMEOUT_MS));
+      return Promise.race([reads, timeout]);
+    },
+    enabled: Boolean(route) && hazardCentres !== null,
+    retry: false,
+  });
+  const hazardCount = hazardCentres === null ? null : (hazardsQuery.data ?? null);
+  const hazardsSettled = hazardCentres === null || !hazardsQuery.isLoading;
+
+  // ── Coachmarks [D4] ──
+  const mapRef = useRef<View>(null);
+  const comparisonRef = useRef<View>(null);
+  const hazardRowRef = useRef<View>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const contentRef = useRef<View>(null);
+  const [tourDone, setTourDone] = useState(hasShownOnboardingTour);
+
+  const compareCoachText = useMemo(() => {
+    const raw = previewQuery.data?.comparison;
+    if (raw?.against === 'fast' && raw.verdict === 'safer') {
+      if (!raw.extraMinutes) return t('onboardingRide.coachCompareFree');
+      const saving = raw.busyRoadMeters
+        ? describeBusyRoadSaving(raw.busyRoadMeters.current, raw.busyRoadMeters.comparison)
+        : { kind: 'none' as const };
+      if (saving.kind === 'saves') {
+        return t('onboardingRide.coachCompareCost', { minutes: raw.extraMinutes });
+      }
+    }
+    return t('onboardingRide.coachCompareGeneric');
+  }, [previewQuery.data?.comparison, t]);
+
+  const coachSteps = useMemo<CoachmarkStep[]>(() => {
+    const steps: CoachmarkStep[] = [];
+    // Outside risk coverage the colour and comparison steps have nothing true
+    // to say [D9]; only the hazard step remains.
+    if (riskAvailable && hasRiskSegments) {
+      steps.push({ key: 'risk', text: t('onboardingRide.coachRisk'), targetRef: mapRef });
+    }
+    if (comparison && riskAvailable) {
+      steps.push({ key: 'compare', text: compareCoachText, targetRef: comparisonRef });
+    }
+    if (hazardCount !== null) {
+      steps.push({
+        key: 'hazards',
+        text: t(hazardCount > 0 ? 'onboardingRide.coachHazardsSome' : 'onboardingRide.coachHazardsNone'),
+        targetRef: hazardRowRef,
+      });
+    }
+    return steps;
+  }, [riskAvailable, hasRiskSegments, comparison, compareCoachText, hazardCount, t]);
+
+  const showTour = Boolean(route) && hazardsSettled && !tourDone && coachSteps.length > 0;
+
+  const scrollTargetIntoView = useCallback(async (key: string) => {
+    const target = key === 'compare' ? comparisonRef.current : key === 'hazards' ? hazardRowRef.current : null;
+    if (!target || !contentRef.current || !scrollRef.current) return;
+    await new Promise<void>((resolve) => {
+      target.measureLayout(
+        contentRef.current as never,
+        (_x, y) => {
+          scrollRef.current?.scrollTo({ y: Math.max(0, y - space[6]), animated: false });
+          resolve();
+        },
+        () => resolve(),
+      );
+    });
+  }, []);
+
+  const finishTour = useCallback(() => {
+    markOnboardingTourShown();
+    setTourDone(true);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, []);
+
   useEffect(() => {
     if (reportedRef.current) return;
     if (route) {
@@ -224,7 +325,12 @@ export default function OnboardingRouteRevealScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.mapWrap, { paddingTop: insets.top }]}>
+      <View
+        ref={mapRef}
+        collapsable={false}
+        importantForAccessibility={showTour ? 'no-hide-descendants' : 'auto'}
+        style={[styles.mapWrap, { paddingTop: insets.top }]}
+      >
         {route ? (
           <RouteMap
             routes={[route]}
@@ -241,9 +347,12 @@ export default function OnboardingRouteRevealScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
+        importantForAccessibility={showTour ? 'no-hide-descendants' : 'auto'}
         style={styles.sheet}
         contentContainerStyle={[styles.sheetContent, { paddingBottom: space[4] }]}
       >
+        <View ref={contentRef} collapsable={false} style={styles.sheetInner}>
         {!route && !failed ? (
           <View style={styles.loading} accessibilityLiveRegion="polite">
             <PedalSays
@@ -283,7 +392,11 @@ export default function OnboardingRouteRevealScreen() {
               )}
 
               {comparison && riskAvailable ? (
-                <View style={[styles.comparison, comparison.isWarning && styles.comparisonWarning]}>
+                <View
+                  ref={comparisonRef}
+                  collapsable={false}
+                  style={[styles.comparison, comparison.isWarning && styles.comparisonWarning]}
+                >
                   <Ionicons
                     name={comparison.isWarning ? 'warning' : 'shield-checkmark'}
                     size={20}
@@ -298,13 +411,34 @@ export default function OnboardingRouteRevealScreen() {
                 </View>
               ) : null}
 
+              {hazardCount !== null ? (
+                <View ref={hazardRowRef} collapsable={false} style={styles.hazardRow}>
+                  <Ionicons
+                    name={hazardCount > 0 ? 'warning-outline' : 'checkmark-circle-outline'}
+                    size={18}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.hazardText}>
+                    {hazardCount === 0
+                      ? t('onboardingRide.hazardRowNone')
+                      : hazardCount === 1
+                        ? t('onboardingRide.hazardRowOne')
+                        : t('onboardingRide.hazardRowMany', { count: hazardCount })}
+                  </Text>
+                </View>
+              ) : null}
+
               {hasRiskSegments ? <RiskDistributionCard riskSegments={route.riskSegments} /> : null}
             </View>
           </FadeSlideIn>
         ) : null}
+        </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
+      <View
+        importantForAccessibility={showTour ? 'no-hide-descendants' : 'auto'}
+        style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}
+      >
         {failed ? (
           <>
             <Button variant="primary" size="lg" fullWidth onPress={() => router.back()}>
@@ -320,6 +454,21 @@ export default function OnboardingRouteRevealScreen() {
           </Button>
         )}
       </View>
+
+      {showTour ? (
+        <Coachmark
+          steps={coachSteps}
+          labels={{
+            next: t('onboardingRide.coachNext'),
+            done: t('onboardingRide.coachDone'),
+            skip: t('onboardingRide.coachSkip'),
+            progress: (current, total) => t('onboardingRide.coachProgress', { current, total }),
+          }}
+          onBeforeStep={scrollTargetIntoView}
+          onAction={(step, action) => telemetry.capture('onb_coachmark', { step, action })}
+          onFinish={finishTour}
+        />
+      ) : null}
     </View>
   );
 }
@@ -345,7 +494,19 @@ const createThemedStyles = (colors: ThemeColors) =>
     sheetContent: {
       paddingHorizontal: space[5],
       paddingTop: space[4],
+    },
+    sheetInner: {
       gap: space[4],
+    },
+    hazardRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[2],
+      paddingVertical: space[1],
+    },
+    hazardText: {
+      ...textSm,
+      color: colors.textSecondary,
     },
     loading: {
       gap: space[4],

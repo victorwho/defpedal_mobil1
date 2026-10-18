@@ -268,8 +268,39 @@ to be more serious".
    Still to verify on a device: Google, Apple and email signups each reach the
    kept route (A-to-B and loop); a hard-close between signup and #8 lands on
    the planner (expected — the hand-off is in memory only).
-3. `Coachmark` organism + the three steps.
-4. #8 Ride it later + reminder notification (preview build — dev's bridge mode
-   hides bridgeless notification failures).
+3. ✅ Built 2026-10-18 (not device-tested): `Coachmark` organism
+   (`src/design-system/organisms/Coachmark.tsx`) — dims everything but the
+   target, one bubble with Next/Got it/Skip, Android back skips, a step whose
+   target is not on screen is skipped, announced to screen readers, motion via
+   FadeSlideIn. Runs once per app session, after the hazard count settles.
+   Steps: **risk** (spotlights the map; names the three tiers), **compare**
+   (the Safe-vs-Fast card; "N min quicker, with more High-risk road" only when
+   the busy-road saving is real, otherwise a neutral line), **hazards** (a new
+   hazard row on the reveal). Outside risk coverage only the hazard step runs.
+   The hazard count comes from up to four `/v1/hazards/nearby` reads along the
+   route (radius 5,000 m, centres 8 km apart, reports within 40 m of the line);
+   a route too long for four reads shows no hazard claim at all
+   (`src/lib/routeHazards.ts`). Also no claim when any read returns the
+   server's 200-row cap (`get_nearby_hazards` default `p_limit`) — in
+   Amsterdam or under the UK imports a 5 km circle holds thousands of
+   reports and a truncated read would say "none" falsely — or takes over 4 s.
+   The hazard coachmark does NOT promise an alert: imported reports with
+   `alertEligible=false` never fire one (code review 2026-10-18).
+4. ✅ Built 2026-10-18 (not device-tested — needs a PREVIEW build, dev's
+   bridge mode hides bridgeless notification failures): "Ride it later" on
+   `/route-preview` (only on the arrival from onboarding) and on
+   `onboarding/ride-loop`. Slots: **Tomorrow morning 08:00 / Tomorrow evening
+   18:00 / This weekend 10:00** (first Sat/Sun at least 2 h away). Deviation:
+   no "Pick a time" — a clock picker would be a new native module; the three
+   fixed slots replace it. Route: saved to the account, and the reminder still
+   schedules if that save fails because the payload carries the route itself.
+   Loop: saved like loop-planner does (account, then local cache); a failed
+   save is a failure, since the reminder reopens the saved loop. One local
+   notification (`first-ride-reminder`, channel `ride-reminder`), body
+   "14°, 10% chance of rain. Tap to ride it." from Open-Meteo for that day.
+   Tap → `/route-preview` with the route, or `/loop-planner?loopId=`; never
+   during a ride; payload validated. The weather ping skips that calendar day
+   (`firstRideReminderAt`), and a reschedule runs immediately. Rides started
+   after a reminder tap emit `onb_ride_now {source: 'reminder'}` [D13].
 5. RO/ES copy, render tests, bundle-content check, preview build, device pass
    in and out of coverage, then fresh-install production release.

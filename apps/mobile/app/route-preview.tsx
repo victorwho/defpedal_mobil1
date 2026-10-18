@@ -53,6 +53,9 @@ import { telemetry } from '../src/lib/telemetry';
 import { ModeTogglePill } from '../src/components/ModeTogglePill';
 import { isLastAllowedAddition } from '../src/lib/plus-nudges';
 import { describeRouteComparison, formatStretchDistance } from '../src/lib/routeComparisonCopy';
+import { consumeReminderTapped } from '../src/lib/firstRideReminder';
+import { useRideLater } from '../src/hooks/useRideLater';
+import { RideLaterSheet } from '../src/design-system/organisms/RideLaterSheet';
 import { useConnectivity } from '../src/providers/ConnectivityMonitor';
 import { useAuthSession } from '../src/providers/AuthSessionProvider';
 import { useAppStore } from '../src/store/appStore';
@@ -150,6 +153,10 @@ function RoutePreviewScreen() {
   // consume the flag on arrival so `/` treats a later preview as stale again
   // (app/index.tsx).
   const fromOnboardingRef = useRef(useAppStore.getState().onboardingRouteFresh);
+  // Same snapshot, for rendering: the post-signup "Ride it later" offer
+  // (docs/plans/onboarding-first-ride.md step 4) shows only on this arrival.
+  const [fromOnboarding] = useState(() => useAppStore.getState().onboardingRouteFresh);
+  const [rideLaterOpen, setRideLaterOpen] = useState(false);
   useEffect(() => {
     if (useAppStore.getState().onboardingRouteFresh) {
       useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
@@ -310,6 +317,21 @@ function RoutePreviewScreen() {
     isEbike: isEbike && ebikeAvailable,
     showRouteComparison,
   };
+
+  const rideLater = useRideLater(
+    fromOnboarding
+      ? {
+          kind: 'route',
+          origin: routeRequest.origin,
+          destination: routeRequest.destination,
+          mode: routeRequest.mode,
+          avoidUnpaved: effectiveRequest.avoidUnpaved,
+          avoidHills: effectiveRequest.avoidHills,
+          avoidHeat: effectiveRequest.avoidHeat,
+          isEbike: effectiveRequest.isEbike,
+        }
+      : null,
+  );
 
   const previewQuery = useQuery({
     queryKey: ['route-preview', effectiveRequest],
@@ -603,9 +625,12 @@ function RoutePreviewScreen() {
     navigationStartedRef.current = true;
 
     // Goal event of the first-ride onboarding (docs/plans/onboarding-first-ride.md).
-    if (fromOnboardingRef.current) {
+    // A ride started after tapping the first-ride reminder counts toward the
+    // same goal, tagged so the two paths can be told apart [D13].
+    const fromReminder = consumeReminderTapped();
+    if (fromOnboardingRef.current || fromReminder) {
       fromOnboardingRef.current = false;
-      telemetry.capture('onb_ride_now', { isLoop: false });
+      telemetry.capture('onb_ride_now', { isLoop: false, source: fromReminder ? 'reminder' : 'onboarding' });
     }
 
     // Flat-route quota is consumed HERE — when a ride actually begins — not
@@ -923,6 +948,26 @@ function RoutePreviewScreen() {
                 ? t('preview.startNavigation')
                 : t('preview.noRouteSelected')}
           </Button>
+          {fromOnboarding && selectedRoute && appState !== 'NAVIGATING' ? (
+            <Button
+              variant="ghost"
+              size="md"
+              fullWidth
+              onPress={() => {
+                // A finished reminder stays shown; anything else starts over.
+                if (rideLater.status.kind !== 'set') rideLater.reset();
+                setRideLaterOpen(true);
+              }}
+            >
+              {t('onboardingRide.rideLater')}
+            </Button>
+          ) : null}
+          <RideLaterSheet
+            visible={rideLaterOpen}
+            status={rideLater.status}
+            onChoose={(slot) => void rideLater.choose(slot)}
+            onClose={() => setRideLaterOpen(false)}
+          />
           <View style={styles.footerSecondaryRow}>
             <View style={styles.footerSecondaryButton}>
               <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>

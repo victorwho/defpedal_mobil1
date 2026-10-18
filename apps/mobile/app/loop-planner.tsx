@@ -83,6 +83,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { mobileApi } from '../src/lib/api';
 import { beginLoopRide } from '../src/lib/loop-ride';
+import { consumeReminderTapped } from '../src/lib/firstRideReminder';
 import { readSavedLoop, writeSavedLoop } from '../src/lib/loopStorage';
 import { createClientTripId } from '../src/lib/offlineQueue';
 import { telemetry } from '../src/lib/telemetry';
@@ -775,6 +776,11 @@ export default function LoopPlannerScreen() {
     });
 
     if (outcome === 'started') {
+      // A loop reopened from the first-ride reminder counts toward the
+      // onboarding goal, tagged by source [D13].
+      if (consumeReminderTapped()) {
+        telemetry.capture('onb_ride_now', { isLoop: true, source: 'reminder' });
+      }
       telemetry.capture('loop_ride_started', {
         km: Math.round(selected.distanceMeters / 1000),
         climb: selected.climbMeters,

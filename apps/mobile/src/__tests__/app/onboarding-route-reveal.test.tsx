@@ -14,19 +14,27 @@ import { render, screen, fireEvent } from '@testing-library/react';
 
 (globalThis as Record<string, unknown>).__DEV__ = false;
 
-const { mockUseQuery, mockBlockEbike, mockParams, mockLocation, mockSearchLoops } = vi.hoisted(() => ({
+const { mockUseQuery, mockBlockEbike, mockParams, mockLocation, mockSearchLoops, mockHazardsQuery } = vi.hoisted(() => ({
   mockUseQuery: vi.fn(),
   mockBlockEbike: vi.fn(),
   mockParams: vi.fn(),
   mockLocation: vi.fn(),
   mockSearchLoops: vi.fn(),
+  mockHazardsQuery: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
   router: { push: vi.fn(), replace: vi.fn(), back: vi.fn() },
   useLocalSearchParams: () => mockParams(),
 }));
-vi.mock('@tanstack/react-query', () => ({ useQuery: (opts: unknown) => mockUseQuery(opts) }));
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: (opts: { queryKey: unknown[] }) =>
+    opts.queryKey[0] === 'onboarding-route-hazards' ? mockHazardsQuery(opts) : mockUseQuery(opts),
+}));
+vi.mock('../../design-system/organisms/Coachmark', () => ({
+  Coachmark: ({ steps }: { steps: Array<{ key: string; text: string }> }) =>
+    `tour:${steps.map((st) => st.key).join(',')}|${steps.map((st) => st.text).join('|')}`,
+}));
 vi.mock('../../hooks/usePremium', () => ({ usePremium: () => ({ blockEbikeRouting: mockBlockEbike }) }));
 vi.mock('../../hooks/useCurrentLocation', () => ({
   useCurrentLocation: () => ({ location: mockLocation() }),
@@ -61,6 +69,7 @@ vi.mock('@expo/vector-icons/Ionicons', () => ({ default: () => null }));
 import { router } from 'expo-router';
 import OnboardingRouteRevealScreen from '../../../app/onboarding/route-reveal';
 import { useAppStore } from '../../store/appStore';
+import { markOnboardingTourShown, resetOnboardingTourForTest } from '../../lib/onboardingTour';
 
 const BUCHAREST = { lat: 44.43, lon: 26.1 };
 const OFFICE = { lat: 44.45, lon: 26.08 };
@@ -86,6 +95,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockBlockEbike.mockReturnValue(false);
   mockParams.mockReturnValue({ intent: 'commute' });
+  mockHazardsQuery.mockReturnValue({ data: undefined, isLoading: false });
+  resetOnboardingTourForTest();
   mockLocation.mockImplementation(() => ({ ...BUCHAREST }));
   useAppStore.setState({
     isEbike: false,
@@ -200,5 +211,69 @@ describe('OnboardingRouteRevealScreen — loop branch', () => {
     mockSearchLoops.mockResolvedValue({ status: 'empty' });
     render(<OnboardingRouteRevealScreen />);
     expect(await screen.findByText(/onboardingRide.loopFailed/)).toBeTruthy();
+  });
+});
+
+describe('OnboardingRouteRevealScreen — coachmarks [D4]', () => {
+  // ~1.6 km east-west line in Bucharest, so the hazard step can be measured.
+  const GEOMETRY = '_mbtsAwkrtpBcAo{@';
+
+  const withComparison = (comparison: unknown) => ({
+    ...route(),
+    routes: [{ ...route().routes[0], geometryPolyline6: GEOMETRY }],
+    comparison,
+  });
+
+  it('runs risk → compare → hazards inside coverage, with the honest compare line', () => {
+    mockUseQuery.mockReturnValue({
+      data: withComparison({
+        against: 'fast',
+        verdict: 'safer',
+        diffPercent: 20,
+        extraMinutes: 3,
+        busyRoadMeters: { current: 200, comparison: 1500 },
+      }),
+      isError: false,
+    });
+    mockHazardsQuery.mockReturnValue({ data: 2, isLoading: false });
+
+    render(<OnboardingRouteRevealScreen />);
+
+    expect(screen.getAllByText(/tour:risk,compare,hazards[|]/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/onboardingRide.coachCompareCost/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/onboardingRide.coachHazardsSome/).length).toBeGreaterThan(0);
+  });
+
+  it('waits for the hazard count before starting the tour', () => {
+    mockUseQuery.mockReturnValue({ data: withComparison(null), isError: false });
+    mockHazardsQuery.mockReturnValue({ data: undefined, isLoading: true });
+
+    render(<OnboardingRouteRevealScreen />);
+
+    expect(screen.queryByText(/tour:/)).toBeNull();
+  });
+
+  it('keeps only the hazard step outside risk coverage', () => {
+    useAppStore.getState().setRouteRequest({ destination: { lat: 40.71, lon: -74.0 } });
+    mockUseQuery.mockReturnValue({ data: withComparison(null), isError: false });
+    mockHazardsQuery.mockReturnValue({ data: 0, isLoading: false });
+
+    render(<OnboardingRouteRevealScreen />);
+
+    expect(screen.getAllByText(/tour:hazards[|]/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/onboardingRide.coachHazardsNone/).length).toBeGreaterThan(0);
+  });
+
+  it('runs once per session', () => {
+    mockUseQuery.mockReturnValue({ data: withComparison(null), isError: false });
+    mockHazardsQuery.mockReturnValue({ data: 0, isLoading: false });
+    const { unmount } = render(<OnboardingRouteRevealScreen />);
+    expect(screen.getAllByText(/tour:/).length).toBeGreaterThan(0);
+    unmount();
+
+    // The rider finished it (mocked Coachmark never calls onFinish, so mark it).
+    markOnboardingTourShown();
+    render(<OnboardingRouteRevealScreen />);
+    expect(screen.queryByText(/tour:/)).toBeNull();
   });
 });
