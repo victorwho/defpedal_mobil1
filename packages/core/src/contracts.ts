@@ -1386,6 +1386,11 @@ export interface ProfileResponse {
    * session before signup. Absent means OFF — the client keeps today's flow.
    */
   onboardingFirstRideEnabled?: boolean;
+  /**
+   * Lets a first-ride onboarding rider take their first ride before signing
+   * up (audit 2026-10-18 #2). Absent means OFF.
+   */
+  onboardingAnonymousRideEnabled?: boolean;
   /** Pedal Plus entitlement + paywall visibility. Server-owned. */
   premium: ProfilePremium;
 }

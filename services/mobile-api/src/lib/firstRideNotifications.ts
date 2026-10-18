@@ -5,7 +5,7 @@
  * Called by the daily notifications cron Cloud Scheduler job.
  *
  * Templates:
- *  1. first_ride_nudge    — 48h after signup, no ride yet
+ *  1. first_ride_nudge    — 24h after signup, no ride yet
  *  2. post_first_ride     — 24h after first ride
  *  3. weather_invitation  — weekend + 3+ days lapsed + a forecast at the
  *                           rider's own location that clears the
@@ -335,7 +335,14 @@ const send = async (
 // 4 Notification trigger functions
 // ---------------------------------------------------------------------------
 
-/** 1. First ride nudge: 48h after signup, no ride yet. Sent once ever. */
+/**
+ * Hours after signup before the first-ride nudge. 24, not 48 (2026-10-18):
+ * a second session in the first days is the earliest predictor of retention,
+ * and at 48 h plus a once-daily cron the nudge landed on day 3 at the soonest.
+ */
+export const FIRST_RIDE_NUDGE_DELAY_HOURS = 24;
+
+/** 1. First ride nudge: a day after signup, no ride yet. Sent once ever. */
 export const checkFirstRideNudge = async (
   db: SupabaseClient,
   profile: FirstRideProfile,
@@ -346,7 +353,7 @@ export const checkFirstRideNudge = async (
   if (profile.total_rides > 0) {
     return { template, sent: false, reason: 'has_rides' };
   }
-  if (hoursSince(profile.created_at) < 48) {
+  if (hoursSince(profile.created_at) < FIRST_RIDE_NUDGE_DELAY_HOURS) {
     return { template, sent: false, reason: 'too_early' };
   }
 

@@ -166,3 +166,39 @@ describe('computeOnboardingGateTarget', () => {
     ).toBe('/onboarding');
   });
 });
+
+describe('computeOnboardingGateTarget — anonymous first ride (audit 2026-10-18 #2)', () => {
+  it('lets an allowed anonymous rider reach the route preview to start their first ride', () => {
+    expect(
+      computeOnboardingGateTarget(fresh({ pathname: '/route-preview', anonymousFirstRideAllowed: true })),
+    ).toBeNull();
+  });
+
+  it('still walls the route preview when the anonymous ride is not allowed (control)', () => {
+    expect(computeOnboardingGateTarget(fresh({ pathname: '/route-preview' }))).toBe('/onboarding');
+  });
+
+  it('sends an allowed rider who leaves the preview back to choosing a ride, not the welcome screens', () => {
+    expect(
+      computeOnboardingGateTarget(fresh({ pathname: '/route-planning', anonymousFirstRideAllowed: true })),
+    ).toBe('/onboarding/ride-intent');
+  });
+
+  it('after the first ride, asks to keep it instead of re-running onboarding', () => {
+    expect(computeOnboardingGateTarget(fresh({ hasCompletedARide: true }))).toBe('/onboarding/signup-prompt');
+  });
+});
+
+describe('computeOnboardingGateTarget — loop reminder before signup', () => {
+  it('opens the loop planner for an allowed anonymous first ride (a loop reminder lands there)', () => {
+    expect(
+      computeOnboardingGateTarget(
+        fresh({ pathname: '/loop-planner', anonymousFirstRideAllowed: true, hasPendingRideReminder: true }),
+      ),
+    ).toBeNull();
+    // Without a reminder the planner stays walled.
+    expect(
+      computeOnboardingGateTarget(fresh({ pathname: '/loop-planner', anonymousFirstRideAllowed: true })),
+    ).toBe('/onboarding/ride-intent');
+  });
+});

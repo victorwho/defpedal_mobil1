@@ -4,6 +4,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { config } from '../config';
 import { requireFullUser } from '../lib/auth';
 import { isLoopServerEnabled } from '../lib/loops/flag';
+import { isOnboardingAnonymousRideEnabled } from '../lib/onboarding/anonymousRideFlag';
 import { isOnboardingFirstRideEnabled } from '../lib/onboarding/flag';
 import { isSesizariEnabled } from '../lib/sesizariKillSwitch';
 import type { MobileApiDependencies } from '../lib/dependencies';
@@ -172,6 +173,7 @@ export const buildFeedProfileRoutes = (
           sesizariEnabled: isSesizariEnabled(),
           loopServerEnabled: isLoopServerEnabled(),
           onboardingFirstRideEnabled: isOnboardingFirstRideEnabled(),
+          onboardingAnonymousRideEnabled: isOnboardingAnonymousRideEnabled(),
           sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };
@@ -249,6 +251,7 @@ export const buildFeedProfileRoutes = (
             sesizariEnabled: isSesizariEnabled(),
           loopServerEnabled: isLoopServerEnabled(),
           onboardingFirstRideEnabled: isOnboardingFirstRideEnabled(),
+          onboardingAnonymousRideEnabled: isOnboardingAnonymousRideEnabled(),
             sesizariBaseUrl: config.sesizari.baseUrl,
             premium,
           };
@@ -285,6 +288,7 @@ export const buildFeedProfileRoutes = (
           sesizariEnabled: isSesizariEnabled(),
           loopServerEnabled: isLoopServerEnabled(),
           onboardingFirstRideEnabled: isOnboardingFirstRideEnabled(),
+          onboardingAnonymousRideEnabled: isOnboardingAnonymousRideEnabled(),
           sesizariBaseUrl: config.sesizari.baseUrl,
           premium,
         };

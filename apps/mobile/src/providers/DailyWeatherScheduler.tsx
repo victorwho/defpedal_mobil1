@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
+import { mayPromptForWeatherPermission } from '../lib/weatherPermissionTiming';
 import { useAppStore } from '../store/appStore';
 import { hasNotificationsNativeModule } from '../lib/notificationNativeModule';
 
@@ -12,9 +13,88 @@ import { hasNotificationsNativeModule } from '../lib/notificationNativeModule';
  * merely foregrounds the app must count as active.
  * Checks for native module availability before attempting anything.
  */
+
+// Rate-limit passes: every pass hits Open-Meteo, and rapid fg/bg cycling
+// shouldn't hammer it. 15 min keeps the escalation anchor fresh enough.
+const MIN_PASS_INTERVAL_MS = 15 * 60 * 1000;
+let lastPassAt = 0;
+
+/**
+ * First-ride onboarding installs prompt at most once per app session, from
+ * whichever path gets there first (the mount pass on a later launch, or the
+ * deferred pass after the first ride). Android lets an app ask twice before it
+ * stops showing the dialog, so without this a rider who just said no could be
+ * asked again as soon as they returned to the map. Older installs keep their
+ * existing behaviour and never read this.
+ */
+let firstRidePromptUsed = false;
+
+const runPass = async (promptForPermission: boolean): Promise<void> => {
+  // Only foreground re-runs are rate-limited. The prompting pass is exempt so
+  // an early AppState flap (e.g. notification-tap launch briefly blurring) can
+  // never consume the window and starve the ONE pass allowed to show the OS
+  // permission prompt (review 2026-07-19, M3).
+  if (!promptForPermission && Date.now() - lastPassAt < MIN_PASS_INTERVAL_MS) return;
+  lastPassAt = Date.now();
+  try {
+    const Location = require('expo-location') as typeof import('expo-location');
+    const { scheduleDailyWeatherNotifications } = require('../lib/daily-weather-notification') as {
+      scheduleDailyWeatherNotifications: (lat: number, lon: number) => Promise<void>;
+    };
+
+    if (promptForPermission) {
+      const { ensureNotificationPermissionAsync } = require('../lib/push-notifications') as {
+        ensureNotificationPermissionAsync: () => Promise<boolean>;
+      };
+      // Prompt for notification permission first (decoupled from location).
+      // The weather ping is on by default, so this is the entry point that
+      // actually surfaces the OS permission dialog for users who never
+      // sign in. Only a prompting pass asks — foreground re-runs must never
+      // nag; the scheduler's own getPermissionsAsync() check silently no-ops
+      // when permission is missing.
+      const notificationsGranted = await ensureNotificationPermissionAsync();
+      if (!notificationsGranted) return;
+    }
+
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const location = await Location.getLastKnownPositionAsync();
+    if (!location) return;
+
+    await scheduleDailyWeatherNotifications(location.coords.latitude, location.coords.longitude);
+  } catch {
+    // Silently fail
+  }
+};
+
+/** Whether this pass may prompt, read at fire time (never from a stale render). */
+const takePromptDecision = (): boolean => {
+  const state = useAppStore.getState();
+  if (state.onboardingFlow !== 'first_ride') return true;
+  if (firstRidePromptUsed || !mayPromptForWeatherPermission(state)) return false;
+  firstRidePromptUsed = true;
+  return true;
+};
+
+/** Test seam. */
+export const __weatherPromptForTest = {
+  decide: takePromptDecision,
+  reset: (): void => {
+    firstRidePromptUsed = false;
+  },
+};
+
 export const DailyWeatherScheduler = () => {
   const notifyWeather = useAppStore((state) => state.notifyWeather);
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
+  // First-ride onboarding defers the OS prompt (audit 2026-10-18 #1): a cold
+  // dialog at signup pre-empted the explained ask in "Ride it later", and a
+  // refusal there means no reminder at all. Until the first ride is done and
+  // the rider is back on an idle screen, passes only schedule silently where
+  // permission already exists.
+  const isFirstRideFlow = useAppStore((state) => state.onboardingFlow === 'first_ride');
+  const mayPrompt = useAppStore(mayPromptForWeatherPermission);
 
   useEffect(() => {
     if (!notifyWeather) return;
@@ -28,55 +108,8 @@ export const DailyWeatherScheduler = () => {
     if (!onboardingCompleted) return;
     if (!hasNotificationsNativeModule()) return;
 
-    // Rate-limit passes: every pass hits Open-Meteo, and rapid fg/bg cycling
-    // shouldn't hammer it. 15 min keeps the escalation anchor fresh enough.
-    const MIN_PASS_INTERVAL_MS = 15 * 60 * 1000;
-    let lastPassAt = 0;
-
-    const runPass = async (promptForPermission: boolean) => {
-      // Only foreground re-runs are rate-limited. The mount pass is exempt
-      // so an early AppState flap (e.g. notification-tap launch briefly
-      // blurring) can never consume the window and starve the ONE pass
-      // allowed to show the OS permission prompt (review 2026-07-19, M3).
-      if (!promptForPermission && Date.now() - lastPassAt < MIN_PASS_INTERVAL_MS) return;
-      lastPassAt = Date.now();
-      try {
-        const Location = require('expo-location') as typeof import('expo-location');
-        const { scheduleDailyWeatherNotifications } = require('../lib/daily-weather-notification') as {
-          scheduleDailyWeatherNotifications: (lat: number, lon: number) => Promise<void>;
-        };
-
-        if (promptForPermission) {
-          const { ensureNotificationPermissionAsync } = require('../lib/push-notifications') as {
-            ensureNotificationPermissionAsync: () => Promise<boolean>;
-          };
-          // Prompt for notification permission first (decoupled from location).
-          // The weather ping is on by default, so this is the entry point that
-          // actually surfaces the OS permission dialog for users who never
-          // sign in. Only the initial mount pass prompts — foreground re-runs
-          // must never nag; the scheduler's own getPermissionsAsync() check
-          // silently no-ops when permission is missing.
-          const notificationsGranted = await ensureNotificationPermissionAsync();
-          if (!notificationsGranted) return;
-        }
-
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-
-        const location = await Location.getLastKnownPositionAsync();
-        if (!location) return;
-
-        await scheduleDailyWeatherNotifications(
-          location.coords.latitude,
-          location.coords.longitude,
-        );
-      } catch {
-        // Silently fail
-      }
-    };
-
     const timer = setTimeout(() => {
-      void runPass(true);
+      void runPass(takePromptDecision());
     }, 3000);
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void runPass(false);
@@ -87,6 +120,17 @@ export const DailyWeatherScheduler = () => {
       subscription.remove();
     };
   }, [notifyWeather, onboardingCompleted]);
+
+  // The deferred ask: once a first-ride rider has ridden and is back on an
+  // idle screen, prompt once (if the mount pass has not already).
+  useEffect(() => {
+    if (!isFirstRideFlow || !mayPrompt || firstRidePromptUsed) return;
+    if (!notifyWeather || !onboardingCompleted || !hasNotificationsNativeModule()) return;
+    const timer = setTimeout(() => {
+      if (takePromptDecision()) void runPass(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [isFirstRideFlow, mayPrompt, notifyWeather, onboardingCompleted]);
 
   return null;
 };

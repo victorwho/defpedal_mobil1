@@ -112,7 +112,10 @@ export default function OnboardingRegionCheckScreen() {
       const decision = await decideOnboardingFlow(() => mobileApi.getProfile());
       if (!mountedRef.current) return;
       flow = decision.flow;
-      if (decision.definitive) useAppStore.getState().setOnboardingFlow(flow);
+      if (decision.definitive) {
+        useAppStore.getState().setOnboardingFlow(flow);
+        useAppStore.getState().setOnboardingAnonymousRide(decision.anonymousRide);
+      }
     }
     if (flow === 'first_ride' && !useAppStore.getState().onboardingCompleted) {
       router.replace('/onboarding/ride-intent' as any);

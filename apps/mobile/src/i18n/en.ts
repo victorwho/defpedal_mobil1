@@ -1408,8 +1408,6 @@ export const en = {
     continue: 'Continue',
     locationTitle: 'Routes that avoid dangerous roads',
     locationSubtitle: 'We use your location to find the safest cycling routes near you, scored with real road risk data.',
-    featureStat: '2.1× safer than Google Maps',
-    featureStatSub: 'Measured on 10,000+ risk-scored routes in Romania & Spain',
     featureRoutes: 'Safety-first routes',
     featureRoutesSub: 'Real road risk data across 32 European countries',
     featureHazards: 'Hazard alerts',
@@ -1970,6 +1968,15 @@ export const en = {
     reminderBody: '{{weather}}. Tap to ride it.',
     reminderBodyNoWeather: 'Tap to ride it.',
     reminderWeather: '{{temp}}°, {{rain}}% chance of rain',
+    // Audit 2026-10-18.
+    laterPrime: 'I’ll send you one reminder, with that day’s weather.',
+    exitOfferTitle: 'Not riding now? Pick a time and I’ll remind you.',
+    rideNowCta: 'Ride it now',
+    saveToAccount: 'Save it to an account instead',
+    signupTitleRide: 'Keep this ride',
+    // "New": the guest-session merge only fills a FRESH account, so signing in
+    // to an existing one does not carry this ride across (merge_anonymous_account).
+    signupSubRide: 'Create a new account and this ride, your streak and your badges come with you, on any phone.',
   },
 } as const;
 

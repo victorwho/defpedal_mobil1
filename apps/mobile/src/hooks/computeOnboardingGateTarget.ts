@@ -15,6 +15,22 @@ export interface OnboardingGateState {
    */
   isSessionUnreadable: boolean;
   hasRealAccount: boolean;
+  /**
+   * First-ride onboarding with the anonymous first ride switched on, and no
+   * ride taken yet: the rider may reach `/route-preview` to start it
+   * (audit 2026-10-18 #2). Optional so older callers default to the wall.
+   */
+  anonymousFirstRideAllowed?: boolean;
+  /**
+   * The anonymous rider has finished a ride. They have seen the value, so the
+   * ask is "keep this ride" — never a second run through onboarding.
+   */
+  hasCompletedARide?: boolean;
+  /**
+   * A "Ride it later" reminder is pending. Only then may an anonymous rider
+   * reach `/loop-planner`, which is where a loop reminder reopens.
+   */
+  hasPendingRideReminder?: boolean;
 }
 
 /**
@@ -76,12 +92,24 @@ export const computeOnboardingGateTarget = (
     return null;
   }
   if (isExemptPath(state.pathname)) return null;
+  // The two places a first ride starts from: the A-to-B preview, and the loop
+  // planner a loop reminder reopens.
+  if (state.anonymousFirstRideAllowed) {
+    if (state.pathname === '/route-preview') return null;
+    if (state.pathname === '/loop-planner' && state.hasPendingRideReminder) return null;
+  }
 
   // `/onboarding` resolves to `app/onboarding/index.tsx`. Matching the path
   // Expo Router's file-router actually exposes (profile sign-out uses the
   // same href). An earlier version of this code used `/onboarding/index`
   // which the router did not normalize reliably under bridgeless — the
   // resulting silent-nav caused an infinite effect loop.
-  if (state.onboardingCompleted === false) return '/onboarding';
+  if (state.onboardingCompleted === false) {
+    if (state.hasCompletedARide) return '/onboarding/signup-prompt';
+    // Mid first-ride onboarding (Back from the preview, a ride that never got
+    // going): back to choosing a ride, not through the welcome screens again.
+    if (state.anonymousFirstRideAllowed) return '/onboarding/ride-intent';
+    return '/onboarding';
+  }
   return '/onboarding/signup-prompt';
 };

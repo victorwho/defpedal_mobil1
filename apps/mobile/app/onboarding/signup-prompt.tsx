@@ -59,6 +59,9 @@ export default function OnboardingSignupPromptScreen() {
   // The rider arrived from the onboarding route reveal with a route in hand
   // (docs/plans/onboarding-first-ride.md #6): the ask is "keep this route".
   const hasRouteToKeep = useAppStore((s) => s.onboardingRouteFresh || s.onboardingLoop !== null);
+  // An anonymous first ride already happened (audit 2026-10-18 #2): the ask
+  // is to keep THAT, which outranks keeping a route.
+  const hasRideToKeep = useAppStore((s) => s.completedRideCount > 0);
 
   // Registration-funnel top: one event per wall mount. Pairs with
   // signup_completed below (PostHog "Registration funnel" dashboard).
@@ -78,7 +81,7 @@ export default function OnboardingSignupPromptScreen() {
     telemetry.capture('signup_completed', {
       method,
       source: 'wall',
-      from: hasRouteToKeep ? 'route_reveal' : 'intro',
+      from: hasRideToKeep ? 'after_ride' : hasRouteToKeep ? 'route_reveal' : 'intro',
     });
     setOnboardingCompleted(true);
     resetAnonymousOpenCount();
@@ -177,10 +180,22 @@ export default function OnboardingSignupPromptScreen() {
               The anonymous→account merge is live (merge_anonymous_account +
               AnonMergeManager), so the copy can promise continuity. */}
           <Text style={styles.title}>
-            {t(hasRouteToKeep ? 'onboardingRide.signupTitleRoute' : 'onboarding.signupPromptTitle')}
+            {t(
+              hasRideToKeep
+                ? 'onboardingRide.signupTitleRide'
+                : hasRouteToKeep
+                  ? 'onboardingRide.signupTitleRoute'
+                  : 'onboarding.signupPromptTitle',
+            )}
           </Text>
           <Text style={styles.subtitle}>
-            {t(hasRouteToKeep ? 'onboardingRide.signupSubRoute' : 'onboarding.signupSubMandatory')}
+            {t(
+              hasRideToKeep
+                ? 'onboardingRide.signupSubRide'
+                : hasRouteToKeep
+                  ? 'onboardingRide.signupSubRoute'
+                  : 'onboarding.signupSubMandatory',
+            )}
           </Text>
         </View>
 

@@ -363,3 +363,17 @@ describe('weekly budget fails closed', () => {
     await expect(isUnderWeeklyBudget(db, 'user-1')).resolves.toBe(true);
   });
 });
+
+describe('first_ride_nudge timing (24 h after signup, 2026-10-18)', () => {
+  const hoursBefore = (h: number) => new Date(FRIDAY.getTime() - h * 3600_000).toISOString();
+
+  it('waits until a day has passed', async () => {
+    const result = await checkFirstRideNudge(db, profile({ total_rides: 0, last_ride_at: null, created_at: hoursBefore(23) }));
+    expect(result).toMatchObject({ sent: false, reason: 'too_early' });
+  });
+
+  it('sends a day after signup — no longer two', async () => {
+    const result = await checkFirstRideNudge(db, profile({ total_rides: 0, last_ride_at: null, created_at: hoursBefore(25) }));
+    expect(result).toMatchObject({ sent: true });
+  });
+});

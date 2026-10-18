@@ -304,3 +304,44 @@ to be more serious".
    after a reminder tap emit `onb_ride_now {source: 'reminder'}` [D13].
 5. RO/ES copy, render tests, bundle-content check, preview build, device pass
    in and out of coverage, then fresh-install production release.
+
+## Audit fixes (2026-10-18)
+
+An audit against published onboarding research (notification opt-in timing,
+deferred signup, time to value, tour length, implementation intentions)
+found four gaps; all four were fixed the same day. NOT deployed, NOT in a
+preview build yet.
+
+1. **No unexplained notification dialog at signup.** For first-ride installs
+   the weather scheduler stays silent until the rider has ridden once and is
+   back on an idle screen, at most once per session
+   (`src/lib/weatherPermissionTiming.ts`, `DailyWeatherScheduler`). Before
+   that, the only ask is inside "Ride it later", which now says what the
+   notification will be first ("I'll send you one reminder, with that day's
+   weather"). Older installs are unchanged.
+2. **First ride before signup — behind `ONBOARDING_ANONYMOUS_RIDE_ENABLED`**
+   (server, default OFF, delivered on `GET /v1/profile` as
+   `onboardingAnonymousRideEnabled`; client fails closed and re-reads it on
+   every reveal, so turning it off reaches installs that already decided).
+   When on: the reveal's main button is **Ride it now** (A-to-B → the real
+   `/route-preview`; loop → `onboarding/ride-loop`), with "Save it to an
+   account instead" as the alternative. The gate lets that anonymous rider
+   reach `/route-preview` (and `/loop-planner` only with a pending loop
+   reminder) until one ride is done; leaving sends them to
+   `/onboarding/ride-intent`, never the welcome screens; after the ride the
+   wall asks to **keep this ride**. Rides already sync anonymously
+   (`requireWriteUser`) and `merge_anonymous_account` re-parents them —
+   into a FRESH account only, so the copy says "create a new account".
+   ⚠️ Trades against the mandatory-registration decision (community trust):
+   that is why it is a separate switch.
+3. **Earlier follow-up.** Leaving the onboarding route preview without riding
+   or setting a reminder offers "Ride it later" once ("Not riding now?"). The
+   server's `first_ride_nudge` moves from 48 h to 24 h after signup
+   (`FIRST_RIDE_NUDGE_DELAY_HOURS`) — needs the API deploy.
+4. **Welcome-screen claim removed.** "2.1× safer than Google Maps — measured
+   in Romania & Spain" predates the 32-country footprint; re-measure before
+   restoring it.
+
+Not changed on purpose: the tour still starts automatically. Self-started
+tours complete more often, but completion is not the goal; decide on the
+`onb_coachmark` skip rates.

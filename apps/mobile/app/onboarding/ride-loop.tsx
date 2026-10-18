@@ -17,6 +17,7 @@ import { useUnits } from '../../src/hooks/useUnits';
 import { beginLoopRide } from '../../src/lib/loop-ride';
 import { createClientTripId } from '../../src/lib/offlineQueue';
 import { telemetry } from '../../src/lib/telemetry';
+import { useAuthSessionOptional } from '../../src/providers/AuthSessionProvider';
 import { useAppStore } from '../../src/store/appStore';
 
 /**
@@ -39,6 +40,7 @@ export default function OnboardingRideLoopScreen() {
   const units = useUnits();
   const loop = useAppStore((s) => s.onboardingLoop);
   const startedRef = useRef(false);
+  const isAnonymous = useAuthSessionOptional()?.isAnonymous ?? true;
   const [rideLaterOpen, setRideLaterOpen] = useState(false);
   const rideLater = useRideLater(
     loop
@@ -92,19 +94,31 @@ export default function OnboardingRideLoopScreen() {
   // straight back here.
   const handleNotNow = useCallback(() => {
     telemetry.capture('onb_ride_dismissed', { isLoop: true });
+    // Before signup (anonymous first ride, audit 2026-10-18 #2) the way out is
+    // the account ask, keeping the loop: after signup the rider lands back here.
+    if (isAnonymous) {
+      router.replace('/onboarding/signup-prompt' as never);
+      return;
+    }
     useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
     router.replace('/route-planning');
-  }, []);
+  }, [isAnonymous]);
 
   const closeRideLater = useCallback(() => {
     setRideLaterOpen(false);
     // Once the loop is saved (with or without a reminder), this screen's job
     // is done.
     if (rideLater.status.kind === 'set' || rideLater.status.kind === 'no_permission') {
+      if (isAnonymous) {
+        // Saved and reminded, but no account yet: ask for it now, keeping the
+        // loop so signup lands back here.
+        router.replace('/onboarding/signup-prompt' as never);
+        return;
+      }
       useAppStore.getState().setOnboardingRideHandoff({ fresh: false, loop: null });
       router.replace('/route-planning');
     }
-  }, [rideLater.status.kind]);
+  }, [rideLater.status.kind, isAnonymous]);
 
   if (!loop) return null;
   const [startLon, startLat] = loop.coordinates[0] ?? [0, 0];

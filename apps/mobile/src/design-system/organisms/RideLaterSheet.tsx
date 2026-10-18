@@ -37,6 +37,8 @@ export interface RideLaterSheetProps {
   readonly onChoose: (slot: ReminderSlot) => void;
   /** Cancel before choosing, or Done after. */
   readonly onClose: () => void;
+  /** Overrides the default "When do you want to go?". */
+  readonly title?: string;
 }
 
 /**
@@ -45,7 +47,7 @@ export interface RideLaterSheetProps {
  * picker: a date/time picker would be a new native module for a choice most
  * riders make in one tap. The outcome is shown in the same sheet.
  */
-export const RideLaterSheet = ({ visible, status, onChoose, onClose }: RideLaterSheetProps) => {
+export const RideLaterSheet = ({ visible, status, onChoose, onClose, title }: RideLaterSheetProps) => {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -66,8 +68,11 @@ export const RideLaterSheet = ({ visible, status, onChoose, onClose }: RideLater
       <Pressable style={styles.backdrop} onPress={busy ? undefined : onClose} accessibilityLabel={t('onboardingRide.laterCancel')} />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + space[4] }]}>
         <Text style={styles.title} accessibilityRole="header">
-          {t('onboardingRide.laterTitle')}
+          {title ?? t('onboardingRide.laterTitle')}
         </Text>
+        {/* The soft ask before the OS dialog (audit 2026-10-18 #1): say what
+            the notification will be, before Android or iOS asks for it. */}
+        {!finished && !outcome ? <Text style={styles.prime}>{t('onboardingRide.laterPrime')}</Text> : null}
 
         {outcome ? (
           <Text style={styles.outcome} accessibilityLiveRegion="polite">
@@ -125,6 +130,11 @@ const createStyles = (colors: ThemeColors) =>
       ...textLg,
       fontFamily: fontFamily.heading.extraBold,
       color: colors.textPrimary,
+    },
+    prime: {
+      ...textBase,
+      color: colors.textSecondary,
+      lineHeight: 22,
     },
     outcome: {
       ...textBase,

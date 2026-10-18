@@ -252,6 +252,12 @@ export type AppStore = QueueSlice & PremiumSlice & {
   onboardingFlow: OnboardingFlow | null;
   setOnboardingFlow: (flow: OnboardingFlow) => void;
   /**
+   * This install may take its first ride before signing up (audit
+   * 2026-10-18 #2). Decided with `onboardingFlow`, persisted with it.
+   */
+  onboardingAnonymousRide: boolean;
+  setOnboardingAnonymousRide: (allowed: boolean) => void;
+  /**
    * Hand-off from the onboarding route reveal to the post-signup "ride it"
    * screen. Deliberately NOT persisted: a cold start drops it, so a stale
    * onboarding route can never resurface later.
@@ -1024,6 +1030,7 @@ export const useAppStore = create<AppStore>()(
       sesizariConfig: { enabled: true, baseUrl: DEFAULT_CIVIA_BASE_URL },
       loopServerEnabled: false,
       onboardingFlow: null,
+      onboardingAnonymousRide: false,
       onboardingRouteFresh: false,
       onboardingLoop: null,
       sessionHazardReports: [],
@@ -1343,6 +1350,7 @@ export const useAppStore = create<AppStore>()(
       setLoopServerEnabled: (enabled) =>
         set(() => ({ loopServerEnabled: enabled })),
       setOnboardingFlow: (flow) => set(() => ({ onboardingFlow: flow })),
+      setOnboardingAnonymousRide: (allowed) => set(() => ({ onboardingAnonymousRide: allowed })),
       setOnboardingRideHandoff: ({ fresh, loop }) =>
         set(() => ({ onboardingRouteFresh: fresh, onboardingLoop: loop })),
       setAnalyticsConsent: (consent) =>
@@ -2084,6 +2092,7 @@ export const useAppStore = create<AppStore>()(
         // Per-install onboarding decision [D12] — must survive a cold start
         // mid-flow, or a switch flip would move the rider to the other flow.
         onboardingFlow: state.onboardingFlow,
+        onboardingAnonymousRide: state.onboardingAnonymousRide,
         sessionHazardReports: state.sessionHazardReports,
         analyticsConsent: state.analyticsConsent,
         cyclingGoal: state.cyclingGoal,

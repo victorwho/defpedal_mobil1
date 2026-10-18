@@ -77,6 +77,7 @@ afterAll(async () => {
 
 afterEach(() => {
   delete process.env.ONBOARDING_FIRST_RIDE_ENABLED;
+  delete process.env.ONBOARDING_ANONYMOUS_RIDE_ENABLED;
 });
 
 const getProfile = () =>
@@ -98,6 +99,12 @@ describe('GET /v1/profile — onboardingFirstRideEnabled', () => {
     const res = await getProfile();
     expect(res.statusCode).toBe(200);
     expect(res.json().onboardingFirstRideEnabled).toBe(true);
+  });
+
+  it('carries the anonymous-first-ride switch to an anonymous session, default off', async () => {
+    expect((await getProfile()).json().onboardingAnonymousRideEnabled).toBe(false);
+    process.env.ONBOARDING_ANONYMOUS_RIDE_ENABLED = 'true';
+    expect((await getProfile()).json().onboardingAnonymousRideEnabled).toBe(true);
   });
 
   it('treats anything other than an explicit on value as off', async () => {

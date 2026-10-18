@@ -12,6 +12,11 @@ export interface OnboardingFlowDecision {
    * runs today's flow for this pass and leaves the question open.
    */
   definitive: boolean;
+  /**
+   * May the rider take their first ride before signing up (audit 2026-10-18
+   * #2)? Only ever true together with the new flow, and fails closed.
+   */
+  anonymousRide: boolean;
 }
 
 /**
@@ -23,7 +28,10 @@ export interface OnboardingFlowDecision {
  * slow read, or any other value keeps today's flow.
  */
 export const decideOnboardingFlow = async (
-  readProfile: () => Promise<{ onboardingFirstRideEnabled?: boolean }>,
+  readProfile: () => Promise<{
+    onboardingFirstRideEnabled?: boolean;
+    onboardingAnonymousRideEnabled?: boolean;
+  }>,
   timeoutMs: number = ONBOARDING_FLOW_DECISION_TIMEOUT_MS,
 ): Promise<OnboardingFlowDecision> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -37,10 +45,12 @@ export const decideOnboardingFlow = async (
       .then(readProfile)
       .catch(() => null);
     const profile = await Promise.race([read, timeout]);
-    if (!profile) return { flow: 'legacy', definitive: false };
+    if (!profile) return { flow: 'legacy', definitive: false, anonymousRide: false };
+    const firstRide = profile.onboardingFirstRideEnabled === true;
     return {
-      flow: profile.onboardingFirstRideEnabled === true ? 'first_ride' : 'legacy',
+      flow: firstRide ? 'first_ride' : 'legacy',
       definitive: true,
+      anonymousRide: firstRide && profile.onboardingAnonymousRideEnabled === true,
     };
   } finally {
     if (timer) clearTimeout(timer);

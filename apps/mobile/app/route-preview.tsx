@@ -120,7 +120,7 @@ function RoutePreviewScreen() {
    */
   const onTintSafe = safetyOnTint(colors, mode, 'safe');
   const onTintCaution = safetyOnTint(colors, mode, 'caution');
-  const { user } = useAuthSession();
+  const { user, isAnonymous: isAnonymousSession } = useAuthSession();
   const t = useT();
   const units = useUnits();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
@@ -582,7 +582,41 @@ function RoutePreviewScreen() {
   ]);
 
   const returnToPlanning = () => {
+    // An anonymous first ride (audit 2026-10-18 #2) has no planner to go back
+    // to — the gate walls it. Back means the route reveal it came from.
+    if (fromOnboarding && isAnonymousSession && router.canGoBack()) {
+      router.back();
+      return;
+    }
     router.replace('/route-planning');
+  };
+
+  // Leaving the onboarding route without riding or planning a ride is the
+  // last moment to catch this rider (audit 2026-10-18 #3): offer "Ride it
+  // later" once, then let them go.
+  const exitOfferShownRef = useRef(false);
+  const [exitOffer, setExitOffer] = useState(false);
+  const handleBack = () => {
+    if (
+      fromOnboarding &&
+      !exitOfferShownRef.current &&
+      rideLater.status.kind === 'idle' &&
+      appState !== 'NAVIGATING'
+    ) {
+      exitOfferShownRef.current = true;
+      telemetry.capture('onb_exit_offer_shown', {});
+      setExitOffer(true);
+      setRideLaterOpen(true);
+      return;
+    }
+    returnToPlanning();
+  };
+  const closeRideLater = () => {
+    setRideLaterOpen(false);
+    if (exitOffer) {
+      setExitOffer(false);
+      returnToPlanning();
+    }
   };
 
   const toggleVoiceGuidance = () => {
@@ -966,11 +1000,12 @@ function RoutePreviewScreen() {
             visible={rideLaterOpen}
             status={rideLater.status}
             onChoose={(slot) => void rideLater.choose(slot)}
-            onClose={() => setRideLaterOpen(false)}
+            onClose={closeRideLater}
+            title={exitOffer ? t('onboardingRide.exitOfferTitle') : undefined}
           />
           <View style={styles.footerSecondaryRow}>
             <View style={styles.footerSecondaryButton}>
-              <Button variant="secondary" size="md" fullWidth onPress={returnToPlanning}>
+              <Button variant="secondary" size="md" fullWidth onPress={handleBack}>
                 {t('common.back')}
               </Button>
             </View>

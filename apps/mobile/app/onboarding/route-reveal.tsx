@@ -32,6 +32,7 @@ import { mobileApi } from '../../src/lib/api';
 import { searchLoops, type GeneratedLoop } from '../../src/lib/loop-generator';
 import { searchLoopsRemote } from '../../src/lib/loop-generator-remote';
 import { isLoopServerEnabled } from '../../src/lib/loopServerFlag';
+import { decideOnboardingFlow } from '../../src/lib/onboardingFlow';
 import { hasShownOnboardingTour, markOnboardingTourShown } from '../../src/lib/onboardingTour';
 import { describeRouteComparison } from '../../src/lib/routeComparisonCopy';
 import {
@@ -315,6 +316,37 @@ export default function OnboardingRouteRevealScreen() {
     router.push('/onboarding/signup-prompt' as never);
   };
 
+  // First ride before signup (audit 2026-10-18 #2): the ride is the "aha",
+  // so it comes first and the account is asked for afterwards, to keep it.
+  const anonymousRide = useAppStore(
+    (s) => s.onboardingAnonymousRide && s.onboardingFlow === 'first_ride' && s.completedRideCount === 0,
+  );
+  // Re-read the switch on every reveal so turning it OFF reaches installs that
+  // already decided (the flow decision itself is persisted once). Fails
+  // closed: no definitive answer means no anonymous ride this time.
+  useEffect(() => {
+    let cancelled = false;
+    void decideOnboardingFlow(() => mobileApi.getProfile()).then((decision) => {
+      if (cancelled) return;
+      useAppStore
+        .getState()
+        .setOnboardingAnonymousRide(decision.definitive ? decision.anonymousRide : false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleRideNow = () => {
+    if (!route) return;
+    useAppStore.getState().setOnboardingRideHandoff({
+      fresh: !isLoop,
+      loop: isLoop && loopState.kind === 'found' ? loopState.loop : null,
+    });
+    telemetry.capture('onb_cta_ride_now_tapped', { isLoop });
+    router.push((isLoop ? '/onboarding/ride-loop' : '/route-preview') as never);
+  };
+
   const handleSkip = () => {
     telemetry.capture('onb_route_skipped', { reason: 'route_failed' });
     router.replace('/onboarding/signup-prompt' as never);
@@ -446,6 +478,15 @@ export default function OnboardingRouteRevealScreen() {
             </Button>
             <Pressable onPress={handleSkip} accessibilityRole="button" hitSlop={8}>
               <Text style={styles.link}>{t('onboardingRide.skip')}</Text>
+            </Pressable>
+          </>
+        ) : anonymousRide ? (
+          <>
+            <Button variant="primary" size="lg" fullWidth disabled={!route} onPress={handleRideNow}>
+              {t('onboardingRide.rideNowCta')}
+            </Button>
+            <Pressable onPress={handleSave} disabled={!route} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.link}>{t('onboardingRide.saveToAccount')}</Text>
             </Pressable>
           </>
         ) : (

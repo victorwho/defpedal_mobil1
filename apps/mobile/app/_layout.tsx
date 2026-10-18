@@ -182,6 +182,9 @@ const OnboardingGuard = () => {
     state.hasRealAccount,
     state.onboardingCompleted,
     state.pathname,
+    state.anonymousFirstRideAllowed,
+    state.hasCompletedARide,
+    state.hasPendingRideReminder,
   ]);
 
   return null;

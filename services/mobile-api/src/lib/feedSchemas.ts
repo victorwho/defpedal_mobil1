@@ -251,6 +251,8 @@ export const profileResponseSchema = {
     // Onboarding rollout switch (server-owned, read by anonymous sessions).
     // Not in `required`; absent means OFF on the client.
     onboardingFirstRideEnabled: { type: 'boolean' },
+    // First ride before signup (audit 2026-10-18 #2). Absent means OFF.
+    onboardingAnonymousRideEnabled: { type: 'boolean' },
     // Fastify strips anything not declared here (gotcha #9) — every premium
     // field must be listed or it silently vanishes from the response.
     premium: {

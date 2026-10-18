@@ -9,18 +9,19 @@
  *   3. Outside risk coverage the screen says so instead of implying a score.
  *   4. A failed route never dead-ends: try another, or skip to the wall.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 (globalThis as Record<string, unknown>).__DEV__ = false;
 
-const { mockUseQuery, mockBlockEbike, mockParams, mockLocation, mockSearchLoops, mockHazardsQuery } = vi.hoisted(() => ({
+const { mockUseQuery, mockBlockEbike, mockParams, mockLocation, mockSearchLoops, mockHazardsQuery, mockGetProfile } = vi.hoisted(() => ({
   mockUseQuery: vi.fn(),
   mockBlockEbike: vi.fn(),
   mockParams: vi.fn(),
   mockLocation: vi.fn(),
   mockSearchLoops: vi.fn(),
   mockHazardsQuery: vi.fn(),
+  mockGetProfile: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
@@ -42,7 +43,7 @@ vi.mock('../../hooks/useCurrentLocation', () => ({
 vi.mock('../../hooks/useUnits', () => ({ useUnits: () => 'metric' }));
 vi.mock('../../hooks/useTranslation', () => ({ useT: () => (key: string) => key }));
 vi.mock('../../lib/telemetry', () => ({ telemetry: { capture: vi.fn() } }));
-vi.mock('../../lib/api', () => ({ mobileApi: { previewRoute: vi.fn() } }));
+vi.mock('../../lib/api', () => ({ mobileApi: { previewRoute: vi.fn(), getProfile: () => mockGetProfile() } }));
 vi.mock('../../lib/loop-generator', () => ({ searchLoops: mockSearchLoops }));
 vi.mock('../../lib/loop-generator-remote', () => ({ searchLoopsRemote: vi.fn() }));
 vi.mock('../../components/map', () => ({ RouteMap: () => null }));
@@ -97,6 +98,11 @@ beforeEach(() => {
   mockParams.mockReturnValue({ intent: 'commute' });
   mockHazardsQuery.mockReturnValue({ data: undefined, isLoading: false });
   resetOnboardingTourForTest();
+  // Server switches as the install already has them, unless a test says otherwise.
+  mockGetProfile.mockImplementation(async () => ({
+    onboardingFirstRideEnabled: true,
+    onboardingAnonymousRideEnabled: useAppStore.getState().onboardingAnonymousRide,
+  }));
   mockLocation.mockImplementation(() => ({ ...BUCHAREST }));
   useAppStore.setState({
     isEbike: false,
@@ -275,5 +281,57 @@ describe('OnboardingRouteRevealScreen — coachmarks [D4]', () => {
     markOnboardingTourShown();
     render(<OnboardingRouteRevealScreen />);
     expect(screen.queryByText(/tour:/)).toBeNull();
+  });
+});
+
+describe('OnboardingRouteRevealScreen — first ride before signup (audit 2026-10-18 #2)', () => {
+  beforeEach(() => {
+    useAppStore.setState({ onboardingAnonymousRide: true, onboardingFlow: 'first_ride', completedRideCount: 0 });
+  });
+  afterEach(() => {
+    useAppStore.setState({ onboardingAnonymousRide: false, onboardingFlow: null });
+  });
+
+  it('offers "Ride it now" and opens the real route preview with the route', () => {
+    mockUseQuery.mockReturnValue({ data: route(), isError: false });
+    render(<OnboardingRouteRevealScreen />);
+
+    fireEvent.click(screen.getByText('onboardingRide.rideNowCta'));
+
+    expect(useAppStore.getState().onboardingRouteFresh).toBe(true);
+    expect(router.push).toHaveBeenCalledWith('/route-preview');
+  });
+
+  it('still lets the rider save to an account first', () => {
+    mockUseQuery.mockReturnValue({ data: route(), isError: false });
+    render(<OnboardingRouteRevealScreen />);
+
+    fireEvent.click(screen.getByText('onboardingRide.saveToAccount'));
+
+    expect(router.push).toHaveBeenCalledWith('/onboarding/signup-prompt');
+  });
+
+  it('keeps today’s "save to ride" button when the switch is off (control)', () => {
+    useAppStore.setState({ onboardingAnonymousRide: false });
+    mockUseQuery.mockReturnValue({ data: route(), isError: false });
+    render(<OnboardingRouteRevealScreen />);
+
+    expect(screen.queryByText('onboardingRide.rideNowCta')).toBeNull();
+    expect(screen.getByText('onboardingRide.saveCta')).toBeTruthy();
+  });
+});
+
+describe('OnboardingRouteRevealScreen — anonymous-ride switch is re-read', () => {
+  it('drops "Ride it now" when the server switch has been turned off', async () => {
+    useAppStore.setState({ onboardingAnonymousRide: true, onboardingFlow: 'first_ride', completedRideCount: 0 });
+    mockGetProfile.mockResolvedValue({ onboardingFirstRideEnabled: true, onboardingAnonymousRideEnabled: false });
+    mockUseQuery.mockReturnValue({ data: route(), isError: false });
+
+    render(<OnboardingRouteRevealScreen />);
+
+    expect(await screen.findByText('onboardingRide.saveCta')).toBeTruthy();
+    expect(screen.queryByText('onboardingRide.rideNowCta')).toBeNull();
+    expect(useAppStore.getState().onboardingAnonymousRide).toBe(false);
+    useAppStore.setState({ onboardingFlow: null });
   });
 });

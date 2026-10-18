@@ -19,7 +19,6 @@ import {
   textSm,
   textXs,
 } from '../../src/design-system/tokens/typography';
-import { safetyColors } from '../../src/design-system/tokens/colors';
 import { PRIVACY_URL } from '../../src/lib/legal-urls';
 import { useT } from '../../src/hooks/useTranslation';
 
@@ -108,15 +107,9 @@ export default function OnboardingPermissionScreen() {
         </View>
 
         <View style={styles.card}>
-          <View style={[styles.featureRow, styles.statRow]}>
-            <View style={[styles.featureIcon, styles.statIcon]}>
-              <Text style={styles.statBadge}>2.1×</Text>
-            </View>
-            <View style={styles.featureText}>
-              <Text style={[styles.featureTitle, styles.statTitle]}>{t('onboarding.featureStat')}</Text>
-              <Text style={styles.featureDesc}>{t('onboarding.featureStatSub')}</Text>
-            </View>
-          </View>
+          {/* The "2.1× safer than Google Maps" stat was removed 2026-10-18: it
+              was measured in Romania & Spain only, before the app covered 32
+              countries. Re-measure across the footprint before restoring it. */}
           <View style={styles.featureRow}>
             <View style={styles.featureIcon}>
               <Ionicons name="navigate" size={20} color={colors.accent} />
@@ -298,22 +291,5 @@ const createThemedStyles = (colors: ThemeColors) =>
       ...textXs,
       color: colors.textSecondary,
       textDecorationLine: 'underline',
-    },
-    statRow: {
-      paddingBottom: space[1],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderDefault,
-    },
-    statIcon: {
-      backgroundColor: safetyColors.safeTint,
-    },
-    statBadge: {
-      fontFamily: fontFamily.mono.bold,
-      fontSize: 13,
-      letterSpacing: -0.5,
-      color: safetyColors.safe,
-    },
-    statTitle: {
-      color: safetyColors.safe,
     },
   });
