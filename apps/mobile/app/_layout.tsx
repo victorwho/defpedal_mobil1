@@ -40,6 +40,7 @@ import { RIDE_SAVED_UNDO_MS } from '../src/lib/postRideScreens';
 import { PlusModesPromoNotice } from '../src/design-system/molecules/PlusModesPromoNotice';
 import { PlusModesMovedNotice } from '../src/design-system/molecules/PlusModesMovedNotice';
 import { LoopIntroSheet } from '../src/design-system/organisms/LoopIntroSheet';
+import { countLaunchOnce } from '../src/lib/appOpenCounter';
 import { useLoopIntro } from '../src/hooks/useLoopIntro';
 import { PlusPaywallHost } from '../src/components/PlusPaywallHost';
 import { usePlusNudge } from '../src/hooks/usePlusNudge';
@@ -104,17 +105,16 @@ const OnboardingGuard = () => {
   const incrementAnonymousOpenCount = useAppStore((s) => s.incrementAnonymousOpenCount);
   const incrementAppOpenCount = useAppStore((s) => s.incrementAppOpenCount);
   const hasIncrementedRef = useRef(false);
-  const hasCountedAppOpenRef = useRef(false);
   // Tracks when the app last went to background so we can decide if a
   // foreground transition should count as a new session.
   const lastBackgroundAtRef = useRef<number | null>(null);
   const { storeHydrated, isLoading, hasRealAccount } = state;
 
-  // Every open, any account — the Loop intro waits for the third one.
+  // Every open, any account — the Loop intro waits for the third one. Once per
+  // LAUNCH (module state), never per mount: this guard re-mounts at signup.
   useEffect(() => {
-    if (!storeHydrated || hasCountedAppOpenRef.current) return;
-    hasCountedAppOpenRef.current = true;
-    incrementAppOpenCount();
+    if (!storeHydrated) return;
+    countLaunchOnce(incrementAppOpenCount);
   }, [storeHydrated, incrementAppOpenCount]);
 
   // Increment anonymous open count once per app launch.

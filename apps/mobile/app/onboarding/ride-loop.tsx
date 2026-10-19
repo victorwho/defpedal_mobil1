@@ -78,6 +78,8 @@ export default function OnboardingRideLoopScreen() {
       clientTripId: createClientTripId(),
     });
     if (outcome === 'started') {
+      // Riding a loop is using loops: the "try a loop" intro must not ask later.
+      useAppStore.getState().markLoopPlannerOpened();
       telemetry.capture('onb_ride_now', { isLoop: true });
       telemetry.capture('navigation_started', {
         mode: 'loop',
