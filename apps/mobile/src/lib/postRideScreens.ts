@@ -102,3 +102,21 @@ export const isNearDestination = (
     ARRIVAL_RADIUS_METERS
   );
 };
+
+/**
+ * Where a quietly saved ride sends the rider.
+ *
+ * A rider on the first-ride onboarding who rode WITHOUT an account (audit
+ * 2026-10-18 #2) goes straight to the signup screen to keep the ride — not to
+ * the map with a "Ride saved" toast, which the signup gate then redirected
+ * through and which could land them back on "Where do you want to ride?".
+ * Everyone else returns to the map as before.
+ */
+export const quietRideDestination = (input: {
+  readonly isAnonymous: boolean;
+  readonly onboardingFlow: 'legacy' | 'first_ride' | null;
+  readonly onboardingCompleted: boolean;
+}): '/onboarding/signup-prompt' | '/route-planning' =>
+  input.isAnonymous && input.onboardingFlow === 'first_ride' && !input.onboardingCompleted
+    ? '/onboarding/signup-prompt'
+    : '/route-planning';

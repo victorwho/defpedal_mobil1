@@ -1919,6 +1919,6 @@ export const ro: TranslationKeys = {
     rideNowCta: 'Pornește acum',
     saveToAccount: 'Salvează-l mai întâi într-un cont',
     signupTitleRide: 'Păstrează tura asta',
-    signupSubRide: 'Creează un cont nou și tura, seria și insignele tale vin cu tine, pe orice telefon.',
+    signupSubRide: 'Înscrie-te ca să salvezi tura asta și pe cele care urmează. Avem nevoie să fii conectat ca aplicația să învețe cum mergi de fapt, de exemplu ritmul tău real pentru estimările de timp. Un cont nou păstrează tura asta; unul existent nu o va include.',
   },
 };

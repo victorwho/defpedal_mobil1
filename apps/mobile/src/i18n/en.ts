@@ -1976,7 +1976,10 @@ export const en = {
     signupTitleRide: 'Keep this ride',
     // "New": the guest-session merge only fills a FRESH account, so signing in
     // to an existing one does not carry this ride across (merge_anonymous_account).
-    signupSubRide: 'Create a new account and this ride, your streak and your badges come with you, on any phone.',
+    // Says what signing in is FOR: rides are kept, and the app learns how the
+    // rider really rides. Only claims what adapts today (pace-based time
+    // estimates) — route choice does not learn from rides.
+    signupSubRide: 'Sign up to save this ride and the ones after it. We need you signed in so the app can learn how you really ride, like your actual pace for time estimates. A new account keeps this ride; an existing one won’t include it.',
   },
 } as const;
 

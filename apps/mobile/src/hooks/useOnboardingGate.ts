@@ -27,6 +27,7 @@ export const useOnboardingGate = (): OnboardingGateState => {
   const onboardingCompleted = useAppStore((s) => s.onboardingCompleted);
   const completedRideCount = useAppStore((s) => s.completedRideCount);
   const hasPendingRideReminder = useAppStore((s) => s.firstRideReminderAt !== null);
+  const isFirstRideFlow = useAppStore((s) => s.onboardingFlow === 'first_ride');
   const anonymousRideOn = useAppStore(
     (s) => s.onboardingAnonymousRide && s.onboardingFlow === 'first_ride',
   );
@@ -45,9 +46,11 @@ export const useOnboardingGate = (): OnboardingGateState => {
     isSessionUnreadable,
     hasRealAccount,
     anonymousFirstRideAllowed: anonymousRideOn && !onboardingCompleted && completedRideCount === 0,
-    // Only on the anonymous-first-ride flow: elsewhere the gate keeps its old
-    // behaviour exactly.
-    hasCompletedARide: anonymousRideOn && completedRideCount > 0,
+    // On the first-ride flow only — elsewhere the gate keeps its old behaviour
+    // exactly. Deliberately NOT tied to the anonymous-ride switch: once a ride
+    // has happened it must be kept, even if the switch was turned off (or a
+    // failed re-read set it off) in the meantime.
+    hasCompletedARide: isFirstRideFlow && completedRideCount > 0,
     hasPendingRideReminder,
   };
 };

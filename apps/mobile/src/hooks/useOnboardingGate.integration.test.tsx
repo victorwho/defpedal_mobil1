@@ -406,3 +406,34 @@ describe('app/index.tsx decision logic', () => {
     expect(target).not.toMatch(/\/index$/);
   });
 });
+
+describe('useOnboardingGate — after an anonymous first ride', () => {
+  afterEach(() => {
+    useAppStore.setState({ onboardingFlow: null, onboardingAnonymousRide: false, completedRideCount: 0 });
+  });
+
+  it('sends the rider to keep the ride even if the anonymous-ride switch was turned off since', () => {
+    mockPathname('/route-planning');
+    mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
+    useAppStore.setState({
+      onboardingCompleted: false,
+      onboardingFlow: 'first_ride',
+      onboardingAnonymousRide: false,
+      completedRideCount: 1,
+    });
+
+    const { result } = renderHook(() => useOnboardingGate());
+
+    expect(computeOnboardingGateTarget(result.current)).toBe('/onboarding/signup-prompt');
+  });
+
+  it('leaves installs on the old onboarding exactly as they were (control)', () => {
+    mockPathname('/route-planning');
+    mockAuth({ isLoading: false, user: { id: 'anon-1' }, isAnonymous: true });
+    useAppStore.setState({ onboardingCompleted: false, onboardingFlow: 'legacy', completedRideCount: 1 });
+
+    const { result } = renderHook(() => useOnboardingGate());
+
+    expect(computeOnboardingGateTarget(result.current)).toBe('/onboarding');
+  });
+});

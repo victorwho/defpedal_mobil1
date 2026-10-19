@@ -1919,6 +1919,6 @@ export const es: TranslationKeys = {
     rideNowCta: 'Salir ahora',
     saveToAccount: 'Guárdala primero en una cuenta',
     signupTitleRide: 'Guarda este recorrido',
-    signupSubRide: 'Crea una cuenta nueva y este recorrido, tu racha y tus insignias se vienen contigo, en cualquier móvil.',
+    signupSubRide: 'Regístrate para guardar este recorrido y los siguientes. Necesitamos que inicies sesión para que la app aprenda cómo ruedas de verdad, como tu ritmo real para calcular los tiempos. Una cuenta nueva conserva este recorrido; una existente no lo incluirá.',
   },
 };

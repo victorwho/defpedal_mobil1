@@ -70,6 +70,7 @@ import {
   isEarlyEndReasonDue,
   isNearDestination,
   isQuietRide,
+  quietRideDestination,
   RIDE_SAVED_HOLD_MS,
   RIDE_SAVED_UNDO_MS,
 } from '../src/lib/postRideScreens';
@@ -138,7 +139,7 @@ function NavigationScreen() {
   const haptics = useHaptics();
   const { colors } = useTheme();
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
-  const { user } = useAuthSession();
+  const { user, isAnonymous: isAnonymousSession } = useAuthSession();
   const guardPassed = useRouteGuard({
     requiredStates: ['NAVIGATING'],
     condition: () => Boolean(useAppStore.getState().navigationSession),
@@ -698,8 +699,16 @@ function NavigationScreen() {
     const clientTripId = store.activeTripClientId;
     const crumbs = store.navigationSession?.gpsBreadcrumbs ?? [];
     const distanceMeters = crumbs.length >= 2 ? calculateTrailDistanceMeters(crumbs) : 0;
+    // An anonymous first ride from onboarding goes straight to the account ask
+    // (audit 2026-10-18 #2). No toast there, so no Discard window to hold for.
+    const destination = quietRideDestination({
+      isAnonymous: isAnonymousSession,
+      onboardingFlow: store.onboardingFlow,
+      onboardingCompleted: store.onboardingCompleted,
+    });
+    const toSignup = destination === '/onboarding/signup-prompt';
     const hold: EnqueueOptions | undefined =
-      reason === 'stopped' && clientTripId
+      reason === 'stopped' && clientTripId && !toSignup
         ? { holdKey: clientTripId, holdUntil: new Date(Date.now() + RIDE_SAVED_HOLD_MS).toISOString() }
         : undefined;
 
@@ -717,19 +726,21 @@ function NavigationScreen() {
       ...(reason === 'stopped' ? { early_end_reason: early?.earlyEndReason ?? 'not_asked' } : {}),
     });
     void clearCachedRoute();
-    setRideSavedNotice({
-      distanceMeters,
-      holdKey: hold?.holdKey ?? null,
-      discardableUntil: hold ? Date.now() + RIDE_SAVED_UNDO_MS : null,
-    });
+    if (!toSignup) {
+      setRideSavedNotice({
+        distanceMeters,
+        holdKey: hold?.holdKey ?? null,
+        discardableUntil: hold ? Date.now() + RIDE_SAVED_UNDO_MS : null,
+      });
+    }
     finishRideQuietly();
-    router.replace('/route-planning');
+    router.replace(destination as never);
     // ⚠️ No `navigationSession` in these deps — read it from the store above.
     // The per-GPS-fix effect depends on `completeRide`, which depends on this,
     // and that effect rewrites the session on every fix: a session dep made a
     // new callback per fix, re-ran the effect, and looped until React gave up
     // ("Maximum update depth exceeded" on preview 0.2.184, error-log #136).
-  }, [queueTripEnd, selectedRoute, setRideSavedNotice, finishRideQuietly]);
+  }, [queueTripEnd, selectedRoute, setRideSavedNotice, finishRideQuietly, isAnonymousSession]);
 
   // A completed ride: arrival, or End Ride within ARRIVAL_RADIUS_METERS of the
   // destination. From ride 4 on it always opens the impact summary (the
