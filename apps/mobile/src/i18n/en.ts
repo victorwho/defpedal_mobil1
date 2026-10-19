@@ -1973,6 +1973,10 @@ export const en = {
     exitOfferTitle: 'Not riding now? Pick a time and I’ll remind you.',
     rideNowCta: 'Ride it now',
     saveToAccount: 'Save it to an account instead',
+    // After an onboarding ride that ended before the rider moved: nothing was
+    // recorded, so there is no ride to "keep".
+    signupTitleStart: 'Sign up to start riding',
+    signupSubStart: 'We need you signed in so we can save your rides and learn how you really ride, like your actual pace for time estimates. It takes a few seconds.',
     signupTitleRide: 'Keep this ride',
     // "New": the guest-session merge only fills a FRESH account, so signing in
     // to an existing one does not carry this ride across (merge_anonymous_account).

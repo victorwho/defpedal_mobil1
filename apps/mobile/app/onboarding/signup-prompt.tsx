@@ -62,6 +62,7 @@ export default function OnboardingSignupPromptScreen() {
   // An anonymous first ride already happened (audit 2026-10-18 #2): the ask
   // is to keep THAT, which outranks keeping a route.
   const hasRideToKeep = useAppStore((s) => s.completedRideCount > 0);
+  const rideEndedUnstarted = useAppStore((s) => s.onboardingRideEndedUnstarted);
 
   // Registration-funnel top: one event per wall mount. Pairs with
   // signup_completed below (PostHog "Registration funnel" dashboard).
@@ -81,7 +82,13 @@ export default function OnboardingSignupPromptScreen() {
     telemetry.capture('signup_completed', {
       method,
       source: 'wall',
-      from: hasRideToKeep ? 'after_ride' : hasRouteToKeep ? 'route_reveal' : 'intro',
+      from: hasRideToKeep
+        ? 'after_ride'
+        : useAppStore.getState().onboardingRideEndedUnstarted
+          ? 'after_unstarted_ride'
+          : hasRouteToKeep
+            ? 'route_reveal'
+            : 'intro',
     });
     setOnboardingCompleted(true);
     resetAnonymousOpenCount();
@@ -183,7 +190,9 @@ export default function OnboardingSignupPromptScreen() {
             {t(
               hasRideToKeep
                 ? 'onboardingRide.signupTitleRide'
-                : hasRouteToKeep
+                : rideEndedUnstarted
+                  ? 'onboardingRide.signupTitleStart'
+                  : hasRouteToKeep
                   ? 'onboardingRide.signupTitleRoute'
                   : 'onboarding.signupPromptTitle',
             )}
@@ -192,7 +201,9 @@ export default function OnboardingSignupPromptScreen() {
             {t(
               hasRideToKeep
                 ? 'onboardingRide.signupSubRide'
-                : hasRouteToKeep
+                : rideEndedUnstarted
+                  ? 'onboardingRide.signupSubStart'
+                  : hasRouteToKeep
                   ? 'onboardingRide.signupSubRoute'
                   : 'onboarding.signupSubMandatory',
             )}

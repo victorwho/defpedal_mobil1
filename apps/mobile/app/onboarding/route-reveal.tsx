@@ -322,15 +322,17 @@ export default function OnboardingRouteRevealScreen() {
     (s) => s.onboardingAnonymousRide && s.onboardingFlow === 'first_ride' && s.completedRideCount === 0,
   );
   // Re-read the switch on every reveal so turning it OFF reaches installs that
-  // already decided (the flow decision itself is persisted once). Fails
-  // closed: no definitive answer means no anonymous ride this time.
+  // already decided (the flow decision itself is persisted once). Only a
+  // DEFINITIVE server answer changes it: a slow read (a cold Cloud Run start
+  // easily passes the timeout) used to switch it off mid-onboarding, after
+  // "Ride it now" had already been offered, and the gate then sent the rider
+  // back to the welcome screen. The first decision, at region-check, is the
+  // one that fails closed.
   useEffect(() => {
     let cancelled = false;
     void decideOnboardingFlow(() => mobileApi.getProfile()).then((decision) => {
-      if (cancelled) return;
-      useAppStore
-        .getState()
-        .setOnboardingAnonymousRide(decision.definitive ? decision.anonymousRide : false);
+      if (cancelled || !decision.definitive) return;
+      useAppStore.getState().setOnboardingAnonymousRide(decision.anonymousRide);
     });
     return () => {
       cancelled = true;

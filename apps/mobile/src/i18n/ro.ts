@@ -1918,6 +1918,8 @@ export const ro: TranslationKeys = {
     exitOfferTitle: 'Nu pleci acum? Alege o oră și îți amintesc eu.',
     rideNowCta: 'Pornește acum',
     saveToAccount: 'Salvează-l mai întâi într-un cont',
+    signupTitleStart: 'Înscrie-te ca să pornești la drum',
+    signupSubStart: 'Avem nevoie să fii conectat ca să-ți salvăm turele și să învățăm cum mergi de fapt, de exemplu ritmul tău real pentru estimările de timp. Durează câteva secunde.',
     signupTitleRide: 'Păstrează tura asta',
     signupSubRide: 'Înscrie-te ca să salvezi tura asta și pe cele care urmează. Avem nevoie să fii conectat ca aplicația să învețe cum mergi de fapt, de exemplu ritmul tău real pentru estimările de timp. Un cont nou păstrează tura asta; unul existent nu o va include.',
   },

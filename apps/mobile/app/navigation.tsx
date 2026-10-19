@@ -783,8 +783,18 @@ function NavigationScreen() {
     });
     void clearCachedRoute();
     resetFlow();
-    router.replace('/route-planning');
-  }, [queueTripEnd, selectedRoute, resetFlow]);
+    // An anonymous onboarding rider ends at the signup screen whichever way the
+    // ride ended (owner request 2026-10-19). Testers end rides at a desk, so
+    // this is in practice the COMMON end of the first ride, not an edge case.
+    const store = useAppStore.getState();
+    const destination = quietRideDestination({
+      isAnonymous: isAnonymousSession,
+      onboardingFlow: store.onboardingFlow,
+      onboardingCompleted: store.onboardingCompleted,
+    });
+    if (destination === '/onboarding/signup-prompt') store.setOnboardingRideEndedUnstarted(true);
+    router.replace(destination as never);
+  }, [queueTripEnd, selectedRoute, resetFlow, isAnonymousSession]);
 
   // End Ride (press-and-hold) and Android back. There is no Save/Discard
   // dialog any more (2026-10-09): the ride is saved and the toast offers

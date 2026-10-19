@@ -1918,6 +1918,8 @@ export const es: TranslationKeys = {
     exitOfferTitle: '¿No sales ahora? Elige una hora y te lo recuerdo.',
     rideNowCta: 'Salir ahora',
     saveToAccount: 'Guárdala primero en una cuenta',
+    signupTitleStart: 'Regístrate para empezar a rodar',
+    signupSubStart: 'Necesitamos que inicies sesión para guardar tus recorridos y aprender cómo ruedas de verdad, como tu ritmo real para calcular los tiempos. Tarda unos segundos.',
     signupTitleRide: 'Guarda este recorrido',
     signupSubRide: 'Regístrate para guardar este recorrido y los siguientes. Necesitamos que inicies sesión para que la app aprenda cómo ruedas de verdad, como tu ritmo real para calcular los tiempos. Una cuenta nueva conserva este recorrido; una existente no lo incluirá.',
   },

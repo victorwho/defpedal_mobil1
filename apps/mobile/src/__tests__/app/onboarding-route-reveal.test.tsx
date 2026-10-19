@@ -335,3 +335,18 @@ describe('OnboardingRouteRevealScreen — anonymous-ride switch is re-read', () 
     useAppStore.setState({ onboardingFlow: null });
   });
 });
+
+describe('OnboardingRouteRevealScreen — a failed re-read is not "off"', () => {
+  it('keeps "Ride it now" when the profile read fails (cold server, no signal)', async () => {
+    useAppStore.setState({ onboardingAnonymousRide: true, onboardingFlow: 'first_ride', completedRideCount: 0 });
+    mockGetProfile.mockRejectedValue(new Error('timeout'));
+    mockUseQuery.mockReturnValue({ data: route(), isError: false });
+
+    render(<OnboardingRouteRevealScreen />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(useAppStore.getState().onboardingAnonymousRide).toBe(true);
+    expect(screen.getByText('onboardingRide.rideNowCta')).toBeTruthy();
+    useAppStore.setState({ onboardingFlow: null, onboardingAnonymousRide: false });
+  });
+});

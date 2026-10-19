@@ -271,6 +271,13 @@ export type AppStore = QueueSlice & PremiumSlice & {
    */
   onboardingRouteFresh: boolean;
   onboardingLoop: GeneratedLoop | null;
+  /**
+   * An anonymous onboarding ride was ended before the rider moved (nothing
+   * recorded). The signup screen then asks them to sign up to start riding,
+   * rather than to keep a ride that does not exist. Not persisted.
+   */
+  onboardingRideEndedUnstarted: boolean;
+  setOnboardingRideEndedUnstarted: (ended: boolean) => void;
   setOnboardingRideHandoff: (handoff: { fresh: boolean; loop: GeneratedLoop | null }) => void;
   /**
    * Hazards this rider reported during the CURRENT ride, so the post-ride
@@ -1033,6 +1040,7 @@ export const useAppStore = create<AppStore>()(
       onboardingAnonymousRide: false,
       onboardingRouteFresh: false,
       onboardingLoop: null,
+      onboardingRideEndedUnstarted: false,
       sessionHazardReports: [],
       // P0.1 (2026-05-25) split crash reporting from product analytics.
       // - sentry: defaults TRUE. Legal basis = legitimate interest (GDPR
@@ -1353,6 +1361,8 @@ export const useAppStore = create<AppStore>()(
       setOnboardingAnonymousRide: (allowed) => set(() => ({ onboardingAnonymousRide: allowed })),
       setOnboardingRideHandoff: ({ fresh, loop }) =>
         set(() => ({ onboardingRouteFresh: fresh, onboardingLoop: loop })),
+      setOnboardingRideEndedUnstarted: (ended) =>
+        set(() => ({ onboardingRideEndedUnstarted: ended })),
       setAnalyticsConsent: (consent) =>
         set(() => ({
           analyticsConsent: {
