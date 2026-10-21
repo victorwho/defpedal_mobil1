@@ -7,7 +7,11 @@ and its comparison line built (`4b15d9c`; device check deferred to the
 phase 1 preview pass). Map screen-reader summary, course screen, HUD, loop planner and
 `eta_accuracy` built. Phase 2 built (`adaptiveEta.ts`, `hud-eta.ts`);
 on E-bike it still blends, since the ride's own speed is the right bike.
-Next: Phase 3, then the preview build and device pass.
+Phase 3 built (`7c1787e`): migration `202610210001` live, API
+`defpedal-api-00185-724` deployed. The client half ships with the next
+build. Loops are routed on the standard graph, so a loop on an e-bike
+records the bike but no prediction, and its time is not scaled by the
+e-bike factor. Next: the preview build and device pass.
 
 ## Problem
 
