@@ -43,8 +43,14 @@ export interface SearchBarProps {
     home: AutocompleteSuggestion | null;
     work: AutocompleteSuggestion | null;
   };
-  /** Called when user long-presses a suggestion and picks "Save as Home/Work" */
+  /**
+   * Saves a suggestion as Home/Work. Reached by long-pressing a suggestion,
+   * or by tapping an unset Home/Work row (or "Change" on a set one), which
+   * makes the next picked suggestion save instead of route.
+   */
   onSavePlace?: (suggestion: AutocompleteSuggestion, type: 'home' | 'work') => void;
+  /** Clears a saved place. Without it the edit menu offers only "Change". */
+  onRemovePlace?: (type: 'home' | 'work') => void;
   onChangeText: (value: string) => void;
   onFocus: () => void;
   onClear: () => void;
@@ -152,13 +158,56 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   onSelectCurrentLocation,
   savedPlaces,
   onSavePlace,
+  onRemovePlace,
   onChangeText,
   onFocus,
   onClear,
-  onSelectSuggestion,
+  onSelectSuggestion: onSelectSuggestionProp,
 }) => {
   const { colors } = useTheme();
   const t = useT();
+
+  // "Set Home / Set Work" mode: the next picked suggestion is saved, not routed to.
+  const [savingType, setSavingType] = React.useState<'home' | 'work' | null>(null);
+  React.useEffect(() => {
+    if (!active) setSavingType(null);
+  }, [active]);
+
+  const onSelectSuggestion = (suggestion: AutocompleteSuggestion) => {
+    if (savingType && onSavePlace) {
+      onSavePlace(suggestion, savingType);
+      setSavingType(null);
+      // Empty the query only: onClear may also reset the field's own value
+      // (the start-override field clears the chosen start point).
+      onChangeText('');
+      return;
+    }
+    onSelectSuggestionProp(suggestion);
+  };
+
+  const placeName = (type: 'home' | 'work') => (type === 'home' ? t('search.home') : t('search.work'));
+
+  const openPlaceMenu = (type: 'home' | 'work') => {
+    Alert.alert(placeName(type), undefined, [
+      { text: t('search.changePlace'), onPress: () => setSavingType(type) },
+      ...(onRemovePlace
+        ? [{ text: t('search.removePlace'), style: 'destructive' as const, onPress: () => onRemovePlace(type) }]
+        : []),
+      { text: t('common.cancel'), style: 'cancel' as const },
+    ]);
+  };
+
+  const renderPlaceMenuButton = (type: 'home' | 'work') =>
+    onSavePlace ? (
+      <Pressable
+        onPress={() => openPlaceMenu(type)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={t('search.editPlaceA11y', { name: placeName(type) })}
+      >
+        <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+      </Pressable>
+    ) : null;
 
   // Show recent destinations when field is active but user hasn't typed anything
   const showRecents = active && value.length === 0 && recentDestinations.length > 0;
@@ -237,6 +286,17 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         ) : null}
       </View>
 
+      {savingType ? (
+        <View style={styles.savingRow}>
+          <Text style={[textSm, { flex: 1, color: colors.accent, fontFamily: fontFamily.body.semiBold }]}>
+            {savingType === 'home' ? t('search.pickToSaveHome') : t('search.pickToSaveWork')}
+          </Text>
+          <Pressable onPress={() => setSavingType(null)} hitSlop={12} accessibilityRole="button">
+            <Text style={[textSm, { color: colors.textSecondary }]}>{t('common.cancel')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* Status text */}
       {statusText ? (
         <Text
@@ -292,7 +352,13 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                   styles.suggestionButton,
                   { backgroundColor: pressed ? colors.bgTertiary : colors.bgPrimary },
                 ]}
-                onPress={place ? () => onSelectSuggestion(place) : undefined}
+                onPress={
+                  place
+                    ? () => onSelectSuggestion(place)
+                    : onSavePlace
+                      ? () => setSavingType(type)
+                      : undefined
+                }
                 accessibilityRole="button"
                 accessibilityLabel={isHome ? t('search.home') : t('search.work')}
               >
@@ -316,6 +382,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     </Text>
                   )}
                 </View>
+                {place ? renderPlaceMenuButton(type) : null}
               </Pressable>
             );
           })}
@@ -386,6 +453,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                     {place.primaryText}
                   </Text>
                 </View>
+                {renderPlaceMenuButton(type)}
               </Pressable>
             );
           })}
@@ -668,6 +736,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: space[2],
     gap: space[2],
+  },
+  savingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    paddingHorizontal: space[2],
   },
   helperRow: {
     flexDirection: 'row',

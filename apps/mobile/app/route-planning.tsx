@@ -1410,6 +1410,7 @@ export default function RoutePlanningScreen() {
                 onSavePlace={(suggestion, type) =>
                   void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
                 }
+                onRemovePlace={(type) => setSavedPlace(type, null)}
               />
               {/* Inside the card, not over the map: the keyboard covers the
                   bottom of the map while this field is open. Shares Cancel's
@@ -1497,6 +1498,7 @@ export default function RoutePlanningScreen() {
                 onSavePlace={(suggestion, type) =>
                   void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
                 }
+                onRemovePlace={(type) => setSavedPlace(type, null)}
               />
               {hasValidDestination ? (
                 <Pressable
@@ -1548,6 +1550,7 @@ export default function RoutePlanningScreen() {
                     onSavePlace={(suggestion, type) =>
                   void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
                 }
+                    onRemovePlace={(type) => setSavedPlace(type, null)}
                   />
                 </View>
               ) : (
@@ -1670,6 +1673,7 @@ export default function RoutePlanningScreen() {
                   onSavePlace={(suggestion, type) =>
                   void withResolvedPick((resolved) => setSavedPlace(type, resolved))(suggestion)
                 }
+                  onRemovePlace={(type) => setSavedPlace(type, null)}
                 />
               </View>
             </View>

@@ -5,8 +5,9 @@
  * Tests rendering, suggestions, recent destinations, and callbacks.
  */
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Alert } from 'react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import type { SearchBarProps } from '../SearchBar';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,14 @@ vi.mock('../../../hooks/useTranslation', () => ({
       'search.selectA11y': 'Select {{name}}',
       'search.saveHintA11y': 'Long-press to save as Home or Work',
       'common.cancel': 'Cancel',
+      'search.home': 'Home',
+      'search.work': 'Work',
+      'search.setWork': 'Set work address',
+      'search.pickToSaveWork': 'Pick an address to save as Work',
+      'search.pickToSaveHome': 'Pick an address to save as Home',
+      'search.changePlace': 'Change',
+      'search.removePlace': 'Remove',
+      'search.editPlaceA11y': 'Edit {{name}}',
     };
     const raw = translations[key] ?? key;
     if (!vars) return raw;
@@ -232,6 +241,99 @@ describe('SearchBar', () => {
       );
       expect(screen.getByText('Recent')).toBeTruthy();
       expect(screen.getByText('Home')).toBeTruthy();
+    });
+  });
+
+  describe('saved places (UX-16)', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const home = {
+      id: 'h',
+      label: 'Str. Victoriei 10',
+      primaryText: 'Str. Victoriei 10',
+      coordinates: { lat: 44.42, lon: 26.1 },
+    };
+    const suggestion = {
+      id: '1',
+      label: 'Piata Victoriei',
+      primaryText: 'Piata Victoriei',
+      coordinates: { lat: 44.45, lon: 26.08 },
+    };
+
+    it('tapping an unset row makes the next pick save instead of route', () => {
+      const onSavePlace = vi.fn();
+      const onSelectSuggestion = vi.fn();
+      const onChangeText = vi.fn();
+      const props = {
+        ...defaultProps,
+        active: true,
+        savedPlaces: { home, work: null },
+        onSavePlace,
+        onSelectSuggestion,
+        onChangeText,
+      };
+      const { rerender } = render(<SearchBar {...props} />);
+      fireEvent.click(screen.getByLabelText('Work'));
+      expect(screen.getByText('Pick an address to save as Work')).toBeTruthy();
+
+      rerender(<SearchBar {...props} value="Piata" suggestions={[suggestion]} />);
+      fireEvent.click(screen.getByLabelText('Select Piata Victoriei'));
+      expect(onSavePlace).toHaveBeenCalledWith(suggestion, 'work');
+      expect(onSelectSuggestion).not.toHaveBeenCalled();
+      expect(onChangeText).toHaveBeenCalledWith('');
+
+      // Mode ends after one save: the next pick routes again.
+      fireEvent.click(screen.getByLabelText('Select Piata Victoriei'));
+      expect(onSelectSuggestion).toHaveBeenCalledWith(suggestion);
+      expect(onSavePlace).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancel leaves set mode', () => {
+      render(
+        <SearchBar {...defaultProps} active savedPlaces={{ home, work: null }} onSavePlace={vi.fn()} />,
+      );
+      fireEvent.click(screen.getByLabelText('Work'));
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(screen.queryByText('Pick an address to save as Work')).toBeNull();
+    });
+
+    it('set row menu offers Change and Remove', () => {
+      const alertSpy = vi.spyOn(Alert, 'alert');
+      const onRemovePlace = vi.fn();
+      render(
+        <SearchBar
+          {...defaultProps}
+          active
+          savedPlaces={{ home, work: null }}
+          onSavePlace={vi.fn()}
+          onRemovePlace={onRemovePlace}
+        />,
+      );
+      fireEvent.click(screen.getByLabelText('Edit Home'));
+      const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+      expect(buttons.map((b) => b.text)).toEqual(['Change', 'Remove', 'Cancel']);
+
+      buttons[1].onPress?.();
+      expect(onRemovePlace).toHaveBeenCalledWith('home');
+    });
+
+    it('Change enters set mode for that place', () => {
+      const alertSpy = vi.spyOn(Alert, 'alert');
+      render(
+        <SearchBar {...defaultProps} active savedPlaces={{ home, work: null }} onSavePlace={vi.fn()} />,
+      );
+      fireEvent.click(screen.getByLabelText('Edit Home'));
+      const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+      expect(buttons.map((b) => b.text)).toEqual(['Change', 'Cancel']);
+      act(() => buttons[0].onPress?.());
+      expect(screen.getByText('Pick an address to save as Home')).toBeTruthy();
+    });
+
+    it('has no edit control or set mode without onSavePlace', () => {
+      render(<SearchBar {...defaultProps} active savedPlaces={{ home, work: null }} />);
+      expect(screen.queryByLabelText('Edit Home')).toBeNull();
+      fireEvent.click(screen.getByLabelText('Work'));
+      expect(screen.queryByText('Pick an address to save as Work')).toBeNull();
     });
   });
 

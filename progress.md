@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-17 (onboarding first-ride: spec + kill switch live)
+Last updated: 2026-10-21 (commute mode plan + Home/Work management)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Commute mode planned; step 1 (Home/Work management, backlog UX-16) device-confirmed on the dev build.** Feature ideas review recorded in `changestoimplement.md`; commute plan at `docs/plans/commute-mode.md` (phase 1 on-device, owner decisions: evening briefing in v1, replaces the weather ping on commute days, departure time asked in setup, free). Step 1: tapping an unset Home/Work row in search makes the next pick save instead of route; set rows get a menu with Change / Remove (`onRemovePlace`, wired at all four route-planning search fields). Saving empties only the query: `onClear` on the start field also clears the chosen start point. EN/RO/ES keys, 5 new SearchBar tests (mutation-checked). Gap kept: the rows only show once one place is set; the Profile Commute section (step 5) is the entry point for a rider with neither.
 
 - **2026-10-19: 0.2.197 RELEASED to both stores** (main `877af34`) — first store release carrying the first-ride onboarding (steps 1-4 + audit fixes + the two ride-end fixes + loop-intro open counting). Play: versionCode 200 on production at a **20% staged rollout** (193 / 0.2.190 completed on the rest), en-GB notes, verified on a fresh read; AAB signed with the upload key (82:7C:…:35:73), R8 keep check + leak audit passed, Sentry upload `0.2.197+200`, archived `apkreleases/DefensivePedal-Production-v0.2.197.aab`. iOS: EAS build 41 (clean worktree at `877af34`) VALID, version **1.28** created with build 41 attached (verified on its own endpoint), `AFTER_APPROVAL`, **WAITING_FOR_REVIEW** (submission `7506fe46`). App Review notes rewritten: sign-in now comes after the route reveal, so the reviewer is told where it is; outdated "Romania and Spain only" coverage line corrected. ⚠️ Server switches `ONBOARDING_FIRST_RIDE_ENABLED` and `ONBOARDING_ANONYMOUS_RIDE_ENABLED` are both ON, so every new install on this release gets the new onboarding and the anonymous first ride. Next: watch Sentry + the `onb_*` funnel, then widen Play; re-run `scripts/onboarding/first-ride-baseline.sql` after a few weeks.
 
