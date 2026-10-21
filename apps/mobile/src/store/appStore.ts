@@ -128,10 +128,16 @@ const DEFAULT_ROUTE_REQUEST: RoutePreviewRequest = {
   countryHint: undefined,
 };
 
-export type WeatherNotice = {
+/**
+ * A tapped notification, re-shown in full in-app before acting on it (the
+ * system shade truncates the text). `data` is the notification payload; the
+ * notice's action button replays it through `performNotificationAction`.
+ */
+export type NotificationNotice = {
   title: string;
   body: string;
   tone: 'good' | 'caution';
+  data: Record<string, unknown> | null;
 };
 
 export type PostRidePrompts = {
@@ -475,12 +481,12 @@ export type AppStore = QueueSlice & PremiumSlice & CommuteSlice & {
     kind: import('./celebrationStage').CelebrationKind,
     wants: boolean,
   ) => void;
-  // Transient: set when the user taps the daily weather notification, so the
-  // app can re-show the same content in-app. Not persisted — derived from the
-  // live tap (NotificationProvider re-reads the tap on cold start anyway).
-  weatherNotice: WeatherNotice | null;
-  setWeatherNotice: (notice: WeatherNotice | null) => void;
-  clearWeatherNotice: () => void;
+  // Transient: set when the user taps any notification, so the app can show
+  // its full text in-app. Not persisted: derived from the live tap
+  // (NotificationProvider re-reads the tap on cold start anyway).
+  notificationNotice: NotificationNotice | null;
+  setNotificationNotice: (notice: NotificationNotice | null) => void;
+  clearNotificationNotice: () => void;
   // Transient: the "Ride saved" toast shown after a quiet ride (one of the
   // first rides, which skip the post-ride screens). `holdKey` is set when the
   // save is held for an undo window, and enables its Discard action. Not
@@ -1259,7 +1265,7 @@ export const useAppStore = create<AppStore>()(
             ),
           };
         }),
-      weatherNotice: null,
+      notificationNotice: null,
       rideSavedNotice: null,
       setRideSavedNotice: (notice) => set(() => ({ rideSavedNotice: notice })),
       finishRideQuietly: () => {
@@ -1270,8 +1276,8 @@ export const useAppStore = create<AppStore>()(
         get().seedReviewInstallAtIfMissing();
         get().resetFlow();
       },
-      setWeatherNotice: (notice) => set(() => ({ weatherNotice: notice })),
-      clearWeatherNotice: () => set(() => ({ weatherNotice: null })),
+      setNotificationNotice: (notice) => set(() => ({ notificationNotice: notice })),
+      clearNotificationNotice: () => set(() => ({ notificationNotice: null })),
       weatherWarningSeenThisSession: false,
       markWeatherWarningSeen: () =>
         set((state) =>
@@ -1990,7 +1996,7 @@ export const useAppStore = create<AppStore>()(
           userHazardVotes: {},
           pendingBadgeUnlocks: [],
           pendingTierPromotion: null,
-          weatherNotice: null,
+          notificationNotice: null,
           rideSavedNotice: null,
           homeLocation: null,
           // Audit 2026-07-05 STATE-3: Home/Work full addresses are the most

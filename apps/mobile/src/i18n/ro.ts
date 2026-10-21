@@ -1928,6 +1928,12 @@ export const ro: TranslationKeys = {
     signupTitleRide: 'Păstrează tura asta',
     signupSubRide: 'Înscrie-te ca să salvezi tura asta și pe cele care urmează. Avem nevoie să fii conectat ca aplicația să învețe cum mergi de fapt, de exemplu ritmul tău real pentru estimările de timp. Un cont nou păstrează tura asta; unul existent nu o va include.',
   },
+  // Full text of a tapped notification, shown in-app before acting on it.
+  notificationNotice: {
+    close: 'Închide',
+    open: 'Deschide',
+    showRoute: 'Vezi traseul',
+  },
   // Commute briefings (docs/plans/commute-mode.md). No units in the
   // strings: wind, duration and distance arrive formatted.
   commute: {

@@ -1928,6 +1928,12 @@ export const es: TranslationKeys = {
     signupTitleRide: 'Guarda este recorrido',
     signupSubRide: 'Regístrate para guardar este recorrido y los siguientes. Necesitamos que inicies sesión para que la app aprenda cómo ruedas de verdad, como tu ritmo real para calcular los tiempos. Una cuenta nueva conserva este recorrido; una existente no lo incluirá.',
   },
+  // Full text of a tapped notification, shown in-app before acting on it.
+  notificationNotice: {
+    close: 'Cerrar',
+    open: 'Abrir',
+    showRoute: 'Ver ruta',
+  },
   // Commute briefings (docs/plans/commute-mode.md). No units in the
   // strings: wind, duration and distance arrive formatted.
   commute: {

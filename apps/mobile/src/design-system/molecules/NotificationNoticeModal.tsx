@@ -1,53 +1,72 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { WeatherNotice } from '../../store/appStore';
+import type { NotificationNotice } from '../../store/appStore';
 import { Mascot } from '../atoms/Mascot';
 import { brandColors, gray } from '../tokens/colors';
 import { radii } from '../tokens/radii';
 import { space } from '../tokens/spacing';
 import { fontFamily, textBase, textSm } from '../tokens/typography';
 
-type WeatherNoticeModalProps = {
-  notice: WeatherNotice | null;
+type NotificationNoticeModalProps = {
+  notice: NotificationNotice | null;
   visible: boolean;
-  onDismiss: () => void;
+  closeLabel: string;
+  /** Null when the notification leads nowhere specific: Close only. */
+  actionLabel: string | null;
+  onAction: () => void;
+  onClose: () => void;
 };
 
 /**
- * Re-shows the daily weather notification content in-app after the user taps
- * the system notification. Mirrors WeatherWarningModal styling.
+ * Shows a tapped notification's full title and text in-app (the system shade
+ * truncates it), then lets the rider go where it leads. Labels come from the
+ * caller so this stays i18n-agnostic.
  */
-export const WeatherNoticeModal = ({
+export const NotificationNoticeModal = ({
   notice,
   visible,
-  onDismiss,
-}: WeatherNoticeModalProps) => {
+  closeLabel,
+  actionLabel,
+  onAction,
+  onClose,
+}: NotificationNoticeModalProps) => {
   if (!notice) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onDismiss}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
             <Mascot pose={notice.tone === 'caution' ? 'rain' : 'ride'} size="sm" />
-            <Text style={styles.title}>{notice.title}</Text>
+            {notice.title ? <Text style={styles.title}>{notice.title}</Text> : null}
           </View>
 
-          <Text style={styles.body}>{notice.body}</Text>
+          {notice.body ? (
+            <ScrollView style={styles.bodyScroll}>
+              <Text style={styles.body}>{notice.body}</Text>
+            </ScrollView>
+          ) : null}
 
-          <Pressable
-            style={styles.button}
-            onPress={onDismiss}
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss"
-          >
-            <Text style={styles.buttonText}>Got it</Text>
-          </Pressable>
+          <View style={styles.buttons}>
+            <Pressable
+              style={[styles.button, styles.closeButton]}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={closeLabel}
+            >
+              <Text style={styles.closeText}>{closeLabel}</Text>
+            </Pressable>
+            {actionLabel ? (
+              <Pressable
+                style={[styles.button, styles.actionButton]}
+                onPress={onAction}
+                accessibilityRole="button"
+                accessibilityLabel={actionLabel}
+              >
+                <Text style={styles.actionText}>{actionLabel}</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
       </View>
     </Modal>
@@ -64,6 +83,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    maxHeight: '80%',
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: brandColors.borderDefault,
@@ -83,22 +103,40 @@ const styles = StyleSheet.create({
     fontSize: 20,
     flex: 1,
   },
+  bodyScroll: {
+    flexGrow: 0,
+  },
   body: {
     ...textSm,
     fontFamily: fontFamily.body.medium,
     color: gray[300],
     lineHeight: 22,
   },
+  buttons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: space[3],
+  },
   button: {
-    alignSelf: 'center',
-    paddingHorizontal: space[6],
-    paddingVertical: space[3],
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: space[5],
     borderRadius: radii.lg,
+  },
+  closeButton: {
     backgroundColor: gray[700],
   },
-  buttonText: {
+  actionButton: {
+    backgroundColor: brandColors.accent,
+  },
+  closeText: {
     ...textSm,
     fontFamily: fontFamily.heading.bold,
     color: brandColors.textPrimary,
+  },
+  actionText: {
+    ...textSm,
+    fontFamily: fontFamily.heading.bold,
+    color: brandColors.textInverse,
   },
 });

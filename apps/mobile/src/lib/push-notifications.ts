@@ -9,6 +9,7 @@ import {
   markReminderTapped,
   parseReminderTarget,
 } from './firstRideReminder';
+import { COMMUTE_NOTIFICATION_TYPE, parseCommuteTarget } from './commute-notification';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
 import { telemetry } from './telemetry';
 import { useAppStore } from '../store/appStore';
@@ -167,13 +168,73 @@ export const unregisterPushToken = async (): Promise<void> => {
 };
 
 /**
- * Handle notification tap — navigate to the relevant screen.
+ * Where a notification leads when the rider acts on it: 'route' when it opens
+ * a specific route (commute briefing, first-ride reminder), 'open' for any
+ * other destination, null when there is nowhere specific to go. Drives the
+ * action button on the in-app notice.
  */
-export const handleNotificationResponse = (
-  response: any,
-): void => {
-  const data = response.notification.request.content.data as Record<string, unknown> | undefined;
+export const notificationActionKind = (
+  data: Record<string, unknown> | null | undefined,
+): 'route' | 'open' | null => {
+  if (!data) return null;
+  if (typeof data.deepLink === 'string' && data.deepLink.startsWith('/')) return 'open';
+  switch (data.type) {
+    case COMMUTE_NOTIFICATION_TYPE:
+      return parseCommuteTarget(data) ? 'route' : 'open';
+    case REMINDER_NOTIFICATION_TYPE:
+      return parseReminderTarget(data) ? 'route' : 'open';
+    case 'community':
+      return data.tripShareId ? 'open' : null;
+    case 'follow_request':
+    case 'weekly_summary':
+    case 'first_ride':
+    case 'activation_ladder':
+    case 'hazard':
+    case 'weather':
+    case 'daily-weather':
+    case 'city_riders_pulse':
+    case 'nudge':
+      return 'open';
+    default:
+      return null;
+  }
+};
 
+/** Tap-time side effects: they record the TAP, whatever the rider does next. */
+const recordNotificationTap = (data: Record<string, unknown>): void => {
+  switch (data.type) {
+    case REMINDER_NOTIFICATION_TYPE: {
+      const target = parseReminderTarget(data);
+      telemetry.capture('onb_reminder_tapped', { kind: target?.kind ?? 'invalid' });
+      if (target) markReminderTapped();
+      break;
+    }
+    case COMMUTE_NOTIFICATION_TYPE:
+      telemetry.capture('commute_briefing_tapped', {
+        direction: parseCommuteTarget(data)?.direction ?? 'invalid',
+      });
+      break;
+    case 'nudge': {
+      // Pedal Nudge tap (review 2026-06-12 item 23): report the tap so the
+      // attribution sweep can close the funnel.
+      const nudgeLogId = typeof data.nudgeLogId === 'string' ? data.nudgeLogId : null;
+      if (nudgeLogId) {
+        void mobileApi.postNudgeTelemetry(nudgeLogId, 'tapped').catch(() => {
+          // Non-fatal — the server-side 2h attribution sweep is the backstop.
+        });
+      }
+      break;
+    }
+    default:
+      break;
+  }
+};
+
+/**
+ * Go where a notification leads. Called straight from a tap when there is
+ * nothing to show, otherwise from the in-app notice's action button.
+ */
+export const performNotificationAction = (data: Record<string, unknown> | null | undefined): void => {
   // Audit 2026-07-05 UX-5: honor an explicit deep link generically so senders
   // that ship `deepLink` (e.g. ambassador referral pushes → '/my-shares')
   // land somewhere useful even without a dedicated case below. Must run
@@ -207,50 +268,28 @@ export const handleNotificationResponse = (
     case 'activation_ladder':
       // Anonymous activation ladder (docs/plans/anonymous-activation-ladder.md):
       // all rungs land on route planning — the plan-framed copy promises a
-      // route/score, and this is where both live. Cold-start taps arrive via
-      // NotificationProvider's getLastNotificationResponseAsync path.
+      // route/score, and this is where both live.
       router.push('/route-planning');
       break;
     case 'hazard':
-      router.push('/route-planning');
-      break;
     case 'weather':
-      router.push('/route-planning');
-      break;
-    case 'daily-weather': {
-      // Re-show the same notification content in-app via a modal overlay.
-      const title = typeof data.title === 'string' ? data.title : null;
-      const body = typeof data.body === 'string' ? data.body : null;
-      if (title && body) {
-        const tone = data.tone === 'caution' ? 'caution' : 'good';
-        useAppStore.getState().setWeatherNotice({ title, body, tone });
-      }
-      // Explicit nav (matches every other case). On cold-start the modal
-      // would otherwise mount over a still-loading `app/index.tsx` whose
-      // `<Redirect>` can drop silently when an overlay is up — leaving the
-      // user "stuck at loading screen". OnboardingGuard still imperatively
-      // redirects anonymous users if needed.
-      router.push('/route-planning');
-      break;
-    }
+    case 'daily-weather':
     // City Riders Pulse (docs/plans/city-riders-pulse-notification.md): the
-    // ask is "join them?" — land on route planning. Today's dispatcher sends
-    // these as type 'nudge' (handled below, ride-asking else-branch → route
-    // planning); this explicit case covers the plan's declared payload type
-    // if the dispatcher ever sets per-trigger types.
+    // ask is "join them?" — land on route planning.
+    case 'city_riders_pulse':
+      router.push('/route-planning');
+      break;
     // First-ride reminder ("Ride it later", docs/plans/onboarding-first-ride.md
     // step 4): reopen exactly the route or loop the rider saved. The payload
     // is validated, since it is replayed into routing.
     case REMINDER_NOTIFICATION_TYPE: {
       const target = parseReminderTarget(data);
-      telemetry.capture('onb_reminder_tapped', { kind: target?.kind ?? 'invalid' });
       if (!target) {
         router.push('/route-planning');
         break;
       }
       // Never pull a rider out of a ride in progress.
       if (useAppStore.getState().appState === 'NAVIGATING') break;
-      markReminderTapped();
       if (target.kind === 'loop') {
         router.push({ pathname: '/loop-planner', params: { loopId: target.savedLoopId } } as never);
         break;
@@ -271,20 +310,34 @@ export const handleNotificationResponse = (
       router.push('/route-preview');
       break;
     }
-    case 'city_riders_pulse':
-      router.push('/route-planning');
-      break;
-    case 'nudge': {
-      // Pedal Nudge tap (review 2026-06-12 item 23): report the tap so the
-      // attribution sweep can close the funnel, then route by trigger —
-      // celebrations to the impact dashboard, everything else (ride-asking
-      // streak/reminder nudges) to route-planning where the user can ride.
-      const nudgeLogId = typeof data.nudgeLogId === 'string' ? data.nudgeLogId : null;
-      if (nudgeLogId) {
-        void mobileApi.postNudgeTelemetry(nudgeLogId, 'tapped').catch(() => {
-          // Non-fatal — the server-side 2h attribution sweep is the backstop.
-        });
+    // Commute briefing (docs/plans/commute-mode.md): the Safe route the
+    // briefing described, with the rider's current bike preferences. Hazards
+    // are fetched live by route preview.
+    case COMMUTE_NOTIFICATION_TYPE: {
+      const target = parseCommuteTarget(data);
+      if (!target) {
+        router.push('/route-planning');
+        break;
       }
+      const state = useAppStore.getState();
+      if (state.appState === 'NAVIGATING') break;
+      state.setRouteRequest({
+        origin: target.origin,
+        destination: target.destination,
+        waypoints: [],
+        startOverride: undefined,
+        mode: 'safe',
+        avoidUnpaved: state.avoidUnpaved,
+        avoidHills: false,
+        avoidHeat: false,
+        isEbike: state.isEbike,
+      });
+      router.push('/route-preview');
+      break;
+    }
+    case 'nudge': {
+      // Route by trigger: celebrations to the impact dashboard, everything
+      // else (ride-asking streak/reminder nudges) to route-planning.
       const triggerId = typeof data.triggerId === 'string' ? data.triggerId : '';
       if (
         triggerId === 'milestone_celebration' ||
@@ -301,4 +354,42 @@ export const handleNotificationResponse = (
     default:
       break;
   }
+};
+
+/**
+ * Handle a notification tap. The system shade truncates long text, so a
+ * notification with visible text is re-shown in full in-app first
+ * (`NotificationNoticeManager` in app/_layout.tsx); its action button then
+ * goes where the notification leads. One with nothing to show acts at once.
+ */
+export const handleNotificationResponse = (
+  response: any,
+): void => {
+  const content = response?.notification?.request?.content as
+    | { title?: unknown; body?: unknown; data?: unknown }
+    | undefined;
+  const data =
+    content?.data && typeof content.data === 'object' ? (content.data as Record<string, unknown>) : null;
+  if (data) recordNotificationTap(data);
+
+  // Local weather pings carry their text in `data` as well; use either.
+  const pick = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+  const title = pick(content?.title) || pick(data?.title);
+  const body = pick(content?.body) || pick(data?.body);
+  if (!title && !body) {
+    performNotificationAction(data);
+    return;
+  }
+
+  useAppStore.getState().setNotificationNotice({
+    title,
+    body,
+    tone: data?.tone === 'caution' ? 'caution' : 'good',
+    data,
+  });
+  // Land on the map under the notice. On a cold start the notice would
+  // otherwise mount over a still-loading `app/index.tsx`, whose `<Redirect>`
+  // can drop silently when an overlay is up (user "stuck at loading screen").
+  // Never during a ride: the notice waits until the ride ends.
+  if (useAppStore.getState().appState !== 'NAVIGATING') router.push('/route-planning');
 };

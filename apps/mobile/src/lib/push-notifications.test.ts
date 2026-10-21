@@ -41,6 +41,8 @@ vi.mock('./api', () => ({
 
 import {
   handleNotificationResponse,
+  notificationActionKind,
+  performNotificationAction,
   unregisterPushToken,
   configureNotificationHandler,
   registerForPushNotifications,
@@ -158,8 +160,8 @@ describe('push-notifications', () => {
       expect(router.push).not.toHaveBeenCalled();
     });
 
-    it('sets weatherNotice in the store for a daily-weather tap', () => {
-      useAppStore.getState().clearWeatherNotice();
+    it('shows a daily-weather tap in full, from its data payload', () => {
+      useAppStore.getState().clearNotificationNotice();
 
       handleNotificationResponse({
         notification: {
@@ -176,7 +178,7 @@ describe('push-notifications', () => {
         },
       });
 
-      expect(useAppStore.getState().weatherNotice).toEqual({
+      expect(useAppStore.getState().notificationNotice).toMatchObject({
         title: 'Perfect day to ride',
         body: '18-24°C, clear skies.',
         tone: 'good',
@@ -199,6 +201,79 @@ describe('push-notifications', () => {
       });
 
       expect(router.push).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('show the notification first', () => {
+    const HOME = { lat: 44.43, lon: 26.1 };
+    const WORK = { lat: 44.45, lon: 26.08 };
+    const commuteData = { type: 'commute', direction: 'to_work', origin: HOME, destination: WORK, tone: 'good' };
+    const tap = (content: Record<string, unknown>) =>
+      handleNotificationResponse({ notification: { request: { content } } });
+
+    beforeEach(() => {
+      vi.mocked(router.push).mockClear();
+      useAppStore.getState().clearNotificationNotice();
+      useAppStore.setState({ appState: 'IDLE' });
+    });
+
+    it('a tap with text shows it in full and does not act yet', () => {
+      tap({ title: 'Your 08:00 ride to work', body: 'Long body text', data: commuteData });
+      expect(useAppStore.getState().notificationNotice).toEqual({
+        title: 'Your 08:00 ride to work',
+        body: 'Long body text',
+        tone: 'good',
+        data: commuteData,
+      });
+      expect(router.push).toHaveBeenCalledTimes(1);
+      expect(router.push).toHaveBeenCalledWith('/route-planning');
+    });
+
+    it('server pushes are shown too (title and body on the content)', () => {
+      tap({ title: 'Streak at risk', body: 'Ride today', data: { type: 'nudge', triggerId: 'streak_at_risk_mild' } });
+      expect(useAppStore.getState().notificationNotice?.title).toBe('Streak at risk');
+    });
+
+    it('does not navigate during a ride; the notice waits', () => {
+      useAppStore.setState({ appState: 'NAVIGATING' });
+      tap({ title: 'T', body: 'B', data: commuteData });
+      expect(router.push).not.toHaveBeenCalled();
+      expect(useAppStore.getState().notificationNotice?.title).toBe('T');
+    });
+
+    it('the commute action opens route preview for the briefing route', () => {
+      useAppStore.setState({ avoidUnpaved: true, isEbike: false });
+      performNotificationAction(commuteData);
+      expect(useAppStore.getState().routeRequest).toMatchObject({
+        origin: HOME,
+        destination: WORK,
+        mode: 'safe',
+        avoidUnpaved: true,
+      });
+      expect(router.push).toHaveBeenCalledWith('/route-preview');
+    });
+
+    it('an invalid commute payload falls back to route planning', () => {
+      performNotificationAction({ ...commuteData, origin: { lat: 999, lon: 0 } });
+      expect(router.push).toHaveBeenCalledWith('/route-planning');
+    });
+
+    it('the commute action never interrupts a ride', () => {
+      useAppStore.setState({ appState: 'NAVIGATING' });
+      performNotificationAction(commuteData);
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [commuteData, 'route'],
+      [{ ...commuteData, origin: null }, 'open'],
+      [{ type: 'daily-weather' }, 'open'],
+      [{ deepLink: '/my-shares' }, 'open'],
+      [{ type: 'community' }, null],
+      [{ type: 'unknown' }, null],
+      [null, null],
+    ])('notificationActionKind(%j) = %s', (data, kind) => {
+      expect(notificationActionKind(data as Record<string, unknown> | null)).toBe(kind);
     });
   });
 

@@ -1990,6 +1990,12 @@ export const en = {
     // estimates) — route choice does not learn from rides.
     signupSubRide: 'Sign up to save this ride and the ones after it. We need you signed in so the app can learn how you really ride, like your actual pace for time estimates. A new account keeps this ride; an existing one won’t include it.',
   },
+  // Full text of a tapped notification, shown in-app before acting on it.
+  notificationNotice: {
+    close: 'Close',
+    open: 'Open',
+    showRoute: 'Show route',
+  },
   // Commute briefings (docs/plans/commute-mode.md). No units in the
   // strings: wind, duration and distance arrive formatted.
   commute: {

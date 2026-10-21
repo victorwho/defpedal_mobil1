@@ -47,7 +47,8 @@ import { usePlusNudge } from '../src/hooks/usePlusNudge';
 import { usePremium } from '../src/hooks/usePremium';
 import { isCoolModeEnabled } from '../src/lib/coolMode';
 import { modesMovedToPlusFor, type PlusRoutingMode } from '../src/lib/plus-nudges';
-import { WeatherNoticeModal } from '../src/design-system/molecules/WeatherNoticeModal';
+import { NotificationNoticeModal } from '../src/design-system/molecules/NotificationNoticeModal';
+import { notificationActionKind, performNotificationAction } from '../src/lib/push-notifications';
 import { ErrorBoundary } from '../src/design-system/organisms/ErrorBoundary';
 import { NavigationResumeGuard } from '../src/components/NavigationResumeGuard';
 import {
@@ -426,7 +427,7 @@ const RootLayoutInner = () => {
       />
       <BadgeUnlockOverlayManager />
       <RankUpOverlayManager />
-      <WeatherNoticeManager />
+      <NotificationNoticeManager />
       <MeetPedalCardManager />
       <PlusModesPromoNoticeManager />
       <PlusModesMovedNoticeManager />
@@ -721,10 +722,11 @@ const RideSavedToastManager = () => {
   );
 };
 
-/** Re-shows the daily weather notification content after the user taps it. */
-const WeatherNoticeManager = () => {
-  const notice = useAppStore((s) => s.weatherNotice);
-  const clearNotice = useAppStore((s) => s.clearWeatherNotice);
+/** Shows a tapped notification in full, then goes where it leads on request. */
+const NotificationNoticeManager = () => {
+  const notice = useAppStore((s) => s.notificationNotice);
+  const clearNotice = useAppStore((s) => s.clearNotificationNotice);
+  const t = useT();
   const appState = useAppStore((s) => s.appState);
   const storeHydrated = useStoreHydrated();
   const authCtx = useAuthSessionOptional();
@@ -738,7 +740,20 @@ const WeatherNoticeManager = () => {
   // notice stays queued and shows once the user leaves NAVIGATING.
   if (!notice || appState === 'NAVIGATING') return null;
 
-  return <WeatherNoticeModal notice={notice} visible onDismiss={clearNotice} />;
+  const kind = notificationActionKind(notice.data);
+  return (
+    <NotificationNoticeModal
+      notice={notice}
+      visible
+      closeLabel={t('notificationNotice.close')}
+      actionLabel={kind === 'route' ? t('notificationNotice.showRoute') : kind === 'open' ? t('notificationNotice.open') : null}
+      onClose={clearNotice}
+      onAction={() => {
+        clearNotice();
+        performNotificationAction(notice.data);
+      }}
+    />
+  );
 };
 
 function RootLayout() {
