@@ -2,8 +2,9 @@
 
 Status: Phase 1 in progress (2026-10-21). Step 1 built (`0771736`):
 `resolveEtaPace`, `personalRideSeconds`, `paceSlice`, `useRiderPace`, the
-Display setting, and the commute briefing on top of them. Screens not
-switched yet.
+Display setting, and the commute briefing on top of them. Route preview
+and its comparison line built (`4b15d9c`; device check deferred to the
+phase 1 preview pass).
 
 ## Problem
 
