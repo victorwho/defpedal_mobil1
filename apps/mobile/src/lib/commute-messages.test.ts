@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { translate, type Locale } from '../i18n';
 import {
   buildCommuteMessage,
+  commuteRideSeconds,
   commuteWeatherKind,
   type CommuteHourForecast,
   type CommuteMessageInput,
@@ -31,6 +32,7 @@ const input = (overrides: Partial<CommuteMessageInput> = {}): CommuteMessageInpu
     fetchedAt: '2026-10-21T06:00:00.000Z',
     placesKey: 'k',
   },
+  pace: null,
   units: 'metric',
   t: (key, vars) => translate('en', key, vars),
   ...overrides,
@@ -91,16 +93,45 @@ describe('buildCommuteMessage', () => {
     const kinds = [{}, { weatherCode: 95 }, { weatherCode: 73 }, { temperature: -2 }, { precipitationProbability: 60 }, { windSpeed: 45 }];
     for (const k of kinds) {
       for (const direction of ['to_work', 'to_home'] as const) {
-        const m = buildCommuteMessage(
-          input({
-            direction,
-            forecast: forecast(k),
-            departAt: new Date('2026-10-21T16:30:00Z'),
-            t: (key, vars) => translate(locale, key, vars),
-          }),
-        );
-        expect(`${m.title} ${m.body}`).not.toMatch(/commute\.|\{\{/);
+        for (const pace of [null, MY_PACE]) {
+          const m = buildCommuteMessage(
+            input({
+              direction,
+              forecast: forecast(k),
+              pace,
+              departAt: new Date('2026-10-21T16:30:00Z'),
+              t: (key, vars) => translate(locale, key, vars),
+            }),
+          );
+          expect(`${m.title} ${m.body}`).not.toMatch(/commute\.|\{\{/);
+        }
       }
+    }
+  });
+});
+
+const MY_PACE = { kmh: 18, personal: true, rideCount: 7 };
+
+describe('ETA at the rider’s pace', () => {
+  const route = (climbMeters?: number | null) => ({ ...input().route!, climbMeters });
+
+  it('uses the rider’s pace, climb counted as extra distance, and says so', () => {
+    // (5.4 km + 30 m / 10 m-per-km) / 18 km/h = 28 min.
+    const m = buildCommuteMessage(input({ route: route(30), pace: MY_PACE }));
+    expect(m.body).toContain('Safe route: about 28 min at your pace, 5.4 km.');
+    expect(commuteRideSeconds(route(30), MY_PACE)).toBe(28 * 60);
+  });
+
+  it('an estimate cached before climb was recorded falls back to distance only', () => {
+    expect(commuteRideSeconds(route(undefined), MY_PACE)).toBe(18 * 60);
+  });
+
+  it('too few rides, or no history, keeps the router time and the plain wording', () => {
+    const few = { kmh: 15, personal: false, rideCount: 2 };
+    for (const pace of [few, null]) {
+      const m = buildCommuteMessage(input({ route: route(30), pace }));
+      expect(m.body).toContain('Safe route: 22 min, 5.4 km.');
+      expect(m.body).not.toContain('your pace');
     }
   });
 });

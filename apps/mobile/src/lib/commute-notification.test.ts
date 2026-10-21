@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RoutePreviewResponse } from '@defensivepedal/core';
+import type { RiderPace, RoutePreviewResponse } from '@defensivepedal/core';
 
 import { useAppStore } from '../store/appStore';
 import { DEFAULT_COMMUTE_SLICE_STATE } from '../store/commuteSlice';
@@ -41,10 +41,12 @@ const fakeNotifications = (permission = 'granted') => {
 const safeRoute = (mode: 'safe' | 'fast' = 'safe') =>
   ({
     selectedMode: mode,
-    routes: [{ adjustedDurationSeconds: 1320, distanceMeters: 5400 }],
+    routes: [{ adjustedDurationSeconds: 1320, distanceMeters: 5400, totalClimbMeters: 30 }],
   }) as unknown as RoutePreviewResponse;
 
-const setup = (opts: { permission?: string; forecast?: typeof anyHour | null; mode?: 'safe' | 'fast' } = {}) => {
+const setup = (
+  opts: { permission?: string; forecast?: typeof anyHour | null; mode?: 'safe' | 'fast'; pace?: RiderPace | null } = {},
+) => {
   const { N, list } = fakeNotifications(opts.permission);
   const previewRoute = vi.fn(async () => safeRoute(opts.mode));
   __setCommuteTestOverrides({
@@ -52,6 +54,7 @@ const setup = (opts: { permission?: string; forecast?: typeof anyHour | null; mo
     store: useAppStore,
     fetchForecast: async () => (opts.forecast === undefined ? anyHour : opts.forecast),
     previewRoute,
+    fetchPace: async () => opts.pace ?? null,
   });
   return { N, list, previewRoute };
 };
@@ -118,6 +121,7 @@ describe('scheduleCommuteBriefings', () => {
       store: useAppStore,
       fetchForecast: async () => null,
       previewRoute: first.previewRoute,
+      fetchPace: async () => null,
     });
     expect(await scheduleCommuteBriefings(new Date(NOW.getTime() + 60_000))).toBe('forecast_failed');
     expect(commuteIds(first.list()).map((s) => s.identifier)).toEqual(before);
@@ -141,5 +145,12 @@ describe('scheduleCommuteBriefings', () => {
     const { list } = setup({ mode: 'fast' });
     await scheduleCommuteBriefings(NOW);
     expect(commuteIds(list())[0].content.body).not.toContain('Safe route');
+  });
+
+  it('uses the rider’s pace and the route climb when trip history has enough rides', async () => {
+    const { list } = setup({ pace: { kmh: 18, personal: true, rideCount: 7 } });
+    await scheduleCommuteBriefings(NOW);
+    expect(useAppStore.getState().commute.routeEstimates[0]?.climbMeters).toBe(30);
+    expect(commuteIds(list())[0].content.body).toContain('Safe route: about 28 min at your pace, 5.4 km.');
   });
 });

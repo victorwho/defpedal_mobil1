@@ -1980,6 +1980,7 @@ export const ro: TranslationKeys = {
       storm: 'Se anunță furtună. Poate alegi altă variantă azi.',
     },
     eta: 'Traseu sigur: {{duration}}, {{distance}}.',
+    etaPersonal: 'Traseu sigur: cam {{duration}} în ritmul tău, {{distance}}.',
     dark: 'Va fi întuneric: aprinde luminile.',
     tapHint: 'Atinge ca să vezi pericolele de azi.',
   },

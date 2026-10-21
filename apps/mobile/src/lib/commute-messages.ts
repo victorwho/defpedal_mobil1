@@ -15,8 +15,10 @@ import {
   formatDuration,
   formatSpeedKmh,
   isDark,
+  rideMinutes,
   type Coordinate,
   type MeasurementSystem,
+  type RiderPace,
 } from '@defensivepedal/core';
 
 import type { CommuteDirection, CommuteRouteEstimate } from '../store/commuteSlice';
@@ -59,9 +61,24 @@ export interface CommuteMessageInput {
   readonly forecast: CommuteHourForecast | null;
   /** Null when no route could be fetched; the ETA is then left out. */
   readonly route: CommuteRouteEstimate | null;
+  /** The rider's pace from trip history; null when it could not be read. */
+  readonly pace: RiderPace | null;
   readonly units: MeasurementSystem;
   readonly t: Translate;
 }
+
+/**
+ * Seconds for the ride. With at least MIN_RIDES_FOR_PACE usable rides it is
+ * the rider's own median pace, climb folded in as extra distance (the loop
+ * planner's rule). Otherwise the router's duration. Scaling the router's time
+ * by pace was rejected: the safe router's own average speed varies from 12.9
+ * to 19.1 km/h across flat city routes (measured 2026-10-21), so there is no
+ * single speed to scale against.
+ */
+export const commuteRideSeconds = (route: CommuteRouteEstimate, pace: RiderPace | null): number =>
+  pace?.personal
+    ? rideMinutes(route.distanceMeters, route.climbMeters ?? null, pace.kmh) * 60
+    : route.durationSeconds;
 
 export interface CommuteMessage {
   readonly title: string;
@@ -70,7 +87,7 @@ export interface CommuteMessage {
 }
 
 export const buildCommuteMessage = (input: CommuteMessageInput): CommuteMessage => {
-  const { t, forecast, route, units } = input;
+  const { t, forecast, route, pace, units } = input;
   const kind = forecast ? commuteWeatherKind(forecast) : null;
 
   const parts: string[] = [];
@@ -85,8 +102,8 @@ export const buildCommuteMessage = (input: CommuteMessageInput): CommuteMessage 
   }
   if (route) {
     parts.push(
-      t('commute.eta', {
-        duration: formatDuration(route.durationSeconds),
+      t(pace?.personal ? 'commute.etaPersonal' : 'commute.eta', {
+        duration: formatDuration(commuteRideSeconds(route, pace)),
         distance: formatDistance(route.distanceMeters, units),
       }),
     );

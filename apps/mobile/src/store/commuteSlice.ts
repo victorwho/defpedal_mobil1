@@ -21,6 +21,8 @@ export interface CommuteRouteEstimate {
   readonly direction: CommuteDirection;
   readonly durationSeconds: number;
   readonly distanceMeters: number;
+  /** Route ascent; absent on estimates cached before it was recorded. */
+  readonly climbMeters?: number | null;
   readonly fetchedAt: string;
   /** Identifies the Home/Work pair it was fetched for; a change invalidates it. */
   readonly placesKey: string;

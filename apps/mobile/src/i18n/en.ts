@@ -2042,6 +2042,7 @@ export const en = {
       storm: 'Thunderstorms expected. Consider another way today.',
     },
     eta: 'Safe route: {{duration}}, {{distance}}.',
+    etaPersonal: 'Safe route: about {{duration}} at your pace, {{distance}}.',
     dark: 'It will be dark: lights on.',
     tapHint: 'Tap to check today’s hazards.',
   },

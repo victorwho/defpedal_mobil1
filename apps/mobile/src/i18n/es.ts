@@ -1980,6 +1980,7 @@ export const es: TranslationKeys = {
       storm: 'Se esperan tormentas. Quizá hoy mejor otra opción.',
     },
     eta: 'Ruta segura: {{duration}}, {{distance}}.',
+    etaPersonal: 'Ruta segura: unos {{duration}} a tu ritmo, {{distance}}.',
     dark: 'Será de noche: enciende las luces.',
     tapHint: 'Toca para ver los peligros de hoy.',
   },

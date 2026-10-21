@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (commute mode plan + Home/Work management)
+Last updated: 2026-10-21 (commute ETA at rider pace + adaptive-ETA plan)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Commute briefing ETA at the rider's own pace; adaptive-ETA plan.** With >= 3 usable rides the briefing's time is the rider's median pace from trip history with climb as extra distance (the loop planner's rule) and says "at your pace"; otherwise the router's time, as before. Scaling the router's time by pace was rejected: the safe router's own average speed is 12.9-19.1 km/h across flat city routes (measured live), so there is no single speed to scale against. Route estimates now cache the route climb. 4 new tests, both rules mutation-checked; not yet seen on a device. Plan for every ride time at the rider's pace (before the ride, learning during it, then calibrated against the router, separate pace per bike, Profile > Display switch to turn it off): `docs/plans/adaptive-eta.md`.
 
 - **2026-10-21: Commute mode step 5, Profile > Commute screen.** `app/commute.tsx`: Home/Work with set/change/remove and an in-screen address search (closes the step-1 gap for riders with no saved place), the briefing switch whose turn-on is the setup (notification permission, then departure time with no default; closing either leaves it off), days (never empty), optional evening briefing. Telemetry: commute_enabled/disabled, commute_briefing_scheduled, navigation_started `source: 'commute'` within 2 h of Show route. 8 screen tests (permission gate mutation-checked). Next: step 6, preview build and a real weekday morning.
 

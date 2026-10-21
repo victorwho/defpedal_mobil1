@@ -13,7 +13,13 @@
  * This module never asks for notification permission. The ask belongs to the
  * moment the rider turns Commute on (Profile, step 5).
  */
-import type { Coordinate, RoutePreviewRequest, RoutePreviewResponse } from '@defensivepedal/core';
+import {
+  riderPace,
+  type Coordinate,
+  type RiderPace,
+  type RoutePreviewRequest,
+  type RoutePreviewResponse,
+} from '@defensivepedal/core';
 import { Platform } from 'react-native';
 
 import { translate, type Locale } from '../i18n';
@@ -40,6 +46,7 @@ let testOverrides: {
   store?: AppStoreHook;
   fetchForecast?: (lat: number, lon: number) => Promise<Forecast | null>;
   previewRoute?: (request: RoutePreviewRequest) => Promise<RoutePreviewResponse>;
+  fetchPace?: () => Promise<RiderPace | null>;
 } = {};
 
 export const __setCommuteTestOverrides = (overrides: typeof testOverrides): void => {
@@ -82,6 +89,21 @@ const previewRoute = (request: RoutePreviewRequest): Promise<RoutePreviewRespons
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { directPreviewRoute } = require('./mapbox-routing') as typeof import('./mapbox-routing');
   return directPreviewRoute(request, { canopyComparison: false });
+};
+
+/**
+ * The rider's pace from trip history, the same read the loop planner makes.
+ * Null on failure: the briefing then shows the router's time.
+ */
+const fetchPace = async (): Promise<RiderPace | null> => {
+  if (testOverrides.fetchPace) return testOverrides.fetchPace();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { mobileApi } = require('./api') as typeof import('./api');
+    return riderPace(await mobileApi.getTripHistory());
+  } catch {
+    return null;
+  }
 };
 
 // "Show route" on a briefing, remembered until the ride it leads to starts, so
@@ -178,6 +200,7 @@ const routeEstimate = async (
       direction,
       durationSeconds: route.adjustedDurationSeconds,
       distanceMeters: route.distanceMeters,
+      climbMeters: route.totalClimbMeters,
       fetchedAt: now.toISOString(),
       placesKey,
     };
@@ -202,6 +225,7 @@ const planBriefing = (
   places: { home: Coordinate; work: Coordinate },
   forecasts: Record<CommuteDirection, Forecast | null>,
   routes: Record<CommuteDirection, CommuteRouteEstimate | null>,
+  pace: RiderPace | null,
   state: StoreState,
 ): PlannedBriefing => {
   const toWork = fire.direction === 'to_work';
@@ -215,6 +239,7 @@ const planBriefing = (
     origin,
     forecast: forecasts[fire.direction]?.get(hourKey(fire.departAt)) ?? null,
     route: routes[fire.direction],
+    pace,
     units: state.measurementSystem,
     t: (key, vars) => translate(state.locale as Locale, key, vars),
   });
@@ -316,6 +341,7 @@ export const scheduleCommuteBriefings = async (now: Date = new Date()): Promise<
     to_work: await routeEstimate('to_work', places.home, places.work, key, now),
     to_home: needsHome ? await routeEstimate('to_home', places.work, places.home, key, now) : null,
   };
+  const pace = await fetchPace();
 
   // Re-read: the route fetch may have taken a while, and the rider may have
   // changed the settings meanwhile. A pass on stale settings is harmless (the
@@ -329,6 +355,7 @@ export const scheduleCommuteBriefings = async (now: Date = new Date()): Promise<
       places,
       { to_work: toWorkForecast, to_home: toHomeForecast },
       routes,
+      pace,
       latest,
     ),
   );
@@ -339,6 +366,7 @@ export const scheduleCommuteBriefings = async (now: Date = new Date()): Promise<
   telemetry.capture('commute_briefing_scheduled', {
     count: planned.length,
     has_eta: routes.to_work !== null,
+    personal_eta: pace?.personal === true,
   });
   return 'scheduled';
 };
@@ -364,6 +392,7 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
 
   const forecast = await fetchForecast(places.home.lat, places.home.lon);
   const route = await routeEstimate('to_work', places.home, places.work, commutePlacesKey(places.home, places.work), now);
+  const pace = await fetchPace();
   const departAt = new Date(now.getTime() + 15 * 60 * 1000);
   const fire: CommuteFire = { at: new Date(now.getTime() + 10_000), departAt, direction: 'to_work' };
   const latest = getAppStore().getState();
@@ -374,9 +403,11 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
     places,
     { to_work: forecast, to_home: null },
     { to_work: route, to_home: null },
+    pace,
     { ...latest, commute: { ...latest.commute, departTime } },
   );
   await ensureChannel(N);
   await scheduleOne(N, briefing, now);
-  return `scheduled in 10 s (forecast ${forecast ? 'ok' : 'missing'}, route ${route ? 'ok' : 'missing'})`;
+  const paceNote = pace?.personal ? `your pace ${pace.kmh.toFixed(1)} km/h` : `router time, ${pace?.rideCount ?? 0} usable rides`;
+  return `scheduled in 10 s (forecast ${forecast ? 'ok' : 'missing'}, route ${route ? 'ok' : 'missing'}, ${paceNote})`;
 };
