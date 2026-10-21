@@ -20,12 +20,15 @@ export const hudRemainingSeconds = (input: {
   /** Null when the Display switch is off: no in-ride blending either. */
   readonly ridden: RiddenSoFar | null;
   readonly riddenClimbMeters: number | null;
+  /** From `routerTimeIsEstimate`: no router factor on this route's time. */
+  readonly routerIsEstimate: boolean;
 }): number => {
   const priorSeconds = personalRideSeconds(
     {
       distanceMeters: input.remainingDistanceMeters,
       climbMeters: input.remainingClimbMeters,
       routerSeconds: input.routerSeconds,
+      routerIsEstimate: input.routerIsEstimate,
     },
     input.pace,
   );

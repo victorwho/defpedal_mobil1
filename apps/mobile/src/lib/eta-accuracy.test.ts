@@ -37,6 +37,19 @@ describe('etaAccuracyProperties', () => {
     expect(props).toMatchObject({ method: 'factor', personal_seconds: 1296 });
   });
 
+  it('a GPX course: the factor does not scale its fixed-speed time', () => {
+    const route = {
+      source: 'gpx_course',
+      distanceMeters: 6000,
+      totalClimbMeters: 0,
+      adjustedDurationSeconds: 1440,
+    } as RouteOption;
+    const props = etaAccuracyProperties(
+      input({ route, riderPaces: { normal: { ...MINE, routerFactor: 0.9 }, ebike: MINE } }),
+    );
+    expect(props).toMatchObject({ personal_seconds: 1200 });
+  });
+
   it('nothing for a rerouted ride: the prediction was for another route', () => {
     const session = { startedAt: new Date(START).toISOString(), rerouteCount: 1 } as NavigationSession;
     expect(etaAccuracyProperties(input({ session }))).toBeNull();

@@ -207,6 +207,18 @@ export const resolveEtaPace = (input: {
 };
 
 /**
+ * True when a route's time is not a prediction by the selected bike's
+ * router, so a router factor must not scale it: a GPX course (distance at a
+ * fixed speed) or a loop ridden on an e-bike (loops are always routed on the
+ * standard graph). The one definition, so no screen decides it alone.
+ */
+export const routerTimeIsEstimate = (
+  route: { readonly source?: string } | null | undefined,
+  isEbike: boolean,
+): boolean =>
+  route?.source === 'gpx_course' || (route?.source === 'generated_loop' && isEbike);
+
+/**
  * Seconds for a ride: the router's time times the rider's own factor when
  * one is known, otherwise at the rider's pace (see `resolveEtaPace`),
  * otherwise the router's time unchanged.

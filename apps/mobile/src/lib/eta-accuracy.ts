@@ -7,6 +7,7 @@
 import {
   personalRideSeconds,
   resolveEtaPace,
+  routerTimeIsEstimate,
   type NavigationSession,
   type RiderPaces,
   type RouteOption,
@@ -41,6 +42,7 @@ export const etaAccuracyProperties = (
         distanceMeters: route.distanceMeters,
         climbMeters: route.totalClimbMeters,
         routerSeconds,
+        routerIsEstimate: routerTimeIsEstimate(route, input.isEbike),
       },
       pace,
     ),

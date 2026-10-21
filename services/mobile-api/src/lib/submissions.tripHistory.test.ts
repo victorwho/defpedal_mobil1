@@ -39,8 +39,10 @@ const tables: Record<string, unknown[]> = {
   ],
 };
 
-const chain = (rows: unknown[]) => {
-  const result = Promise.resolve({ data: rows, error: null });
+let tripsError: { message: string } | null = null;
+
+const chain = (rows: unknown[], error: { message: string } | null = null) => {
+  const result = Promise.resolve({ data: error ? null : rows, error });
   const builder: Record<string, unknown> = {};
   for (const m of ['select', 'eq', 'gte', 'order', 'limit', 'in']) builder[m] = () => builder;
   builder.then = result.then.bind(result);
@@ -48,8 +50,13 @@ const chain = (rows: unknown[]) => {
 };
 
 vi.mock('./supabaseAdmin', () => ({
-  supabaseAdmin: { from: (table: string) => chain(tables[table] ?? []) },
+  supabaseAdmin: {
+    from: (table: string) => chain(tables[table] ?? [], table === 'trips' ? tripsError : null),
+  },
 }));
+
+const { capture } = vi.hoisted(() => ({ capture: vi.fn() }));
+vi.mock('./sentry', () => ({ captureServerException: capture }));
 
 import { getTripHistory } from './submissions';
 
@@ -60,5 +67,14 @@ describe('getTripHistory — adaptive ETA fields', () => {
     expect(older!.plannedDurationSeconds).toBeUndefined();
     expect(older!.isEbike).toBeUndefined();
     expect(older!.rerouteCount).toBeUndefined();
+  });
+
+  it('a failed trips read keeps history and reports it', async () => {
+    tripsError = { message: 'boom' };
+    const rows = await getTripHistory('user-1');
+    tripsError = null;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.plannedDurationSeconds).toBeUndefined();
+    expect(capture).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ source: 'trip_history_start_facts' }));
   });
 });

@@ -20,6 +20,7 @@ import {
   formatDuration,
   isRiskDataAvailable,
   personalRideSeconds,
+  routerTimeIsEstimate,
   resolveCountryFromCoord,
   type HighRiskStretch,
   type RouteOption,
@@ -428,7 +429,7 @@ export default function CourseImportScreen() {
       distanceMeters: state.route.distanceMeters,
       climbMeters: state.route.totalClimbMeters,
       routerSeconds: state.route.adjustedDurationSeconds,
-      routerIsEstimate: true,
+      routerIsEstimate: routerTimeIsEstimate(state.route, false),
     },
     pace,
   );

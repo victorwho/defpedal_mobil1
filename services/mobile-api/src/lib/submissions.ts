@@ -26,6 +26,7 @@ import {
   sanitizeBreadcrumbs,
 } from '@defensivepedal/core';
 
+import { captureServerException } from './sentry';
 import { supabaseAdmin } from './supabaseAdmin';
 
 const memoryTrips = new Map<
@@ -524,8 +525,14 @@ export const getTripHistory = async (
       .from('trips')
       .select('id, planned_route_duration_seconds, is_ebike')
       .in('id', tripIds);
-    // Never fail history over these: they only refine an estimate.
-    if (!tripError) {
+    // Never fail history over these: they only refine an estimate. But say
+    // so, or calibration data can vanish with nothing noticing.
+    if (tripError) {
+      captureServerException(new Error(tripError.message), {
+        source: 'trip_history_start_facts',
+        tripCount: tripIds.length,
+      });
+    } else {
       for (const trip of tripData ?? []) {
         startFacts.set(trip.id as string, {
           plannedDurationSeconds: (trip.planned_route_duration_seconds as number | null) ?? undefined,

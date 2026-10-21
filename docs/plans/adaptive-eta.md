@@ -113,6 +113,25 @@ That needs the prediction stored, which it isn't today.
   weeks to arrive because no past ride has a prediction stored, and there is
   no backfill.
 
+## Known limits of Phase 3 (independent verification, 2026-10-21)
+
+- **`is_ebike` records the E-bike routing MODE, not the bike.** Fast, Flat
+  and Cool clear it (`selectRoutingMode`), so an e-bike owner riding those
+  modes is recorded as a normal bike and those rides feed the normal pace.
+  Recording the bike itself would need a separate "my bike" setting; open
+  product question.
+- **One router factor is pooled across routers.** Safe, Flat, Cool (OSRM
+  graphs) and Fast (Mapbox Directions) feed the same median, which is then
+  applied to whichever mode is chosen. If the routers are biased
+  differently, the factor carries that across modes. Check with
+  `eta_accuracy` split by mode before keying the factor per router.
+- **The first ride recorded on the e-bike drops every unrecorded older
+  ride from the normal pace** (the decision's rule). A rider can fall below
+  3 rides and see router time again until new rides are recorded.
+- Fixed before shipping: the in-ride ETA and `eta_accuracy` applied the
+  factor to a GPX course's fixed-speed time and to an e-bike loop's
+  standard-graph time. `routerTimeIsEstimate` (core) is now the one rule.
+
 ## Measuring it (all phases)
 
 There is no way today to tell whether any ETA is right. From Phase 1:

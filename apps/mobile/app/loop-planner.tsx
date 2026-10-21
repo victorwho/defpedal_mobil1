@@ -20,6 +20,7 @@ import {
   LOOP_RESULTS_SHOWN,
   DEFAULT_PACE_KMH,
   personalRideSeconds,
+  routerTimeIsEstimate,
   rideMinutes,
   MAX_RETRACE_SHARE,
   SPUR_RANKING_DEADBAND,
@@ -1347,9 +1348,7 @@ export default function LoopPlannerScreen() {
                                   distanceMeters: loop.distanceMeters,
                                   climbMeters: loop.climbMeters,
                                   routerSeconds: loop.route.adjustedDurationSeconds,
-                                  // Loops use the standard graph: on an e-bike
-                                  // its time is not that bike's prediction.
-                                  routerIsEstimate: isEbike,
+                                  routerIsEstimate: routerTimeIsEstimate(loop.route, isEbike),
                                 },
                                 pace,
                               ) / 60,

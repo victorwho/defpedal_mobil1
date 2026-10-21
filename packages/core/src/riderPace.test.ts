@@ -8,6 +8,7 @@ import {
   rideMinutes,
   riderPace,
   riderPaces,
+  routerTimeIsEstimate,
 } from './riderPace';
 
 /** A ride of `km` covered in `minutes`. */
@@ -160,6 +161,17 @@ describe('riderPace: router factor', () => {
   ])('leaves out %s', (_label, extra) => {
     const pace = riderPace([predicted(6, 18, 20), predicted(6, 22, 20), predicted(6, 24, 20, extra)]);
     expect(pace.routerFactor).toBeUndefined();
+  });
+});
+
+describe('routerTimeIsEstimate', () => {
+  it.each([
+    ['a GPX course', 'gpx_course', false, true],
+    ['a loop on an e-bike', 'generated_loop', true, true],
+    ['a loop on a normal bike', 'generated_loop', false, false],
+    ['a routed A-to-B on an e-bike', 'custom_osrm', true, false],
+  ])('%s', (_label, source, isEbike, expected) => {
+    expect(routerTimeIsEstimate({ source }, isEbike)).toBe(expected);
   });
 });
 

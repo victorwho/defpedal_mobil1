@@ -5,7 +5,13 @@ import { hudRemainingSeconds } from './hud-eta';
 const MINE = { kmh: 18, personal: true, rideCount: 7 };
 /** 3 km in 10 min: 18 km/h, past the point the observed speed weighs 0.7. */
 const RIDDEN_FAST = { distanceMeters: 3000, movingSeconds: 600 };
-const LEG = { remainingDistanceMeters: 6000, remainingClimbMeters: 0, routerSeconds: 1800, riddenClimbMeters: 0 };
+const LEG = {
+  remainingDistanceMeters: 6000,
+  remainingClimbMeters: 0,
+  routerSeconds: 1800,
+  riddenClimbMeters: 0,
+  routerIsEstimate: false,
+};
 
 describe('hudRemainingSeconds', () => {
   it('switched off: the router’s time, nothing learned', () => {
@@ -15,6 +21,13 @@ describe('hudRemainingSeconds', () => {
   it('before riding: the rider’s pace', () => {
     // 6 km at 18 km/h = 20 min.
     expect(hudRemainingSeconds({ ...LEG, pace: MINE, ridden: { distanceMeters: 0, movingSeconds: 0 } })).toBe(1200);
+  });
+
+  it('a router factor scales the router’s time, but not a course’s', () => {
+    const fast = { ...MINE, routerFactor: 0.8 };
+    const none = { distanceMeters: 0, movingSeconds: 0 };
+    expect(hudRemainingSeconds({ ...LEG, pace: fast, ridden: none })).toBe(1440);
+    expect(hudRemainingSeconds({ ...LEG, pace: fast, ridden: none, routerIsEstimate: true })).toBe(1200);
   });
 
   it('during the ride: blends in the speed actually ridden', () => {

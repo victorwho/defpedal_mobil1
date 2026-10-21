@@ -17,6 +17,7 @@ import {
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
   riddenSoFar,
+  routerTimeIsEstimate,
   shouldTriggerAutomaticReroute,
   toRoutingDisplayMode,
 } from '@defensivepedal/core';
@@ -448,6 +449,7 @@ function NavigationScreen() {
     selectedRoute?.totalClimbMeters != null && climbData.value != null
       ? Math.max(0, selectedRoute.totalClimbMeters - climbData.value)
       : null;
+  const routerIsEstimate = routerTimeIsEstimate(selectedRoute, isEbike);
   const remainingRideSeconds = selectedRoute
     ? hudRemainingSeconds({
         remainingDistanceMeters:
@@ -458,6 +460,7 @@ function NavigationScreen() {
         pace: ridePace,
         ridden,
         riddenClimbMeters,
+        routerIsEstimate,
       })
     : 0;
   // Read by the five-minute spoken ETA, so it says what the HUD shows.
@@ -477,6 +480,7 @@ function NavigationScreen() {
             pace: ridePace,
             ridden,
             riddenClimbMeters,
+            routerIsEstimate,
           }),
           climbMeters: nextStopProgress.climbToNextStopMeters,
         }

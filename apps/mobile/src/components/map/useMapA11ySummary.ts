@@ -20,6 +20,7 @@ import {
   formatDuration,
   formatElevation,
   personalRideSeconds,
+  routerTimeIsEstimate,
 } from '@defensivepedal/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -36,6 +37,8 @@ export interface MapA11yInput {
   selectedRoute?: RouteOption | null;
   /** From `useRiderPace`: the duration is read at this pace, and says so. */
   pace?: RiderPace | null;
+  /** E-bike selected: a loop's time is then not that bike's prediction. */
+  isEbike?: boolean;
   /** How many reported hazards are relevant to this route/view. */
   hazardsOnRoute?: number;
   /** The single hazard approaching the user within announcement range, if any. */
@@ -96,6 +99,7 @@ const buildLabel = (
       distanceMeters: route.distanceMeters,
       climbMeters: route.totalClimbMeters,
       routerSeconds: route.adjustedDurationSeconds ?? route.durationSeconds,
+      routerIsEstimate: routerTimeIsEstimate(route, input.isEbike === true),
     },
     input.pace ?? null,
   );
@@ -238,6 +242,9 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
       input.selectedRoute?.riskSegments?.length,
       input.pace?.kmh,
       input.pace?.personal,
+      input.pace?.routerFactor,
+      input.isEbike,
+      input.selectedRoute?.source,
       input.hazardsOnRoute,
       input.remainingDistanceMeters,
       input.userLocationKnown,
