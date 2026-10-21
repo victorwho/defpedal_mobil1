@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (adaptive ETA phase 1, map screen-reader summary)
+Last updated: 2026-10-21 (adaptive ETA phase 1, all surfaces built)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Adaptive ETA phase 1, remaining surfaces + telemetry.** GPX course screen (replaces the fixed 15 km/h when a pace applies, "at your pace" on the expanded stat). Navigation HUD remaining time, arrival clock, next-stop time and the five-minute spoken ETA all read the remaining distance and remaining climb at the rider's pace (no label, per decision); the session keeps the router's figure. Loop planner now uses `useRiderPace`, so it obeys the switch and the E-bike rule; without a pace a loop shows the router's time instead of the old fixed 15 km/h. `eta_accuracy` PostHog event on every completed ride that never rerouted: method, router/personal/actual seconds, distance, pace ride count (`src/lib/eta-accuracy.ts`, 3 tests, reroute and E-bike rules mutation-checked). Course, HUD and loop screens have no screen tests; all go through the tested core function. Bundle check not run (Metro stopped for low memory). Next: phase 1 preview build and device pass.
 
 - **2026-10-21: Adaptive ETA phase 1, map screen-reader summary.** `useMapA11ySummary` reads the route time through `personalRideSeconds` and appends "at your pace" when the pace applies. `RouteMap` asks `useRiderPace` only in planning and navigating modes (`active` flag: past trips and feed maps neither read history nor get a pace). 3 new tests, both rules mutation-checked. Bundle check not run (Metro stopped for low memory); covered by the phase 1 preview build content check.
 

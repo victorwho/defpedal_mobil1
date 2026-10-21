@@ -1,0 +1,43 @@
+import type { NavigationSession, RouteOption } from '@defensivepedal/core';
+import { describe, expect, it } from 'vitest';
+
+import { etaAccuracyProperties, type EtaAccuracyInput } from './eta-accuracy';
+
+const START = Date.parse('2026-10-21T08:00:00Z');
+const MINE = { kmh: 18, personal: true, rideCount: 7 };
+
+/** 6 km flat, router 24 min; ridden in 20 min. */
+const input = (overrides: Partial<EtaAccuracyInput> = {}): EtaAccuracyInput => ({
+  session: { startedAt: new Date(START).toISOString(), rerouteCount: 0 } as NavigationSession,
+  route: { distanceMeters: 6000, totalClimbMeters: 0, adjustedDurationSeconds: 1440 } as RouteOption,
+  riderPaceSnapshot: MINE,
+  paceEtaEnabled: true,
+  isEbike: false,
+  nowMs: START + 20 * 60_000,
+  ...overrides,
+});
+
+describe('etaAccuracyProperties', () => {
+  it('records the router, personal and actual times', () => {
+    expect(etaAccuracyProperties(input())).toEqual({
+      method: 'pace',
+      router_seconds: 1440,
+      personal_seconds: 1200, // 6 km at 18 km/h
+      actual_seconds: 1200,
+      distance_meters: 6000,
+      pace_ride_count: 7,
+    });
+  });
+
+  it('nothing for a rerouted ride: the prediction was for another route', () => {
+    const session = { startedAt: new Date(START).toISOString(), rerouteCount: 1 } as NavigationSession;
+    expect(etaAccuracyProperties(input({ session }))).toBeNull();
+  });
+
+  it('E-bike or switched off: the method is the router, and so is the shown time', () => {
+    for (const o of [{ isEbike: true }, { paceEtaEnabled: false }]) {
+      const props = etaAccuracyProperties(input(o));
+      expect(props).toMatchObject({ method: 'router', personal_seconds: 1440 });
+    }
+  });
+});

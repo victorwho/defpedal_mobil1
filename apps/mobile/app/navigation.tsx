@@ -16,6 +16,7 @@ import {
   haversineDistance,
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
+  personalRideSeconds,
   shouldTriggerAutomaticReroute,
   toRoutingDisplayMode,
 } from '@defensivepedal/core';
@@ -39,6 +40,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useKeyboardHeight } from '../src/hooks/useKeyboardHeight';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
+import { useRiderPace } from '../src/hooks/useRiderPace';
+import { etaAccuracyProperties } from '../src/lib/eta-accuracy';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
@@ -176,6 +179,7 @@ function NavigationScreen() {
     avoidUnpaved: state.avoidUnpaved,
   })));
 
+  const ridePace = useRiderPace();
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
   const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
@@ -424,13 +428,40 @@ function NavigationScreen() {
     );
   }, [selectedRoute, routeCoordinates, routeRequest.waypoints, mapUserCoordinate]);
 
+  // What is left of the ride, at the rider's pace when there is one
+  // (docs/plans/adaptive-eta.md). Display only: the session keeps the
+  // router's figure.
+  const remainingRideSeconds = selectedRoute
+    ? Math.round(
+        personalRideSeconds(
+          {
+            distanceMeters: navigationSession?.remainingDistanceMeters ?? selectedRoute.distanceMeters,
+            climbMeters: climbData.value,
+            routerSeconds:
+              navigationSession?.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
+          },
+          ridePace,
+        ),
+      )
+    : 0;
+  // Read by the five-minute spoken ETA, so it says what the HUD shows.
+  const remainingRideSecondsRef = useRef(remainingRideSeconds);
+  remainingRideSecondsRef.current = remainingRideSeconds;
+
   const footerNextStop: FooterNextStop | null =
     nextStopProgress?.hasNextStop
       ? {
           stopIndex: nextStopProgress.stopIndex,
           stopCount: nextStopProgress.stopCount,
           distanceMeters: nextStopProgress.distanceToNextStopMeters,
-          durationSeconds: nextStopProgress.durationToNextStopSeconds,
+          durationSeconds: personalRideSeconds(
+            {
+              distanceMeters: nextStopProgress.distanceToNextStopMeters,
+              climbMeters: nextStopProgress.climbToNextStopMeters,
+              routerSeconds: nextStopProgress.durationToNextStopSeconds,
+            },
+            ridePace,
+          ),
           climbMeters: nextStopProgress.climbToNextStopMeters,
         }
       : null;
@@ -747,6 +778,16 @@ function NavigationScreen() {
   // rating step after it is sampled on /feedback); a quiet first ride saves
   // and goes home like any other.
   const completeRide = useCallback((how: 'arrived' | 'near_destination') => {
+    const state = useAppStore.getState();
+    const etaAccuracy = etaAccuracyProperties({
+      session: state.navigationSession,
+      route: selectedRoute ?? null,
+      riderPaceSnapshot: state.riderPaceSnapshot,
+      paceEtaEnabled: state.paceEtaEnabled,
+      isEbike: state.isEbike,
+      nowMs: Date.now(),
+    });
+    if (etaAccuracy) telemetry.capture('eta_accuracy', etaAccuracy);
     if (isQuietRide(useAppStore.getState().completedRideCount)) {
       saveRideAndGoHome('completed');
       return;
@@ -1353,7 +1394,7 @@ function NavigationScreen() {
     const interval = setInterval(() => {
       const session = useAppStore.getState().navigationSession;
       if (!session || session.state !== 'navigating') return;
-      const remaining = session.remainingDurationSeconds ?? 0;
+      const remaining = remainingRideSecondsRef.current;
       if (remaining <= 0) return;
 
       const mins = Math.round(remaining / 60);
@@ -1741,9 +1782,7 @@ function NavigationScreen() {
           <SteepGradeIndicator gradePercent={currentGrade} />
           <FooterCard
             onEndRide={confirmEndRide}
-            remainingDurationSeconds={Math.round(
-              navigationSession.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
-            )}
+            remainingDurationSeconds={remainingRideSeconds}
             remainingDistanceMeters={
               navigationSession.remainingDistanceMeters ?? selectedRoute.distanceMeters
             }
