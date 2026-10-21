@@ -13,8 +13,11 @@ import { useAppStore } from '../store/appStore';
  * screens already share, so it adds no request. The result is saved to the
  * store, so a cold start or an offline ride still has the rider's pace while
  * the query is loading or failing.
+ *
+ * `active: false` reads nothing and returns null, for a component mounted on
+ * screens that don't describe a ride ahead (a past trip, a feed card).
  */
-export const useRiderPace = (): RiderPace | null => {
+export const useRiderPace = ({ active = true }: { active?: boolean } = {}): RiderPace | null => {
   const enabled = useAppStore((s) => s.paceEtaEnabled);
   const isEbike = useAppStore((s) => s.isEbike);
   const snapshot = useAppStore((s) => s.riderPaceSnapshot);
@@ -24,12 +27,12 @@ export const useRiderPace = (): RiderPace | null => {
     queryKey: ['trip-history'],
     queryFn: () => mobileApi.getTripHistory(),
     staleTime: 5 * 60_000,
-    enabled,
+    enabled: enabled && active,
   });
 
   useEffect(() => {
     if (history.data) setSnapshot(riderPace(history.data));
   }, [history.data, setSnapshot]);
 
-  return resolveEtaPace({ pace: snapshot, enabled, isEbike });
+  return active ? resolveEtaPace({ pace: snapshot, enabled, isEbike }) : null;
 };

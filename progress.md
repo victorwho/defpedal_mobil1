@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (adaptive ETA phase 1, route preview)
+Last updated: 2026-10-21 (adaptive ETA phase 1, map screen-reader summary)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Adaptive ETA phase 1, map screen-reader summary.** `useMapA11ySummary` reads the route time through `personalRideSeconds` and appends "at your pace" when the pace applies. `RouteMap` asks `useRiderPace` only in planning and navigating modes (`active` flag: past trips and feed maps neither read history nor get a pace). 3 new tests, both rules mutation-checked. Bundle check not run (Metro stopped for low memory); covered by the phase 1 preview build content check.
 
 - **2026-10-21: Adaptive ETA phase 1, route preview.** The preview's ride time (peek strip and expanded summary) goes through `personalRideSeconds`; the expanded one says "at your pace" when the pace applies. The safe-vs-fast line quotes the safe route's extra distance at the rider's pace ("+3 min at your pace for a calmer ride"), from the fast route's length now carried as `RouteComparison.comparisonDistanceMeters` (absent for Cool, which quotes no minutes). Climb is assumed equal on both routes, since the fast route's climb is not measured. Under one minute shows the "no extra time" line. Onboarding route reveal keeps the router's figure (no rides yet). 6 new tests; pace gap and fast-route length mutation-checked. Not device-checked: owner chose to check it at the phase 1 preview pass.
 

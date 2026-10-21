@@ -59,6 +59,13 @@ describe('useRiderPace', () => {
     expect(mockHistory).not.toHaveBeenCalled();
   });
 
+  it('inactive (a past trip on the map): no pace, and no history read', () => {
+    useAppStore.setState({ riderPaceSnapshot: SAVED });
+    const { result } = renderHook(() => useRiderPace({ active: false }), { wrapper });
+    expect(result.current).toBeNull();
+    expect(mockHistory).not.toHaveBeenCalled();
+  });
+
   it('E-bike selected: router time', () => {
     mockHistory.mockResolvedValue(HISTORY);
     useAppStore.setState({ isEbike: true, riderPaceSnapshot: SAVED });

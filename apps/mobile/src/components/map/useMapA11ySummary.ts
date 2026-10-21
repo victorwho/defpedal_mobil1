@@ -14,8 +14,13 @@
  *    state change). Memoized via a key-based dedup ref so the same hazard
  *    isn't announced repeatedly on 1 Hz GPS ticks.
  */
-import type { HazardType, MeasurementSystem, RouteOption } from '@defensivepedal/core';
-import { formatDistance, formatDuration, formatElevation } from '@defensivepedal/core';
+import type { HazardType, MeasurementSystem, RiderPace, RouteOption } from '@defensivepedal/core';
+import {
+  formatDistance,
+  formatDuration,
+  formatElevation,
+  personalRideSeconds,
+} from '@defensivepedal/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useT } from '../../hooks/useTranslation';
@@ -29,6 +34,8 @@ export interface MapA11yInput {
   mode: MapSummaryMode;
   /** The currently selected route, if any. Used for distance / duration / climb / risk mix. */
   selectedRoute?: RouteOption | null;
+  /** From `useRiderPace`: the duration is read at this pace, and says so. */
+  pace?: RiderPace | null;
   /** How many reported hazards are relevant to this route/view. */
   hazardsOnRoute?: number;
   /** The single hazard approaching the user within announcement range, if any. */
@@ -84,7 +91,17 @@ const buildLabel = (
 
   const route = input.selectedRoute;
   const distance = formatDistance(route.distanceMeters, units);
-  const duration = formatDuration(route.adjustedDurationSeconds ?? route.durationSeconds);
+  const rideSeconds = personalRideSeconds(
+    {
+      distanceMeters: route.distanceMeters,
+      climbMeters: route.totalClimbMeters,
+      routerSeconds: route.adjustedDurationSeconds ?? route.durationSeconds,
+    },
+    input.pace ?? null,
+  );
+  const duration = input.pace?.personal
+    ? `${formatDuration(rideSeconds)} ${t('preview.atYourPace')}`
+    : formatDuration(rideSeconds);
   const climbMeters = route.totalClimbMeters ?? 0;
 
   const summary =
@@ -219,6 +236,8 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
       input.selectedRoute?.adjustedDurationSeconds,
       input.selectedRoute?.totalClimbMeters,
       input.selectedRoute?.riskSegments?.length,
+      input.pace?.kmh,
+      input.pace?.personal,
       input.hazardsOnRoute,
       input.remainingDistanceMeters,
       input.userLocationKnown,

@@ -91,6 +91,25 @@ describe('useMapA11ySummary — label', () => {
     expect(result.current.label).toContain('5.0 km');
   });
 
+  it('reads the duration at the rider’s pace, and says so', () => {
+    // 5 km flat at 30 km/h = 10 min; the router says 20.
+    const route = makeRoute({ totalClimbMeters: 0 });
+    const pace = { kmh: 30, personal: true, rideCount: 5 };
+    const { result } = renderHook(() =>
+      useMapA11ySummary({ mode: 'planning', selectedRoute: route, pace }),
+    );
+    expect(result.current.label).toContain('10 min preview.atYourPace');
+  });
+
+  it('without a pace: the router’s duration, unlabelled', () => {
+    const route = makeRoute({ totalClimbMeters: 0 });
+    const { result } = renderHook(() =>
+      useMapA11ySummary({ mode: 'planning', selectedRoute: route, pace: null }),
+    );
+    expect(result.current.label).toContain('20 min');
+    expect(result.current.label).not.toContain('preview.atYourPace');
+  });
+
   it('uses the no-climb summary when totalClimbMeters is 0 or null', () => {
     const route = makeRoute({ totalClimbMeters: 0 });
     const { result } = renderHook(() =>

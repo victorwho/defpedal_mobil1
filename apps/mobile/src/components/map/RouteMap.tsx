@@ -25,6 +25,7 @@ import { space } from '../../design-system/tokens/spacing';
 import { fontFamily, textSm } from '../../design-system/tokens/typography';
 import { HazardDetailSheet } from '../../design-system/organisms/HazardDetailSheet';
 import { useHazardVote } from '../../hooks/useHazardVote';
+import { useRiderPace } from '../../hooks/useRiderPace';
 import { useT } from '../../hooks/useTranslation';
 import { mobileEnv } from '../../lib/env';
 import { STANDARD_STYLE_URL } from './constants';
@@ -286,9 +287,15 @@ export const RouteMap = ({
   const repairVisible = poiVisibility?.repair ?? false;
 
   const isDecorative = a11yContext?.decorative === true;
+  const a11yMode = isDecorative || !a11yContext ? 'empty' : a11yContext.mode;
+  // Only a ride still ahead is read at the rider's pace, never a past trip.
+  const ridePace = useRiderPace({
+    active: a11yMode === 'planning' || a11yMode === 'navigating',
+  });
   const a11ySummary = useMapA11ySummary({
-    mode: isDecorative || !a11yContext ? 'empty' : a11yContext.mode,
+    mode: a11yMode,
     selectedRoute: selectedRoute?.route ?? null,
+    pace: ridePace,
     hazardsOnRoute: !isDecorative ? a11yContext?.hazardsOnRoute : undefined,
     nearestApproachingHazard: !isDecorative
       ? a11yContext?.nearestApproachingHazard
