@@ -18,15 +18,15 @@ import {
   loopSearchExtentMeters,
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
+  DEFAULT_PACE_KMH,
+  personalRideSeconds,
   rideMinutes,
-  riderPace,
   MAX_RETRACE_SHARE,
   SPUR_RANKING_DEADBAND,
   LOOP_DISTANCE_STEPS_METERS,
   formatDistance,
   formatDistanceParts,
   formatElevation,
-  formatSpeedKmh,
   loopSessionPeriodKey,
   loopSessionRemainingMs,
   planOutOfTown,
@@ -72,6 +72,7 @@ import { usePremium } from '../src/hooks/usePremium';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
+import { useRiderPace } from '../src/hooks/useRiderPace';
 import { searchLoops, type GeneratedLoop } from '../src/lib/loop-generator';
 import {
   LoopSearchRequestError,
@@ -79,7 +80,6 @@ import {
 } from '../src/lib/loop-generator-remote';
 import { isLoopServerEnabled } from '../src/lib/loopServerFlag';
 import { reverseGeocodeUrbanEdgeMeters } from '../src/lib/mapbox-search';
-import { useQuery } from '@tanstack/react-query';
 
 import { mobileApi } from '../src/lib/api';
 import { beginLoopRide } from '../src/lib/loop-ride';
@@ -276,21 +276,10 @@ export default function LoopPlannerScreen() {
   const [detent, setDetent] = useState<SheetDetent>('expanded');
 
   /**
-   * The rider's own pace, so the time on each loop is theirs.
-   *
-   * Trip history is already fetched for the History tab, so this shares its
-   * cache rather than adding a request. Riders with fewer than three usable
-   * rides get the default, and the copy says so.
+   * The rider's own pace, so the time on each loop is theirs; null (switched
+   * off, E-bike, fewer than three usable rides) means the router's time.
    */
-  const tripHistoryQuery = useQuery({
-    queryKey: ['trip-history'],
-    queryFn: () => mobileApi.getTripHistory(),
-    staleTime: 5 * 60_000,
-  });
-  const pace = useMemo(
-    () => riderPace(tripHistoryQuery.data ?? []),
-    [tripHistoryQuery.data],
-  );
+  const pace = useRiderPace();
   const [savedIds, setSavedIds] = useState<Record<string, string>>({});
   const savedLoops = useAppStore((state) => state.savedLoops);
   const addSavedLoop = useAppStore((state) => state.addSavedLoop);
@@ -1047,7 +1036,7 @@ export default function LoopPlannerScreen() {
           {'  ·  '}
           {t('loop.timeEstimate', {
             minutes: String(
-              rideMinutes(targetDistanceMeters, null, pace.kmh),
+              rideMinutes(targetDistanceMeters, null, pace?.kmh ?? DEFAULT_PACE_KMH),
             ),
           })}
         </Text>
@@ -1351,20 +1340,23 @@ export default function LoopPlannerScreen() {
                       <Text style={styles.specValue}>
                         {t('loop.duration', {
                           minutes: String(
-                            rideMinutes(
-                              loop.distanceMeters,
-                              loop.climbMeters,
-                              pace.kmh,
+                            Math.round(
+                              personalRideSeconds(
+                                {
+                                  distanceMeters: loop.distanceMeters,
+                                  climbMeters: loop.climbMeters,
+                                  routerSeconds: loop.route.adjustedDurationSeconds,
+                                },
+                                pace,
+                              ) / 60,
                             ),
                           ),
                         })}
                       </Text>
                       <Text style={styles.specLabel}>
-                        {pace.personal
-                          ? t('loop.statTime')
-                          : t('loop.statTimeAtPace', {
-                              speed: formatSpeedKmh(pace.kmh, units),
-                            })}
+                        {pace
+                          ? `${t('loop.statTime')} · ${t('preview.atYourPace')}`
+                          : t('loop.statTime')}
                       </Text>
                     </View>
                     <View style={styles.spec}>
