@@ -19,6 +19,7 @@ import {
   formatElevation,
   formatDuration,
   isRiskDataAvailable,
+  personalRideSeconds,
   resolveCountryFromCoord,
   type HighRiskStretch,
   type RouteOption,
@@ -44,6 +45,7 @@ import { radii } from '../src/design-system/tokens/radii';
 import { space } from '../src/design-system/tokens/spacing';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
+import { useRiderPace } from '../src/hooks/useRiderPace';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { usePremium } from '../src/hooks/usePremium';
 import { buildCourseRoute, enrichCourseRoute } from '../src/lib/course-route';
@@ -88,6 +90,7 @@ export default function CourseImportScreen() {
   const styles = useMemo(() => createThemedStyles(colors), [colors]);
   const t = useT();
   const units = useUnits();
+  const pace = useRiderPace();
   const locale = useAppStore((s) => s.locale);
 
   // Map screens are handlebar-mounted — portrait only, like route-preview.
@@ -415,6 +418,17 @@ export default function CourseImportScreen() {
 
   // ── Ready ────────────────────────────────────────────────────────────────
 
+  // A course's own time is distance at a fixed 15 km/h; the rider's pace
+  // replaces it when there is one (docs/plans/adaptive-eta.md).
+  const rideSeconds = personalRideSeconds(
+    {
+      distanceMeters: state.route.distanceMeters,
+      climbMeters: state.route.totalClimbMeters,
+      routerSeconds: state.route.adjustedDurationSeconds,
+    },
+    pace,
+  );
+
   const busyCountLabel = t(
     stretches.length === 1 ? 'course.busyFound_one' : 'course.busyFound_other',
     { count: stretches.length },
@@ -430,9 +444,7 @@ export default function CourseImportScreen() {
             {formatDistance(state.route.distanceMeters, units)}
           </Text>
           <Text style={styles.peekDivider}>·</Text>
-          <Text style={styles.peekStat}>
-            {formatDuration(state.route.adjustedDurationSeconds)}
-          </Text>
+          <Text style={styles.peekStat}>{formatDuration(rideSeconds)}</Text>
           <View style={styles.peekSpacer} />
           {!state.scored ? (
             <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -504,8 +516,10 @@ export default function CourseImportScreen() {
             styles={styles}
           />
           <Stat
-            label={t('course.estTime')}
-            value={formatDuration(state.route.adjustedDurationSeconds)}
+            label={
+              pace ? `${t('course.estTime')} · ${t('preview.atYourPace')}` : t('course.estTime')
+            }
+            value={formatDuration(rideSeconds)}
             styles={styles}
           />
           <Stat
