@@ -1,7 +1,9 @@
 # Adaptive ETA: every ride time at the rider's own pace
 
-Status: PLAN (2026-10-21). Nothing built beyond the commute briefing
-(uncommitted, see "Starting point").
+Status: Phase 1 in progress (2026-10-21). Step 1 built (`0771736`):
+`resolveEtaPace`, `personalRideSeconds`, `paceSlice`, `useRiderPace`, the
+Display setting, and the commute briefing on top of them. Screens not
+switched yet.
 
 ## Problem
 
