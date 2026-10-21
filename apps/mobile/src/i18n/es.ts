@@ -1928,4 +1928,21 @@ export const es: TranslationKeys = {
     signupTitleRide: 'Guarda este recorrido',
     signupSubRide: 'Regístrate para guardar este recorrido y los siguientes. Necesitamos que inicies sesión para que la app aprenda cómo ruedas de verdad, como tu ritmo real para calcular los tiempos. Una cuenta nueva conserva este recorrido; una existente no lo incluirá.',
   },
+  // Commute briefings (docs/plans/commute-mode.md). No units in the
+  // strings: wind, duration and distance arrive formatted.
+  commute: {
+    titleToWork: 'Tu ruta al trabajo de las {{time}}',
+    titleToHome: 'Tu ruta a casa de las {{time}}',
+    weather: {
+      ok: '{{temp}}°, {{rain}}% de probabilidad de lluvia, viento {{wind}}.',
+      rain: 'Probable lluvia ({{rain}}%), {{temp}}°. Lleva chubasquero.',
+      wind: 'Viento fuerte, {{wind}}. Sal con algo de margen.',
+      ice: '{{temp}}° al salir. Cuidado con el hielo.',
+      snow: 'Se espera nieve, {{temp}}°. Las calles pueden resbalar.',
+      storm: 'Se esperan tormentas. Quizá hoy mejor otra opción.',
+    },
+    eta: 'Ruta segura: {{duration}}, {{distance}}.',
+    dark: 'Será de noche: enciende las luces.',
+    tapHint: 'Toca para ver los peligros de hoy.',
+  },
 };

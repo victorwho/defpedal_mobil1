@@ -1990,6 +1990,23 @@ export const en = {
     // estimates) — route choice does not learn from rides.
     signupSubRide: 'Sign up to save this ride and the ones after it. We need you signed in so the app can learn how you really ride, like your actual pace for time estimates. A new account keeps this ride; an existing one won’t include it.',
   },
+  // Commute briefings (docs/plans/commute-mode.md). No units in the
+  // strings: wind, duration and distance arrive formatted.
+  commute: {
+    titleToWork: 'Your {{time}} ride to work',
+    titleToHome: 'Your {{time}} ride home',
+    weather: {
+      ok: '{{temp}}°, {{rain}}% chance of rain, wind {{wind}}.',
+      rain: 'Rain likely ({{rain}}%), {{temp}}°. Pack a jacket.',
+      wind: 'Strong wind, {{wind}}. Allow extra time.',
+      ice: '{{temp}}° when you leave. Watch for ice.',
+      snow: 'Snow expected, {{temp}}°. Roads may be slippery.',
+      storm: 'Thunderstorms expected. Consider another way today.',
+    },
+    eta: 'Safe route: {{duration}}, {{distance}}.',
+    dark: 'It will be dark: lights on.',
+    tapHint: 'Tap to check today’s hazards.',
+  },
 } as const;
 
 /** Recursive type that mirrors the en structure but allows any string values. */

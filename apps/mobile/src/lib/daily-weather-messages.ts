@@ -154,8 +154,8 @@ export const buildGoodWeatherBody = (
 export const TRIGGER_HOUR = 8;
 export const TRIGGER_MINUTE = 30;
 
-const weatherCodeIsStorm = (code: number): boolean => code >= 95;
-const weatherCodeIsSnow = (code: number): boolean =>
+export const weatherCodeIsStorm = (code: number): boolean => code >= 95;
+export const weatherCodeIsSnow = (code: number): boolean =>
   (code >= 71 && code <= 77) || code === 85 || code === 86;
 const weatherCodeIsFog = (code: number): boolean => code >= 45 && code <= 48;
 

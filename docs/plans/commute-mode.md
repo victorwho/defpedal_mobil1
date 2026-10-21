@@ -101,7 +101,7 @@ No I/O, fully unit-tested:
   Calendar-day math via `addDays` (DST-safe — the weather scheduler already
   paid for raw-ms hour offsets once), skip fires in the past, briefing time =
   departure − `leadMinutes`.
-- `buildCommuteMessage(direction, hourlyForecastRow, cachedRoute, units, t)` →
+- `buildCommuteMessage({ direction, departTime, departAt, origin, forecast, route, units, t })` →
   `{ title, body, tone }`. Good weather → short positive line; bad weather
   (storm, snow, freezing, strong wind, heavy rain — reuse the thresholds in
   `daily-weather-messages.ts` / core `cyclingWeather`) → a warning line.
@@ -144,10 +144,12 @@ iOS's 64.
 
 ### 7. Coexistence with the cycling-weather ping
 
-Two weather messages on the same morning is noise. On days with a commute
-briefing, the weather ping drops its fires for that calendar day:
-`buildWeatherSchedule` gets an `excludeDays` input, filled from
-`buildCommuteFires`. Days without a commute keep the weather ping unchanged.
+Two weather messages on the same morning is noise. On a day with a commute
+briefing the weather ping sends nothing. Done the way the first-ride reminder
+already does it: `daily-weather-notification.ts` drops any planned fire that
+`isSameLocalDay` as a reminder; commute days join that filter. No change to
+`buildWeatherSchedule` (the `excludeDays` input first planned here is not
+needed). Days without a commute keep the weather ping unchanged.
 
 ### 8. Tap → route preview
 
@@ -219,7 +221,12 @@ No server, migration or Cloud Run change.
    entry point; the Profile › Commute section (step 5) is that entry point.
 2. Store slice. **Built 2026-10-21** (`commuteSlice.ts`, 13 tests, reset and
    persistence wiring mutation-checked); no UI yet, so nothing to device-test.
-3. Pure builders + tests.
+3. Pure builders + tests. **Built 2026-10-21**: `src/lib/commute-schedule.ts`
+   (`buildCommuteFires`, DST-safe, weekday mask, lead time, optional evening)
+   and `src/lib/commute-messages.ts` (`buildCommuteMessage`, one weather
+   condition named by severity, ETA via core formatters, lights note after
+   dark, localized via a passed `t`); `commute.*` copy in EN/RO/ES; 21 tests,
+   including every key in every locale. Not imported by the app yet.
 4. Hourly forecast + ETA cache + scheduler + weather `excludeDays`.
 5. Tap handler + Profile section + i18n + telemetry + diagnostics button.
 6. `npm run typecheck`, tests, `npm run check:bundle` **plus a bundle grep for

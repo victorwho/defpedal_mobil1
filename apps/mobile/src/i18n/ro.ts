@@ -1928,4 +1928,21 @@ export const ro: TranslationKeys = {
     signupTitleRide: 'Păstrează tura asta',
     signupSubRide: 'Înscrie-te ca să salvezi tura asta și pe cele care urmează. Avem nevoie să fii conectat ca aplicația să învețe cum mergi de fapt, de exemplu ritmul tău real pentru estimările de timp. Un cont nou păstrează tura asta; unul existent nu o va include.',
   },
+  // Commute briefings (docs/plans/commute-mode.md). No units in the
+  // strings: wind, duration and distance arrive formatted.
+  commute: {
+    titleToWork: 'Drumul tău spre serviciu la {{time}}',
+    titleToHome: 'Drumul tău spre casă la {{time}}',
+    weather: {
+      ok: '{{temp}}°, {{rain}}% șanse de ploaie, vânt {{wind}}.',
+      rain: 'Probabil plouă ({{rain}}%), {{temp}}°. Ia o geacă.',
+      wind: 'Vânt puternic, {{wind}}. Pleacă puțin mai devreme.',
+      ice: '{{temp}}° la plecare. Atenție la polei.',
+      snow: 'Se anunță ninsoare, {{temp}}°. Drumurile pot fi alunecoase.',
+      storm: 'Se anunță furtună. Poate alegi altă variantă azi.',
+    },
+    eta: 'Traseu sigur: {{duration}}, {{distance}}.',
+    dark: 'Va fi întuneric: aprinde luminile.',
+    tapHint: 'Atinge ca să vezi pericolele de azi.',
+  },
 };
