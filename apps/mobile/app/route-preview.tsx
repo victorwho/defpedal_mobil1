@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { SHARE_MIN_TRIMMABLE_METERS, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
+import { SHARE_MIN_TRIMMABLE_METERS, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, personalRideSeconds, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -81,6 +81,7 @@ import { useExportRouteGpx } from '../src/hooks/useExportRouteGpx';
 import { useGpxDestinationChooser } from '../src/hooks/useGpxDestinationChooser';
 import { useShareRoute } from '../src/hooks/useShareRoute';
 import { useT } from '../src/hooks/useTranslation';
+import { useRiderPace } from '../src/hooks/useRiderPace';
 import { useUnits } from '../src/hooks/useUnits';
 import { useTheme, type ThemeColors, type ThemeMode } from '../src/design-system';
 import { safetyTints, surfaceTints } from '../src/design-system/tokens/tints';
@@ -124,6 +125,7 @@ function RoutePreviewScreen() {
   const { user, isAnonymous: isAnonymousSession } = useAuthSession();
   const t = useT();
   const units = useUnits();
+  const pace = useRiderPace();
   // Allow IDLE (initial load), ROUTE_PREVIEW (routes loaded), and NAVIGATING
   // (brief transitional state while router.push('/navigation') is in flight).
   // Without NAVIGATING here, the guard fires router.replace('/route-planning')
@@ -438,9 +440,22 @@ function RoutePreviewScreen() {
   // Safe-vs-fast comparison badge content — shared with the onboarding
   // route reveal (src/lib/routeComparisonCopy.ts).
   const comparisonContent = useMemo(
-    () => describeRouteComparison(routePreview, t, units),
-    [routePreview, t, units],
+    () =>
+      describeRouteComparison(routePreview, t, units, pace, selectedRoute?.distanceMeters ?? null),
+    [routePreview, t, units, pace, selectedRoute?.distanceMeters],
   );
+
+  // The ride time at the rider's own pace, or the router's (docs/plans/adaptive-eta.md).
+  const rideSeconds = selectedRoute
+    ? personalRideSeconds(
+        {
+          distanceMeters: selectedRoute.distanceMeters,
+          climbMeters: selectedRoute.totalClimbMeters,
+          routerSeconds: selectedRoute.adjustedDurationSeconds,
+        },
+        pace,
+      )
+    : 0;
 
 
   // Slice 6: the share button no longer jumps straight to the native
@@ -943,7 +958,7 @@ function RoutePreviewScreen() {
           </Text>
           <Text style={styles.peekDivider}>·</Text>
           <Text style={styles.peekStat}>
-            {formatDuration(selectedRoute.adjustedDurationSeconds)}
+            {formatDuration(rideSeconds)}
           </Text>
           <View style={styles.peekSpacer} />
           <Text style={styles.peekHint}>{t('preview.peekSwipeUp')}</Text>
@@ -1099,8 +1114,13 @@ function RoutePreviewScreen() {
 
             <View style={styles.stat}>
               <Text style={styles.statValue}>
-                {formatDuration(selectedRoute.adjustedDurationSeconds)}
+                {formatDuration(rideSeconds)}
               </Text>
+              {pace ? (
+                <Text style={styles.statUnit} numberOfLines={1}>
+                  {t('preview.atYourPace')}
+                </Text>
+              ) : null}
             </View>
 
             <Text style={styles.statDivider}>·</Text>

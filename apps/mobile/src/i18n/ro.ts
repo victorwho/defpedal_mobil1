@@ -121,6 +121,7 @@ export const ro: TranslationKeys = {
     retryPreview: 'Reîncearcă previzualizarea',
     routeName: 'Nume traseu (ex. Drum spre muncă)',
     peekSwipeUp: 'Trage în sus',
+    atYourPace: 'în ritmul tău',
     lifeEarnedShort: 'de viață câștigată',
     missingConfigTitle: 'Configurație lipsă',
     missingConfigBody: 'Setează `EXPO_PUBLIC_MOBILE_API_URL` înainte de a cere previzualizări.',
@@ -133,6 +134,7 @@ export const ro: TranslationKeys = {
     // Safe-vs-fast comparison badge
     comparison: {
       calmerCost: '+{{minutes}} min pentru o rută mai liniștită',
+      calmerCostAtPace: '+{{minutes}} min în ritmul tău, pentru o rută mai liniștită',
       calmerCostSub: 'Puțină distanță în plus pentru mult mai puțin trafic.',
       calmerFree: 'Mai liniștită decât ruta rapidă — fără timp în plus',
       busySaving: 'Cu {{distance}} mai puțin pe drumuri aglomerate decât ruta rapidă.',

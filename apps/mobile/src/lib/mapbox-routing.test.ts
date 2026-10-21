@@ -1086,6 +1086,8 @@ describe('EU-wide OSRM dispatch (single graph, 2026-07-12)', () => {
       verdict: 'safer',
       diffPercent: 80, // |1 - 10/50| = 80%
       extraMinutes: 5, // 1200s vs 900s
+      // The fast route's length, so the gap can be quoted at the rider's pace.
+      comparisonDistanceMeters: 5000,
       // These stub segments carry neither `riskCategory` nor `geometry`, so
       // nothing counts as busy. Real segments are exercised in the
       // busy-road-exposure suite below.
@@ -1791,6 +1793,7 @@ describe('directPreviewRoute — canopy composition', () => {
 
       expect(result.comparison?.verdict).toBe('safer');
       expect(result.comparison?.extraMinutes).toBeGreaterThanOrEqual(1);
+      expect(result.comparison?.comparisonDistanceMeters).toBeGreaterThan(0);
     });
 
     it('a shade route reports the same verdict with NO minute figure', async () => {
@@ -1802,6 +1805,8 @@ describe('directPreviewRoute — canopy composition', () => {
 
       expect(result.comparison?.verdict).toBe('safer');
       expect(result.comparison?.extraMinutes).toBeUndefined();
+      // Nor a length to work one out at the rider's pace.
+      expect(result.comparison?.comparisonDistanceMeters).toBeUndefined();
       // ...and the canopy row is present, i.e. this is the exact composed
       // screen where the two lines would have sat together.
       expect(result.canopy).toEqual({ shadeTreePct: 29.0, standardTreePct: 28.6 });

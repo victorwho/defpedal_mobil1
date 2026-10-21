@@ -2,6 +2,7 @@ import {
   describeBusyRoadSaving,
   formatDistance,
   type MeasurementSystem,
+  type RiderPace,
   type RoutePreviewResponse,
 } from '@defensivepedal/core';
 
@@ -24,6 +25,24 @@ export const formatStretchDistance = (meters: number, units: MeasurementSystem):
     : formatDistance(Math.round(meters / 10) * 10, units);
 
 /**
+ * Whole minutes the current route costs at the rider's pace: the extra
+ * distance at their speed. Climb is taken as equal on both routes (they join
+ * the same two points, and the compared route is never elevation-enriched),
+ * so this is a distance gap, not a terrain one. Null without a pace or
+ * without the compared route's length.
+ */
+const extraMinutesAtPace = (
+  comparisonDistanceMeters: number | undefined,
+  currentDistanceMeters: number | null,
+  pace: RiderPace | null,
+): number | null => {
+  if (!pace?.personal || comparisonDistanceMeters === undefined || currentDistanceMeters === null) {
+    return null;
+  }
+  return Math.round(((currentDistanceMeters - comparisonDistanceMeters) / 1000 / pace.kmh) * 60);
+};
+
+/**
  * The Safe-vs-Fast comparison line, shared by `/route-preview` and the
  * onboarding route reveal so the two can never describe the same route
  * differently.
@@ -36,6 +55,10 @@ export const describeRouteComparison = (
   preview: Pick<RoutePreviewResponse, 'comparison' | 'comparisonLabel'> | null | undefined,
   t: Translate,
   units: MeasurementSystem,
+  /** From `useRiderPace`; with it the time cost is quoted at the rider's pace. */
+  pace: RiderPace | null,
+  /** Length of the route shown, needed for the pace-based cost. */
+  currentDistanceMeters: number | null,
 ): RouteComparisonCopy | null => {
   const comparison = preview?.comparison;
   if (comparison) {
@@ -69,8 +92,16 @@ export const describeRouteComparison = (
               })
             : null;
 
-        if (comparison.extraMinutes) {
-          title = t('preview.comparison.calmerCost', { minutes: comparison.extraMinutes });
+        const atPace = extraMinutesAtPace(
+          comparison.comparisonDistanceMeters,
+          currentDistanceMeters,
+          pace,
+        );
+        const extraMinutes = atPace ?? comparison.extraMinutes ?? 0;
+        if (extraMinutes >= 1) {
+          title = atPace !== null
+            ? t('preview.comparison.calmerCostAtPace', { minutes: extraMinutes })
+            : t('preview.comparison.calmerCost', { minutes: extraMinutes });
           subtitle = savingLine ?? t('preview.comparison.calmerCostSub');
         } else {
           title = t('preview.comparison.calmerFree');

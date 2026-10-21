@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (adaptive ETA phase 1, step 1)
+Last updated: 2026-10-21 (adaptive ETA phase 1, route preview)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Adaptive ETA phase 1, route preview.** The preview's ride time (peek strip and expanded summary) goes through `personalRideSeconds`; the expanded one says "at your pace" when the pace applies. The safe-vs-fast line quotes the safe route's extra distance at the rider's pace ("+3 min at your pace for a calmer ride"), from the fast route's length now carried as `RouteComparison.comparisonDistanceMeters` (absent for Cool, which quotes no minutes). Climb is assumed equal on both routes, since the fast route's climb is not measured. Under one minute shows the "no extra time" line. Onboarding route reveal keeps the router's figure (no rides yet). 6 new tests; pace gap and fast-route length mutation-checked. Not device-checked: owner chose to check it at the phase 1 preview pass.
 
 - **2026-10-21: Adaptive ETA phase 1, step 1: the shared pieces** (`docs/plans/adaptive-eta.md`). Core `resolveEtaPace` (the rider's pace only when the new setting is on, a personal pace exists, and E-bike is NOT selected: history can't tell bikes apart yet) and `personalRideSeconds` (pace with climb as extra distance, else the router's time untouched). `paceSlice`: `paceEtaEnabled` (Profile > Display "Ride times at my pace", default on, device-scoped) and `riderPaceSnapshot` (last pace from history, user-scoped, carries cold starts and offline). `useRiderPace()` hook over the shared `['trip-history']` query. The commute briefing now goes through all of it, falls back to the saved pace on a failed read, and reschedules when the switch or E-bike changes. EN/RO/ES copy. 15 new tests; E-bike rule, account-switch reset, switch-off short circuit and the hook's skipped read all mutation-checked. Next: route preview, comparison, map summary, course, HUD start, loop planner, plus `eta_accuracy` telemetry.
 

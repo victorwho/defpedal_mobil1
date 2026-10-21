@@ -221,6 +221,12 @@ export interface RouteComparison {
   /** Whole minutes the current route costs vs the compared one; present only when >= 1. */
   extraMinutes?: number;
   /**
+   * Length of the compared route. Present exactly when a time cost may be
+   * quoted at all (a safer route, not the Cool graph), so the gap can also be
+   * worked out at the rider's own pace (`describeRouteComparison`).
+   */
+  comparisonDistanceMeters?: number;
+  /**
    * Metres each route spends on 'High risk' roads — length-weighted, and a
    * TIER-level figure rather than a score-level one.
    *

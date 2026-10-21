@@ -121,6 +121,7 @@ export const es: TranslationKeys = {
     retryPreview: 'Reintentar vista previa',
     routeName: 'Nombre de la ruta (p. ej. Camino al trabajo)',
     peekSwipeUp: 'Desliza arriba',
+    atYourPace: 'a tu ritmo',
     lifeEarnedShort: 'de vida ganada',
     missingConfigTitle: 'Falta configuración',
     missingConfigBody: 'Configura `EXPO_PUBLIC_MOBILE_API_URL` antes de pedir vistas previas.',
@@ -133,6 +134,7 @@ export const es: TranslationKeys = {
     // Safe-vs-fast comparison badge
     comparison: {
       calmerCost: '+{{minutes}} min por una ruta más tranquila',
+      calmerCostAtPace: '+{{minutes}} min a tu ritmo por una ruta más tranquila',
       calmerCostSub: 'Un poco más de distancia a cambio de mucho menos tráfico.',
       calmerFree: 'Más tranquila que la ruta rápida — sin tiempo extra',
       busySaving: '{{distance}} menos por vías con mucho tráfico que la ruta rápida.',

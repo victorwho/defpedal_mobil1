@@ -884,6 +884,7 @@ export const directPreviewRoute = async (
       const currentSegments = enrichedRoutes[0].riskSegments;
       let comparisonSegments: readonly RiskSegment[] = [];
       let comparisonDurationSeconds: number | undefined;
+      let comparisonDistanceMeters: number | undefined;
 
       if (effectiveMode === 'safe') {
         // Skip comparison for very long routes — Mapbox 422s at > ~400km (MOBILE-2)
@@ -899,6 +900,7 @@ export const directPreviewRoute = async (
           // Raw (not elevation-adjusted) duration — the comparison route is
           // never elevation-enriched, so compare raw vs raw for a fair delta.
           comparisonDurationSeconds = fastRoute.durationSeconds;
+          comparisonDistanceMeters = fastRoute.distanceMeters;
         }
         }
       } else {
@@ -951,6 +953,7 @@ export const directPreviewRoute = async (
           // (The "calmer ride" framing is also wrong here: the cool graph
           // optimises canopy, not traffic.)
           let extraMinutes: number | undefined;
+          let pricedDistanceMeters: number | undefined;
           if (
             verdict === 'safer' &&
             comparisonDurationSeconds !== undefined &&
@@ -960,6 +963,7 @@ export const directPreviewRoute = async (
               (enrichedRoutes[0].durationSeconds - comparisonDurationSeconds) / 60,
             );
             if (extra >= 1) extraMinutes = extra;
+            pricedDistanceMeters = comparisonDistanceMeters;
           }
 
           comparison = {
@@ -967,6 +971,7 @@ export const directPreviewRoute = async (
             verdict,
             diffPercent: verdict === 'safer' ? diffPercent : 0,
             extraMinutes,
+            comparisonDistanceMeters: pricedDistanceMeters,
             // Length-weighted tier-level exposure, alongside the older
             // score-level `diffPercent`. See `describeBusyRoadSaving`.
             busyRoadMeters: {

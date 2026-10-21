@@ -195,7 +195,8 @@ export default function OnboardingRouteRevealScreen() {
   const hasRiskSegments = (route?.riskSegments.length ?? 0) > 0;
 
   const comparison = useMemo(
-    () => (isLoop ? null : describeRouteComparison(previewQuery.data, t, units)),
+    // No pace: a new install has no rides to learn one from.
+    () => (isLoop ? null : describeRouteComparison(previewQuery.data, t, units, null, null)),
     [isLoop, previewQuery.data, t, units],
   );
 

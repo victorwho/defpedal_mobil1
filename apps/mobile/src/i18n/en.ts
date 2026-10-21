@@ -121,6 +121,7 @@ export const en = {
     retryPreview: 'Retry preview',
     routeName: 'Route name (e.g. Morning commute)',
     peekSwipeUp: 'Swipe up',
+    atYourPace: 'at your pace',
     lifeEarnedShort: 'life earned',
     missingConfigTitle: 'Missing configuration',
     missingConfigBody: 'Set `EXPO_PUBLIC_MOBILE_API_URL` before requesting route previews.',
@@ -133,6 +134,7 @@ export const en = {
     // Safe-vs-fast comparison badge
     comparison: {
       calmerCost: '+{{minutes}} min for a calmer ride',
+      calmerCostAtPace: '+{{minutes}} min at your pace for a calmer ride',
       calmerCostSub: 'A little distance traded for a lot less traffic.',
       calmerFree: 'Calmer than the fast route — at no extra time',
       // How much safer, quantified. Metres on HIGH-RISK roads, length-weighted
