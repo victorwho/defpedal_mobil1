@@ -65,25 +65,29 @@ search result; `setSavedPlace(type, null)` has no UI caller.
 
 ### 2. Commute settings (store)
 
-New slice in `appStore.ts`, **user-scoped** like `savedPlaces` (cleared by
-`resetUserScopedState`, persisted via `partialize`, persist migration bump):
+Own slice, `src/store/commuteSlice.ts` (built 2026-10-21), **user-scoped**
+like `savedPlaces` (cleared by `resetUserScopedState`, persisted via
+`partialize`). No persist migration: it is a new top-level key, so older saved
+state simply falls back to the default.
 
 ```ts
 commute: {
-  enabled: boolean;              // default false — opt-in
+  enabled: boolean;              // default false (opt-in)
   days: number[];                // ISO weekdays 1..7, default [1,2,3,4,5]
-  departTime: string | null;     // 'HH:MM'; null until the rider picks it in setup (no default)
-  returnTime: string | null;     // 'HH:MM' or null (evening briefing off — the default; offered in setup)
-  leadMinutes: number;           // briefing fires this long before departure, default 15
-  cachedRoute: {                 // refreshed at most once a day
-    from: 'home' | 'work';
+  departTime: string | null;     // 'HH:MM'; null until picked in setup (no default)
+  returnTime: string | null;     // 'HH:MM' or null (evening briefing off, the default)
+  routeEstimates: {              // one per direction, refreshed at most once a day
+    direction: 'to_work' | 'to_home';
     durationSeconds: number;
     distanceMeters: number;
     fetchedAt: string;           // ISO
-    placesKey: string;           // hash of both coords — invalidates on change
+    placesKey: string;           // identifies the Home/Work pair; a change invalidates it
   }[];
 }
 ```
+
+The lead time is a constant, `COMMUTE_LEAD_MINUTES = 15`, not state: nothing
+in the UI changes it. Malformed times are ignored, never stored.
 
 Turning it off, removing Home or Work, or `resetUserScopedState` all cancel
 the scheduled briefings (the weather ping's toggle-off lesson: with several
@@ -213,7 +217,8 @@ No server, migration or Cloud Run change.
    tests (mutation-checked). Known gap kept on purpose: the Home/Work rows only
    appear once at least one place is set, so a rider with neither has no search
    entry point; the Profile › Commute section (step 5) is that entry point.
-2. Store slice + migration.
+2. Store slice. **Built 2026-10-21** (`commuteSlice.ts`, 13 tests, reset and
+   persistence wiring mutation-checked); no UI yet, so nothing to device-test.
 3. Pure builders + tests.
 4. Hourly forecast + ETA cache + scheduler + weather `excludeDays`.
 5. Tap handler + Profile section + i18n + telemetry + diagnostics button.

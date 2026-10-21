@@ -88,6 +88,11 @@ import {
   type PremiumSlice,
 } from './premiumSlice';
 import { createQueueSlice, type QueueSlice } from './queueSlice';
+import {
+  createCommuteSlice,
+  DEFAULT_COMMUTE_SLICE_STATE,
+  type CommuteSlice,
+} from './commuteSlice';
 import { resolveAvoidHeat } from '../lib/coolMode';
 
 const MAX_RECENT_DESTINATIONS = 3;
@@ -144,7 +149,7 @@ export type RideSavedNotice = {
   discardableUntil: number | null;
 };
 
-export type AppStore = QueueSlice & PremiumSlice & {
+export type AppStore = QueueSlice & PremiumSlice & CommuteSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
   routeRequest: RoutePreviewRequest;
@@ -958,6 +963,7 @@ export const useAppStore = create<AppStore>()(
       showRouteComparison: true,
       ...createQueueSlice(set, get),
       ...createPremiumSlice(set),
+      ...createCommuteSlice(set),
       shareTripsPublicly: true,
       shareConversionFeedOptin: true,
       bikeTypeId: null,
@@ -1991,6 +1997,8 @@ export const useAppStore = create<AppStore>()(
           // sensitive locations we hold — they must never survive a sign-out /
           // account switch and greet the next account on this device.
           savedPlaces: { home: null, work: null },
+          // Commute settings describe where this account lives and works.
+          ...DEFAULT_COMMUTE_SLICE_STATE,
           cachedCityHeartbeat: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,
@@ -2136,6 +2144,7 @@ export const useAppStore = create<AppStore>()(
         localeExplicitlySet: state.localeExplicitlySet,
         homeLocation: state.homeLocation,
         savedPlaces: state.savedPlaces,
+        commute: state.commute,
         // Offline entitlement cache — what lets a paying rider with no signal
         // keep Plus for the grace window. User-scoped.
         premiumSnapshot: state.premiumSnapshot,
