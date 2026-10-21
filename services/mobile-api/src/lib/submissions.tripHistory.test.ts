@@ -1,0 +1,64 @@
+// @vitest-environment node
+/**
+ * The Supabase branch of `getTripHistory`: history rows are trip_tracks, but
+ * the planned duration and bike are written to `trips` at START (adaptive
+ * ETA Phase 3, migration 202610210001), so they are read in a second query
+ * and merged by trip id. A dropped merge is invisible everywhere else.
+ */
+import { describe, expect, it, vi } from 'vitest';
+
+const tables: Record<string, unknown[]> = {
+  trip_tracks: [
+    {
+      id: 'track-1',
+      trip_id: 'trip-1',
+      routing_mode: 'safe',
+      planned_route_distance_meters: 6000,
+      actual_distance_meters: 6100,
+      gps_trail: [],
+      end_reason: 'completed',
+      started_at: '2026-10-21T08:00:00.000Z',
+      ended_at: '2026-10-21T08:20:00.000Z',
+      reroute_count: 0,
+    },
+    {
+      id: 'track-2',
+      trip_id: 'trip-2',
+      routing_mode: 'safe',
+      gps_trail: [],
+      end_reason: 'completed',
+      started_at: '2026-10-20T08:00:00.000Z',
+      ended_at: '2026-10-20T08:20:00.000Z',
+      reroute_count: null,
+    },
+  ],
+  ride_impacts: [],
+  trips: [
+    { id: 'trip-1', planned_route_duration_seconds: 1440, is_ebike: true },
+    { id: 'trip-2', planned_route_duration_seconds: null, is_ebike: null },
+  ],
+};
+
+const chain = (rows: unknown[]) => {
+  const result = Promise.resolve({ data: rows, error: null });
+  const builder: Record<string, unknown> = {};
+  for (const m of ['select', 'eq', 'gte', 'order', 'limit', 'in']) builder[m] = () => builder;
+  builder.then = result.then.bind(result);
+  return builder;
+};
+
+vi.mock('./supabaseAdmin', () => ({
+  supabaseAdmin: { from: (table: string) => chain(tables[table] ?? []) },
+}));
+
+import { getTripHistory } from './submissions';
+
+describe('getTripHistory — adaptive ETA fields', () => {
+  it('merges planned duration and bike from trips, reroute count from the track', async () => {
+    const [recorded, older] = await getTripHistory('user-1');
+    expect(recorded).toMatchObject({ plannedDurationSeconds: 1440, isEbike: true, rerouteCount: 0 });
+    expect(older!.plannedDurationSeconds).toBeUndefined();
+    expect(older!.isEbike).toBeUndefined();
+    expect(older!.rerouteCount).toBeUndefined();
+  });
+});

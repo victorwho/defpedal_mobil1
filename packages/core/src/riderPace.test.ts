@@ -7,6 +7,7 @@ import {
   resolveEtaPace,
   rideMinutes,
   riderPace,
+  riderPaces,
 } from './riderPace';
 
 /** A ride of `km` covered in `minutes`. */
@@ -103,18 +104,85 @@ describe('rideMinutes', () => {
 const MINE = { kmh: 18, personal: true, rideCount: 7 };
 const DEFAULT = { kmh: DEFAULT_PACE_KMH, personal: false, rideCount: 2 };
 
+const EBIKE = { kmh: 24, personal: true, rideCount: 4 };
+
 describe('resolveEtaPace', () => {
-  it('uses a personal pace when switched on, on a normal bike', () => {
-    expect(resolveEtaPace({ pace: MINE, enabled: true, isEbike: false })).toBe(MINE);
+  it('the normal bike’s pace when switched on, on a normal bike', () => {
+    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, isEbike: false })).toBe(MINE);
+  });
+
+  it('the e-bike’s own pace with E-bike selected', () => {
+    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, isEbike: true })).toBe(EBIKE);
   });
 
   it.each([
-    ['switched off', { pace: MINE, enabled: false, isEbike: false }],
-    ['E-bike selected', { pace: MINE, enabled: true, isEbike: true }],
-    ['not enough rides', { pace: DEFAULT, enabled: true, isEbike: false }],
-    ['no pace read yet', { pace: null, enabled: true, isEbike: false }],
+    ['switched off', { paces: { normal: MINE, ebike: EBIKE }, enabled: false, isEbike: false }],
+    ['too few e-bike rides', { paces: { normal: MINE, ebike: DEFAULT }, enabled: true, isEbike: true }],
+    ['not enough rides', { paces: { normal: DEFAULT, ebike: DEFAULT }, enabled: true, isEbike: false }],
+    ['no pace read yet', { paces: null, enabled: true, isEbike: false }],
   ])('router time when %s', (_label, input) => {
     expect(resolveEtaPace(input)).toBeNull();
+  });
+});
+
+/** A completed, never-rerouted ride the router predicted at `plannedMinutes`. */
+const predicted = (
+  km: number,
+  minutes: number,
+  plannedMinutes: number,
+  extra: Record<string, unknown> = {},
+) => ({
+  ...ride(km, minutes),
+  plannedDurationSeconds: plannedMinutes * 60,
+  rerouteCount: 0,
+  endReason: 'completed',
+  ...extra,
+});
+
+describe('riderPace: router factor', () => {
+  it('median of actual / predicted, once three rides carry a prediction', () => {
+    const pace = riderPace([predicted(6, 18, 20), predicted(6, 22, 20), predicted(6, 24, 20)]);
+    expect(pace.routerFactor).toBeCloseTo(1.1, 5);
+  });
+
+  it('no factor from fewer than three', () => {
+    const pace = riderPace([predicted(6, 18, 20), predicted(6, 22, 20), ride(6, 20)]);
+    expect(pace.personal).toBe(true);
+    expect(pace.routerFactor).toBeUndefined();
+  });
+
+  it.each([
+    ['a rerouted ride', { rerouteCount: 1 }],
+    ['an unknown reroute count', { rerouteCount: undefined }],
+    ['a stopped ride', { endReason: 'stopped' }],
+    ['a ride under 1 km', { distanceMeters: 900 }],
+    ['an implausible ratio', { plannedDurationSeconds: 60 }],
+  ])('leaves out %s', (_label, extra) => {
+    const pace = riderPace([predicted(6, 18, 20), predicted(6, 22, 20), predicted(6, 24, 20, extra)]);
+    expect(pace.routerFactor).toBeUndefined();
+  });
+});
+
+describe('riderPaces: one pace per bike', () => {
+  const normalRide = (minutes: number) => ({ ...ride(10, minutes), isEbike: false });
+  const ebikeRide = (minutes: number) => ({ ...ride(10, minutes), isEbike: true });
+  const unrecorded = (minutes: number) => ride(10, minutes);
+
+  it('splits recorded rides by bike', () => {
+    const paces = riderPaces([normalRide(40), normalRide(40), normalRide(40), ebikeRide(25), ebikeRide(25), ebikeRide(25)]);
+    expect(paces.normal.kmh).toBeCloseTo(15, 5);
+    expect(paces.ebike.kmh).toBeCloseTo(24, 5);
+  });
+
+  it('unrecorded rides count for the normal bike while the e-bike was never recorded', () => {
+    const paces = riderPaces([unrecorded(40), unrecorded(40), normalRide(40)]);
+    expect(paces.normal).toMatchObject({ personal: true, rideCount: 3 });
+    expect(paces.ebike.personal).toBe(false);
+  });
+
+  it('once any ride is on the e-bike, unrecorded rides are left out', () => {
+    const paces = riderPaces([unrecorded(40), unrecorded(40), normalRide(40), ebikeRide(25)]);
+    expect(paces.normal).toMatchObject({ personal: false, rideCount: 1 });
   });
 });
 
@@ -133,5 +201,15 @@ describe('personalRideSeconds', () => {
   it('the router’s time, untouched, without a personal pace', () => {
     expect(personalRideSeconds(route, null)).toBe(1320);
     expect(personalRideSeconds(route, DEFAULT)).toBe(1320);
+  });
+
+  it('with a router factor: the router’s time scaled to this rider', () => {
+    expect(personalRideSeconds(route, { ...MINE, routerFactor: 1.25 })).toBe(1650);
+  });
+
+  it('not on a time no router made (a GPX course): the pace instead', () => {
+    expect(
+      personalRideSeconds({ ...route, routerIsEstimate: true }, { ...MINE, routerFactor: 1.25 }),
+    ).toBe(28 * 60);
   });
 });

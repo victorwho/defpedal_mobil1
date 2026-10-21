@@ -212,6 +212,13 @@ export const startTripRecord = async (
             planned_route_polyline6: request.plannedRoutePolyline6 ?? null,
             planned_route_distance_meters: request.plannedRouteDistanceMeters ?? null,
             routing_mode: request.routingMode ?? null,
+            // Migration 202610210001. `?? null` for the same upsert reason as
+            // above, and never a default: NULL means "not recorded".
+            planned_route_duration_seconds:
+              request.plannedDurationSeconds != null
+                ? Math.round(request.plannedDurationSeconds)
+                : null,
+            is_ebike: request.isEbike ?? null,
           },
         ],
         { onConflict: 'user_id,client_trip_id' },
@@ -480,7 +487,7 @@ export const getTripHistory = async (
 
   let query = supabaseAdmin
     .from('trip_tracks')
-    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at, reroute_count')
     .eq('user_id', userId);
 
   if (sinceIso) query = query.gte('started_at', sinceIso);
@@ -509,6 +516,25 @@ export const getTripHistory = async (
     }
   }
 
+  // Planned duration and bike live on `trips` (written at START, migration
+  // 202610210001); history rows are trip_tracks, so read them separately.
+  const startFacts = new Map<string, { plannedDurationSeconds?: number; isEbike?: boolean }>();
+  if (tripIds.length > 0) {
+    const { data: tripData, error: tripError } = await supabaseAdmin
+      .from('trips')
+      .select('id, planned_route_duration_seconds, is_ebike')
+      .in('id', tripIds);
+    // Never fail history over these: they only refine an estimate.
+    if (!tripError) {
+      for (const trip of tripData ?? []) {
+        startFacts.set(trip.id as string, {
+          plannedDurationSeconds: (trip.planned_route_duration_seconds as number | null) ?? undefined,
+          isEbike: (trip.is_ebike as boolean | null) ?? undefined,
+        });
+      }
+    }
+  }
+
   return rows.map((row: Record<string, unknown>) => ({
     id: row.id as string,
     tripId: row.trip_id as string,
@@ -523,6 +549,9 @@ export const getTripHistory = async (
     endedAt: (row.ended_at as string) ?? null,
     distanceMeters: (row.actual_distance_meters as number) ?? undefined,
     caloriesBurned: caloriesMap.get(row.trip_id as string),
+    plannedDurationSeconds: startFacts.get(row.trip_id as string)?.plannedDurationSeconds,
+    isEbike: startFacts.get(row.trip_id as string)?.isEbike,
+    rerouteCount: (row.reroute_count as number | null) ?? undefined,
   }));
 };
 

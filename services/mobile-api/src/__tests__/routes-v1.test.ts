@@ -447,6 +447,46 @@ describe('POST /v1/trips/start', () => {
     await app.close();
   });
 
+  it('forwards the planned duration and bike (adaptive ETA phase 3)', async () => {
+    const startTripRecord = vi.fn().mockResolvedValue({
+      clientTripId: 'client-trip-1',
+      tripId: 'server-trip-1',
+      acceptedAt: '2026-10-21T08:00:00.000Z',
+    });
+    const app = buildTestApp({ startTripRecord });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/start',
+      headers: authHeaders,
+      payload: { ...validTripStartBody, plannedDurationSeconds: 1440, isEbike: true },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(startTripRecord.mock.calls[0]![0]).toMatchObject({
+      plannedDurationSeconds: 1440,
+      isEbike: true,
+    });
+    await app.close();
+  });
+
+  it('rejects a non-boolean isEbike, naming the field', async () => {
+    const app = buildTestApp();
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/trips/start',
+      headers: authHeaders,
+      payload: { ...validTripStartBody, isEbike: 'notabool' },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.body).toContain('isEbike');
+    await app.close();
+  });
+
   it('returns 200 with tripId when authenticated', async () => {
     const app = buildTestApp();
     await app.ready();
@@ -992,6 +1032,39 @@ describe('GET /v1/trips/history', () => {
     const response = await app.inject({ method: 'GET', url: '/v1/trips/history' });
     expect(response.statusCode).toBe(401);
 
+    await app.close();
+  });
+
+  it('keeps the adaptive-ETA fields in the response (Fastify drops undeclared ones)', async () => {
+    const app = buildTestApp({
+      getTripHistory: vi.fn().mockResolvedValue([
+        {
+          id: 'track-1',
+          tripId: 'trip-1',
+          routingMode: 'safe',
+          gpsBreadcrumbs: [],
+          endReason: 'completed',
+          startedAt: '2026-10-21T08:00:00.000Z',
+          endedAt: '2026-10-21T08:20:00.000Z',
+          plannedDurationSeconds: 1440,
+          isEbike: false,
+          rerouteCount: 0,
+        },
+      ]),
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/trips/history',
+      headers: authHeaders,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()[0]).toMatchObject({
+      plannedDurationSeconds: 1440,
+      isEbike: false,
+      rerouteCount: 0,
+    });
     await app.close();
   });
 

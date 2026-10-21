@@ -6,6 +6,7 @@ const route = {
   id: 'loop-1',
   source: 'generated_loop',
   distanceMeters: 24_000,
+  adjustedDurationSeconds: 5400,
 } as never;
 
 const start = { lat: 45.59, lon: 25.46 };
@@ -20,9 +21,10 @@ const args = {
   clientTripId: 'client-trip-1',
 };
 
-const makeStore = (appState = 'IDLE') => {
+const makeStore = (appState = 'IDLE', isEbike = false) => {
   const store: LoopRideStore = {
     appState,
+    isEbike,
     setRouteRequest: vi.fn(),
     setRoutePreview: vi.fn(),
     enqueueMutation: vi.fn(),
@@ -63,6 +65,21 @@ describe('beginLoopRide', () => {
     expect(payload.distanceMeters).toBe(24_000);
     expect(payload.destinationText).toBe('24 km loop');
     expect(store.setActiveTripClientId).toHaveBeenCalledWith('client-trip-1');
+  });
+
+  it('records the router’s prediction and the bike (adaptive ETA phase 3)', () => {
+    const store = makeStore();
+    beginLoopRide(store, args);
+    const [, payload] = (store.enqueueMutation as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(payload).toMatchObject({ plannedDurationSeconds: 5400, isEbike: false });
+  });
+
+  it('on an e-bike: the bike, but no prediction (loops use the standard graph)', () => {
+    const store = makeStore('IDLE', true);
+    beginLoopRide(store, args);
+    const [, payload] = (store.enqueueMutation as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(payload.isEbike).toBe(true);
+    expect(payload.plannedDurationSeconds).toBeUndefined();
   });
 
   it('routes a loop back to where it started', () => {

@@ -8,14 +8,14 @@ import {
   personalRideSeconds,
   resolveEtaPace,
   type NavigationSession,
-  type RiderPace,
+  type RiderPaces,
   type RouteOption,
 } from '@defensivepedal/core';
 
 export interface EtaAccuracyInput {
   readonly session: NavigationSession | null;
   readonly route: RouteOption | null;
-  readonly riderPaceSnapshot: RiderPace | null;
+  readonly riderPaces: RiderPaces | null;
   readonly paceEtaEnabled: boolean;
   readonly isEbike: boolean;
   readonly nowMs: number;
@@ -30,7 +30,7 @@ export const etaAccuracyProperties = (
   if (!Number.isFinite(actualSeconds) || actualSeconds <= 0) return null;
 
   const pace = resolveEtaPace({
-    pace: input.riderPaceSnapshot,
+    paces: input.riderPaces,
     enabled: input.paceEtaEnabled,
     isEbike: input.isEbike,
   });
@@ -47,11 +47,12 @@ export const etaAccuracyProperties = (
   );
 
   return {
-    method: pace ? 'pace' : 'router',
+    method: pace ? (pace.routerFactor !== undefined ? 'factor' : 'pace') : 'router',
     router_seconds: routerSeconds,
     personal_seconds: personalSeconds,
     actual_seconds: actualSeconds,
     distance_meters: Math.round(route.distanceMeters),
-    pace_ride_count: input.riderPaceSnapshot?.rideCount ?? 0,
+    pace_ride_count: pace?.rideCount ?? 0,
+    is_ebike: input.isEbike ? 1 : 0,
   };
 };

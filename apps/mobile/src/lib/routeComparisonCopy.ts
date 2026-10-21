@@ -35,9 +35,15 @@ const extraMinutesAtPace = (
   comparisonDistanceMeters: number | undefined,
   currentDistanceMeters: number | null,
   pace: RiderPace | null,
+  routerExtraMinutes: number | undefined,
 ): number | null => {
   if (!pace?.personal || comparisonDistanceMeters === undefined || currentDistanceMeters === null) {
     return null;
+  }
+  // With a router factor, the router's own gap scaled to this rider, as for
+  // every other time (`personalRideSeconds`).
+  if (pace.routerFactor !== undefined && routerExtraMinutes !== undefined) {
+    return Math.round(routerExtraMinutes * pace.routerFactor);
   }
   return Math.round(((currentDistanceMeters - comparisonDistanceMeters) / 1000 / pace.kmh) * 60);
 };
@@ -96,6 +102,7 @@ export const describeRouteComparison = (
           comparison.comparisonDistanceMeters,
           currentDistanceMeters,
           pace,
+          comparison.extraMinutes,
         );
         const extraMinutes = atPace ?? comparison.extraMinutes ?? 0;
         if (extraMinutes >= 1) {

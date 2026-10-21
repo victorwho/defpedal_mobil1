@@ -33,6 +33,7 @@ export type LoopRideStore = Pick<
   | 'enqueueMutation'
   | 'setActiveTripClientId'
   | 'startNavigation'
+  | 'isEbike'
 >;
 
 export interface BeginLoopRideArgs {
@@ -107,6 +108,10 @@ export const beginLoopRide = (
     plannedRoutePolyline6: boundRoutePolyline6(args.route.geometryPolyline6),
     plannedRouteDistanceMeters: args.route.distanceMeters,
     routingMode: 'generated_loop',
+    // Loops are always routed on the standard graph, so for an e-bike ride
+    // this is not that bike's prediction: record the bike, not the time.
+    plannedDurationSeconds: store.isEbike ? undefined : args.route.adjustedDurationSeconds,
+    isEbike: store.isEbike,
   });
   store.setActiveTripClientId(args.clientTripId);
 

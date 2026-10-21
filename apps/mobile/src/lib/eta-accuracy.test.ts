@@ -10,7 +10,7 @@ const MINE = { kmh: 18, personal: true, rideCount: 7 };
 const input = (overrides: Partial<EtaAccuracyInput> = {}): EtaAccuracyInput => ({
   session: { startedAt: new Date(START).toISOString(), rerouteCount: 0 } as NavigationSession,
   route: { distanceMeters: 6000, totalClimbMeters: 0, adjustedDurationSeconds: 1440 } as RouteOption,
-  riderPaceSnapshot: MINE,
+  riderPaces: { normal: MINE, ebike: { kmh: 15, personal: false, rideCount: 0 } },
   paceEtaEnabled: true,
   isEbike: false,
   nowMs: START + 20 * 60_000,
@@ -26,7 +26,15 @@ describe('etaAccuracyProperties', () => {
       actual_seconds: 1200,
       distance_meters: 6000,
       pace_ride_count: 7,
+      is_ebike: 0,
     });
+  });
+
+  it('a router factor: method factor, the router time scaled', () => {
+    const props = etaAccuracyProperties(
+      input({ riderPaces: { normal: { ...MINE, routerFactor: 0.9 }, ebike: MINE } }),
+    );
+    expect(props).toMatchObject({ method: 'factor', personal_seconds: 1296 });
   });
 
   it('nothing for a rerouted ride: the prediction was for another route', () => {

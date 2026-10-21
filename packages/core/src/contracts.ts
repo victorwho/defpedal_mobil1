@@ -605,6 +605,14 @@ export interface TripStartRequest {
   plannedRoutePolyline6?: string;
   plannedRouteDistanceMeters?: number;
   routingMode?: string;
+  /**
+   * The router's predicted ride time (s) for the route at start, so the
+   * rider's pace can be calibrated against it (docs/plans/adaptive-eta.md,
+   * Phase 3). Omitted for a GPX course, whose time is not a router's.
+   */
+  plannedDurationSeconds?: number;
+  /** E-bike selected at start: pace is kept per bike. */
+  isEbike?: boolean;
 }
 
 export interface TripStartResponse {
@@ -724,6 +732,12 @@ export interface TripHistoryItem {
   readonly endedAt: string | null;
   readonly distanceMeters?: number;
   readonly caloriesBurned?: number;
+  /** Router-predicted time at start. Absent = not recorded (older ride). */
+  readonly plannedDurationSeconds?: number;
+  /** Bike at start. Absent = not recorded (older ride). */
+  readonly isEbike?: boolean;
+  /** Absent = unknown; 0 = the ride never rerouted. */
+  readonly rerouteCount?: number;
 }
 
 export interface TripEndResponse {

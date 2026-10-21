@@ -953,6 +953,11 @@ export const buildV1Routes = (
                   plannedRouteDistanceMeters: { type: ['number', 'null'] },
                   distanceMeters: { type: ['number', 'null'] },
                   caloriesBurned: { type: ['number', 'null'] },
+                  // Adaptive ETA Phase 3. Fastify drops undeclared response
+                  // fields, so these must be listed here.
+                  plannedDurationSeconds: { type: ['number', 'null'] },
+                  isEbike: { type: ['boolean', 'null'] },
+                  rerouteCount: { type: ['integer', 'null'] },
                   gpsBreadcrumbs: {
                     type: 'array',
                     items: {

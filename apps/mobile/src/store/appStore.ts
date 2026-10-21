@@ -2156,7 +2156,7 @@ export const useAppStore = create<AppStore>()(
         savedPlaces: state.savedPlaces,
         commute: state.commute,
         paceEtaEnabled: state.paceEtaEnabled,
-        riderPaceSnapshot: state.riderPaceSnapshot,
+        riderPaces: state.riderPaces,
         // Offline entitlement cache — what lets a paying rider with no signal
         // keep Plus for the grace window. User-scoped.
         premiumSnapshot: state.premiumSnapshot,

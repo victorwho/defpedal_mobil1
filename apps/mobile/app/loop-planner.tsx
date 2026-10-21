@@ -280,6 +280,7 @@ export default function LoopPlannerScreen() {
    * off, E-bike, fewer than three usable rides) means the router's time.
    */
   const pace = useRiderPace();
+  const isEbike = useAppStore((state) => state.isEbike);
   const [savedIds, setSavedIds] = useState<Record<string, string>>({});
   const savedLoops = useAppStore((state) => state.savedLoops);
   const addSavedLoop = useAppStore((state) => state.addSavedLoop);
@@ -1346,6 +1347,9 @@ export default function LoopPlannerScreen() {
                                   distanceMeters: loop.distanceMeters,
                                   climbMeters: loop.climbMeters,
                                   routerSeconds: loop.route.adjustedDurationSeconds,
+                                  // Loops use the standard graph: on an e-bike
+                                  // its time is not that bike's prediction.
+                                  routerIsEstimate: isEbike,
                                 },
                                 pace,
                               ) / 60,

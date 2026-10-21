@@ -685,6 +685,10 @@ export const tripStartRequestSchema = {
     plannedRoutePolyline6: { type: 'string', maxLength: 6000000 },
     plannedRouteDistanceMeters: { type: 'number', minimum: 0 },
     routingMode: { type: 'string', maxLength: 32 },
+    // Adaptive ETA Phase 3 (migration 202610210001). Optional: an older
+    // client sends neither and the columns stay NULL ("not recorded").
+    plannedDurationSeconds: { type: 'number', minimum: 0, maximum: 864000 },
+    isEbike: { type: 'boolean' },
   },
 } as const;
 
@@ -1117,6 +1121,8 @@ export const normalizeTripStartRequest = (body: TripStartBody): TripStartRequest
   plannedRoutePolyline6: body.plannedRoutePolyline6,
   plannedRouteDistanceMeters: body.plannedRouteDistanceMeters,
   routingMode: body.routingMode,
+  plannedDurationSeconds: body.plannedDurationSeconds,
+  isEbike: body.isEbike,
 });
 
 export const normalizeTripEndRequest = (body: TripEndBody): TripEndRequest => ({

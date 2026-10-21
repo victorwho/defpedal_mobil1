@@ -15,9 +15,10 @@
  */
 import {
   resolveEtaPace,
-  riderPace,
+  riderPaces,
   type Coordinate,
   type RiderPace,
+  type RiderPaces,
   type RoutePreviewRequest,
   type RoutePreviewResponse,
 } from '@defensivepedal/core';
@@ -47,7 +48,7 @@ let testOverrides: {
   store?: AppStoreHook;
   fetchForecast?: (lat: number, lon: number) => Promise<Forecast | null>;
   previewRoute?: (request: RoutePreviewRequest) => Promise<RoutePreviewResponse>;
-  fetchPace?: () => Promise<RiderPace | null>;
+  fetchPace?: () => Promise<RiderPaces | null>;
 } = {};
 
 export const __setCommuteTestOverrides = (overrides: typeof testOverrides): void => {
@@ -92,13 +93,13 @@ const previewRoute = (request: RoutePreviewRequest): Promise<RoutePreviewRespons
   return directPreviewRoute(request, { canopyComparison: false });
 };
 
-/** The rider's pace from trip history, the read `useRiderPace` makes. Null on failure. */
-const fetchPace = async (): Promise<RiderPace | null> => {
+/** The rider's paces from trip history, the read `useRiderPace` makes. Null on failure. */
+const fetchPace = async (): Promise<RiderPaces | null> => {
   if (testOverrides.fetchPace) return testOverrides.fetchPace();
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { mobileApi } = require('./api') as typeof import('./api');
-    return riderPace(await mobileApi.getTripHistory());
+    return riderPaces(await mobileApi.getTripHistory());
   } catch {
     return null;
   }
@@ -113,9 +114,9 @@ const briefingPace = async (): Promise<RiderPace | null> => {
   const store = getAppStore();
   if (!store.getState().paceEtaEnabled) return null;
   const fresh = await fetchPace();
-  if (fresh) store.getState().setRiderPaceSnapshot(fresh);
+  if (fresh) store.getState().setRiderPaces(fresh);
   const s = store.getState();
-  return resolveEtaPace({ pace: fresh ?? s.riderPaceSnapshot, enabled: s.paceEtaEnabled, isEbike: s.isEbike });
+  return resolveEtaPace({ paces: fresh ?? s.riderPaces, enabled: s.paceEtaEnabled, isEbike: s.isEbike });
 };
 
 // "Show route" on a briefing, remembered until the ride it leads to starts, so
@@ -420,9 +421,12 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
   );
   await ensureChannel(N);
   await scheduleOne(N, briefing, now);
-  const saved = latest.riderPaceSnapshot;
+  const saved = latest.isEbike ? latest.riderPaces?.ebike : latest.riderPaces?.normal;
+  const bike = latest.isEbike ? 'e-bike' : 'bike';
   const paceNote = pace
-    ? `your pace ${pace.kmh.toFixed(1)} km/h`
-    : `router time (${!latest.paceEtaEnabled ? 'switched off' : latest.isEbike ? 'e-bike' : `${saved?.rideCount ?? 0} usable rides`})`;
+    ? pace.routerFactor !== undefined
+      ? `your ${bike}: router time x ${pace.routerFactor.toFixed(2)}`
+      : `your ${bike} pace ${pace.kmh.toFixed(1)} km/h`
+    : `router time (${!latest.paceEtaEnabled ? 'switched off' : `${saved?.rideCount ?? 0} usable ${bike} rides`})`;
   return `scheduled in 10 s (forecast ${forecast ? 'ok' : 'missing'}, route ${route ? 'ok' : 'missing'}, ${paceNote})`;
 };

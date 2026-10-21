@@ -1,4 +1,4 @@
-import type { RiderPace } from '@defensivepedal/core';
+import type { RiderPace, RiderPaces } from '@defensivepedal/core';
 
 // ---------------------------------------------------------------------------
 // Ride times at the rider's own pace (docs/plans/adaptive-eta.md, Phase 1).
@@ -11,32 +11,40 @@ export type PaceSliceState = {
    */
   paceEtaEnabled: boolean;
   /**
-   * The pace last computed from trip history, kept so cold starts and
-   * offline rides still show a personal time. USER-scoped: it describes how
-   * one account rides, so resetUserScopedState clears it.
+   * The paces (one per bike) last computed from trip history, kept so cold
+   * starts and offline rides still show a personal time. USER-scoped: they
+   * describe how one account rides, so resetUserScopedState clears them.
+   * Replaced `riderPaceSnapshot` (one pace) in Phase 3; an old persisted
+   * value under that name is simply ignored.
    */
-  riderPaceSnapshot: RiderPace | null;
+  riderPaces: RiderPaces | null;
 };
 
 export type PaceSliceActions = {
   setPaceEtaEnabled: (enabled: boolean) => void;
-  setRiderPaceSnapshot: (pace: RiderPace) => void;
+  setRiderPaces: (paces: RiderPaces) => void;
 };
 
 export type PaceSlice = PaceSliceState & PaceSliceActions;
 
 export const DEFAULT_PACE_SLICE_STATE: PaceSliceState = {
   paceEtaEnabled: true,
-  riderPaceSnapshot: null,
+  riderPaces: null,
 };
 
 /** The user-scoped part, spread into resetUserScopedState. */
-export const RESET_PACE_SLICE_STATE: Pick<PaceSliceState, 'riderPaceSnapshot'> = {
-  riderPaceSnapshot: null,
+export const RESET_PACE_SLICE_STATE: Pick<PaceSliceState, 'riderPaces'> = {
+  riderPaces: null,
 };
 
-const samePace = (a: RiderPace | null, b: RiderPace): boolean =>
-  a !== null && a.kmh === b.kmh && a.personal === b.personal && a.rideCount === b.rideCount;
+const samePace = (a: RiderPace, b: RiderPace): boolean =>
+  a.kmh === b.kmh &&
+  a.personal === b.personal &&
+  a.rideCount === b.rideCount &&
+  a.routerFactor === b.routerFactor;
+
+const samePaces = (a: RiderPaces | null, b: RiderPaces): boolean =>
+  a !== null && samePace(a.normal, b.normal) && samePace(a.ebike, b.ebike);
 
 export const createPaceSlice = (
   set: (fn: (state: PaceSliceState) => Partial<PaceSliceState>) => void,
@@ -45,6 +53,6 @@ export const createPaceSlice = (
   setPaceEtaEnabled: (enabled) => set(() => ({ paceEtaEnabled: enabled })),
   // Unchanged pace = no write: every screen that shows a time recomputes it
   // when trip history refetches, and a persist write per screen is waste.
-  setRiderPaceSnapshot: (pace) =>
-    set((state) => (samePace(state.riderPaceSnapshot, pace) ? {} : { riderPaceSnapshot: pace })),
+  setRiderPaces: (paces) =>
+    set((state) => (samePaces(state.riderPaces, paces) ? {} : { riderPaces: paces })),
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RiderPace, RoutePreviewResponse } from '@defensivepedal/core';
+import type { RiderPaces, RoutePreviewResponse } from '@defensivepedal/core';
 
 import { useAppStore } from '../store/appStore';
 import { DEFAULT_COMMUTE_SLICE_STATE } from '../store/commuteSlice';
@@ -46,7 +46,7 @@ const safeRoute = (mode: 'safe' | 'fast' = 'safe') =>
   }) as unknown as RoutePreviewResponse;
 
 const setup = (
-  opts: { permission?: string; forecast?: typeof anyHour | null; mode?: 'safe' | 'fast'; pace?: RiderPace | null } = {},
+  opts: { permission?: string; forecast?: typeof anyHour | null; mode?: 'safe' | 'fast'; pace?: RiderPaces | null } = {},
 ) => {
   const { N, list } = fakeNotifications(opts.permission);
   const previewRoute = vi.fn(async () => safeRoute(opts.mode));
@@ -152,34 +152,37 @@ describe('scheduleCommuteBriefings', () => {
   });
 
   it('uses the rider’s pace and the route climb when trip history has enough rides', async () => {
-    const { list } = setup({ pace: MY_PACE });
+    const { list } = setup({ pace: MY_PACES });
     await scheduleCommuteBriefings(NOW);
     expect(useAppStore.getState().commute.routeEstimates[0]?.climbMeters).toBe(30);
     expect(commuteIds(list())[0].content.body).toContain('Safe route: about 28 min at your pace, 5.4 km.');
-    expect(useAppStore.getState().riderPaceSnapshot).toMatchObject({ kmh: 18 });
+    expect(useAppStore.getState().riderPaces?.normal).toMatchObject({ kmh: 18 });
   });
 
   it('switched off: the router time, and trip history is not read', async () => {
     useAppStore.setState({ paceEtaEnabled: false });
-    const { list, fetchPace } = setup({ pace: MY_PACE });
+    const { list, fetchPace } = setup({ pace: MY_PACES });
     await scheduleCommuteBriefings(NOW);
     expect(fetchPace).not.toHaveBeenCalled();
     expect(commuteIds(list())[0].content.body).toContain('Safe route: 22 min, 5.4 km.');
   });
 
-  it('E-bike selected: the router time', async () => {
+  it('E-bike selected, no e-bike rides yet: the router time', async () => {
     useAppStore.setState({ isEbike: true });
-    const { list } = setup({ pace: MY_PACE });
+    const { list } = setup({ pace: MY_PACES });
     await scheduleCommuteBriefings(NOW);
     expect(commuteIds(list())[0].content.body).toContain('Safe route: 22 min, 5.4 km.');
   });
 
   it('a failed history read uses the saved pace', async () => {
-    useAppStore.setState({ riderPaceSnapshot: MY_PACE });
+    useAppStore.setState({ riderPaces: MY_PACES });
     const { list } = setup({ pace: null });
     await scheduleCommuteBriefings(NOW);
     expect(commuteIds(list())[0].content.body).toContain('at your pace');
   });
 });
 
-const MY_PACE = { kmh: 18, personal: true, rideCount: 7 };
+const MY_PACES = {
+  normal: { kmh: 18, personal: true, rideCount: 7 },
+  ebike: { kmh: 15, personal: false, rideCount: 0 },
+};

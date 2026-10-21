@@ -1,4 +1,4 @@
-import { resolveEtaPace, riderPace, type RiderPace } from '@defensivepedal/core';
+import { resolveEtaPace, riderPaces, type RiderPace } from '@defensivepedal/core';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
@@ -20,8 +20,8 @@ import { useAppStore } from '../store/appStore';
 export const useRiderPace = ({ active = true }: { active?: boolean } = {}): RiderPace | null => {
   const enabled = useAppStore((s) => s.paceEtaEnabled);
   const isEbike = useAppStore((s) => s.isEbike);
-  const snapshot = useAppStore((s) => s.riderPaceSnapshot);
-  const setSnapshot = useAppStore((s) => s.setRiderPaceSnapshot);
+  const snapshot = useAppStore((s) => s.riderPaces);
+  const setSnapshot = useAppStore((s) => s.setRiderPaces);
 
   const history = useQuery({
     queryKey: ['trip-history'],
@@ -31,8 +31,8 @@ export const useRiderPace = ({ active = true }: { active?: boolean } = {}): Ride
   });
 
   useEffect(() => {
-    if (history.data) setSnapshot(riderPace(history.data));
+    if (history.data) setSnapshot(riderPaces(history.data));
   }, [history.data, setSnapshot]);
 
-  return active ? resolveEtaPace({ pace: snapshot, enabled, isEbike }) : null;
+  return active ? resolveEtaPace({ paces: snapshot, enabled, isEbike }) : null;
 };

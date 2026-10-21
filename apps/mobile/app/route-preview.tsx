@@ -738,6 +738,10 @@ function RoutePreviewScreen() {
       plannedRoutePolyline6: boundRoutePolyline6(selectedRoute.geometryPolyline6),
       plannedRouteDistanceMeters: selectedRoute.distanceMeters,
       routingMode: routePreview?.selectedMode ?? routeRequest.mode,
+      // The router's own prediction, and the bike, so the rider's pace can
+      // be calibrated per bike (adaptive ETA Phase 3).
+      plannedDurationSeconds: selectedRoute.adjustedDurationSeconds,
+      isEbike: effectiveRequest.isEbike,
     });
     setActiveTripClientId(clientTripId);
 

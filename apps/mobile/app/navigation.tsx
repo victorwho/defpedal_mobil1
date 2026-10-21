@@ -798,7 +798,7 @@ function NavigationScreen() {
     const etaAccuracy = etaAccuracyProperties({
       session: state.navigationSession,
       route: selectedRoute ?? null,
-      riderPaceSnapshot: state.riderPaceSnapshot,
+      riderPaces: state.riderPaces,
       paceEtaEnabled: state.paceEtaEnabled,
       isEbike: state.isEbike,
       nowMs: Date.now(),

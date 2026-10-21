@@ -31,6 +31,12 @@ describe('describeRouteComparison: time cost', () => {
     expect(copy?.title).toBe('+3 min at your pace for a calmer ride');
   });
 
+  it('with a router factor: the router’s gap scaled to the rider', () => {
+    // 5 router minutes x 1.2 = 6.
+    const copy = describeRouteComparison(safer(), t, 'metric', { ...MINE, routerFactor: 1.2 }, 5900);
+    expect(copy?.title).toBe('+6 min at your pace for a calmer ride');
+  });
+
   it('no cost to quote at the rider’s pace: the free line', () => {
     // 100 m more at 18 km/h rounds to 0.
     const copy = describeRouteComparison(safer(), t, 'metric', MINE, 5100);

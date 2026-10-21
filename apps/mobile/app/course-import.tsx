@@ -379,6 +379,9 @@ export default function CourseImportScreen() {
       plannedRoutePolyline6: boundRoutePolyline6(state.route.geometryPolyline6),
       plannedRouteDistanceMeters: state.route.distanceMeters,
       routingMode: 'gpx_course',
+      // No plannedDurationSeconds: a course's time is not a router's, so it
+      // must not calibrate the rider against the router.
+      isEbike: store.isEbike,
     });
     store.setActiveTripClientId(clientTripId);
 
@@ -425,6 +428,7 @@ export default function CourseImportScreen() {
       distanceMeters: state.route.distanceMeters,
       climbMeters: state.route.totalClimbMeters,
       routerSeconds: state.route.adjustedDurationSeconds,
+      routerIsEstimate: true,
     },
     pace,
   );

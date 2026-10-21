@@ -94,6 +94,25 @@ describe('startTripRecord — planned route captured at start', () => {
     });
   });
 
+  it('writes the planned duration (whole seconds) and the bike', async () => {
+    await startTripRecord(
+      { ...baseRequest, plannedDurationSeconds: 1439.6, isEbike: false },
+      'user-1',
+    );
+    expect(upsertRows[0]).toMatchObject({
+      planned_route_duration_seconds: 1440,
+      is_ebike: false,
+    });
+  });
+
+  it('an old client: both NULL ("not recorded"), never a default', async () => {
+    await startTripRecord(baseRequest, 'user-1');
+    expect(upsertRows[0]).toMatchObject({
+      planned_route_duration_seconds: null,
+      is_ebike: null,
+    });
+  });
+
   it('still returns the trip id the queue needs to resolve', async () => {
     const result = await startTripRecord(baseRequest, 'user-1');
     expect(result).toMatchObject({ clientTripId: 'ct-1', tripId: 'trip-1' });
