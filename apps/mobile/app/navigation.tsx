@@ -16,7 +16,7 @@ import {
   haversineDistance,
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
-  personalRideSeconds,
+  riddenSoFar,
   shouldTriggerAutomaticReroute,
   toRoutingDisplayMode,
 } from '@defensivepedal/core';
@@ -42,6 +42,7 @@ import { useKeyboardHeight } from '../src/hooks/useKeyboardHeight';
 import { useLockOrientation } from '../src/hooks/useLockOrientation';
 import { useRiderPace } from '../src/hooks/useRiderPace';
 import { etaAccuracyProperties } from '../src/lib/eta-accuracy';
+import { hudRemainingSeconds } from '../src/lib/hud-eta';
 import { useRouteGuard } from '../src/hooks/useRouteGuard';
 import { useT } from '../src/hooks/useTranslation';
 import { useUnits } from '../src/hooks/useUnits';
@@ -180,6 +181,7 @@ function NavigationScreen() {
   })));
 
   const ridePace = useRiderPace();
+  const paceEtaEnabled = useAppStore((state) => state.paceEtaEnabled);
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
   const appendGpsBreadcrumb = useAppStore((state) => state.appendGpsBreadcrumb);
@@ -428,21 +430,35 @@ function NavigationScreen() {
     );
   }, [selectedRoute, routeCoordinates, routeRequest.waypoints, mapUserCoordinate]);
 
-  // What is left of the ride, at the rider's pace when there is one
-  // (docs/plans/adaptive-eta.md). Display only: the session keeps the
-  // router's figure.
+  // What is left of the ride: the rider's pace, then the speed ridden so far
+  // (docs/plans/adaptive-eta.md, `hudRemainingSeconds`). Display only: the
+  // session keeps the router's figure.
+  const gpsBreadcrumbs = navigationSession?.gpsBreadcrumbs;
+  const sessionStartedAt = navigationSession?.startedAt;
+  const ridden = useMemo(
+    () =>
+      paceEtaEnabled && gpsBreadcrumbs
+        ? riddenSoFar(gpsBreadcrumbs, sessionStartedAt ? Date.parse(sessionStartedAt) : undefined)
+        : null,
+    [paceEtaEnabled, gpsBreadcrumbs, sessionStartedAt],
+  );
+  // After a reroute this counts only the new route's climb ridden, so it
+  // under-credits; the observed speed stays the rider's either way.
+  const riddenClimbMeters =
+    selectedRoute?.totalClimbMeters != null && climbData.value != null
+      ? Math.max(0, selectedRoute.totalClimbMeters - climbData.value)
+      : null;
   const remainingRideSeconds = selectedRoute
-    ? Math.round(
-        personalRideSeconds(
-          {
-            distanceMeters: navigationSession?.remainingDistanceMeters ?? selectedRoute.distanceMeters,
-            climbMeters: climbData.value,
-            routerSeconds:
-              navigationSession?.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
-          },
-          ridePace,
-        ),
-      )
+    ? hudRemainingSeconds({
+        remainingDistanceMeters:
+          navigationSession?.remainingDistanceMeters ?? selectedRoute.distanceMeters,
+        remainingClimbMeters: climbData.value,
+        routerSeconds:
+          navigationSession?.remainingDurationSeconds ?? selectedRoute.adjustedDurationSeconds,
+        pace: ridePace,
+        ridden,
+        riddenClimbMeters,
+      })
     : 0;
   // Read by the five-minute spoken ETA, so it says what the HUD shows.
   const remainingRideSecondsRef = useRef(remainingRideSeconds);
@@ -454,14 +470,14 @@ function NavigationScreen() {
           stopIndex: nextStopProgress.stopIndex,
           stopCount: nextStopProgress.stopCount,
           distanceMeters: nextStopProgress.distanceToNextStopMeters,
-          durationSeconds: personalRideSeconds(
-            {
-              distanceMeters: nextStopProgress.distanceToNextStopMeters,
-              climbMeters: nextStopProgress.climbToNextStopMeters,
-              routerSeconds: nextStopProgress.durationToNextStopSeconds,
-            },
-            ridePace,
-          ),
+          durationSeconds: hudRemainingSeconds({
+            remainingDistanceMeters: nextStopProgress.distanceToNextStopMeters,
+            remainingClimbMeters: nextStopProgress.climbToNextStopMeters,
+            routerSeconds: nextStopProgress.durationToNextStopSeconds,
+            pace: ridePace,
+            ridden,
+            riddenClimbMeters,
+          }),
           climbMeters: nextStopProgress.climbToNextStopMeters,
         }
       : null;

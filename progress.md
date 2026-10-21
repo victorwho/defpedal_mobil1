@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (adaptive ETA phase 1, all surfaces built)
+Last updated: 2026-10-21 (adaptive ETA phase 2 built)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Adaptive ETA phase 2, the HUD learns from the ride in progress.** Core `riddenSoFar` (distance and riding time from the sanitised breadcrumbs; a stay within 25 m longer than 2 min, a cafe, comes out of riding time, a wait at lights stays in) and `adaptiveRemainingSeconds` (the Phase 1 figure for what is left, blended with the remaining distance and climb at the speed ridden so far; its weight grows from 0 to 0.7 over the first 3 km; climb already ridden is credited back). Mobile `hud-eta.ts` combines both for the HUD remaining time, arrival clock, next-stop time and spoken ETA. Off with the Display switch; on E-bike too (the ride's own speed is the right bike). Weights are proposals, to be tuned from `eta_accuracy`. 10 new tests on synthetic trails (no recorded production trail used); stop exclusion, growing weight, climb credit, stop closing and the blend wiring mutation-checked. Not device-tested; bundle check not run (Metro stopped for low memory). Next: phase 3 (server: planned duration + is_ebike on trips), then the preview build.
 
 - **2026-10-21: Adaptive ETA phase 1, remaining surfaces + telemetry.** GPX course screen (replaces the fixed 15 km/h when a pace applies, "at your pace" on the expanded stat). Navigation HUD remaining time, arrival clock, next-stop time and the five-minute spoken ETA all read the remaining distance and remaining climb at the rider's pace (no label, per decision); the session keeps the router's figure. Loop planner now uses `useRiderPace`, so it obeys the switch and the E-bike rule; without a pace a loop shows the router's time instead of the old fixed 15 km/h. `eta_accuracy` PostHog event on every completed ride that never rerouted: method, router/personal/actual seconds, distance, pace ride count (`src/lib/eta-accuracy.ts`, 3 tests, reroute and E-bike rules mutation-checked). Course, HUD and loop screens have no screen tests; all go through the tested core function. Bundle check not run (Metro stopped for low memory). Next: phase 1 preview build and device pass.
 

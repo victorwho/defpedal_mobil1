@@ -5,7 +5,9 @@ Status: Phase 1 in progress (2026-10-21). Step 1 built (`0771736`):
 Display setting, and the commute briefing on top of them. Route preview
 and its comparison line built (`4b15d9c`; device check deferred to the
 phase 1 preview pass). Map screen-reader summary, course screen, HUD, loop planner and
-`eta_accuracy` built. Next: preview build and device pass.
+`eta_accuracy` built. Phase 2 built (`adaptiveEta.ts`, `hud-eta.ts`);
+on E-bike it still blends, since the ride's own speed is the right bike.
+Next: Phase 3, then the preview build and device pass.
 
 ## Problem
 

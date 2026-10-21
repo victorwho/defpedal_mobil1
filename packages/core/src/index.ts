@@ -1,4 +1,5 @@
 export * from './appAvailability';
+export * from './adaptiveEta';
 export * from './breadcrumbs';
 export * from './calories';
 export * from './canopyComparison';
