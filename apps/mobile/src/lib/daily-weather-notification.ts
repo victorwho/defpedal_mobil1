@@ -12,6 +12,8 @@ import {
   buildWeatherSchedule,
   forecastDayIndex,
 } from './daily-weather-schedule';
+import { commutePlaces } from './commute-notification';
+import { commuteDepartures } from './commute-schedule';
 import { isSameLocalDay } from './firstRideReminder';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
 
@@ -194,10 +196,17 @@ export const scheduleDailyWeatherNotifications = async (
   // two nudges about riding on one day is one too many.
   const reminderAtIso = store.getState().firstRideReminderAt;
   const reminderAt = reminderAtIso ? new Date(reminderAtIso) : null;
+  // Same rule for commute briefings: they carry that morning's weather.
+  const commuteDays = commuteDepartures(
+    now,
+    store.getState().commute,
+    commutePlaces(store.getState()) !== null,
+  );
   const plans = fires.map((fireAt, index) => {
     if (reminderAt && Number.isFinite(reminderAt.getTime()) && isSameLocalDay(fireAt, reminderAt)) {
       return null;
     }
+    if (commuteDays.some((d) => isSameLocalDay(fireAt, d))) return null;
     const forecast = rows[Math.min(forecastDayIndex(fireAt, now), rows.length - 1)];
     if (!forecast) return null;
     const tone: 'good' | 'caution' = isGoodCyclingWeather(forecast) ? 'good' : 'caution';

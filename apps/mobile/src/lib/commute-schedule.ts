@@ -65,3 +65,16 @@ export const buildCommuteFires = (
   }
   return fires.sort((a, b) => a.at.getTime() - b.at.getTime());
 };
+
+/**
+ * Departure times of the briefings a rider will get, or none when Home or
+ * Work is missing. The cycling-weather ping skips these calendar days: two
+ * weather messages on one morning is one too many. One day past the horizon,
+ * because the weather ping can snap a late fire into the next day.
+ */
+export const commuteDepartures = (
+  now: Date,
+  settings: CommuteSettings,
+  placesSet: boolean,
+): Date[] =>
+  placesSet ? buildCommuteFires(now, settings, COMMUTE_HORIZON_DAYS + 1).map((f) => f.departAt) : [];

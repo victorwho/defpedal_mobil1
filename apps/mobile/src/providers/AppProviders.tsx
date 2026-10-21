@@ -9,6 +9,7 @@ import { AnonMergeManager } from './AnonMergeManager';
 import { AuthSessionProvider } from './AuthSessionProvider';
 import { ConnectivityProvider } from './ConnectivityMonitor';
 import { NavigationLifecycleManager } from './NavigationLifecycleManager';
+import { CommuteScheduler } from './CommuteScheduler';
 import { DailyWeatherScheduler } from './DailyWeatherScheduler';
 import { NotificationProvider } from './NotificationProvider';
 import { OfflineMutationSyncManager } from './OfflineMutationSyncManager';
@@ -52,6 +53,7 @@ export const AppProviders = ({ children }: PropsWithChildren) => (
                   subscription cannot follow the device to the next rider. */}
               <PurchasesIdentityManager />
               <DailyWeatherScheduler />
+              <CommuteScheduler />
               {/*
                 ActivationLadderScheduler mounted AFTER DailyWeatherScheduler:
                 the weather scheduler owns the one-and-only notification

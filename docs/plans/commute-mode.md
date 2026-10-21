@@ -227,7 +227,16 @@ No server, migration or Cloud Run change.
    condition named by severity, ETA via core formatters, lights note after
    dark, localized via a passed `t`); `commute.*` copy in EN/RO/ES; 21 tests,
    including every key in every locale. Not imported by the app yet.
-4. Hourly forecast + ETA cache + scheduler + weather `excludeDays`.
+4. Hourly forecast + ETA cache + scheduler + weather skip. **Built and
+   device-confirmed 2026-10-21** (dev build: test fire, real schedule, tap): `commute-forecast.ts` (hourly parse, local hour
+   key), `commute-notification.ts` (pass, cancel, Diagnostics test fire; ETA
+   only from a route that came back SAFE, cached 24 h per Home/Work pair, an
+   older estimate kept if a refresh fails), `CommuteScheduler` provider (mount,
+   foreground with 15 min limit, and every settings/places change), weather
+   ping skip via `commuteDepartures`, Diagnostics card "Commute briefing (dev)"
+   (fire in 10 s / leave in 20 min / off). The tap case (§8) shipped with it:
+   since 2026-10-21 EVERY notification tap first shows its full text in-app
+   (owner request), and the card's "Show route" button runs the commute action.
 5. Tap handler + Profile section + i18n + telemetry + diagnostics button.
 6. `npm run typecheck`, tests, `npm run check:bundle` **plus a bundle grep for
    `commute-briefing`** (a port is not an identity — error-log #103), preview

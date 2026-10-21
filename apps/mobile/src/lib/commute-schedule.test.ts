@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_COMMUTE_SLICE_STATE, type CommuteSettings } from '../store/commuteSlice';
-import { buildCommuteFires, isoWeekday } from './commute-schedule';
+import { buildCommuteFires, commuteDepartures, isoWeekday } from './commute-schedule';
 
 const settings = (overrides: Partial<CommuteSettings> = {}): CommuteSettings => ({
   ...DEFAULT_COMMUTE_SLICE_STATE.commute,
@@ -54,5 +54,13 @@ describe('buildCommuteFires', () => {
     const fires = buildCommuteFires(at(2026, 10, 23, 9), settings({ days: [1, 2, 3, 4, 5, 6, 7] }));
     expect(fires).toHaveLength(6);
     expect(fires.map((f) => hm(f.at))).toEqual(Array(6).fill('07:45'));
+  });
+});
+
+describe('commuteDepartures', () => {
+  it('lists departures only when both places are set', () => {
+    const now = at(2026, 10, 19, 6);
+    expect(commuteDepartures(now, settings(), false)).toEqual([]);
+    expect(commuteDepartures(now, settings(), true).map((d) => d.getDate())).toEqual([19, 20, 21, 22, 23, 26]);
   });
 });

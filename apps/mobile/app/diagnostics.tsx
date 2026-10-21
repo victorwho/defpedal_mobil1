@@ -328,6 +328,8 @@ function DiagnosticsContent() {
   const [screenError, setScreenError] = useState<string | null>(null);
   const [devStatusMessage, setDevStatusMessage] = useState<string | null>(null);
   const [ladderDevMessage, setLadderDevMessage] = useState<string | null>(null);
+  const [commuteDevMessage, setCommuteDevMessage] = useState<string | null>(null);
+  const commute = useAppStore((state) => state.commute);
   const [growthDevMessage, setGrowthDevMessage] = useState<string | null>(null);
   const [holoTier, setHoloTier] = useState<BadgeTier>('gold');
   const [foregroundPermission, setForegroundPermission] = useState<string>('unknown');
@@ -1019,6 +1021,65 @@ function DiagnosticsContent() {
             </Button>
           </View>
         </DiagnosticCard>
+      ) : null}
+
+      {mobileEnv.appEnv !== 'production' ? (
+      <DiagnosticCard title="Commute briefing (dev)">
+        <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+          State:{' '}
+          <Text style={styles.monoValue}>
+            enabled={String(commute.enabled)} · depart={commute.departTime ?? 'null'} · return={commute.returnTime ?? 'null'} · days={commute.days.join(',')}
+          </Text>
+        </Text>
+        <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 8 }]}>
+          Needs Home and Work saved and notification permission. "Fire in 10 s"
+          builds one briefing exactly like a real one. "Leave in 20 min" turns
+          Commute on for every day, so the real schedule fires in ~5 min.
+        </Text>
+        {commuteDevMessage ? (
+          <Text style={[styles.bodyText, { color: colors.textPrimary, marginBottom: 8 }]}>{commuteDevMessage}</Text>
+        ) : null}
+        <View style={styles.buttonRow}>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              setCommuteDevMessage('Working...');
+              const { fireTestCommuteBriefing } = require('../src/lib/commute-notification') as typeof import('../src/lib/commute-notification');
+              void fireTestCommuteBriefing().then(setCommuteDevMessage, (e: unknown) => setCommuteDevMessage(String(e)));
+            }}
+          >
+            Fire briefing in 10 s
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              const d = new Date(Date.now() + 20 * 60 * 1000);
+              const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+              const store = useAppStore.getState();
+              store.setCommuteDays([1, 2, 3, 4, 5, 6, 7]);
+              store.enableCommute(hhmm);
+              setCommuteDevMessage(`Commute on, leaving ${hhmm}. Scheduling pass runs in ~3 s.`);
+            }}
+          >
+            Leave in 20 min (every day)
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            fullWidth
+            onPress={() => {
+              useAppStore.getState().disableCommute();
+              setCommuteDevMessage('Commute off. Briefings cancelled on the next pass (~3 s).');
+            }}
+          >
+            Turn Commute off
+          </Button>
+        </View>
+      </DiagnosticCard>
       ) : null}
 
       {mobileEnv.appEnv !== 'production' ? (
