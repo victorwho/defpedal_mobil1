@@ -33,6 +33,9 @@ export const CommuteScheduler = () => {
   const home = useAppStore((state) => state.savedPlaces.home);
   const work = useAppStore((state) => state.savedPlaces.work);
   const onboardingCompleted = useAppStore((state) => state.onboardingCompleted);
+  // The briefing's ride time depends on these two (resolveEtaPace).
+  const paceEtaEnabled = useAppStore((state) => state.paceEtaEnabled);
+  const isEbike = useAppStore((state) => state.isEbike);
 
   // Route estimates are written BY the pass; only settings changes re-run it.
   const { enabled, days, departTime, returnTime } = commute;
@@ -41,7 +44,7 @@ export const CommuteScheduler = () => {
     if (!onboardingCompleted || !hasNotificationsNativeModule()) return;
     const timer = setTimeout(() => void runPass(true), 3000);
     return () => clearTimeout(timer);
-  }, [onboardingCompleted, enabled, days, departTime, returnTime, home, work]);
+  }, [onboardingCompleted, enabled, days, departTime, returnTime, home, work, paceEtaEnabled, isEbike]);
 
   useEffect(() => {
     if (!onboardingCompleted || !hasNotificationsNativeModule()) return;

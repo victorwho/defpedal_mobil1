@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (commute ETA at rider pace + adaptive-ETA plan)
+Last updated: 2026-10-21 (adaptive ETA phase 1, step 1)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-21: Adaptive ETA phase 1, step 1: the shared pieces** (`docs/plans/adaptive-eta.md`). Core `resolveEtaPace` (the rider's pace only when the new setting is on, a personal pace exists, and E-bike is NOT selected: history can't tell bikes apart yet) and `personalRideSeconds` (pace with climb as extra distance, else the router's time untouched). `paceSlice`: `paceEtaEnabled` (Profile > Display "Ride times at my pace", default on, device-scoped) and `riderPaceSnapshot` (last pace from history, user-scoped, carries cold starts and offline). `useRiderPace()` hook over the shared `['trip-history']` query. The commute briefing now goes through all of it, falls back to the saved pace on a failed read, and reschedules when the switch or E-bike changes. EN/RO/ES copy. 15 new tests; E-bike rule, account-switch reset, switch-off short circuit and the hook's skipped read all mutation-checked. Next: route preview, comparison, map summary, course, HUD start, loop planner, plus `eta_accuracy` telemetry.
 
 - **2026-10-21: Commute briefing ETA at the rider's own pace; adaptive-ETA plan.** With >= 3 usable rides the briefing's time is the rider's median pace from trip history with climb as extra distance (the loop planner's rule) and says "at your pace"; otherwise the router's time, as before. Scaling the router's time by pace was rejected: the safe router's own average speed is 12.9-19.1 km/h across flat city routes (measured live), so there is no single speed to scale against. Route estimates now cache the route climb. 4 new tests, both rules mutation-checked; not yet seen on a device. Plan for every ride time at the rider's pace (before the ride, learning during it, then calibrated against the router, separate pace per bike, Profile > Display switch to turn it off): `docs/plans/adaptive-eta.md`.
 

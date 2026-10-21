@@ -15,7 +15,7 @@ import {
   formatDuration,
   formatSpeedKmh,
   isDark,
-  rideMinutes,
+  personalRideSeconds,
   type Coordinate,
   type MeasurementSystem,
   type RiderPace,
@@ -61,24 +61,18 @@ export interface CommuteMessageInput {
   readonly forecast: CommuteHourForecast | null;
   /** Null when no route could be fetched; the ETA is then left out. */
   readonly route: CommuteRouteEstimate | null;
-  /** The rider's pace from trip history; null when it could not be read. */
+  /** From `resolveEtaPace`: null means the router's time. */
   readonly pace: RiderPace | null;
   readonly units: MeasurementSystem;
   readonly t: Translate;
 }
 
-/**
- * Seconds for the ride. With at least MIN_RIDES_FOR_PACE usable rides it is
- * the rider's own median pace, climb folded in as extra distance (the loop
- * planner's rule). Otherwise the router's duration. Scaling the router's time
- * by pace was rejected: the safe router's own average speed varies from 12.9
- * to 19.1 km/h across flat city routes (measured 2026-10-21), so there is no
- * single speed to scale against.
- */
+/** Seconds for the ride: at the rider's pace when one applies (core `personalRideSeconds`). */
 export const commuteRideSeconds = (route: CommuteRouteEstimate, pace: RiderPace | null): number =>
-  pace?.personal
-    ? rideMinutes(route.distanceMeters, route.climbMeters ?? null, pace.kmh) * 60
-    : route.durationSeconds;
+  personalRideSeconds(
+    { distanceMeters: route.distanceMeters, climbMeters: route.climbMeters, routerSeconds: route.durationSeconds },
+    pace,
+  );
 
 export interface CommuteMessage {
   readonly title: string;

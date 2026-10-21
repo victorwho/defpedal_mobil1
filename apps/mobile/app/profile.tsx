@@ -165,7 +165,7 @@ export default function ProfileScreen() {
   // State values - grouped by section with shallow comparison
   const {
     locale, bikeTypeId, cyclingFrequency, avoidUnpaved, avoidHills, showRouteComparison,
-    shareTripsPublicly, themePreference, measurementSystem, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, poiVisibility,
+    shareTripsPublicly, themePreference, measurementSystem, quizCountryPreference, showMascot, showBicycleLanes, showRouteFeatures, paceEtaEnabled, poiVisibility,
     notifyWeather, notifyHazard, notifyCommunity, quietHoursStart, quietHoursEnd,
     shareConversionFeedOptin, reviewPromptOptedOut,
     pedalVoiceSassy, notifyStreak, notifyPedalNudges, weightKg,
@@ -184,6 +184,7 @@ export default function ProfileScreen() {
     showMascot: state.showMascot,
     showBicycleLanes: state.showBicycleLanes,
     showRouteFeatures: state.showRouteFeatures,
+    paceEtaEnabled: state.paceEtaEnabled,
     poiVisibility: state.poiVisibility,
     notifyWeather: state.notifyWeather,
     notifyHazard: state.notifyHazard,
@@ -204,7 +205,7 @@ export default function ProfileScreen() {
   const {
     setLocale, setBikeType, selectRoutingMode, setCyclingFrequency, setAvoidUnpaved, setAvoidHills,
     setShowRouteComparison, setShareTripsPublicly, setThemePreference, setMeasurementSystem, setQuizCountryPreference, setShowMascot,
-    setShowBicycleLanes, setShowRouteFeatures, setPoiVisibility, setNotifyWeather,
+    setShowBicycleLanes, setShowRouteFeatures, setPaceEtaEnabled, setPoiVisibility, setNotifyWeather,
     setNotifyHazard, setNotifyCommunity, setQuietHours,
     setShareConversionFeedOptin, setReviewOptOut,
     setPedalVoiceSassy, setNotifyStreak, setNotifyPedalNudges, setWeightKg,
@@ -224,6 +225,7 @@ export default function ProfileScreen() {
     setShowMascot: state.setShowMascot,
     setShowBicycleLanes: state.setShowBicycleLanes,
     setShowRouteFeatures: state.setShowRouteFeatures,
+    setPaceEtaEnabled: state.setPaceEtaEnabled,
     setPoiVisibility: state.setPoiVisibility,
     setNotifyWeather: state.setNotifyWeather,
     setNotifyHazard: state.setNotifyHazard,
@@ -867,6 +869,13 @@ export default function ProfileScreen() {
               }
               checked={measurementSystem === 'imperial'}
               onChange={(on) => setMeasurementSystem(on ? 'imperial' : 'metric')}
+            />
+
+            <SettingRow
+              label={t('profile.paceEta')}
+              description={paceEtaEnabled ? t('profile.paceEtaOn') : t('profile.paceEtaOff')}
+              checked={paceEtaEnabled}
+              onChange={setPaceEtaEnabled}
             />
 
             <SettingRow

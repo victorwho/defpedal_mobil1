@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PACE_KMH,
   MIN_RIDES_FOR_PACE,
+  personalRideSeconds,
+  resolveEtaPace,
   rideMinutes,
   riderPace,
 } from './riderPace';
@@ -95,5 +97,41 @@ describe('rideMinutes', () => {
     expect(rideMinutes(0, null, 15)).toBe(1);
     expect(rideMinutes(-100, null, 15)).toBe(1);
     expect(rideMinutes(10_000, null, 0)).toBeGreaterThan(0);
+  });
+});
+
+const MINE = { kmh: 18, personal: true, rideCount: 7 };
+const DEFAULT = { kmh: DEFAULT_PACE_KMH, personal: false, rideCount: 2 };
+
+describe('resolveEtaPace', () => {
+  it('uses a personal pace when switched on, on a normal bike', () => {
+    expect(resolveEtaPace({ pace: MINE, enabled: true, isEbike: false })).toBe(MINE);
+  });
+
+  it.each([
+    ['switched off', { pace: MINE, enabled: false, isEbike: false }],
+    ['E-bike selected', { pace: MINE, enabled: true, isEbike: true }],
+    ['not enough rides', { pace: DEFAULT, enabled: true, isEbike: false }],
+    ['no pace read yet', { pace: null, enabled: true, isEbike: false }],
+  ])('router time when %s', (_label, input) => {
+    expect(resolveEtaPace(input)).toBeNull();
+  });
+});
+
+describe('personalRideSeconds', () => {
+  const route = { distanceMeters: 5400, climbMeters: 30, routerSeconds: 1320 };
+
+  it('at the rider’s pace, climb as extra distance', () => {
+    // (5.4 km + 30 m / 10 m-per-km) / 18 km/h = 28 min.
+    expect(personalRideSeconds(route, MINE)).toBe(28 * 60);
+  });
+
+  it('no climb figure counts distance only', () => {
+    expect(personalRideSeconds({ ...route, climbMeters: undefined }, MINE)).toBe(18 * 60);
+  });
+
+  it('the router’s time, untouched, without a personal pace', () => {
+    expect(personalRideSeconds(route, null)).toBe(1320);
+    expect(personalRideSeconds(route, DEFAULT)).toBe(1320);
   });
 });

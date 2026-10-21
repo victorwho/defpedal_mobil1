@@ -14,6 +14,7 @@
  * moment the rider turns Commute on (Profile, step 5).
  */
 import {
+  resolveEtaPace,
   riderPace,
   type Coordinate,
   type RiderPace,
@@ -91,10 +92,7 @@ const previewRoute = (request: RoutePreviewRequest): Promise<RoutePreviewRespons
   return directPreviewRoute(request, { canopyComparison: false });
 };
 
-/**
- * The rider's pace from trip history, the same read the loop planner makes.
- * Null on failure: the briefing then shows the router's time.
- */
+/** The rider's pace from trip history, the read `useRiderPace` makes. Null on failure. */
 const fetchPace = async (): Promise<RiderPace | null> => {
   if (testOverrides.fetchPace) return testOverrides.fetchPace();
   try {
@@ -104,6 +102,20 @@ const fetchPace = async (): Promise<RiderPace | null> => {
   } catch {
     return null;
   }
+};
+
+/**
+ * The pace the briefing uses, or null for the router's time: same switch and
+ * E-bike rule as every other ride time (`resolveEtaPace`). A failed read
+ * falls back to the pace saved by the last successful one.
+ */
+const briefingPace = async (): Promise<RiderPace | null> => {
+  const store = getAppStore();
+  if (!store.getState().paceEtaEnabled) return null;
+  const fresh = await fetchPace();
+  if (fresh) store.getState().setRiderPaceSnapshot(fresh);
+  const s = store.getState();
+  return resolveEtaPace({ pace: fresh ?? s.riderPaceSnapshot, enabled: s.paceEtaEnabled, isEbike: s.isEbike });
 };
 
 // "Show route" on a briefing, remembered until the ride it leads to starts, so
@@ -341,7 +353,7 @@ export const scheduleCommuteBriefings = async (now: Date = new Date()): Promise<
     to_work: await routeEstimate('to_work', places.home, places.work, key, now),
     to_home: needsHome ? await routeEstimate('to_home', places.work, places.home, key, now) : null,
   };
-  const pace = await fetchPace();
+  const pace = await briefingPace();
 
   // Re-read: the route fetch may have taken a while, and the rider may have
   // changed the settings meanwhile. A pass on stale settings is harmless (the
@@ -392,7 +404,7 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
 
   const forecast = await fetchForecast(places.home.lat, places.home.lon);
   const route = await routeEstimate('to_work', places.home, places.work, commutePlacesKey(places.home, places.work), now);
-  const pace = await fetchPace();
+  const pace = await briefingPace();
   const departAt = new Date(now.getTime() + 15 * 60 * 1000);
   const fire: CommuteFire = { at: new Date(now.getTime() + 10_000), departAt, direction: 'to_work' };
   const latest = getAppStore().getState();
@@ -408,6 +420,9 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
   );
   await ensureChannel(N);
   await scheduleOne(N, briefing, now);
-  const paceNote = pace?.personal ? `your pace ${pace.kmh.toFixed(1)} km/h` : `router time, ${pace?.rideCount ?? 0} usable rides`;
+  const saved = latest.riderPaceSnapshot;
+  const paceNote = pace
+    ? `your pace ${pace.kmh.toFixed(1)} km/h`
+    : `router time (${!latest.paceEtaEnabled ? 'switched off' : latest.isEbike ? 'e-bike' : `${saved?.rideCount ?? 0} usable rides`})`;
   return `scheduled in 10 s (forecast ${forecast ? 'ok' : 'missing'}, route ${route ? 'ok' : 'missing'}, ${paceNote})`;
 };

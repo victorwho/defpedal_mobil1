@@ -93,6 +93,7 @@ import {
   DEFAULT_COMMUTE_SLICE_STATE,
   type CommuteSlice,
 } from './commuteSlice';
+import { createPaceSlice, RESET_PACE_SLICE_STATE, type PaceSlice } from './paceSlice';
 import { resolveAvoidHeat } from '../lib/coolMode';
 
 const MAX_RECENT_DESTINATIONS = 3;
@@ -155,7 +156,7 @@ export type RideSavedNotice = {
   discardableUntil: number | null;
 };
 
-export type AppStore = QueueSlice & PremiumSlice & CommuteSlice & {
+export type AppStore = QueueSlice & PremiumSlice & CommuteSlice & PaceSlice & {
   appState: AppState;
   voiceGuidanceEnabled: boolean;
   routeRequest: RoutePreviewRequest;
@@ -970,6 +971,7 @@ export const useAppStore = create<AppStore>()(
       ...createQueueSlice(set, get),
       ...createPremiumSlice(set),
       ...createCommuteSlice(set),
+      ...createPaceSlice(set),
       shareTripsPublicly: true,
       shareConversionFeedOptin: true,
       bikeTypeId: null,
@@ -2005,6 +2007,8 @@ export const useAppStore = create<AppStore>()(
           savedPlaces: { home: null, work: null },
           // Commute settings describe where this account lives and works.
           ...DEFAULT_COMMUTE_SLICE_STATE,
+          // How fast this account rides; the on/off switch is device-scoped.
+          ...RESET_PACE_SLICE_STATE,
           cachedCityHeartbeat: null,
           pendingShareClaim: null,
           pendingShareClaimAttempts: 0,
@@ -2151,6 +2155,8 @@ export const useAppStore = create<AppStore>()(
         homeLocation: state.homeLocation,
         savedPlaces: state.savedPlaces,
         commute: state.commute,
+        paceEtaEnabled: state.paceEtaEnabled,
+        riderPaceSnapshot: state.riderPaceSnapshot,
         // Offline entitlement cache — what lets a paying rider with no signal
         // keep Plus for the grace window. User-scoped.
         premiumSnapshot: state.premiumSnapshot,

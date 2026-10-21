@@ -122,3 +122,38 @@ export const rideMinutes = (
       : 0;
   return Math.max(1, Math.round(((km + climbPenaltyKm) / pace) * 60));
 };
+
+/**
+ * The pace a ride time should use, or null for the router's time.
+ *
+ * Null when the rider switched it off, when there is no personal pace yet,
+ * or with E-bike selected: trip history does not record which bike a ride
+ * was on (docs/plans/adaptive-eta.md, Phase 3), so a mixed pace would be
+ * wrong for both bikes, and the e-bike router already models a pedelec.
+ */
+export const resolveEtaPace = (input: {
+  readonly pace: RiderPace | null;
+  readonly enabled: boolean;
+  readonly isEbike: boolean;
+}): RiderPace | null =>
+  input.enabled && !input.isEbike && input.pace?.personal ? input.pace : null;
+
+/**
+ * Seconds for a ride: at the rider's pace when one applies (see
+ * `resolveEtaPace`), otherwise the router's time unchanged.
+ *
+ * It never scales the router's time by pace: the safe router's own average
+ * speed is 12.9 to 19.1 km/h across flat city routes (measured 2026-10-21),
+ * so there is no single speed to scale against.
+ */
+export const personalRideSeconds = (
+  route: {
+    readonly distanceMeters: number;
+    readonly climbMeters?: number | null;
+    readonly routerSeconds: number;
+  },
+  pace: RiderPace | null,
+): number =>
+  pace?.personal
+    ? rideMinutes(route.distanceMeters, route.climbMeters ?? null, pace.kmh) * 60
+    : route.routerSeconds;
