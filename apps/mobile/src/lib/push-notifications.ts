@@ -9,7 +9,7 @@ import {
   markReminderTapped,
   parseReminderTarget,
 } from './firstRideReminder';
-import { COMMUTE_NOTIFICATION_TYPE, parseCommuteTarget } from './commute-notification';
+import { COMMUTE_NOTIFICATION_TYPE, markCommuteTapped, parseCommuteTarget } from './commute-notification';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
 import { telemetry } from './telemetry';
 import { useAppStore } from '../store/appStore';
@@ -321,6 +321,7 @@ export const performNotificationAction = (data: Record<string, unknown> | null |
       }
       const state = useAppStore.getState();
       if (state.appState === 'NAVIGATING') break;
+      markCommuteTapped();
       state.setRouteRequest({
         origin: target.origin,
         destination: target.destination,

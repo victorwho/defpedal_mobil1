@@ -53,6 +53,7 @@ import { telemetry } from '../src/lib/telemetry';
 import { ModeTogglePill } from '../src/components/ModeTogglePill';
 import { isLastAllowedAddition } from '../src/lib/plus-nudges';
 import { describeRouteComparison, formatStretchDistance } from '../src/lib/routeComparisonCopy';
+import { consumeCommuteTapped } from '../src/lib/commute-notification';
 import { consumeReminderTapped } from '../src/lib/firstRideReminder';
 import { useRideLater } from '../src/hooks/useRideLater';
 import { RideLaterSheet } from '../src/design-system/organisms/RideLaterSheet';
@@ -730,6 +731,7 @@ function RoutePreviewScreen() {
       route_id: selectedRoute.id,
       route_source: selectedRoute.source,
       signed_in: Boolean(user),
+      ...(consumeCommuteTapped() ? { source: 'commute' } : {}),
     });
     startNavigation(selectedRoute, sessionId);
     router.push('/navigation');

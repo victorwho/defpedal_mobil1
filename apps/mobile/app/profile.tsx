@@ -765,6 +765,21 @@ export default function ProfileScreen() {
               checked={showRouteComparison}
               onChange={setShowRouteComparison}
             />
+
+            <Pressable
+              style={styles.helpFaqRow}
+              onPress={() => router.push('/commute' as never)}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={t('commuteScreen.title')}
+            >
+              <Ionicons name="briefcase-outline" size={22} color={colors.accent} />
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingLabel}>{t('commuteScreen.title')}</Text>
+                <Text style={styles.settingDescription}>{t('commuteScreen.rowDesc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={gray[400]} />
+            </Pressable>
           </View>
 
           {/* ── Section 2: Display ────────────────────────────────── */}

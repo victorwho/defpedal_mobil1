@@ -22,6 +22,7 @@ import { buildCommuteMessage, type CommuteHourForecast } from './commute-message
 import { buildHourlyForecastUrl, hourKey, parseHourlyForecast } from './commute-forecast';
 import { buildCommuteFires, type CommuteFire } from './commute-schedule';
 import { hasNotificationsNativeModule } from './notificationNativeModule';
+import { telemetry } from './telemetry';
 
 export const COMMUTE_ID_PREFIX = 'commute-briefing';
 export const COMMUTE_NOTIFICATION_TYPE = 'commute';
@@ -81,6 +82,20 @@ const previewRoute = (request: RoutePreviewRequest): Promise<RoutePreviewRespons
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { directPreviewRoute } = require('./mapbox-routing') as typeof import('./mapbox-routing');
   return directPreviewRoute(request, { canopyComparison: false });
+};
+
+// "Show route" on a briefing, remembered until the ride it leads to starts, so
+// `navigation_started` can carry `source: 'commute'`. In memory, and it
+// expires after the 2 h the plan's success criterion measures.
+export const COMMUTE_TAP_WINDOW_MS = 2 * 60 * 60 * 1000;
+let commuteTappedAt: number | null = null;
+export const markCommuteTapped = (now: number = Date.now()): void => {
+  commuteTappedAt = now;
+};
+export const consumeCommuteTapped = (now: number = Date.now()): boolean => {
+  const tapped = commuteTappedAt !== null && now - commuteTappedAt <= COMMUTE_TAP_WINDOW_MS;
+  commuteTappedAt = null;
+  return tapped;
 };
 
 export interface CommuteTarget {
@@ -321,6 +336,10 @@ export const scheduleCommuteBriefings = async (now: Date = new Date()): Promise<
   await ensureChannel(N);
   await Promise.all(planned.map((b) => scheduleOne(N, b, now)));
   await cancelBriefingsExcept(N, generation);
+  telemetry.capture('commute_briefing_scheduled', {
+    count: planned.length,
+    has_eta: routes.to_work !== null,
+  });
   return 'scheduled';
 };
 

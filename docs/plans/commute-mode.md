@@ -238,6 +238,15 @@ No server, migration or Cloud Run change.
    since 2026-10-21 EVERY notification tap first shows its full text in-app
    (owner request), and the card's "Show route" button runs the commute action.
 5. Tap handler + Profile section + i18n + telemetry + diagnostics button.
+   **Built 2026-10-21**: `app/commute.tsx` (Profile > Commute) with its own
+   address search (`CommutePlaceSearch`, so a rider with no saved places can
+   set them) and `CommuteTimePicker`. Turning the briefing on is the setup:
+   permission first, then the departure time (no default); closing either
+   leaves Commute off. Days (never empty), optional evening briefing.
+   Telemetry: `commute_enabled` / `commute_disabled`,
+   `commute_briefing_scheduled`, `commute_briefing_tapped`, and
+   `navigation_started` with `source: 'commute'` within 2 h of "Show route".
+   8 screen tests. The tap handler and Diagnostics card came with step 4.
 6. `npm run typecheck`, tests, `npm run check:bundle` **plus a bundle grep for
    `commute-briefing`** (a port is not an identity — error-log #103), preview
    build, device pass: set places, enable, fire via Diagnostics, tap, confirm
