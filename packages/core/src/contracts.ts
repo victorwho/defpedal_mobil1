@@ -734,7 +734,7 @@ export interface TripHistoryItem {
   readonly caloriesBurned?: number;
   /** Router-predicted time at start. Absent = not recorded (older ride). */
   readonly plannedDurationSeconds?: number;
-  /** Bike at start. Absent = not recorded (older ride). */
+  /** The Profile bike recorded on the track is an e-bike (none picked = false). */
   readonly isEbike?: boolean;
   /** Absent = unknown; 0 = the ride never rerouted. */
   readonly rerouteCount?: number;

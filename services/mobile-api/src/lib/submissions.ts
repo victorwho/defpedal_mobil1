@@ -22,6 +22,7 @@ import {
   CIVIA_CATEGORY_BY_HAZARD_TYPE,
   calculateCo2SavedKg,
   calculateTrailDistanceMeters,
+  isEbikeBikeTypeValue,
   isSesizareEligible,
   sanitizeBreadcrumbs,
 } from '@defensivepedal/core';
@@ -488,7 +489,7 @@ export const getTripHistory = async (
 
   let query = supabaseAdmin
     .from('trip_tracks')
-    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at, reroute_count')
+    .select('id, trip_id, routing_mode, planned_route_polyline6, planned_route_distance_meters, actual_distance_meters, gps_trail, end_reason, started_at, ended_at, reroute_count, bike_type')
     .eq('user_id', userId);
 
   if (sinceIso) query = query.gte('started_at', sinceIso);
@@ -517,13 +518,13 @@ export const getTripHistory = async (
     }
   }
 
-  // Planned duration and bike live on `trips` (written at START, migration
-  // 202610210001); history rows are trip_tracks, so read them separately.
-  const startFacts = new Map<string, { plannedDurationSeconds?: number; isEbike?: boolean }>();
+  // The planned duration lives on `trips` (written at START, migration
+  // 202610210001); history rows are trip_tracks, so read it separately.
+  const startFacts = new Map<string, { plannedDurationSeconds?: number }>();
   if (tripIds.length > 0) {
     const { data: tripData, error: tripError } = await supabaseAdmin
       .from('trips')
-      .select('id, planned_route_duration_seconds, is_ebike')
+      .select('id, planned_route_duration_seconds')
       .in('id', tripIds);
     // Never fail history over these: they only refine an estimate. But say
     // so, or calibration data can vanish with nothing noticing.
@@ -536,7 +537,6 @@ export const getTripHistory = async (
       for (const trip of tripData ?? []) {
         startFacts.set(trip.id as string, {
           plannedDurationSeconds: (trip.planned_route_duration_seconds as number | null) ?? undefined,
-          isEbike: (trip.is_ebike as boolean | null) ?? undefined,
         });
       }
     }
@@ -557,7 +557,9 @@ export const getTripHistory = async (
     distanceMeters: (row.actual_distance_meters as number) ?? undefined,
     caloriesBurned: caloriesMap.get(row.trip_id as string),
     plannedDurationSeconds: startFacts.get(row.trip_id as string)?.plannedDurationSeconds,
-    isEbike: startFacts.get(row.trip_id as string)?.isEbike,
+    // The Profile bike, recorded on every track. No bike picked (null) is a
+    // normal bike, the same default the pace is selected with.
+    isEbike: isEbikeBikeTypeValue(row.bike_type as string | null),
     rerouteCount: (row.reroute_count as number | null) ?? undefined,
   }));
 };

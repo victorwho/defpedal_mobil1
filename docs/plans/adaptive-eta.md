@@ -115,19 +115,22 @@ That needs the prediction stored, which it isn't today.
 
 ## Known limits of Phase 3 (independent verification, 2026-10-21)
 
-- **`is_ebike` records the E-bike routing MODE, not the bike.** Fast, Flat
-  and Cool clear it (`selectRoutingMode`), so an e-bike owner riding those
-  modes is recorded as a normal bike and those rides feed the normal pace.
-  Recording the bike itself would need a separate "my bike" setting; open
-  product question.
+- ~~`is_ebike` records the E-bike routing MODE, not the bike.~~ Resolved
+  2026-10-22: the pace follows the Profile bike (decision 1, revised).
 - **One router factor is pooled across routers.** Safe, Flat, Cool (OSRM
   graphs) and Fast (Mapbox Directions) feed the same median, which is then
   applied to whichever mode is chosen. If the routers are biased
   differently, the factor carries that across modes. Check with
   `eta_accuracy` split by mode before keying the factor per router.
-- **The first ride recorded on the e-bike drops every unrecorded older
-  ride from the normal pace** (the decision's rule). A rider can fall below
-  3 rides and see router time again until new rides are recorded.
+  Since the bike now comes from Profile this also covers the graphs: an
+  e-bike owner's factor pools rides on the e-bike graph and on the standard
+  one (Safe, Flat, Cool, loops), whose predictions differ by 7-30%. Read
+  `eta_accuracy` by `ebike_routing` before splitting it.
+- **A ride on someone else's bike counts for the Profile bike.** The bike is
+  what Profile said at the time, not what was ridden.
+- ~~The first ride recorded on the e-bike drops unrecorded older rides from
+  the normal pace.~~ Resolved 2026-10-22: every ride has a bike, so nothing
+  is dropped.
 - Fixed before shipping: the in-ride ETA and `eta_accuracy` applied the
   factor to a GPX course's fixed-speed time and to an e-bike loop's
   standard-graph time. `routerTimeIsEstimate` (core) is now the one rule.
@@ -155,6 +158,13 @@ There is no way today to tell whether any ETA is right. From Phase 1:
    selected. Rides from before the column count for the normal bike only
    when the rider has never selected E-bike; otherwise they are left out
    rather than guessed.
+   **Revised 2026-10-22 (owner):** the bike is the one picked in Profile
+   (`bikeTypeId`), which every ride already stores on
+   `trip_tracks.bike_type`, so history knows the bike for every ride and
+   both paces are kept: no ride is dropped from either, and no bike picked
+   counts as a normal bike. The E-bike routing mode no longer chooses the
+   pace. `trips.is_ebike` stays, recording the routing mode, which
+   `eta_accuracy` reports as `ebike_routing` beside `is_ebike` (the bike).
 2. **Labels:** "at your pace" on route preview, the comparison and the
    course screen; no label in the navigation HUD.
 3. **A setting to switch back.** Profile > Display: "Ride times at my pace"

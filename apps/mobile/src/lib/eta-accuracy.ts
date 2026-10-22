@@ -5,6 +5,7 @@
  * route.
  */
 import {
+  isEbikeBikeTypeValue,
   personalRideSeconds,
   resolveEtaPace,
   routerTimeIsEstimate,
@@ -18,6 +19,9 @@ export interface EtaAccuracyInput {
   readonly route: RouteOption | null;
   readonly riderPaces: RiderPaces | null;
   readonly paceEtaEnabled: boolean;
+  /** Profile bike id: picks the pace. */
+  readonly bikeTypeId: string | null;
+  /** E-bike routing mode: decides whether the route's time is a router's. */
   readonly isEbike: boolean;
   readonly nowMs: number;
 }
@@ -33,7 +37,7 @@ export const etaAccuracyProperties = (
   const pace = resolveEtaPace({
     paces: input.riderPaces,
     enabled: input.paceEtaEnabled,
-    isEbike: input.isEbike,
+    ebikeOwner: isEbikeBikeTypeValue(input.bikeTypeId),
   });
   const routerSeconds = Math.round(route.adjustedDurationSeconds);
   const personalSeconds = Math.round(
@@ -55,6 +59,7 @@ export const etaAccuracyProperties = (
     actual_seconds: actualSeconds,
     distance_meters: Math.round(route.distanceMeters),
     pace_ride_count: pace?.rideCount ?? 0,
-    is_ebike: input.isEbike ? 1 : 0,
+    is_ebike: isEbikeBikeTypeValue(input.bikeTypeId) ? 1 : 0,
+    ebike_routing: input.isEbike ? 1 : 0,
   };
 };

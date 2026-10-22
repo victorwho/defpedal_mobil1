@@ -68,6 +68,7 @@ beforeEach(() => {
     ...DEFAULT_COMMUTE_SLICE_STATE,
     ...DEFAULT_PACE_SLICE_STATE,
     isEbike: false,
+    bikeTypeId: 'city',
     savedPlaces: { home: HOME, work: WORK },
     locale: 'en',
     measurementSystem: 'metric',
@@ -167,8 +168,8 @@ describe('scheduleCommuteBriefings', () => {
     expect(commuteIds(list())[0].content.body).toContain('Safe route: 22 min, 5.4 km.');
   });
 
-  it('E-bike selected, no e-bike rides yet: the router time', async () => {
-    useAppStore.setState({ isEbike: true });
+  it('E-bike in Profile, no e-bike rides yet: the router time', async () => {
+    useAppStore.setState({ bikeTypeId: 'ebike' });
     const { list } = setup({ pace: MY_PACES });
     await scheduleCommuteBriefings(NOW);
     expect(commuteIds(list())[0].content.body).toContain('Safe route: 22 min, 5.4 km.');

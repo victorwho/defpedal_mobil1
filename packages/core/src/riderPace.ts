@@ -38,7 +38,7 @@ export interface PaceSample {
   /** Absent = unknown; only a ride known to have no reroute is compared. */
   readonly rerouteCount?: number | undefined;
   readonly endReason?: string | undefined;
-  /** Bike at start (Phase 3). Absent = not recorded. */
+  /** The Profile bike for this ride is an e-bike. Absent counts as a normal bike. */
   readonly isEbike?: boolean | undefined;
 }
 
@@ -146,22 +146,14 @@ export interface RiderPaces {
 }
 
 /**
- * Splits history by the bike recorded at start. Rides from before that was
- * recorded count for the normal bike only while no ride is recorded on the
- * e-bike: once one is, an unrecorded ride could be either, so it is left out
- * rather than guessed.
+ * Splits history by the Profile bike each ride was recorded with, so both
+ * paces are kept: switching bike in Profile switches pace, and no ride is
+ * dropped from either.
  */
-export const riderPaces = (samples: readonly PaceSample[]): RiderPaces => {
-  const usesEbike = samples.some((sample) => sample.isEbike === true);
-  return {
-    normal: riderPace(
-      samples.filter(
-        (sample) => sample.isEbike === false || (sample.isEbike === undefined && !usesEbike),
-      ),
-    ),
-    ebike: riderPace(samples.filter((sample) => sample.isEbike === true)),
-  };
-};
+export const riderPaces = (samples: readonly PaceSample[]): RiderPaces => ({
+  normal: riderPace(samples.filter((sample) => sample.isEbike !== true)),
+  ebike: riderPace(samples.filter((sample) => sample.isEbike === true)),
+});
 
 /**
  * Metres of ascent that cost about as much time as a kilometre on the flat.
@@ -194,15 +186,16 @@ export const rideMinutes = (
 
 /**
  * The pace a ride time should use, or null for the router's time: the pace
- * for the bike selected now, when the rider has not switched it off and has
- * enough rides on that bike.
+ * for the rider's bike (Profile), when they have not switched it off and
+ * have enough rides on that bike.
  */
 export const resolveEtaPace = (input: {
   readonly paces: RiderPaces | null;
   readonly enabled: boolean;
-  readonly isEbike: boolean;
+  /** The Profile bike is an e-bike (not the E-bike routing mode). */
+  readonly ebikeOwner: boolean;
 }): RiderPace | null => {
-  const pace = input.isEbike ? input.paces?.ebike : input.paces?.normal;
+  const pace = input.ebikeOwner ? input.paces?.ebike : input.paces?.normal;
   return input.enabled && pace?.personal ? pace : null;
 };
 

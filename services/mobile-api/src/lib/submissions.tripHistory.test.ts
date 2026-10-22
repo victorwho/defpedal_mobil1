@@ -1,9 +1,10 @@
 // @vitest-environment node
 /**
  * The Supabase branch of `getTripHistory`: history rows are trip_tracks, but
- * the planned duration and bike are written to `trips` at START (adaptive
- * ETA Phase 3, migration 202610210001), so they are read in a second query
- * and merged by trip id. A dropped merge is invisible everywhere else.
+ * the planned duration is written to `trips` at START (adaptive ETA Phase 3,
+ * migration 202610210001), so it is read in a second query and merged by trip
+ * id. A dropped merge is invisible everywhere else. The bike is the Profile
+ * bike already stored on the track (`bike_type`).
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,6 +21,7 @@ const tables: Record<string, unknown[]> = {
       started_at: '2026-10-21T08:00:00.000Z',
       ended_at: '2026-10-21T08:20:00.000Z',
       reroute_count: 0,
+      bike_type: 'E-bike',
     },
     {
       id: 'track-2',
@@ -30,12 +32,13 @@ const tables: Record<string, unknown[]> = {
       started_at: '2026-10-20T08:00:00.000Z',
       ended_at: '2026-10-20T08:20:00.000Z',
       reroute_count: null,
+      bike_type: null,
     },
   ],
   ride_impacts: [],
   trips: [
-    { id: 'trip-1', planned_route_duration_seconds: 1440, is_ebike: true },
-    { id: 'trip-2', planned_route_duration_seconds: null, is_ebike: null },
+    { id: 'trip-1', planned_route_duration_seconds: 1440 },
+    { id: 'trip-2', planned_route_duration_seconds: null },
   ],
 };
 
@@ -61,11 +64,11 @@ vi.mock('./sentry', () => ({ captureServerException: capture }));
 import { getTripHistory } from './submissions';
 
 describe('getTripHistory — adaptive ETA fields', () => {
-  it('merges planned duration and bike from trips, reroute count from the track', async () => {
+  it('planned duration from trips; bike and reroute count from the track', async () => {
     const [recorded, older] = await getTripHistory('user-1');
     expect(recorded).toMatchObject({ plannedDurationSeconds: 1440, isEbike: true, rerouteCount: 0 });
     expect(older!.plannedDurationSeconds).toBeUndefined();
-    expect(older!.isEbike).toBeUndefined();
+    expect(older!.isEbike).toBe(false); // no bike picked = a normal bike
     expect(older!.rerouteCount).toBeUndefined();
   });
 

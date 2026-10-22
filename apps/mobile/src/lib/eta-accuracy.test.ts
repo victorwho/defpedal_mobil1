@@ -12,6 +12,7 @@ const input = (overrides: Partial<EtaAccuracyInput> = {}): EtaAccuracyInput => (
   route: { distanceMeters: 6000, totalClimbMeters: 0, adjustedDurationSeconds: 1440 } as RouteOption,
   riderPaces: { normal: MINE, ebike: { kmh: 15, personal: false, rideCount: 0 } },
   paceEtaEnabled: true,
+  bikeTypeId: 'city',
   isEbike: false,
   nowMs: START + 20 * 60_000,
   ...overrides,
@@ -27,6 +28,7 @@ describe('etaAccuracyProperties', () => {
       distance_meters: 6000,
       pace_ride_count: 7,
       is_ebike: 0,
+      ebike_routing: 0,
     });
   });
 
@@ -50,13 +52,21 @@ describe('etaAccuracyProperties', () => {
     expect(props).toMatchObject({ personal_seconds: 1200 });
   });
 
+  it('E-bike routing mode alone does not change the pace: the bike is the Profile one', () => {
+    expect(etaAccuracyProperties(input({ isEbike: true }))).toMatchObject({
+      method: 'pace',
+      is_ebike: 0,
+      ebike_routing: 1,
+    });
+  });
+
   it('nothing for a rerouted ride: the prediction was for another route', () => {
     const session = { startedAt: new Date(START).toISOString(), rerouteCount: 1 } as NavigationSession;
     expect(etaAccuracyProperties(input({ session }))).toBeNull();
   });
 
-  it('E-bike or switched off: the method is the router, and so is the shown time', () => {
-    for (const o of [{ isEbike: true }, { paceEtaEnabled: false }]) {
+  it('E-bike in Profile with no e-bike rides, or switched off: the router time', () => {
+    for (const o of [{ bikeTypeId: 'ebike' }, { paceEtaEnabled: false }]) {
       const props = etaAccuracyProperties(input(o));
       expect(props).toMatchObject({ method: 'router', personal_seconds: 1440 });
     }

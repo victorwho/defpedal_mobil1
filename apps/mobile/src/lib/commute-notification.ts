@@ -14,6 +14,7 @@
  * moment the rider turns Commute on (Profile, step 5).
  */
 import {
+  isEbikeBikeTypeValue,
   resolveEtaPace,
   riderPaces,
   type Coordinate,
@@ -116,7 +117,11 @@ const briefingPace = async (): Promise<RiderPace | null> => {
   const fresh = await fetchPace();
   if (fresh) store.getState().setRiderPaces(fresh);
   const s = store.getState();
-  return resolveEtaPace({ paces: fresh ?? s.riderPaces, enabled: s.paceEtaEnabled, isEbike: s.isEbike });
+  return resolveEtaPace({
+    paces: fresh ?? s.riderPaces,
+    enabled: s.paceEtaEnabled,
+    ebikeOwner: isEbikeBikeTypeValue(s.bikeTypeId),
+  });
 };
 
 // "Show route" on a briefing, remembered until the ride it leads to starts, so
@@ -421,8 +426,9 @@ export const fireTestCommuteBriefing = async (now: Date = new Date()): Promise<s
   );
   await ensureChannel(N);
   await scheduleOne(N, briefing, now);
-  const saved = latest.isEbike ? latest.riderPaces?.ebike : latest.riderPaces?.normal;
-  const bike = latest.isEbike ? 'e-bike' : 'bike';
+  const ebikeOwner = isEbikeBikeTypeValue(latest.bikeTypeId);
+  const saved = ebikeOwner ? latest.riderPaces?.ebike : latest.riderPaces?.normal;
+  const bike = ebikeOwner ? 'e-bike' : 'bike';
   const paceNote = pace
     ? pace.routerFactor !== undefined
       ? `your ${bike}: router time x ${pace.routerFactor.toFixed(2)}`

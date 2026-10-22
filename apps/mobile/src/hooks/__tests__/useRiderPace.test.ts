@@ -35,7 +35,7 @@ const SAVED_PACES = { normal: SAVED, ebike: NONE };
 
 beforeEach(() => {
   mockHistory.mockReset();
-  useAppStore.setState({ ...DEFAULT_PACE_SLICE_STATE, isEbike: false });
+  useAppStore.setState({ ...DEFAULT_PACE_SLICE_STATE, isEbike: false, bikeTypeId: 'city' });
 });
 
 describe('useRiderPace', () => {
@@ -68,18 +68,25 @@ describe('useRiderPace', () => {
     expect(mockHistory).not.toHaveBeenCalled();
   });
 
-  it('E-bike selected: the e-bike’s own pace once its rides are recorded', async () => {
+  it('E-bike in Profile: the e-bike’s own pace once its rides are recorded', async () => {
     mockHistory.mockResolvedValue(HISTORY.map((r) => ({ ...r, isEbike: true })));
-    useAppStore.setState({ isEbike: true });
+    useAppStore.setState({ bikeTypeId: 'ebike' });
     const { result } = renderHook(() => useRiderPace(), { wrapper });
     await waitFor(() => expect(result.current?.kmh).toBeCloseTo(30, 5));
   });
 
-  it('E-bike selected, no e-bike rides recorded: router time', () => {
+  it('E-bike in Profile, no e-bike rides recorded: router time', () => {
     mockHistory.mockResolvedValue(HISTORY);
-    useAppStore.setState({ isEbike: true, riderPaces: SAVED_PACES });
+    useAppStore.setState({ bikeTypeId: 'ebike', riderPaces: SAVED_PACES });
     const { result } = renderHook(() => useRiderPace(), { wrapper });
     expect(result.current).toBeNull();
+  });
+
+  it('E-bike routing mode on a normal bike: still the normal pace', async () => {
+    mockHistory.mockResolvedValue(HISTORY);
+    useAppStore.setState({ isEbike: true });
+    const { result } = renderHook(() => useRiderPace(), { wrapper });
+    await waitFor(() => expect(result.current?.personal).toBe(true));
   });
 
   it('the saved pace is cleared on account switch, the switch is not', () => {

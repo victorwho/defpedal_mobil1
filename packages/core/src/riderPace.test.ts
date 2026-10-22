@@ -109,18 +109,18 @@ const EBIKE = { kmh: 24, personal: true, rideCount: 4 };
 
 describe('resolveEtaPace', () => {
   it('the normal bike’s pace when switched on, on a normal bike', () => {
-    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, isEbike: false })).toBe(MINE);
+    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, ebikeOwner: false })).toBe(MINE);
   });
 
   it('the e-bike’s own pace with E-bike selected', () => {
-    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, isEbike: true })).toBe(EBIKE);
+    expect(resolveEtaPace({ paces: { normal: MINE, ebike: EBIKE }, enabled: true, ebikeOwner: true })).toBe(EBIKE);
   });
 
   it.each([
-    ['switched off', { paces: { normal: MINE, ebike: EBIKE }, enabled: false, isEbike: false }],
-    ['too few e-bike rides', { paces: { normal: MINE, ebike: DEFAULT }, enabled: true, isEbike: true }],
-    ['not enough rides', { paces: { normal: DEFAULT, ebike: DEFAULT }, enabled: true, isEbike: false }],
-    ['no pace read yet', { paces: null, enabled: true, isEbike: false }],
+    ['switched off', { paces: { normal: MINE, ebike: EBIKE }, enabled: false, ebikeOwner: false }],
+    ['too few e-bike rides', { paces: { normal: MINE, ebike: DEFAULT }, enabled: true, ebikeOwner: true }],
+    ['not enough rides', { paces: { normal: DEFAULT, ebike: DEFAULT }, enabled: true, ebikeOwner: false }],
+    ['no pace read yet', { paces: null, enabled: true, ebikeOwner: false }],
   ])('router time when %s', (_label, input) => {
     expect(resolveEtaPace(input)).toBeNull();
   });
@@ -186,15 +186,16 @@ describe('riderPaces: one pace per bike', () => {
     expect(paces.ebike.kmh).toBeCloseTo(24, 5);
   });
 
-  it('unrecorded rides count for the normal bike while the e-bike was never recorded', () => {
+  it('a ride with no bike counts for the normal bike', () => {
     const paces = riderPaces([unrecorded(40), unrecorded(40), normalRide(40)]);
     expect(paces.normal).toMatchObject({ personal: true, rideCount: 3 });
     expect(paces.ebike.personal).toBe(false);
   });
 
-  it('once any ride is on the e-bike, unrecorded rides are left out', () => {
+  it('e-bike rides do not take rides away from the normal pace', () => {
     const paces = riderPaces([unrecorded(40), unrecorded(40), normalRide(40), ebikeRide(25)]);
-    expect(paces.normal).toMatchObject({ personal: false, rideCount: 1 });
+    expect(paces.normal).toMatchObject({ personal: true, rideCount: 3 });
+    expect(paces.ebike.rideCount).toBe(1);
   });
 });
 

@@ -804,6 +804,7 @@ function NavigationScreen() {
       route: selectedRoute ?? null,
       riderPaces: state.riderPaces,
       paceEtaEnabled: state.paceEtaEnabled,
+      bikeTypeId: state.bikeTypeId,
       isEbike: state.isEbike,
       nowMs: Date.now(),
     });
