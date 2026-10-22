@@ -1,11 +1,13 @@
 # Implementation Progress
 
-Last updated: 2026-10-21 (adaptive ETA phase 3 live server-side)
+Last updated: 2026-10-22 (adaptive ETA device pass on the emulator)
 
 This file tracks the mobile app implementation progress against `docs/archive/mobile_implementation_plan.md`.
 Update it at the end of each implementation slice.
 
 ## Snapshot
+
+- **2026-10-22: Adaptive ETA device pass on an Android emulator, two copy fixes.** Preview build (x86_64) on AVD `dp_test35`, three rides replayed with fake GPS on a new production test account (`eta-emulator-test-20261022@example.com`; kit, credentials path and gotchas in `C:\Users\Victor\defpedal-ops\emulator-test\README.md`, outside the repo). Confirmed: router time with fewer than 3 rides; after 3 (factor 0.68) "at your pace" on preview and comparison, no label in the HUD, commute briefing at the pace, the Display switch restores router times. Fixed: the "Ride times at my pace" subtitle dropped "(not in E-bike mode)" in EN/RO/ES (stale since the pace follows the Profile bike), and a word space between "7 min" and "at your pace" on the preview summary. Not tested: Profile E-bike (behind Pedal Plus), the course screen, in-ride blending. Open: the collapsed peek strip has no label. Typecheck and the full mobile suite (2,495 tests) pass; bundle check not run (Metro stopped). Record in `docs/plans/adaptive-eta.md` § Device pass.
 
 - **2026-10-22: Adaptive ETA, the pace follows the Profile bike.** Owner decision: the bike is the one picked in Profile, not the E-bike routing mode. Every ride already stores it on `trip_tracks.bike_type` (live: 441 rides with none picked, 18 e-bike rides as `E-bike`/`ebike`), so `/v1/trips/history` now derives `isEbike` from it via `isEbikeBikeTypeValue` and both paces use every ride: none picked = normal bike, and an e-bike ride no longer drops older rides from the normal pace. `resolveEtaPace` takes `ebikeOwner` (Profile bike); `routerTimeIsEstimate` still takes the routing mode. `eta_accuracy` reports `is_ebike` (bike) and `ebike_routing` (mode). Known limit: an e-bike owner's router factor pools e-bike-graph and standard-graph rides. Five mutations, all caught. API **`defpedal-api-00186-2w8`** (was `00185-724`) from a clean worktree at `54832c6`, by digest `sha256:f655a6a9...` (= tag `build-834c26d1-f527-4a13-be8d-daa7d3c4390c`); also carries the `6af3800` Sentry report. Verified live with a throwaway anonymous rider: two rides started with `isEbike: false`, the one tracked on `E-bike` came back `isEbike: true` (the old revision returns false for both); all rows and the user deleted after.
 

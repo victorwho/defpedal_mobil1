@@ -135,6 +135,27 @@ That needs the prediction stored, which it isn't today.
   factor to a GPX course's fixed-speed time and to an e-bike loop's
   standard-graph time. `routerTimeIsEstimate` (core) is now the one rule.
 
+## Device pass (Android emulator, 2026-10-22)
+
+Preview build at `6a78fca` (x86_64 APK), API `00186-2w8`, test account
+`eta-emulator-test-20261022@example.com` (kit and credentials outside the
+repo: `C:\Users\Victor\defpedal-ops\emulator-test\README.md`). Three rides
+replayed with fake GPS (actual / router 0.71, 0.57, 0.67 → factor 0.68).
+
+- Under 3 rides: router time, no label. After 3: preview "7 min at your
+  pace" (router 10 min), comparison "+2 min at your pace for a calmer ride",
+  HUD 7 min with no label, commute briefing "about 6 min at your pace"
+  (Diagnostics reports "router time x 0.68").
+- Display switch off: "10 min", "+3 min for a calmer ride", no label.
+- Fixed after the pass: the Display subtitle still said "(not in E-bike
+  mode)", stale since the pace follows the Profile bike; and "7 min" and
+  "at your pace" ran together in the expanded summary.
+- Not tested: the Profile bike on E-bike (it sits behind Pedal Plus and the
+  test account has none), the course screen, Phase 2's in-ride blending (the
+  replay rode at a constant speed).
+- Open: the collapsed peek strip shows the pace time without the label (the
+  screen reader label has it).
+
 ## Measuring it (all phases)
 
 There is no way today to tell whether any ETA is right. From Phase 1:
