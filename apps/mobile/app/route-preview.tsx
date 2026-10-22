@@ -1121,7 +1121,7 @@ function RoutePreviewScreen() {
                 {formatDuration(rideSeconds)}
               </Text>
               {pace ? (
-                <Text style={styles.statUnit} numberOfLines={1}>
+                <Text style={[styles.statUnit, styles.paceLabel]} numberOfLines={1}>
                   {t('preview.atYourPace')}
                 </Text>
               ) : null}
@@ -1603,6 +1603,10 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       ...textXs,
       color: colors.textMuted,
       fontFamily: fontFamily.mono.medium,
+    },
+    // The stat gap suits "2.1 km"; after "7 min" the label needs a word space.
+    paceLabel: {
+      marginLeft: space[1],
     },
     statDivider: {
       ...textSm,

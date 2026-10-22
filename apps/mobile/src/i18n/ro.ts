@@ -668,7 +668,7 @@ export const ro: TranslationKeys = {
     useMilesOff: 'Kilometri, metri și km/h',
     showRouteFeaturesOn: 'Tuneluri, poduri, semafoare și treceri feroviare apar pe hartă',
     showRouteFeaturesOff: 'Marcajele cu elemente ale traseului sunt ascunse',
-    paceEtaOn: 'Folosește viteza ta medie din cel puțin 3 ture (nu în modul E-bike)',
+    paceEtaOn: 'Folosește viteza ta medie din cel puțin 3 ture',
     paceEtaOff: 'Estimări standard ale planificatorului de traseu',
     showMascotOn: 'Pedal apare în momente prietenoase',
     showMascotOff: 'Pedal este ascuns în toată aplicația',

@@ -731,7 +731,7 @@ export const en = {
     useMilesOff: 'Kilometres, metres and km/h',
     showRouteFeaturesOn: 'Tunnels, bridges, signals and rail crossings shown on the map',
     showRouteFeaturesOff: 'Route feature markers are hidden',
-    paceEtaOn: 'Uses your average speed from 3 or more rides (not in E-bike mode)',
+    paceEtaOn: 'Uses your average speed from 3 or more rides',
     paceEtaOff: 'Standard estimates from the route planner',
     showMascotOn: 'Pedal appears in friendly moments',
     showMascotOff: 'Pedal is hidden across the app',

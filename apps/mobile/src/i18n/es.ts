@@ -668,7 +668,7 @@ export const es: TranslationKeys = {
     useMilesOff: 'Kilómetros, metros y km/h',
     showRouteFeaturesOn: 'Túneles, puentes, semáforos y pasos a nivel se muestran en el mapa',
     showRouteFeaturesOff: 'Los marcadores de elementos de la ruta están ocultos',
-    paceEtaOn: 'Usa tu velocidad media de 3 salidas o más (no en modo E-bike)',
+    paceEtaOn: 'Usa tu velocidad media de 3 salidas o más',
     paceEtaOff: 'Estimaciones estándar del planificador de rutas',
     showMascotOn: 'Pedal aparece en momentos amistosos',
     showMascotOff: 'Pedal está oculto en toda la app',
