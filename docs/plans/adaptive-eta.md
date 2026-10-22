@@ -155,6 +155,9 @@ replayed with fake GPS (actual / router 0.71, 0.57, 0.67 → factor 0.68).
   replay rode at a constant speed).
 - Open: the collapsed peek strip shows the pace time without the label (the
   screen reader label has it).
+- Testers (preview v0.2.198): the label overlapped the climb in the expanded
+  summary. It now sits under the time; fixed in v0.2.199, checked on the
+  emulator.
 
 ## Measuring it (all phases)
 

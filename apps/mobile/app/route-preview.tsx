@@ -1116,12 +1116,12 @@ function RoutePreviewScreen() {
 
             <Text style={styles.statDivider}>·</Text>
 
-            <View style={styles.stat}>
+            <View style={pace ? styles.paceStat : styles.stat}>
               <Text style={styles.statValue}>
                 {formatDuration(rideSeconds)}
               </Text>
               {pace ? (
-                <Text style={[styles.statUnit, styles.paceLabel]} numberOfLines={1}>
+                <Text style={styles.statUnit} numberOfLines={1}>
                   {t('preview.atYourPace')}
                 </Text>
               ) : null}
@@ -1604,9 +1604,12 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       color: colors.textMuted,
       fontFamily: fontFamily.mono.medium,
     },
-    // The stat gap suits "2.1 km"; after "7 min" the label needs a word space.
-    paceLabel: {
-      marginLeft: space[1],
+    // "at your pace" sits under the time: beside it, the row ran out of width
+    // and the label overlapped the climb. The row aligns on the time's baseline.
+    paceStat: {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      flexShrink: 1,
     },
     statDivider: {
       ...textSm,
