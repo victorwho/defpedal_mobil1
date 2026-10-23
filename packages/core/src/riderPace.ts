@@ -12,6 +12,14 @@
 export const DEFAULT_PACE_KMH = 15;
 
 /**
+ * An e-bike's time on a route no router timed (a GPX course, a loop planned
+ * in E-bike mode, which is routed on the standard graph). Fixed, never the
+ * rider's own speed and never labelled "at your pace" (owner decision
+ * 2026-10-23). Climb is not counted: assist to 25 km/h carries it.
+ */
+export const EBIKE_FIXED_KMH = 17;
+
+/**
  * Rides needed before we trust the rider's own pace.
  *
  * Three, because one ride is an anecdote — a single short errand or one ride
@@ -218,6 +226,12 @@ export const routerTimeIsEstimate = (
 ): boolean =>
   route?.source === 'gpx_course' || (route?.source === 'generated_loop' && isEbike);
 
+/** A time no router made, ridden on an e-bike: `EBIKE_FIXED_KMH`. */
+const isFixedEbikeEstimate = (route: {
+  readonly routerIsEstimate?: boolean;
+  readonly ebike?: boolean;
+}): boolean => route.routerIsEstimate === true && route.ebike === true;
+
 /**
  * True when the rider's pace changes this route's time, so the time may say
  * "at your pace". On a router's prediction that takes the router factor:
@@ -227,10 +241,13 @@ export const routerTimeIsEstimate = (
  * so the rider's speed replaces it as soon as there is one.
  */
 export const paceAppliesTo = (
-  route: { readonly routerIsEstimate?: boolean },
+  route: { readonly routerIsEstimate?: boolean; readonly ebike?: boolean },
   pace: RiderPace | null,
 ): pace is RiderPace =>
-  pace?.personal === true && (pace.routerFactor !== undefined || route.routerIsEstimate === true);
+  pace?.personal === true &&
+  !isFixedEbikeEstimate(route) &&
+  (pace.routerFactor !== undefined || route.routerIsEstimate === true);
+
 
 /**
  * Seconds for a ride: the router's time times the rider's own factor when
@@ -252,9 +269,17 @@ export const personalRideSeconds = (
      * is distance at a fixed speed), so the factor does not apply to it.
      */
     readonly routerIsEstimate?: boolean;
+    /**
+     * Ridden on an e-bike (E-bike mode or the Profile bike). Only matters
+     * with `routerIsEstimate`: that time is then `EBIKE_FIXED_KMH`.
+     */
+    readonly ebike?: boolean;
   },
   pace: RiderPace | null,
 ): number => {
+  if (isFixedEbikeEstimate(route)) {
+    return (Math.max(0, route.distanceMeters) / 1000 / EBIKE_FIXED_KMH) * 3600;
+  }
   if (!paceAppliesTo(route, pace)) return route.routerSeconds;
   if (pace.routerFactor !== undefined && !route.routerIsEstimate) {
     return route.routerSeconds * pace.routerFactor;

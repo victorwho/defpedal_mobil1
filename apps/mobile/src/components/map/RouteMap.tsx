@@ -15,7 +15,7 @@
  * 11. MarkerLayers — origin/dest/user markers + off-route connector
  * 12. Overlays — crosshair, POI card, route info
  */
-import type { NearbyHazard } from '@defensivepedal/core';
+import { isEbikeBikeTypeValue, type NearbyHazard } from '@defensivepedal/core';
 import Mapbox from '@rnmapbox/maps';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
@@ -291,6 +291,9 @@ export const RouteMap = ({
   const a11yMode = isDecorative || !a11yContext ? 'empty' : a11yContext.mode;
   // Only a ride still ahead is read at the rider's pace, never a past trip.
   const rideIsEbike = useAppStore((state) => state.isEbike);
+  const ridesEbike = useAppStore(
+    (state) => state.isEbike || isEbikeBikeTypeValue(state.bikeTypeId),
+  );
   const ridePace = useRiderPace({
     active: a11yMode === 'planning' || a11yMode === 'navigating',
   });
@@ -299,6 +302,7 @@ export const RouteMap = ({
     selectedRoute: selectedRoute?.route ?? null,
     pace: ridePace,
     isEbike: rideIsEbike,
+    ridesEbike,
     hazardsOnRoute: !isDecorative ? a11yContext?.hazardsOnRoute : undefined,
     nearestApproachingHazard: !isDecorative
       ? a11yContext?.nearestApproachingHazard

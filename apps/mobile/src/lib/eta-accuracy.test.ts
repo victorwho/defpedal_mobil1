@@ -62,6 +62,19 @@ describe('etaAccuracyProperties', () => {
     });
   });
 
+  it('an e-bike on a course or an e-bike loop: method ebike_fixed, 17 km/h', () => {
+    const course = { source: 'gpx_course', distanceMeters: 6000, totalClimbMeters: 50, adjustedDurationSeconds: 1440 } as RouteOption;
+    const loop = { ...course, source: 'generated_loop' } as RouteOption;
+    for (const o of [
+      { route: course, bikeTypeId: 'ebike' },
+      { route: course, isEbike: true },
+      { route: loop, isEbike: true },
+    ]) {
+      // 6 km at 17 km/h, climb not counted.
+      expect(etaAccuracyProperties(input(o))).toMatchObject({ method: 'ebike_fixed', personal_seconds: 1271 });
+    }
+  });
+
   it('nothing for a rerouted ride: the prediction was for another route', () => {
     const session = { startedAt: new Date(START).toISOString(), rerouteCount: 1 } as NavigationSession;
     expect(etaAccuracyProperties(input({ session }))).toBeNull();

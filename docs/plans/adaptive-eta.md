@@ -214,6 +214,12 @@ There is no way today to tell whether any ETA is right. From Phase 1:
    rides, because they can never get a factor. One predicate,
    `paceAppliesTo` in `packages/core/src/riderPace.ts`, decides both the
    number and every "at your pace" label.
+   **E-bike (owner, 2026-10-23):** on an e-bike (E-bike mode or the Profile
+   bike), a time no router made is a fixed 17 km/h (`EBIKE_FIXED_KMH`),
+   distance only, never the rider's speed and never labelled, also with the
+   Display switch off. The HUD still blends in the speed ridden during the
+   ride. Router-timed routes on an e-bike are unchanged. `eta_accuracy`
+   reports these rides as method `ebike_fixed`.
 
 ## Starting point
 

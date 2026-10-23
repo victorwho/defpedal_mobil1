@@ -18,7 +18,9 @@ import {
   formatDistance,
   formatElevation,
   formatDuration,
+  isEbikeBikeTypeValue,
   isRiskDataAvailable,
+  paceAppliesTo,
   personalRideSeconds,
   routerTimeIsEstimate,
   resolveCountryFromCoord,
@@ -92,6 +94,7 @@ export default function CourseImportScreen() {
   const t = useT();
   const units = useUnits();
   const pace = useRiderPace();
+  const ridesEbike = useAppStore((s) => s.isEbike || isEbikeBikeTypeValue(s.bikeTypeId));
   const locale = useAppStore((s) => s.locale);
 
   // Map screens are handlebar-mounted — portrait only, like route-preview.
@@ -422,17 +425,17 @@ export default function CourseImportScreen() {
 
   // ── Ready ────────────────────────────────────────────────────────────────
 
-  // A course's own time is distance at a fixed 15 km/h; the rider's pace
-  // replaces it when there is one (docs/plans/adaptive-eta.md).
-  const rideSeconds = personalRideSeconds(
-    {
-      distanceMeters: state.route.distanceMeters,
-      climbMeters: state.route.totalClimbMeters,
-      routerSeconds: state.route.adjustedDurationSeconds,
-      routerIsEstimate: routerTimeIsEstimate(state.route, false),
-    },
-    pace,
-  );
+  // A course's own time is distance at a fixed 15 km/h (17 on an e-bike);
+  // on a normal bike the rider's pace replaces it when there is one
+  // (docs/plans/adaptive-eta.md).
+  const timedCourse = {
+    distanceMeters: state.route.distanceMeters,
+    climbMeters: state.route.totalClimbMeters,
+    routerSeconds: state.route.adjustedDurationSeconds,
+    routerIsEstimate: routerTimeIsEstimate(state.route, false),
+    ebike: ridesEbike,
+  };
+  const rideSeconds = personalRideSeconds(timedCourse, pace);
 
   const busyCountLabel = t(
     stretches.length === 1 ? 'course.busyFound_one' : 'course.busyFound_other',
@@ -522,7 +525,9 @@ export default function CourseImportScreen() {
           />
           <Stat
             label={
-              pace ? `${t('course.estTime')} · ${t('preview.atYourPace')}` : t('course.estTime')
+              paceAppliesTo(timedCourse, pace)
+                ? `${t('course.estTime')} · ${t('preview.atYourPace')}`
+                : t('course.estTime')
             }
             value={formatDuration(rideSeconds)}
             styles={styles}

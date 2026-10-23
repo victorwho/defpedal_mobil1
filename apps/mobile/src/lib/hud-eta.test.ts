@@ -32,6 +32,16 @@ describe('hudRemainingSeconds', () => {
     expect(hudRemainingSeconds({ ...LEG, pace: fast, ridden: none, routerIsEstimate: true })).toBe(1200);
   });
 
+  it('an e-bike on a course or e-bike loop: a fixed 17 km/h, even with a pace or switched off', () => {
+    const none = { distanceMeters: 0, movingSeconds: 0 };
+    const leg = { ...LEG, routerIsEstimate: true, ebike: true };
+    // 6 km at 17 km/h = 1271 s.
+    expect(hudRemainingSeconds({ ...leg, pace: MINE, ridden: none })).toBe(1271);
+    expect(hudRemainingSeconds({ ...leg, pace: null, ridden: null })).toBe(1271);
+    // A router-timed route is untouched.
+    expect(hudRemainingSeconds({ ...LEG, ebike: true, pace: null, ridden: null })).toBe(1800);
+  });
+
   it('during the ride: blends in the speed actually ridden', () => {
     // Router prior 1800 s (e-bike or no pace), ridden 18 km/h -> 1200 s; 0.3/0.7.
     expect(hudRemainingSeconds({ ...LEG, pace: null, ridden: RIDDEN_FAST })).toBe(1380);

@@ -14,6 +14,7 @@ import {
   formatDistance,
   formatDuration,
   haversineDistance,
+  isEbikeBikeTypeValue,
   isFixedLineRoute,
   PERMANENT_HAZARD_DENY_THRESHOLD,
   riddenSoFar,
@@ -182,6 +183,9 @@ function NavigationScreen() {
   })));
 
   const ridePace = useRiderPace();
+  const ridesEbike = useAppStore(
+    (state) => state.isEbike || isEbikeBikeTypeValue(state.bikeTypeId),
+  );
   const paceEtaEnabled = useAppStore((state) => state.paceEtaEnabled);
   const advanceNavigation = useAppStore((state) => state.advanceNavigation);
   const removeWaypoint = useAppStore((state) => state.removeWaypoint);
@@ -461,6 +465,7 @@ function NavigationScreen() {
         ridden,
         riddenClimbMeters,
         routerIsEstimate,
+        ebike: ridesEbike,
       })
     : 0;
   // Read by the five-minute spoken ETA, so it says what the HUD shows.

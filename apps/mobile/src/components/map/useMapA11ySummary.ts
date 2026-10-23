@@ -40,6 +40,8 @@ export interface MapA11yInput {
   pace?: RiderPace | null;
   /** E-bike selected: a loop's time is then not that bike's prediction. */
   isEbike?: boolean;
+  /** E-bike mode or Profile bike: an estimate time is a fixed speed. */
+  ridesEbike?: boolean;
   /** How many reported hazards are relevant to this route/view. */
   hazardsOnRoute?: number;
   /** The single hazard approaching the user within announcement range, if any. */
@@ -100,6 +102,7 @@ const buildLabel = (
     climbMeters: route.totalClimbMeters,
     routerSeconds: route.adjustedDurationSeconds ?? route.durationSeconds,
     routerIsEstimate: routerTimeIsEstimate(route, input.isEbike === true),
+    ebike: input.ridesEbike === true,
   };
   const rideSeconds = personalRideSeconds(timed, input.pace ?? null);
   const duration = paceAppliesTo(timed, input.pace ?? null)
@@ -243,6 +246,7 @@ export const useMapA11ySummary = (input: MapA11yInput): MapA11yOutput => {
       input.pace?.personal,
       input.pace?.routerFactor,
       input.isEbike,
+      input.ridesEbike,
       input.selectedRoute?.source,
       input.hazardsOnRoute,
       input.remainingDistanceMeters,

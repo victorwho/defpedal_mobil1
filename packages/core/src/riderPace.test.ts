@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_PACE_KMH,
+  EBIKE_FIXED_KMH,
   MIN_RIDES_FOR_PACE,
   paceAppliesTo,
   personalRideSeconds,
@@ -235,6 +236,22 @@ describe('personalRideSeconds', () => {
 
   it('with a router factor: the router’s time scaled to this rider', () => {
     expect(personalRideSeconds(route, { ...MINE, routerFactor: 1.25 })).toBe(1650);
+  });
+
+  it('on an e-bike, a time no router made is a fixed 17 km/h (owner decision 2026-10-23)', () => {
+    const ebikeCourse = { ...course, ebike: true };
+    // 5.4 km / 17 km/h, climb not counted: the motor carries it.
+    const fixed = (5.4 / EBIKE_FIXED_KMH) * 3600;
+    for (const pace of [null, DEFAULT, MINE, { ...MINE, routerFactor: 1.25 }]) {
+      expect(personalRideSeconds(ebikeCourse, pace)).toBeCloseTo(fixed);
+      expect(paceAppliesTo(ebikeCourse, pace)).toBe(false);
+    }
+  });
+
+  it('on an e-bike, a router’s own time is untouched by the fixed speed', () => {
+    const ebikeRoute = { ...route, ebike: true };
+    expect(personalRideSeconds(ebikeRoute, null)).toBe(1320);
+    expect(personalRideSeconds(ebikeRoute, { ...MINE, routerFactor: 1.25 })).toBe(1650);
   });
 
   it('not on a time no router made (a GPX course): the pace instead', () => {

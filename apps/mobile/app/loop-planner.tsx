@@ -19,6 +19,8 @@ import {
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
   DEFAULT_PACE_KMH,
+  EBIKE_FIXED_KMH,
+  isEbikeBikeTypeValue,
   paceAppliesTo,
   personalRideSeconds,
   routerTimeIsEstimate,
@@ -283,6 +285,9 @@ export default function LoopPlannerScreen() {
    */
   const pace = useRiderPace();
   const isEbike = useAppStore((state) => state.isEbike);
+  const ridesEbike = useAppStore(
+    (state) => state.isEbike || isEbikeBikeTypeValue(state.bikeTypeId),
+  );
   const [savedIds, setSavedIds] = useState<Record<string, string>>({});
   const savedLoops = useAppStore((state) => state.savedLoops);
   const addSavedLoop = useAppStore((state) => state.addSavedLoop);
@@ -1039,7 +1044,9 @@ export default function LoopPlannerScreen() {
           {'  ·  '}
           {t('loop.timeEstimate', {
             minutes: String(
-              rideMinutes(targetDistanceMeters, null, pace?.kmh ?? DEFAULT_PACE_KMH),
+              isEbike
+                ? rideMinutes(targetDistanceMeters, null, EBIKE_FIXED_KMH)
+                : rideMinutes(targetDistanceMeters, null, pace?.kmh ?? DEFAULT_PACE_KMH),
             ),
           })}
         </Text>
@@ -1350,6 +1357,7 @@ export default function LoopPlannerScreen() {
                                   climbMeters: loop.climbMeters,
                                   routerSeconds: loop.route.adjustedDurationSeconds,
                                   routerIsEstimate: routerTimeIsEstimate(loop.route, isEbike),
+                                  ebike: ridesEbike,
                                 },
                                 pace,
                               ) / 60,
@@ -1359,7 +1367,10 @@ export default function LoopPlannerScreen() {
                       </Text>
                       <Text style={styles.specLabel}>
                         {paceAppliesTo(
-                          { routerIsEstimate: routerTimeIsEstimate(loop.route, isEbike) },
+                          {
+                            routerIsEstimate: routerTimeIsEstimate(loop.route, isEbike),
+                            ebike: ridesEbike,
+                          },
                           pace,
                         )
                           ? `${t('loop.statTime')} · ${t('preview.atYourPace')}`

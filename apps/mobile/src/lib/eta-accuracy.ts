@@ -46,9 +46,12 @@ export const etaAccuracyProperties = (
     climbMeters: route.totalClimbMeters,
     routerSeconds,
     routerIsEstimate: routerTimeIsEstimate(route, input.isEbike),
+    ebike: input.isEbike || isEbikeBikeTypeValue(input.bikeTypeId),
   };
   const personalSeconds = Math.round(personalRideSeconds(timed, pace));
-  const method = !paceAppliesTo(timed, pace)
+  const method = timed.routerIsEstimate && timed.ebike
+    ? 'ebike_fixed'
+    : !paceAppliesTo(timed, pace)
     ? 'router'
     : pace.routerFactor !== undefined && !timed.routerIsEstimate
       ? 'factor'

@@ -22,6 +22,8 @@ export const hudRemainingSeconds = (input: {
   readonly riddenClimbMeters: number | null;
   /** From `routerTimeIsEstimate`: no router factor on this route's time. */
   readonly routerIsEstimate: boolean;
+  /** E-bike mode or Profile bike: an estimate time is then a fixed speed. */
+  readonly ebike?: boolean;
 }): number => {
   const priorSeconds = personalRideSeconds(
     {
@@ -29,6 +31,7 @@ export const hudRemainingSeconds = (input: {
       climbMeters: input.remainingClimbMeters,
       routerSeconds: input.routerSeconds,
       routerIsEstimate: input.routerIsEstimate,
+      ebike: input.ebike,
     },
     input.pace,
   );
