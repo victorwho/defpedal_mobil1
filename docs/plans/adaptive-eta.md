@@ -158,6 +158,14 @@ replayed with fake GPS (actual / router 0.71, 0.57, 0.67 → factor 0.68).
 - Testers (preview v0.2.198): the label overlapped the climb in the expanded
   summary. It now sits under the time; fixed in v0.2.199, checked on the
   emulator.
+- Testers (preview v0.2.199): a 16 km ride previewed at 3 h 27 "at your
+  pace". The rider had enough rides for an average speed but no router
+  factor yet, so the time came from average speed plus the climb penalty,
+  which charged 10 m of climb as one flat km. Fixed in v0.2.200: the
+  penalty is 60 m per flat km (`CLIMB_METERS_PER_FLAT_KM`), the label has
+  its own line under the summary strip, and decision 4 below. Checked on
+  the emulator (factor 0.68): 30.2 km reads "1h 15m" with the climb in
+  full and the label below; the no-factor path is covered by tests only.
 
 ## Measuring it (all phases)
 
@@ -196,6 +204,16 @@ There is no way today to tell whether any ETA is right. From Phase 1:
    Display toggles). OFF shows the router's time everywhere, including the
    commute briefing, and Phase 2's in-ride blending is off too. Built in
    Phase 1, together with the hook, so every surface reads one switch.
+4. **A router's time stands until there is a router factor (2026-10-23).**
+   The average-speed estimate is no longer used on a route a router timed:
+   A-to-B routes, loops on the standard bike, the comparison, the commute
+   briefing and the HUD prior show the router's time, unlabelled, until 3
+   completed rides carry a router prediction; then router time x factor.
+   Rides with no router time (GPX courses, loops planned on an e-bike,
+   `routerIsEstimate`) still use the average speed once the rider has 3
+   rides, because they can never get a factor. One predicate,
+   `paceAppliesTo` in `packages/core/src/riderPace.ts`, decides both the
+   number and every "at your pace" label.
 
 ## Starting point
 

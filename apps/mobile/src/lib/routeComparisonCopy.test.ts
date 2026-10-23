@@ -25,10 +25,9 @@ describe('describeRouteComparison: time cost', () => {
     expect(copy?.title).toBe('+5 min for a calmer ride');
   });
 
-  it('the extra distance at the rider’s pace, and says so', () => {
-    // 900 m more at 18 km/h = 3 min.
+  it('a pace with no router factor yet: the router’s minutes', () => {
     const copy = describeRouteComparison(safer(), t, 'metric', MINE, 5900);
-    expect(copy?.title).toBe('+3 min at your pace for a calmer ride');
+    expect(copy?.title).toBe('+5 min for a calmer ride');
   });
 
   it('with a router factor: the router’s gap scaled to the rider', () => {
@@ -38,8 +37,8 @@ describe('describeRouteComparison: time cost', () => {
   });
 
   it('no cost to quote at the rider’s pace: the free line', () => {
-    // 100 m more at 18 km/h rounds to 0.
-    const copy = describeRouteComparison(safer(), t, 'metric', MINE, 5100);
+    // 5 router minutes x 0.05 rounds to 0.
+    const copy = describeRouteComparison(safer(), t, 'metric', { ...MINE, routerFactor: 0.05 }, 5100);
     expect(copy?.title).toBe(t('preview.comparison.calmerFree'));
   });
 

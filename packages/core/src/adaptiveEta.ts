@@ -7,6 +7,8 @@
  */
 import { sanitizeBreadcrumbs, type SanitisableCrumb } from './breadcrumbs';
 import { haversineDistance } from './distance';
+// Same rule as `rideMinutes`.
+import { CLIMB_METERS_PER_FLAT_KM } from './riderPace';
 
 /** The observed speed's weight never passes this, so history still counts. */
 export const OBSERVED_WEIGHT_CAP = 0.7;
@@ -21,8 +23,6 @@ export const STOP_RADIUS_METERS = 25;
  */
 export const LONG_STOP_SECONDS = 120;
 
-/** Same rule as `rideMinutes`: 10 m of ascent costs about a flat kilometre. */
-const CLIMB_METERS_PER_FLAT_KM = 10;
 /** Below these there is nothing to learn from yet. */
 const MIN_OBSERVED_METERS = 200;
 const MIN_OBSERVED_SECONDS = 60;

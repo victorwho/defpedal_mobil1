@@ -15,6 +15,7 @@ import {
   formatDuration,
   formatSpeedKmh,
   isDark,
+  paceAppliesTo,
   personalRideSeconds,
   type Coordinate,
   type MeasurementSystem,
@@ -96,7 +97,7 @@ export const buildCommuteMessage = (input: CommuteMessageInput): CommuteMessage 
   }
   if (route) {
     parts.push(
-      t(pace?.personal ? 'commute.etaPersonal' : 'commute.eta', {
+      t(paceAppliesTo({}, pace) ? 'commute.etaPersonal' : 'commute.eta', {
         duration: formatDuration(commuteRideSeconds(route, pace)),
         distance: formatDistance(route.distanceMeters, units),
       }),

@@ -18,9 +18,11 @@ describe('hudRemainingSeconds', () => {
     expect(hudRemainingSeconds({ ...LEG, pace: null, ridden: null })).toBe(1800);
   });
 
-  it('before riding: the rider’s pace', () => {
+  it('before riding, no router factor yet: the router’s time; a course: the rider’s pace', () => {
+    const none = { distanceMeters: 0, movingSeconds: 0 };
+    expect(hudRemainingSeconds({ ...LEG, pace: MINE, ridden: none })).toBe(1800);
     // 6 km at 18 km/h = 20 min.
-    expect(hudRemainingSeconds({ ...LEG, pace: MINE, ridden: { distanceMeters: 0, movingSeconds: 0 } })).toBe(1200);
+    expect(hudRemainingSeconds({ ...LEG, pace: MINE, ridden: none, routerIsEstimate: true })).toBe(1200);
   });
 
   it('a router factor scales the router’s time, but not a course’s', () => {

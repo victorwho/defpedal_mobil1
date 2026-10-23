@@ -72,15 +72,15 @@ describe('adaptiveRemainingSeconds', () => {
   });
 
   it('climb ridden is credited back, climb ahead is charged', () => {
-    // 3 km + 30 m climb (= 3 flat km) in 600 s: 10 m/s on the flat.
+    // 3 km + 180 m climb (= 3 flat km) in 600 s: 10 m/s on the flat.
     const ridden = { distanceMeters: 3000, movingSeconds: 600 };
-    const flatAhead = adaptiveRemainingSeconds({ ...base, ridden, riddenClimbMeters: 30 });
+    const flatAhead = adaptiveRemainingSeconds({ ...base, ridden, riddenClimbMeters: 180 });
     expect(flatAhead).toBeCloseTo(0.3 * 1800 + 0.7 * 600, 5);
     const hillAhead = adaptiveRemainingSeconds({
       ...base,
       ridden,
-      riddenClimbMeters: 30,
-      remainingClimbMeters: 60,
+      riddenClimbMeters: 180,
+      remainingClimbMeters: 360,
     });
     expect(hillAhead).toBeCloseTo(0.3 * 1800 + 0.7 * 1200, 5);
   });

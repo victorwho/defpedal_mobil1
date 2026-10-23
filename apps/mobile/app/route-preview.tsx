@@ -1,5 +1,5 @@
 import type { RiskSegment } from '@defensivepedal/core';
-import { SHARE_MIN_TRIMMABLE_METERS, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, personalRideSeconds, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
+import { SHARE_MIN_TRIMMABLE_METERS, formatDistance, formatDistanceParts, formatElevationParts, getPreviewOrigin, hasStartOverride, isHeatRoutingAvailable, isRiskDataAvailable, longestHighRiskStretchMeters, paceAppliesTo, personalRideSeconds, routeMatchesEndpoints, toRoutingDisplayMode, totalWalkMeters, type RoutingDisplayMode } from '@defensivepedal/core';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -1116,15 +1116,10 @@ function RoutePreviewScreen() {
 
             <Text style={styles.statDivider}>·</Text>
 
-            <View style={pace ? styles.paceStat : styles.stat}>
-              <Text style={styles.statValue}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue} numberOfLines={1}>
                 {formatDuration(rideSeconds)}
               </Text>
-              {pace ? (
-                <Text style={styles.statUnit} numberOfLines={1}>
-                  {t('preview.atYourPace')}
-                </Text>
-              ) : null}
             </View>
 
             <Text style={styles.statDivider}>·</Text>
@@ -1144,6 +1139,14 @@ function RoutePreviewScreen() {
 
           </View>
         </View>
+        {/* Its own line: inside the strip, a long time ("3h 27m") left no
+            room and the label and the climb were cut off. */}
+        {paceAppliesTo({}, pace) ? (
+          <View style={styles.walkRow}>
+            <Ionicons name="speedometer-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.walkText}>{t('preview.rideTimeAtYourPace')}</Text>
+          </View>
+        ) : null}
         {/* Walked sections (core walkSections.ts): stated, never hidden. The
             ETA above already includes them, so nothing is added to it. */}
         {totalWalkMeters(selectedRoute.walkSections) > 0 ? (
@@ -1603,13 +1606,6 @@ const createThemedStyles = (colors: ThemeColors, mode: ThemeMode) =>
       ...textXs,
       color: colors.textMuted,
       fontFamily: fontFamily.mono.medium,
-    },
-    // "at your pace" sits under the time: beside it, the row ran out of width
-    // and the label overlapped the climb. The row aligns on the time's baseline.
-    paceStat: {
-      flexDirection: 'column',
-      alignItems: 'flex-start',
-      flexShrink: 1,
     },
     statDivider: {
       ...textSm,

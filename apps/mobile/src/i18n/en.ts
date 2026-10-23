@@ -122,6 +122,7 @@ export const en = {
     routeName: 'Route name (e.g. Morning commute)',
     peekSwipeUp: 'Swipe up',
     atYourPace: 'at your pace',
+    rideTimeAtYourPace: 'Ride time at your pace',
     lifeEarnedShort: 'life earned',
     missingConfigTitle: 'Missing configuration',
     missingConfigBody: 'Set `EXPO_PUBLIC_MOBILE_API_URL` before requesting route previews.',

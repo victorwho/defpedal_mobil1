@@ -6,6 +6,7 @@
  */
 import {
   isEbikeBikeTypeValue,
+  paceAppliesTo,
   personalRideSeconds,
   resolveEtaPace,
   routerTimeIsEstimate,
@@ -40,20 +41,21 @@ export const etaAccuracyProperties = (
     ebikeOwner: isEbikeBikeTypeValue(input.bikeTypeId),
   });
   const routerSeconds = Math.round(route.adjustedDurationSeconds);
-  const personalSeconds = Math.round(
-    personalRideSeconds(
-      {
-        distanceMeters: route.distanceMeters,
-        climbMeters: route.totalClimbMeters,
-        routerSeconds,
-        routerIsEstimate: routerTimeIsEstimate(route, input.isEbike),
-      },
-      pace,
-    ),
-  );
+  const timed = {
+    distanceMeters: route.distanceMeters,
+    climbMeters: route.totalClimbMeters,
+    routerSeconds,
+    routerIsEstimate: routerTimeIsEstimate(route, input.isEbike),
+  };
+  const personalSeconds = Math.round(personalRideSeconds(timed, pace));
+  const method = !paceAppliesTo(timed, pace)
+    ? 'router'
+    : pace.routerFactor !== undefined && !timed.routerIsEstimate
+      ? 'factor'
+      : 'pace';
 
   return {
-    method: pace ? (pace.routerFactor !== undefined ? 'factor' : 'pace') : 'router',
+    method,
     router_seconds: routerSeconds,
     personal_seconds: personalSeconds,
     actual_seconds: actualSeconds,

@@ -19,6 +19,7 @@ import {
   LOOP_CANDIDATE_COUNT,
   LOOP_RESULTS_SHOWN,
   DEFAULT_PACE_KMH,
+  paceAppliesTo,
   personalRideSeconds,
   routerTimeIsEstimate,
   rideMinutes,
@@ -1357,7 +1358,10 @@ export default function LoopPlannerScreen() {
                         })}
                       </Text>
                       <Text style={styles.specLabel}>
-                        {pace
+                        {paceAppliesTo(
+                          { routerIsEstimate: routerTimeIsEstimate(loop.route, isEbike) },
+                          pace,
+                        )
                           ? `${t('loop.statTime')} · ${t('preview.atYourPace')}`
                           : t('loop.statTime')}
                       </Text>

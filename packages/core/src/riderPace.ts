@@ -158,11 +158,18 @@ export const riderPaces = (samples: readonly PaceSample[]): RiderPaces => ({
 /**
  * Metres of ascent that cost about as much time as a kilometre on the flat.
  *
- * A rough rule cyclists already use, and rough is the honest register here:
- * the alternative is presenting a hilly loop at flat-ground pace, which is
- * wrong in the direction that leaves someone out after dark.
+ * It was 10, which made each 10 m of climb cost a flat kilometre (about 5 min
+ * at 12 km/h, 30 s per metre). A tester's 16 km ride with a couple of hundred
+ * metres of climb came out at 3 h 27. Measured 2026-10-22: the live safe
+ * router takes 3,143 s for Brasov -> Poiana (9.0 km, about 420 m up), 771 s
+ * more than the same distance at its flat speed (Bucharest control, 13.6
+ * km/h), so about 1.8 s per metre. Lifting a rider and bike (~85 kg) at a
+ * leisure 150 W takes ~5.5 s per metre. 60 m per flat km is 5 s per metre at
+ * 12 km/h, which sits at the slow, leisure end of the two. Still not quoting
+ * a hilly loop at flat-ground pace, the failure that leaves someone out after
+ * dark.
  */
-const CLIMB_METERS_PER_FLAT_KM = 10;
+export const CLIMB_METERS_PER_FLAT_KM = 60;
 
 /**
  * Minutes for a ride of this length and ascent, at this pace.
@@ -212,9 +219,23 @@ export const routerTimeIsEstimate = (
   route?.source === 'gpx_course' || (route?.source === 'generated_loop' && isEbike);
 
 /**
+ * True when the rider's pace changes this route's time, so the time may say
+ * "at your pace". On a router's prediction that takes the router factor:
+ * until three rides carry one, the router's own time stands (owner decision
+ * 2026-10-23, after an average-speed estimate put a tester's 16 km ride at
+ * 3 h 27). A time no router made (`routerIsEstimate`) never gets a factor,
+ * so the rider's speed replaces it as soon as there is one.
+ */
+export const paceAppliesTo = (
+  route: { readonly routerIsEstimate?: boolean },
+  pace: RiderPace | null,
+): pace is RiderPace =>
+  pace?.personal === true && (pace.routerFactor !== undefined || route.routerIsEstimate === true);
+
+/**
  * Seconds for a ride: the router's time times the rider's own factor when
- * one is known, otherwise at the rider's pace (see `resolveEtaPace`),
- * otherwise the router's time unchanged.
+ * one is known, otherwise the router's time unchanged. A time no router made
+ * (a GPX course) is replaced by one at the rider's pace (see `paceAppliesTo`).
  *
  * It never scales the router's time by pace: the safe router's own average
  * speed is 12.9 to 19.1 km/h across flat city routes (measured 2026-10-21),
@@ -234,7 +255,7 @@ export const personalRideSeconds = (
   },
   pace: RiderPace | null,
 ): number => {
-  if (!pace?.personal) return route.routerSeconds;
+  if (!paceAppliesTo(route, pace)) return route.routerSeconds;
   if (pace.routerFactor !== undefined && !route.routerIsEstimate) {
     return route.routerSeconds * pace.routerFactor;
   }

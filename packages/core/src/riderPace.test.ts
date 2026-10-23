@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PACE_KMH,
   MIN_RIDES_FOR_PACE,
+  paceAppliesTo,
   personalRideSeconds,
   resolveEtaPace,
   rideMinutes,
@@ -93,6 +94,12 @@ describe('rideMinutes', () => {
     const flat = rideMinutes(30_000, 0, 15);
     const hilly = rideMinutes(30_000, 600, 15);
     expect(hilly).toBeGreaterThan(flat);
+  });
+
+  it('does not let climbing dominate a ride (tester report, 2026-10-22)', () => {
+    // 16 km with 260 m up at 12 km/h was quoted 3 h 27 at 10 m per flat km.
+    // (16 km + 260 / 60) / 12 km/h = 102 min.
+    expect(rideMinutes(16_000, 260, 12)).toBe(102);
   });
 
   it('never returns zero or a negative', () => {
@@ -202,13 +209,23 @@ describe('riderPaces: one pace per bike', () => {
 describe('personalRideSeconds', () => {
   const route = { distanceMeters: 5400, climbMeters: 30, routerSeconds: 1320 };
 
-  it('at the rider’s pace, climb as extra distance', () => {
-    // (5.4 km + 30 m / 10 m-per-km) / 18 km/h = 28 min.
-    expect(personalRideSeconds(route, MINE)).toBe(28 * 60);
+  const course = { ...route, routerIsEstimate: true };
+
+  it('a GPX course at the rider’s pace, climb as extra distance', () => {
+    // (5.4 km + 30 m / 60 m-per-km) / 18 km/h = 20 min.
+    expect(personalRideSeconds(course, MINE)).toBe(20 * 60);
   });
 
   it('no climb figure counts distance only', () => {
-    expect(personalRideSeconds({ ...route, climbMeters: undefined }, MINE)).toBe(18 * 60);
+    expect(personalRideSeconds({ ...course, climbMeters: undefined }, MINE)).toBe(18 * 60);
+  });
+
+  it('a router’s time stands until there is a router factor (owner decision 2026-10-23)', () => {
+    expect(personalRideSeconds(route, MINE)).toBe(1320);
+    expect(paceAppliesTo(route, MINE)).toBe(false);
+    expect(paceAppliesTo(route, { ...MINE, routerFactor: 1.25 })).toBe(true);
+    expect(paceAppliesTo(course, MINE)).toBe(true);
+    expect(paceAppliesTo(course, DEFAULT)).toBe(false);
   });
 
   it('the router’s time, untouched, without a personal pace', () => {
@@ -223,6 +240,6 @@ describe('personalRideSeconds', () => {
   it('not on a time no router made (a GPX course): the pace instead', () => {
     expect(
       personalRideSeconds({ ...route, routerIsEstimate: true }, { ...MINE, routerFactor: 1.25 }),
-    ).toBe(28 * 60);
+    ).toBe(20 * 60);
   });
 });

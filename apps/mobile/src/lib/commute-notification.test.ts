@@ -152,11 +152,12 @@ describe('scheduleCommuteBriefings', () => {
     expect(commuteIds(list())[0].content.body).not.toContain('Safe route');
   });
 
-  it('uses the rider’s pace and the route climb when trip history has enough rides', async () => {
+  it('uses the rider’s factor and keeps the route climb when trip history has enough rides', async () => {
     const { list } = setup({ pace: MY_PACES });
     await scheduleCommuteBriefings(NOW);
     expect(useAppStore.getState().commute.routeEstimates[0]?.climbMeters).toBe(30);
-    expect(commuteIds(list())[0].content.body).toContain('Safe route: about 28 min at your pace, 5.4 km.');
+    // 1,320 s x 0.9 = 1,188 s, 20 min.
+    expect(commuteIds(list())[0].content.body).toContain('Safe route: about 20 min at your pace, 5.4 km.');
     expect(useAppStore.getState().riderPaces?.normal).toMatchObject({ kmh: 18 });
   });
 
@@ -184,6 +185,6 @@ describe('scheduleCommuteBriefings', () => {
 });
 
 const MY_PACES = {
-  normal: { kmh: 18, personal: true, rideCount: 7 },
+  normal: { kmh: 18, personal: true, rideCount: 7, routerFactor: 0.9 },
   ebike: { kmh: 15, personal: false, rideCount: 0 },
 };

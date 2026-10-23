@@ -20,10 +20,11 @@ const input = (overrides: Partial<EtaAccuracyInput> = {}): EtaAccuracyInput => (
 
 describe('etaAccuracyProperties', () => {
   it('records the router, personal and actual times', () => {
+    // No router factor yet: the router's time stands.
     expect(etaAccuracyProperties(input())).toEqual({
-      method: 'pace',
+      method: 'router',
       router_seconds: 1440,
-      personal_seconds: 1200, // 6 km at 18 km/h
+      personal_seconds: 1440,
       actual_seconds: 1200,
       distance_meters: 6000,
       pace_ride_count: 7,
@@ -49,12 +50,13 @@ describe('etaAccuracyProperties', () => {
     const props = etaAccuracyProperties(
       input({ route, riderPaces: { normal: { ...MINE, routerFactor: 0.9 }, ebike: MINE } }),
     );
-    expect(props).toMatchObject({ personal_seconds: 1200 });
+    expect(props).toMatchObject({ method: 'pace', personal_seconds: 1200 }); // 6 km at 18 km/h
   });
 
   it('E-bike routing mode alone does not change the pace: the bike is the Profile one', () => {
-    expect(etaAccuracyProperties(input({ isEbike: true }))).toMatchObject({
-      method: 'pace',
+    const riderPaces = { normal: { ...MINE, routerFactor: 0.9 }, ebike: MINE };
+    expect(etaAccuracyProperties(input({ isEbike: true, riderPaces }))).toMatchObject({
+      method: 'factor',
       is_ebike: 0,
       ebike_routing: 1,
     });

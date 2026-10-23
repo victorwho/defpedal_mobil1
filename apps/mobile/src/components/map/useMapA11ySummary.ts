@@ -19,6 +19,7 @@ import {
   formatDistance,
   formatDuration,
   formatElevation,
+  paceAppliesTo,
   personalRideSeconds,
   routerTimeIsEstimate,
 } from '@defensivepedal/core';
@@ -94,16 +95,14 @@ const buildLabel = (
 
   const route = input.selectedRoute;
   const distance = formatDistance(route.distanceMeters, units);
-  const rideSeconds = personalRideSeconds(
-    {
-      distanceMeters: route.distanceMeters,
-      climbMeters: route.totalClimbMeters,
-      routerSeconds: route.adjustedDurationSeconds ?? route.durationSeconds,
-      routerIsEstimate: routerTimeIsEstimate(route, input.isEbike === true),
-    },
-    input.pace ?? null,
-  );
-  const duration = input.pace?.personal
+  const timed = {
+    distanceMeters: route.distanceMeters,
+    climbMeters: route.totalClimbMeters,
+    routerSeconds: route.adjustedDurationSeconds ?? route.durationSeconds,
+    routerIsEstimate: routerTimeIsEstimate(route, input.isEbike === true),
+  };
+  const rideSeconds = personalRideSeconds(timed, input.pace ?? null);
+  const duration = paceAppliesTo(timed, input.pace ?? null)
     ? `${formatDuration(rideSeconds)} ${t('preview.atYourPace')}`
     : formatDuration(rideSeconds);
   const climbMeters = route.totalClimbMeters ?? 0;

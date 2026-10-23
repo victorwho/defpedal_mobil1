@@ -122,6 +122,7 @@ export const ro: TranslationKeys = {
     routeName: 'Nume traseu (ex. Drum spre muncă)',
     peekSwipeUp: 'Trage în sus',
     atYourPace: 'în ritmul tău',
+    rideTimeAtYourPace: 'Durata, în ritmul tău',
     lifeEarnedShort: 'de viață câștigată',
     missingConfigTitle: 'Configurație lipsă',
     missingConfigBody: 'Setează `EXPO_PUBLIC_MOBILE_API_URL` înainte de a cere previzualizări.',

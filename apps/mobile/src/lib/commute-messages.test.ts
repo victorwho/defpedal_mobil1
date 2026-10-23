@@ -115,20 +115,16 @@ const MY_PACE = { kmh: 18, personal: true, rideCount: 7 };
 describe('ETA at the rider’s pace', () => {
   const route = (climbMeters?: number | null) => ({ ...input().route!, climbMeters });
 
-  it('uses the rider’s pace, climb counted as extra distance, and says so', () => {
-    // (5.4 km + 30 m / 10 m-per-km) / 18 km/h = 28 min.
-    const m = buildCommuteMessage(input({ route: route(30), pace: MY_PACE }));
-    expect(m.body).toContain('Safe route: about 28 min at your pace, 5.4 km.');
-    expect(commuteRideSeconds(route(30), MY_PACE)).toBe(28 * 60);
+  it('with a router factor: the router time scaled to the rider, and says so', () => {
+    // 1,320 s x 0.9 = 1,188 s, 20 min.
+    const m = buildCommuteMessage(input({ route: route(30), pace: { ...MY_PACE, routerFactor: 0.9 } }));
+    expect(m.body).toContain('Safe route: about 20 min at your pace, 5.4 km.');
+    expect(commuteRideSeconds(route(30), { ...MY_PACE, routerFactor: 0.9 })).toBe(1188);
   });
 
-  it('an estimate cached before climb was recorded falls back to distance only', () => {
-    expect(commuteRideSeconds(route(undefined), MY_PACE)).toBe(18 * 60);
-  });
-
-  it('too few rides, or no history, keeps the router time and the plain wording', () => {
+  it('too few rides, no factor yet, or no history: the router time and the plain wording', () => {
     const few = { kmh: 15, personal: false, rideCount: 2 };
-    for (const pace of [few, null]) {
+    for (const pace of [few, MY_PACE, null]) {
       const m = buildCommuteMessage(input({ route: route(30), pace }));
       expect(m.body).toContain('Safe route: 22 min, 5.4 km.');
       expect(m.body).not.toContain('your pace');
