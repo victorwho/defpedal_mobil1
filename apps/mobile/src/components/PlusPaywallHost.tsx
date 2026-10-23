@@ -16,7 +16,7 @@
  *    to make them regret it.
  */
 import React, { useEffect, useRef } from 'react';
-import { Linking, Platform } from 'react-native';
+import { AppState, Linking, Platform, type AppStateStatus } from 'react-native';
 
 import {
   PaywallSheet,
@@ -26,6 +26,8 @@ import {
 import { usePaywallOffer } from '../hooks/usePaywallOffer';
 import { usePremium } from '../hooks/usePremium';
 import { awaitPremiumActivation, refreshPremiumEntitlement } from '../lib/premiumRefresh';
+import { syncPurchasesAfterRedeem } from '../lib/purchases';
+import { useAuthSession } from '../providers/AuthSessionProvider';
 import { telemetry } from '../lib/telemetry';
 import { useAppStore } from '../store/appStore';
 
@@ -42,6 +44,39 @@ export type PaywallSource =
   | 'loop_quota'
   | 'loop_save_limit'
   | 'course_limit';
+
+/** Stop waiting for the rider to come back from the store after this long. */
+const REDEEM_RETURN_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * Runs `onReturn` once, the first time the app is active again after leaving
+ * the foreground. The App Store page and the Play Store backgrounds the app;
+ * Apple's in-app sheet only makes it inactive. Either way the code has been
+ * entered (or not) by the time we are active again.
+ */
+const onceBackInForeground = (onReturn: () => void): void => {
+  let left = false;
+  let done = false;
+  const finish = () => {
+    done = true;
+    subscription.remove();
+    clearTimeout(timer);
+  };
+  const subscription = AppState.addEventListener('change', (state: AppStateStatus) => {
+    if (done) return;
+    if (state !== 'active') {
+      left = true;
+      return;
+    }
+    if (left) {
+      finish();
+      onReturn();
+    }
+  });
+  const timer = setTimeout(() => {
+    if (!done) finish();
+  }, REDEEM_RETURN_TIMEOUT_MS);
+};
 
 const MANAGE_SUBSCRIPTION_URL =
   Platform.OS === 'ios'
@@ -66,6 +101,8 @@ export const PlusPaywallHost: React.FC<PlusPaywallHostProps> = ({
 }) => {
   const premium = usePremium();
   const offer = usePaywallOffer(visible);
+  const { user } = useAuthSession();
+  const userId = user?.id ?? null;
   const retirePlusNudges = useAppStore((s) => s.retirePlusNudges);
 
   // One view event per opening, not per render.
@@ -113,6 +150,25 @@ export const PlusPaywallHost: React.FC<PlusPaywallHostProps> = ({
     });
   };
 
+  const handleRedeem = () => {
+    void offer.redeem().then((outcome) => {
+      telemetry.capture('plus_redeem_opened', { source, outcome: outcome.kind });
+      if (outcome.kind !== 'opened') return;
+      onDismiss();
+      // Neither store reports whether the code worked. When the rider comes
+      // back, push the store's transactions to RevenueCat and poll our server
+      // for the webhook's result, exactly as after a purchase.
+      onceBackInForeground(() => {
+        void syncPurchasesAfterRedeem(userId)
+          .then(() => awaitPremiumActivation())
+          .then((activated) => {
+            telemetry.capture('plus_redeem_result', { source, activated });
+            if (activated) retirePlusNudges();
+          });
+      });
+    });
+  };
+
   return (
     <PaywallSheet
       visible={visible}
@@ -134,6 +190,7 @@ export const PlusPaywallHost: React.FC<PlusPaywallHostProps> = ({
       }}
       onSubscribe={handleSubscribe}
       onRestore={handleRestore}
+      onRedeemCode={handleRedeem}
     />
   );
 };

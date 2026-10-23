@@ -1869,6 +1869,8 @@ export const en = {
     cta: 'Start free trial',
     ctaNoTrial: 'Subscribe',
     restore: 'Restore purchase',
+    redeemCode: 'Have a code? Redeem it',
+    redeemCodeAndroidHint: 'Shared code? Tap the subscribe button, then choose Redeem code as the payment method in Google’s sheet.',
     manage: 'Manage subscription',
     legal: 'Renews automatically until cancelled. Cancel any time in the store.',
     activeTitle: 'Pedal Plus is active',

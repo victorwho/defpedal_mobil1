@@ -268,6 +268,17 @@ describe('PaywallSheet — plans', () => {
     expect(onRestore).toHaveBeenCalled();
   });
 
+  it('offers to redeem a code, but not to someone already subscribed', () => {
+    const onRedeemCode = vi.fn();
+    const { unmount } = wrap(<PaywallSheet {...sheetProps} onRedeemCode={onRedeemCode} />);
+    fireEvent.click(screen.getByText('Have a code? Redeem it'));
+    expect(onRedeemCode).toHaveBeenCalled();
+    unmount();
+
+    wrap(<PaywallSheet {...sheetProps} isSubscribed onRedeemCode={onRedeemCode} />);
+    expect(screen.queryByText('Have a code? Redeem it')).toBeNull();
+  });
+
   it('discloses auto-renewal', () => {
     wrap(<PaywallSheet {...sheetProps} />);
     expect(screen.getByText(/Renews automatically until cancelled/)).toBeTruthy();

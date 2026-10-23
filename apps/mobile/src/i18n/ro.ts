@@ -1819,6 +1819,8 @@ export const ro: TranslationKeys = {
     cta: 'Incepe perioada gratuita',
     ctaNoTrial: 'Aboneaza-te',
     restore: 'Restaureaza achizitia',
+    redeemCode: 'Ai un cod? Foloseste-l',
+    redeemCodeAndroidHint: 'Cod comun? Apasa butonul de abonare, apoi alege Utilizeaza codul ca metoda de plata in fereastra Google.',
     manage: 'Gestioneaza abonamentul',
     legal: 'Se reinnoieste automat pana la anulare. Poti anula oricand din magazin.',
     activeTitle: 'Pedal Plus este activ',

@@ -14,8 +14,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   getStoreOffers,
   purchasePlan,
+  redeemOfferCode,
   restorePurchases,
   type PurchaseOutcome,
+  type RedeemOutcome,
   type PurchasePlan,
   type RestoreOutcome,
   type StoreOffers,
@@ -37,6 +39,8 @@ export interface UsePaywallOfferResult {
   readonly busy: boolean;
   readonly subscribe: (plan: PurchasePlan) => Promise<PurchaseOutcome>;
   readonly restore: () => Promise<RestoreOutcome>;
+  /** Opens the store's offer/promo code screen. */
+  readonly redeem: () => Promise<RedeemOutcome>;
 }
 
 const EMPTY: StoreOffers = { monthly: null, annual: null };
@@ -90,6 +94,11 @@ export const usePaywallOffer = (active: boolean): UsePaywallOfferResult => {
     }
   }, [userId]);
 
+  const redeem = useCallback(
+    (): Promise<RedeemOutcome> => redeemOfferCode(userId),
+    [userId],
+  );
+
   const derived = useMemo(
     () => ({
       perMonth: annualPerMonthString(offers.annual, intlLocaleTag(locale)) ?? undefined,
@@ -110,5 +119,6 @@ export const usePaywallOffer = (active: boolean): UsePaywallOfferResult => {
     busy,
     subscribe,
     restore,
+    redeem,
   };
 };

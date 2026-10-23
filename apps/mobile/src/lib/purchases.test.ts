@@ -14,7 +14,7 @@
 // shared stub directly.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NativeModules } from 'react-native';
+import { Linking, NativeModules, Platform } from 'react-native';
 import Purchases from 'react-native-purchases';
 
 const { env } = vi.hoisted(() => ({
@@ -38,7 +38,9 @@ import {
   identifyPurchaser,
   isBillingAvailable,
   purchasePlan,
+  redeemOfferCode,
   restorePurchases,
+  syncPurchasesAfterRedeem,
   type StoreOffer,
 } from './purchases';
 
@@ -292,5 +294,71 @@ describe('restore', () => {
   it('reports a failure with its message', async () => {
     sdk.restorePurchases.mockRejectedValue({ message: 'no network' });
     expect(await restorePurchases('u1')).toEqual({ kind: 'failed', message: 'no network' });
+  });
+});
+
+describe('redeem a code', () => {
+  const platform = Platform as unknown as { OS: string };
+  const openURL = vi.spyOn(Linking, 'openURL');
+
+  beforeEach(() => {
+    platform.OS = 'ios';
+    openURL.mockReset();
+    openURL.mockResolvedValue(undefined as never);
+    sdk.presentCodeRedemptionSheet.mockResolvedValue(undefined as never);
+  });
+
+  it('iOS: shows the in-app sheet', async () => {
+    expect(await redeemOfferCode('u1')).toEqual({ kind: 'opened' });
+    expect(sdk.presentCodeRedemptionSheet).toHaveBeenCalled();
+    expect(openURL).not.toHaveBeenCalled();
+  });
+
+  it('iOS: falls back to the App Store page when the sheet fails', async () => {
+    sdk.presentCodeRedemptionSheet.mockRejectedValue(new Error('sheet broke'));
+    expect(await redeemOfferCode('u1')).toEqual({ kind: 'opened' });
+    expect(openURL).toHaveBeenCalledWith(
+      'https://apps.apple.com/redeem?ctx=offercodes&id=6778694757',
+    );
+  });
+
+  it('Android: opens the Play Store redeem screen, never the Apple sheet', async () => {
+    platform.OS = 'android';
+    expect(await redeemOfferCode('u1')).toEqual({ kind: 'opened' });
+    expect(openURL).toHaveBeenCalledWith('https://play.google.com/redeem');
+    expect(sdk.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    platform.OS = 'ios';
+  });
+
+  it('reports a failure when the store cannot be opened', async () => {
+    sdk.presentCodeRedemptionSheet.mockRejectedValue(new Error('sheet broke'));
+    openURL.mockRejectedValue({ message: 'no handler' });
+    expect(await redeemOfferCode('u1')).toEqual({ kind: 'failed', message: 'no handler' });
+  });
+
+  it('is unavailable without the native module, and does not throw', async () => {
+    delete nativeModules.RNPurchases;
+    __resetPurchasesForTests(sdk);
+    expect(await redeemOfferCode('u1')).toEqual({ kind: 'unavailable' });
+    expect(await syncPurchasesAfterRedeem('u1')).toBe(false);
+  });
+});
+
+describe('sync after redeeming', () => {
+  it('true only when the synced account owns Plus', async () => {
+    sdk.syncPurchasesForResult.mockResolvedValue({
+      customerInfo: { entitlements: { active: { pedal_plus: {} } } },
+    } as never);
+    expect(await syncPurchasesAfterRedeem('u1')).toBe(true);
+
+    sdk.syncPurchasesForResult.mockResolvedValue({
+      customerInfo: { entitlements: { active: {} } },
+    } as never);
+    expect(await syncPurchasesAfterRedeem('u1')).toBe(false);
+  });
+
+  it('a failed sync is false, never a throw', async () => {
+    sdk.syncPurchasesForResult.mockRejectedValue(new Error('offline'));
+    expect(await syncPurchasesAfterRedeem('u1')).toBe(false);
   });
 });

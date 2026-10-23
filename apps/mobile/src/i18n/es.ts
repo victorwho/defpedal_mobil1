@@ -1819,6 +1819,8 @@ export const es: TranslationKeys = {
     cta: 'Empezar prueba gratis',
     ctaNoTrial: 'Suscribirse',
     restore: 'Restaurar compra',
+    redeemCode: 'Tienes un codigo? Canjealo',
+    redeemCodeAndroidHint: 'Codigo compartido? Pulsa el boton de suscripcion y elige Canjear codigo como metodo de pago en la ventana de Google.',
     manage: 'Gestionar suscripcion',
     legal: 'Se renueva automaticamente hasta que la canceles. Cancela cuando quieras en la tienda.',
     activeTitle: 'Pedal Plus esta activo',

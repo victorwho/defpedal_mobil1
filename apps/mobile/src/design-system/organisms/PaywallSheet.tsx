@@ -24,6 +24,7 @@ import {
   Linking,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -122,6 +123,8 @@ export interface PaywallSheetProps {
   onManage?: () => void;
   onSubscribe: (plan: PaywallPlan) => void;
   onRestore: () => void;
+  /** Opens the store's offer/promo code screen. Omit to hide the link. */
+  onRedeemCode?: () => void;
 }
 
 export const PaywallSheet: React.FC<PaywallSheetProps> = ({
@@ -142,6 +145,7 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
   onManage,
   onSubscribe,
   onRestore,
+  onRedeemCode,
 }) => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -474,6 +478,23 @@ export const PaywallSheet: React.FC<PaywallSheetProps> = ({
               {t('premium.restore')}
             </Text>
           </Pressable>
+
+          {!isSubscribed && onRedeemCode ? (
+            <>
+              <Pressable onPress={onRedeemCode} hitSlop={8} accessibilityRole="button">
+                <Text style={[styles.restore, { color: colors.accent }]}>
+                  {t('premium.redeemCode')}
+                </Text>
+              </Pressable>
+              {/* Play's shared (custom) codes cannot be typed on the Play
+                  Store's redeem screen, only in Google's payment sheet. */}
+              {Platform.OS === 'android' ? (
+                <Text style={[styles.trialNote, { color: colors.textSecondary }]}>
+                  {t('premium.redeemCodeAndroidHint')}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
 
           <Text style={[styles.legal, { color: colors.textMuted }]}>{t('premium.legal')}</Text>
 

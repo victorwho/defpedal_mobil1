@@ -19,7 +19,7 @@
  * lets the paywall render, and the app boot, on a dev build that has no billing
  * configured at all.
  */
-import { NativeModules, Platform } from 'react-native';
+import { Linking, NativeModules, Platform } from 'react-native';
 
 import { PLUS_ENTITLEMENT_ID } from '@defensivepedal/core';
 
@@ -319,6 +319,81 @@ export const restorePurchases = async (appUserId: string | null): Promise<Restor
   } catch (error) {
     const e = error as { message?: string };
     return { kind: 'failed', message: e?.message ?? 'Restore failed.' };
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Offer / promo codes
+// ---------------------------------------------------------------------------
+
+export type RedeemOutcome =
+  /** The store's redemption screen was shown. Says nothing about the code. */
+  | { readonly kind: 'opened' }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'failed'; readonly message: string };
+
+/** Numeric App Store id (same value as in `review-prompt.ts`). */
+const IOS_APP_STORE_APP_ID = '6778694757';
+const IOS_REDEEM_URL = `https://apps.apple.com/redeem?ctx=offercodes&id=${IOS_APP_STORE_APP_ID}`;
+/**
+ * Play Store redeem screen. Takes Play's one-time codes only: Play's CUSTOM
+ * (shared) codes can be entered solely inside the purchase flow, under the
+ * payment method, so the paywall tells Android riders that separately.
+ */
+const ANDROID_REDEEM_URL = 'https://play.google.com/redeem';
+
+/**
+ * Opens the store's screen for an Apple offer code or a Google Play promo code.
+ *
+ * Neither store reports back whether a code was accepted, so the outcome is
+ * only "shown". The caller syncs with `syncPurchasesAfterRedeem` once the
+ * rider returns; the server learns of the grant from the RevenueCat webhook
+ * like any other purchase.
+ *
+ * iOS tries the in-app sheet first and falls back to the App Store page:
+ * RevenueCat documents the sheet as unreliable (fails to show, or rejects
+ * valid codes), and the page takes the same codes.
+ */
+export const redeemOfferCode = async (appUserId: string | null): Promise<RedeemOutcome> => {
+  const Purchases = ensureConfigured(appUserId);
+  if (!Purchases) return { kind: 'unavailable' };
+
+  if (Platform.OS === 'ios' && typeof Purchases.presentCodeRedemptionSheet === 'function') {
+    try {
+      await Purchases.presentCodeRedemptionSheet();
+      return { kind: 'opened' };
+    } catch {
+      // Fall through to the App Store page.
+    }
+  }
+
+  try {
+    await Linking.openURL(Platform.OS === 'ios' ? IOS_REDEEM_URL : ANDROID_REDEEM_URL);
+    return { kind: 'opened' };
+  } catch (error) {
+    const e = error as { message?: string };
+    return { kind: 'failed', message: e?.message ?? 'Could not open the store.' };
+  }
+};
+
+/**
+ * Sends the store's transactions to RevenueCat after a redemption, so a code
+ * redeemed outside the app reaches the webhook without waiting for the next
+ * purchase event. True when the account now owns Plus. Never throws.
+ */
+export const syncPurchasesAfterRedeem = async (appUserId: string | null): Promise<boolean> => {
+  const Purchases = ensureConfigured(appUserId);
+  if (!Purchases) return false;
+
+  try {
+    if (typeof Purchases.syncPurchasesForResult === 'function') {
+      const result = await Purchases.syncPurchasesForResult();
+      return ownsPlus(result?.customerInfo);
+    }
+    await Purchases.syncPurchases();
+    return false;
+  } catch {
+    return false;
   }
 };
 

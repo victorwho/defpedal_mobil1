@@ -117,6 +117,8 @@ vi.mock('react-native-purchases', () => ({
     getOfferings: vi.fn().mockResolvedValue({ current: null }),
     purchasePackage: vi.fn().mockResolvedValue({ customerInfo: {} }),
     restorePurchases: vi.fn().mockResolvedValue({}),
+    presentCodeRedemptionSheet: vi.fn().mockResolvedValue(undefined),
+    syncPurchasesForResult: vi.fn().mockResolvedValue({ customerInfo: {} }),
   },
 }));
 
